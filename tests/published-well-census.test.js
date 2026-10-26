@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { entryNamed, shippedCensus, syntheticCensus } from './helpers/publishedComponentCensus.js';
-import { declarationsOf } from './helpers/publishedComponentGate.js';
+import { declarationsOf, gatedRoot } from './helpers/publishedComponentGate.js';
 
 /** The published well's root: no published key writes a class on it, and no ancestor is pinned. */
 const WELL = Object.freeze({
@@ -33,7 +33,7 @@ describe('the module sheet and every component style against the published Well'
     );
     assert.deepEqual(declarationsOf(census[0].rule), [['background', 'var(--fab-bg-2)']]);
     assert.deepEqual(
-      [Object.keys(entryNamed('Well').props), entryNamed('Well').root],
+      [Object.keys(entryNamed('Well').props), gatedRoot(entryNamed('Well'))],
       [['label', 'children'], 'fabricate'],
       'a published class or a wider root reopens the census'
     );

@@ -632,8 +632,11 @@ function renderOptionsFor(viewCase) {
     steps: viewCase.steps ?? [],
     expectView: viewCase.expectView ?? null,
     // The player app has no declared route field: the tab it was asked for is the tab it must
-    // be showing.
-    expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
+    // be showing. A specimen replaces the shell, so it shows no tab and its `expectSelector` guards it.
+    expectTab:
+      viewCase.app === 'fabricate-app' && !viewCase.query?.specimen
+        ? (viewCase.query?.tab ?? 'crafting')
+        : null,
     expectSelector: viewCase.expectSelector ?? null,
     expectLayout: viewCase.expectLayout ?? null,
     expectAttributes: viewCase.expectAttributes ?? [],

@@ -2,7 +2,8 @@
  * Issue 2448's seven published leaves, and issue 2451's `Kicker`, `Chip`, `Rail`, `InspectorCard`,
  * `EmptyState` and `Notice`, on Fabricate's real Svelte runtime, each through a fresh seam
  * registered with the adapter's own table, into a bare companion target or the shell its root
- * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
+ * needs, and `InspectorCard` under the standalone style root in a bare one (issue 2456): mount,
+ * update on one root and destroy; the seam's refusal of an unpublished or missing
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
@@ -36,6 +37,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -1320,13 +1322,14 @@ describe('Notice with an action under a bare ancestor', () => {
   });
 });
 
-describe('InspectorCard and its required root', () => {
-  it('refuses a bare target (M16), and renders nothing', () => {
+describe('InspectorCard and its root', () => {
+  it('draws the card inside one standalone style root in a bare target, and destroy leaves it empty', () => {
     const target = companionTarget(targets);
-    assert.throws(() => ui().mount('InspectorCard', { target, props: {} }), {
-      name: 'TypeError',
-      message: `${REFUSAL}InspectorCard needs a Fabricate window ancestor`,
-    });
+    const handle = ui().mount('InspectorCard', { target, props: {} });
+    const card = standaloneRootIn(target).firstElementChild;
+    assert.equal(card.localName, 'section');
+    assert.deepEqual([...card.classList], ['fabricate-card']);
+    handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
 

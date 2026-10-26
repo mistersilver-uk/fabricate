@@ -623,6 +623,7 @@ A class that carries no meaning beyond a repeated declaration set — visually-h
 A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
 A published component restates the visually hidden declaration set in its own scoped stylesheet, recorded with the reason that it renders under a companion's ancestor, so the `.fabricate` ancestor is not guaranteed (`ui-extension-points` § Ownership, strings and theme); `TierTrack`'s `.fab-tier-track-hidden` is the first (issue 2424).
 `Meter`'s `.fab-meter-hidden` is the next (issue 2448).
+A published component Fabricate draws under the standalone style root does not restate it, because that element carries `.fabricate` (issue 2456).
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.

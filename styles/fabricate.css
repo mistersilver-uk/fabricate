@@ -36,7 +36,7 @@
 /* The GM Travel route (realms browse pane, map links, realm environments, regions, parties and their actor tiles) and, interleaved with it, the picker primitive that SearchablePopover draws (fabricate-picker, fabricate-picker-popover: roots, composite search field, panel, option rows, grid and grouped forms, keyboard cursor). Strays: the recipe bulk panel's book picker and select widths, and the recipe requirement row's or-menu. */
 @import url("fabricate-manager-travel.css");
 
-/* The app's one select (fabricate-select: trigger rungs, value, popover panel, option rows, tick, hint, badge, and the labelled form with its note and error). Strays: the standalone roll-prompt overlay host, and the recipe library row's collapse ladder (three fabricate-recipes container rungs). */
+/* The app's one select (fabricate-select: trigger rungs, value, popover panel, option rows, tick, hint, badge, and the labelled form with its note and error). Strays: the standalone roll-prompt overlay host, the standalone style root a published component is drawn in outside a Fabricate window, and the recipe library row's collapse ladder (three fabricate-recipes container rungs). */
 @import url("fabricate-select.css");
 
 /* The sheet's tail: the Tool Studio library (the tools route: authority band, breakage card, list, inspector, create card) with its container rungs, the GM Knowledge surface, the flat surface ladder the essence and tool screens share, the world Component catalogue and its entry page, and the system Component Rules list, inspector and editor. Shared families kept here: the sortable list (fabricate-sortable-list), the manager button's opt-in sizes and the bulk dock. Strays: the salvage DC bodies and the essence catalogue rows. */

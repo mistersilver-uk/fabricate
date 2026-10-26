@@ -5,11 +5,11 @@
  */
 
 import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { managerCase, playerCase } from './caseFactories.js';
 
 /**
  * The seam, its lazy loading, its prop kinds, its callbacks, its values, its overlay chain, its
- * manifest, its adapter and its host: each redraws what it mounts.
+ * standalone style root, its manifest, its adapter and its host: each redraws what it mounts.
  */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
@@ -18,6 +18,7 @@ const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentCallbacks\.js$/,
   /^src\/ui\/publishedComponentValues\.js$/,
   /^src\/ui\/publishedComponentOverlays\.js$/,
+  /^src\/ui\/publishedComponentStandaloneRoot\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
@@ -423,6 +424,55 @@ const MODAL_DONE = `${MODAL_GROUND} [data-lab-modal-footer] button`;
 
 /** Wider and taller than the 560px dialog, which is sized from the viewport and clipped past it. */
 const MODAL_WINDOW = Object.freeze({ width: 720, height: 560 });
+
+/** The standalone fixture's ground, one target by key, the style root the seam writes in it, and the player window's root. */
+const STANDALONE_GROUND = '[data-lab-standalone-ground]';
+const STANDALONE_TARGET = (key) => `[data-lab-standalone-target="${key}"]`;
+const STANDALONE_ROOT = '.fabricate.fabricate-standalone-root';
+const FABRICATE_WINDOW = '.fabricate.fabricate-app';
+
+/** What each target draws: the three controls, and the companion's line in the card's well. */
+const STANDALONE_DRAWN = Object.freeze({
+  button: '.fabricate-button',
+  'icon-button': '.fabricate-icon-button',
+  toggle: '.manager-status-toggle-track',
+  card: '.fabricate-card .fab-well p',
+});
+const holdingDrawn = (within) =>
+  Object.entries(STANDALONE_DRAWN)
+    .map(([key, drawn]) => `:has(> ${STANDALONE_TARGET(key)}${within}${drawn})`)
+    .join('');
+
+/** A drawing directly under the style root the seam wrote in its target. */
+const UNDER_STANDALONE_ROOT = ` > ${STANDALONE_ROOT} `;
+
+/**
+ * A ground with no `.fabricate` on it or above it, so none above a target, holding each drawing
+ * directly under the style root the seam wrote in its target, and none inside the card, so the well
+ * mounted in the card's slot wrote none.
+ */
+const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT)}:not(:has(.fabricate-card ${STANDALONE_ROOT}))`;
+
+/** The same ground under the player window's Fabricate root, with no style root written in it. */
+const STANDALONE_IN_WINDOW = `${FABRICATE_WINDOW} ${STANDALONE_GROUND}:not(:has(${STANDALONE_ROOT}))${holdingDrawn(' ')}`;
+
+/** Sized to the companion frame, which is also the player window's own floor. */
+const STANDALONE_WINDOW = Object.freeze({ width: 1024, height: 640 });
+
+/** A case in the classless companion frame; the light one differs from the dark by the page's colour scheme alone. */
+const standaloneCase = (entry) => ({
+  app: 'fabricate-standalone-companion',
+  publish: true,
+  reaches: 'beyond',
+  smokeLabels: [],
+  steps: [],
+  expectSelector: STANDALONE_BARE,
+  expectContained: [{ container: '.window-content', target: STANDALONE_GROUND }],
+  position: STANDALONE_WINDOW,
+  kinds: ['standalone', 'specimen'],
+  sourceMatches: PUBLISHED_SEAM_SOURCES,
+  ...entry,
+});
 
 export const CASES = Object.freeze([
   managerCase({
@@ -1526,6 +1576,35 @@ export const CASES = Object.freeze([
     position: MODAL_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  standaloneCase({
+    id: 'published-standalone',
+    label:
+      'Specimen, mounted through the published seam — the five entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it: a primary Button, an IconButton, a StatusToggle on, and an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, one above the other on a --fab-bg-1 ground the companion paints, because the style root paints none. The seam wrote one style root in each of the four targets and none for the well in the card; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the mounted suite’s',
+    // Beyond the smoke: a companion mounts them through `api.ui` into a target with no Fabricate root.
+    query: { specimen: 'published-standalone' },
+  }),
+  standaloneCase({
+    id: 'published-standalone-light',
+    label:
+      'Specimen, mounted through the published seam — the same five entries and ground, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot reads in that ink on the dark ground',
+    // Beyond the smoke: Foundry’s light theme is a condition the smoke never walks.
+    query: { specimen: 'published-standalone', colorScheme: 'light' },
+  }),
+  playerCase({
+    id: 'published-standalone-in-window',
+    label:
+      'Specimen, mounted through the published seam — the five entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it: a primary Button, an IconButton, a StatusToggle on, and an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, one above the other on a --fab-bg-1 ground. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
+    // Beyond the smoke: a companion mounts them through `api.ui` into a target with a Fabricate root.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-standalone' },
+    steps: [],
+    expectSelector: STANDALONE_IN_WINDOW,
+    expectContained: [{ container: '.window-content', target: STANDALONE_GROUND }],
+    position: STANDALONE_WINDOW,
+    kinds: ['standalone', 'specimen'],
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

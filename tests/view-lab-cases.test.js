@@ -11,6 +11,7 @@ import { createManagerServices } from '../src/ui/managerServices.js';
 import {
   APP_CHROME,
   FOUNDRY_CHROME_SPEC,
+  frameClassesFor,
   minimumViewportFor,
 } from '../scripts/lib/foundryChromeSpec.js';
 import {
@@ -41,6 +42,7 @@ import {
   WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
+import { CANVAS_APPS } from '../scripts/lib/view-lab-cases/caseConstants.js';
 import { chooseSelectOption } from '../scripts/lib/view-lab-cases/caseFactories.js';
 import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
@@ -411,6 +413,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
   'tests/view-lab/fixtures/PublishedModal.svelte',
+  'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
@@ -5604,10 +5607,7 @@ const playerCaseIds = () =>
 /** The three canvas windows' cases, derived rather than listed. */
 const canvasCaseIds = () =>
   publishableCases()
-    .filter(
-      (viewCase) =>
-        viewCase.app !== 'fabricate-app' && viewCase.app !== 'fabricate-crafting-system-manager'
-    )
+    .filter((viewCase) => CANVAS_APPS.includes(viewCase.app))
     .map((viewCase) => viewCase.id);
 
 const knowledgeSurfaceCaseIds = () =>
@@ -6225,6 +6225,9 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-action-menu-choice',
       'manager-published-modal-specimen',
       'manager-published-modal-close',
+      'published-standalone',
+      'published-standalone-light',
+      'published-standalone-in-window',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
@@ -8600,5 +8603,65 @@ test('the tabs specimen case presses ArrowRight on the strip the fixture mounts 
       .map(({ properties }) => properties.find(({ key }) => key.name === 'id').value.value),
     ['inputs', 'outputs'],
     'the first two tabs, which the case reaches by place, are Inputs and Outputs'
+  );
+});
+
+test('the standalone specimen cases draw the entries that state a standalone root with and without a Fabricate root above their target', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedStandalone.svelte'
+  );
+  const mounted = [...walkNodes(instance)].flatMap((node) =>
+    node.type === 'CallExpression' && node.callee?.name === 'mount' ? [node.arguments[0].value] : []
+  );
+  assert.deepEqual(
+    [...new Set(mounted)].sort(byCodePoint),
+    PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.standaloneRoot === true)
+      .map((entry) => entry.name)
+      .sort(byCodePoint),
+    'the fixture mounts every entry that states a standalone root, and no other'
+  );
+  for (const hook of ['data-lab-standalone-ground', 'data-lab-standalone-target']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the cases name`
+    );
+  }
+
+  const root = '.fabricate.fabricate-standalone-root';
+  const bareApp = 'fabricate-standalone-companion';
+  assert.deepEqual(
+    frameClassesFor(APP_CHROME[bareApp]),
+    ['application'],
+    'the companion frame carries no Fabricate class, so nothing in it has a Fabricate ancestor'
+  );
+  for (const [id, colorScheme] of [
+    ['published-standalone', undefined],
+    ['published-standalone-light', 'light'],
+  ]) {
+    const viewCase = getCaseById(id);
+    assert.equal(viewCase.app, bareApp, `${id} draws in the classless frame`);
+    assert.equal(viewCase.query.specimen, 'published-standalone');
+    assert.equal(viewCase.query.colorScheme, colorScheme);
+    assert.ok(
+      viewCase.expectSelector.includes(':not(.fabricate, .fabricate *)'),
+      `${id} asserts that neither the ground nor an ancestor of it, so no ancestor of a target, is a Fabricate root`
+    );
+    assert.ok(
+      viewCase.expectSelector.includes(`> ${root}`),
+      `${id} asserts that the seam wrote a style root in each target`
+    );
+  }
+  const inWindow = getCaseById('published-standalone-in-window');
+  assert.equal(inWindow.app, 'fabricate-app');
+  assert.equal(inWindow.query.specimen, 'published-standalone');
+  assert.ok(
+    inWindow.expectSelector.startsWith('.fabricate.fabricate-app ') &&
+      inWindow.expectSelector.includes(`:not(:has(${root}))`),
+    'the reference frame asserts the ground sits under the window’s root with no style root in it'
+  );
+  assert.deepEqual(
+    ['published-standalone', 'published-standalone-light'].map((id) => getCaseById(id).position),
+    [inWindow.position, inWindow.position],
+    'the three frames are one size'
   );
 });
