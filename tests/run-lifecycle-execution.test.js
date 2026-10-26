@@ -2767,6 +2767,52 @@ test('CraftingEngine world-time execution keeps an input stage blocked with zero
   assert.deepEqual(journal.intent, { stepIndex: 0, recipeId: 'recipe-1', trigger: 'start' });
 });
 
+test('CraftingEngine world-time execution keeps a set essence or set Tool stage blocked with zero journal effects', async () => {
+  const cases = [
+    ['essences', { essences: { solar: 3 } }, undefined],
+    ['tools', { name: 'Forged', toolIds: ['hammer'] }, { resolutionMode: 'routedByIngredients' }],
+  ];
+  for (const [blocker, setFields, system] of cases) {
+    const { engine, ingredientSet, runManager } = setupEngineFixture();
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+    const actor = new FakeActor(`crafter-${blocker}`);
+    const source = new FakeActor('source');
+    engine.installVersionedRunAuthority({
+      consumeExecutionGrant: async () => ({
+        operationId: 'operation',
+        resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+      }),
+    });
+    const started = await engine.startVersionedRun({
+      viewer: game.user,
+      actor,
+      sourceActors: [source],
+      recipeId: 'recipe-1',
+      completionMode: 'worldTime',
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+      executionGrant: 'start-grant',
+    });
+    ingredientSet.ingredients = [];
+    Object.assign(ingredientSet, setFields);
+    game.time.worldTime = 1120;
+
+    const result = await engine.executeVersionedStage({
+      actor,
+      componentSourceActors: [source],
+      runId: started.runId,
+      expectedRevision: started.runRevision,
+      trigger: 'worldTime',
+      executionGrant: 'execute-grant',
+    });
+
+    assert.equal(result.automaticBlocked, true, blocker);
+    assert.equal(result.blocker, blocker);
+    runManager.invalidateCache();
+    const journal = runManager.getActiveRun(actor, started.runId).executionJournal;
+    assert.deepEqual(journal.intent, { stepIndex: 0, recipeId: 'recipe-1', trigger: 'start' }, blocker);
+  }
+});
+
 test('CraftingEngine delegates due world-time runs to authority without pre-mutating revisions', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('auto-crafter');
