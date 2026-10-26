@@ -2656,6 +2656,50 @@ test('every emitted `data-gap` rung is declared, and each default is written as 
   }
 });
 
+/** The rung rules whose `--<utility>-gap` is not `var(--fab-space-<rung>)`, as `utility=rung`. */
+const rungsOffTheirToken = (rungs) =>
+  rungs
+    .filter(({ rung, value }) => value !== undefined && value !== `var(--fab-space-${rung})`)
+    .map(({ utility, rung }) => gapRungKey(utility, rung));
+
+test('every declared `data-gap` rung takes the spacing token of the same rung', () => {
+  // The default-rung check above pins one rung per utility. This one binds all of them, so
+  // `[data-gap='3']` cannot be re-pointed at `--fab-space-1` and still read as rung 3.
+  const rungs = [];
+  for (const rule of sheetRules()) {
+    for (const member of rule.selectors) {
+      for (const [, utility, rung] of member.matchAll(/\.(fab-[\w-]+)\[data-gap='([^']+)'\]/gu)) {
+        rungs.push({ utility, rung, value: declarationMap(rule)[`--${utility}-gap`] });
+      }
+    }
+  }
+
+  assert.ok(
+    rungs.length >= 7,
+    `only ${rungs.length} \`data-gap\` rung rules reached this scan, below the 7 the sheet held when ` +
+      'this was written. A selector that stopped matching reads as a clean sheet.'
+  );
+  assert.deepEqual(
+    rungsOffTheirToken(rungs),
+    [],
+    'a rung R must set `--<utility>-gap` to `var(--fab-space-R)`. A rung on another token makes ' +
+      'the attribute name a step that the rule does not take.'
+  );
+  assert.deepEqual(
+    rungs.filter(({ value }) => value === undefined),
+    [],
+    'every rung rule sets its utility’s gap property, or the rung paints the base default.'
+  );
+  assert.deepEqual(
+    rungsOffTheirToken([
+      { utility: 'fab-stack', rung: '3', value: 'var(--fab-space-1)' },
+      { utility: 'fab-stack', rung: '2xs', value: 'var(--fab-space-2xs)' },
+    ]),
+    ['fab-stack=3'],
+    'the check reports a rung on the wrong token and passes a named rung on its own'
+  );
+});
+
 test('each half of the module focus pair is declared exactly once, at the module root', () => {
   for (const { half, compound, declarations } of MODULE_FOCUS_PAIR) {
     const blocks = sheetRules().filter(
