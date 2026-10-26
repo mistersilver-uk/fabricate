@@ -99,8 +99,8 @@ export function rectRegionThrowingTestPoint(options = {}) {
  * @param {number} [options.width] Footprint width in grid squares.
  * @param {number} [options.height] Footprint height in grid squares.
  * @param {object|null} [options.scene] The parent scene (should carry `grid.size`).
- * @param {object|null} [options.object] The placeable. Omitted ⇒ none, as on a client not viewing
- * the scene. A test passes a deliberately wrong `center` to prove the document position wins.
+ * @param {object|null} [options.object] The placeable. Omitted means none, as on a client not
+ * viewing the scene.
  * @param {number} [options.elevation] Omitted ⇒ the document has no elevation.
  * @param {*} [options.regions] The membership collection, used VERBATIM (Set, `{ contents }`,
  * array, null, ...).

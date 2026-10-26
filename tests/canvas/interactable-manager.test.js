@@ -920,11 +920,11 @@ test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is den
 // the requester's scene, so no token document here has a placeable.
 const CONTAINMENT_RECT = { x: 100, y: 100, w: 100, h: 100 };
 
-/** A region testPoint recording every submitted point on `calls`, delegating to the shared rect fake. */
+/** A region testPoint recording every submitted point on `calls` when given, delegating to the shared rect fake. */
 function recordingRectTestPoint(calls, rect = CONTAINMENT_RECT) {
   const { testPoint } = rectRegion(rect);
   return (point) => {
-    calls.push(point);
+    calls?.push(point);
     return testPoint(point);
   };
 }
@@ -967,10 +967,11 @@ test('validateAndGrant DENIES TOKEN_NOT_INSIDE when the token is genuinely outsi
   }
 });
 
-test('validateAndGrant DENIES a token outside a region that has no testPoint (no blanket grant at the call site, issue 1006)', async () => {
+test('validateAndGrant lets testInsideRegion=false deny on a testPoint-less region, with no grant at the call site (issue 1006)', async () => {
   const saved = snapshotGlobals();
   try {
-    // A `testPoint`-less region only occurs when the fixture asks for it; `testInsideRegion` still answers.
+    // A `testPoint`-less region only occurs when the fixture asks for it. Signal 2 answers here, so
+    // this pins that the call site does not short-circuit to a grant before the seam runs.
     const { manager, region, emits, request } = setupValidateAndGrant({
       testPoint: null,
       tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1', insideRegion: false })]
@@ -986,19 +987,38 @@ test('validateAndGrant DENIES a token outside a region that has no testPoint (no
   }
 });
 
+test('validateAndGrant ADMITS when a testPoint-less region leaves no signal able to answer (cannot locate => admit, issue 1006)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    // No `testInsideRegion`, no membership and no `testPoint`: the seam's documented posture.
+    const { manager, region, emits, request } = setupValidateAndGrant({
+      testPoint: null,
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1', insideRegion: 'absent' })]
+    });
+    assert.ok(region.testPoint === null, 'the region really has no testPoint');
+
+    const ok = await manager.validateAndGrant(request);
+
+    assert.equal(ok, true, 'no signal can answer, so the token is admitted');
+    assert.equal(deniedReason(emits), null);
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
 test('validateAndGrant applies the region elevation band through the shared rect fake (issue 1006)', async () => {
   const saved = snapshotGlobals();
   try {
     const banded = { ...CONTAINMENT_RECT, elevationBand: { bottom: 10, top: 30 } };
     const outOfBand = setupValidateAndGrant({
-      testPoint: recordingRectTestPoint([], banded),
+      testPoint: recordingRectTestPoint(null, banded),
       tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1', elevation: 50 })]
     });
     assert.equal(await outOfBand.manager.validateAndGrant(outOfBand.request), false, 'an out-of-band token is denied');
     assert.equal(deniedReason(outOfBand.emits), 'TOKEN_NOT_INSIDE');
 
     const inBand = setupValidateAndGrant({
-      testPoint: recordingRectTestPoint([], banded),
+      testPoint: recordingRectTestPoint(null, banded),
       tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1', elevation: 20 })]
     });
     assert.equal(await inBand.manager.validateAndGrant(inBand.request), true, 'an in-band token is admitted');

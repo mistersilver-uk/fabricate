@@ -239,7 +239,9 @@ test('signal 3 (centre point) alone admits when membership is empty and Foundry 
   );
 });
 
-test('signal 3 prefers the DOCUMENT centre over a present placeable whose centre lags (issue 1006)', () => {
+test('signal 3 never consults token.object, even when a placeable is present (issue 1006)', () => {
+  // The shared fake's getCenterPoint cannot lag, so this pins that `object.center` is not read,
+  // not immunity to a lagging getCenterPoint.
   const staleObject = { center: { x: 900, y: 900 } };
   const viaGetCenterPoint = rectRegion(RECT);
   const token = containmentToken(CENTRE_INSIDE, { object: staleObject });
