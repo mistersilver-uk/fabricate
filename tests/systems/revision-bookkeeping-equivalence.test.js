@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { handleFabricateSettingChange } from '../../src/config/settingChangeBridge.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
 import { ALL_INVALIDATION_DOMAINS } from '../../src/systems/invalidationDomains.js';
 import {
@@ -432,14 +433,22 @@ describe('the announcement carries exactly what was attributed since the last on
     const calls = await onHookBus(async () => {
       await systemManager.save({ put: systemManager.getSystem(SYS_A), domains: LABELLING });
       write(withSystem(env, SYS_B, (system) => ({ ...system, description: 'Prose' })));
-      assert.equal(systemManager.reload(), true, 'the interleaved reload must be a real one');
+      // The production leg: the setting-change bridge reloads, then announces from the delta, on
+      // the same ordered bus as the local notifier below.
+      handleFabricateSettingChange('fabricate.craftingSystems', {
+        craftingSystemManager: systemManager,
+        callAll: (hook, payload) => globalThis.Hooks.callAll(hook, payload),
+      });
       systemManager._notifySystemsChanged();
     });
 
     assert.deepEqual(
       announcements(calls),
-      [{ source: 'systems', scopes: [{ systemId: SYS_A, domains: LABELLING }] }],
-      'a replicated change is announced from the delta, never from the pending set'
+      [
+        { source: 'systems', scopes: [{ systemId: SYS_B, domains: NARRATIVE }] },
+        { source: 'systems', scopes: [{ systemId: SYS_A, domains: LABELLING }] },
+      ],
+      'the replicated change is announced from the delta and the local one from the pending set'
     );
   });
 
