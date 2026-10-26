@@ -2144,7 +2144,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result set
-- **AND** the group is not duplicated to serve them
+- **AND** the result set is not duplicated to serve them
 
 #### Scenario: An ingredient set names no result set
 

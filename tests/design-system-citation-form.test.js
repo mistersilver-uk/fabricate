@@ -13,7 +13,7 @@ const CITING_FILES = [
 ];
 
 /** `file.ext:123`, and a bare continuation such as `` `:1406` `` or `<b>:854</b>` after one. */
-const LINE_CITATIONS = [/\.(?:css|html|svelte|js|mjs|md):\d+/g, /[`>( ]:\d{2,}(?!\d)/g];
+const LINE_CITATIONS = [/\.(?:s?css|html|svelte|js|mjs|ts|json|md):\d+/g, /[`>( ]:\d{2,}(?!\d)/g];
 
 /** Every line citation in a text, as `line N: match`. */
 function lineCitationsIn(text) {
