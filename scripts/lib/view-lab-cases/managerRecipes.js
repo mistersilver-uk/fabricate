@@ -271,6 +271,25 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
     ],
   }),
+  // Issue 1816: the library with grouping switched off, so the rows stand in one ungrouped list.
+  managerCase({
+    id: 'manager-recipes-grouped-off',
+    label: 'Manager — Recipes with grouping off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: ['Crafting', { selector: '[data-recipe-group-toggle]' }],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-group-toggle][aria-pressed="false"])' +
+      ' .manager-main:not(:has([data-group-header])) .manager-recipe-row',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      /^src\/ui\/model\/entityBrowserModel\.js$/,
+    ],
+  }),
   managerCase({
     id: 'manager-recipes-no-check',
     label: 'Manager — Recipes no check',

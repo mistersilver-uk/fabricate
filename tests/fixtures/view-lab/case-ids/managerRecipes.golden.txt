@@ -8,6 +8,7 @@ manager-recipes-inspector-reward-rows
 manager-recipes-inspector-route-list
 manager-recipes-narrow
 manager-recipes-narrow-status-row
+manager-recipes-grouped-off
 manager-recipes-no-check
 manager-recipes-inspector-check-off
 manager-recipes-grouped-continuation
