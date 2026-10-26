@@ -3,8 +3,9 @@
  * through the test-only overlay probe: the `overlayHost` option, a disconnected option falling
  * through, the nearest overlay root, the seam's standalone layer with its theme and its count, a
  * press inside the container reaching `onChoose`, and `destroy` and a fault leaving no panel,
- * container, layer or listener; then a second happy-dom `Window`, where the panel's handlers run
- * only because its container is a Svelte mount target. M18 is `published-components.test.js`'s.
+ * held overlay, container, layer or listener; then a second happy-dom `Window`, where the panel's
+ * handlers run only because its container is a Svelte mount target. M18 is
+ * `published-components.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -26,10 +27,12 @@ import {
   fabricateTarget,
   recordEscapes,
   settle,
+  shippedSeam,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const PROBE = PROBE_OVERLAY_ENTRY.path;
+const OVERLAY_HOST = 'src/ui/svelte/util/overlayHost.js';
 const LAYER = '.fabricate.fabricate-standalone-overlay';
 const THEME = 'data-fabricate-theme';
 
@@ -43,6 +46,8 @@ const harness = createMountedComponentHarness({
 });
 
 let runtime;
+let components;
+let overlaysOpenedFrom;
 let createPublishedComponents;
 let probe;
 let reports;
@@ -53,7 +58,9 @@ let stopRecording;
 
 before(async () => {
   await harness.setup();
-  ({ publishedComponentRuntime: runtime } = await harness.loadRuneModule(ADAPTER));
+  ({ publishedComponentRuntime: runtime, COMPONENTS: components } =
+    await harness.loadRuneModule(ADAPTER));
+  ({ overlaysOpenedFrom } = await harness.loadRawModule(OVERLAY_HOST));
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
   stopRecording = recordEscapes((error) => {
@@ -394,12 +401,15 @@ describe('destroy and a fault close every open overlay', () => {
       };
       const { handle, panel, props } = openProbe(target, { onFault });
       const container = containerOf(panel);
+      const trigger = target.querySelector('[data-overlay-probe-trigger]');
+      assert.equal(overlaysOpenedFrom(trigger).length, 1, 'the panel is held, opened from it');
       handle.update({ ...props, open: true, explode: true });
       await settle();
       assert.deepEqual(faults, ['overlay probe fault']);
       assert.ok(!panel.isConnected && !container.isConnected, 'no panel and no container');
       assert.equal(target.childNodes.length, 0, 'the target is empty');
       assert.deepEqual(listeners.still(), [], 'no listener');
+      assert.equal(overlaysOpenedFrom(trigger).length, 0, 'nor held');
       assert.equal(handle.update(props), false, 'the handle is inert');
     } finally {
       listeners.stop();
@@ -409,6 +419,51 @@ describe('destroy and a fault close every open overlay', () => {
       [[FAULT_REPORT, 'PublishedOverlayProbe']]
     );
   });
+});
+
+describe('the overlays a published mount opened (issue 2660)', () => {
+  const shipped = () =>
+    shippedSeam({
+      createPublishedComponents,
+      runtime,
+      components,
+      report: (...args) => {
+        reports.push(args);
+      },
+    });
+
+  /** Mounts the published `name` into a new Fabricate target and opens it from its trigger. */
+  async function openShipped(name, props) {
+    const target = fabricateTarget(shells, 'fabricate fabricate-app');
+    const handle = shipped().mount(name, { target, props });
+    handles.push(handle);
+    flushSync();
+    const trigger = target.querySelector('button');
+    trigger.click();
+    flushSync();
+    await settle();
+    return { handle, trigger };
+  }
+
+  for (const [name, props] of [
+    [
+      'Select',
+      { options: [{ value: 'flask', label: 'Flask' }], ariaLabel: 'Vessel', onChange() {} },
+    ],
+    [
+      'ActionMenu',
+      { items: [{ id: 'rename', label: 'Rename' }], ariaLabel: 'Actions', onSelect() {} },
+    ],
+  ]) {
+    it(`holds none once an open published ${name} is destroyed`, async () => {
+      const { handle, trigger } = await openShipped(name, props);
+      assert.equal(overlaysOpenedFrom(trigger).length, 1, 'its panel, opened from the trigger');
+      handle.destroy();
+      await settle();
+      assert.ok(!trigger.isConnected, 'the trigger is gone');
+      assert.equal(overlaysOpenedFrom(trigger).length, 0, 'and the entry with it');
+    });
+  }
 });
 
 describe('in a second window', () => {

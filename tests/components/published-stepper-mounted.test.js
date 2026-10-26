@@ -1,8 +1,9 @@
 /**
  * The published `Stepper` on Fabricate's real Svelte runtime (issue 2452), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window roots it needs: the number
- * field and its two buttons, a press, a typed edit, the snap-back of a refused value on blur, a
- * bound, every refusal the entry adds, and its required root. The number field is held here
+ * registered with the adapter's own table, under a Fabricate window root: the number field and
+ * its two buttons, a press, a typed edit, the snap-back of a refused value on blur, a bound, every
+ * refusal the entry adds, and the standalone style root it is drawn under in a companion's own
+ * shell (issue 2679). The number field is held here
  * because the static gates pin it to the defaults of the unpublished `formatValue` and
  * `parseValue`.
  * Limit: happy-dom steps no number input from a key or the wheel, and computes no accessible name,
@@ -25,6 +26,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -373,8 +375,21 @@ describe('what the published Stepper refuses', () => {
   it('refuses a string for onChange (M17)', () => {
     assertRefused({ onChange: 'x' }, '"onChange" must be a function');
   });
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
-    assertRefused({}, 'Stepper needs a Fabricate window ancestor', companionTarget(targets));
+describe('the published Stepper in a companion’s own shell', () => {
+  it('draws inside one standalone style root, its input is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const handle = ui().mount('Stepper', { target, props: base() });
+    await settle();
+    const stepper = standaloneRootIn(target).firstElementChild;
+    assert.ok(stepper.classList.contains('fab-stepper'), 'the stepper is the root’s child');
+    const input = target.querySelector('input');
+    assert.ok(
+      stepper.contains(input) && input.type === 'number',
+      'target’s input is the stepper’s'
+    );
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });

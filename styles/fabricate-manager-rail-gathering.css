@@ -661,7 +661,7 @@
 }
 
 /* The armed half of the inline two-step row confirmation. This is the product's first SOLID `--fab-danger` surface, which is why `--fab-on-danger` exists at all: `--fab-on-accent` fails 4.5:1 against `--fab-danger` in foundry-native and is marginal in ironblood-forge, and `--fab-danger-text` fails everywhere (issue 785). */
-.fabricate-button.fabricate-button.is-danger.is-armed {
+.fabricate-button.is-danger.is-armed:not(:disabled) {
   border-color: var(--fab-danger);
   color: var(--fab-on-danger);
   background: var(--fab-danger);

@@ -344,13 +344,13 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
 function collectUnreachableGroupIssues(executionSteps, isMultiStep) {
   const issues = [];
   for (const step of executionSteps) {
-    const { inbound } = buildRoutingModel({
+    const { unreachable } = buildRoutingModel({
       provider: 'ingredientSet',
       ingredientSets: step.ingredientSets,
       resultGroups: step.resultGroups,
     });
-    const index = inbound.findIndex((sources) => sources.length === 0);
-    if (index === -1) continue;
+    const [index] = unreachable;
+    if (index === undefined) continue;
     issues.push({
       id: 'unreachableResultGroup',
       severity: 'warning',

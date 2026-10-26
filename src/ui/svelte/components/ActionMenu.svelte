@@ -44,6 +44,8 @@
   - The headed list's static `data-action-menu-list` hook tells the seam's gate its two menu divs apart.
   - Each element it focuses in the menu carries `data-action-menu-focused` while it holds focus, the marker the
     sheet paints, because a focus moved after a pointer press matches no `:focus-visible`.
+  - An open menu whose root leaves its document closes, moving no focus and choosing nothing, as
+    `dismissOnOutsideClick`'s `onDetached` states (issue 2671).
   - A repeating Enter in the menu is prevented, never stopped, so the repeats of an Enter held from
     the press that opened it choose nothing; `tests/components/published-action-menu-mounted.test.js`.
 -->
@@ -257,6 +259,7 @@
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: (event) => close({ restoreFocus: event?.key === 'Escape' }),
+    onDetached: () => close({ restoreFocus: false }),
     additionalNodes: () => [panelRoot],
   }}
 >

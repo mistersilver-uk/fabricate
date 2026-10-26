@@ -967,6 +967,16 @@ describe('evaluateRecipeReadiness: unreachable result sets under ingredient rout
     ]);
   });
 
+  it('focuses the first unreachable set, a failure-role one ahead of a non-failure one', () => {
+    const readiness = ingredientRouted({
+      ingredientSets: [{ id: 's1', resultGroupId: 'gone' }],
+      resultGroups: [{ id: 'gf', role: 'failure' }, { id: 'g2' }]
+    });
+    assert.deepEqual(unreachable(readiness), [
+      { id: 'unreachableResultGroup', severity: 'warning', target: 'results', focusTarget: 'result-group-gf' }
+    ]);
+  });
+
   it('raises an id-less unreachable set with no focusTarget key', () => {
     const [issue] = unreachable(
       ingredientRouted({

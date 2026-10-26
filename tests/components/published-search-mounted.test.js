@@ -1,10 +1,11 @@
 /**
  * The published `SearchField` on Fabricate's real Svelte runtime (issue 2453), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window roots it needs: the label
- * root and its one input, a typed query and the browser's clear reported through `onValueChange`,
- * an `update` drawn without a call back, the Enter guard inside a `<form>`, and every refusal the
- * entry adds. The label root is held here because the static gates pin the rest landing to the
- * default of the unpublished `label`.
+ * registered with the adapter's own table, under a Fabricate window root: the label root and its
+ * one input, a typed query and the browser's clear reported through `onValueChange`, an `update`
+ * drawn without a call back, the Enter guard inside a `<form>`, every refusal the entry adds, and
+ * the standalone style root it is drawn under in a companion's own shell (issue 2679). The label
+ * root is held here because the static gates pin the rest landing to the default of the unpublished
+ * `label`.
  * Limit: happy-dom draws no cancel button, clears nothing on Escape and submits no form on Enter,
  * so a clear is the `input` event the browser fires, and the guard is read off `defaultPrevented`.
  */
@@ -25,6 +26,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -304,12 +306,19 @@ describe('the published SearchField refuses', () => {
     );
     assertRefused({ ...NAMED, onValueChange: 'filter' }, '"onValueChange" must be a function');
   });
+});
 
-  it('a target outside a Fabricate window (M16)', () => {
-    assertRefused(
-      { ...NAMED },
-      'SearchField needs a Fabricate window ancestor',
-      companionTarget(targets)
+describe('the published SearchField in a companion’s own shell', () => {
+  it('draws its label inside one standalone style root, its input is reached, and destroy leaves the shell empty', async () => {
+    const { target, handle, input } = mountSearch({}, companionTarget(targets));
+    await settle();
+    const label = standaloneRootIn(target).firstElementChild;
+    assert.equal(label.localName, 'label');
+    assert.ok(
+      label.contains(input()) && input().type === 'search',
+      'target’s input is the field’s'
     );
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });
