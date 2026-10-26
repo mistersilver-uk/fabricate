@@ -1,6 +1,8 @@
 /** The forward-port's content gate, EXECUTED (issues #1418 and #1439). */
 
 import assert from 'node:assert/strict';
+import { rmSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
@@ -754,32 +756,48 @@ test('the completion script and the gate CHAIN: the merge one builds is the merg
   );
 });
 
-// ── 23 ──────────────────────────────────────────────────────────────────────────────────────────
-
-test('A6 checks a NON-ASCII conflicted path rather than silently skipping it', (t) => {
-  const harness = createGateHarness(t);
+/**
+ * One file, written verbatim on each line from a shared base (`null` deletes it), with
+ * `origin/main` and `origin/release` at the two tips and `main` checked out at its own.
+ */
+function divergedOn(harness, name, { main, release }) {
   const { git, write } = harness;
-
-  // `core.quotePath` defaults to true, so git NAMES this path as `"caf\303\251.txt"` — a form that
-  // matches nothing when handed back as a pathspec, because no real path contains a quote.
-  const name = 'caf\u00e9.txt';
+  const commitSide = (contents, message) => {
+    if (contents === null) harness.remove(name);
+    else write(name, contents);
+    git('commit', '-qam', message);
+  };
   write(name, fileWith({}));
   git('add', '-A');
   git('commit', '-qm', 'chore: the shared base');
   const base = git('rev-parse', 'HEAD');
 
-  write(name, fileWith({ 5: 'main took this line' }));
-  git('commit', '-qam', 'feat: something on main');
+  commitSide(main, 'feat: something on main');
   const mainTip = git('rev-parse', 'HEAD');
 
   git('checkout', '-q', '-b', 'release', base);
-  write(name, fileWith({ 5: 'release took the same line' }));
-  git('commit', '-qam', 'fix: the same line, differently');
+  commitSide(release, 'fix: the same line, differently');
   const releaseTip = git('rev-parse', 'HEAD');
 
   git('checkout', '-q', 'main');
   git('update-ref', 'refs/remotes/origin/main', mainTip);
   git('update-ref', 'refs/remotes/origin/release', releaseTip);
+  return { mainTip, releaseTip };
+}
+
+// ── 23 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('A6 checks a NON-ASCII conflicted path rather than silently skipping it', (t) => {
+  const harness = createGateHarness(t);
+  const { git } = harness;
+
+  // `core.quotePath` defaults to true, so git NAMES this path as `"caf\303\251.txt"` — a form that
+  // matches nothing when handed back as a pathspec, because no real path contains a quote.
+  const name = 'caf\u00e9.txt';
+  const { mainTip, releaseTip } = divergedOn(harness, name, {
+    main: fileWith({ 5: 'main took this line' }),
+    release: fileWith({ 5: 'release took the same line' }),
+  });
 
   // Resolve NOTHING, so git's own markers are staged verbatim.
   const resolution = resolveConflictInto(harness, () => {});
@@ -857,4 +875,111 @@ test('A5 decides composed paths on BLOBS, so a mode-only change does not open a 
   assert.equal(status, 1, output);
   assert.match(output, /alters content the two lines could be combined on automatically/);
   assert.match(output, /run\.sh/);
+});
+
+// ── 25 ──────────────────────────────────────────────────────────────────────────────────────────
+
+/** Diverge `f.txt` with the two sides given verbatim, resolve it as `resolved`, and complete it. */
+function resolvedVerbatim(harness, { main, release, resolved }) {
+  const { mainTip, releaseTip } = divergedOn(harness, 'f.txt', { main, release });
+  const resolution = resolveConflictInto(harness, () => harness.write('f.txt', resolved));
+  harness.git('reset', '--hard', '-q', mainTip);
+  completeFrom(harness, resolution, [mainTip, releaseTip]);
+  return resolution;
+}
+
+/** The release line's edit, carrying a NUL byte, which GNU grep takes as a binary file. */
+const RELEASE_LINE_WITH_NUL = 'release\0took line 3';
+
+test('A6 and A7 read a blob carrying a NUL byte as text, on either side (issue 1599)', (t) => {
+  const sides = {
+    main: fileWith({ 3: 'main took line 3', 5: 'main took line 5' }),
+    release: fileWith({ 3: RELEASE_LINE_WITH_NUL, 5: 'release took line 5' }),
+  };
+  const gate = (resolved) => {
+    const harness = createGateHarness(t);
+    const resolution = resolvedVerbatim(harness, { ...sides, resolved });
+    harness.stub('gh', answering(associationPayload()));
+    return harness.runGate({ RESOLUTION_REF: resolution, RESOLUTION_EFFECT: 'content-onto-main' });
+  };
+
+  // A line taken from the NUL-bearing parent is that parent's, not an invention.
+  const chosen = gate(fileWith({ 3: 'main took line 3', 5: 'release took line 5' }));
+  assert.equal(chosen.status, 0, chosen.output);
+  assert.match(chosen.output, /the supplied resolution .* is accounted for/);
+
+  // A NUL-bearing resolution is still read, so a line neither side wrote is named.
+  const invented = gate(
+    fileWith({ 3: RELEASE_LINE_WITH_NUL, 5: 'a resolution neither side wrote' })
+  );
+  assert.equal(invented.status, 1, invented.output);
+  assert.match(invented.output, /::error:: {2}a resolution neither side wrote/);
+
+  // ...and a marker left in a NUL-bearing resolution is still counted.
+  const marked = gate(
+    fileWith({ 1: '<<<<<<< HEAD', 3: RELEASE_LINE_WITH_NUL, 5: 'main took line 5' })
+  );
+  assert.equal(marked.status, 1, marked.output);
+  assert.match(marked.output, /f\.txt still carries 1 line\(s\) marking a difference/);
+});
+
+// ── 26 ──────────────────────────────────────────────────────────────────────────────────────────
+
+/** Delete one loose object, so the tree still records it and nothing can read it. */
+function loseObject(harness, oid) {
+  rmSync(path.join(harness.directory, '.git', 'objects', oid.slice(0, 2), oid.slice(2)));
+}
+
+test('a recorded blob that cannot be READ is unverifiable, never accepted and never accused', (t) => {
+  const harness = createGateHarness(t);
+  const resolution = resolvedVerbatim(harness, {
+    main: fileWith({ 5: 'main took this line' }),
+    release: fileWith({ 5: 'release took the same line' }),
+    resolved: fileWith({ 2: '<<<<<<< HEAD', 5: 'a resolution neither side wrote' }),
+  });
+  loseObject(harness, harness.git('rev-parse', 'HEAD:f.txt'));
+  harness.stub('gh', answering(associationPayload()));
+
+  for (const environment of [{}, { ALLOW_CONTENT: 'true' }]) {
+    const { status, output } = harness.runGate({
+      RESOLUTION_REF: resolution,
+      RESOLUTION_EFFECT: 'content-onto-main',
+      ...environment,
+    });
+    assert.equal(status, 2, output);
+    assert.match(
+      output,
+      /f\.txt is recorded in the tree this run would push, but its content could not be read/
+    );
+    assert.ok(!/is accounted for/.test(output), 'an unread blob establishes nothing');
+    assert.ok(!/present in neither origin/.test(output), 'an unread blob accuses nothing');
+    assert.ok(!new RegExp(OVERRIDE_HINT).test(output), 'no remedy tells the reader to override');
+  }
+});
+
+// ── 27 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test("A7: a parent's blob that cannot be READ is unverifiable, not a source of invented lines", (t) => {
+  const harness = createGateHarness(t);
+  // A modify/delete conflict, so the re-merge records the release blob without reading it.
+  const release = fileWith({ 5: 'release took line 5' });
+  const resolution = resolvedVerbatim(harness, {
+    main: null,
+    release,
+    resolved: fileWith({ 5: 'release took line 5', 6: 'line 7' }),
+  });
+  harness.stub('gh', answering(associationPayload()));
+  const environment = { RESOLUTION_REF: resolution, RESOLUTION_EFFECT: 'content-onto-main' };
+
+  const readable = harness.runGate(environment);
+  assert.equal(readable.status, 0, readable.output);
+
+  loseObject(harness, harness.git('rev-parse', 'origin/release:f.txt'));
+  const { status, output } = harness.runGate(environment);
+  assert.equal(status, 2, output);
+  assert.match(
+    output,
+    /f\.txt is recorded on origin\/main or origin\/release, but that version's content could not be read/
+  );
+  assert.ok(!/present in neither origin/.test(output), 'an unread parent accuses nothing');
 });
