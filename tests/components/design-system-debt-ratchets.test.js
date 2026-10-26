@@ -1681,6 +1681,60 @@ test('no hover in the sheet and every scoped block tints its edge over a rung fi
   );
 });
 
+const HOVER_STATE_EVERYWHERE = new RegExp(HOVER_STATE.source, 'gu');
+const BACKGROUND_FILL = /^background(?:-color)?$/u;
+
+/**
+ * Each in-scope hover item that raises its surface, with the fills its own rest rule takes in the
+ * same file and at-context (`null` when the sheet holds no such rest rule: the item is unpaired).
+ */
+function hoverRaises(corpus) {
+  const fills = declarationsOf(corpus, (property) => BACKGROUND_FILL.test(property))
+    .filter(unmarkedInScope(corpus))
+    .map((d) => ({ ...d, value: normaliseValue(d.value) }));
+  const keyOf = (d, item) => `${d.file}|${d.context}|${oneLine(item.replaceAll(NEGATION, ''))}`;
+  const rests = new Map();
+  const restItems = fills.flatMap((d) =>
+    splitSelectorList(d.selector)
+      .filter((one) => stateOf(one) === null)
+      .map((item) => ({ key: keyOf(d, item), value: d.value }))
+  );
+  for (const { key, value } of restItems) rests.set(key, [...(rests.get(key) ?? []), value]);
+  const raised = fills.filter((d) => d.value === STATE_FILL.hover);
+  return raised.flatMap((d) =>
+    splitSelectorList(d.selector)
+      .filter((item) => stateOf(item) === 'hover')
+      .map((item) => ({
+        d,
+        item,
+        rest: rests.get(keyOf(d, item.replaceAll(HOVER_STATE_EVERYWHERE, ''))) ?? null,
+      }))
+  );
+}
+
+/** A hover that raises to the rung its own rest rule already takes changes nothing under the pointer. */
+const HOVER_RESTATES_GATE = styleGate((corpus) =>
+  hoverRaises(corpus)
+    .filter(({ rest }) => rest?.includes(STATE_FILL.hover))
+    .map(({ d, item }) => declarationSite('hover restates its rest fill', { ...d, selector: item }))
+);
+
+test('no hover raises a surface to the fill its own rest rule already takes', (t) => {
+  const hovers = hoverRaises(treeStyles());
+  const paired = hovers.filter(({ rest }) => rest !== null).length;
+  // Measured on this tree: 73 hover items read and 65 paired with a rest rule; none restates it.
+  assert.ok(hovers.length >= 60, `only ${hovers.length} in-scope hover raises were read`);
+  assert.ok(paired >= 50, `only ${paired} hover raises met a rest rule of their own`);
+  checkGate(
+    t,
+    HOVER_RESTATES_GATE,
+    'A hover raises a surface off its rest fill, so a rest rule already on `--fab-surface-raised` ' +
+      'leaves the pointer nothing to show. Rest takes the `soft` rung, or the hover does not raise. ' +
+      'This reads the hover item against a rest rule in the same file and at-context only; a ' +
+      'panel with no hover rule at all is held by review.'
+  );
+});
+
 test('each surface check reads every channel a state can tint through', () => {
   const css = [
     ".a[aria-checked='true'] { background: var(--fab-accent-soft); }",
@@ -3089,6 +3143,42 @@ test('a reasoned marker at the site exempts it, and an empty one fails', (t) => 
     {
       head: { [PROBE]: probeWith({ markup: [...marked.markup, '<select></select>'] }) },
       failures: [`${PROBE}: native <select> rose from 1 to 2`],
+    },
+  ]);
+});
+
+test('the hover-restates gate fails a hover over a raised rest and passes the rest it can raise from', (t) => {
+  const restates = '.fabricate .h:hover | var(--fab-surface-raised)';
+  const failure = `${MODULE_SHEET}: hover restates its rest fill ${restates} is new (1)`;
+  const rule = (selector, fill) => `${selector} { background: var(--fab-surface-${fill}); }`;
+
+  assertGateCases(t, HOVER_RESTATES_GATE, WIRING_BASE, [
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'raised'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [failure],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'soft'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'raised'),
+          `@container (min-width: 1px) { ${rule('.fabricate .h:hover', 'raised')} }`
+        ),
+      },
+      failures: [],
     },
   ]);
 });
