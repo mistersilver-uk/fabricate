@@ -28,6 +28,8 @@ manager-checks-salvage-modifiers
 manager-checks-gathering-modifiers
 manager-component-edit-salvage-modifier-pick
 manager-gathering-task-edit-modifier-pick
+manager-component-edit-salvage-modifier-suppressed
+manager-gathering-task-edit-modifier-suppressed
 manager-checks-crafting-modifiers-narrow
 manager-components-stacked
 manager-components-grouped-continuation
