@@ -30,8 +30,30 @@ export function svelteFiles(dir, found = []) {
   return found;
 }
 
+/** The node types `walkElements` visits: the tag forms a template can draw an element through. */
+const WALKED_TYPES = new Set([
+  'RegularElement',
+  'Component',
+  'SvelteElement',
+  'SvelteComponent',
+  'SvelteSelf',
+]);
+
 /**
- * Visit every `RegularElement` AND every `Component` in a parsed template.
+ * The lower-cased tag an element node draws, or `null` when the template does not name one
+ * statically: a `RegularElement`'s name, or a `<svelte:element this="…">` with a string literal.
+ */
+export function elementTag(node) {
+  if (node?.type === 'RegularElement') return node.name.toLowerCase();
+  if (node?.type === 'SvelteElement' && node.tag?.type === 'Literal') {
+    return typeof node.tag.value === 'string' ? node.tag.value.toLowerCase() : null;
+  }
+  return null;
+}
+
+/**
+ * Visit every element node in a parsed template: `RegularElement`, `Component`, and the dynamic
+ * forms `SvelteElement`, `SvelteComponent` and `SvelteSelf`. A static `this="form"` opens a form.
  *
  * @param {unknown} node Any AST node, array of nodes, or `ast.fragment`.
  * @param {boolean} [inForm] Whether an ancestor `<form>` element is open.
@@ -45,11 +67,9 @@ export function walkElements(node, visit, inForm = false, seen = new Set()) {
     return;
   }
   let descendantsAreInForm = inForm;
-  if (node.type === 'RegularElement' || node.type === 'Component') {
+  if (WALKED_TYPES.has(node.type)) {
     visit(node, inForm);
-    if (node.type === 'RegularElement' && node.name.toLowerCase() === 'form') {
-      descendantsAreInForm = true;
-    }
+    if (elementTag(node) === 'form') descendantsAreInForm = true;
   }
   for (const key of Object.keys(node)) {
     if (key === 'parent') continue;

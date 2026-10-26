@@ -10,7 +10,7 @@ import {
   templatesOf,
   workingTree,
 } from './helpers/designSystemRatchet.js';
-import { attributeText, walkElements } from './helpers/svelteTemplateScan.js';
+import { attributeText, elementTag, walkElements } from './helpers/svelteTemplateScan.js';
 
 /**
  * Foundry decides whether a keypress belongs to the focused element or to its own bindings by
@@ -46,7 +46,7 @@ function focusPopulations(corpus = templates()) {
   const roving = [];
   for (const { file, source, ast } of corpus) {
     walkElements(ast.fragment, (element, inForm) => {
-      const tag = element.name.toLowerCase();
+      const tag = elementTag(element) ?? element.name.toLowerCase();
       const declared = attributeText(source, element, DECLARATION);
       const tabindex = attributeText(source, element, 'tabindex');
       const roleText = attributeText(source, element, 'role');
