@@ -2635,7 +2635,7 @@ The input takes the keys a number field takes, Up and Down among them; the butto
 The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
 In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
 `Stepper` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window whose element is not a `<form>`; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so leave no room for it, provided nothing of your own clips inside the stepper's box.
@@ -2704,7 +2704,7 @@ The field has no `name`, so it adds nothing to a form's data, and a form with `s
 - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
 - In a DialogV2 that wants Enter to confirm, handle Enter in your own listener above `target`, because the field cancels the form's implicit submission.
 - It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so.
-- In a DialogV2, Escape clears the query and closes the dialog; stop it in your own `keydown` if you must keep the dialog open.
+- In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element; whether the query is cleared first is not stated; stop it in your own `keydown` if you must keep the dialog open.
 
 Rest `data-*` props land on the `<label>` root, never on the input, so no rest name is reserved.
 `SearchField` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, as the default 38px shell at radius 9; it fills the width of `target`, so give `target` `display: flex`.
@@ -3991,7 +3991,7 @@ The exception is a component Fabricate draws under the [standalone style root](#
 A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root, which Fabricate's window frames carry (the player window, the Manager and the interactable windows), so both extension targets have it.
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twelve components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where the element is not a `<form>`.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twelve components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -4002,7 +4002,7 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
 - A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
-  Enter on a radio or number input in a form with a submit button submits the form, as on a text-like input.
+  That exception reaches a radio and a number input too where the form has a submit button: Enter there submits the form, as on a text-like input.
 - A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so reset no form a published control is in, or destroy the control and mount it again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
@@ -4064,7 +4064,7 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window whose element is not a `<form>`, as [Stepper](#stepper) states.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.

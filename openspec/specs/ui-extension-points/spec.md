@@ -637,7 +637,7 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 - A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
-Enter on a radio or number input in a form with a submit button submits the form, as on a text-like input.
+That exception reaches a radio and a number input too where the form has a submit button: Enter there submits the form, as on a text-like input.
 - A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so the companion resets no form a published control is in, or destroys and mounts the control again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
@@ -1036,7 +1036,7 @@ Each group states the accepted values of every key that entry publishes.
     The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
     In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window whose element is not a `<form>`; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
@@ -1061,7 +1061,7 @@ Each group states the accepted values of every key that entry publishes.
   - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
     The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
   - It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so.
-  - In a DialogV2, Escape clears the query and closes the dialog; a companion that must keep the dialog open stops it in its own `keydown`.
+  - In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element; whether the query is cleared first is not stated; a companion that must keep the dialog open stops it in its own `keydown`.
   - A DialogV2 companion that wants Enter to confirm handles Enter in its own listener above `target`, because the field cancels the form's implicit submission.
   - Rest `data-*` attributes land on the `<label>` root, never on the input, so the entry reserves no rest name.
   - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, as the default 38px shell at radius 9; it fills the width of `target`, which the companion gives `display: flex`.
@@ -1781,7 +1781,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 #### Scenario: A labelled stepper in a companion's window
 
-- **WHEN** a companion mounts `Field` with `as: 'div'` and `children: true` into a target in its own ApplicationV2 window, whose element is not a `<form>`, under no Fabricate root, with the same `font-family`, `font-size` and `line-height` as a target in the player window, draws a caption `<span id>` in its content slot, and mounts `Stepper` with its required keys and an `ariaLabel` containing the caption's words into an element it appends there below the caption
+- **WHEN** a companion mounts `Field` with `as: 'div'` and `children: true` into a target in its own ApplicationV2 window, inside no `<form>`, under no Fabricate root, with the same `font-family`, `font-size` and `line-height` as a target in the player window, draws a caption `<span id>` in its content slot, and mounts `Stepper` with its required keys and an `ariaLabel` containing the caption's words into an element it appends there below the caption
 - **THEN** one standalone style root is written, in the field's `target`, and none in the stepper's `target`
 - **AND** the field and the stepper compute the same styles as the same two mounted the same way in the player window
 - **AND** destroying the field destroys the stepper first and leaves the field's `target` empty
