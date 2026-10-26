@@ -2,8 +2,8 @@
  * CraftingEngine — the system-level alchemy checkMode additions (issue 554): - `_runCraftingCheck`
  * dispatch on `alchemy.checkMode` (none/simple/tiered); - the matched Simple-FAILURE path
  * (`_resolveAlchemySimpleFailure`): consume via alchemy.consumeOnFail, produce the reserved failure
- * group (nothing when empty), learn on match, and a distinct produced-on-failure disposition; and -
- * the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
+ * group (nothing when empty), learn on match, and a distinct produced-on-failure disposition when
+ * results were produced; and - the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
  */
 
 import test from 'node:test';
@@ -175,4 +175,27 @@ test('the timed twin produces + learns WITHOUT re-consuming (components spent at
   assert.equal(calls.currency, 0, 'no re-spend at FINISH');
   assert.equal(calls.learn, 1, 'still learns at FINISH');
   assert.equal(outcome.result.disposition, 'produced-on-failure');
+});
+
+test('the timed twin with an EMPTY failure group replies a plain failed disposition', async () => {
+  const { engine, calls } = failureHarness({ failureGroupItems: [] });
+  const outcome = await engine._finishAlchemySimpleFailure({
+    craftingActor: ACTOR,
+    componentSourceActors: [{ items: [] }],
+    recipe: RECIPE,
+    executionRecipe: RECIPE,
+    step: {},
+    stepIndex: 0,
+    ingredientSet: { id: 'set-1' },
+    consumedItems: [],
+    consumedRunRefs: [],
+    toolItems: [],
+    resolvedEssences: {},
+    checkResult: { success: false, outcome: 'fail', message: 'Failed', data: {} },
+    runManager: { completeStepFailure: async () => {} },
+    run: { id: 'run-1' },
+  });
+  assert.equal(outcome.result.disposition, 'failed');
+  assert.equal(outcome.result.results, null, 'an empty failure group produces no items');
+  assert.equal(calls.learn, 1, 'still learns at FINISH');
 });

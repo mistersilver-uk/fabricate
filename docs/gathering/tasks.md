@@ -187,14 +187,12 @@ Clearing visibility removes the gate only when the task already had one saved.
 
 ## Routed Result Selection
 
-{: .warning }
-> **Routed gathering is not available yet either.**
-> Like progressive, it appears in the resolution-mode card but is disabled, pending a future release.
-> The rules below are what it will do once it ships, and anything you author now is saved until then.
+A task uses these rules when you choose **Check** on its **Gathering resolution** card.
 
-Routed gathering tasks do not carry their own result-selection setting.
-They are resolved by the system's gathering check, which you configure once for the whole system.
-When a routed task is attempted, the gathering check rolls and produces a named outcome.
+Check tasks do not carry their own result-selection setting.
+They are resolved by the system's gathering check, which is authored on **Checks › Gathering**.
+Known limitation: **Checks › Gathering** still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** and the gathering check's roll cannot be authored there ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
+When a Check task is attempted, the gathering check rolls and produces a named outcome.
 That outcome name is matched to a result set by name, and the matching set is awarded.
 
 A few outcome names are reserved and take the failure path instead of awarding a result set.
@@ -202,27 +200,26 @@ Because the match is by name, give each result set a name that lines up with one
 Names are matched ignoring upper and lower case and surrounding spaces, so each result set needs a name that is unique once case is ignored.
 
 If the outcome is a success but matches none of your result sets, the attempt fails and no result set is awarded.
-A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
+A Check task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
-A routed task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.
+A Check task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.
 The field is labelled **DC** when the check rolls over a fixed difficulty, **Target** when it rolls under one, or **Adjustment** when it is measured against a character value instead.
 There are no presets to pick from here, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets.
 See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage-and-gathering-task-overrides) and [Successes-needed overrides]({% link checks/crafting.md %}#successes-needed-overrides) for the full guide, including what a switch between them keeps.
 
-## Progressive Checks
+## Legacy Progressive Tasks
 
-{: .warning }
-> **Progressive gathering is not available yet.**
-> The only gathering resolution mode you can select today is `d100`, and it rolls each drop against its own percentage chance rather than a formula.
-> Progressive and Routed by check appear in the resolution-mode card but are disabled, pending a future release.
-> Anything you author here is saved and starts applying as soon as those modes ship.
+{: .note }
+> **Progressive is not offered for new tasks.**
+> The **Gathering resolution** card offers only **Direct**, **d100** and **Check**.
+> A task that was already Progressive keeps its Progressive behavior, and shows a warning on its Overview tab, until you choose another mode.
+> Once you choose another mode, Progressive is no longer a choice for that task.
 
-When progressive gathering does ship, the value it spends comes from the **system's** gathering check, not from the task.
-Author it on **Checks › Gathering**, beside the crafting and salvage checks.
+A legacy Progressive task spends a value from the **system's** gathering check, not from the task.
+The award mode (equal, partial, or exceed) is the system's too, and a task contributes only its results.
+Both belong to **Checks › Gathering**, beside the crafting and salvage checks.
+Known limitation: **Checks › Gathering** still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** and the gathering check's roll cannot be authored there ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
 See [Gathering Checks]({% link checks/gathering.md %}).
-
-The award mode — equal, partial, or exceed — is the system's too, authored beside the roll on **Checks › Gathering**.
-A task contributes only its results.
 
 {% include screenshot.html case="manager-checks-gathering" %}
 
@@ -295,9 +292,8 @@ With the default **Tool-specific** source, each tool's own breakage mechanic dec
 With the **Check-driven** source, the gathering check decides whether every required tool that is not **Immune** breaks, the same way it does for crafting and salvage.
 Each Tool retains its own mechanic, but that mechanic is not evaluated while this source is active.
 Retained limited-use counters also remain unchanged while check-driven authority is active.
-This takes effect once the Progressive and Routed by check gathering modes ship.
-The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
-Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.
+This applies to a task resolved by **Check** and to a legacy Progressive task, because each rolls a gathering check for the breakage triggers to read.
+A **Direct** or **d100** task rolls no check, so check-driven breakage cannot fire for it and its required tools are never force-broken under this source.
 This is separate from the **Tool breakage outcome** setting above.
 The source decides whether a tool breaks.
 The outcome setting decides what a broken tool does to the gather.

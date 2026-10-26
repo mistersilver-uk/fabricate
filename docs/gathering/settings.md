@@ -9,13 +9,12 @@ nav_order: 4
 
 The system's gathering **Settings** page carries the rules that apply to every environment, task, and event in the system.
 
-## Gathering Resolution Mode
+## Gathering Resolution
 
-The system's gathering **Settings** tab has a **Gathering resolution mode** card above the Limitation card.
-It chooses how a gathering attempt decides its outcome.
-
-The only mode available today is **d100**, which is selected by default.
-**Progressive** and **Routed by check** are shown but disabled with a "Coming soon" label, because they are planned and not yet available.
+The gathering **Settings** tab has no resolution control.
+Each Gathering Task chooses how its own attempts are resolved, on the **Gathering resolution** card of its **Overview** tab.
+That card offers **Direct**, **d100** and **Check**.
+See [Editor tabs]({% link gathering/tasks.md %}#editor-tabs) for the task editor.
 
 ## Gathering Limitations
 

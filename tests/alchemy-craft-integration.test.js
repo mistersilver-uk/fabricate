@@ -190,7 +190,7 @@ function makeMatcher(comps) {
   };
 }
 
-function setup({ checkMode, resultGroups, learnOnCraft = true, consumeOnFail = true, routed = null, chatOutput = false }) {
+function setup({ checkMode, resultGroups, learnOnCraft = true, consumeOnFail = true, routed = null, failureResultPolicy = null, chatOutput = false }) {
   const comps = components();
   const recipe = alchemyRecipe(resultGroups);
   const system = {
@@ -198,7 +198,7 @@ function setup({ checkMode, resultGroups, learnOnCraft = true, consumeOnFail = t
     resolutionMode: 'alchemy',
     features: { essences: false, chatOutput },
     alchemy: { checkMode, learnOnCraft, consumeOnFail, showAttemptHistoryToPlayers: false },
-    craftingCheck: routed ? { routed } : {},
+    craftingCheck: { ...(routed && { routed }), ...(failureResultPolicy && { failureResultPolicy }) },
     components: comps,
     managedItems: comps,
   };
@@ -322,7 +322,7 @@ test('Simple FAIL routes past the fizzle into the failure group: consumes, produ
   assert.deepEqual(visibility.learned, ['brew'], 'a matched fail is still a discovery');
 });
 
-test('Simple FAIL with an EMPTY failure group consumes + learns but produces nothing (still produced-on-failure)', async () => {
+test('Simple FAIL with an EMPTY failure group consumes + learns but produces nothing (plain failed)', async () => {
   const { engine, validator, visibility } = setup({
     checkMode: 'simple',
     resultGroups: [
@@ -333,8 +333,37 @@ test('Simple FAIL with an EMPTY failure group consumes + learns but produces not
   engine._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 4, data: {} });
   const inputs = brewInputs();
   const result = await brew(engine, validator, inputs);
-  assert.equal(result.disposition, 'produced-on-failure');
+  assert.equal(result.disposition, 'failed');
   assert.equal(result.results, null, 'an empty failure group produces no items');
+  assert.equal(inputs.owned._deleted, true, 'still consumes');
+  assert.deepEqual(visibility.learned, ['brew'], 'still learns');
+});
+
+test('Simple FAIL with NO failure group consumes + learns but produces nothing (plain failed)', async () => {
+  const { engine, validator, visibility } = setup({
+    checkMode: 'simple',
+    resultGroups: [{ id: 'rg-ok', name: 'On success', results: [{ id: 'r-ok', componentId: 'potion', quantity: 1 }] }],
+  });
+  engine._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 4, data: {} });
+  const inputs = brewInputs();
+  const result = await brew(engine, validator, inputs);
+  assert.equal(result.disposition, 'failed');
+  assert.equal(result.results, null, 'an absent failure group produces no items');
+  assert.equal(inputs.owned._deleted, true, 'still consumes');
+  assert.deepEqual(visibility.learned, ['brew'], 'still learns');
+});
+
+test('Simple FAIL under failureResultPolicy never consumes + learns but produces nothing (plain failed)', async () => {
+  const { engine, validator, visibility } = setup({
+    checkMode: 'simple',
+    failureResultPolicy: 'never',
+    resultGroups: successAndFailureGroups(),
+  });
+  engine._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 4, data: {} });
+  const inputs = brewInputs();
+  const result = await brew(engine, validator, inputs);
+  assert.equal(result.disposition, 'failed');
+  assert.equal(result.results, null, 'a refused failure group produces no items');
   assert.equal(inputs.owned._deleted, true, 'still consumes');
   assert.deepEqual(visibility.learned, ['brew'], 'still learns');
 });

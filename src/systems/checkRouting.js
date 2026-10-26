@@ -90,7 +90,8 @@ function tierThreshold(routing, outcome) {
  */
 function tierRanking(routing) {
   if (routing.type === 'fixed') {
-    return { valueOf: (outcome) => Number(outcome.start), direction: routing.direction };
+    const valueOf = (outcome) => (Number.isFinite(outcome.start) ? outcome.start : NaN);
+    return { valueOf, direction: routing.direction };
   }
   if (routing.multiply) {
     return { valueOf: (outcome) => tierThreshold(routing, outcome), direction: routing.direction };
@@ -106,11 +107,15 @@ function rankableTiers(routing) {
   );
 }
 
-/** Whether a whole-number fixed range holds `value`, floored first so it covers `[start, end + 1)`. */
+/**
+ * Whether a whole-number fixed range holds `value`, floored first so it covers `[start, end + 1)`.
+ * Bounds are read as authored: a range missing either holds nothing, never a bound of 0.
+ */
 export function fixedRangeHolds(outcome, value) {
   const floored = Math.floor(value);
-  const end = Number(outcome?.end);
-  return Number.isFinite(end) && floored >= Number(outcome?.start) && floored <= end;
+  const start = outcome?.start;
+  const end = outcome?.end;
+  return Number.isFinite(start) && Number.isFinite(end) && floored >= start && floored <= end;
 }
 
 /**
@@ -325,10 +330,11 @@ function applyTierStepTriggers(
 function minSuccessTierFailed(routing, { minOutcomeId, matched }) {
   if (routing.type !== 'fixed' || !minOutcomeId) return false;
   const required = rankedRoutedOutcomes(routing).find((outcome) => outcome.id === minOutcomeId);
-  const requiredStart = Number(required?.start);
-  // A stale/unknown `minOutcomeId` no-ops gracefully, like `checkTierId`.
+  const requiredStart = required?.start;
+  // A stale/unknown `minOutcomeId` imposes no minimum, nor does a tier with no finite `start`,
+  // which `tierRanking` leaves unranked so `required` is absent.
   if (!Number.isFinite(requiredStart)) return false;
-  const matchedStart = Number(matched?.start);
+  const matchedStart = matched?.start;
   return (
     !Number.isFinite(matchedStart) ||
     !compareToTarget(matchedStart, requiredStart, 'meet', routing.direction)
