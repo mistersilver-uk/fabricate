@@ -45,6 +45,7 @@ globalThis.fromUuid = async () => null;
 
 const { resolveDropUuid, resolveDropData, folderIdFromDropData } = await import('../src/ui/svelte/util/dropUtils.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+const { COMPONENT_FACTS } = await import('../src/systems/manager/collaborators.js');
 
 // Helpers
 
@@ -65,8 +66,31 @@ function buildManager(systems = []) {
     mgr.systems.set(sys.id, mgr._normalizeSystem(sys));
   }
   mgr.initialized = true;
-  mgr.save = async () => {};
+  recordSaves(mgr);
   return mgr;
+}
+
+/** Replace a manager's `save` with a stub that records each change it is given (`null` when a
+ * caller passes none, which is a whole-corpus write). */
+function recordSaves(mgr) {
+  const saves = [];
+  mgr.save = async (change) => { saves.push(change ?? null); };
+  return saves;
+}
+
+/** A metadata refresh names the systems it touched and the component domains. */
+function assertRefreshSave(save, ...systems) {
+  assert.ok(save?.batch instanceof Set, 'a refresh saves a named batch, never the whole corpus');
+  assert.equal(save.batch.size, systems.length, 'the batch holds exactly the touched systems');
+  for (const system of systems) assert.ok(save.batch.has(system), 'the batch holds the touched system');
+  assert.deepEqual(save.domains, COMPONENT_FACTS);
+}
+
+/** An import names the one system it filled and the component domains, never the whole corpus. */
+function assertImportSave(save, system) {
+  assert.ok(save, 'an import never saves the whole corpus');
+  assert.equal(save.put, system, 'the put names the system the items went into');
+  assert.deepEqual(save.domains, COMPONENT_FACTS);
 }
 
 // Phase 1: resolveDropUuid unit tests (8 cases)
@@ -323,9 +347,10 @@ test('addItemsFromPack — throws for unknown packId', async () => {
  * WHAT the flush actually carried.
  */
 function countCorpusWrites(mgr, systemId) {
-  const record = { calls: 0, componentNamesAtLastWrite: [] };
-  mgr.save = async () => {
+  const record = { calls: 0, saves: [], componentNamesAtLastWrite: [] };
+  mgr.save = async (change) => {
     record.calls += 1;
+    record.saves.push(change ?? null);
     record.componentNamesAtLastWrite = (mgr.getSystem(systemId)?.components || []).map(c => c.name);
   };
   return record;
@@ -363,6 +388,8 @@ test('addItemsFromPack — issues ONE corpus write for the whole batch, whatever
     smallWrites.calls,
     'the corpus write count must be independent of the number of imported items'
   );
+  assertImportSave(smallWrites.saves[0], small.getSystem('sys1'));
+  assertImportSave(largeWrites.saves[0], large.getSystem('sys1'));
   assert.equal(
     largeWrites.componentNamesAtLastWrite.length,
     30,
@@ -382,6 +409,7 @@ test('addItemFromUuid — a single-item caller still writes per call (positive c
   // what makes the `calls === 1` above a statement about batching rather than an
   // artefact of a stub that never increments.
   assert.equal(writes.calls, 4, 'each single-item import persists immediately, one write each');
+  for (const save of writes.saves) assertImportSave(save, mgr.getSystem('sys1'));
   assert.equal(mgr.getSystem('sys1').components.length, 4);
 });
 
@@ -425,6 +453,7 @@ test('addItemsFromPack — a mid-batch failure flushes the items already importe
   globalThis.fromUuid = async () => null;
 
   assert.equal(writes.calls, 1, 'the partial batch is flushed by exactly one write');
+  assertImportSave(writes.saves[0], mgr.getSystem('sys1'));
   assert.deepEqual(
     writes.componentNamesAtLastWrite,
     ['Item 1', 'Item 2', 'Item 3'],
@@ -991,8 +1020,7 @@ test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrit
       { id: 'comp-talonvine', name: 'Talonvine', registeredItemUuid: 'Item.y8qq6t1F9YwRh8HH' }
     ]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
@@ -1011,7 +1039,8 @@ test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrit
     'Moonsilver Weed',
     'the original component must not be renamed by editing its clone'
   );
-  assert.equal(saveCount, 1);
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 test('createItem — rejects a duplicate source reference already used by another component', async () => {
@@ -1196,10 +1225,9 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for dir
       registeredItemUuid: 'Item.herb'
     }]
   }]);
-  let saveCount = 0;
+  const saves = recordSaves(mgr);
   let notifyCount = 0;
   const previousHooks = globalThis.Hooks;
-  mgr.save = async () => { saveCount++; };
   globalThis.Hooks = {
     callAll: (hookName) => {
       if (hookName === 'fabricate.craftingSystemsChanged') notifyCount++;
@@ -1214,7 +1242,8 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for dir
 
     assert.equal(result.updated, 1);
     assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb-new.webp');
-    assert.equal(saveCount, 1);
+    assert.equal(saves.length, 1);
+    assertRefreshSave(saves[0], mgr.getSystem('sys1'));
     assert.equal(notifyCount, 1);
   } finally {
     globalThis.Hooks = previousHooks;
@@ -1232,8 +1261,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component name for dire
       registeredItemUuid: 'Item.herb'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', name: 'Fresh Herb', img: 'icons/herb.webp' },
@@ -1242,7 +1270,8 @@ test('refreshComponentMetadataForUpdatedItem — updates component name for dire
 
   assert.equal(result.updated, 1);
   assert.equal(mgr.getSystem('sys1').components[0].name, 'Fresh Herb');
-  assert.equal(saveCount, 1);
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 test('refreshComponentMetadataForUpdatedItem — updates component image when the compendium entry it records is edited, not an owned copy of it', async () => {
@@ -1257,8 +1286,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component image when th
       originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   // An actor-owned copy is a sibling of the linked source, not the linked source (issue 2217).
   const owned = await mgr.refreshComponentMetadataForUpdatedItem(
@@ -1272,7 +1300,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component image when th
 
   assert.equal(owned.updated, 0);
   assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/ore-old.webp');
-  assert.equal(saveCount, 0);
+  assert.equal(saves.length, 0);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Compendium.source.items.iron-ore', img: 'icons/ore-new.webp' },
@@ -1281,7 +1309,8 @@ test('refreshComponentMetadataForUpdatedItem — updates component image when th
 
   assert.equal(result.updated, 1);
   assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/ore-new.webp');
-  assert.equal(saveCount, 1);
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 // Issue 2217: the Items below share a compendium source with a component's source Item without
@@ -1373,8 +1402,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component description f
       registeredItemUuid: 'Item.herb'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
@@ -1387,7 +1415,8 @@ test('refreshComponentMetadataForUpdatedItem — updates component description f
 
   assert.equal(result.updated, 1);
   assert.equal(mgr.getSystem('sys1').components[0].description, 'Bright green leaves.');
-  assert.equal(saveCount, 1);
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description, not just normalizes it (issue 800)', async () => {
@@ -1403,7 +1432,7 @@ test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description
       registeredItemUuid: 'Item.supplies'
     }]
   }]);
-  mgr.save = async () => {};
+  const saves = recordSaves(mgr);
   mgr._enrichToHtml = async (raw) =>
     raw.replaceAll('@UUID[Item.pouch]', '<a class="content-link">Component Pouch</a>');
   const raw = 'Includes @UUID[Item.pouch] and a mortar.';
@@ -1418,6 +1447,8 @@ test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description
     mgr.getSystem('sys1').components[0].description,
     'Includes Component Pouch and a mortar.'
   );
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 test('refreshComponentMetadataForUpdatedItem — clears component description when the compendium entry it records is edited, not an owned copy of it', async () => {
@@ -1433,8 +1464,7 @@ test('refreshComponentMetadataForUpdatedItem — clears component description wh
       originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const owned = await mgr.refreshComponentMetadataForUpdatedItem(
     {
@@ -1448,7 +1478,7 @@ test('refreshComponentMetadataForUpdatedItem — clears component description wh
 
   assert.equal(owned.updated, 0);
   assert.equal(mgr.getSystem('sys1').components[0].description, 'Old ore description.');
-  assert.equal(saveCount, 0);
+  assert.equal(saves.length, 0);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
@@ -1461,7 +1491,8 @@ test('refreshComponentMetadataForUpdatedItem — clears component description wh
 
   assert.equal(result.updated, 1);
   assert.equal(mgr.getSystem('sys1').components[0].description, '');
-  assert.equal(saveCount, 1);
+  assert.equal(saves.length, 1);
+  assertRefreshSave(saves[0], mgr.getSystem('sys1'));
 });
 
 test('refreshComponentMetadataForUpdatedItem — ignores updates without synced metadata changes', async () => {
@@ -1475,8 +1506,7 @@ test('refreshComponentMetadataForUpdatedItem — ignores updates without synced 
       registeredItemUuid: 'Item.herb'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', img: 'icons/herb-new.webp' },
@@ -1485,7 +1515,7 @@ test('refreshComponentMetadataForUpdatedItem — ignores updates without synced 
 
   assert.equal(result.updated, 0);
   assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb-old.webp');
-  assert.equal(saveCount, 0);
+  assert.equal(saves.length, 0);
 });
 
 test('refreshComponentMetadataForUpdatedItem — skips save when matched metadata is unchanged', async () => {
@@ -1499,8 +1529,7 @@ test('refreshComponentMetadataForUpdatedItem — skips save when matched metadat
       registeredItemUuid: 'Item.herb'
     }]
   }]);
-  let saveCount = 0;
-  mgr.save = async () => { saveCount++; };
+  const saves = recordSaves(mgr);
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', img: 'icons/herb.webp' },
@@ -1509,7 +1538,7 @@ test('refreshComponentMetadataForUpdatedItem — skips save when matched metadat
 
   assert.equal(result.updated, 0);
   assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb.webp');
-  assert.equal(saveCount, 0);
+  assert.equal(saves.length, 0);
 });
 
 // Defect 2: resolveDropData unit tests
