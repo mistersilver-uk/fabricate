@@ -2,8 +2,8 @@
  * CraftingEngine — the system-level alchemy checkMode additions (issue 554): - `_runCraftingCheck`
  * dispatch on `alchemy.checkMode` (none/simple/tiered); - the matched Simple-FAILURE path
  * (`_resolveAlchemySimpleFailure`): consume via alchemy.consumeOnFail, produce the reserved failure
- * group (nothing when empty), learn on match, and a distinct produced-on-failure disposition; and -
- * the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
+ * group (nothing when empty), learn on match, and a distinct produced-on-failure disposition when
+ * results were produced; and - the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
  */
 
 import test from 'node:test';

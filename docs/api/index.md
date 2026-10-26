@@ -264,8 +264,8 @@ Hooks.once('fabricate.ready', async () => {
   A match the submitted units cannot fund is refused with nothing consumed.
   The system's alchemy check mode decides the result: `none` always produces the success set, a `simple` check produces the success set on a pass and the reserved failure set on a fail, and a `tiered` check routes to the result set for the rolled outcome tier.
   A failed `simple` check still counts as a match, so it discovers the recipe, and its spent units are kept, or returned when Consume on Fail is off.
-  It produces the failure set when one is authored with results and the failure-result policy permits, replying `disposition: 'produced-on-failure'`.
-  Otherwise nothing is produced and the reply carries `disposition: 'failed'` with `results: null`, which the Workbench reads as a failed check; a macro that matched on `'produced-on-failure'` for that case now sees `'failed'`.
+  It produces the failure set when one is authored with results and the failure-result policy permits; otherwise nothing is produced.
+  The reply carries `disposition: 'failed'`, with `createdResultUuids` listing any awarded items.
   Otherwise the attempt fizzles with no check and no roll, consuming the components only when the system's Consume on Fail setting is on.
   `interactive` prompts a roll on a matched brew in `simple` or `tiered` check mode, and defaults to `false` for macros and automation, so it never triggers a roll on the fizzle path.
 - `getSelectedAlchemySystemId()` reads the persisted last-selected alchemy system from the `fabricate.lastAlchemySystem` client setting, returning `''` when unset.
