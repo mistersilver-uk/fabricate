@@ -706,6 +706,9 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-leaves-specimen',
         'manager-published-controls-specimen',
         'manager-published-buttons-specimen',
+        'published-standalone',
+        'published-standalone-light',
+        'published-standalone-in-window',
       ],
     ],
     [
@@ -716,6 +719,9 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'player-journal-stacked',
         'manager-published-pagination-specimen',
         'manager-published-pagination-size-specimen',
+        'published-standalone',
+        'published-standalone-light',
+        'published-standalone-in-window',
       ],
     ],
   ];
@@ -851,13 +857,16 @@ function assertBroadSignalFrames(file, frames) {
   }
 }
 
-test('(a) a Stepper change publishes its two frames, then the two specimens that mount it through the seam', () => {
+test('(a) a Stepper change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Stepper.svelte';
   const frames = [
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
@@ -885,7 +894,7 @@ test('(a) a StageBars change publishes its two run frames, then the specimen tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam', () => {
+test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Field.svelte';
   const frames = [
     'manager-gathering-task-editor-normal',
@@ -901,17 +910,23 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
     'player-crafting-roll-prompt-basic',
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam', () => {
+test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Well.svelte';
   const frames = [
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
     'manager-published-well-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
@@ -928,17 +943,53 @@ test('(a) a Callout change publishes its four frames, then the specimen that mou
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam', () => {
+test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconButton.svelte';
   const frames = [
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an EditorTabs change publishes its twenty frames, then the specimen that mounts it through the seam', () => {
+test('(a) a StatusToggle change publishes its six frames, then the three that mount it with and without a Fabricate root', () => {
+  const file = 'src/ui/svelte/components/StatusToggle.svelte';
+  const frames = [
+    'manager-system-edit-normal',
+    'coverage-mode-routed-check-checks',
+    'manager-tool-parity-04-requirements-1280x720',
+    'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
+    'manager-published-toggles-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) an InspectorCard change publishes its frames, then the three that mount it with and without a Fabricate root', () => {
+  const file = 'src/ui/svelte/components/InspectorCard.svelte';
+  const frames = [
+    'manager-essences-disabled-in-use',
+    'coverage-mode-routed-check-checks',
+    'manager-published-leaves-specimen',
+    'manager-tool-parity-01-library-1280x720',
+    'manager-world-travel-realms-normal',
+    'manager-world-travel-map-normal',
+    'manager-world-travel-map-empty',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) an EditorTabs change publishes its twenty frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/EditorTabs.svelte';
   const frames = [
     'manager-system-edit-normal',
@@ -962,11 +1013,14 @@ test('(a) an EditorTabs change publishes its twenty frames, then the specimen th
     'player-salvage',
     'player-gathering-events',
     'manager-published-tabs-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a RadioCardGroup change publishes its six frames, then the specimen that mounts it through the seam', () => {
+test('(a) a RadioCardGroup change publishes its six frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/RadioCardGroup.svelte';
   const frames = [
     'world-tool-entry-requirements',
@@ -976,21 +1030,27 @@ test('(a) a RadioCardGroup change publishes its six frames, then the specimen th
     'manager-checks-crafting-modifiers',
     'fabricate-journal-lifecycle-ingredient-route',
     'manager-published-option-cards-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a SegmentedControl change publishes its two frames, then the specimen that mounts it through the seam', () => {
+test('(a) a SegmentedControl change publishes its two frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/SegmentedControl.svelte';
   const frames = [
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
     'manager-published-segmented-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Pagination change publishes its four frames, then the two specimens that mount it through the seam', () => {
+test('(a) a Pagination change publishes its four frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Pagination.svelte';
   const frames = [
     'player-inventory',
@@ -999,6 +1059,9 @@ test('(a) a Pagination change publishes its four frames, then the two specimens 
     'player-journal-stacked',
     'manager-published-pagination-specimen',
     'manager-published-pagination-size-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });

@@ -1,12 +1,13 @@
 /**
  * The published `Pagination` on Fabricate's real Svelte runtime (issue 2646), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs: the named
- * region, navigation, arrows and radiogroup, each the companion's text, the filled templates, a
- * page turn and a size choice with the one argument each callback takes, a declined size put back,
- * the focus Fabricate moves off an arrow an update disables, in a second document too, the held
- * Enter it cancels there and the tooltip that focus opens, the return-focus selector, what an
- * enclosing form reads, when the bar is drawn, the clipped radios and page label, every refusal the
- * entry adds, and both View Lab specimens.
+ * registered with the adapter's own table, under a Fabricate window root and the standalone style
+ * root it is drawn under in a companion's own shell (issue 2679): the named region, navigation,
+ * arrows and radiogroup, each the companion's text, the filled templates, a page turn and a size
+ * choice with the one argument each callback takes, a declined size put back, the focus Fabricate
+ * moves off an arrow an update disables, in a second document too, the held Enter it cancels there
+ * and the tooltip that focus opens, the return-focus selector, what an enclosing form reads, when
+ * the bar is drawn, the clipped radios and page label, every refusal the entry adds, and both View
+ * Lab specimens.
  * Limit: happy-dom activates no button on a key and runs no radio arrow navigation, so a page turn
  * is a click and a size key is the platform's simulated check; the View Lab cases press the keys.
  * Limit: happy-dom does not tell a keyboard focus from a pointer one, so the tooltip clause answers
@@ -34,6 +35,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -224,7 +226,7 @@ describe('the published Pagination', () => {
       'density',
     ]);
     assert.deepEqual(described.props.onPageChange, { kind: 'callback', required: true });
-    assert.equal(described.root, 'fabricate');
+    assert.equal(described.root, 'any');
     assert.equal(described.overlays, false);
     assert.equal(described.rest, false);
   });
@@ -691,18 +693,38 @@ describe('what the published Pagination refuses', () => {
       '"pageSizeOptions" must not hold a function'
     );
   });
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
-    const shell = companionTarget(targets);
+describe('the published Pagination in a companion’s own shell', () => {
+  it('draws its region inside one standalone style root, its return-focus query is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
     const props = pagerProps(
       () => {},
       () => {}
     );
-    assert.throws(() => ui().mount('Pagination', { target: shell, props }), {
-      name: 'TypeError',
-      message: `${REFUSAL}Pagination needs a Fabricate window ancestor`,
-    });
-    assert.equal(shell.childNodes.length, 0);
+    const handle = ui().mount('Pagination', { target, props });
+    await settle();
+    const region = standaloneRootIn(target).firstElementChild;
+    assert.equal(region.localName, 'section');
+    const focusable = target.querySelector('button:not(:disabled), input[type="radio"]:checked');
+    assert.ok(region.contains(focusable), 'target’s return-focus element is the pager’s');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('draws nothing but the empty standalone style root while a non-persistent pager is hidden', async () => {
+    const target = companionTarget(targets);
+    const props = pagerProps(
+      () => {},
+      () => {},
+      { totalCount: 5, pageSize: 10, pageSizeOptions: [10, 25] }
+    );
+    const handle = ui().mount('Pagination', { target, props });
+    await settle();
+    assert.equal(standaloneRootIn(target).childElementCount, 0, 'the root holds nothing');
+    assert.ok(!target.querySelector('button, input'), 'nothing inside target takes focus');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });
 

@@ -71,7 +71,8 @@
         "Collapse": "Hide details for {name}"
       },
       "StageBars": {
-        "Unnamed": "Stage {index} of {count}"
+        "Unnamed": "Stage {index} of {count}",
+        "Position": "{percent}%, stage {index} of {count}"
       },
       "RuleRow": {
         "Remove": "Remove rule",

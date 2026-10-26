@@ -2,7 +2,8 @@
  * The published `Well` on Fabricate's real Svelte runtime (issue 2601), through a fresh seam
  * registered with the adapter's own table: the well root in a Fabricate window, its kicker and
  * group name, its content slot drawn in normal flow, its two fills, an `update` that keeps the slot
- * and focus in place, a well nested in a published `InspectorCard`, and its refusals.
+ * and focus in place, a well nested in a published `InspectorCard`, its refusals, and the
+ * standalone style root it is drawn under in a companion's own shell (issue 2456).
  * Limit: happy-dom computes no accessible name and draws no frame, so a name is read off
  * `aria-label` and a fill off the computed `background-color`.
  */
@@ -21,6 +22,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -133,7 +135,7 @@ describe('the published Well draws its well', () => {
         children: { kind: 'slot', required: false },
       },
       rest: true,
-      root: 'fabricate',
+      root: 'any',
       overlays: false,
     });
   });
@@ -251,8 +253,17 @@ describe('the published Well refuses', () => {
   it('a function for its label (M10)', () => {
     assertRefused({ label: () => 'Reagents' }, '"label" must not hold a function');
   });
+});
 
-  it('a target outside a Fabricate window (M16)', () => {
-    assertRefused(LABELLED, 'Well needs a Fabricate window ancestor', companionTarget(targets));
+describe('the published Well in a companion’s own shell', () => {
+  it('draws its well inside one standalone style root, its slot in it, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const { handle } = mountWell(LABELLED, target);
+    await settle();
+    const well = standaloneRootIn(target).firstElementChild;
+    assert.equal(well.localName, 'div');
+    assert.ok(well.contains(handle.slot('children')), 'its content slot is inside the well');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });

@@ -1,10 +1,11 @@
 /**
  * The published `SegmentedControl` on Fabricate's real Svelte runtime (issue 2644), through a fresh
- * seam registered with the adapter's own table, under the Fabricate window root it needs: the named
- * radiogroup and its native radios, each named by its option's `label` and sharing one name unique
- * to the mount, a press and a key with the one `value` its `onChange` takes, a declined change put
- * back and an accepted one drawn, numeric values, what an enclosing form reads, the disabled option,
- * the clipped radio, every refusal the entry adds, an empty `options`, and the View Lab specimen.
+ * seam registered with the adapter's own table, under a Fabricate window root and the standalone
+ * style root it is drawn under in a companion's own shell (issue 2679): the named radiogroup and
+ * its native radios, each named by its option's `label` and sharing one name unique to the mount, a
+ * press and a key with the one `value` its `onChange` takes, a declined change put back and an
+ * accepted one drawn, numeric values, what an enclosing form reads, the disabled option, the
+ * clipped radio, every refusal the entry adds, an empty `options`, and the View Lab specimen.
  * Limit: happy-dom runs no radio arrow navigation, so the key clause asserts the keys pass the
  * control unhandled and simulates the platform's check; the View Lab case presses the real key.
  */
@@ -29,6 +30,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -175,7 +177,7 @@ describe('the published SegmentedControl', () => {
       'density',
     ]);
     assert.deepEqual(described.props.onChange, { kind: 'callback', required: true });
-    assert.equal(described.root, 'fabricate');
+    assert.equal(described.root, 'any');
     assert.equal(described.overlays, false);
   });
 
@@ -507,14 +509,19 @@ describe('what the published SegmentedControl refuses', () => {
       assertRefused(overrides, tail);
     });
   }
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
-    const shell = companionTarget(targets);
-    assert.throws(
-      () => ui().mount('SegmentedControl', { target: shell, props: controlProps(() => {}) }),
-      { name: 'TypeError', message: `${REFUSAL}SegmentedControl needs a Fabricate window ancestor` }
-    );
-    assert.equal(shell.childNodes.length, 0);
+describe('the published SegmentedControl in a companion’s own shell', () => {
+  it('draws its radiogroup inside one standalone style root, the checked radio is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const handle = ui().mount('SegmentedControl', { target, props: controlProps(() => {}) });
+    await settle();
+    const group = standaloneRootIn(target).firstElementChild;
+    assert.equal(group.getAttribute('role'), 'radiogroup');
+    const checked = target.querySelector('input[type="radio"]:checked');
+    assert.ok(group.contains(checked), 'target’s checked radio is the control’s');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });
 

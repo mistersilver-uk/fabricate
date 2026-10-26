@@ -35,6 +35,7 @@ import {
   byName,
   declarationsOf,
   everyStylesheet,
+  gatedRoot,
   selectorsNaming,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
@@ -118,7 +119,7 @@ describe('the module sheet and every component style against the published Statu
       'each pinned ancestor keeps at least one selector off a published switch'
     );
     assert.deepEqual(
-      [Object.keys(entryNamed('StatusToggle').props), entryNamed('StatusToggle').root],
+      [Object.keys(entryNamed('StatusToggle').props), gatedRoot(entryNamed('StatusToggle'))],
       [['on', 'ariaLabel', 'onclick', 'aria-labelledby', 'aria-describedby'], 'fabricate'],
       'a published host, label, disabled state, class or wider root reopens the census'
     );

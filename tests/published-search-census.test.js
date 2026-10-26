@@ -19,7 +19,7 @@ import {
   staleAncestors,
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
-import { SHIPPED, byName } from './helpers/publishedComponentGate.js';
+import { SHIPPED, byName, gatedRoot } from './helpers/publishedComponentGate.js';
 
 /**
  * The published field's root: no published key writes a class on it, and the classes under which
@@ -110,7 +110,7 @@ describe('the module sheet and every component style against the published Searc
   it('publishes no key that would reopen the census', () => {
     const entry = entryNamed('SearchField');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root],
+      [Object.keys(entry.props), gatedRoot(entry)],
       [['value', 'placeholder', 'ariaLabel'], 'fabricate'],
       'a published density, label, class or wider root reopens the census'
     );

@@ -75,6 +75,16 @@ function chainAbove(node) {
   return null;
 }
 
+// Each acquired overlay by the element it was opened from, until it is released (issue 2660).
+// An overlay acquired from itself, as a `Modal` dialog is, is not stored, so a `Modal` never
+// counts as opened from another.
+const openedFrom = new Map();
+
+function recordOpener(overlay, anchor) {
+  if (anchor?.nodeType === 1 && anchor !== overlay) openedFrom.set(overlay, anchor);
+  else openedFrom.delete(overlay);
+}
+
 /**
  * The host `overlay` portals into while open: under a registered published mount, the container
  * its chain holds for `overlay`, the same one until `releaseOverlayHost`; otherwise the class walk
@@ -84,15 +94,45 @@ export function acquireOverlayHost(overlay, anchor, options) {
   const chain = chainAbove(anchor);
   const held = owners.get(overlay);
   if (held && held !== chain) releaseOverlayHost(overlay);
+  recordOpener(overlay, anchor);
   if (!chain) return resolveOverlayHost(anchor, options);
   owners.set(overlay, chain);
   return chain.acquire(overlay);
 }
 
 export function releaseOverlayHost(overlay) {
+  openedFrom.delete(overlay);
   const chain = owners.get(overlay);
   owners.delete(overlay);
   chain?.release(overlay);
+}
+
+/** True when `node`, told by its `nodeType`, is in `container`, or in an open shadow root whose host chain reaches it. */
+export function heldBy(container, node) {
+  for (let at = node; typeof at?.nodeType === 'number'; at = at.getRootNode?.().host) {
+    if (container?.contains?.(at)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every held overlay opened from an element `root` holds, or from one such an overlay holds, to a
+ * fixed point; `root` itself is never in the answer.
+ */
+export function overlaysOpenedFrom(root) {
+  const found = [];
+  let grew = openedFrom.size > 0;
+  while (grew) {
+    grew = false;
+    for (const [overlay, anchor] of openedFrom) {
+      if (overlay === root || found.includes(overlay)) continue;
+      if (heldBy(root, anchor) || found.some((panel) => heldBy(panel, anchor))) {
+        found.push(overlay);
+        grew = true;
+      }
+    }
+  }
+  return found;
 }
 
 /** A `display: contents` container in `host` for `chain`, so `host` stays the containing block. */

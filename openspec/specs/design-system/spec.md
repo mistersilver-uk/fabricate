@@ -623,6 +623,7 @@ A class that carries no meaning beyond a repeated declaration set — visually-h
 A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
 A published component restates the visually hidden declaration set in its own scoped stylesheet, recorded with the reason that it renders under a companion's ancestor, so the `.fabricate` ancestor is not guaranteed (`ui-extension-points` § Ownership, strings and theme); `TierTrack`'s `.fab-tier-track-hidden` is the first (issue 2424).
 `Meter`'s `.fab-meter-hidden` is the next (issue 2448).
+A published component Fabricate draws under the standalone style root does not restate it, because that element carries `.fabricate` (issue 2456).
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
@@ -1007,6 +1008,7 @@ A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY p
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 `Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
 `ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
+A disabled `ArmedDangerButton` MUST draw `Button`'s disabled face whether or not it is armed; the armed fill MUST paint only an enabled control, and an armed control's hover ink MUST reach 4.5:1 against the fill it hovers on.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
@@ -1096,6 +1098,11 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **THEN** the control keeps keyboard focus, carries `aria-busy` and `aria-disabled` and no `disabled`, and its label and accessible name read its `busyLabel`
 - **AND** a press while it is busy confirms nothing
 
+#### Scenario: A disabled armed control draws the disabled face
+
+- **WHEN** an `ArmedDangerButton` is rendered armed with `disabled` set
+- **THEN** it keeps `data-armed="true"` and its armed label, and draws `Button`'s disabled face rather than the `--fab-danger` fill
+
 #### Scenario: A change writes its own motion
 
 - **WHEN** a change writes a literal duration or timing function on a transition or animation, or a scoped reduced-motion block
@@ -1121,6 +1128,8 @@ A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLab
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
 A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
 An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
+A bar's reading is its stage's `valueText` where the caller passes a non-empty one and its percentage otherwise: `RunProgress` passes "p%, stage n of m" through the `FABRICATE.Common.StageBars.Position` key for each named stage of several, whose name states no position, and none for an unnamed one, whose label does; `p` is the stage's whole percent, truncated, so a stage short of done never reads 100%.
+A named stage's caption is ellipsized on overflow with its stage's name as its `title`, as an entry's time is; the caption stays `aria-hidden`, so the title is a pointer affordance and the bar's own name is what is announced.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
@@ -1180,6 +1189,11 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **WHEN** a screen reader reaches a tile in the tint popover
 - **THEN** it announces the colour's name and selected state within a listbox named by the palette label
 - **AND** only the selected tile announces selected
+
+#### Scenario: A named stage of several announces its position
+
+- **WHEN** `RunProgress` draws three stages of which only the first is named, Gather, with the first done
+- **THEN** Gather's bar carries `aria-valuetext` "100%, stage 1 of 3" and each unnamed bar carries none
 
 ### Requirement: Shared primitives share one API convention
 
@@ -2509,7 +2523,9 @@ It dismisses on an outside click and on Escape.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
-A panel such a control portals outside the dialog is outside it, as a `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape there dismisses the modal too.
+A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
+The dialog element is a focus target, `tabindex="-1"` carrying `data-keyboard-focus="true"`, so a pointer press on its surface outside every control focuses the dialog, Foundry's keybindings stay held off, and Tab or Shift+Tab from it moves to its first or its last control, the close control being the first; it keeps its elevation and draws no focus ring (issue 2661).
+The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
@@ -2531,6 +2547,13 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the import folder mapping is open and the user presses Escape on its match-by-name checkbox
 - **THEN** the modal is dismissed once and Foundry's dismiss keybinding closes no window
 - **AND** Escape on an open category list closes that list and leaves the modal open
+
+#### Scenario: A press on the dialog's surface
+
+- **WHEN** the import report is open and the user presses its header band outside the close control
+- **THEN** focus is on the dialog and no keyboard ring and no elevation change is drawn
+- **AND** a following Escape dismisses the modal once and Foundry's dismiss keybinding closes no window
+- **AND** the import report's dialog carries no `aria-modal`, while the roll prompt's carries `aria-modal="true"`
 
 #### Scenario: A roll prompt opens outside every Fabricate window
 

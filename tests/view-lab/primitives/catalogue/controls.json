@@ -400,6 +400,18 @@
     }
   },
   {
+    "spec": "<ArmedDangerButton>",
+    "cap": "armed while disabled — the disabled face",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
+    "props": {
+      "armed": true,
+      "disabled": true,
+      "armedLabel": "Confirm delete",
+      "armedAriaLabel": "Confirm delete"
+    }
+  },
+  {
     "spec": "<Toggle>",
     "cap": "on · accent",
     "draws": ".k-tog",

@@ -1397,12 +1397,22 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
-  const armedBlock = blockFor('.fabricate-button.fabricate-button.is-danger.is-armed');
+  const armedBlock = blockFor('.fabricate-button.is-danger.is-armed');
   const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
   const rosterFocusBlock = blockFor(
     '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
   );
 
+  assert.match(
+    css,
+    /^\.fabricate-button\.is-danger\.is-armed:not\(:disabled\) \{/m,
+    'the armed fill paints only an enabled control, at the specificity the row actions out-rank'
+  );
+  assert.doesNotMatch(
+    css,
+    /^\.fabricate-button(?:\.fabricate-button)*\.is-danger\.is-armed \{/m,
+    'no ungated armed rule survives'
+  );
   assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
   assert.ok(armedBlock.includes('border-color: var(--fab-danger);'), 'armed uses the danger edge');
   assert.ok(

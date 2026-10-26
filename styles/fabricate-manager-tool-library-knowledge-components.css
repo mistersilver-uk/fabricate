@@ -1574,6 +1574,12 @@
   color: var(--fab-danger-text);
 }
 
+.fabricate-manager
+  .manager-component-entry-row-actions
+  .fabricate-button.is-danger.is-armed:not(:disabled):hover {
+  color: var(--fab-on-danger);
+}
+
 .fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger > span:empty {
   display: none;
 }
