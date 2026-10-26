@@ -31,13 +31,13 @@ See [Additional dice]({% link checks/crafting.md %}#additional-dice).
 
 ## What the check decides
 
-A **routed** gathering task is resolved by this check.
+A gathering task set to **Check** is resolved by this check.
 The check rolls, produces a named outcome, and that outcome name is matched to one of the task's result sets by name.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 See [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection).
 
-A **progressive** gathering task needs an award mode and a check formula of its own, set on the task.
-See [Progressive Checks]({% link gathering/tasks.md %}#progressive-checks).
+A legacy **Progressive** gathering task also rolls this check, and needs an award mode and a roll formula authored here.
+See [Legacy Progressive Tasks]({% link gathering/tasks.md %}#legacy-progressive-tasks).
 
-The system's gathering resolution mode decides which of these applies.
-See [Gathering Resolution Mode]({% link gathering/settings.md %}#gathering-resolution-mode).
+Each task's own **Gathering resolution** card decides which of these applies.
+See [Gathering Resolution]({% link gathering/settings.md %}#gathering-resolution).

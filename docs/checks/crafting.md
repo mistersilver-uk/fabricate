@@ -566,7 +566,7 @@ Where you already had a DC override recorded, it is kept but has no effect on a 
 See [Salvage]({% link components/salvage.md %}) for the component editor these controls live on.
 
 A **Routed** gathering task carries the equivalent single **Successes needed override** field, edited with one stepper and a **System default** placeholder, and no presets to choose from.
-See [Gathering Checks]({% link checks/gathering.md %}) and [Progressive Checks]({% link gathering/tasks.md %}#progressive-checks) for where that field sits on the task editor.
+See [Gathering Checks]({% link checks/gathering.md %}) and [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection) for where that field sits on the task editor.
 
 ### Botch and other count triggers
 

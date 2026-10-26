@@ -21,7 +21,7 @@ When the feature is on, the Crafting Admin panel's left rail grows a **Gathering
 | [Environments]({% link gathering/environments.md %}) | The places themselves: their fields, their conditions, and which library tasks and events compose into them. |
 | [Tasks]({% link gathering/tasks.md %}) | The reusable Gathering Task library: drop rows, availability, checks, timing, and required tools. |
 | [Events]({% link gathering/events.md %}) | The reusable event library that fires alongside a gathering attempt. |
-| [Settings]({% link gathering/settings.md %}) | System-level gathering rules: resolution mode, limitations, reward and event rules, and blind mode. |
+| [Settings]({% link gathering/settings.md %}) | System-level gathering rules: limitations, reward and event rules, and blind mode. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
