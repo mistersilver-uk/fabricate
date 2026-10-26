@@ -331,7 +331,8 @@ function minSuccessTierFailed(routing, { minOutcomeId, matched }) {
   if (routing.type !== 'fixed' || !minOutcomeId) return false;
   const required = rankedRoutedOutcomes(routing).find((outcome) => outcome.id === minOutcomeId);
   const requiredStart = required?.start;
-  // A stale/unknown `minOutcomeId`, or a tier with no finite `start`, imposes no minimum.
+  // A stale/unknown `minOutcomeId` imposes no minimum, nor does a tier with no finite `start`,
+  // which `tierRanking` leaves unranked so `required` is absent.
   if (!Number.isFinite(requiredStart)) return false;
   const matchedStart = matched?.start;
   return (
