@@ -281,6 +281,18 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
     assert.deepEqual(model.unassigned, [0, 2, 3]);
   });
 
+  it('reads a failure-role group an ingredient set names explicitly as reachable', () => {
+    const model = setModel(
+      [{ id: 's1', resultGroupId: 'gf' }],
+      [{ id: 'g1' }, { id: 'gf', role: 'failure' }]
+    );
+    assert.deepEqual(model.unreachable, [0]);
+    assert.deepEqual(
+      model.inbound.map((sources) => sources.map(({ id }) => id)),
+      [[], ['s1']]
+    );
+  });
+
   it('counts a multi-target fallback by its largest target', () => {
     const model = setModel(
       [

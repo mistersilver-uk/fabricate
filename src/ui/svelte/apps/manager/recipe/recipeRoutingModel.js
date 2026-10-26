@@ -115,8 +115,9 @@ function unassignedIndexes(provider, sets, groups, tiers) {
  * - `sharedCount`: the sources reaching the source's target, itself included, taking the largest
  *   across several targets and `0` with none. It is shared when above 1.
  * - `inbound`: each group's effective sources, parallel to `resultGroups`.
- * - `unreachable`: the groups no source reaches, failure-role ones included under `'ingredientSet'`,
- *   which never awards one on a failed check, and excluded under `'check'`; empty under `null`.
+ * - `unreachable`: the groups no source reaches. Under `'ingredientSet'` that includes failure-role
+ *   ones, since that mode never awards one on a failed check; under `'check'` it excludes them, and
+ *   under `null` it is empty.
  * - `unassigned`: the groups that claim no offered source, failure-role ones included.
  * - `minimum`: the located minimum tier, or `null`.
  */
