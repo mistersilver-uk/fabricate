@@ -77,6 +77,31 @@ const UNREACHED = Object.freeze([
   'cards-disabled',
   'pagination-persistent-single',
 ]);
+/** The specimens no pointer is moved over, and those whose hover target need not change. */
+const UNHOVERED = Object.freeze(['card-filled', 'well-labelled', 'well-unlabelled']);
+const INERT = Object.freeze([
+  'button-disabled',
+  'search-empty',
+  'search-holding',
+  'field-text-input',
+  'field-textarea',
+  'field-label-host',
+  'field-fieldset-host',
+  'icon-button-disabled',
+  'cards-disabled',
+  'pagination-persistent-single',
+]);
+/** The entries whose specimens draw an element with a resting transition, in table order. */
+const MOVERS = Object.freeze([
+  'Button',
+  'StatusToggle',
+  'Stepper',
+  'SearchField',
+  'Field',
+  'IconButton',
+  'EditorTabs',
+  'Pagination',
+]);
 /**
  * What the harness writes on both targets; ink is left to each host. The width is the companion's
  * own, because core pads a bare `.window-content` and the player window's sheet does not.
@@ -89,7 +114,11 @@ const CORE_MIN_SHEETS = Object.freeze([
   fixture('foundry-core-button-min.css'),
   fixture('foundry-core-input-min.css'),
 ]);
-/** The bare inputs read to hold the core sheets' order and text, and what is read on them. */
+/**
+ * The bare inputs read to hold the core sheets' order and the input fixture's geometry, outline
+ * and transition, and what is read on them. Colours and `outline-color` are left out: core
+ * transitions `outline-color` over 0.5s and the probe reads straight after `focus()`.
+ */
 const PROBED_TYPES = Object.freeze(['text', 'number', 'search']);
 const PROBED = Object.freeze([
   'height',
@@ -135,6 +164,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'columns',
   'persistent',
   'activePanelOnly',
+  'as',
 ]);
 const DECLARED_VOCABULARIES = Object.freeze({ columns: Object.freeze(['1', '2', '3']) });
 
@@ -147,21 +177,50 @@ function objectKeysOf(ast, name) {
   return [];
 }
 
-/** Each literal the component compares `local` with by `===`, in its script or its markup. */
-function comparedLiterals(ast, local) {
-  const isLocal = (node) => node.type === 'Identifier' && node.name === local;
-  const literals = [];
-  for (const node of walkNodes(ast)) {
-    if (node.type !== 'BinaryExpression' || node.operator !== '===') continue;
-    const [named, other] = isLocal(node.left) ? [node.left, node.right] : [node.right, node.left];
-    if (isLocal(named) && other.type === 'Literal') literals.push(String(other.value));
-  }
-  return literals;
+/** The literals of an array, of `new Set([...])`, or of a name declared as either, or `[]`. */
+function listedLiterals(node, declared) {
+  const list = node?.type === 'Identifier' ? declared.get(node.name) : node;
+  const array = list?.type === 'NewExpression' ? list.arguments[0] : list;
+  if (array?.type !== 'ArrayExpression') return [];
+  return array.elements.filter((element) => element?.type === 'Literal');
 }
 
-/** A published key's vocabulary, read from its component: its default and each value it maps or compares. */
-function vocabularyOf(path, key) {
-  const ast = componentAstOf(path);
+/** The literals one node compares `isLocal` with: by `===` or `!==`, a `switch`, or a list's `includes` or `has`. */
+function literalsCompared(node, isLocal, declared) {
+  if (node.type === 'BinaryExpression' && ['===', '!=='].includes(node.operator)) {
+    const other = isLocal(node.left) ? node.right : isLocal(node.right) ? node.left : null;
+    return other?.type === 'Literal' ? [other] : [];
+  }
+  if (node.type === 'SwitchStatement' && isLocal(node.discriminant)) {
+    return node.cases.map((each) => each.test).filter((test) => test?.type === 'Literal');
+  }
+  const method = node.type === 'CallExpression' ? node.callee.property?.name : undefined;
+  if ((method === 'includes' || method === 'has') && isLocal(node.arguments[0])) {
+    return listedLiterals(node.callee.object, declared);
+  }
+  return [];
+}
+
+/** Each literal the component compares `local` with, in its script or its markup. */
+function comparedLiterals(ast, local) {
+  const isLocal = (node) => node?.type === 'Identifier' && node.name === local;
+  const nodes = [...walkNodes(ast)];
+  const declared = new Map(
+    nodes
+      .filter((node) => node.type === 'VariableDeclarator' && node.id.type === 'Identifier')
+      .map((node) => [node.id.name, node.init])
+  );
+  return nodes
+    .flatMap((node) => literalsCompared(node, isLocal, declared))
+    .map((literal) => String(literal.value));
+}
+
+/**
+ * A published key's vocabulary, read from its component: its default, unless the key is required,
+ * and each value it maps or compares.
+ */
+function vocabularyOf(entry, key) {
+  const ast = componentAstOf(entry.path);
   const prop = propLocals(ast).find((local) => local.key === key);
   const fallback = prop?.fallback?.value;
   if (typeof fallback === 'boolean') return { kind: 'boolean', values: ['false', 'true'] };
@@ -173,7 +232,8 @@ function vocabularyOf(path, key) {
     ...comparedLiterals(ast, prop.local),
   ];
   if (read.length > 0) {
-    return { kind: 'listed', fallback, values: [...new Set([String(fallback), ...read])] };
+    const defaulted = entry.props[key].required === true ? [] : [String(fallback)];
+    return { kind: 'listed', fallback, values: [...new Set([...defaulted, ...read])] };
   }
   return { kind: 'text', fallback, values: ['', 'text'] };
 }
@@ -201,7 +261,7 @@ describe('the standalone specimen table', () => {
       const entry = entryNamed(name);
       for (const key of VOCABULARY_KEYS) {
         if (!Object.hasOwn(entry.props, key)) continue;
-        const vocabulary = vocabularyOf(entry.path, key);
+        const vocabulary = vocabularyOf(entry, key);
         assert.ok(vocabulary.values.length > 1, `${name} ${key} reads a vocabulary`);
         const drawn = new Set(
           Object.values(specimens).map(({ props }) => valueOf(vocabulary, props, key))
@@ -211,12 +271,17 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 16, 'each vocabulary key the twelve publish was read');
+    assert.equal(held, 17, 'each vocabulary key the twelve publish was read');
   });
 
   it('reads the densities SegmentedControl compares, which no class table maps', () => {
-    const { values } = vocabularyOf(entryNamed('SegmentedControl').path, 'density');
+    const { values } = vocabularyOf(entryNamed('SegmentedControl'), 'density');
     assert.deepEqual([...values].sort(byName), ['compact', 'default', 'field', 'inline']);
+  });
+
+  it('reads the hosts Field draws for as through its set, with no default for the required key', () => {
+    const { values } = vocabularyOf(entryNamed('Field'), 'as');
+    assert.deepEqual([...values].sort(byName), ['div', 'fieldset', 'label']);
   });
 
   it('compares every property the three-host test compares on these controls', () => {
@@ -235,9 +300,21 @@ describe('the standalone specimen table', () => {
     );
   });
 
+  it('declares exactly the specimens no pointer is moved over, and those whose hover may not change', () => {
+    assert.deepEqual(
+      SPECIMENS.filter(({ reach }) => reach.hover === null).map(({ id }) => id),
+      UNHOVERED
+    );
+    assert.deepEqual(
+      SPECIMENS.filter(({ reach }) => reach.inert).map(({ id }) => id),
+      INERT
+    );
+  });
+
   it('lays every scoped component of the closures, and names the one no published key draws', () => {
     assert.ok(SCOPED.length > 2, 'the closures state scoped rules');
     for (const name of Object.keys(UNDRAWN_SCOPED)) assert.ok(SCOPED.includes(name), name);
+    assert.ok(!Object.hasOwn(entryNamed('EditorTabs').props, 'badges'), 'badges is unpublished');
   });
 });
 
@@ -663,8 +740,29 @@ function assertFocusReach(reads) {
       const at = (state) =>
         mark.properties.map((name) => reads[state][id][host][index].properties[name]);
       assert.notDeepEqual(at('focus'), at('rest'), `${id} ${host} draws its keyboard mark`);
+      const marked = reads.focus[id][host][index].properties;
+      assert.ok(markShows(marked, mark.properties), `${id} ${host}'s keyboard mark is visible`);
     }
   }
+}
+
+/** A computed colour's alpha: `transparent` is 0, an `rgb()` with no alpha 1. */
+function alphaOf(colour) {
+  if (colour === 'transparent') return 0;
+  const alpha = /^rgba\(.*,\s*([\d.]+)\)$/.exec(colour) ?? /\/\s*([\d.]+)\)$/.exec(colour);
+  return alpha ? Number(alpha[1]) : 1;
+}
+
+/** Whether a focus mark is drawn: a ring with a style, a width and an ink, else inked colours. */
+function markShows(marked, properties) {
+  if (properties.includes('outline-style')) {
+    return (
+      marked['outline-style'] !== 'none' &&
+      marked['outline-width'] !== '0px' &&
+      alphaOf(marked['outline-color']) > 0
+    );
+  }
+  return properties.every((name) => alphaOf(marked[name]) > 0);
 }
 
 /** Each hover target is under the pointer, and an enabled one changes what it or a descendant computes. */
@@ -778,6 +876,7 @@ for (const palette of PALETTES) {
       assertFocusReach(measured.reads);
       assertHoverReach(measured.reads);
       assert.equal(Object.keys(measured.reads.focus).length, FOCUSED.length, 'each was focused');
+      assert.equal(Object.keys(measured.reads.hover).length, HOVERED.length, 'each was hovered');
       assert.equal(measured.reads.reducedQuery, true, 'reduced motion was in force');
     });
 
@@ -798,8 +897,12 @@ for (const palette of PALETTES) {
       }
     });
 
-    it('lays the default pager on one row at 560px and wraps it at 336px', async () => {
+    it('lays the default pager on one row at 560px, first page or last, and wraps it at 336px', async () => {
       assert.deepEqual(await measured.tab.evaluate(pagerWraps, { id: 'pagination-first-wide' }), [
+        false,
+        false,
+      ]);
+      assert.deepEqual(await measured.tab.evaluate(pagerWraps, { id: 'pagination-last-wide' }), [
         false,
         false,
       ]);
@@ -810,7 +913,7 @@ for (const palette of PALETTES) {
     });
 
     it('draws nothing alike by accident: the root carries the ink and the reduced-motion rule', async () => {
-      let moved = 0;
+      const moved = [];
       for (const name of Object.keys(STANDALONE_SPECIMENS)) {
         const first = SPECIMENS.find((specimen) => specimen.name === name);
         const { stripped, rooted, classes } = await rootedReads(measured.tab, first.id);
@@ -828,9 +931,9 @@ for (const palette of PALETTES) {
             `${moving.id}'s ${element.tag} takes its reduced motion from the root`
           );
         }
-        moved += 1;
+        moved.push(name);
       }
-      assert.ok(moved > 1, 'entries that move were held to the reduced-motion rule');
+      assert.deepEqual(moved, MOVERS, 'the entries that move were held to the reduced-motion rule');
     });
   });
 }

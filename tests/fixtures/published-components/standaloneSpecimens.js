@@ -30,7 +30,8 @@ const SHELL_BORDER = Object.freeze([
  * from the sentinel reaches, or `null` where nothing is reachable; `mark` the element and
  * properties its keyboard mark changes, the focused element's ring by default; `hover` an enabled,
  * unselected target whose compared properties the pointer changes, or `null`; `inert` marks a
- * disabled hover target, drawn alike under the pointer but not required to change.
+ * disabled hover target, or one the family draws no hover state on, drawn alike under the pointer
+ * but not required to change.
  */
 const reach = (focus, hover = focus, mark = {}) => ({
   focus,
@@ -59,7 +60,7 @@ const SEGMENTS = Object.freeze([
   { value: 'owned', label: 'Owned' },
   { value: 'missing', label: 'Missing' },
 ]);
-const segmented = (props) => ({
+export const segmentedProps = (props) => ({
   options: SEGMENTS,
   value: 'all',
   ariaLabel: 'Show',
@@ -68,7 +69,7 @@ const segmented = (props) => ({
 });
 const SEGMENT_HOVER = '.manager-segment:not(.is-active, .is-disabled)';
 const chosenSegment = (props) => ({
-  props: segmented(props),
+  props: segmentedProps(props),
   reach: reach('input:checked', SEGMENT_HOVER, { selector: '.manager-segment.is-active' }),
 });
 
@@ -82,7 +83,7 @@ const CARDS = Object.freeze([
   { value: 'brew', label: 'Brew', description: 'Simmer it over a low flame', icon: 'fas fa-flask' },
   { value: 'hand', label: 'By hand' },
 ]);
-const cards = (props) => ({
+export const cardsProps = (props) => ({
   options: CARDS,
   value: 'forge',
   legend: 'Method',
@@ -91,7 +92,7 @@ const cards = (props) => ({
 });
 const CARD_HOVER = '.manager-resolution-option:not(.is-active, .is-disabled)';
 const chosenCard = (props) => ({
-  props: cards(props),
+  props: cardsProps(props),
   width: 480,
   reach: reach('input:checked', CARD_HOVER),
 });
@@ -114,7 +115,7 @@ const tabs = (props) => ({
   reach: reach('[role="tab"][tabindex="0"]', '[role="tab"]:not(.is-active)'),
 });
 
-const pager = (props) => ({
+export const pagerProps = (props) => ({
   totalCount: 42,
   pageSize: 10,
   pageIndex: 0,
@@ -169,29 +170,47 @@ export const STANDALONE_SPECIMENS = Object.freeze({
   SearchField: Object.freeze({
     'search-empty': {
       props: { placeholder: 'Search recipes', ariaLabel: 'Search recipes' },
-      reach: reach('input', null, { selector: '.fabricate-search', properties: SHELL_BORDER }),
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
     },
     'search-holding': {
       props: { value: 'iron', placeholder: 'Search recipes', ariaLabel: 'Search recipes' },
-      reach: reach('input', null, { selector: '.fabricate-search', properties: SHELL_BORDER }),
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
     },
   }),
   Field: Object.freeze({
     'field-text-input': {
       props: { as: 'div', children: true },
-      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption"><small>Shown to players</small>`,
-      reach: reach('input', null),
+      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption" aria-describedby="standalone-field-hint"><small id="standalone-field-hint">Shown to players</small>`,
+      reach: reach('input', 'input', { inert: true }),
     },
     'field-textarea': {
       props: { as: 'div', children: true },
       slot: `${CAPTION}<textarea aria-labelledby="standalone-field-caption"></textarea>`,
-      reach: reach('textarea', null),
+      reach: reach('textarea', 'textarea', { inert: true }),
     },
     'field-nested-stepper': {
       props: { as: 'div', children: true },
       slot: CAPTION,
       nest: { name: 'Stepper', props: stepper({ ariaLabel: 'Batch name size' }) },
       reach: reach('[data-stepper-decrement]', '[data-stepper-increment]'),
+    },
+    'field-label-host': {
+      props: { as: 'label', children: true },
+      slot: '<span>Batch name</span><input type="text" placeholder="Moonpetal tonic">',
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-fieldset-host': {
+      props: { as: 'fieldset', children: true },
+      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
     },
   }),
   Well: Object.freeze({
@@ -257,7 +276,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     }),
     'cards-one-column': chosenCard({ columns: 1 }),
     'cards-disabled': {
-      props: cards({ disabled: true }),
+      props: cardsProps({ disabled: true }),
       width: 480,
       reach: inertHover('.manager-resolution-option:not(.is-active)'),
     },
@@ -265,7 +284,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       disabledOptions: [{ value: 'brew', reason: 'Needs a cauldron' }],
     }),
     'cards-unchosen': {
-      props: cards({ value: '' }),
+      props: cardsProps({ value: '' }),
       width: 480,
       reach: reach('input', CARD_HOVER),
     },
@@ -284,22 +303,30 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       ],
     }),
     'segmented-unselected': {
-      props: segmented({ value: '' }),
+      props: segmentedProps({ value: '' }),
       reach: reach('input', SEGMENT_HOVER, { selector: '.manager-segment' }),
     },
   }),
   Pagination: Object.freeze({
-    'pagination-first-wide': { props: pager({}), width: 560, reach: reach(NEXT) },
-    'pagination-last-wide': { props: pager({ pageIndex: 4 }), width: 560, reach: reach(PREVIOUS) },
-    'pagination-first-narrow': { props: pager({}), width: 336, reach: reach(NEXT) },
-    'pagination-compact': { props: pager({ density: 'compact' }), width: 336, reach: reach(NEXT) },
+    'pagination-first-wide': { props: pagerProps({}), width: 560, reach: reach(NEXT) },
+    'pagination-last-wide': {
+      props: pagerProps({ pageIndex: 4 }),
+      width: 560,
+      reach: reach(PREVIOUS),
+    },
+    'pagination-first-narrow': { props: pagerProps({}), width: 336, reach: reach(NEXT) },
+    'pagination-compact': {
+      props: pagerProps({ density: 'compact' }),
+      width: 336,
+      reach: reach(NEXT),
+    },
     'pagination-no-sizes': {
-      props: pager({ pageSizeOptions: [] }),
+      props: pagerProps({ pageSizeOptions: [] }),
       width: 336,
       reach: reach(NEXT),
     },
     'pagination-persistent-single': {
-      props: pager({ totalCount: 6, pageSizeOptions: [], persistent: true }),
+      props: pagerProps({ totalCount: 6, pageSizeOptions: [], persistent: true }),
       width: 336,
       reach: inertHover(NEXT),
     },
@@ -336,6 +363,15 @@ export const STANDALONE_COMPARED = Object.freeze([
     'letter-spacing',
     'text-transform',
     'visibility',
+    'background-image',
+    'text-decoration-line',
+    'font-style',
+    'text-shadow',
+    'filter',
+    'white-space',
+    'word-spacing',
+    'accent-color',
+    'resize',
     ...RING,
     'outline-offset',
     'box-shadow',

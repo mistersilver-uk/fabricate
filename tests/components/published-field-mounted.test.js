@@ -265,13 +265,12 @@ describe('the published Field refuses', () => {
 describe('the published Field in a companion’s own shell', () => {
   it('draws its column inside one standalone style root, a control in its slot is reached, and destroy leaves the shell empty', async () => {
     const target = companionTarget(targets);
-    const { handle, root } = mountField(COLUMN, target);
+    const { handle } = mountField(COLUMN, target);
     await settle();
     const column = standaloneRootIn(target).firstElementChild;
     assert.equal(column.className, 'fabricate-field');
     const { input } = drawCaptionAndInput(handle.slot('children'));
     assert.ok(target.querySelector(FOCUSABLE) === input, 'the companion’s input is all it focuses');
-    assert.ok(root().classList.contains('fabricate-standalone-root'), 'the root is the only child');
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });

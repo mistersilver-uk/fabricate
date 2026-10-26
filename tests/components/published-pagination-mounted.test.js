@@ -711,6 +711,21 @@ describe('the published Pagination in a companion’s own shell', () => {
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
+
+  it('draws nothing but the empty standalone style root while a non-persistent pager is hidden', async () => {
+    const target = companionTarget(targets);
+    const props = pagerProps(
+      () => {},
+      () => {},
+      { totalCount: 5, pageSize: 10, pageSizeOptions: [10, 25] }
+    );
+    const handle = ui().mount('Pagination', { target, props });
+    await settle();
+    assert.equal(standaloneRootIn(target).childElementCount, 0, 'the root holds nothing');
+    assert.ok(!target.querySelector('button, input'), 'nothing inside target takes focus');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+  });
 });
 
 describe('the pagination View Lab specimen cases against the DOM the fixture draws', () => {

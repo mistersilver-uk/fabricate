@@ -19,6 +19,11 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { applyFabricateTheme } from '../../src/ui/theme.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import {
+  cardsProps,
+  pagerProps,
+  segmentedProps,
+} from '../fixtures/published-components/standaloneSpecimens.js';
+import {
   FAULT_REPORT,
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -46,39 +51,6 @@ const STEPPER = Object.freeze({
   incrementLabel: 'More',
   onChange() {},
 });
-const segmented = () => ({
-  options: [
-    { value: 'all', label: 'All' },
-    { value: 'owned', label: 'Owned' },
-  ],
-  value: 'all',
-  ariaLabel: 'Show',
-  onChange() {},
-});
-const cards = () => ({
-  options: [
-    { value: 'forge', label: 'Forge' },
-    { value: 'brew', label: 'Brew' },
-  ],
-  value: 'forge',
-  legend: 'Method',
-  onChange() {},
-});
-const pager = () => ({
-  totalCount: 42,
-  pageSize: 10,
-  pageSizeOptions: [10, 25, 50],
-  onPageChange() {},
-  onPageSizeChange() {},
-  ariaLabel: 'Recipes pages',
-  navLabel: 'Recipes page navigation',
-  previousLabel: 'Previous page',
-  nextLabel: 'Next page',
-  perPageLabel: 'Per page',
-  rangeTemplate: 'Showing {first}–{last} of {total}',
-  pageTemplate: 'Page {page} of {total}',
-});
-
 /** Each widened entry with props it mounts with. */
 const WIDENED = Object.freeze({
   Button: { children: 'Clear filters', onclick() {} },
@@ -99,9 +71,9 @@ const WIDENED = Object.freeze({
     idStem: 'companion',
     onSelect() {},
   },
-  RadioCardGroup: cards(),
-  SegmentedControl: segmented(),
-  Pagination: pager(),
+  RadioCardGroup: cardsProps({}),
+  SegmentedControl: segmentedProps({}),
+  Pagination: pagerProps({}),
 });
 const BUTTON = WIDENED.Button;
 /** Each slot owner a nested target sits in, with its props but the slot. */
@@ -316,12 +288,12 @@ describe('radio groups side by side in one bare form', () => {
     targets.push(form);
     const seam = ui();
     const groups = [
-      ['SegmentedControl', segmented()],
-      ['SegmentedControl', segmented()],
-      ['RadioCardGroup', cards()],
-      ['RadioCardGroup', cards()],
-      ['Pagination', pager()],
-      ['Pagination', pager()],
+      ['SegmentedControl', segmentedProps({})],
+      ['SegmentedControl', segmentedProps({})],
+      ['RadioCardGroup', cardsProps({})],
+      ['RadioCardGroup', cardsProps({})],
+      ['Pagination', pagerProps({})],
+      ['Pagination', pagerProps({})],
     ].map(([name, props]) => {
       const target = document.createElement('div');
       form.append(target);
