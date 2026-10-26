@@ -954,7 +954,7 @@ The "no settings fallback" rule above is unaffected by that surface existing and
   - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.
   - **Simple** — the mandatory shared `craftingCheck.simple` pass/fail check (cannot be disabled).
 Pass → the success result group; fail → the reserved `role: 'failure'` result group (produced only when non-empty; a matched fail is a genuine outcome, not a fizzle).
-In the engine's immediate and timed alchemy reply (the legacy reply), a matched fail that awarded at least one result replies `disposition: 'produced-on-failure'`; one that awarded nothing — the failure group absent, empty, or not permitted by the failure-result policy — replies `disposition: 'failed'`, which the Workbench reads as `check-failed`.
+In the engine's immediate and timed alchemy reply (the legacy reply), a matched fail that awarded at least one result replies `disposition: 'produced-on-failure'`; one that awarded nothing — the failure group absent, empty, or not permitted by the failure-result policy — replies `disposition: 'failed'`, which `classifyBrewReply` reads as `check-failed`.
 A version-1 reply is always `failed` and reads its awards from its created results.
 The failure group's absence is tolerated (a settings-only None→Simple flip runs no recipe migration).
 This reserved failure-group mechanism is **shared** with plain `simple` resolution mode (see §Simple Mode), which mirrors the same none/simple path; `role: 'failure'` is not alchemy-only.
