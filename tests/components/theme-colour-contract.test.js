@@ -152,27 +152,43 @@ function tokensReadByProduct() {
   return read;
 }
 
-function findColourLiteralOffenders() {
+/**
+ * A parenthesised issue number `(#1066)` is a citation, not a colour: all digits, a `(` that does
+ * not close a call such as `url(`, and a closing `)`. The repo's own citation form is `(issue N)`.
+ */
+function isIssueCitation(source, index, text) {
+  return (
+    /^#\d+$/.test(text) &&
+    source[index - 1] === '(' &&
+    !/\w/.test(source[index - 2] ?? ' ') &&
+    source[index + text.length] === ')'
+  );
+}
+
+/** The colour-literal sites of one file's source, as `path:line literal` strings. */
+function colourLiteralOffendersIn(source, filePath) {
   const offenders = [];
 
-  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
-  for (const filePath of productRoots.flatMap(root => collectProductFiles(root))) {
-    const source = readProductFile(filePath);
-    let match;
-
-    while ((match = colourLiteralPattern.exec(source))) {
-      if (
-        isInsideApprovedThemeBlock(filePath, source, match.index) ||
-        isSvelteBlockSyntax(source, match.index)
-      ) {
-        continue;
-      }
-
-      offenders.push(`${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`);
+  for (const match of source.matchAll(colourLiteralPattern)) {
+    if (
+      isInsideApprovedThemeBlock(filePath, source, match.index) ||
+      isSvelteBlockSyntax(source, match.index) ||
+      isIssueCitation(source, match.index, match[1])
+    ) {
+      continue;
     }
+
+    offenders.push(`${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`);
   }
 
   return offenders;
+}
+
+function findColourLiteralOffenders() {
+  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
+  return productRoots
+    .flatMap(root => collectProductFiles(root))
+    .flatMap(filePath => colourLiteralOffendersIn(readProductFile(filePath), filePath));
 }
 
 describe('Theme colour contract', () => {
@@ -321,7 +337,27 @@ describe('Theme colour contract', () => {
     assert.deepEqual(
       offenders,
       [],
-      `product UI colour literals must use theme variables outside approved theme blocks:\n${offenders.join('\n')}`
+      `product UI colour literals must use theme variables outside approved theme blocks; cite an `
+        + `issue as \`(issue N)\`, which reads as prose:\n${offenders.join('\n')}`
     );
+  });
+
+  it('exempts a parenthesised issue citation and flags every other issue-number form', () => {
+    const scan = source => colourLiteralOffendersIn(source, resolve(repoRoot, 'src/ui/x.js'));
+
+    assert.deepEqual(scan('// see (#1066)'), [], 'a parenthesised citation is not a colour');
+    assert.deepEqual(scan('(#1066)'), [], 'a citation at offset 0 is exempt');
+    for (const flagged of [
+      '// see #1066',
+      '/* #1066 */',
+      '(#1a2)',
+      'url(#123)',
+      'fill: url(#1066)',
+      'x(#1066)',
+      '(#1066, #1067)',
+      'a { color: #1066; }'
+    ]) {
+      assert.notDeepEqual(scan(flagged), [], `${flagged} still reads as a colour literal`);
+    }
   });
 });
