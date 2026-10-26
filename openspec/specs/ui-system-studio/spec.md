@@ -1443,12 +1443,9 @@ Current GM editor behavior:
 - Tasks / Nodes authoring exposes task identity, enabled state, current node count, max node count, depletion timing, respawn policy, next respawn evidence, and manual restock controls when node economy is enabled.
 - Manual restock controls are GM-only and show whether they affect current count, max count, or both.
 - Economy authoring shows the selected gathering economy mode and exposes only relevant controls as primary: time requirement for `time`, node controls for `nodes`, stamina cost/regeneration for `stamina`, and combined controls for `hybrid`.
-- Economy authoring exposes a Gathering resolution mode card above the Limitation mode card.
-  It offers `d100` (the only currently implemented gathering resolution; selectable and the default),
-  `progressive`, and `routed` (display name "Routed by check").
-  `progressive` and `routed` are modelled but unimplemented and SHALL render disabled with a "Coming soon" affordance;
-  clicking a disabled option persists nothing.
-  The selection persists on the system gathering economy block as `economy.resolutionMode`.
+- Economy authoring SHALL expose no resolution control.
+  Each Gathering Task authors its own mode on its Overview tab, which offers `straight`, `d100` and `routed`; `progressive` is not offered for authoring, and a legacy `progressive` task keeps its runtime behaviour until the GM chooses another mode.
+  The economy block's `economy.resolutionMode` is inert compatibility data (see § GatheringEconomyConfig in `gathering-and-harvesting`) that the Economy view normalizes and writes back without exposing a control.
 - Stamina authoring exposes system-level stamina configuration, including max/current provider strategy, regeneration mode, regeneration rule, manual adjustment permissions, and task stamina costs.
 - GM controls allow authorized GMs to manually set an actor's current gathering stamina and, when Fabricate owns the maximum, maximum gathering stamina.
 - Risk / Encounters authoring exposes environment risk, task risk overrides, encounter table links, trigger hooks, and player-facing risk copy.
