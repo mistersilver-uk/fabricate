@@ -6,12 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-let mintedIds = 0;
-globalThis.foundry = {
-  utils: { randomID: () => `rid-${String(++mintedIds).padStart(4, '0')}` },
-};
-globalThis.game = { user: { isGM: true }, system: { id: 'dnd5e' }, actors: [], fabricate: null };
-globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
+import { seeded } from '../helpers/seededNormalizeCounter.js';
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
 const { memberScenarios } = await import('../helpers/systemNormalizeCorpus.js');
@@ -71,15 +66,6 @@ const DELETED = Object.freeze([
 const exportName = (member) => member.slice(1);
 const moduleFor = (member) => MODULES[OWNER[member]];
 
-/**
- * Both sides of every comparison mint from the same seed, so the seven delegates that reach a mint
- * site can deep-equal at all; the mint SEQUENCE is pinned by the equivalence suite instead.
- */
-function seeded(call) {
-  mintedIds = 0;
-  return call();
-}
-
 /** A result that could not tell a forwarding delegate from a stub returning it. */
 function isVacuous(value) {
   if (value === null || value === undefined) return true;
@@ -128,6 +114,14 @@ for (const row of FORWARDING) {
       seeded(() => manager[row.member](...row.args)),
       expected,
       `${row.member} no longer returns what ${target} returns for the same arguments`
+    );
+  });
+
+  test(`${row.member} declares exactly one alternative per argument`, () => {
+    assert.equal(
+      row.alternatives.length,
+      row.args.length,
+      `${row.name} has ${row.alternatives.length} alternatives for ${row.args.length} arguments, so a trailing argument escapes the materiality and dropped-argument checks`
     );
   });
 
