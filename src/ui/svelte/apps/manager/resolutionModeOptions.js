@@ -1,9 +1,6 @@
-// Shared recipe/salvage resolution-mode option lists (issue 511). Extracted from
-// SystemEditView so the Crafting Settings page and any other surface reuse one
-// canonical list rather than duplicating it (avoids Sonar new-code duplication).
-// Each option is { value, icon, labelKey, fallback, descKey, descFallback }; a caller
-// drawing it with RadioCardGroup resolves it with `localizeOptions` (issue 2601), and
-// the mode callouts read the keys themselves.
+// Recipe and salvage resolution-mode options; each is { value, icon, labelKey, fallback,
+// descKey, descFallback }. A caller drawing it with RadioCardGroup resolves it with
+// `localizeOptions` (issue 2601), and the mode callouts read the keys themselves.
 
 export const resolutionModeOptions = [
   {
