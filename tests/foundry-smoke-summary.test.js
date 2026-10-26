@@ -158,7 +158,7 @@ test('a console error throws only once steps are clean', () => {
   assert.equal(outcome.reason, 'console-errors');
 });
 
-test('the console-error throw hands back a COPY, so the catch cannot append to what is persisted', () => {
+test('the console-error throw hands back a copy, so the catch cannot append to what is persisted', () => {
   // The runner's path (issue 1064): `results.errors = outcome.errors`, the catch pushes the thrown
   // message onto `results.errors`, and cleanup persists the captured array and counts it.
   const consoleErrors = ['pageerror: a', 'pageerror: b', 'pageerror: c'];

@@ -196,7 +196,7 @@ test('the lint job runs both gates against a base, and no debt job is left', () 
   const end = workflow.indexOf('\n  validate-bindings:');
   assert.ok(start !== -1 && end > start, 'could not locate the lint job in ci.yml');
   const job = workflow.slice(start, end);
-  for (const gate of ['lint', 'format:check']) {
+  for (const gate of ['lint', 'lint:svelte', 'lint:css', 'format:check']) {
     const step = new RegExp(String.raw`^\s*run: npm run ${gate}$`, 'mu');
     assert.match(job, step, `the lint job runs ${gate}`);
   }
@@ -255,7 +255,7 @@ function packageScripts() {
 test('lint:css is pinned by argv equality, and the config it finds enforces a rule', async () => {
   assertGateArgv({ scripts: packageScripts() }, 'lint:css', LINT_CSS_ARGV);
 
-  // A config emptied of rules, or an ignore file covering `styles/`, inspects the corpus and passes.
+  // An emptied config or a .stylelintignore covering styles/ would let lint:css pass while checking nothing.
   const { errored, results } = await stylelint.lint({
     code: '.fabricate-probe { color: red; color: blue; }\n',
     codeFilename: path.join(REPOSITORY_ROOT, 'styles', 'lint-css-probe.css'),
@@ -269,10 +269,6 @@ test('lint:css is pinned by argv equality, and the config it finds enforces a ru
 test('the lint:css argv pin fails when a --config decoy is appended', () => {
   const scripts = packageScripts();
   const withDecoy = { scripts: { 'lint:css': `${scripts['lint:css']} --config decoy.config.js` } };
-  assert.ok(
-    withDecoy.scripts['lint:css'].includes('styles/**/*.{css,scss}'),
-    'the decoy keeps the glob a substring check would look for'
-  );
   assert.throws(
     () => assertGateArgv(withDecoy, 'lint:css', LINT_CSS_ARGV),
     /parsed argv must equal/,

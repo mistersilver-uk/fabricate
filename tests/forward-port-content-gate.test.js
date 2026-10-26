@@ -915,7 +915,8 @@ test('A6 and A7 read a blob carrying a NUL byte as text, on either side (issue 1
   assert.equal(invented.status, 1, invented.output);
   assert.match(invented.output, /::error:: {2}a resolution neither side wrote/);
 
-  // ...and a marker left in a NUL-bearing resolution is still counted.
+  // Characterization: GNU grep -c already counts binary input, so -a on the A6 count is defensive.
+  // A marker left in a NUL-bearing resolution is still counted.
   const marked = gate(
     fileWith({ 1: '<<<<<<< HEAD', 3: RELEASE_LINE_WITH_NUL, 5: 'main took line 5' })
   );
@@ -930,7 +931,7 @@ function loseObject(harness, oid) {
   rmSync(path.join(harness.directory, '.git', 'objects', oid.slice(0, 2), oid.slice(2)));
 }
 
-test('a recorded blob that cannot be READ is unverifiable, never accepted and never accused', (t) => {
+test('a recorded blob that cannot be read is unverifiable, never accepted and never accused', (t) => {
   const harness = createGateHarness(t);
   const resolution = resolvedVerbatim(harness, {
     main: fileWith({ 5: 'main took this line' }),
@@ -959,13 +960,14 @@ test('a recorded blob that cannot be READ is unverifiable, never accepted and ne
 
 // ── 27 ──────────────────────────────────────────────────────────────────────────────────────────
 
-test("A7: a parent's blob that cannot be READ is unverifiable, not a source of invented lines", (t) => {
+test("A7: a parent's blob that cannot be read is unverifiable, not a source of invented lines", (t) => {
   const harness = createGateHarness(t);
   // A modify/delete conflict, so the re-merge records the release blob without reading it.
   const release = fileWith({ 5: 'release took line 5' });
   const resolution = resolvedVerbatim(harness, {
     main: null,
     release,
+    // Line 6 repeats release's line 7, so HEAD's blob is a distinct object that losing release's leaves readable.
     resolved: fileWith({ 5: 'release took line 5', 6: 'line 7' }),
   });
   harness.stub('gh', answering(associationPayload()));
@@ -982,4 +984,21 @@ test("A7: a parent's blob that cannot be READ is unverifiable, not a source of i
     /f\.txt is recorded on origin\/main or origin\/release, but that version's content could not be read/
   );
   assert.ok(!/present in neither origin/.test(output), 'an unread parent accuses nothing');
+});
+
+test('A6: a whitespace-only parent is readable, so it is not mistaken for an unreadable blob', (t) => {
+  const harness = createGateHarness(t);
+  const release = fileWith({ 5: 'release took line 5' });
+  const resolution = resolvedVerbatim(harness, {
+    main: ' \n\t\n',
+    release,
+    resolved: release,
+  });
+  harness.stub('gh', answering(associationPayload()));
+  const { status, output } = harness.runGate({
+    RESOLUTION_REF: resolution,
+    RESOLUTION_EFFECT: 'content-onto-main',
+  });
+  assert.equal(status, 0, output);
+  assert.ok(!/could not be read/.test(output), 'a readable blob of whitespace is not unreadable');
 });
