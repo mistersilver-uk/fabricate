@@ -11,8 +11,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
+import stylelint from 'stylelint';
 
 import { ABSOLUTE_RULES } from '../scripts/lib/newViolations.js';
+
+import { assertGateArgv } from './helpers/gateScope.js';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -239,4 +242,40 @@ test('the npm scripts cover the repository, and are short enough to read', () =>
     '`test:shard` must be the `test` script with `--test-shard` inserted before its glob'
   );
   assert.notEqual(scripts['test:shard'], scripts.test, 'the shard flag was not inserted');
+});
+
+// `--config` is not in the pinned argv, so the config stylelint finds beside a stylesheet is the one
+// `npm run lint:css` runs (issue 947).
+const LINT_CSS_ARGV = ['stylelint', 'styles/**/*.{css,scss}', '--max-warnings=0'];
+
+function packageScripts() {
+  return JSON.parse(readFileSync(path.join(REPOSITORY_ROOT, 'package.json'), 'utf8')).scripts;
+}
+
+test('lint:css is pinned by argv equality, and the config it finds enforces a rule', async () => {
+  assertGateArgv({ scripts: packageScripts() }, 'lint:css', LINT_CSS_ARGV);
+
+  // A config emptied of rules, or an ignore file covering `styles/`, inspects the corpus and passes.
+  const { errored, results } = await stylelint.lint({
+    code: '.fabricate-probe { color: red; color: blue; }\n',
+    codeFilename: path.join(REPOSITORY_ROOT, 'styles', 'lint-css-probe.css'),
+    cwd: REPOSITORY_ROOT,
+  });
+  const rules = results.flatMap((result) => result.warnings.map((warning) => warning.rule));
+  assert.ok(errored, `a duplicated property beside styles/fabricate.css must fail, got ${rules}`);
+  assert.ok(rules.includes('declaration-block-no-duplicate-properties'), `got ${rules}`);
+});
+
+test('the lint:css argv pin fails when a --config decoy is appended', () => {
+  const scripts = packageScripts();
+  const withDecoy = { scripts: { 'lint:css': `${scripts['lint:css']} --config decoy.config.js` } };
+  assert.ok(
+    withDecoy.scripts['lint:css'].includes('styles/**/*.{css,scss}'),
+    'the decoy keeps the glob a substring check would look for'
+  );
+  assert.throws(
+    () => assertGateArgv(withDecoy, 'lint:css', LINT_CSS_ARGV),
+    /parsed argv must equal/,
+    'an appended --config must break the argv pin'
+  );
 });
