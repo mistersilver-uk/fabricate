@@ -1,7 +1,8 @@
 /**
  * `RunProgress` names each bar of its `StageBars` (issue 2455): an unnamed stage of several is
  * labelled "Stage n of m" through its own key, and a lone one takes the group's name, the kicker
- * when one is drawn and `ariaLabel` otherwise.
+ * when one is drawn and `ariaLabel` otherwise. A named stage of several reads "p%, stage n of m"
+ * (issue 2610).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -12,6 +13,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const UNNAMED = 'FABRICATE.Common.StageBars.Unnamed';
+const POSITION = 'FABRICATE.Common.StageBars.Position';
 
 const harness = createMountedComponentHarness({
   repoRoot: resolve(import.meta.dirname, '../..'),
@@ -26,6 +28,7 @@ afterEach(() => harness.remount());
 after(() => harness.teardown());
 
 const barsOf = (root) => [...root.querySelectorAll('[role="progressbar"]')];
+const readingsOf = (root) => barsOf(root).map((bar) => bar.getAttribute('aria-valuetext'));
 
 describe('RunProgress (mounted)', () => {
   it('labels each unnamed stage of several by its position, and a named one by its name', async () => {
@@ -49,6 +52,36 @@ describe('RunProgress (mounted)', () => {
     for (const bar of barsOf(root)) {
       assert.ok(!bar.hasAttribute('aria-labelledby'), 'a bar of several borrows no name');
     }
+    assert.deepEqual(
+      readingsOf(root),
+      [`${POSITION}:{"percent":100,"index":1,"count":3}`, null, null],
+      'a named stage of several reads its position, and an unnamed one, whose label states it, none'
+    );
+  });
+
+  it('reads a named stage of several at its rounded percentage', async () => {
+    const root = await harness.mount({
+      stages: [{ name: 'Gather' }, { name: 'Refine' }, { id: 'x' }],
+      current: 1,
+      progress: 40.4,
+      label: 'Progress',
+    });
+    assert.deepEqual(readingsOf(root), [
+      `${POSITION}:{"percent":100,"index":1,"count":3}`,
+      `${POSITION}:{"percent":40,"index":2,"count":3}`,
+      null,
+    ]);
+  });
+
+  it('reads a lone named stage by its percentage alone', async () => {
+    const root = await harness.mount({
+      stages: [{ name: 'Gather' }],
+      progress: 30,
+      label: 'Progress',
+    });
+    const [bar] = barsOf(root);
+    assert.equal(bar.getAttribute('aria-label'), 'Gather');
+    assert.ok(!bar.hasAttribute('aria-valuetext'), 'a lone stage has no position to state');
   });
 
   it('names an unnamed lone stage by the kicker it draws', async () => {

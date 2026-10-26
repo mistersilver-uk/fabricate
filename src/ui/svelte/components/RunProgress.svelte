@@ -1,7 +1,7 @@
 <!-- Run progress presents caller-supplied stage and time state without advancing execution: a run
      heading over `StageBars`, which names its group by the kicker when one is drawn and by
-     `ariaLabel` otherwise. An unnamed stage of several is labelled "Stage n of m"; a lone one
-     takes the group's name. -->
+     `ariaLabel` otherwise. An unnamed stage of several is labelled "Stage n of m", a named one reads
+     "p%, stage n of m" as its bar's `valueText`, and a lone one takes the group's name. -->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import Kicker from './Kicker.svelte';
@@ -27,9 +27,11 @@
   function barOf(stage, index) {
     const name = stage?.presentationSnapshot?.name || stage?.stepName || stage?.name || '';
     const bar = { name, value: stageProgress(stage, index) };
-    if (name || stages.length === 1) return bar;
+    if (stages.length === 1) return bar;
     const position = { index: index + 1, count: stages.length };
-    return { ...bar, label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
+    if (!name) return { ...bar, label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
+    const reading = { percent: Math.round(bar.value), ...position };
+    return { ...bar, valueText: localize('FABRICATE.Common.StageBars.Position', reading) };
   }
 
   const bars = $derived(stages.map(barOf));
