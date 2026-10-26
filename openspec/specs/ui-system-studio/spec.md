@@ -1445,7 +1445,8 @@ Current GM editor behavior:
 - Economy authoring shows the selected gathering economy mode and exposes only relevant controls as primary: time requirement for `time`, node controls for `nodes`, stamina cost/regeneration for `stamina`, and combined controls for `hybrid`.
 - Economy authoring SHALL expose no resolution control.
   Each Gathering Task authors its own mode on its Overview tab, which offers `straight`, `d100` and `routed`; `progressive` is not offered for authoring, and a legacy `progressive` task keeps its runtime behaviour until the GM chooses another mode.
-  The economy block's `economy.resolutionMode` is inert compatibility data (see § GatheringEconomyConfig in `gathering-and-harvesting`) that the Economy view normalizes and writes back without exposing a control.
+  The economy block's `economy.resolutionMode` is compatibility data (see § GatheringEconomyConfig in `gathering-and-harvesting`) that no UI edits: the Economy view normalizes it and writes it back without exposing a control, and the engine never lets it override a task's `resolutionMode`.
+  The Checks › Gathering editor and the component editor's progressive-DC gate still read it, a known limitation tracked as issue 2696.
 - Stamina authoring exposes system-level stamina configuration, including max/current provider strategy, regeneration mode, regeneration rule, manual adjustment permissions, and task stamina costs.
 - GM controls allow authorized GMs to manually set an actor's current gathering stamina and, when Fabricate owns the maximum, maximum gathering stamina.
 - Risk / Encounters authoring exposes environment risk, task risk overrides, encounter table links, trigger hooks, and player-facing risk copy.

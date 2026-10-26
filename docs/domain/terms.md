@@ -776,7 +776,8 @@ Spec reference: openspec/specs/gathering-and-harvesting/spec.md
 ## Gathering Resolution Mode (system-level economy)
 
 It is distinct from both `CraftingSystem.resolutionMode` (recipe) and the per-task `GatheringTask.resolutionMode`: this is a system-level compatibility field, whereas Task Resolution Mode is the per-task choice that governs runtime.
-It is inert compatibility data: the GM gathering economy UI exposes no control for it, and it never overrides the per-task `GatheringTask.resolutionMode`, which each task authors on its Overview tab (`straight`, `d100` or `routed`, with legacy `progressive` kept until the GM chooses another mode).
+It is compatibility data that no UI edits: the GM gathering economy UI exposes no control for it, and the engine never lets it override the per-task `GatheringTask.resolutionMode`, which each task authors on its Overview tab (`straight`, `d100` or `routed`, with legacy `progressive` kept until the GM chooses another mode).
+The Checks › Gathering editor and the component editor's progressive-DC gate still read it, a known limitation tracked as issue 2696.
 It is GM configuration and is not part of the player gathering listing payload.
 
 Canonical mapping: `gatheringConfig.systems[systemId].economy.resolutionMode`, `GatheringRichStateService.normalizeGatheringEconomy`
