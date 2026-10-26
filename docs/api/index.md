@@ -3991,7 +3991,7 @@ The exception is a component Fabricate draws under the [standalone style root](#
 A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root, which Fabricate's window frames carry (the player window, the Manager and the interactable windows), so both extension targets have it.
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twelve components the [standalone style root](#standalone-style-root) section names are drawn there under one.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twelve components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where the element is not a `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -4064,7 +4064,7 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window whose element is not a `<form>`, as [Stepper](#stepper) states.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.
@@ -4086,7 +4086,7 @@ What it gives you and what it leaves to you:
   The typeface still comes from `target`, so set `font-family`, `font-size` and `line-height` there.
 - It paints no ground, so you supply one.
   Paint `--fab-bg-1` on `target`, or nest the component in an `InspectorCard` or a `Well`, as for [`Callout`](#callout).
-  On Foundry's light theme whatever a component draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the switch's off face, `Field`'s ink and the caption and hint you draw in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary.
+  On Foundry's light theme whatever a component draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the switch's off face, `Field`'s ink and the caption and hint you draw in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows.
   `RadioCardGroup`'s cards and a default `Pagination` bar paint their own ground.
   `--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window.
 - Your own content in a content slot of such a mount takes the Fabricate window's ink, dark colour scheme, palette tokens, focus ring and reduced-motion rule, as it does in a Fabricate window.
@@ -4105,6 +4105,7 @@ What it gives you and what it leaves to you:
 - A component is drawn under the standalone style root only where its admission test holds.
   That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws with the same props in the player window, at rest, under keyboard focus, under the pointer and under reduced motion.
   It runs over Fabricate's core-min fixture and, where the harvest exists, Foundry 14.365's core sheet.
+  The harvested arm draws under no Foundry theme class.
   Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the component does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the test does not measure them.
   Core's `fieldset`, `legend`, radio and `textarea` rules are measured only where the harvest exists.
   An ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.
