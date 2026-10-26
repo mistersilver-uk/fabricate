@@ -35,6 +35,7 @@ import {
   main,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   BLOCK_END,
   BLOCK_START,
@@ -1675,4 +1676,20 @@ describe('design-library frames are not application evidence (issue 2413)', () =
       assert.doesNotMatch(decision.message, /3-0-stepper/);
     });
   }
+});
+
+test('CONTRIBUTING lists every failing gate code, and only those (issue 1176)', () => {
+  const lead = 'A failing check names which problem it is';
+  const lines = readFileSync(new URL('../CONTRIBUTING.md', import.meta.url), 'utf8')
+    .split('\n')
+    .filter((line) => line.startsWith(lead));
+  assert.equal(lines.length, 1, `CONTRIBUTING.md must state "${lead}" on exactly one line`);
+  // A code is a bare lowercase token, so the `::error::<code>` prefix on the same line is not one.
+  const listed = [...lines[0].matchAll(/`([a-z][a-z-]*)`/g)].map(([, code]) => code);
+  const failing = Object.values(GATE_CODES).filter((code) => code !== GATE_CODES.SUPERSEDED);
+  assert.deepEqual(
+    [...new Set(listed)].sort(byCodePoint),
+    [...failing].sort(byCodePoint),
+    'the gate codes CONTRIBUTING.md lists have drifted from GATE_CODES'
+  );
 });
