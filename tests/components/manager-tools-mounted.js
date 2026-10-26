@@ -18,6 +18,7 @@ import {
   labCaseSelector,
   managerComponents,
   settleBetweenTests,
+  settleRouteExit,
   titledIconButtons,
   assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
@@ -1530,6 +1531,59 @@ export function registerToolsCases() {
     assert.ok(calls.some((call) => call[0] === 'confirmDirtyToolsNavigation'));
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tool-edit');
     assert.ok(target.querySelector('[data-tool-editor-dirty]'));
+  });
+
+  it('keeps a dirty Tool mounted and surfaces Validation when Save-on-navigate is refused', async () => {
+    // The route-exit finisher, not the Save button: a refused save must not complete the exit.
+    const warnings = [];
+    const previousUi = globalThis.ui;
+    // ratchet-exempt(lint): the bridge reads `ui.notifications.warn` from the global scope.
+    globalThis.ui = {
+      notifications: {
+        warn: (message) => {
+          warnings.push(message);
+        },
+      },
+    };
+    try {
+      const calls = await mountToolRoute({
+        storeOptions: { saveToolDraftResult: false },
+        services: { confirmDirtyToolsNavigation: () => 'save' },
+      });
+      await openFixtureToolEditor(calls);
+      const input = target.querySelector('[data-tool-label]');
+      input.value = 'Changed';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+      navButton('Component Rules').click();
+      await settleRouteExit();
+
+      assert.ok(
+        calls.some((call) => call[0] === 'saveToolDraft'),
+        'the save is attempted'
+      );
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        'tool-edit',
+        'a refused save keeps the GM on the editor'
+      );
+      assert.ok(
+        target
+          .querySelector('[role="tab"][aria-selected="true"]')
+          .textContent.trim()
+          .startsWith('Validation'),
+        'and the Validation tab is selected'
+      );
+      assert.equal(warnings.length, 1, 'and the save-blocked warning is raised once');
+      assert.equal(warnings[0], 'FABRICATE.Admin.Manager.Tools.SaveBlockedInvalid');
+    } finally {
+      if (previousUi === undefined) {
+        delete globalThis.ui;
+      } else {
+        // ratchet-exempt(lint): puts back the global the install above replaced.
+        globalThis.ui = previousUi;
+      }
+    }
   });
 
   it('discards the focused baseline before navigating away', async () => {
