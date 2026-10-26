@@ -60,6 +60,7 @@
     ariaLabel = '',
     announcement = '',
     onReorderSettled = () => {},
+    itemKey = undefined,
     class: extraClass = '',
     ...rest
   } = $props();
@@ -92,6 +93,11 @@
 
   function idOf(item) {
     return String(item?.id ?? '');
+  }
+
+  // The row's `{#each}` key: the caller's, for a list whose ids may repeat, else the id or index.
+  function keyOf(item, index) {
+    return itemKey ? itemKey(item, index) : idOf(item) || index;
   }
 
   function nameOf(item) {
@@ -249,7 +255,7 @@
   bind:this={listElement}
   {...rest}
 >
-  {#each list as item, index (idOf(item) || index)}
+  {#each list as item, index (keyOf(item, index))}
     <li
       class={`fabricate-sortable-list-row ${rowStateClasses(item, index)}`}
       {...rowAttributes(item)}

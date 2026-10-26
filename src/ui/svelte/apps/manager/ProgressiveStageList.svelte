@@ -20,6 +20,7 @@
   | `dcLabel` / `dcUnsetLabel` / `editLabel` / `editTitle` | strings | `''` | the caller's own copy |
   | `editAriaLabel(item)` | function | `() => ''` | the Edit link's accessible name |
   | `macroNames` / `triggerLabels` | `Map` | `undefined` | passed to `StageComplicationList` |
+  | `itemKey(item, index)` | function | `undefined` | `SortableList`'s render key, for stages that may share an id |
   | `adderClass` | string | `''` | the class of the footer `<li>` around `adder` |
 
   Snippets:
@@ -68,6 +69,7 @@
     editAriaLabel = () => '',
     macroNames = undefined,
     triggerLabels = undefined,
+    itemKey = undefined,
     adder = undefined,
     adderClass = '',
     onItemChange = () => {},
@@ -99,6 +101,7 @@
 
 <SortableList
   {items}
+  {itemKey}
   {itemLabel}
   numbered
   alwaysOpen

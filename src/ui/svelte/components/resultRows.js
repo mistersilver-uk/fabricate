@@ -100,6 +100,28 @@ export function resultAmountInvalid(result, text) {
 }
 
 /**
+ * A keyed `{#each}` key per result: its id on that id's first occurrence, `id#n` for a later
+ * duplicate with `n` counting up from its index past every id and key in the set, and the index for
+ * a missing id, so a repeated result id cannot throw `each_key_duplicate` (issue 2169).
+ */
+export function resultRowKeys(results) {
+  const list = Array.isArray(results) ? results : [];
+  const ids = new Set(list.map((result) => (result?.id ? String(result.id) : '')));
+  const used = new Set();
+  const taken = (key) => used.has(key) || ids.has(key);
+  return list.map((result, index) => {
+    if (!result?.id) return index;
+    const id = String(result.id);
+    let key = id;
+    for (let n = index; used.has(key); n += 1) {
+      if (!taken(`${id}#${n}`)) key = `${id}#${n}`;
+    }
+    used.add(key);
+    return key;
+  });
+}
+
+/**
  * `results` with `componentId` added: the fixed row already producing it gains one, and otherwise,
  * a rolled row included because a bump would not change its roll, a row of one is appended.
  * Gathering task results and salvage add this way; a recipe's result set adds an empty row.

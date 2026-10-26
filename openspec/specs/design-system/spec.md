@@ -1572,6 +1572,7 @@ A paginated table is the clearest case: a reorder callback expressed over a page
 
 Disclosure state and drag state MUST live in the list and be keyed by record id, not lifted into the store the list renders from.
 The key MUST be the item's own `id` field, read by the list, rather than a key function the caller supplies: the expanded id is bindable, so the list and its caller must agree on ONE derivation.
+This binds the state key only: a caller whose records may share an id MAY pass `itemKey` so each row's render key is unique, and disclosure state stays keyed by `id`.
 A caller whose records carry no stable id supplies one before it renders them.
 Every persisted edit refreshes that store, and state held there collapses the row the GM is editing.
 

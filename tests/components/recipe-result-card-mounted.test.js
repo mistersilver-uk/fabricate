@@ -257,6 +257,48 @@ describe('RecipeResultGroupCard: Fixed | Rolled through the card', () => {
     }));
 });
 
+describe('RecipeResultGroupCard: results sharing an id (issue 2169)', () => {
+  const DUPLICATES = Object.freeze([
+    { id: 'dup', componentId: 'cmp-herb', quantity: 1 },
+    { id: 'dup', componentId: 'cmp-water', quantity: 2 },
+  ]);
+  const chosen = (target) =>
+    rows(target).map((row) => row.querySelector('[data-recipe-option-chosen]').textContent.trim());
+
+  for (const [surface, extra] of [
+    ['recipe', {}],
+    ['gathering task', { surface: undefined }],
+  ]) {
+    it(`a ${surface} set draws both rows instead of failing to mount`, async () => {
+      const { target } = await mountCard(DUPLICATES, extra);
+      assert.deepEqual(chosen(target), ['Mountain Herb', 'Pure Water']);
+    });
+  }
+
+  it('a progressive set draws both stages', async () => {
+    const { target } = await mountCard(DUPLICATES, { progressive: true });
+    assert.equal(target.querySelectorAll('[data-recipe-result-row]').length, 2);
+    assert.deepEqual(chosen(target), ['Mountain Herb', 'Pure Water']);
+  });
+
+  it('deleting the first leaves the survivor reading its own data in the instance it takes', async () => {
+    const { target, groups } = await mountCard([
+      DUPLICATES[0],
+      { ...DUPLICATES[1], quantityFormula: '1d4+1' },
+    ]);
+    rows(target)[0].querySelector('[data-recipe-remove="result-item"]').click();
+    await settle();
+
+    assert.deepEqual(groups.at(-1).results, [
+      { id: 'dup', componentId: 'cmp-water', quantity: 2, quantityFormula: '1d4+1' },
+    ]);
+    const [survivor] = rows(target);
+    assert.deepEqual(chosen(target), ['Pure Water']);
+    assert.ok(radio(survivor, 'rolled').checked, 'its own stored expression keeps it Rolled');
+    assert.equal(survivor.querySelector('[data-recipe-option-formula]').value, '1d4+1');
+  });
+});
+
 describe('RecipeResultGroupCard: the Result adder', () => {
   it('appends an empty component row when one kind is offered, and focuses its name field', async () => {
     const { target, groups } = await mountCard([
