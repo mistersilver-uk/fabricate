@@ -80,6 +80,38 @@ const target = (extra = {}) => ({
 
 const BULK_DECISION = { confirmed: true, bonus: 0, rollMode: 'publicroll', advantage: null };
 
+const SHARD_AWARD = [{ id: 'shard', name: 'Shard' }];
+
+/** The `markRunInProgress` rebind: a resumed waiting run that vanishes at that call. */
+async function resumeOfARunThatVanishesAtMarkInProgress() {
+  const world = salvageRunProbe({
+    salvageCraftingCheck: { simple: PASS_FAIL },
+    targets: [target({ timeRequirement: { hours: 1 } })],
+    awards: SHARD_AWARD,
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const run = await world.seedRun({
+    status: 'waitingTime',
+    timeGate: { requiredSeconds: 3600, initiatedAt: 0, availableAt: 3600 },
+  });
+  world.armCallEffect('markRunInProgress', () => world.dropActiveRun(run.id));
+  await world.salvage({ skipTimeGate: true });
+  return world.journal.entries;
+}
+
+/** The `markRunWaitingForTime` rebind: a fresh timed run that vanishes at that call. */
+async function freshRunThatVanishesAtMarkWaiting() {
+  const world = salvageRunProbe({
+    salvageCraftingCheck: { simple: PASS_FAIL },
+    targets: [target({ timeRequirement: { minutes: 1 } })],
+    awards: SHARD_AWARD,
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  world.armCallEffect('markRunWaitingForTime', () => world.dropActiveRun('rid-1'));
+  await world.salvage();
+  return world.journal.entries;
+}
+
 const SCENARIOS = [
   {
     name: "simple success awards, records the run and posts the card",
@@ -773,6 +805,34 @@ const SCENARIOS = [
     ],
   },
   {
+    name: "a resumed run that vanishes at markRunInProgress is nulled and every later run write is skipped",
+    run: resumeOfARunThatVanishesAtMarkInProgress,
+    journal: [
+      ["run.findActiveRunForComponent","Actor:Salvager","sys-salvage","ore"],
+      ["run.markRunInProgress","Actor:Salvager","Run:rid-1 ore waitingTime 0c/0t/0r gate@3600"],
+      ["item.update","Item:ore",{"system.quantity":2}],
+      ["actor.createEmbedded","Actor:Salvager","Item",[{"name":"Shard","quantity":2}]],
+      ["chat.create",{"alias":"Salvager","rolls":0,"text":"FABRICATE.Chat.SalvageSuccess FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 FABRICATE.Chat.SalvageRecovered 2× Shard FABRICATE.Chat.SalvageConsumed Iron Ore"}],
+      ["returned",{"success":true,"results":["Item:made-1"],"message":"Successfully salvaged Iron Ore","value":17,"salvageRun":null}],
+    ],
+  },
+  {
+    // Characterisation: a run that vanishes while arming its gate reads as no gate, so the salvage
+    // awards at once instead of waiting.
+    name: "a fresh run that vanishes at markRunWaitingForTime skips the time gate and awards at once",
+    run: freshRunThatVanishesAtMarkWaiting,
+    journal: [
+      ["run.findActiveRunForComponent","Actor:Salvager","sys-salvage","ore"],
+      ["run.createRun","Actor:Salvager",{"actorUuid":"Actor.Salvager","craftingSystemId":"sys-salvage","componentId":"ore","componentName":"Iron Ore","status":"inProgress","startedAt":0,"usedTools":[],"resultOrder":null}],
+      ["run.markRunWaitingForTime","Actor:Salvager","Run:rid-1 ore inProgress 0c/0t/0r",{"minutes":1}],
+      ["run.canProceedTimeGate",null,0],
+      ["item.update","Item:ore",{"system.quantity":2}],
+      ["actor.createEmbedded","Actor:Salvager","Item",[{"name":"Shard","quantity":2}]],
+      ["chat.create",{"alias":"Salvager","rolls":0,"text":"FABRICATE.Chat.SalvageSuccess FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 FABRICATE.Chat.SalvageRecovered 2× Shard FABRICATE.Chat.SalvageConsumed Iron Ore"}],
+      ["returned",{"success":true,"results":["Item:made-1"],"message":"Successfully salvaged Iron Ore","value":17,"salvageRun":null}],
+    ],
+  },
+  {
     name: "a progressive run spends the player's captured order and fires its complication",
     async run() {
       const world = salvageRunProbe({
@@ -1066,5 +1126,24 @@ const SCENARIOS = [
 for (const scenario of SCENARIOS) {
   test(`salvage pipeline effect journal: ${scenario.name}`, async () => {
     assert.deepEqual(await scenario.run(), scenario.journal);
+  });
+}
+
+for (const [name, scenario] of [
+  ['markRunInProgress', resumeOfARunThatVanishesAtMarkInProgress],
+  ['markRunWaitingForTime', freshRunThatVanishesAtMarkWaiting],
+]) {
+  test(`a run that vanishes at ${name} returns salvageRun null and takes no later run write`, async () => {
+    const journal = await scenario();
+    const at = journal.findIndex(([call]) => call === `run.${name}`);
+    const returned = journal.find(([call]) => call === 'returned')[1];
+
+    assert.ok(at >= 0, `the ${name} call was reached`);
+    assert.ok(Object.hasOwn(returned, 'salvageRun') && returned.salvageRun === null, 'the run is nulled');
+    assert.deepEqual(
+      journal.slice(at + 1).filter(([call]) => call.startsWith('run.') && call !== 'run.canProceedTimeGate'),
+      [],
+      'no run write follows the vanished run'
+    );
   });
 }
