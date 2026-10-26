@@ -184,6 +184,19 @@ function colourLiteralOffendersIn(source, filePath) {
   return offenders;
 }
 
+/** The base triples and the rung count one theme block gives an overlay ladder (`dark` or `light`). */
+function overlayBases(block, ladder) {
+  const source = stripCommentedSource(block);
+  const declared = [...source.matchAll(new RegExp(String.raw`--fab-overlay-${ladder}-\d+\s*:`, 'g'))].length;
+  const bases = [...source.matchAll(new RegExp(String.raw`--fab-overlay-${ladder}-\d+:\s*rgba?\(([^/)]+)`, 'g'))]
+    .map(match => match[1].trim());
+
+  return { declared, matched: bases.length, bases: new Set(bases) };
+}
+
+// Exact rung counts: a rung rewritten as hex or `color-mix` drops out of the base match.
+const OVERLAY_RUNGS = Object.freeze({ dark: 11, light: 9 });
+
 function findColourLiteralOffenders() {
   // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
   return productRoots
@@ -340,6 +353,37 @@ describe('Theme colour contract', () => {
       `product UI colour literals must use theme variables outside approved theme blocks; cite an `
         + `issue as \`(issue N)\`, which reads as prose:\n${offenders.join('\n')}`
     );
+  });
+
+  // Issue 1770: `mythwright` bases its ladder on `0 0 0`, not on `--fab-bg-0`, so the invariant is
+  // one base per theme and ladder, never a fixed derivation.
+  it('expresses each overlay ladder of every theme from one base triple', () => {
+    const css = readStylesheet();
+
+    for (const [themeId, selector] of Object.entries(themeSelectors)) {
+      for (const [ladder, rungs] of Object.entries(OVERLAY_RUNGS)) {
+        const { declared, matched, bases } = overlayBases(blockFor(css, selector), ladder);
+
+        assert.equal(declared, rungs, `${themeId} declares ${rungs} --fab-overlay-${ladder}-* rungs`);
+        assert.equal(matched, rungs, `${themeId} writes every ${ladder} rung as rgb(r g b / a)`);
+        assert.equal(
+          bases.size,
+          1,
+          `${themeId} should express every --fab-overlay-${ladder}-* rung from one base triple, found: ${[...bases].join(' | ')}`
+        );
+      }
+    }
+  });
+
+  it('reports a ladder with two bases and a rung that no longer reads as rgb', () => {
+    const twoBases = '--fab-overlay-dark-05: rgb(0 0 0 / 5%);\n--fab-overlay-dark-10: rgb(1 1 1 / 10%);';
+    const hexRung = '--fab-overlay-dark-05: rgb(0 0 0 / 5%);\n--fab-overlay-dark-10: #000;';
+    const commented = '/* --fab-overlay-dark-10: rgb(9 9 9 / 10%); */\n--fab-overlay-dark-05: rgb(0 0 0 / 5%);';
+
+    assert.deepEqual([...overlayBases(twoBases, 'dark').bases], ['0 0 0', '1 1 1']);
+    assert.notEqual(overlayBases(hexRung, 'dark').matched, overlayBases(hexRung, 'dark').declared);
+    assert.deepEqual([...overlayBases(commented, 'dark').bases], ['0 0 0'], 'a commented rung is not read');
+    assert.equal(overlayBases(twoBases, 'light').declared, 0, 'the light ladder is read separately');
   });
 
   it('exempts a parenthesised issue citation and flags every other issue-number form', () => {
