@@ -10,19 +10,15 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js';
+import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { themePalettes } from '../helpers/themePaletteContrast.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const componentPath = 'src/ui/svelte/components/ArmedDangerButton.svelte';
 
 const THEMES = Object.freeze([
-  'fabricate',
-  'foundry-native',
-  'hearth-herb',
-  'ironblood-forge',
-  'mythwright',
-  'sovereign',
-  'starglass-arcana',
+  ...themePalettes(rulesIn(collectStyleCorpus()['styles/fabricate.css'])).keys(),
 ]);
 
 const FACES = Object.freeze({

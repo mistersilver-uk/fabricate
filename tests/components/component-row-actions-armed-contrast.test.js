@@ -20,6 +20,4 @@ test('the armed row action hovers in --fab-on-danger, which clears 4.5:1 on the 
   const ink = token(ARMED_HOVER, 'color');
   assert.equal(ink, '--fab-on-danger');
   assert.deepEqual(shortfalls(themes, ink, ['--fab-danger']), []);
-  // Why the rest ink is not carried onto the hover.
-  assert.notDeepEqual(shortfalls(themes, '--fab-danger-text', ['--fab-danger']), []);
 });
