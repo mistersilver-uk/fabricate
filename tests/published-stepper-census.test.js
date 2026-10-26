@@ -21,6 +21,7 @@ import {
 import {
   byName,
   everyStylesheet,
+  gatedRoot,
   isComponent,
   selectorsWithRules,
   writtenSelector,
@@ -295,7 +296,7 @@ describe('the module sheet and every component style against the published Stepp
 
   it('publishes no key that would reopen either census', () => {
     assert.deepEqual(
-      [Object.keys(entryNamed('Stepper').props), entryNamed('Stepper').root],
+      [Object.keys(entryNamed('Stepper').props), gatedRoot(entryNamed('Stepper'))],
       [
         [
           'value',

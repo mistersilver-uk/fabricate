@@ -1,7 +1,8 @@
 /**
  * The published `IconButton` on Fabricate's real Svelte runtime (issue 2601), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs: the one
- * native button it draws at each role and size, named by `ariaLabel` and holding its glyph alone,
+ * registered with the adapter's own table, under a Fabricate window root and, in a companion's own
+ * shell, the standalone style root (issue 2456): the one native button it draws at each role and
+ * size, named by `ariaLabel` and holding its glyph alone,
  * a press and its `onclick`, an update that keeps the node and its focus, the native `disabled`,
  * every refusal the entry adds, its `aria-expanded` key, read off the button, and the tooltip:
  * its hover text, always written, and the focus tooltip the runtime's facade opens and closes.
@@ -28,6 +29,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createLabTooltipManager } from '../view-lab/foundry/installFoundryShim.js';
@@ -376,14 +378,22 @@ describe('what the published IconButton refuses', () => {
       assertRefused(props, tail);
     });
   }
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
+describe('the published IconButton in a companion’s own shell', () => {
+  it('draws its button inside one standalone style root, and destroy leaves the shell empty', async () => {
     const target = companionTarget(targets);
-    const props = { icon: GLYPH, ariaLabel: LABEL, onclick() {} };
-    assert.throws(() => ui().mount('IconButton', { target, props }), {
-      name: 'TypeError',
-      message: `${REFUSAL}IconButton needs a Fabricate window ancestor`,
-    });
+    const press = recorder();
+    const props = { icon: GLYPH, ariaLabel: LABEL, onclick: press.record };
+    const handle = ui().mount('IconButton', { target, props });
+    await settle();
+    const button = standaloneRootIn(target).firstElementChild;
+    assert.equal(button.localName, 'button');
+    assert.equal(button.getAttribute('type'), 'button');
+    assert.equal(button.getAttribute('aria-label'), LABEL);
+    button.click();
+    assert.deepEqual(press.calls, [[]]);
+    handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
 });

@@ -602,10 +602,11 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 - Every set drawn as a card is renameable in that card in both routed modes.
   A result set's card names its effective sources: an explicit source is removable, and a fallback source is marked "default" and is not.
   A set nothing reaches reads "Nothing — unreachable" beside its Assign control, and a shared set states how many sources route to it.
+  Under `routedByIngredients` this holds for a set with the `failure` role too, since that mode never awards one on a failed check, so the card and the Validation tab's `unreachableResultGroup` row name the same set.
+  Under `routedByCheck` a `failure`-role set does not read as unreachable.
   Assign lists every source the system offers, and choosing one routed elsewhere re-points it, with a "now → ⟨set⟩" note naming where it routes today.
   While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers reaching a result set by default.
   A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, no longer defined, or a success tier below the recipe's minimum success tier — shows struck, says it does not route, and stays removable.
-  NOT SHIPPED here yet, issue 2520: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
 - The Overview tab ends with a routing card in both routed modes: one routing overview per step scope, each row naming a source and the result set it effectively produces, marked "default" when inherited and "shared · N" when shared, re-pointed in place through the same fields the set card writes.
   Under check routing the card states that the tiers belong to the system and offers "Edit outcome tiers"; a failure tier the policy forbids reads "routing not permitted by this system", a success tier below the recipe's minimum success tier reads "below this recipe's minimum success tier", and a gap between fixed tiers is a blocked row with "Edit outcome tiers".
   Where the recipe sets a minimum success tier, a failure tier the policy permits is marked "only on a forced failure".

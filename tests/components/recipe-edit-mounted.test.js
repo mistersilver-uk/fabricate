@@ -1743,6 +1743,24 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('ingredient mode: a failure-role set nothing reaches shows the badge and the edge', async () => {
+    const groups = [
+      ROUTED_RESULT_GROUPS[0],
+      { id: 'grp-f', name: 'Ruin', role: 'failure', results: [] },
+    ];
+    const { target } = await ingredientRouted(
+      [{ id: 'iset-1', name: 'Alpha', ingredientGroups: [], resultGroupId: 'grp-a' }],
+      groups
+    );
+    const failure = resultCard(target, 1);
+    assert.ok(failure.classList.contains('is-warning'), 'the failure-role set takes the edge');
+    assert.equal(
+      failure.querySelector('[data-route-sources-unreachable]')?.textContent,
+      'Nothing — unreachable'
+    );
+    editHarness.remount();
+  });
+
   it('ingredient mode: a shared set says how many sets route to it', async () => {
     const { target } = await ingredientRouted([
       { id: 'iset-1', name: 'Alpha', ingredientGroups: [], resultGroupId: 'grp-a' },

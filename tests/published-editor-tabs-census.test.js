@@ -33,6 +33,7 @@ import {
   byName,
   declarationsOf,
   everyStylesheet,
+  gatedRoot,
 } from './helpers/publishedComponentGate.js';
 
 /**
@@ -93,7 +94,7 @@ describe('the module sheet and every component style against the published Edito
       'no pinned ancestor'
     );
     assert.deepEqual(
-      [Object.keys(entryNamed('EditorTabs').props), entryNamed('EditorTabs').root],
+      [Object.keys(entryNamed('EditorTabs').props), gatedRoot(entryNamed('EditorTabs'))],
       [['tabs', 'activeTab', 'onSelect', 'ariaLabel', 'idStem', 'activePanelOnly'], 'fabricate'],
       'a published mark, padlock, description, class or wider root reopens the census'
     );

@@ -604,6 +604,8 @@ A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, 
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.
 The measurement is SPAN-INTERIOR ONLY: a set that simply does not cover every value the die can roll is not a gap, because `2d20` rolls 2–40 and a GM who authors 7–34 has authored a deliberate window.
 Invalid and overlapping ranges are excluded from the measurement first, since both already raise their own `critical` and a `start > end` range would otherwise manufacture a phantom gap.
+A fixed tier's bounds are read as authored and never coerced, so a tier with no finite `start` is not placed: it ranks nowhere, no total matches it, and no forced outcome or tier step lands on it, as a tier with no finite `end` (a null one included) holds nothing.
+A saved tier always has a finite `start`, since the normalizer stores a missing one as 0, so this reaches only unnormalized or draft input.
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value in the check's direction, so a lower `start` ranks higher under.
@@ -613,6 +615,7 @@ Because no tier routes on this failure, the blocked tier's own `breakTools` flag
 The default (null/unset) imposes no override, so the outcome is the final tier.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
+So does one naming a fixed tier with no finite `start`.
 The gate is fixed-type only; relative-type routed checks ignore it.
 It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
 Runtime scope: the minimum-success-tier gate is `routedByCheck`-only.
@@ -954,6 +957,8 @@ The "no settings fallback" rule above is unaffected by that surface existing and
   - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.
   - **Simple** — the mandatory shared `craftingCheck.simple` pass/fail check (cannot be disabled).
 Pass → the success result group; fail → the reserved `role: 'failure'` result group (produced only when non-empty; a matched fail is a genuine outcome, not a fizzle).
+In the engine's immediate and timed alchemy reply (the legacy reply), a matched fail that awarded at least one result replies `disposition: 'produced-on-failure'`; one that awarded nothing — the failure group absent, empty, or not permitted by the failure-result policy — replies `disposition: 'failed'`, which `classifyBrewReply` reads as `check-failed`.
+A version-1 reply is always `failed` and reads its awards from its created results.
 The failure group's absence is tolerated (a settings-only None→Simple flip runs no recipe migration).
 This reserved failure-group mechanism is **shared** with plain `simple` resolution mode (see §Simple Mode), which mirrors the same none/simple path; `role: 'failure'` is not alchemy-only.
   - **Tiered** — behaves EXACTLY like `routedByCheck`: the mandatory `craftingCheck.routed` check (cannot be disabled) routes each success outcome to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles before result creation.

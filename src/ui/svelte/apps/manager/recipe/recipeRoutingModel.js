@@ -43,7 +43,7 @@ function setSource(set, index, groups, setName) {
 /**
  * Whether a fixed check's minimum blocks a success tier, comparing `start` in the check's direction
  * as `checkRouting.minSuccessTierFailed` does. A forced failure skips that gate, so a failure tier
- * is never blocked, and a non-finite `start` never blocks where the engine coerces it to 0.
+ * is never blocked, and a non-finite `start` never blocks.
  */
 function belowMinimum(tier, start, minimum, direction) {
   if (tier.success !== true || !minimum || !Number.isFinite(start)) return false;
@@ -115,8 +115,9 @@ function unassignedIndexes(provider, sets, groups, tiers) {
  * - `sharedCount`: the sources reaching the source's target, itself included, taking the largest
  *   across several targets and `0` with none. It is shared when above 1.
  * - `inbound`: each group's effective sources, parallel to `resultGroups`.
- * - `unreachable`: the non-`failure`-role groups no source reaches, defined only for a routed
- *   provider, so it is empty under `null`.
+ * - `unreachable`: the groups no source reaches. Under `'ingredientSet'` that includes failure-role
+ *   ones, since that mode never awards one on a failed check; under `'check'` it excludes them, and
+ *   under `null` it is empty.
  * - `unassigned`: the groups that claim no offered source, failure-role ones included.
  * - `minimum`: the located minimum tier, or `null`.
  */
@@ -151,7 +152,11 @@ export function buildRoutingModel({
     sources,
     inbound,
     unreachable: routed
-      ? indexesWhere(groups, (group, i) => group?.role !== 'failure' && inbound[i].length === 0)
+      ? indexesWhere(
+          groups,
+          (group, i) =>
+            inbound[i].length === 0 && (provider === 'ingredientSet' || group?.role !== 'failure')
+        )
       : [],
     unassigned: unassignedIndexes(provider, sets, groups, offered),
     minimum,

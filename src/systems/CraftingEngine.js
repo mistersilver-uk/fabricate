@@ -3727,7 +3727,7 @@ export class CraftingEngine {
         success: false,
         results: resultItems.length > 0 ? resultItems : null,
         message: checkResult.message || 'FABRICATE.Alchemy.FailureResult',
-        disposition: 'produced-on-failure',
+        disposition: resultItems.length > 0 ? 'produced-on-failure' : 'failed',
       },
     };
   }

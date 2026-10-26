@@ -450,6 +450,29 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.deepEqual(rowActionArgs(calls), [['results', 'result-group-g-orphan']]);
     harness.remount();
   });
+
+  it('lists a failure-role result set no ingredient set reaches as the same warning row', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipe: {
+        name: 'Routed Brew',
+        enabled: true,
+        ingredientSets: [{ id: 's1', resultGroupId: 'g-good' }],
+        resultGroups: [{ id: 'g-good' }, { id: 'g-fail', role: 'failure' }]
+      },
+      routingProvider: 'ingredientSet',
+      onSelectIssue: (...args) => {
+        calls.push(args);
+      }
+    });
+    const check = target.querySelector('[data-check="routedResultGroupsReachable"]');
+    assert.equal(check.dataset.satisfied, 'false');
+    assert.ok(check.classList.contains('is-warn'), 'it reads as a warning, not a blocker');
+    check.querySelector('[data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(rowActionArgs(calls), [['results', 'result-group-g-fail']]);
+    harness.remount();
+  });
 });
 
 /** THE SURFACE ITSELF, MOUNTED (issue 1517). */

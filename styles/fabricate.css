@@ -3,7 +3,7 @@
 /* Tokens: the self-hosted font faces, the :root design tokens and scales, the six [data-fabricate-theme] palettes and the derived --fab-control-outline token. Nothing here paints an element. */
 @import url("fabricate-tokens.css");
 
-/* Every Fabricate window: heading normalisation, the module's one reduced-motion block (it also reaches the chat cards, dice tiles and canvas prompt), the player app shell root and its resize floor, the module focus-ring pair with its text-field and validation-focus variants, and the module utilities (fab-truncate, fab-stack, fab-cluster). Strays: the nav rail's count pip and the journal fact-card heading. */
+/* Every Fabricate window: heading normalisation, the module's one reduced-motion block (it also reaches the chat cards, dice tiles and canvas prompt), the player app shell root and its resize floor, the module focus-ring pair with its text-field and validation-focus variants and the Modal dialog's exemption from its ring, and the module utilities (fab-truncate, fab-stack, fab-cluster). Strays: the nav rail's count pip and the journal fact-card heading. */
 @import url("fabricate-base.css");
 
 /* The manager's frame: the manager root and its host resets (font floor, text-field baseline), the titlebar, the page header and its action cluster, the body grid with the rail and its collapsed form, and each route's .manager-main row template. Shared family kept here: the manager button treatment (the fabricate-button root's 34px rung, ghost, dashed, full-width, and the save-failed alert). */
@@ -36,7 +36,7 @@
 /* The GM Travel route (realms browse pane, map links, realm environments, regions, parties and their actor tiles) and, interleaved with it, the picker primitive that SearchablePopover draws (fabricate-picker, fabricate-picker-popover: roots, composite search field, panel, option rows, grid and grouped forms, keyboard cursor). Strays: the recipe bulk panel's book picker and select widths, and the recipe requirement row's or-menu. */
 @import url("fabricate-manager-travel.css");
 
-/* The app's one select (fabricate-select: trigger rungs, value, popover panel, option rows, tick, hint, badge, and the labelled form with its note and error). Strays: the standalone roll-prompt overlay host, and the recipe library row's collapse ladder (three fabricate-recipes container rungs). */
+/* The app's one select (fabricate-select: trigger rungs, value, popover panel, option rows, tick, hint, badge, and the labelled form with its note and error). Strays: the standalone roll-prompt overlay host, the standalone style root a published component is drawn in outside a Fabricate window, and the recipe library row's collapse ladder (three fabricate-recipes container rungs). */
 @import url("fabricate-select.css");
 
 /* The sheet's tail: the Tool Studio library (the tools route: authority band, breakage card, list, inspector, create card) with its container rungs, the GM Knowledge surface, the flat surface ladder the essence and tool screens share, the world Component catalogue and its entry page, and the system Component Rules list, inspector and editor. Shared families kept here: the sortable list (fabricate-sortable-list), the manager button's opt-in sizes and the bulk dock. Strays: the salvage DC bodies and the essence catalogue rows. */

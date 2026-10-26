@@ -1258,6 +1258,12 @@ export function foundryReads(file, reader) {
   return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
 }
 
+/**
+ * The root a gate judges `entry`'s closure and focus mark at: `'fabricate'` for one the seam draws
+ * under the standalone style root, whose `.fabricate` the module sheet styles it by (issue 2456).
+ */
+export const gatedRoot = (entry) => (entry.standaloneRoot === true ? 'fabricate' : entry.root);
+
 /** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
 export function closureDependencies(path, reader = SHIPPED, root = 'any') {
   return [...importClosure(path, reader)].flatMap((file) =>

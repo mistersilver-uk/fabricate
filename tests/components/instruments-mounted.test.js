@@ -441,7 +441,37 @@ describe('StageBars (mounted)', () => {
       ['1 Draw', '2 Fold', '3 '],
       'numbered by default, each caption its position and its name, never its label'
     );
+    assert.deepEqual(
+      [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) =>
+        caption.getAttribute('title')
+      ),
+      ['Draw', 'Fold', null],
+      "each named caption's title is its stage's whole name, never its label or position"
+    );
     assert.ok(!group.querySelector('button'), 'choosing a stage is not this instrument');
+  });
+
+  it('announces a stage valueText as its reading, and only a non-empty string one', async () => {
+    const root = await stages.mount({
+      stages: [
+        { name: 'Draw', valueText: '100%, stage 1 of 4', value: 100 },
+        { name: 'Fold', value: 45 },
+        { name: 'Quench', valueText: '', value: 0 },
+        { name: 'Temper', valueText: 7, value: 0 },
+      ],
+      ariaLabel: 'Progress',
+    });
+    const bars = [...root.querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(
+      bars.map((bar) => [bar.getAttribute('aria-valuetext'), bar.getAttribute('aria-valuenow')]),
+      [
+        ['100%, stage 1 of 4', '100'],
+        [null, '45'],
+        [null, '0'],
+        [null, '0'],
+      ],
+      'an omitted, empty or non-string valueText leaves the percentage as the reading'
+    );
   });
 
   it('draws an empty named group for no stages', async () => {
