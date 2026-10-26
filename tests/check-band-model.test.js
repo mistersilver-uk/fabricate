@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  bandToneFor,
   bandsAreEditable,
   buildCountBands,
   countBandScale,
@@ -13,6 +14,7 @@ import {
   buildPassFailBands,
   buildRoutedBands,
   describeBandRange,
+  oddsRowTone,
   previewBandTarget,
   resolvePreviewTarget,
 } from '../src/ui/svelte/apps/manager/checks/checkBandModel.js';
@@ -569,5 +571,62 @@ describe('count bands (issue 2006)', () => {
       }),
       true
     );
+  });
+});
+
+describe('oddsRowTone (issue 2185)', () => {
+  const failing = (id = 'tier') => ({ id, success: false });
+  const succeeding = (id = 'tier') => ({ id, success: true });
+  const chart = (rows, options = {}) =>
+    rows.map((row, index) => oddsRowTone(row, index, rows.length, options));
+
+  it('draws a botch row and the unrouted bucket in danger wherever they sit', () => {
+    assert.equal(oddsRowTone(failing('botch'), 0, 1), 'danger');
+    assert.equal(oddsRowTone(failing('botch'), 2, 3), 'danger');
+    assert.equal(oddsRowTone(succeeding('unrouted'), 2, 3), 'danger');
+  });
+
+  it('tones a lone row by its outcome, not the ramp’s middle', () => {
+    assert.equal(oddsRowTone(succeeding(), 0, 1), 'success');
+    assert.equal(oddsRowTone(failing(), 0, 1), 'danger');
+  });
+
+  it('keeps the plain ramp for a row whose outcome is not a boolean', () => {
+    assert.equal(oddsRowTone({ id: 'tier' }, 1, 3), bandToneFor(1, 3));
+    assert.equal(oddsRowTone({ id: 'tier', success: 'yes' }, 0, 1), bandToneFor(0, 1));
+  });
+
+  it('caps a failing row at warning, and leaves one below the cap where the ramp put it', () => {
+    assert.deepEqual(chart([failing(), failing(), succeeding()]), ['danger', 'warning', 'accent']);
+    assert.deepEqual(chart([failing(), failing(), failing()]), ['danger', 'warning', 'warning']);
+    assert.equal(oddsRowTone(failing(), 1, 5), 'warning', 'already at the cap');
+  });
+
+  it('floors a succeeding row at success, except on a progressive award-count chart', () => {
+    const awards = [failing('award-0'), succeeding('award-1'), succeeding('award-2')];
+    const fourAwards = [...awards, succeeding('award-3')];
+    assert.deepEqual(chart(fourAwards), ['danger', 'success', 'info', 'accent']);
+    assert.deepEqual(chart(fourAwards, { progressive: true }), [
+      'danger',
+      'warning',
+      'info',
+      'accent',
+    ]);
+    // The cap still holds on a progressive chart.
+    const failedTwice = [failing('botch'), failing('award-0'), succeeding('award-1')];
+    assert.deepEqual(chart(failedTwice, { progressive: true }), ['danger', 'warning', 'accent']);
+  });
+
+  it('leaves the ramp-ordered pass/fail and fail/success/critical charts as they were', () => {
+    for (const rows of [
+      [failing(), succeeding()],
+      [failing(), succeeding(), succeeding()],
+      [failing(), failing(), succeeding(), succeeding()],
+    ]) {
+      assert.deepEqual(
+        chart(rows),
+        rows.map((_, index) => bandToneFor(index, rows.length))
+      );
+    }
   });
 });

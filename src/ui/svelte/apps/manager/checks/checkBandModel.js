@@ -40,6 +40,19 @@ export function bandToneFor(position, count) {
 }
 
 /**
+ * An odds row's tone: its ramp position bounded by its outcome (`ui-system-studio` odds bars); a
+ * row with no boolean `success` keeps the plain ramp.
+ */
+export function oddsRowTone(row, index, count, { progressive = false } = {}) {
+  if (row?.id === 'botch' || row?.id === 'unrouted') return 'danger';
+  if (typeof row?.success !== 'boolean') return bandToneFor(index, count);
+  if (count <= 1) return row.success ? 'success' : 'danger';
+  const ramp = BAND_TONES.indexOf(bandToneFor(index, count));
+  if (!row.success) return BAND_TONES[Math.min(ramp, 1)];
+  return BAND_TONES[progressive ? ramp : Math.max(ramp, 2)];
+}
+
+/**
  * Whether a strip keeps its drag handles: only summed roll-over against a fixed DC (R2), judged by
  * the evaluation the runtime grades with, so an inert count record keeps them.
  */
