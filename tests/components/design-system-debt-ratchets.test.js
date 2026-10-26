@@ -2210,9 +2210,10 @@ const cornersOf = (radii, definitions) => [
  * Every in-scope rule pairing a banded size with a corner off its band, and how many paired rules
  * were judged. Read: each `height`, `min-height` and `width` (logical twins too) in px, in rem at
  * Foundry's 16px root or through `var()`; every radius shorthand and longhand. A marker exempts
- * only the radius or size declaration it sits on. Unseen, so the rendered corner audit holds them:
- * a size and a corner split across two rules, an inherited corner, a size set by markup or a
- * prop, and a `calc()` size.
+ * only the radius or size declaration it sits on. Unseen here: a size and a corner split across
+ * two rules, an inherited corner, a size set by markup or a prop, and a `calc()` size. The View Lab
+ * computed census (`scripts/lib/viewLabComputedCensus.js`) judges controls so sized; an unsized
+ * card, panel or well is held by review.
  */
 function offBandCorners({ declarations, definitions, sources }) {
   const rules = new Map();
