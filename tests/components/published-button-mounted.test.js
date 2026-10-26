@@ -1,9 +1,10 @@
 /**
  * The published `Button` on Fabricate's real Svelte runtime (issue 2452), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs: the one
- * native button it draws at each visual role, a press and its `onclick`, an update that keeps the
- * node and its focus, the native `disabled`, every refusal the entry adds, its required root, and a
- * button in a published `EmptyState`'s content slot; then its two `aria` keys, read off the button.
+ * registered with the adapter's own table, under a Fabricate window root: the one native button
+ * it draws at each visual role, a press and its `onclick`, an update that keeps the node and its
+ * focus, the native `disabled`, every refusal the entry adds, the standalone style root it is drawn
+ * under in a companion's own shell (issue 2456), and a button in a published `EmptyState`'s content
+ * slot; then its two `aria` keys, read off the button.
  * The `type` and the mark for keyboard focus are read here because the component writes both on a
  * `svelte:element`, where the static gates see the mark and not the type.
  * Limit: happy-dom moves no focus when a focused button is disabled and activates no button from
@@ -28,6 +29,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -655,16 +657,16 @@ describe('an aria key on the published Button', () => {
   }
 });
 
-describe('the published Button and its required root', () => {
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
+describe('the published Button and its root', () => {
+  it('draws inside one standalone style root in a companion’s own shell, and destroy leaves it empty', async () => {
     const target = companionTarget(targets);
-    assert.throws(
-      () => ui().mount('Button', { target, props: { children: LABEL, onclick() {} } }),
-      {
-        name: 'TypeError',
-        message: `${REFUSAL}Button needs a Fabricate window ancestor`,
-      }
-    );
+    const handle = ui().mount('Button', { target, props: { children: LABEL, onclick() {} } });
+    await settle();
+    const button = standaloneRootIn(target).firstElementChild;
+    assert.equal(button.localName, 'button');
+    assert.equal(button.getAttribute('type'), 'button');
+    assert.deepEqual(authoredClasses(button), FAMILY);
+    handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
 
@@ -710,15 +712,14 @@ describe('the published Button and its required root', () => {
     assert.deepEqual(reports, []);
   });
 
-  it('is refused in the content slot of an EmptyState that sits in no Fabricate window (M16)', async () => {
+  it('draws under a standalone style root of its own in the content slot of an EmptyState in no Fabricate window', async () => {
     const seam = ui();
     const { panel, inner } = panelWithSlot(seam, companionTarget(targets));
     await settle();
-    assert.throws(
-      () => seam.mount('Button', { target: inner, props: { children: LABEL, onclick() {} } }),
-      { name: 'TypeError', message: `${REFUSAL}Button needs a Fabricate window ancestor` }
-    );
-    assert.equal(inner.childNodes.length, 0);
+    seam.mount('Button', { target: inner, props: { children: LABEL, onclick() {} } });
+    await settle();
+    assert.equal(standaloneRootIn(inner).firstElementChild.localName, 'button');
     panel.destroy();
+    assert.equal(inner.childNodes.length, 0, 'the nested root left with the panel');
   });
 });

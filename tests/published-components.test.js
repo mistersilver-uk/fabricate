@@ -1,7 +1,8 @@
 /**
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
  * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
- * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
+ * destroy, the claim on a target, `load`, the fault path with its `onFault` notice, and the
+ * standalone style root's registration, description and element (issue 2456). Content
  * slots and the required root are `published-component-slots.test.js`'s, callbacks
  * `published-component-callbacks.test.js`'s, and the real Svelte runtime the mounted suites'.
  */
@@ -95,6 +96,90 @@ describe('the published-components descriptor', () => {
     seam.bindPublicApi(api);
     assert.equal(api.ui, ui, 'a rebind publishes the same object');
     assert.equal('liveMountCount' in ui, false);
+  });
+});
+
+describe('an entry drawn under the standalone style root', () => {
+  const STANDALONE = Object.freeze({ ...ZETA, name: 'Standalone', standaloneRoot: true });
+  const WIDENED = ['InspectorCard', 'Button', 'StatusToggle', 'Well', 'IconButton'];
+
+  it('describes the entry without standaloneRoot, which only its group states', () => {
+    const { ui } = seamWith({ table: [ZETA, STANDALONE] });
+    assert.deepEqual(ui.describe('Standalone'), ui.describe('Zeta'));
+  });
+
+  it('describes each widened shipped entry at the any root, without standaloneRoot', () => {
+    const { publicApi: ui } = createPublishedComponents({ isReady: () => true });
+    const stated = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.standaloneRoot === true);
+    assert.deepEqual(
+      stated.map(({ name }) => name),
+      WIDENED
+    );
+    for (const name of WIDENED) {
+      assert.equal(ui.describe(name).root, 'any', name);
+      assert.ok(!Object.hasOwn(ui.describe(name), 'standaloneRoot'), `${name} leaves it out`);
+    }
+  });
+
+  for (const root of ['fabricate', 'manager']) {
+    it(`refuses at registration standaloneRoot on the ${root} root, naming the entry`, () => {
+      const table = [{ ...STANDALONE, root }];
+      const seam = createPublishedComponents({ table, isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          const tail = `Standalone states standaloneRoot on the root "${root}"`;
+          assert.match(error.message, exactly(PREFIX + tail));
+          return true;
+        }
+      );
+    });
+  }
+
+  for (const value of [false, 'true', 1]) {
+    it(`refuses at registration a standaloneRoot of ${JSON.stringify(value)}, naming the entry`, () => {
+      const table = [{ ...STANDALONE, standaloneRoot: value }];
+      const seam = createPublishedComponents({ table, isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          const tail = `Standalone has an unknown standaloneRoot "${String(value)}"`;
+          assert.match(error.message, exactly(PREFIX + tail));
+          return true;
+        }
+      );
+    });
+  }
+
+  it('writes one display: contents root in a bare target, draws in it, and removes it by reference', () => {
+    const { ui, mounts } = seamWith({ table: [STANDALONE], hasAncestor: () => false });
+    const target = new FakeTarget();
+    const handle = ui.mount('Standalone', { target, props: zetaProps() });
+    const [root] = target.childNodes;
+    assert.equal(target.childNodes.length, 1, 'one element in the target');
+    assert.equal(root.className, 'fabricate fabricate-standalone-root');
+    assert.equal(root.style.display, 'contents');
+    assert.equal(mounts[0].target, root, 'the host is drawn inside it');
+    const elsewhere = new FakeTarget();
+    elsewhere.append(root);
+    handle.destroy();
+    assert.equal(root.removals, 1, 'removed wherever it now is');
+    assert.equal(elsewhere.childNodes.length, 0);
+  });
+
+  it('writes none under any .fabricate, which is the one question it asks', () => {
+    const asked = [];
+    const hasAncestor = (_target, selector) => {
+      asked.push(selector);
+      return true;
+    };
+    const { ui, mounts } = seamWith({ table: [STANDALONE], hasAncestor });
+    const target = new FakeTarget();
+    ui.mount('Standalone', { target, props: zetaProps() });
+    assert.equal(mounts[0].target, target, 'the host is drawn in the target');
+    assert.deepEqual(asked, ['.fabricate']);
   });
 });
 

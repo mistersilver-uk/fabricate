@@ -706,6 +706,9 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-leaves-specimen',
         'manager-published-controls-specimen',
         'manager-published-buttons-specimen',
+        'published-standalone',
+        'published-standalone-light',
+        'published-standalone-in-window',
       ],
     ],
     [
@@ -905,13 +908,16 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam', () => {
+test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Well.svelte';
   const frames = [
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
     'manager-published-well-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
@@ -928,12 +934,48 @@ test('(a) a Callout change publishes its four frames, then the specimen that mou
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam', () => {
+test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconButton.svelte';
   const frames = [
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) a StatusToggle change publishes its six frames, then the three that mount it with and without a Fabricate root', () => {
+  const file = 'src/ui/svelte/components/StatusToggle.svelte';
+  const frames = [
+    'manager-system-edit-normal',
+    'coverage-mode-routed-check-checks',
+    'manager-tool-parity-04-requirements-1280x720',
+    'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
+    'manager-published-toggles-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) an InspectorCard change publishes its frames, then the three that mount it with and without a Fabricate root', () => {
+  const file = 'src/ui/svelte/components/InspectorCard.svelte';
+  const frames = [
+    'manager-essences-disabled-in-use',
+    'coverage-mode-routed-check-checks',
+    'manager-published-leaves-specimen',
+    'manager-tool-parity-01-library-1280x720',
+    'manager-world-travel-realms-normal',
+    'manager-world-travel-map-normal',
+    'manager-world-travel-map-empty',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });

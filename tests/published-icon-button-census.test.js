@@ -34,6 +34,7 @@ import {
   byName,
   declarationsOf,
   everyStylesheet,
+  gatedRoot,
 } from './helpers/publishedComponentGate.js';
 
 /**
@@ -112,7 +113,7 @@ describe('the module sheet and every component style against the published IconB
       'each pinned ancestor keeps at least one selector off a published icon button'
     );
     assert.deepEqual(
-      [Object.keys(entryNamed('IconButton').props), entryNamed('IconButton').root],
+      [Object.keys(entryNamed('IconButton').props), gatedRoot(entryNamed('IconButton'))],
       [['icon', 'ariaLabel', 'role', 'size', 'disabled', 'onclick', 'aria-expanded'], 'fabricate'],
       'a published tooltip, class, child or wider root reopens the census'
     );

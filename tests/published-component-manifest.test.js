@@ -59,8 +59,11 @@
  * alone, so the reaching set's first clause is what holds each visual role under either window.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
+import DESIGN_SYSTEM from '../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import {
@@ -123,6 +126,7 @@ import {
   everyStylesheet,
   focusableElements,
   followedProps,
+  gatedRoot,
   importClosure,
   isComponent,
   moduleRing,
@@ -643,10 +647,11 @@ function sheetClassNames() {
 
 /**
  * Sheet reach: each `fab-`, `fabricate-` or `manager-` class token an `any` entry's closure
- * spells that a selector in `sheet` names, as `<file>: <token>`. Another root is not judged.
+ * spells that a selector in `sheet` names, as `<file>: <token>`. Another root is not judged, nor is
+ * an entry drawn under the standalone style root, which its rendered admission test judges.
  */
-function sheetReach({ path, root }, sheet, reader = SHIPPED) {
-  if (root !== 'any') return [];
+function sheetReach({ path, root, standaloneRoot }, sheet, reader = SHIPPED) {
+  if (root !== 'any' || standaloneRoot === true) return [];
   return [...importClosure(path, reader)].flatMap((file) => {
     const tokens = spelledStrings(file, reader).flatMap((text) => text.split(/\s+/));
     return [...new Set(tokens)]
@@ -857,6 +862,30 @@ describe('the manifest', () => {
     for (const entry of PUBLISHED_COMPONENT_MANIFEST) {
       assert.ok(Object.isFrozen(entry) && Object.isFrozen(entry.props), entry.name);
     }
+  });
+
+  it('publishes no manager-only design-system row, and the spec names every one (issue 2456)', () => {
+    const rows = DESIGN_SYSTEM.designSystemPrimitives.filter(
+      ({ scope }) => scope === 'manager-only'
+    );
+    const names = rows.map(({ path }) => basename(path, '.svelte'));
+    assert.ok(names.length > 20, `the manager-only rows were read: ${names.length}`);
+    const published = new Set(PUBLISHED_COMPONENT_MANIFEST.map(({ path }) => path));
+    assert.deepEqual(
+      rows.filter(({ path }) => published.has(path)),
+      [],
+      'none is published'
+    );
+    const spec = readFileSync(
+      resolve(import.meta.dirname, '../openspec/specs/ui-extension-points/spec.md'),
+      'utf8'
+    ).split('\n');
+    const ruling = spec.findIndex((line) =>
+      line.includes('row scoped `manager-only` is not published')
+    );
+    assert.ok(ruling !== -1, 'the ruling is in the spec');
+    const listed = [...spec[ruling + 1].matchAll(/`(\w+)`/g)].map(([, name]) => name);
+    assert.deepEqual(listed.sort(byName), names.sort(byName), 'the ruling names each row');
   });
 });
 
@@ -1101,7 +1130,7 @@ describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      const optional = new Set(['restOn', 'tooltip', 'overlays', 'lazy']);
+      const optional = new Set(['restOn', 'tooltip', 'overlays', 'lazy', 'standaloneRoot']);
       const keys = Object.keys(entry).filter((key) => !optional.has(key));
       assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
       assert.ok(
@@ -1117,6 +1146,11 @@ describe('each entry matches its component declaration', () => {
         'overlays is true or absent'
       );
       assert.ok(!Object.hasOwn(entry, 'lazy') || entry.lazy === true, 'lazy is true or absent');
+      assert.ok(
+        !Object.hasOwn(entry, 'standaloneRoot') ||
+          (entry.standaloneRoot === true && entry.root === 'any'),
+        "standaloneRoot is true on an entry whose root is 'any', or absent"
+      );
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);
@@ -1131,7 +1165,7 @@ describe('each entry matches its component declaration', () => {
     });
 
     it(`${entry.name} needs no ancestor above its root and reads no Foundry global, closure included`, () => {
-      assert.deepEqual(closureDependencies(entry.path, SHIPPED, entry.root), []);
+      assert.deepEqual(closureDependencies(entry.path, SHIPPED, gatedRoot(entry)), []);
     });
 
     it(`${entry.name} marks every focusable element it draws, and names no form control`, () => {
@@ -1282,10 +1316,11 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual([...new Set(reach)].sort(byName), [...SHEET_REACH_PINS]);
     const card = PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'InspectorCard');
+    assert.equal(card.standaloneRoot, true, 'the card is drawn under the standalone style root');
     assert.deepEqual(
-      sheetReach({ ...card, root: 'any' }, sheet),
+      sheetReach({ ...card, standaloneRoot: undefined }, sheet),
       ['src/ui/svelte/components/InspectorCard.svelte: fabricate-card'],
-      'the class the sheet draws the card by is what refuses it the any root'
+      'the class the sheet draws the card by is what refuses it the any root without that root'
     );
   });
 
@@ -2797,8 +2832,11 @@ describe('each entry matches its component declaration', () => {
 
 const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector }) => selector);
 
-/** An entry's published keys and root, which a census of its root class pins. */
-const publishedShapeOf = (name) => [Object.keys(entryNamed(name).props), entryNamed(name).root];
+/** An entry's published keys and the root its gates judge, which a census of its root class pins. */
+const publishedShapeOf = (name) => [
+  Object.keys(entryNamed(name).props),
+  gatedRoot(entryNamed(name)),
+];
 
 describe('the module sheet against the published Chip', () => {
   it('names the chip root in 15 selectors, none of which a published chip can match', () => {
@@ -2858,7 +2896,9 @@ describe('the module sheet and every component style against the published Inspe
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
     assert.equal(selectors.length, 15, 'the census at issue 2467');
     assert.deepEqual(
-      PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
+      PUBLISHED_COMPONENT_MANIFEST.filter(
+        ({ root, standaloneRoot }) => root !== 'any' || standaloneRoot === true
+      ).map(({ name }) => name),
       [
         'InspectorCard',
         'Button',
@@ -2877,7 +2917,7 @@ describe('the module sheet and every component style against the published Inspe
         'ActionMenu',
         'Modal',
       ],
-      'an entry with a required root needs a census of its own'
+      'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );
     assert.deepEqual(
       publishedShapeOf('InspectorCard'),
