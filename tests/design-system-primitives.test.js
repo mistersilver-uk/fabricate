@@ -695,7 +695,11 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
     [
       'src/ui/svelte/components/Chip.svelte',
       ['player-crafting-simple'],
-      ['manager-published-leaves-specimen'],
+      [
+        'manager-published-leaves-specimen',
+        'manager-recipes-narrow-status-row',
+        'manager-recipes-inspector-cant-enable',
+      ],
     ],
     [
       'src/ui/svelte/components/Button.svelte',

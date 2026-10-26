@@ -114,6 +114,30 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
+  // Issue 1589: the inspector's chip row on the recipe that is off and cannot be enabled.
+  managerCase({
+    id: 'manager-recipes-inspector-cant-enable',
+    label: "Manager — Recipes inspector, Can't enable chip",
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"] .manager-recipe-identity',
+      },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '[data-recipe-inspector] .manager-chip-row .manager-chip:has-text("Can\'t enable")',
+    expectContained: [{ container: '[data-recipe-inspector]', target: '.manager-chip-row' }],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+    ],
+  }),
   // Issue 1773: the inspector's Produces rows name a currency reward by its label and amount with
   // its unit, and a knowledge reward by the recipe it teaches, each with its kind's glyph.
   // Issue 1773: a choice group reads in the inspector as the Requires list's any-one-of box,
@@ -216,6 +240,35 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  // Issue 1589: both of a row's status pills at the narrow window, where the name row has the least room.
+  managerCase({
+    id: 'manager-recipes-narrow-status-row',
+    label: 'Manager — Recipes narrow, off and un-enableable row',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
+      ':has(.manager-recipe-name-row .manager-chip:has-text("Disabled"))' +
+      ':has(.manager-recipe-name-row .manager-chip:has-text("Can\'t enable"))',
+    expectContained: [
+      {
+        container: '.manager-main',
+        target: '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]',
+      },
+    ],
+    position: { width: 900, height: 700 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({

@@ -728,9 +728,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-in-window',
   ]),
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
+  // Then the manager recipe row's two status pills and the inspector's chip row (issue 1589).
   'src/ui/svelte/components/Chip.svelte': Object.freeze([
     'player-crafting-simple',
     'manager-published-leaves-specimen',
+    'manager-recipes-narrow-status-row',
+    'manager-recipes-inspector-cant-enable',
   ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
   // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
