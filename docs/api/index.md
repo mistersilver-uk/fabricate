@@ -2815,7 +2815,8 @@ So in a list of two or more stages each stage requires a `label` or a `name`: a 
 `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too.
 A stage whose `valueText` is absent, `''` or not a string announces its percentage.
 Pass a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
-A Fabricate that predates `valueText` ignores it and announces the percentage.
+Naming `valueText` is additive, and the entry stays at `version` 1.
+A Fabricate that predates it ignores it and announces the percentage, and `describe` cannot tell you which one is running.
 A member other than `name`, `label`, `valueText` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
 `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
@@ -2845,7 +2846,7 @@ const props = () => ({
     name: stage.title,
     value: stage.percent,
     // Your own words; they replace the percentage, so they state it too.
-    valueText: `${stage.percent}%, stage ${index + 1} of ${all.length}`,
+    valueText: `${Math.floor(stage.percent)}%, stage ${index + 1} of ${all.length}`,
   })),
 });
 const bars = fabUi.mount('StageBars', { target, props: props() });
