@@ -1,7 +1,6 @@
 /**
- * The `check-screenshots` gate's composed decision (issue 1133). THE MUTATION MAP IS THE ACCEPTANCE
- * BAR -------------------------------------- Each of the 62 mutations below must flip the named
- * test to FAIL.
+ * The `check-screenshots` gate's composed decision (issue 1133). Each lettered case pins one
+ * direction of the verdict, so a mutation of the gate that inverts it fails that case.
  */
 
 import assert from 'node:assert/strict';
@@ -337,6 +336,29 @@ describe('decideScreenshotGate', () => {
       !gh.calls.some((args) => args.includes('headRefOid')),
       'only a cancelled run raises the question of whether a newer head superseded this one'
     );
+  });
+
+  it('(f4) fails a cancelled capture whose live head could not be read, rather than passing it as superseded', async () => {
+    // The failed read's stderr is non-empty and differs from HEAD, so a read that handed it back as
+    // the head would pass this head as superseded.
+    const gh = makeGhFake({
+      runs: [workflowRun({ conclusion: 'cancelled' })],
+      headOidFails: 'HTTP 502: Bad Gateway',
+      body: '',
+    });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+
+    let decision;
+    const captured = await captureConsole(async () => {
+      decision = await decide({ gh, clock });
+    });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_CANCELLED);
+    assert.ok(
+      gh.calls.some((args) => args.includes('headRefOid')),
+      'the cancelled run must have asked for the live head'
+    );
+    assert.ok(captured.warn.length > 0, 'the failed head read is warned about');
   });
 
   it('(g1) fails on the deadline when the capture never concludes and the clock advances', async () => {
