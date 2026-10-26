@@ -1588,6 +1588,14 @@ test('the gutter-claim catalogue cases align the filter bar box with their rows'
   }
 });
 
+/** A bar narrowed but not zeroed passes `oneLineRows`, so the stage bars case floors each track (issue 2610). */
+function assertStageBarsTrackFloor({ minInlineSize, oneLineRows, unclipped }) {
+  assert.equal(minInlineSize?.pixels, 72, 'the forge group draws its four tracks at 79.5px');
+  assert.ok(minInlineSize.selector.endsWith(' .fab-stage-bars-track'), 'the floor is per track');
+  assert.equal(oneLineRows, '[data-lab-stage-bars-ground] .fab-stage-bars');
+  assert.equal(unclipped, '[data-lab-stage-bars-ground] .fab-stage-bars-caption');
+}
+
 test('exactly the declared layout cases carry complete layout expectations', () => {
   assert.deepEqual(
     LAYOUT_CASE_REGISTRATIONS.filter(
@@ -1635,6 +1643,9 @@ test('exactly the declared layout cases carry complete layout expectations', () 
         typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
         `${viewCase.id} states its rows as one line or as wrapped lines`
       );
+      if (viewCase.id === 'manager-published-stage-bars-specimen') {
+        assertStageBarsTrackFloor(viewCase.expectLayout);
+      }
       continue;
     }
     if (HEADING_FLOOR_LAYOUT_CASE_IDS.includes(viewCase.id)) {

@@ -924,12 +924,13 @@ export const CASES = Object.freeze([
       })),
       { container: '.window-content', target: STAGE_BARS_GROUND },
     ],
-    // Each group's bars side by side on one line, and every caption whole, so no name is cut
-    // off with an ellipsis.
+    // Each group's bars side by side on one line, every caption whole, so no name is cut off
+    // with an ellipsis, and every track at least 72px, as the forge group's four draw 79.5px.
     expectLayout: {
       containerSelector: STAGE_BARS_GROUND,
       oneLineRows: `${STAGE_BARS_GROUND} .fab-stage-bars`,
       unclipped: `${STAGE_BARS_GROUND} .fab-stage-bars-caption`,
+      minInlineSize: { selector: `${STAGE_BARS_GROUND} .fab-stage-bars-track`, pixels: 72 },
     },
     position: STAGE_BARS_WINDOW,
     kinds: ['manager', 'specimen'],
