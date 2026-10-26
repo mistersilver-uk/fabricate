@@ -1811,7 +1811,13 @@ test('no register row cites a line number', () => {
     ruledOut: RULED_OUT,
   }).flatMap(([table, rows]) =>
     rows.flatMap((row) =>
-      lineCitesIn(row.why).map((cite) => `${table} ${row.path ?? row.name}: ${cite}`)
+      Object.entries(row).flatMap(([field, value]) =>
+        [value]
+          .flat()
+          .filter((text) => typeof text === 'string')
+          .flatMap(lineCitesIn)
+          .map((cite) => `${table} ${row.path ?? row.name} ${field}: ${cite}`)
+      )
     )
   );
   assert.deepEqual(
