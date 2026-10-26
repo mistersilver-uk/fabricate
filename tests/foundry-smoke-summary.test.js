@@ -158,6 +158,24 @@ test('a console error throws only once steps are clean', () => {
   assert.equal(outcome.reason, 'console-errors');
 });
 
+test('the console-error throw hands back a COPY, so the catch cannot append to what is persisted', () => {
+  // The runner's path (issue 1064): `results.errors = outcome.errors`, the catch pushes the thrown
+  // message onto `results.errors`, and cleanup persists the captured array and counts it.
+  const consoleErrors = ['pageerror: a', 'pageerror: b', 'pageerror: c'];
+  const steps = [{ step: 'a', passed: true }];
+  const outcome = evaluateSmokeOutcome({ steps, consoleErrors });
+  assert.equal(outcome.reason, 'console-errors');
+  assert.deepEqual(outcome.errors, consoleErrors);
+
+  const results = { steps, errors: outcome.errors };
+  results.errors.push(outcome.message);
+  results.consoleErrors = consoleErrors;
+
+  assert.deepEqual(consoleErrors, ['pageerror: a', 'pageerror: b', 'pageerror: c']);
+  assert.equal(computeSmokeSignal(results).consoleErrorCount, 3);
+  assert.deepEqual(results.errors, [...consoleErrors, '3 runtime console error(s) captured.']);
+});
+
 test('no input waives a step failure — an all-waived console list still throws on the step', () => {
   // Model the full pipeline: the waiver removed every console error (consoleErrors is empty because
   // all matched a pattern), yet a step failed.
@@ -303,9 +321,13 @@ test('runSmokeCleanup assigns stepFailures/consoleErrorCount after the cleanup p
 
 test('the runner evaluates its terminal gate via evaluateSmokeOutcome, not an inline re-implementation', () => {
   // The terminal throw at the end of the runner's try goes through evaluateSmokeOutcome
-  // (steps-first ordering, no input waives a step) — a runner-side concern, not cleanup.mjs's.
+  // (steps-first ordering, no input waives a step) — a runner-side concern, not cleanup.mjs's. Its
+  // console-error branch takes the outcome's copy, never the array cleanup.mjs persists (issue 1064).
   const source = smokeModule('foundry-test-run.mjs');
-  assert.match(source, /evaluateSmokeOutcome\(\{ steps: results\.steps, consoleErrors \}\)/);
+  assert.match(
+    source,
+    /evaluateSmokeOutcome\(\{ steps: results\.steps, consoleErrors \}\);\s*if \(outcome\.reason === 'console-errors'\) \{\s*results\.errors = outcome\.errors;/
+  );
 });
 
 test('isTransientPageTeardown recognises browser/page teardown, not real failures', () => {
