@@ -2704,7 +2704,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>progress</b> 0–100 — the current stage’s own fill</li>
         <li><b>label</b> the kicker, which names the track group when drawn · <b>ariaLabel</b> — the group’s name when no kicker is drawn</li>
         <li><b>blocker</b> string — the one line beside the Progress kicker</li>
-        <li>No events and no rest spread; the tracks, their group and their stage-named progress roles are <code>&lt;StageBars&gt;</code>’, and an unnamed stage of several is labelled “Stage <i>n</i> of <i>m</i>” here, through the <code>FABRICATE.Common.StageBars.Unnamed</code> key, while a named stage of several reads “<i>p</i>%, stage <i>n</i> of <i>m</i>” as its bar’s <b>valueText</b>, through the <code>FABRICATE.Common.StageBars.Position</code> key; a lone stage takes neither.</li>
+        <li>No events and no rest spread; the tracks, their group and their stage-named progress roles are <code>&lt;StageBars&gt;</code>’, and an unnamed stage of several is labelled “Stage <i>n</i> of <i>m</i>” here, through the <code>FABRICATE.Common.StageBars.Unnamed</code> key, while a named stage of several reads “<i>p</i>%, stage <i>n</i> of <i>m</i>”, <i>p</i> its whole percent truncated, as its bar’s <b>valueText</b>, through the <code>FABRICATE.Common.StageBars.Position</code> key; a lone stage takes neither.</li>
       </ul></div>
       <div><h5>StageNav API</h5><ul>
         <li class="k-hint"><b>Read from <code>StageNav.svelte</code>&rsquo;s <code>$props()</code> at issue 1644.</b></li>

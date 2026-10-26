@@ -30,7 +30,7 @@
     if (stages.length === 1) return bar;
     const position = { index: index + 1, count: stages.length };
     if (!name) return { ...bar, label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
-    const reading = { percent: Math.round(bar.value), ...position };
+    const reading = { percent: Math.floor(bar.value), ...position };
     return { ...bar, valueText: localize('FABRICATE.Common.StageBars.Position', reading) };
   }
 

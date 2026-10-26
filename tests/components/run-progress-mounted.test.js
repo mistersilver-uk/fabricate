@@ -9,14 +9,16 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const UNNAMED = 'FABRICATE.Common.StageBars.Unnamed';
 const POSITION = 'FABRICATE.Common.StageBars.Position';
 
+const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
-  repoRoot: resolve(import.meta.dirname, '../..'),
+  repoRoot,
   tmpPrefix: 'fabricate-run-progress-',
   rawModules: FOUNDRY_BRIDGE_RAW_MODULES,
   compiledModules: ['FillBar', 'Kicker', 'StageBars', 'RunProgress'].map(component),
@@ -59,18 +61,41 @@ describe('RunProgress (mounted)', () => {
     );
   });
 
-  it('reads a named stage of several at its rounded percentage', async () => {
-    const root = await harness.mount({
+  it('reads a named stage of several at its whole percentage, truncated', async () => {
+    const refining = (progress) => ({
       stages: [{ name: 'Gather' }, { name: 'Refine' }, { id: 'x' }],
       current: 1,
-      progress: 40.4,
+      progress,
       label: 'Progress',
     });
+    const root = await harness.mount(refining(40.4));
     assert.deepEqual(readingsOf(root), [
       `${POSITION}:{"percent":100,"index":1,"count":3}`,
       `${POSITION}:{"percent":40,"index":2,"count":3}`,
       null,
     ]);
+    harness.remount();
+    const nearlyDone = await harness.mount(refining(99.6));
+    assert.equal(
+      readingsOf(nearlyDone)[1],
+      `${POSITION}:{"percent":99,"index":2,"count":3}`,
+      'a stage short of done never reads 100%'
+    );
+  });
+
+  it('reads each named stage of several in the shipped wording', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const root = await harness.mount({
+        stages: [{ name: 'Gather' }, { name: 'Refine' }, { id: 'x' }],
+        current: 1,
+        progress: 99.6,
+        label: 'Progress',
+      });
+      assert.deepEqual(readingsOf(root), ['100%, stage 1 of 3', '99%, stage 2 of 3', null]);
+    } finally {
+      restoreI18n();
+    }
   });
 
   it('reads a lone named stage by its percentage alone', async () => {
