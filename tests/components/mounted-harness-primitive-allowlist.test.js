@@ -469,7 +469,7 @@ const syntheticSuite = (...lines) => lines.join('\n').replaceAll('@KEY', 'compil
 
 test('a roster passed by name or shorthand is read as a spread, and a call on it is not', () => {
   const gapsOf = (...lines) => gapsIn(SYNTHETIC_SUITE, syntheticSuite(...lines));
-  const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it`;
+  const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it (the roster at line 2)`;
 
   const byName = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE });');
   assert.ok(byName.gaps.includes(selectGap), 'a roster passed by name is read');
@@ -477,6 +477,66 @@ test('a roster passed by name or shorthand is read as a spread, and a call on it
   assert.ok(shorthand.gaps.includes(selectGap), 'a roster passed by shorthand is read');
   const call = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
   assert.deepEqual(call.named, [], 'a call on a roster stays unread, as the harness test needs');
+});
+
+const [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD] = [
+  'Button',
+  'ArmedDangerButton',
+  'InspectorCard',
+].map((name) => SHARED_PRIMITIVES.find((path) => path.endsWith(`/${name}.svelte`)));
+const BULK_DELETE_CARD = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
+const gapFor = (primitive, line) =>
+  `${SYNTHETIC_SUITE} mounts a tree that renders ${primitive} but never compiles it` +
+  (line === undefined ? '' : ` (the roster at line ${line})`);
+const quoted = (...paths) => paths.map((path) => `'${path}'`).join(', ');
+
+test('a harness roster is checked on its own, so another harness cannot hide its omission', () => {
+  const both = syntheticSuite(
+    `h({ @KEY: [${quoted(BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD)}] });`,
+    `h({ @KEY: [${quoted(ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD)}] });`
+  );
+  assert.deepEqual(gapsIn(SYNTHETIC_SUITE, both).gaps, [gapFor(BUTTON, 2)]);
+  assert.ok(
+    compiledPathsOf(both, SYNTHETIC_SUITE).includes(BUTTON),
+    'the union of both rosters names Button, which is what hid the second roster’s gap'
+  );
+});
+
+test('a path constant the declaring file binds once is read as its path', () => {
+  const card = syntheticSuite(`const CARD = '${BULK_DELETE_CARD}';`, 'h({ @KEY: [CARD] });');
+  const rendered = [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD];
+  assert.deepEqual(
+    gapsIn(SYNTHETIC_SUITE, card).gaps,
+    SHARED_PRIMITIVES.filter((primitive) => rendered.includes(primitive)).map((primitive) =>
+      gapFor(primitive, 2)
+    )
+  );
+});
+
+test('an element no single path constant binds is left unread, not failed', () => {
+  const unread = {
+    'an identifier nothing declares': syntheticSuite('h({ @KEY: [componentPath] });'),
+    'a template-literal constant': syntheticSuite(
+      `const CARD = \`${BULK_DELETE_CARD}\`;`,
+      'h({ @KEY: [CARD] });'
+    ),
+    'a constant declared twice': syntheticSuite(
+      `const CARD = '${BULK_DELETE_CARD}';`,
+      `const CARD = '${INSPECTOR_CARD}';`,
+      'h({ @KEY: [CARD] });'
+    ),
+    'a call': syntheticSuite("h({ @KEY: [component('X')] });"),
+  };
+  for (const [label, suite] of Object.entries(unread)) {
+    assert.deepEqual(gapsIn(SYNTHETIC_SUITE, suite).named, [], `${label} stays unread`);
+  }
+});
+
+test('one hand-rolled temp tree is checked whole, whichever call compiles each component', () => {
+  const calls = [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD].map(
+    (path) => `writeCompiledSvelte('${path}');`
+  );
+  assert.deepEqual(gapsIn(SYNTHETIC_SUITE, syntheticSuite(...calls)).gaps, []);
 });
 
 test('a spread roster is followed one level into the file that declares it', () => {
