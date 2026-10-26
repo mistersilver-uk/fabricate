@@ -56,9 +56,10 @@ export const GATE_CODES = Object.freeze({
   PULL_REQUEST_READ_FAILED: 'pull-request-read-failed',
 });
 
-/** The managed screenshot block's delimiters, as `upsertScreenshotsBlock` writes them. */
-const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
-const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
+/** A managed-block delimiter counts only as a whole line, as `upsertScreenshotsBlock` writes it. */
+const BLOCK_MARKER_LINE = /^[ \t]*<!-- fabricate:screenshots:(start|end) -->[ \t]*$/;
+const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const TOP_LEVEL_HEADING = /^#{1,2}\s/;
 
 /** What the body says about evidence, independent of what the producer's run did. */
 const EVIDENCE = Object.freeze({
@@ -81,20 +82,74 @@ const NEXT_HEADING_PATTERN = /^(#{1,6})\s/;
 
 // Pure parsing: what the body carries, and which frame each published URL is.
 
-/** The managed block's text, or `''` when the body carries no complete block. */
-function managedBlockText(text) {
-  const start = text.indexOf(SCREENSHOTS_BLOCK_START);
-  if (start === -1) return '';
-  const end = text.indexOf(SCREENSHOTS_BLOCK_END, start);
-  if (end === -1) return '';
-  return text.slice(start, end + SCREENSHOTS_BLOCK_END.length);
+/** The fence a line leaves open: `open` itself, a new fence it opens, or `''` when it closes one. */
+function fenceAfter(line, open) {
+  const run = CODE_FENCE.exec(line)?.[1];
+  if (!run) return open;
+  if (!open) return run;
+  const closes = run[0] === open[0] && run.length >= open.length && line.trim() === run;
+  return closes ? '' : open;
 }
 
-/** The body with the managed block blanked out, line count preserved. */
-function maskManagedBlock(text) {
-  const block = managedBlockText(text);
-  if (!block) return text;
-  return text.replaceAll(block, block.replaceAll(/[^\n]/g, ' '));
+/** Each line of `text` with its offsets, and the delimiter it is when it is one outside a fence. */
+function scanLines(text) {
+  const lines = [];
+  let offset = 0;
+  let fence = '';
+  for (const raw of text.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const fenced = fence !== '' || CODE_FENCE.test(line);
+    const marker = fenced ? null : (BLOCK_MARKER_LINE.exec(line)?.[1] ?? null);
+    lines.push({ line, fenced, marker, start: offset, end: offset + line.length });
+    fence = fenceAfter(line, fence);
+    offset += raw.length + 1;
+  }
+  return lines;
+}
+
+/** Whether a line is a heading opening a "Screenshots" section. */
+function isScreenshotsHeading(line) {
+  const heading = HEADING_PATTERN.exec(line);
+  return Boolean(heading) && /^screenshots?\b/i.test(heading[2].trim());
+}
+
+/**
+ * The last line of a block with no end delimiter: the last non-blank line before the first level-1
+ * or level-2 heading after its own Screenshots heading, so the sections that follow survive.
+ */
+function unterminatedLastLine(lines, first) {
+  let index = first + 1;
+  while (index < lines.length && lines[index].line.trim() === '') index += 1;
+  if (index < lines.length && isScreenshotsHeading(lines[index].line)) index += 1;
+  let last = first;
+  for (; index < lines.length; index += 1) {
+    const { line, fenced } = lines[index];
+    if (!fenced && TOP_LEVEL_HEADING.test(line)) break;
+    if (line.trim() !== '') last = index;
+  }
+  return last;
+}
+
+/**
+ * The managed block's `{ start, end, terminated }` character span in `text`, or `null` when there
+ * is none: the first start delimiter through the last end delimiter after it, so a body carrying
+ * two blocks has one. The publisher replaces exactly this span and the gate masks exactly it.
+ */
+export function locateManagedBlock(text) {
+  const lines = scanLines(String(text ?? ''));
+  const first = lines.findIndex((entry) => entry.marker === 'start');
+  if (first === -1) return null;
+  const last = lines.findLastIndex((entry) => entry.marker === 'end');
+  const terminated = last > first;
+  const end = lines[terminated ? last : unterminatedLastLine(lines, first)].end;
+  return { start: lines[first].start, end, terminated };
+}
+
+/** The body with a span blanked out, line count preserved. */
+function maskSpan(text, span) {
+  if (!span) return text;
+  const blanked = text.slice(span.start, span.end).replaceAll(/[^\n]/g, ' ');
+  return `${text.slice(0, span.start)}${blanked}${text.slice(span.end)}`;
 }
 
 /**
@@ -118,10 +173,8 @@ function screenshotSections(body) {
     .split('\n');
   const sections = [];
   for (let index = 0; index < lines.length; index += 1) {
-    const heading = HEADING_PATTERN.exec(lines[index]);
-    if (!heading) continue;
-    if (!/^screenshots?\b/i.test(heading[2].trim())) continue;
-    sections.push(sectionBody(lines, index, heading[1].length));
+    if (!isScreenshotsHeading(lines[index])) continue;
+    sections.push(sectionBody(lines, index, HEADING_PATTERN.exec(lines[index])[1].length));
   }
   return sections;
 }
@@ -197,15 +250,20 @@ export function classifyPublishedFrameUrl(url, prNumber) {
  */
 export function parseScreenshotEvidenceImages(body = '', { prNumber } = {}) {
   const text = String(body || '').replaceAll('\r\n', '\n');
-  const block = managedBlockText(text);
-  const inBlock = imageUrlsIn(block).map((url) => ({
+  const block = locateManagedBlock(text);
+  const inBlock = imageUrlsIn(block ? text.slice(block.start, block.end) : '').map((url) => ({
     url,
     ...(classifyPublishedFrameUrl(url, prNumber) ?? { caseId: null, headSha: null }),
   }));
-  const outsideBlock = screenshotSections(maskManagedBlock(text)).flatMap((section) =>
+  const outsideBlock = screenshotSections(maskSpan(text, block)).flatMap((section) =>
     imageUrlsIn(section)
   );
-  return { inBlock, outsideBlock, hasManagedBlock: block !== '' };
+  return {
+    inBlock,
+    outsideBlock,
+    hasManagedBlock: block !== null,
+    unterminatedBlock: block !== null && !block.terminated,
+  };
 }
 
 // Run selection: `head_sha` identifies a commit, not a run.
@@ -256,13 +314,10 @@ function framesForThisHead(identified, context) {
  * Whether the automatically published frames in the block are evidence for this head and these
  * views.
  */
-function matchPublishedFrames({ inBlock, hasManagedBlock }, context) {
-  const identified = inBlock.filter((frame) => frame.caseId);
+function matchPublishedFrames(images, context) {
+  const identified = images.inBlock.filter((frame) => frame.caseId);
   if (identified.length === 0) {
-    return {
-      state: EVIDENCE.NONE,
-      message: publishedNothingIdentifiable(context, hasManagedBlock),
-    };
+    return { state: EVIDENCE.NONE, message: publishedNothingIdentifiable(context, images) };
   }
 
   const forThisHead = framesForThisHead(identified, context);
@@ -330,11 +385,14 @@ function headSuffix(context) {
 }
 
 /** The diagnostic for a body whose Screenshots section produced no identifiable published frame. */
-function publishedNothingIdentifiable(context, hasManagedBlock) {
+function publishedNothingIdentifiable(context, { hasManagedBlock, unterminatedBlock }) {
   if (!hasManagedBlock) {
     return `This pull request's body carries no managed screenshot block, and the image markup under its Screenshots heading supplies no image URL — an \`<img>\` with an empty \`src\`, or an \`![alt]()\` with an empty target, is markup without an image. Embed an image with a real URL, or let the ${context.captureWorkflow} capture publish the block.`;
   }
-  return `The managed screenshot block carries no frame this gate can identify as belonging to pull request #${context.prNumber}. Auto-published frames are identified by their published location (\`<prefix>/<pr>/<head-sha>/<case-id>.png\`), not by their caption.`;
+  const unterminated = unterminatedBlock
+    ? ' It has no end marker, so it runs to the next level-1 or level-2 heading; restore the `<!-- fabricate:screenshots:end -->` line, or delete the block and let the capture republish it.'
+    : '';
+  return `The managed screenshot block carries no frame this gate can identify as belonging to pull request #${context.prNumber}. Auto-published frames are identified by their published location (\`<prefix>/<pr>/<head-sha>/<case-id>.png\`), not by their caption.${unterminated}`;
 }
 
 /**

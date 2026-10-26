@@ -10,7 +10,7 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // The `check` gate's composed decision — await the capture run for this head, then match what it
 // published — lives in the lib for the same two reasons, plus a third: it is a leaf that imports
 // nothing from this file.
-import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+import { decideScreenshotGate, locateManagedBlock } from './lib/screenshotEvidenceMatching.js';
 import { logicalStylesheetPath } from './lib/stylesheetSource.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file cannot
 // derive: what to call it, whether it needs a caption, and where the Primitive Lab's boundary lies.
@@ -22,8 +22,8 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 // Default human-only label that exempts a UI PR from the screenshot requirement.
 const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 
-// Stable delimiters for the managed screenshot block in the PR body. `publish` replaces everything
-// between these markers so re-runs update in place instead of appending duplicate blocks.
+// Stable delimiters for the managed screenshot block in the PR body. `publish` replaces the span
+// `locateManagedBlock` finds, the one the gate masks, so re-runs update in place (issue 1174).
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
@@ -1459,13 +1459,8 @@ export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
   // Include a `## Screenshots` heading so an auto-published body satisfies the
   // same check humans do (an image beneath a Screenshots heading).
   const inner = `${SCREENSHOTS_BLOCK_START}\n## Screenshots\n\n${blockMarkdown}\n${SCREENSHOTS_BLOCK_END}`;
-  const startIndex = text.indexOf(SCREENSHOTS_BLOCK_START);
-  const endIndex = text.indexOf(SCREENSHOTS_BLOCK_END);
-  if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-    const before = text.slice(0, startIndex);
-    const after = text.slice(endIndex + SCREENSHOTS_BLOCK_END.length);
-    return `${before}${inner}${after}`;
-  }
+  const block = locateManagedBlock(text);
+  if (block) return `${text.slice(0, block.start)}${inner}${text.slice(block.end)}`;
   const trimmed = text.replace(/\s+$/, '');
   return trimmed ? `${trimmed}\n\n${inner}\n` : `${inner}\n`;
 }

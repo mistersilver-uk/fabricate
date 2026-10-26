@@ -33,6 +33,7 @@ import {
   hasUiChanges,
   isExemptByLabel,
   main,
+  upsertScreenshotsBlock,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -46,6 +47,7 @@ import {
   makeGateClock,
   makeGhFake,
   managedScreenshotBlock,
+  publishedFrameMarkdown,
   runPreservingExitCode,
   workflowRun,
   writeGateCliInputs,
@@ -1695,4 +1697,97 @@ test('CONTRIBUTING lists every failing gate code, and only those (issue 1176)', 
     [...failing].sort(byCodePoint),
     'the gate codes CONTRIBUTING.md lists have drifted from GATE_CODES'
   );
+});
+
+describe('one managed block per body, read the way the publisher writes it (issue 1174)', () => {
+  const HUMAN_URL = 'https://github.test/attachments/1174';
+  const HUMAN_SECTION = `## Screenshots\n\n![by hand](${HUMAN_URL})\n`;
+  const stale = (headSha) =>
+    managedScreenshotBlock({ prNumber: PR, caseIds: EXPECTED_CASE_IDS, headSha });
+  const unterminated = (headSha) => stale(headSha).replace(`\n${BLOCK_END}`, '');
+  const decideOn = (body) =>
+    decide({
+      gh: makeGhFake({}),
+      clock: makeGateClock({}),
+      body,
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+  it('reads an unterminated block as the block, up to the next top-level heading', () => {
+    const body = `Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n\n## Notes\n\nKept.\n\n${HUMAN_SECTION}`;
+    const parsed = parseScreenshotEvidenceImages(body, { prNumber: PR });
+    assert.deepEqual(
+      parsed.inBlock.map((frame) => frame.caseId),
+      EXPECTED_CASE_IDS
+    );
+    assert.deepEqual(parsed.outsideBlock, [HUMAN_URL]);
+    assert.equal(parsed.hasManagedBlock, true);
+  });
+
+  it('fails an unterminated stale block for this head instead of passing it as hand-supplied', async () => {
+    const decision = await decideOn(`Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n`);
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('masks two blocks as one, so no frame of the second counts as outside it', async () => {
+    const body = `Intro.\n\n${stale(PREVIOUS_HEAD)}\n\n${stale(NEXT_HEAD)}\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assertFailedWith(await decideOn(body), GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('keeps a stray end marker from turning two publishes into a pass on stale frames', async () => {
+    let body = `Intro.\n\n${BLOCK_END}\n\n## Testing\n\nRan.\n`;
+    for (const headSha of [PREVIOUS_HEAD, NEXT_HEAD]) {
+      const frames = publishedFrameMarkdown({ prNumber: PR, caseIds: EXPECTED_CASE_IDS, headSha });
+      body = upsertScreenshotsBlock(body, frames);
+    }
+    assert.equal(body.split(BLOCK_START).length - 1, 1, body);
+    const decision = await decideOn(body);
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+    assert.match(decision.message, new RegExp(NEXT_HEAD));
+  });
+
+  it('names a missing end marker when the block carries no frame it can identify', async () => {
+    const library = `![pr-${PR} Library](https://cdn.example.test/pr-screenshots/${PR}/${HEAD}/library/1.png)`;
+    const decision = await decideOn(`${BLOCK_START}\n## Screenshots\n\n${library}\n`);
+    assertFailedWith(decision, GATE_CODES.NO_SCREENSHOTS_SECTION);
+    assert.match(decision.message, /no end marker/);
+  });
+
+  it('still counts hand-supplied images below a marker quoted in prose', async () => {
+    const body = `Quotes \`${BLOCK_START}\` in passing.\n\n${HUMAN_SECTION}`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, [
+      HUMAN_URL,
+    ]);
+    assert.equal((await decideOn(body)).exitCode, 0);
+  });
+
+  /** Bodies the publisher must replace one block in and the gate must read one block out of. */
+  const EDGE_BODIES = Object.freeze({
+    'a stray end above': `Intro.\n\n${BLOCK_END}\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'two blocks': `${stale(PREVIOUS_HEAD)}\n\n${stale(NEXT_HEAD)}\n`,
+    'an unterminated block': `Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n`,
+    'a marker quoted inline': `Quotes \`${BLOCK_START}\`.\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'markers in a code fence': `\`\`\`md\n${BLOCK_START}\n${BLOCK_END}\n\`\`\`\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'CRLF line endings': `${stale(PREVIOUS_HEAD)}\n`.replaceAll('\n', '\r\n'),
+  });
+
+  for (const [shape, body] of Object.entries(EDGE_BODIES)) {
+    it(`reads what the publisher wrote as the one block, in a body with ${shape}`, () => {
+      const frames = publishedFrameMarkdown({
+        prNumber: PR,
+        caseIds: ['probe-case'],
+        headSha: HEAD,
+      });
+      const published = upsertScreenshotsBlock(`${body}\n${HUMAN_SECTION}`, frames);
+      const parsed = parseScreenshotEvidenceImages(published, { prNumber: PR });
+      assert.deepEqual(
+        parsed.inBlock.map((frame) => frame.caseId),
+        ['probe-case'],
+        published
+      );
+      assert.deepEqual(parsed.outsideBlock, [HUMAN_URL], published);
+    });
+  }
 });

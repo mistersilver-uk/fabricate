@@ -52,6 +52,8 @@ import {
 // `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while `tests/**` duplication
 // counts against the new-code gate.
 import {
+  BLOCK_END,
+  BLOCK_START,
   captureConsole,
   gateCheckArgv,
   makeGateClock,
@@ -2251,6 +2253,68 @@ describe('UI PR screenshot evidence', () => {
     assert.match(second, /assets\/bbbbbbbb/);
     assert.doesNotMatch(second, /assets\/aaaaaaaa/);
     assert.match(second, /Body text\./);
+  });
+
+  describe('one managed block per body (issue 1174)', () => {
+    const frame = (tag) => `![pr-1 ${tag}](https://cdn.example.test/${tag}.png)`;
+    const blockOf = (tag) => `${BLOCK_START}\n## Screenshots\n\n${frame(tag)}\n${BLOCK_END}`;
+    const countOf = (text, marker) => text.split(marker).length - 1;
+
+    it('publishes in place below a stray end marker, however many times', () => {
+      const body = `## Description\n\nIntro.\n\n${BLOCK_END}\n\n## Testing\n\nRan.`;
+      const twice = upsertScreenshotsBlock(upsertScreenshotsBlock(body, frame('head-a')), frame('head-b'));
+      assert.equal(countOf(twice, BLOCK_START), 1, twice);
+      assert.equal(twice, `${body}\n\n${blockOf('head-b')}\n`);
+    });
+
+    it('collapses every block from the first start to the last end into one', () => {
+      const body = `Intro.\n\n${blockOf('a')}\n\nBetween.\n\n${blockOf('b')}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `Intro.\n\n${blockOf('c')}\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('replaces an unterminated block up to the next top-level heading, keeping what follows', () => {
+      const body =
+        `Intro.\n\n${BLOCK_START}\n## Screenshots\n\n${frame('stale')}\n\n### Library\n\n` +
+        `${frame('stale-library')}\n\n## Notes\n\nKept.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `Intro.\n\n${blockOf('fresh')}\n\n## Notes\n\nKept.\n`
+      );
+    });
+
+    it('replaces an unterminated block that runs to the end of the body', () => {
+      const body = `Intro.\n\n${BLOCK_START}\n## Screenshots\n\n${frame('stale')}\n`;
+      assert.equal(upsertScreenshotsBlock(body, frame('fresh')), `Intro.\n\n${blockOf('fresh')}\n`);
+    });
+
+    it('takes only the start line of an unterminated block no Screenshots heading follows', () => {
+      const body = `${BLOCK_START}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `${blockOf('fresh')}\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('recognises a marker only on a line of its own, outside a code fence', () => {
+      const inline = `Mentions \`${BLOCK_START}\` and \`${BLOCK_END}\` inline.`;
+      const fenced = ['```md', BLOCK_START, BLOCK_END, '```'].join('\n');
+      const tildeFenced = ['~~~~', BLOCK_START, '~~~', BLOCK_END, '~~~~'].join('\n');
+      for (const body of [inline, fenced, tildeFenced, `${fenced}\n\n## Testing\n\nRan.`]) {
+        assert.equal(upsertScreenshotsBlock(body, frame('fresh')), `${body}\n\n${blockOf('fresh')}\n`);
+      }
+    });
+
+    it('replaces a block in a CRLF body without disturbing the lines around it', () => {
+      const lines = ['Intro.', '', BLOCK_START, '## Screenshots', '', frame('stale'), BLOCK_END];
+      const body = [...lines, '', '## Testing', 'Ran.'].join('\r\n');
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `Intro.\r\n\r\n${blockOf('fresh')}\r\n\r\n## Testing\r\nRan.`
+      );
+    });
   });
 
   const S3_CONFIG = {
