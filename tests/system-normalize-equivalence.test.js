@@ -69,6 +69,12 @@ function freshManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
+/** The first pass, sampled by the helper itself so no caller statement can sit between the two. */
+function firstPass(manager, system) {
+  const pass = manager._normalizeSystem(system);
+  return { pass, mintedByPass: mintedIds };
+}
+
 /**
  * The idempotence re-feed. It reads the counter first, so the discipline assertions see a reset
  * placed anywhere before this call and not only one placed after the caller's own sample.
@@ -93,8 +99,7 @@ function runCorpus() {
 
   for (const scenario of systemScenarios()) {
     resetMintedIds();
-    const pass = manager._normalizeSystem(scenario.system);
-    const mintedByPass = mintedIds;
+    const { pass, mintedByPass } = firstPass(manager, scenario.system);
     const again = refeed(manager, pass);
     systems[scenario.name] = pass;
     systemRefeed[scenario.name] = again.output;

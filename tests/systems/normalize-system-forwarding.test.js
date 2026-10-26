@@ -7,12 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-let mintedIds = 0;
-globalThis.foundry = {
-  utils: { randomID: () => `rid-${String(++mintedIds).padStart(4, '0')}` },
-};
-globalThis.game = { user: { isGM: true }, system: { id: 'dnd5e' }, actors: [], fabricate: null };
-globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
+import { seeded } from '../helpers/seededNormalizeCounter.js';
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
 const { normalizeSystem } = await import('../../src/systems/normalize/system.js');
@@ -28,11 +23,6 @@ function decode(value) {
   if (Array.isArray(value)) return value.map(decode);
   if (value === null || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, decode(inner)]));
-}
-
-function seeded(call) {
-  mintedIds = 0;
-  return call();
 }
 
 const seededScope = (ids) => ({ isSeeded: () => true, entityIds: () => ids });
