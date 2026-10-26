@@ -374,6 +374,7 @@
         "MarkerToken": "Token",
         "MarkerRegionOnly": "Region only",
         "MarkerMissing": "Missing",
+        "UnresolvedSourceId": "Source not found: {id}",
         "OpenConfig": "Open configuration",
         "JumpToRegion": "Jump to region",
         "Delete": "Delete interactable",

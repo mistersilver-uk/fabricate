@@ -1,12 +1,15 @@
 /**
  * PURE scene scan to display rows for the GM Manage Interactables panel (issue 335): name, type,
  * source label, state and marker status per `fabricate.interactable` behaviour.
+ * `sourceLabel` is the resolved label or `''`; a configured row that resolves nothing is
+ * `sourceResolved: false` with its `sourceId`, and an unconfigured one is `sourceConfigured: false`.
  * Nothing here reads `game.*` or `canvas.*` — the source-label and visual-resolution lookups are
  * INJECTED, and the live iteration edge lives in the app shell.
  */
 
 import {
   isInteractableRegionBehavior,
+  isUnconfiguredInteractable,
   readInteractableBehaviorSystem,
 } from './interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './interactableRegionNodeAdapter.js';
@@ -78,17 +81,24 @@ export function buildInteractableRow(behavior, { resolveSourceLabel, resolveVisu
 
   const rawLabel =
     typeof resolveSourceLabel === 'function' ? resolveSourceLabel({ system, behavior }) : null;
-  const sourceLabel = pickLabel(rawLabel, system);
+  const sourceLabel = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+  const sourceConfigured = !isUnconfiguredInteractable(system);
+  const sourceId = sourceConfigured ? referenceIdOf(system) : '';
 
-  // Prefer the behaviour's own name, falling back to the source label so an unnamed interactable
-  // is never a blank row.
-  const name = system.name && system.name.trim() ? system.name.trim() : sourceLabel;
+  // The behaviour's own name, else the resolved label, else the id; an unconfigured interactable
+  // has none of them, and the view titles it.
+  const storedName = typeof system.name === 'string' ? system.name.trim() : '';
+  const name = storedName || sourceLabel || sourceId;
 
   return {
     ref,
     name,
     interactableType: system.interactableType,
     sourceLabel,
+    // A real Tool with a blank name and no linked component resolves no label, so it reads Unresolved.
+    sourceResolved: sourceLabel !== '',
+    sourceConfigured,
+    sourceId,
     state: {
       enabled: system.state.enabled === true,
       locked: system.state.locked === true,
@@ -98,20 +108,10 @@ export function buildInteractableRow(behavior, { resolveSourceLabel, resolveVisu
   };
 }
 
-/** The first non-empty of: the resolved label, the stored name, the bare source id, `sourceUuid`. */
-function pickLabel(rawLabel, system) {
-  const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
-  if (label) return label;
-  const stored = typeof system?.name === 'string' ? system.name.trim() : '';
-  if (stored) return stored;
-  const id =
-    system?.interactableType === 'tool'
-      ? system?.toolId
-      : system?.interactableType === 'gatheringTask'
-        ? system?.taskId
-        : null;
-  if (typeof id === 'string' && id.trim()) return id.trim();
-  return typeof system?.sourceUuid === 'string' ? system.sourceUuid : '';
+/** The type-appropriate Tool or Task id of a configured interactable, trimmed. */
+function referenceIdOf(system) {
+  const id = system.interactableType === 'tool' ? system.toolId : system.taskId;
+  return typeof id === 'string' ? id.trim() : '';
 }
 
 /** PURE. Every behaviour on the scene as a row, in scene-iteration order. */

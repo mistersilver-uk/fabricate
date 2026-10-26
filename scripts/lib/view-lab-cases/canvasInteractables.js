@@ -201,19 +201,20 @@ export const CASES = Object.freeze([
   interactablesManagerCase({
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',
-    // `window`: a third interactable resolves and locks and a fourth does not, so every badge the row draws is photographed.
+    // `window`: one interactable resolves and locks, one has a missing marker, one has a deleted source and one is unconfigured, so every badge the row draws is photographed.
     reaches: 'window',
     smokeLabels: ['interactables-manager-list'],
     steps: [],
-    // A row with its actions, so a list that loses its per-row controls fails here rather than publishing as healthy.
+    // A row with its actions and the unresolved-source chip, so a list that loses either fails here rather than publishing as healthy.
     expectSelector:
       '.fabricate-interactables-manager-body ' +
-      '.fab-im-list:has([data-interactable-manager-chip-marker="missing"]) .fab-im-row ' +
+      '.fab-im-list:has([data-interactable-manager-chip-marker="missing"]):has([data-interactable-manager-chip-source="unresolved"]) .fab-im-row ' +
       '.fab-im-row-actions [data-interactable-manager-delete]',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,
       /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+      /^src\/canvas\/regions\/interactableSceneScan\.js$/,
     ],
   }),
   interactablesManagerCase({

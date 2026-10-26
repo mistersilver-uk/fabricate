@@ -1097,6 +1097,8 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['interactables-manager-list'],
     matches: [
       /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/interactables\/InteractableRowChips\.svelte$/,
+      /^src\/canvas\/regions\/interactableSceneScan\.js$/,
       /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
       /^src\/ui\/interactableSourceLibrary\.js$/,
     ],
@@ -1107,6 +1109,8 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['interactables-manager-promote'],
     matches: [
       /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/interactables\/InteractableRowChips\.svelte$/,
+      /^src\/canvas\/regions\/interactableSceneScan\.js$/,
       /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
       /^src\/ui\/interactableSourceLibrary\.js$/,
     ],

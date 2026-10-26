@@ -26,7 +26,6 @@
     systemDisplayLabel,
     pickDefaultSystemId,
   } from '../../util/systemDisambiguation.js';
-  import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Field from '../../components/Field.svelte';
   import IconButton from '../../components/IconButton.svelte';
@@ -34,6 +33,7 @@
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
+  import InteractableRowChips from './InteractableRowChips.svelte';
 
   let { services = null } = $props();
 
@@ -69,58 +69,6 @@
     void tick;
     return services?.listRows?.() ?? [];
   });
-
-  // Marker-status → localized label + icon for the row badge.
-  function markerLabel(status) {
-    switch (status) {
-      case 'Tile':
-        return text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile');
-      case 'Drawing':
-        return text('FABRICATE.Canvas.Manage.MarkerDrawing', 'Drawing');
-      case 'Token':
-        return text('FABRICATE.Canvas.Manage.MarkerToken', 'Token');
-      case 'region-only':
-        return text('FABRICATE.Canvas.Manage.MarkerRegionOnly', 'Region only');
-      case 'missing':
-      default:
-        return text('FABRICATE.Canvas.Manage.MarkerMissing', 'Missing');
-    }
-  }
-
-  /**
-   * The marker badge's TONE, which is the statement the hand-rolled chip made with a
-   * danger-coloured edge and an `opacity` fade (issue 1520).
-   *
-   * `missing` is a fault the GM has to act on, so it stays in the danger family. `region-only`
-   * is not a fault at all — it is a deliberate configuration with no marker to report — which
-   * is exactly what `Chip`'s `muted` tone is documented for, and it replaces a fade that dimmed
-   * the pill's border and fill along with its text.
-   *
-   * @param {string} status The row's marker status.
-   * @returns {string} A `Chip` tone.
-   */
-  function markerTone(status) {
-    if (status === 'missing') return 'danger';
-    if (status === 'region-only') return 'muted';
-    return 'neutral';
-  }
-
-  function typeLabel(interactableType) {
-    return interactableType === 'gatheringTask'
-      ? text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task')
-      : text('FABRICATE.Canvas.Manage.TypeTool', 'Tool');
-  }
-
-  // The state badges a row shows (enabled is the default, so surface the notable
-  // states: disabled, locked, consumed).
-  function stateBadges(state) {
-    const badges = [];
-    if (!state.enabled) badges.push(text('FABRICATE.Canvas.Manage.StateDisabled', 'Disabled'));
-    if (state.locked) badges.push(text('FABRICATE.Canvas.Manage.StateLocked', 'Locked'));
-    if (state.consumed) badges.push(text('FABRICATE.Canvas.Manage.StateConsumed', 'Consumed'));
-    if (badges.length === 0) badges.push(text('FABRICATE.Canvas.Manage.StateEnabled', 'Enabled'));
-    return badges;
-  }
 
   function openConfig(ref) {
     services?.openConfig?.(ref);
@@ -461,23 +409,15 @@
         {#each rows as row (row.ref.regionId + '.' + row.ref.behaviorId)}
           <li class="fab-im-row">
             <div class="fab-im-row-main">
-              <span class="fab-im-row-name">{row.name}</span>
+              <span class="fab-im-row-name"
+                >{row.name ||
+                  text(
+                    'FABRICATE.Canvas.Interactable.Config.Untitled',
+                    'Untitled interactable'
+                  )}</span
+              >
               <div class="fab-im-row-meta">
-                <Chip tone="secondary" data-interactable-manager-chip-type=""
-                  >{typeLabel(row.interactableType)}</Chip
-                >
-                <Chip tone="neutral" data-interactable-manager-chip-source=""
-                  >{row.sourceLabel}</Chip
-                >
-                {#each stateBadges(row.state) as badge (badge)}
-                  <Chip tone="neutral" data-interactable-manager-chip-state="">{badge}</Chip>
-                {/each}
-                <Chip
-                  tone={markerTone(row.markerStatus)}
-                  data-interactable-manager-chip-marker={row.markerStatus}
-                >
-                  {markerLabel(row.markerStatus)}
-                </Chip>
+                <InteractableRowChips {row} />
               </div>
             </div>
             <div class="fab-im-row-actions">
