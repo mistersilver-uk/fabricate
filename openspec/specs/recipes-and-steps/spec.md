@@ -420,11 +420,11 @@ A progressive craft fires the component complications its committed award earned
 - When the last step succeeds, mark run complete and clean up run state.
 - On step failure, mark run failed and clean up run state.
 
-#### Player-Initiated Advance ("Trigger Next Step")
+#### Player-Initiated Advance
 
 This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
 A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
-The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-journal-app/spec.md` *Journal App*).
+The player-facing Journal exposes this as its primary advance button (Complete stage, Complete on the final stage, Roll check for a disclosed check, Brew for alchemy), which routes a legacy run to `advanceCraftingRun` (see `ui-journal-app/spec.md` *Journal App (Player)*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId, presentTools })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.

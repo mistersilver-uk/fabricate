@@ -234,7 +234,7 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 Every check-bearing execution that accepts `interactive`, the Journal run command included, also accepts `additionalDice` (default 0; issue 2008), honoured only when non-interactive, where an interactive call's prompt chooses instead.
 An invalid, unoffered or unaffordable value, or a non-zero value while additional dice are unavailable, refuses with a reason and is never clamped.
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
-This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
+This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal's run action (`advanceCraftingRun` for a legacy run, the versioned `execute` command otherwise); `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
 - **One modal, one header.**
 The prompt renders in Fabricate's shared modal chrome, the `Modal` component, never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.

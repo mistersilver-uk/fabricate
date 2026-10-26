@@ -3915,7 +3915,7 @@ RunModel = {
   createdResultCount: number,
   craftingYield: object | null,          // current-stage authored preview, never an actual award
   gatheringYield: object | null,         // permitted mode-specific preview and recorded roll evidence
-  manualAdvance: boolean,                // true for every crafting run (the Trigger Next Step gate); redaction does not suppress it
+  manualAdvance: boolean,                // true for every crafting run (it enables the Journal's legacy primary advance action, which calls `advanceCraftingRun`); redaction does not suppress it
   canCancel: boolean,                    // crafting compatibility alias of actions.cancel, including lifecycle refusals
   refundOnCancel: boolean,               // legacy refund policy; versioned cancel retains completed spending
 }
