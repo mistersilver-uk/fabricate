@@ -223,7 +223,7 @@ const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
 
 // A suite declares its temp tree in a `writeCompiledSvelte(…)` argument or a `compiledModules`
 // array, roster name or shorthand. A spread is followed one level into the file declaring it, and
-// a call on a roster (`NAME.filter(…)`) is not read.
+// a call on a roster (`NAME.filter(…)`) is not read. Each `compiledModules` key is its own roster.
 const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
 const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
 const COMPILED_MODULES_NAME = /compiledModules\s*:\s*([A-Za-z_$][\w$]*)\s*(?=[,}]|$)/gm;
@@ -245,21 +245,39 @@ const QUOTED = /'([\w./@-]+)'/g;
 
 const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
 
-/** The set of component paths a suite actually COMPILES into its temp tree. */
-function compiledPathsOf(suite, suitePath) {
+// A bare identifier element of a roster body: alone between `[`, `,` or a line start and `,` or the
+// body's end, so `...NAME`, `NAME(…)` and `NAME.x` are not elements.
+const BARE_ELEMENT = /(?:^|[,[])\s*([A-Za-z_$][\w$]*)\s*(?=,|$)/gm;
+const withoutComments = (text) =>
+  text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
+
+/** The path each bare identifier in a body names, when `text` binds it once to a path literal. */
+function constPathsIn(body, text) {
+  const paths = [];
+  for (const [, name] of withoutComments(body).matchAll(BARE_ELEMENT)) {
+    const declaration = new RegExp(
+      String.raw`const\s+${name.replaceAll('$', String.raw`\$`)}\s*=\s*(?:'([\w./@-]+)'\s*;)?`,
+      'g'
+    );
+    const declared = [...text.matchAll(declaration)];
+    if (declared.length === 1 && declared[0][1]) paths.push(declared[0][1]);
+  }
+  return paths;
+}
+
+const pathsOfBody = (body, text) => [...literalsIn(body), ...constPathsIn(body, text)];
+
+/**
+ * One roster per `compiledModules` occurrence, tagged with the line of its key, plus one hand-rolled
+ * roster holding every `writeCompiledSvelte(` region, because a hand-rolled suite builds one tree.
+ */
+function rostersOf(suite, suitePath) {
   const arrays = arraysOf(suite, suitePath);
+  const lineOf = (index) => suite.slice(0, index).split('\n').length;
 
   // A roster passed by name reads as its body when the suite declares it, else as `[...NAME]`.
   const rosterRegion = (name) =>
     arrays.get(name)?.file === suitePath ? arrays.get(name).body : `...${name}`;
-
-  const declared = [];
-  const regions = [
-    ...[...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument),
-    ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
-    ...[...suite.matchAll(COMPILED_MODULES_NAME)].map(([, name]) => rosterRegion(name)),
-    ...[...suite.matchAll(COMPILED_MODULES_SHORTHAND)].map(() => rosterRegion('compiledModules')),
-  ];
 
   // The list a `for (const <variable> of …)` compile loop iterates, inline or by const name.
   const loopMembers = (variable) => {
@@ -272,40 +290,57 @@ function compiledPathsOf(suite, suitePath) {
     );
   };
 
-  for (const region of regions) {
+  const pathsOfRegion = (region) => {
     const template = TEMPLATE_COMPILE.exec(region.trim());
     if (template) {
-      // A compile loop. The iterated list is either inline.
       const [, prefix, variable, suffix] = template;
-      const members = loopMembers(variable);
-      if (!members) continue;
-      for (const member of members) declared.push(`${prefix}${member}${suffix}`);
-      continue;
+      return (loopMembers(variable) ?? []).map((member) => `${prefix}${member}${suffix}`);
     }
 
+    // The same loop with whole paths and no template around the variable.
     const bare = BARE_LOOP_COMPILE.exec(region.trim());
-    if (bare) {
-      // The same loop with whole paths and no template around the variable.
-      for (const member of loopMembers(bare[1]) ?? []) declared.push(member);
-      continue;
-    }
+    const members = bare ? loopMembers(bare[1]) : null;
+    if (members) return members;
 
-    declared.push(...literalsIn(region), ...spreadPathsOf(region, arrays, suitePath));
+    return [...pathsOfBody(region, suite), ...spreadPathsOf(region, arrays, suite, suitePath)];
+  };
+
+  const keyed = (line, region) => ({ line, paths: pathsOfRegion(region) });
+  const rosters = [
+    ...[...suite.matchAll(COMPILED_MODULES)].map(({ index, 1: body }) =>
+      keyed(lineOf(index), body)
+    ),
+    ...[...suite.matchAll(COMPILED_MODULES_NAME)].map(({ index, 1: name }) =>
+      keyed(lineOf(index), rosterRegion(name))
+    ),
+    ...[...suite.matchAll(COMPILED_MODULES_SHORTHAND)].map(({ index, 0: matched }) =>
+      keyed(lineOf(index + matched.indexOf('compiledModules')), rosterRegion('compiledModules'))
+    ),
+  ];
+
+  const handRolled = [...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument);
+  if (handRolled.length > 0) {
+    rosters.push({ line: null, paths: handRolled.flatMap(pathsOfRegion) });
   }
-
-  return declared;
+  return rosters;
 }
 
-/** The literals each `...NAME` in a region resolves to, plus those of NAME's own spreads. */
-function spreadPathsOf(region, arrays, suitePath) {
+/** The set of component paths a suite actually COMPILES into its temp tree. */
+const compiledPathsOf = (suite, suitePath) =>
+  rostersOf(suite, suitePath).flatMap(({ paths }) => paths);
+
+/** The paths each `...NAME` in a region resolves to, plus those of NAME's own spreads. */
+function spreadPathsOf(region, arrays, suite, suitePath) {
+  const textOf = (file) => (file === suitePath ? suite : readFileSync(file, 'utf8'));
   const paths = [];
   for (const [, spread] of region.matchAll(SPREAD)) {
     const array = arrays.get(spread);
     if (!array) continue;
-    paths.push(...literalsIn(array.body));
+    paths.push(...pathsOfBody(array.body, textOf(array.file)));
     const scope = array.file === suitePath ? arrays : arraysOfFile(array.file);
     for (const [, nested] of array.body.matchAll(SPREAD)) {
-      paths.push(...literalsIn(scope.get(nested)?.body ?? ''));
+      const inner = scope.get(nested);
+      if (inner) paths.push(...pathsOfBody(inner.body, textOf(inner.file)));
     }
   }
   return paths;
@@ -378,17 +413,22 @@ function closureOf(componentPath, seen = new Set()) {
 
 const closures = new Map(componentPaths.map((path) => [path, closureOf(path)]));
 
-/** What one suite's temp tree names, and each shared primitive that tree renders without naming. */
+/** What one suite's temp trees name, and each shared primitive a tree renders without naming. */
 function gapsIn(suitePath, suite) {
-  const compiled = new Set(compiledPathsOf(suite, suitePath));
+  const rosters = rostersOf(suite, suitePath);
+  const compiled = new Set(rosters.flatMap(({ paths }) => paths));
   const named = componentPaths.filter((path) => compiled.has(path));
-  const missing = SHARED_PRIMITIVES.filter(
-    (primitive) =>
-      !named.includes(primitive) && named.some((path) => closures.get(path).has(primitive))
-  );
-  const gaps = missing.map(
-    (primitive) => `${suitePath} mounts a tree that renders ${primitive} but never compiles it`
-  );
+  const gaps = rosters.flatMap(({ line, paths }) => {
+    const own = componentPaths.filter((path) => paths.includes(path));
+    const where = line === null ? '' : ` (the roster at line ${line})`;
+    return SHARED_PRIMITIVES.filter(
+      (primitive) =>
+        !own.includes(primitive) && own.some((path) => closures.get(path).has(primitive))
+    ).map(
+      (primitive) =>
+        `${suitePath} mounts a tree that renders ${primitive} but never compiles it${where}`
+    );
+  });
   return { named, gaps };
 }
 
