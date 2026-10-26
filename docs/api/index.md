@@ -2809,13 +2809,16 @@ const select = fabUi.mount('Select', { target, props: props() });
 ### StageBars
 
 `StageBars` draws how far a staged process has come: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value; it draws no control.
-`stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+`stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
 A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
 So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
-A member other than `name`, `label` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+`valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too; a stage whose `valueText` is absent or `''` announces its percentage.
+A Fabricate that predates `valueText` ignores it and announces the percentage.
+A member other than `name`, `label`, `valueText` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
 `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
 A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so keep each name short.
+Each caption carries its stage's `name` as its native tooltip (`title`), so a name the ellipsis cuts is shown whole under the pointer; a caption with no `name` carries none.
 `ariaLabel` is required and names the group, final display text, as "Forging progress".
 It also names the one bar of a one-stage list whose stage has no label or name.
 Rest `data-*` attributes land on the group root.
@@ -2824,7 +2827,7 @@ It is not a live region: an `update` redraws the bars in place and announces not
 Its track height and corner, its gaps, its caption's face, size and ink, each tone's colours, and what it draws for a `currentIndex` outside the list are private.
 `ariaLabelledBy` is not published at version 1, so it is refused with `"ariaLabelledBy" is not a data attribute`.
 
-A worked stage group follows: the stages of your own forging project, each named by its own title.
+A worked stage group follows: the stages of your own forging project, each named by its own title and read with its position.
 
 ```javascript
 // After `load(['StageBars'])` has resolved and `fabricate.ready` has fired.
@@ -2835,7 +2838,12 @@ if (!fabUi?.components.includes('StageBars')) return;
 const props = () => ({
   ariaLabel: 'Forging progress', // The words your heading draws.
   currentIndex: acmeForge.stage,
-  stages: acmeForge.stages.map((stage) => ({ name: stage.title, value: stage.percent })),
+  stages: acmeForge.stages.map((stage, index, all) => ({
+    name: stage.title,
+    value: stage.percent,
+    // Your own words; they replace the percentage, so they state it too.
+    valueText: `${stage.percent}%, stage ${index + 1} of ${all.length}`,
+  })),
 });
 const bars = fabUi.mount('StageBars', { target, props: props() });
 // After your own stage advances, pass every prop again.
