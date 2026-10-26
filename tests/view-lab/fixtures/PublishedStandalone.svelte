@@ -11,12 +11,12 @@
   same in both, so the two frames differ only by the root.
 
   The ground is two 360px columns on `--fab-bg-1`, the ground the standalone style root paints none
-  of: B6a's five, the field and the search field in the first, the stepper, the segmented control,
-  the option cards, the tabs and the pager in the second. Neither carries a `fabricate` class or a
+  of: the five issue 2456 widened, the field and the search field in the first, the stepper, the
+  segmented control, the option cards, the tabs and the pager in the second. Neither carries a `fabricate` class or a
   theme attribute, so the ink and scheme their content shows are the root's. A case addresses the
   ground by `data-lab-standalone-ground`, a column by `data-lab-standalone-column` and each target
-  by its `data-lab-standalone-target` key; each target is `display: flex`, as the spec asks of a
-  companion.
+  by its `data-lab-standalone-target` key; the targets of the button, icon button, switch, search
+  field and stepper are `display: flex`, as their groups ask of a companion; the rest are blocks.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -26,6 +26,7 @@
     Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager']),
   ]);
   const KEYS = COLUMNS.flat();
+  const FLEX = new Set(['button', 'icon-button', 'toggle', 'search', 'stepper']);
 
   let targets = $state({});
 
@@ -61,8 +62,9 @@
         type: 'text',
         placeholder: 'Moonpetal tonic',
         'aria-labelledby': 'lab-standalone-field-caption',
+        'aria-describedby': 'lab-standalone-field-hint',
       }),
-      drawn(column, 'small', 'Shown to players')
+      drawn(column, 'small', 'Shown to players', { id: 'lab-standalone-field-hint' })
     );
     const handles = [
       mount('Button', {
@@ -169,6 +171,7 @@
       {#each keys as key (key)}
         <div
           class="published-standalone-target"
+          class:is-flex={FLEX.has(key)}
           data-lab-standalone-target={key}
           bind:this={targets[key]}
         ></div>
@@ -188,13 +191,13 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-3);
     width: 360px;
     padding: var(--fab-space-3);
     background: var(--fab-bg-1);
   }
 
-  .published-standalone-target {
+  .published-standalone-target.is-flex {
     display: flex;
   }
 </style>

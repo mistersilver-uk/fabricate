@@ -435,30 +435,34 @@ const STANDALONE_ROOT = '.fabricate.fabricate-standalone-root';
 const FABRICATE_WINDOW = '.fabricate.fabricate-app';
 
 /**
- * What each target draws: the three controls, the companion's line in the card's well, its input
- * in the field's slot, and the search input, the stepper's input, the chosen segment, the chosen
- * card, the selected tab and the pager's page-size control.
+ * What each target draws, column by column: the three controls, the companion's line in the card's
+ * well, its input in the field's slot and the search input; then the stepper's input, the chosen
+ * segment, the chosen card, the selected tab and the pager's page-size control.
  */
-const STANDALONE_DRAWN = Object.freeze({
-  button: '.fabricate-button',
-  'icon-button': '.fabricate-icon-button',
-  toggle: '.manager-status-toggle-track',
-  card: '.fabricate-card .fab-well p',
-  field: '.fabricate-field input[type="text"]',
-  search: '.fabricate-search input[type="search"]',
-  stepper: '.fab-stepper input[type="number"]',
-  segmented: '.manager-segmented .manager-segment.is-active',
-  cards: '.fabricate-option-cards .manager-resolution-option.is-active',
-  tabs: '.fabricate-tabs [role="tab"][aria-selected="true"]',
-  pager: '.fabricate-pagination [data-pagination-size]',
-});
+const STANDALONE_DRAWN = Object.freeze([
+  Object.freeze({
+    button: '.fabricate-button',
+    'icon-button': '.fabricate-icon-button',
+    toggle: '.manager-status-toggle-track',
+    card: '.fabricate-card .fab-well p',
+    field: '.fabricate-field input[type="text"]',
+    search: '.fabricate-search input[type="search"]',
+  }),
+  Object.freeze({
+    stepper: '.fab-stepper input[type="number"]',
+    segmented: '.manager-segmented .manager-segment.is-active',
+    cards: '.fabricate-option-cards .manager-resolution-option.is-active',
+    tabs: '.fabricate-tabs [role="tab"][aria-selected="true"]',
+    pager: '.fabricate-pagination [data-pagination-size]',
+  }),
+]);
 const holdingDrawn = (within) =>
-  Object.entries(STANDALONE_DRAWN)
-    .map(
+  STANDALONE_DRAWN.flatMap((column, index) =>
+    Object.entries(column).map(
       ([key, drawn]) =>
-        `:has(> [data-lab-standalone-column] > ${STANDALONE_TARGET(key)}${within}${drawn})`
+        `:has(> [data-lab-standalone-column="${index + 1}"] > ${STANDALONE_TARGET(key)}${within}${drawn})`
     )
-    .join('');
+  ).join('');
 
 /** A drawing directly under the style root the seam wrote in its target. */
 const UNDER_STANDALONE_ROOT = ` > ${STANDALONE_ROOT} `;
@@ -1610,7 +1614,7 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone-light',
     label:
-      'Specimen, mounted through the published seam — the same twelve entries and two columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot, the card descriptions and the pager’s summary read in that ink on the dark ground',
+      'Specimen, mounted through the published seam — the same twelve entries and two columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot read in that ink on the dark ground, and the card descriptions and the pager’s summary on their own fills',
     // Beyond the smoke: Foundry’s light theme is a condition the smoke never walks.
     query: { specimen: 'published-standalone', colorScheme: 'light' },
   }),
