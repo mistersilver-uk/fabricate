@@ -1588,14 +1588,6 @@ test('the gutter-claim catalogue cases align the filter bar box with their rows'
   }
 });
 
-/** A bar narrowed but not zeroed passes `oneLineRows`, so the stage bars case floors each track (issue 2610). */
-function assertStageBarsTrackFloor({ minInlineSize, oneLineRows, unclipped }) {
-  assert.equal(minInlineSize?.pixels, 72, 'the forge group draws its four tracks at 79.5px');
-  assert.ok(minInlineSize.selector.endsWith(' .fab-stage-bars-track'), 'the floor is per track');
-  assert.equal(oneLineRows, '[data-lab-stage-bars-ground] .fab-stage-bars');
-  assert.equal(unclipped, '[data-lab-stage-bars-ground] .fab-stage-bars-caption');
-}
-
 test('exactly the declared layout cases carry complete layout expectations', () => {
   assert.deepEqual(
     LAYOUT_CASE_REGISTRATIONS.filter(
@@ -1643,9 +1635,6 @@ test('exactly the declared layout cases carry complete layout expectations', () 
         typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
         `${viewCase.id} states its rows as one line or as wrapped lines`
       );
-      if (viewCase.id === 'manager-published-stage-bars-specimen') {
-        assertStageBarsTrackFloor(viewCase.expectLayout);
-      }
       continue;
     }
     if (HEADING_FLOOR_LAYOUT_CASE_IDS.includes(viewCase.id)) {
@@ -6778,10 +6767,28 @@ test('the stage bars specimen case names the groups the stage bars fixture mount
       `the frame is taken only once the ${key} group is drawn`
     );
   }
-  assert.ok(
-    expectLayout.oneLineRows.endsWith(' .fab-stage-bars') &&
-      expectLayout.unclipped.endsWith(' .fab-stage-bars-caption'),
-    'each group’s bars are held on one line, and every caption whole'
+  // A bar narrowed but not zeroed passes `oneLineRows`, so each track is floored (issue 2610):
+  // the forge group's four tracks share the 360px ground at (336 - 3 x 6) / 4 = 79.5px.
+  const { minInlineSize, oneLineRows, unclipped } = expectLayout;
+  const ground = minInlineSize.selector.replace(/ \.fab-stage-bars-track$/u, '');
+  assert.notEqual(ground, minInlineSize.selector, 'the floor is measured per track');
+  assert.equal(expectLayout.containerSelector, ground, 'inside the fixture ground');
+  assert.equal(minInlineSize.pixels, 72, "the floor sits under the forge group's 79.5px tracks");
+  assert.equal(oneLineRows, `${ground} .fab-stage-bars`, 'each group’s bars on one line');
+  assert.equal(unclipped, `${ground} .fab-stage-bars-caption`, 'and every caption whole');
+  const [, forge] = groups[0].elements;
+  assert.equal(
+    forge.properties.find((property) => property.key.name === 'stages').value.elements.length,
+    4,
+    'the forge group draws four stages'
+  );
+  const { css } = scopedComponentCss(
+    resolve(ROOT, 'tests/view-lab/fixtures/PublishedStageBars.svelte')
+  );
+  assert.match(
+    css,
+    /\.published-stage-bars-ground\.svelte-[a-z0-9]+\s*\{[^}]*\bwidth:\s*360px;/u,
+    'the fixture ground is one 360px column'
   );
 });
 
