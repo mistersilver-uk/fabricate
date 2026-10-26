@@ -633,7 +633,7 @@ Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/design-
 A result set (`ResultGroup`) is unreachable under `routedByIngredients` when no ingredient set reaches it by effective routing.
 The routing is the set's `resultGroupId`, else its `resultMapping`, else the scope's first group.
 The recipe-readiness warning `unreachableResultGroup` is raised once per step for the first such group, with a `results` target and a focus tag on the group, and never blocks enabling.
-It carries the check `routedResultGroupsReachable` and is built from `buildRoutingModel`'s `inbound`, with no role filter, so a `role: 'failure'` group is held to the same rule because this mode never awards one on a failed check (the set card's own "Nothing — unreachable" reading still skips it, issue 2520).
+It carries the check `routedResultGroupsReachable` and is built from `buildRoutingModel`'s `unreachable`, the reading the set card's "Nothing — unreachable" line and warning edge also use, so a `role: 'failure'` group is held to the same rule because this mode never awards one on a failed check.
 `systemValidation`'s `collectRecipeIssues` derives `routingProvider = 'ingredientSet'` under `routedByIngredients`, so the System Overview lists the warning with a headless message too, and a gap between fixed tiers raises nothing there.
 
 Canonical mapping: `collectUnreachableGroupIssues` in `recipeReadiness.js`; `CHECK_TO_ISSUES.routedResultGroupsReachable`; `READINESS_ISSUE_MESSAGES.unreachableResultGroup` in `src/systems/systemValidation.js`

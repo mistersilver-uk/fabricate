@@ -23,7 +23,13 @@ import {
   staleAncestors,
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
-import { SHIPPED, byName, declarationsOf, isStrip } from './helpers/publishedComponentGate.js';
+import {
+  SHIPPED,
+  byName,
+  declarationsOf,
+  gatedRoot,
+  isStrip,
+} from './helpers/publishedComponentGate.js';
 
 /**
  * The published field's root: no published key writes a class on it, and the classes under which
@@ -107,7 +113,7 @@ describe('the module sheet and every component style against the published Field
       'each pinned ancestor keeps at least one selector off a published field'
     );
     assert.deepEqual(
-      [Object.keys(entryNamed('Field').props), entryNamed('Field').root],
+      [Object.keys(entryNamed('Field').props), gatedRoot(entryNamed('Field'))],
       [['as', 'children'], 'fabricate'],
       'a published class, caption, label host or wider root reopens the census'
     );

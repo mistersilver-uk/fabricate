@@ -535,3 +535,35 @@ describe('2667 ActionMenu marks the focus it moves', () => {
     });
   }
 });
+
+describe('2671 ActionMenu closes a menu whose root leaves the document', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  it('removes the open menu, chooses nothing and moves no focus, and reads closed once back', async () => {
+    const chosen = [];
+    const target = await open(await harness.mount(props(chosen)));
+    assert.ok(Boolean(panel(target)), 'the menu is open');
+    const root = target.querySelector('.fabricate-action-menu');
+    const button = trigger(target);
+    const focused = [];
+    button.focus = () => {
+      focused.push('trigger');
+    };
+    // Registered after the menu's own watch, so it puts the root back before the close's focus
+    // step would run, where a focus restore would find the trigger connected.
+    const putBack = new document.defaultView.MutationObserver(() => {
+      putBack.disconnect();
+      target.append(root);
+    });
+    putBack.observe(document, { childList: true, subtree: true });
+    root.remove();
+    await flushRender();
+    assert.ok(!panel(target), 'the menu is gone');
+    assert.ok(root.isConnected, 'the root is back');
+    assert.deepEqual(chosen, [], 'nothing is chosen');
+    assert.deepEqual(focused, [], 'no focus is moved');
+    assert.equal(button.getAttribute('aria-expanded'), 'false');
+    harness.remount();
+  });
+});

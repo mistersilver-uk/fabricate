@@ -223,7 +223,7 @@ const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
 
 // A suite declares its temp tree in a `writeCompiledSvelte(…)` argument or a `compiledModules`
 // array, roster name or shorthand. A spread is followed one level into the file declaring it, and
-// a call on a roster (`NAME.filter(…)`) is not read.
+// a call on a roster (`NAME.filter(…)`) is not read. Each `compiledModules` key is its own roster.
 const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
 const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
 const COMPILED_MODULES_NAME = /compiledModules\s*:\s*([A-Za-z_$][\w$]*)\s*(?=[,}]|$)/gm;
@@ -245,21 +245,39 @@ const QUOTED = /'([\w./@-]+)'/g;
 
 const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
 
-/** The set of component paths a suite actually COMPILES into its temp tree. */
-function compiledPathsOf(suite, suitePath) {
+// A bare identifier element of a roster body: alone between `[`, `,` or a line start and `,` or the
+// body's end, so `...NAME`, `NAME(…)` and `NAME.x` are not elements.
+const BARE_ELEMENT = /(?:^|[,[])\s*([A-Za-z_$][\w$]*)\s*(?=,|$)/g;
+const withoutComments = (text) =>
+  text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
+
+/** The path each bare identifier in a body names, when `text` binds it once to a path literal. */
+function constPathsIn(body, text) {
+  const paths = [];
+  for (const [, name] of withoutComments(body).matchAll(BARE_ELEMENT)) {
+    const declaration = new RegExp(
+      String.raw`const\s+${name.replaceAll('$', String.raw`\$`)}\s*=\s*(?:'([\w./@-]+)'\s*;)?`,
+      'g'
+    );
+    const declared = [...text.matchAll(declaration)];
+    if (declared.length === 1 && declared[0][1]) paths.push(declared[0][1]);
+  }
+  return paths;
+}
+
+const pathsOfBody = (body, text) => [...literalsIn(body), ...constPathsIn(body, text)];
+
+/**
+ * One roster per `compiledModules` occurrence, tagged with the line of its key, plus one hand-rolled
+ * roster holding every `writeCompiledSvelte(` region, because a hand-rolled suite builds one tree.
+ */
+function rostersOf(suite, suitePath) {
   const arrays = arraysOf(suite, suitePath);
+  const lineOf = (index) => suite.slice(0, index).split('\n').length;
 
   // A roster passed by name reads as its body when the suite declares it, else as `[...NAME]`.
   const rosterRegion = (name) =>
     arrays.get(name)?.file === suitePath ? arrays.get(name).body : `...${name}`;
-
-  const declared = [];
-  const regions = [
-    ...[...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument),
-    ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
-    ...[...suite.matchAll(COMPILED_MODULES_NAME)].map(([, name]) => rosterRegion(name)),
-    ...[...suite.matchAll(COMPILED_MODULES_SHORTHAND)].map(() => rosterRegion('compiledModules')),
-  ];
 
   // The list a `for (const <variable> of …)` compile loop iterates, inline or by const name.
   const loopMembers = (variable) => {
@@ -272,40 +290,57 @@ function compiledPathsOf(suite, suitePath) {
     );
   };
 
-  for (const region of regions) {
+  const pathsOfRegion = (region) => {
     const template = TEMPLATE_COMPILE.exec(region.trim());
     if (template) {
-      // A compile loop. The iterated list is either inline.
       const [, prefix, variable, suffix] = template;
-      const members = loopMembers(variable);
-      if (!members) continue;
-      for (const member of members) declared.push(`${prefix}${member}${suffix}`);
-      continue;
+      return (loopMembers(variable) ?? []).map((member) => `${prefix}${member}${suffix}`);
     }
 
+    // The same loop with whole paths and no template around the variable.
     const bare = BARE_LOOP_COMPILE.exec(region.trim());
-    if (bare) {
-      // The same loop with whole paths and no template around the variable.
-      for (const member of loopMembers(bare[1]) ?? []) declared.push(member);
-      continue;
-    }
+    const members = bare ? loopMembers(bare[1]) : null;
+    if (members) return members;
 
-    declared.push(...literalsIn(region), ...spreadPathsOf(region, arrays, suitePath));
+    return [...pathsOfBody(region, suite), ...spreadPathsOf(region, arrays, suite, suitePath)];
+  };
+
+  const keyed = (line, region) => ({ line, paths: pathsOfRegion(region) });
+  const rosters = [
+    ...[...suite.matchAll(COMPILED_MODULES)].map(({ index, 1: body }) =>
+      keyed(lineOf(index), body)
+    ),
+    ...[...suite.matchAll(COMPILED_MODULES_NAME)].map(({ index, 1: name }) =>
+      keyed(lineOf(index), rosterRegion(name))
+    ),
+    ...[...suite.matchAll(COMPILED_MODULES_SHORTHAND)].map(({ index, 0: matched }) =>
+      keyed(lineOf(index + matched.indexOf('compiledModules')), rosterRegion('compiledModules'))
+    ),
+  ];
+
+  const handRolled = [...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument);
+  if (handRolled.length > 0) {
+    rosters.push({ line: null, paths: handRolled.flatMap(pathsOfRegion) });
   }
-
-  return declared;
+  return rosters;
 }
 
-/** The literals each `...NAME` in a region resolves to, plus those of NAME's own spreads. */
-function spreadPathsOf(region, arrays, suitePath) {
+/** The set of component paths a suite actually COMPILES into its temp tree. */
+const compiledPathsOf = (suite, suitePath) =>
+  rostersOf(suite, suitePath).flatMap(({ paths }) => paths);
+
+/** The paths each `...NAME` in a region resolves to, plus those of NAME's own spreads. */
+function spreadPathsOf(region, arrays, suite, suitePath) {
+  const textOf = (file) => (file === suitePath ? suite : readFileSync(file, 'utf8'));
   const paths = [];
   for (const [, spread] of region.matchAll(SPREAD)) {
     const array = arrays.get(spread);
     if (!array) continue;
-    paths.push(...literalsIn(array.body));
+    paths.push(...pathsOfBody(array.body, textOf(array.file)));
     const scope = array.file === suitePath ? arrays : arraysOfFile(array.file);
     for (const [, nested] of array.body.matchAll(SPREAD)) {
-      paths.push(...literalsIn(scope.get(nested)?.body ?? ''));
+      const inner = scope.get(nested);
+      if (inner) paths.push(...pathsOfBody(inner.body, textOf(inner.file)));
     }
   }
   return paths;
@@ -337,7 +372,10 @@ function importedArraysOf(source, fromFile) {
       ])
     );
     for (const raw of names.split(',')) {
-      const name = raw.trim().split(/\s+as\s+/).at(-1);
+      const name = raw
+        .trim()
+        .split(/\s+as\s+/)
+        .at(-1);
       if (declared.has(name)) pairs.push([name, declared.get(name)]);
     }
   }
@@ -378,17 +416,22 @@ function closureOf(componentPath, seen = new Set()) {
 
 const closures = new Map(componentPaths.map((path) => [path, closureOf(path)]));
 
-/** What one suite's temp tree names, and each shared primitive that tree renders without naming. */
+/** What one suite's temp trees name, and each shared primitive a tree renders without naming. */
 function gapsIn(suitePath, suite) {
-  const compiled = new Set(compiledPathsOf(suite, suitePath));
+  const rosters = rostersOf(suite, suitePath);
+  const compiled = new Set(rosters.flatMap(({ paths }) => paths));
   const named = componentPaths.filter((path) => compiled.has(path));
-  const missing = SHARED_PRIMITIVES.filter(
-    (primitive) =>
-      !named.includes(primitive) && named.some((path) => closures.get(path).has(primitive))
-  );
-  const gaps = missing.map(
-    (primitive) => `${suitePath} mounts a tree that renders ${primitive} but never compiles it`
-  );
+  const gaps = rosters.flatMap(({ line, paths }) => {
+    const own = componentPaths.filter((path) => paths.includes(path));
+    const where = line === null ? '' : ` (the roster at line ${line})`;
+    return SHARED_PRIMITIVES.filter(
+      (primitive) =>
+        !own.includes(primitive) && own.some((path) => closures.get(path).has(primitive))
+    ).map(
+      (primitive) =>
+        `${suitePath} mounts a tree that renders ${primitive} but never compiles it${where}`
+    );
+  });
   return { named, gaps };
 }
 
@@ -429,7 +472,7 @@ const syntheticSuite = (...lines) => lines.join('\n').replaceAll('@KEY', 'compil
 
 test('a roster passed by name or shorthand is read as a spread, and a call on it is not', () => {
   const gapsOf = (...lines) => gapsIn(SYNTHETIC_SUITE, syntheticSuite(...lines));
-  const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it`;
+  const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it (the roster at line 2)`;
 
   const byName = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE });');
   assert.ok(byName.gaps.includes(selectGap), 'a roster passed by name is read');
@@ -437,6 +480,73 @@ test('a roster passed by name or shorthand is read as a spread, and a call on it
   assert.ok(shorthand.gaps.includes(selectGap), 'a roster passed by shorthand is read');
   const call = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
   assert.deepEqual(call.named, [], 'a call on a roster stays unread, as the harness test needs');
+});
+
+const [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD] = [
+  'Button',
+  'ArmedDangerButton',
+  'InspectorCard',
+].map((name) => SHARED_PRIMITIVES.find((path) => path.endsWith(`/${name}.svelte`)));
+const BULK_DELETE_CARD = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
+const gapFor = (primitive, line) =>
+  `${SYNTHETIC_SUITE} mounts a tree that renders ${primitive} but never compiles it` +
+  (line === undefined ? '' : ` (the roster at line ${line})`);
+const quoted = (...paths) => paths.map((path) => `'${path}'`).join(', ');
+
+test('a harness roster is checked on its own, so another harness cannot hide its omission', () => {
+  const both = syntheticSuite(
+    `h({ @KEY: [${quoted(BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD)}] });`,
+    `h({ @KEY: [${quoted(ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD)}] });`
+  );
+  assert.deepEqual(gapsIn(SYNTHETIC_SUITE, both).gaps, [gapFor(BUTTON, 2)]);
+  assert.ok(
+    compiledPathsOf(both, SYNTHETIC_SUITE).includes(BUTTON),
+    'the union of both rosters names Button, which is what hid the second roster’s gap'
+  );
+});
+
+test('a path constant the declaring file binds once is read as its path', () => {
+  const card = syntheticSuite(`const CARD = '${BULK_DELETE_CARD}';`, 'h({ @KEY: [CARD] });');
+  const rendered = [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD];
+  assert.deepEqual(
+    gapsIn(SYNTHETIC_SUITE, card).gaps,
+    SHARED_PRIMITIVES.filter((primitive) => rendered.includes(primitive)).map((primitive) =>
+      gapFor(primitive, 2)
+    )
+  );
+});
+
+test('an element no single path constant binds is left unread, not failed', () => {
+  const unread = {
+    'an identifier nothing declares': syntheticSuite('h({ @KEY: [componentPath] });'),
+    'a template-literal constant': syntheticSuite(
+      `const CARD = \`${BULK_DELETE_CARD}\`;`,
+      'h({ @KEY: [CARD] });'
+    ),
+    'a constant declared twice': syntheticSuite(
+      `const CARD = '${BULK_DELETE_CARD}';`,
+      `const CARD = '${INSPECTOR_CARD}';`,
+      'h({ @KEY: [CARD] });'
+    ),
+    'a call': syntheticSuite(
+      `const component = '${BULK_DELETE_CARD}';`,
+      "h({ @KEY: [component('X')] });"
+    ),
+    'a spread constant': syntheticSuite(
+      `const CARD = '${BULK_DELETE_CARD}';`,
+      'h({ @KEY: [...CARD] });'
+    ),
+  };
+  for (const [label, suite] of Object.entries(unread)) {
+    assert.deepEqual(gapsIn(SYNTHETIC_SUITE, suite).named, [], `${label} stays unread`);
+  }
+});
+
+test('one hand-rolled temp tree is checked whole, whichever call compiles each component', () => {
+  const calls = [BUTTON, ARMED_DANGER_BUTTON, INSPECTOR_CARD, BULK_DELETE_CARD].map(
+    (path) => `writeCompiledSvelte('${path}');`
+  );
+  assert.deepEqual(gapsIn(SYNTHETIC_SUITE, syntheticSuite(...calls)).gaps, []);
 });
 
 test('a spread roster is followed one level into the file that declares it', () => {
@@ -474,9 +584,9 @@ test('every inspected suite resolves at least one real component, so none passes
   assert.deepEqual(
     unreadable,
     [],
-    'these suites compile components the parser cannot read, so the guard above holds over an '
-      + 'empty set for them and reports clean whatever they render:\n- '
-      + unreadable.join('\n- ')
+    'these suites compile components the parser cannot read, so the guard above holds over an ' +
+      'empty set for them and reports clean whatever they render:\n- ' +
+      unreadable.join('\n- ')
   );
 });
 

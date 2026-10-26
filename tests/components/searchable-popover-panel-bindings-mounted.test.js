@@ -120,3 +120,39 @@ describe('1719 the picker holds its panel element', () => {
     harness.remount();
   });
 });
+
+describe('2671 the picker closes a panel whose root leaves the document', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  it('removes the open panel, chooses nothing and moves no focus, and reads closed once back', async () => {
+    const chosen = [];
+    await openPanel({
+      onSelect: (id) => {
+        chosen.push(id);
+      },
+    });
+    assert.ok(Boolean(panel()), 'the panel is open');
+    const root = harness.target.querySelector('.fabricate-picker');
+    const button = trigger();
+    const focused = [];
+    button.focus = () => {
+      focused.push('trigger');
+    };
+    // Registered after the picker's own watch, so it puts the root back before the close's focus
+    // step would run, where a focus restore would find the trigger connected.
+    const putBack = new globalThis.MutationObserver(() => {
+      putBack.disconnect();
+      harness.target.append(root);
+    });
+    putBack.observe(document, { childList: true, subtree: true });
+    root.remove();
+    await settle();
+    assert.ok(!panel(), 'the panel is gone');
+    assert.ok(root.isConnected, 'the root is back');
+    assert.deepEqual(chosen, [], 'nothing is chosen');
+    assert.deepEqual(focused, [], 'no focus is moved');
+    assert.equal(button.getAttribute('aria-expanded'), 'false');
+    harness.remount();
+  });
+});

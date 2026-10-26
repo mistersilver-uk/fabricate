@@ -470,6 +470,8 @@ describe('M16: the required ancestor root', () => {
   const MANAGED = Object.freeze({ ...PANEL, name: 'Managed', root: 'manager' });
   const WINDOW = 'Windowed needs a Fabricate window ancestor';
   const MANAGER = 'Managed needs a Fabricate manager ancestor';
+  // A Fabricate root: a `.fabricate` that is no standalone style root (issue 2456).
+  const FABRICATE_ROOT = '.fabricate:not(.fabricate-standalone-root)';
 
   /** A seam whose `hasAncestor` answers from `rooted`, logging each question in `asked`. */
   function rootedSeam(options = {}) {
@@ -495,7 +497,7 @@ describe('M16: the required ancestor root', () => {
     const second = under();
     assert.throws(() => ui.mount('Managed', { target: second }), refusal(MANAGER));
     assert.deepEqual(asked, [
-      [first, '.fabricate'],
+      [first, FABRICATE_ROOT],
       [second, '.fabricate-manager'],
     ]);
     assert.equal(mounts.length, 0);
@@ -553,8 +555,8 @@ describe('M16: the required ancestor root', () => {
     const nested = under(outer.slot('body'));
     assert.equal(ui.mount('Windowed', { target: nested, props: {} }).update({}), true);
     assert.deepEqual(asked, [
-      [nested, '.fabricate'],
-      [inside, '.fabricate'],
+      [nested, FABRICATE_ROOT],
+      [inside, FABRICATE_ROOT],
     ]);
 
     const outside = ui.mount('Panel', { target: under(), props: { body: true } });
@@ -616,11 +618,11 @@ describe('M16: the required ancestor root', () => {
     const framed = new FakeTarget();
     framed.closest = (selector) => {
       asked.push(selector);
-      return selector === '.fabricate' ? framed : null;
+      return selector === FABRICATE_ROOT ? framed : null;
     };
     assert.equal(ui.mount('Windowed', { target: framed, props: {} }).update({}), true);
     assert.throws(() => ui.mount('Managed', { target: framed }), refusal(MANAGER));
-    assert.deepEqual(asked, ['.fabricate', '.fabricate-manager']);
+    assert.deepEqual(asked, [FABRICATE_ROOT, '.fabricate-manager']);
     assert.throws(
       () => ui.mount('Windowed', { target: new FakeTarget() }),
       refusal(WINDOW),

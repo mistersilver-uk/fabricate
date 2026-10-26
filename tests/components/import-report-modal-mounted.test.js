@@ -117,7 +117,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.ok(root, 'expected the report to be portaled');
     assert.ok(root.hasAttribute('data-manager-modal'), 'wears the shared modal chrome');
     assert.equal(root.getAttribute('role'), 'dialog');
-    assert.equal(root.getAttribute('aria-modal'), 'true');
+    assert.ok(!root.hasAttribute('aria-modal'), 'traps no focus, so it is not announced as modal');
     assert.ok(document.querySelector('[data-manager-modal-close]'), 'has the round close control');
   });
 

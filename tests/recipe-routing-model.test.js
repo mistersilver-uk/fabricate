@@ -273,8 +273,24 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
       model.sources.map(({ sharedCount }) => sharedCount),
       [3, 3, 3, 0]
     );
-    assert.deepEqual(model.unreachable, [3], 'a failure-role group is never unreachable');
+    assert.deepEqual(
+      model.unreachable,
+      [2, 3],
+      'a failure-role group no set reaches is unreachable under ingredient routing'
+    );
     assert.deepEqual(model.unassigned, [0, 2, 3]);
+  });
+
+  it('reads a failure-role group an ingredient set names explicitly as reachable', () => {
+    const model = setModel(
+      [{ id: 's1', resultGroupId: 'gf' }],
+      [{ id: 'g1' }, { id: 'gf', role: 'failure' }]
+    );
+    assert.deepEqual(model.unreachable, [0]);
+    assert.deepEqual(
+      model.inbound.map((sources) => sources.map(({ id }) => id)),
+      [[], ['s1']]
+    );
   });
 
   it('counts a multi-target fallback by its largest target', () => {
@@ -291,9 +307,9 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
     );
   });
 
-  it('lists every non-failure group as unreachable under ingredientSet with no sets', () => {
+  it('lists every group as unreachable under ingredientSet with no sets', () => {
     const model = setModel([], [{ id: 'g1' }, { id: 'g2', role: 'failure' }, null]);
-    assert.deepEqual([model.sources, model.unreachable], [[], [0, 2]]);
+    assert.deepEqual([model.sources, model.unreachable], [[], [0, 1, 2]]);
   });
 
   it('claims an id-less group only by a set naming it, never by an undefined resultGroupId', () => {
@@ -311,6 +327,17 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
     );
     assert.deepEqual(model.unassigned, [1, 2]);
     assert.deepEqual(model.unreachable, [1, 2]);
+  });
+
+  it('keeps a failure-role group that lists no tier out of unreachable under tier routing', () => {
+    const model = tierModel(
+      [
+        { id: 'g1', checkOutcomeIds: ['t-fine'] },
+        { id: 'g2', role: 'failure' },
+      ],
+      [FINE]
+    );
+    assert.deepEqual([model.unassigned, model.unreachable], [[1], []]);
   });
 
   it('routes nothing without a provider', () => {
