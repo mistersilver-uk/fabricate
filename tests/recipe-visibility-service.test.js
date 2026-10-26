@@ -8,7 +8,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
+import {
+  applyFaithfulWrite,
+  deletedKey,
+  forEachDeletionForm,
+  recordWrite
+} from './helpers/forcedDeletion.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
 // Foundry globals
@@ -3496,31 +3501,12 @@ function seedLearnedActor(learned = {}, discovery = {}, items = [], Actor = Fake
   return new Actor({ id: 'actor-773', items, flagsArg: { fabricate } });
 }
 
-function mergeNeverDeleting(target, source) {
-  for (const [key, value] of Object.entries(source)) {
-    if (isPlainObjectValue(value) && isPlainObjectValue(target[key])) mergeNeverDeleting(target[key], value);
-    else target[key] = value;
-  }
-}
-
-// `Actor#setFlag` and `Actor#update` as core runs them: a recursive merge of the JSON value that
-// never deletes, so only a real deletion removes a key a retained-map write omits.
+// `Actor#setFlag` and `Actor#update` as core runs them: a recursive merge that never deletes, so
+// only a real deletion removes a key a retained-map write omits.
 class MergeFaithfulActor extends FakeActor {
-  _mergeAt(root, path, value) {
-    const parts = String(path).split('.');
-    const last = parts.pop();
-    let node = root;
-    for (const part of parts) node = node[part] ??= {};
-    const deleted = deletedKey(last, value);
-    if (deleted !== null) return void delete node[deleted];
-    const expanded = expandValueTree(JSON.parse(JSON.stringify(value)));
-    if (isPlainObjectValue(node[last]) && isPlainObjectValue(expanded)) mergeNeverDeleting(node[last], expanded);
-    else node[last] = expanded;
-  }
-
   async setFlag(scope, key, value) {
     recordWrite(this.setFlagCalls, value, { scope, key, value });
-    this._mergeAt((this._flags[scope] ??= {}), key, value);
+    applyFaithfulWrite((this._flags[scope] ??= {}), key, expandValueTree(value));
     return value;
   }
 
@@ -3529,7 +3515,7 @@ class MergeFaithfulActor extends FakeActor {
     for (const [path, value] of Object.entries(changes)) {
       const [root, ...rest] = path.split('.');
       assert.equal(root, 'flags', 'the two-step writes address the flags root');
-      this._mergeAt(this._flags, rest.join('.'), value);
+      applyFaithfulWrite(this._flags, rest.join('.'), expandValueTree(value));
     }
     return this;
   }

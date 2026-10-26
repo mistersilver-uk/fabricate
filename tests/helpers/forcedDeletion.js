@@ -86,6 +86,45 @@ export function replacedKey(key, value) {
   return key.startsWith('==') ? { key: key.slice(2), value } : null;
 }
 
+const isPlainRecord = (value) =>
+  Boolean(value) && typeof value === 'object' && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+
+/** `incoming` merged into `existing` as core merges an update: keys the write omits survive. */
+function mergeFaithful(existing, incoming) {
+  if (!isPlainRecord(incoming)) return structuredClone(incoming);
+  const target = isPlainRecord(existing) ? existing : {};
+  for (const [key, value] of Object.entries(incoming)) {
+    const deleted = deletedKey(key, value);
+    const replaced = replacedKey(key, value);
+    if (deleted !== null) delete target[deleted];
+    else if (replaced) target[replaced.key] = structuredClone(replaced.value);
+    else target[key] = mergeFaithful(target[key], value);
+  }
+  return target;
+}
+
+/**
+ * One flattened-path `Document#update` write against `root`, as core applies it: missing parents are
+ * created, plain objects merge without deleting a key the write omits, arrays and scalars replace,
+ * and only a forced deletion removes a key (a forced replacement assigns wholesale), at the leaf or
+ * nested in `value`, in either the V13 or the V14 form. Values are cloned, never aliased.
+ */
+export function applyFaithfulWrite(root, dottedPath, value) {
+  const segments = String(dottedPath).split('.');
+  const last = segments.pop();
+  let node = root;
+  for (const segment of segments) {
+    if (!node[segment] || typeof node[segment] !== 'object') node[segment] = {};
+    node = node[segment];
+  }
+  const deleted = deletedKey(last, value);
+  const replaced = replacedKey(last, value);
+  if (deleted !== null) delete node[deleted];
+  else if (replaced) node[replaced.key] = structuredClone(replaced.value);
+  else node[last] = mergeFaithful(node[last], value);
+  return root;
+}
+
 export function countForcedDeletions(value) {
   if (isForcedDeletion(value)) return 1;
   if (!value || typeof value !== 'object') return 0;

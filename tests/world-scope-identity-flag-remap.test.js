@@ -6,19 +6,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
-import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
-import {
-  deletedKey,
-  forEachReplacementForm,
-  isForcedReplacement,
-  recordWrite,
-  replacedKey,
-} from './helpers/forcedDeletion.js';
-import { buildEssenceMergeCorpus } from './helpers/worldScopeCorpus.js';
-import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
-import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 import { SETTING_KEYS, WORLD_SCOPE_IDENTITY_FLAG_TARGET } from '../src/config/settings.js';
+import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
 import {
   forcedReplacementFlagWriters,
   hasPendingWorldEssenceMerge,
@@ -34,6 +23,17 @@ import {
   unambiguousEssenceRemap,
   worldEssenceMergeLegs,
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
+import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
+
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import {
+  applyFaithfulWrite,
+  forEachReplacementForm,
+  isForcedReplacement,
+  recordWrite,
+} from './helpers/forcedDeletion.js';
+import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
+import { buildEssenceMergeCorpus } from './helpers/worldScopeCorpus.js';
 
 
 test('actual equivalent-essence merge and flag remap preserve captured history through applied-prefix resume', async () => {
@@ -427,25 +427,9 @@ function craftingRunFlag(essences = { 'fire-a': 1, 'fire-b': 2 }, enabled = null
   };
 }
 
-function isObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
- * Foundry's recursive inner-object merge, with `performDeletions` at its documented default of
- * `false`: no key present in the original is ever removed by a write that omits it.
- */
-function mergeRecursiveWithoutDeletions(original, other) {
-  if (!isObject(original) || !isObject(other)) return other;
-  for (const [key, value] of Object.entries(other)) {
-    original[key] = mergeRecursiveWithoutDeletions(original[key], value);
-  }
-  return original;
-}
-
-/**
- * A document whose `update()` expands a dotted path and applies the merge semantics above,
- * honouring a forced replacement or deletion on the last segment in its V13 or V14 form.
+ * A document whose `update()` expands a dotted path and applies Foundry's merge semantics with
+ * `performDeletions` at its documented default of `false`, honouring a forced replacement or deletion in its V13 or V14 form.
  */
 function makeMergeDocument(flags) {
   const document = {
@@ -461,20 +445,7 @@ function makeMergeDocument(flags) {
     },
     async update(changes) {
       recordWrite(document.updateCalls, changes);
-      for (const [path, value] of Object.entries(changes)) {
-        const segments = path.split('.');
-        const leaf = segments.pop();
-        let node = document;
-        for (const segment of segments) {
-          if (!isObject(node[segment])) node[segment] = {};
-          node = node[segment];
-        }
-        const replaced = replacedKey(leaf, value);
-        const deleted = deletedKey(leaf, value);
-        if (replaced) node[replaced.key] = replaced.value;
-        else if (deleted === null) node[leaf] = mergeRecursiveWithoutDeletions(node[leaf], value);
-        else delete node[deleted];
-      }
+      for (const [path, value] of Object.entries(changes)) applyFaithfulWrite(document, path, value);
       return document;
     },
   };
