@@ -2037,6 +2037,8 @@ The gathering implementation checkpoints are in [the domain history](docs/domain
 - Startup migration runner with checkpoint and rollback
 - Canonical-write and legacy-read normalization
 - Cleanup of stale runs, learned recipes, and preferences
+- A **writeback leg** is one payload value the startup pass reads, snapshots, change-detects and writes back, in the order of `WRITEBACK_LEGS`, which is a requirement and not an implementation detail; the version bump is not a leg.
+  It is not a **Slot** (an `IngredientGroup`), and not a leg of a persisted map such as the re-key or merge map.
 
 ### 8. Module Integration (Infrastructure)
 
