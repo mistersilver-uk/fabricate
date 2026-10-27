@@ -1,7 +1,7 @@
 /**
  * Issue 2365 — every drawn `.k-seg` in the design library paints its form as `SegmentedControl`
  * ships it. Each `--fab-*` token is pinned to a unique sentinel colour on both pages, so a computed
- * colour reads back as the token it came from, and the only differing pairs are the named D1 inks.
+ * colour reads back as the token it came from, and no pair differs.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -46,15 +46,6 @@ const FORMS = Object.freeze({
     geometry: true,
   },
 });
-
-/** D1: the shipped idle ink measures under 4.5:1 at these sizes, so the drawing passes (#2368). */
-const D1 = Object.freeze(
-  ['tag', 'inline', 'field', 'tagInline', 'tagField'].map((form) => ({
-    pair: `${form} idle color`,
-    drawn: '--fab-text-muted',
-    shipped: '--fab-text-subtle',
-  }))
-);
 
 const tokens = [
   ...new Set([...`${library}\n${shipped.css}`.matchAll(/--fab-[a-z0-9-]+/g)].map(([t]) => t)),
@@ -206,7 +197,7 @@ it('reads a non-empty paint from every drawn and shipped form', () => {
   }
 });
 
-it('draws each form in the shipped tokens, except the named D1 inks', () => {
+it('draws each form in the shipped tokens', () => {
   const differing = [];
   for (const form of Object.keys(FORMS)) {
     const drawn = onePaint('drawn', form);
@@ -223,5 +214,5 @@ it('draws each form in the shipped tokens, except the named D1 inks', () => {
       }
     }
   }
-  assert.deepEqual(differing, D1);
+  assert.deepEqual(differing, []);
 });
