@@ -148,7 +148,7 @@
   const missingText = $derived.by(() => {
     const clear = localizeOr(
       'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierMissingClear',
-      'To clear this, untick "Pick check modifiers" and tick it again; that resets the other picks too.'
+      'To clear this, turn off Pick check modifiers and turn it on again; that resets the other picks too.'
     );
     if (missingCount === 1) {
       return `${localizeOr(

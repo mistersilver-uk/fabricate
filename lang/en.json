@@ -6726,7 +6726,7 @@
             "SubjectModifierCapOneComponent": "This system lets a component pick one check modifier.",
             "SubjectModifierCapOneTask": "This system lets a task pick one check modifier.",
             "SubjectModifierCapReached": "Remove one to pick another.",
-            "SubjectModifierMissingClear": "To clear this, untick \"Pick check modifiers\" and tick it again; that resets the other picks too.",
+            "SubjectModifierMissingClear": "To clear this, turn off Pick check modifiers and turn it on again; that resets the other picks too.",
             "ModifierEligibilityApplied": "Applied",
             "ModifierEligibilityConsidered": "Considered",
             "ModifierEligibilitySelectable": "Selectable",
