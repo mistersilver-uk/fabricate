@@ -1619,6 +1619,8 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     query: { tab: 'crafting', journalCaseState: 'past-stage' },
     steps: [
+      // The journal seed adds recipes, so search for the blade rather than assume it is on page one.
+      { selector: '.crafting-browser-search input', fill: 'Pattern-Welded' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
       { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },
     ],
