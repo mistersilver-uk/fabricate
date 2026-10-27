@@ -2284,12 +2284,57 @@ describe('UI PR screenshot evidence', () => {
       assert.equal(twice, `${body}\n\n${blockOf('head-b')}\n`);
     });
 
-    it('collapses every block from the first start to the last end into one', () => {
+    it('replaces the first block and deletes later ones, keeping the text between them', () => {
       const body = `Intro.\n\n${blockOf('a')}\n\nBetween.\n\n${blockOf('b')}\n\n## Testing\n\nRan.\n`;
       assert.equal(
         upsertScreenshotsBlock(body, frame('c')),
-        `Intro.\n\n${blockOf('c')}\n\n## Testing\n\nRan.\n`
+        `Intro.\n\n${blockOf('c')}\n\nBetween.\n\n## Testing\n\nRan.\n`
       );
+    });
+
+    it('leaves everything below the block alone when a stray end marker sits further down', () => {
+      const below = `## Testing\n\nRan.\n\n${BLOCK_END}\n\n## Screenshots\n\n${frame('by-hand')}\n`;
+      assert.equal(
+        upsertScreenshotsBlock(`Intro.\n\n${blockOf('a')}\n\n${below}`, frame('c')),
+        `Intro.\n\n${blockOf('c')}\n\n${below}`
+      );
+    });
+
+    it('deletes an unterminated block that follows a complete one', () => {
+      const body = `${blockOf('a')}\n\n${BLOCK_START}\n## Screenshots\n\n${frame('b')}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `${blockOf('c')}\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('closes a block only at an end marker before the next start marker', () => {
+      const body =
+        `${BLOCK_START}\n## Screenshots\n\n${frame('a')}\n\n## Notes\n\nKept.\n\n${blockOf('b')}\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `${blockOf('c')}\n\n## Notes\n\nKept.\n`
+      );
+    });
+
+    it('stops an unterminated block at the next start marker', () => {
+      const body = `${BLOCK_START}\n## Screenshots\n\n${frame('a')}\n\n${BLOCK_START}\n${frame('b')}\n${BLOCK_END}\n\nKept.\n`;
+      assert.equal(upsertScreenshotsBlock(body, frame('c')), `${blockOf('c')}\n\nKept.\n`);
+    });
+
+    it('finds the block past a fence it cannot mistake for one GitHub never draws', () => {
+      const later = '\n\n```\nlater\n```\n';
+      for (const [before, after] of [
+        ['1. Run:\n2. ```bash\n   npm test\n   ```\n\n', later],
+        ['```js\nnever closed\n\n', '\n'],
+        ['```inline``` prose opens no fence.\n\n', later],
+      ]) {
+        assert.equal(
+          upsertScreenshotsBlock(`${before}${blockOf('a')}${after}`, frame('c')),
+          `${before}${blockOf('c')}${after}`,
+          before
+        );
+      }
     });
 
     it('replaces an unterminated block up to the next top-level heading, keeping what follows', () => {

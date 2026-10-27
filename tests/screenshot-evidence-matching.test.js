@@ -37,7 +37,6 @@ import {
   upsertScreenshotsBlock,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
-// CODE POINT, not `localeCompare`: compared id lists must order identically on every machine.
 import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   BLOCK_END,
@@ -1751,6 +1750,26 @@ describe('one managed block per body, read the way the publisher writes it (issu
     assert.match(decision.message, new RegExp(NEXT_HEAD));
   });
 
+  it('fails a complete block followed by an unterminated stale one, not passing it as hand-supplied', async () => {
+    const body = `${stale(PREVIOUS_HEAD)}\n\n${unterminated(NEXT_HEAD)}\n\n## Notes\n\nKept.\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assertFailedWith(await decideOn(body), GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('ends an unterminated block at the next start marker, so what follows that block is read', () => {
+    const human = `### Screenshots\n\n![by hand](${HUMAN_URL})\n`;
+    const body = `${unterminated(PREVIOUS_HEAD)}\n\n${BLOCK_START}\n${BLOCK_END}\n\n${human}`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, [
+      HUMAN_URL,
+    ]);
+  });
+
+  it('fails closed on a block a fence hides, rather than counting its frames as hand-supplied', async () => {
+    const body = `\`\`\`md\n${stale(PREVIOUS_HEAD)}\n\`\`\`\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assert.equal((await decideOn(body)).exitCode, 1);
+  });
+
   it('names a missing end marker when the block carries no frame it can identify', async () => {
     const library = `![pr-${PR} Library](https://cdn.example.test/pr-screenshots/${PR}/${HEAD}/library/1.png)`;
     const decision = await decideOn(`${BLOCK_START}\n## Screenshots\n\n${library}\n`);
@@ -1774,6 +1793,10 @@ describe('one managed block per body, read the way the publisher writes it (issu
     'a marker quoted inline': `Quotes \`${BLOCK_START}\`.\n\n${stale(PREVIOUS_HEAD)}\n`,
     'markers in a code fence': `\`\`\`md\n${BLOCK_START}\n${BLOCK_END}\n\`\`\`\n\n${stale(PREVIOUS_HEAD)}\n`,
     'CRLF line endings': `${stale(PREVIOUS_HEAD)}\n`.replaceAll('\n', '\r\n'),
+    'a stray end below': `${stale(PREVIOUS_HEAD)}\n\n## Testing\n\nRan.\n\n${BLOCK_END}\n`,
+    'a complete block, then an unterminated one': `${stale(PREVIOUS_HEAD)}\n\n${unterminated(NEXT_HEAD)}\n`,
+    'a fence opened on a list item': `1. \`\`\`bash\n   npm test\n   \`\`\`\n\n${stale(PREVIOUS_HEAD)}\n\n\`\`\`\nlater\n\`\`\`\n`,
+    'an unclosed fence': `\`\`\`js\nnever closed\n\n${stale(PREVIOUS_HEAD)}\n`,
   });
 
   for (const [shape, body] of Object.entries(EDGE_BODIES)) {

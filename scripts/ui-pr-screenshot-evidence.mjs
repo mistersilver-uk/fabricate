@@ -7,11 +7,20 @@ import { spawnSync } from 'node:child_process';
 
 // The refusal diagnostic lives beside `evaluateSmokeOutcome` in the lib, not here (issue #1019).
 import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
+import { replaceManagedBlocks } from './lib/screenshotBlock.js';
 // The `check` gate's composed decision — await the capture run for this head, then match what it
 // published — lives in the lib for the same two reasons, plus a third: it is a leaf that imports
 // nothing from this file.
-import { decideScreenshotGate, locateManagedBlock } from './lib/screenshotEvidenceMatching.js';
+import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 import { logicalStylesheetPath } from './lib/stylesheetSource.js';
+// The render-module patterns the View Lab cases also name, declared once (issues 1790, 1891, 1901).
+import {
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_LIST_STATE_MATCH,
+  BROWSER_PAGINATION_MATCH,
+  BULK_SELECTION_MATCH,
+  ENVIRONMENT_EDITOR_STATE_MATCHES,
+} from './lib/view-lab-cases/caseConstants.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file cannot
 // derive: what to call it, whether it needs a caption, and where the Primitive Lab's boundary lies.
 import { evidenceNoteForCaseId, isPrimitiveLabPath, labelForCaseId } from './lib/viewLabCases.js';
@@ -22,8 +31,8 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 // Default human-only label that exempts a UI PR from the screenshot requirement.
 const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 
-// Stable delimiters for the managed screenshot block in the PR body. `publish` replaces the span
-// `locateManagedBlock` finds, the one the gate masks, so re-runs update in place (issue 1174).
+// Stable delimiters for the managed screenshot block in the PR body. `publish` replaces the blocks
+// `replaceManagedBlocks` finds, the ones the gate masks, so re-runs update in place (issue 1174).
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
@@ -66,20 +75,11 @@ const KNOWLEDGE_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.js$/,
   /^src\/ui\/svelte\/stores\/adminKnowledgeSection\.js$/,
 ];
-// Only Tool Studio's own files. It deliberately excludes two shared surfaces it used to match.
-// Render modules that select their own screens rather than the global fallback (issues 1790, 1891,
-// 1901): the browsers' lifted-list wiring and bulk selection, and their page and group-total models.
-const BROWSER_LIST_STATE_PATTERN = /^src\/ui\/svelte\/apps\/manager\/browserListState\.svelte\.js$/;
-const BULK_SELECTION_PATTERN = /^src\/ui\/svelte\/apps\/manager\/bulkSelection\.svelte\.js$/;
-const BROWSER_PAGE_MODEL_PATTERN = /^src\/ui\/model\/browser(?:GroupCounts|Pagination)\.js$/;
-const ENVIRONMENT_EDITOR_STATE_MATCHES = [
-  /^src\/ui\/svelte\/stores\/adminEnvironment(?:DraftSection|WriteActions)\.js$/,
-  /^src\/ui\/model\/environment(?:Validation|Composition)\.js$/,
-];
+// Tool Studio's own files, plus the lifted-list wiring every manager browser shares (issue 1901).
 const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/stores\/adminToolDraftSection\.js$/,
-  BROWSER_LIST_STATE_PATTERN,
+  BROWSER_LIST_STATE_MATCH,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
   // The shared side-panel fact row the Tool Studio's preview and library inspector render (issue
@@ -206,7 +206,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],
-    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/, BROWSER_LIST_STATE_PATTERN],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/, BROWSER_LIST_STATE_MATCH],
   },
   {
     id: 'manager-rail-expanded',
@@ -313,14 +313,14 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit',
     'Manager components browser — bulk edit (multi-select, selection toolbar, staged rail panel)',
-    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_PATTERN],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_MATCH],
   ),
   // The bulk panel's other two states, each its own view for the same `candidates[0]` reason as the
   // staged frame above — and each a separate frame because no one photograph can hold them.
   componentsBrowserFrame(
     'manager-components-bulk-edit-unstaged',
     'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
-    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_PATTERN],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_MATCH],
   ),
   // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it renders on
   // the progressive smoke system and on no other — which is also the only system in this world that
@@ -339,8 +339,9 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
       /^src\/ui\/model\/componentBrowserModel\.js$/,
-      BROWSER_PAGE_MODEL_PATTERN,
-      BROWSER_LIST_STATE_PATTERN,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
+      BROWSER_LIST_STATE_MATCH,
     ],
   },
   // Issue 800: write-time resolution of source descriptions.
@@ -522,27 +523,27 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
       // The shared bulk-delete card (issue 1132).
       /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/,
-      BROWSER_LIST_STATE_PATTERN,
-      BULK_SELECTION_PATTERN,
+      BROWSER_LIST_STATE_MATCH,
+      BULK_SELECTION_MATCH,
     ],
   },
   {
     id: 'manager-environments',
     label: 'Manager gathering environments',
     smokeLabels: ['manager-environments-browse-normal', 'manager-environments-browse-stacked', 'manager-environment-edit-placeholder'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/environment\//, ...ENVIRONMENT_EDITOR_STATE_MATCHES, BROWSER_LIST_STATE_PATTERN],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/environment\//, ...ENVIRONMENT_EDITOR_STATE_MATCHES, BROWSER_LIST_STATE_MATCH],
   },
   {
     id: 'manager-gathering-tasks',
     label: 'Manager gathering tasks',
     smokeLabels: ['manager-gathering-task-editor-normal', 'manager-gathering-task-editor-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/gathering-task\//, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/, BROWSER_LIST_STATE_PATTERN],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/gathering-task\//, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/, BROWSER_LIST_STATE_MATCH],
   },
   {
     id: 'manager-gathering-events',
     label: 'Manager gathering events',
     smokeLabels: ['manager-gathering-events-normal', 'manager-gathering-event-editor-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/, BROWSER_LIST_STATE_PATTERN],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/, BROWSER_LIST_STATE_MATCH],
   },
   toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('zero-state-empty-library-1280x720', 'Tool Studio — empty library zero state', 'manager-tool-zero-state-empty-library-1280x720', TOOL_STUDIO_MATCHES),
@@ -598,7 +599,7 @@ export const VIEW_RECIPES = Object.freeze([
   recipesBrowserFrame(
     'manager-recipes-bulk-edit',
     'Manager recipes browser — bulk edit (multi-select, selection toolbar, every axis staged)',
-    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_PATTERN],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_MATCH],
   ),
   // The pristine draft is its own FRAME as well as its own view, because no one photograph holds
   // both faces of an axis: a segmented control cannot read `Unchanged` and `Enable` at once, and
@@ -607,7 +608,7 @@ export const VIEW_RECIPES = Object.freeze([
   recipesBrowserFrame(
     'manager-recipes-bulk-edit-unstaged',
     'Manager recipes browser — bulk edit, pristine draft (three Unchanged segments, both check-tier sentinels, Apply inert)',
-    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_PATTERN],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES, BULK_SELECTION_MATCH],
   ),
   // Acceptance criterion 6's frame: the pre-flight warning Callout over the rows the browser has
   // itself pilled `Can't enable`.
@@ -628,8 +629,9 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
       /^src\/ui\/model\/recipeBrowserModel\.js$/,
-      BROWSER_PAGE_MODEL_PATTERN,
-      BROWSER_LIST_STATE_PATTERN,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
+      BROWSER_LIST_STATE_MATCH,
     ],
   },
   // Issue 806: the editor round-trip preservation frame.
@@ -1487,8 +1489,8 @@ export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
   // Include a `## Screenshots` heading so an auto-published body satisfies the
   // same check humans do (an image beneath a Screenshots heading).
   const inner = `${SCREENSHOTS_BLOCK_START}\n## Screenshots\n\n${blockMarkdown}\n${SCREENSHOTS_BLOCK_END}`;
-  const block = locateManagedBlock(text);
-  if (block) return `${text.slice(0, block.start)}${inner}${text.slice(block.end)}`;
+  const replaced = replaceManagedBlocks(text, inner);
+  if (replaced !== null) return replaced;
   const trimmed = text.replace(/\s+$/, '');
   return trimmed ? `${trimmed}\n\n${inner}\n` : `${inner}\n`;
 }

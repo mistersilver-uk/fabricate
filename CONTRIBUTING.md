@@ -966,7 +966,9 @@ There is **no `SCREENSHOTS_NEEDED:` text bypass**.
 
 An image the View Lab capture job published automatically only counts when it sits inside that job's own managed block in the PR body (`<!-- fabricate:screenshots:start -->` … `<!-- fabricate:screenshots:end -->`).
 Its case id and head SHA, read back from its published S3 URL (`<prefix>/<pr>/<head-sha>/<caseId>.png`), must match this PR's current head and one of the changed views.
-A body has at most one managed block, which the publisher replaces and the check masks alike: a marker counts only on a line of its own outside a code fence, and the block runs from the first start marker to the last end marker after it, or, with no end marker, to the next level-1 or level-2 heading after its own Screenshots heading.
+The publisher and the check find managed blocks alike: a marker counts only on a line of its own outside a closed code fence, and each start marker opens one block that closes at the first end marker before the next start marker.
+A block with no end marker runs to the next start marker or to the next `#` or `##` heading after its own Screenshots heading; a setext or indented heading does not end it.
+The publisher replaces the first block and deletes every later one, keeping any text between them, and the check masks every block, so no frame in a block counts as hand-supplied.
 An image in a Screenshots section that is NOT inside that managed block satisfies the check outright, with no matching applied — that is what keeps the maintainer-pasted path and the fork path working, since a drag-and-dropped GitHub attachment carries no case id and no head SHA.
 
 A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, `capture-did-not-conclude`, or `pull-request-read-failed`.
