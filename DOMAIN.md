@@ -1469,7 +1469,7 @@ It is descriptive: it places a period on the clock and never gates, matches or c
 
 #### Valid Id Basis
 
-The id sets a destructive pass derives from the live corpus before pruning anything naming an id outside them — `validRecipes`, `validSystems`, `validSalvageComponentsBySystem` and `validComponentIds`, which had no name until issue 1080, joined at issue 1308 by the two character-library sets and at issue 1359 by the three WORLD-SCOPE entity sets (component, essence and tool ids) and the two CATEGORY VOCABULARIES an icon map is pruned against.
+The id sets a destructive pass derives from the live corpus before pruning anything naming an id outside them — `validRecipes`, `validSystems` and `validSalvageComponentsBySystem`, which had no name until issue 1080, joined at issue 1308 by the two character-library sets and at issue 1359 by the three WORLD-SCOPE entity sets (component, essence and tool ids) and the two CATEGORY VOCABULARIES an icon map is pruned against.
 
 [Notes](docs/domain/terms.md#valid-id-basis)
 

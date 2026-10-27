@@ -901,6 +901,7 @@ It was previously modelled, normalized, GM-authorable, captured onto every salva
 - The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
 - Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<systemId>:<componentId>`.
 - The salvage key is system-qualified because component ids are not globally unique (copy-mode import preserves them), so a component-id-only key would let two systems' components share one order.
+- The stale-preference sweep keeps a `salvage:<systemId>:<componentId>` key while that system holds that component, and the earlier component-id-only `salvage:<componentId>` form while any system does.
 - One key per recipe, not per step.
 - The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
 - It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
