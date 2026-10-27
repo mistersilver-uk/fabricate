@@ -91,13 +91,16 @@ export function rectRegionThrowingTestPoint(options = {}) {
 }
 
 /**
- * A TokenDocument fake with NO placeable, as seen by a client not viewing its scene.
+ * A TokenDocument fake that has NO placeable unless `object` is given, as on a client not viewing
+ * its scene.
  *
  * @param {number} [options.x] Document top-left x (NOT the centre).
  * @param {number} [options.y] Document top-left y (NOT the centre).
  * @param {number} [options.width] Footprint width in grid squares.
  * @param {number} [options.height] Footprint height in grid squares.
  * @param {object|null} [options.scene] The parent scene (should carry `grid.size`).
+ * @param {object|null} [options.object] The placeable. Omitted means none, as on a client not
+ * viewing the scene.
  * @param {number} [options.elevation] Omitted ⇒ the document has no elevation.
  * @param {*} [options.regions] The membership collection, used VERBATIM (Set, `{ contents }`,
  * array, null, ...).
@@ -110,6 +113,7 @@ export function tokenDoc({
   width = 1,
   height = 1,
   scene = null,
+  object = null,
   elevation,
   regions = [],
   insideRegion = 'absent',
@@ -126,6 +130,7 @@ export function tokenDoc({
     height,
     elevation,
     parent: scene,
+    object,
     regions,
     testInsideRegionCalls: [],
     // A complete ElevatedPoint, exactly as V13/V14 TokenDocument#getCenterPoint returns it: the

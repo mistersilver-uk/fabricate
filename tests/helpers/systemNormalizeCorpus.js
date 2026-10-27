@@ -399,6 +399,13 @@ function essenceScenarios() {
       args: [{ id: 'e7', associatedSystemItemId: 'comp-7', sourceItemUuid: 'Item.seven' }, new Set()],
     },
     { member: '_normalizeEssenceDefinition', name: 'essenceDefinitionNonObject', args: [7, new Set()] },
+    // An id that slugs to nothing falls back to 'essence', and to 'essence-2' once that is taken.
+    { member: '_normalizeEssenceDefinition', name: 'essenceDefinitionUnsluggableId', args: [{ id: '---' }, new Set()] },
+    {
+      member: '_normalizeEssenceDefinition',
+      name: 'essenceDefinitionUnsluggableIdCollides',
+      args: [{ id: '---' }, new Set(['essence'])],
+    },
 
     { member: '_looksLikeDocumentUuid', name: 'looksLikeDocumentUuidItem', args: ['Item.abc'], alternatives: ['nope'] },
     { member: '_looksLikeDocumentUuid', name: 'looksLikeDocumentUuidCompendium', args: ['Compendium.mod.pack.abc'] },
