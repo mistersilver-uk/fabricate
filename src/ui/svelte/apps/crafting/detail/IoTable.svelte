@@ -44,6 +44,8 @@
     openSlotId = null,
     // A later step's rail, or one whose time gate is armed, is inert preview.
     readOnly = false,
+    // True when the read-only rail is the active step's own (a run is in progress).
+    inProgress = false,
     announcement = '',
     onOpenSlot = null,
     onPickForMe = null,
@@ -205,6 +207,7 @@
         {slots}
         {openSlotId}
         {readOnly}
+        {inProgress}
         {announcement}
         {panelId}
         choices={ingredientChoices}

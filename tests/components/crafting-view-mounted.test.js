@@ -13,6 +13,7 @@ import {
   essenceCraftability,
   fakeCraftingStore,
   listing,
+  multiStepRecipe,
   recipe
 } from '../helpers/crafting-fixtures.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
@@ -288,6 +289,20 @@ describe('CraftingView mounted behavior', () => {
     });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
+  });
+
+  // 1615: step 2 is the step being crafted, so only step 1 may say it is not.
+  it('words a parked run\'s two read-only rails differently: the displayed step is not crafted, the active one is', async () => {
+    const parked = multiStepRecipe({ activeStepId: 'step-2', displayedStepId: 'step-1' });
+    const store = fakeCraftingStore({ recipes: [parked] });
+    const target = await harness.mount({ services: services(store) });
+    const notes = [...target.querySelectorAll('[data-requirement-rail-readonly]')].map((note) =>
+      note.textContent.trim()
+    );
+    assert.deepEqual(notes, [
+      'FABRICATE.App.Crafting.Slots.ReadOnly',
+      'FABRICATE.App.Crafting.Slots.ReadOnlyInProgress'
+    ]);
   });
 
   it('routes the rail callbacks back to the store', async () => {

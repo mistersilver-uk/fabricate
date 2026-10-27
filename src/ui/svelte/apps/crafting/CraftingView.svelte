@@ -139,6 +139,7 @@
     chosenGroupIds: Object.keys(store?.selectedIngredientOptions ?? {}),
     openSlotId: railReadOnly ? null : (store?.openSlotId ?? null),
     readOnly: railReadOnly,
+    inProgress: railReadOnly,
     announcement: store?.slotAnnouncement ?? '',
     onChooseOption,
     onOpenSlot,

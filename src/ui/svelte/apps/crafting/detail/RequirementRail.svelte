@@ -9,6 +9,7 @@
   | `slots` | `buildRequirementSlots` output | `[]` | The set's slots in author order. |
   | `openSlotId` | slot id | `null` | Resolved and re-validated by the store; the rail never remembers it. |
   | `readOnly` | boolean | `false` | True when the displayed step is not the step the engine would execute, or its time gate is armed. |
+  | `inProgress` | boolean | `false` | True when this rail belongs to the step the engine is on; its read-only note then speaks of the run, not of another step. |
   | `announcement` | localized string | `''` | Wins over the open-chooser sentence in the live region. |
   | `panelId` | DOM id | `null` | The id the open slot's panel takes. |
   | `choices` | craftability `ingredientChoices` | `[]` | A group's `option` entry becomes its slot's alternatives; other kinds are ignored here. |
@@ -41,6 +42,7 @@
     slots = [],
     openSlotId = null,
     readOnly = false,
+    inProgress = false,
     announcement = '',
     panelId = null,
     choices = [],
@@ -220,7 +222,11 @@
 
     {#if readOnly}
       <p class="requirement-rail-hint" data-requirement-rail-readonly>
-        {localize('FABRICATE.App.Crafting.Slots.ReadOnly')}
+        {localize(
+          inProgress
+            ? 'FABRICATE.App.Crafting.Slots.ReadOnlyInProgress'
+            : 'FABRICATE.App.Crafting.Slots.ReadOnly'
+        )}
       </p>
     {:else}
       <p class="requirement-rail-hint">{localize('FABRICATE.App.Crafting.Slots.Hint')}</p>

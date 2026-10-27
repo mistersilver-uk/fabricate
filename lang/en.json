@@ -1092,6 +1092,7 @@
           "Title": "Requirements",
           "Hint": "Choose what this craft will use for each requirement.",
           "ReadOnly": "This isn't the step being crafted, so its requirements can't be changed yet.",
+          "ReadOnlyInProgress": "A run is in progress, so this step's requirements can't be changed.",
           "PickForMe": "Pick for me",
           "PickForMeHint": "Choose components for every requirement you haven't set yourself.",
           "PickedForYou": "Picked components for the requirements you hadn't chosen.",
