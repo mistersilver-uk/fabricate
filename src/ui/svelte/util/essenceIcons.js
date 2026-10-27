@@ -687,6 +687,11 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
+/** The normalised icon class of a stored essence icon, or `null` when none was authored. */
+export function essenceIconOrNull(iconClass) {
+  return String(iconClass ?? '').trim() ? normalizeEssenceIcon(iconClass) : null;
+}
+
 export function buildEssenceIconOptions(iconDefinitions = null) {
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
     ? iconDefinitions

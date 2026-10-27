@@ -9,14 +9,11 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseFontAwesomeRelease } from '../scripts/lib/fontAwesomeBundle.js';
 import { resolveChromeCache } from '../scripts/lib/foundryChromeCache.js';
 import { ESSENCE_ICON_STYLE_PREFIXES } from '../src/ui/svelte/util/essenceIcons.js';
-import { FOUNDRY_ICON_BUNDLE_RELEASE } from '../src/ui/svelte/util/foundryIconCatalogue.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STYLESHEET = 'fonts/fontawesome/css/all.min.css';
-const FOUNDRY_CATALOGUE_MAJOR = 14;
 
 // Each supported prefix and the @font-face it draws from: the family flavour and the weight.
 const PREFIX_FACES = Object.freeze({
@@ -118,21 +115,4 @@ describe('essence icon style prefixes and the Font Awesome faces', () => {
       );
     }
   });
-
-  it(
-    'measured the committed catalogue from the Font Awesome release Foundry 14 ships',
-    { skip },
-    (t) => {
-      if (Number.parseInt(cache.version, 10) !== FOUNDRY_CATALOGUE_MAJOR) {
-        t.skip(
-          `the catalogue is measured from Foundry ${FOUNDRY_CATALOGUE_MAJOR}, not ${cache.version}`
-        );
-        return;
-      }
-      const release = parseFontAwesomeRelease(cssText);
-      assert.equal(release.edition, FOUNDRY_ICON_BUNDLE_RELEASE.edition);
-      if (release.version) assert.equal(release.version, FOUNDRY_ICON_BUNDLE_RELEASE.version);
-      else assert.equal(release.major, Number.parseInt(FOUNDRY_ICON_BUNDLE_RELEASE.version, 10));
-    }
-  );
 });

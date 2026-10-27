@@ -656,6 +656,22 @@ test('_projectOwnedComponents omits essences when the system has essences disabl
   assert.deepEqual(ember.essences, [], 'essences are omitted when the system disables essences');
 });
 
+test('_projectOwnedComponents maps a stored Sharp essence icon onto a face Foundry 14 draws', () => {
+  const emberEss = { ...component('emberroot', 'Emberroot'), essences: { fire: 2 } };
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1 }, 'emberroot', 1);
+  const system = {
+    ...makeSystem('sys-a', 'Herbalism', [vigor], [emberEss]),
+    features: { essences: true },
+    essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fasr fa-fire' }],
+  };
+  const listing = build([{ system, recipes: [vigor] }], {
+    craftingActor: makeActor('pc', { learned: { vigor: {} }, owned: { Emberroot: 3 } }),
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  assert.equal(listing.components[0].essences[0].icon, 'far fa-fire');
+});
+
 // Reserved failure-group leak invariant + checkMode projection (issue 554)
 
 const SECRET_COMPONENT = component('sludge', 'Toxic Sludge');

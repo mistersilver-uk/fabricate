@@ -9,6 +9,7 @@ import {
   getEssenceAllIconOptions,
   getEssenceIconOption,
   getEssenceIconOptions,
+  essenceIconOrNull,
   getEssenceIconPrefix,
   normalizeEssenceColorToken,
   normalizeEssenceIcon
@@ -188,12 +189,21 @@ describe('essenceIcons utility', () => {
     assert.equal(normalizeEssenceIcon('fa-sharp-duotone fa-solid fa-fire'), 'fad fa-fire');
     assert.equal(normalizeEssenceIcon('fa-sharp fa-fire'), 'fas fa-fire');
     assert.equal(normalizeEssenceIcon('fa-sharp-duotone fa-fire'), 'fad fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp fa-light fa-fire'), 'fa-light fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp fa-thin fa-fire'), 'fa-thin fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp-duotone fa-light fa-fire'), 'fad fa-fire');
   });
 
   it('keeps every supported prefix a Sharp mapping did not touch', () => {
     for (const prefix of ['fal', 'fat', 'fad', 'fab']) {
       assert.equal(normalizeEssenceIcon(`${prefix} fa-fire`), `${prefix} fa-fire`, prefix);
     }
+  });
+
+  it('leaves a blank essence icon null for the display fallback', () => {
+    assert.equal(essenceIconOrNull('  '), null);
+    assert.equal(essenceIconOrNull(undefined), null);
+    assert.equal(essenceIconOrNull('fass fa-fire'), 'fas fa-fire');
   });
 
   it('does not read an inherited object key as a style prefix', () => {

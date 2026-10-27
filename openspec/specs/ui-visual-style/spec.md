@@ -440,7 +440,7 @@ An empty measurement is never memoised, either, because it is reachable before t
 
 An essence icon keeps only a style prefix that both supported Foundry generations draw: the classic solid, regular, light and thin faces, duotone and brands, in their short or long form.
 Foundry 14 ships no Sharp webfonts, so a stored Sharp prefix is mapped onto the classic face of the same weight when the icon is normalised — `fass` to `fas`, `fasr` to `far`, `fasl` to `fal`, `fast` to `fat`, and every Sharp duotone, short or long form, to `fad`.
-The mapping is decided at the normaliser rather than at a picker, because the picker offers only solid and regular and the Sharp prefixes arrive from stored data, imports and the API.
+Normalisation, not the picker, performs the mapping, since Sharp prefixes arrive from stored data, imports and the API.
 A drift test resolves every kept prefix against the `@font-face` rules of the harvested Foundry stylesheet, so a prefix the client cannot draw fails the suite instead of rendering a fallback glyph.
 
 Every Fabricate icon picker offers ONE curated subset of that catalogue — 750 of its 1420 names today — and the test for membership is this.
