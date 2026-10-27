@@ -159,7 +159,7 @@ import {
   extractSourceDescription,
   rawSourceDescription,
 } from './sourceIdentitySnapshots.js';
-import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
+import { componentIdsBySystem, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 /** The Valid Id Basis for one world-scope entity type (issue 1359): the world roster unioned with
@@ -1755,12 +1755,7 @@ export class CraftingSystemManager {
     const systems = this.getSystems();
     const validSystemIds = new Set(systems.map((system) => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((recipe) => recipe.id));
-    const validSalvageComponentsBySystem = new Map(
-      systems.map((system) => [
-        system.id,
-        new Set((system.components || []).map((component) => component.id)), // ratchet-exempt(world-scope): destructive-basis
-      ])
-    );
+    const validSalvageComponentsBySystem = componentIdsBySystem(systems);
     await runGatedMutationCleanup({
       passes: [
         {

@@ -15,7 +15,11 @@
 
 import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
 
-import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
+import {
+  buildStartupPassList,
+  componentIdsBySystem,
+  WHOLE_CORPUS_ID_BASIS,
+} from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 /**
@@ -37,12 +41,8 @@ export function composeStartupPassList({
 } = {}) {
   const validRecipes = new Set(recipeManager.getRecipes({}).map((r) => r.id));
   const validSystems = new Set(craftingSystemManager.getSystems().map((s) => s.id));
-  const validSalvageComponentsBySystem = new Map(
-    craftingSystemManager.getSystems().map((system) => [
-      system.id,
-      new Set((system.components || []).map((component) => component.id)), // ratchet-exempt(world-scope): destructive-basis
-    ])
-  );
+  const validSalvageComponentsBySystem = componentIdsBySystem(craftingSystemManager.getSystems());
+
   const candidates = [
     ['crafting runs', () => craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
     // A single-step recipe with no time requirement never legitimately persists an active run, so

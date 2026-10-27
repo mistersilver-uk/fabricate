@@ -479,6 +479,23 @@ function collectChoiceGroupReadiness(executionSteps, isMultiStep, progressive) {
   return { issues, checks };
 }
 
+/** What blocks a step's result sets from saving: their choice groups, and any repeated result id. */
+function collectResultSetReadiness(executionSteps, isMultiStep, progressive) {
+  const choiceGroups = collectChoiceGroupReadiness(
+    executionSteps,
+    isMultiStep,
+    progressive === true
+  );
+  const duplicates = collectDuplicateResultIssues(executionSteps, isMultiStep);
+  return {
+    issues: [...choiceGroups.issues, ...duplicates],
+    checks: [
+      ...choiceGroups.checks,
+      { id: 'noDuplicateResults', satisfied: duplicates.length === 0 },
+    ],
+  };
+}
+
 /**
  * Alchemy-only enable blockers: two checks the enable path enforces that are invisible to the
  * generic readiness list and used to throw only on the click.
@@ -616,17 +633,9 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     checks.push(...taught.checks);
   }
 
-  const choiceGroups = collectChoiceGroupReadiness(
-    executionSteps,
-    isMultiStep,
-    options.progressive === true
-  );
-  issues.push(...choiceGroups.issues);
-  checks.push(...choiceGroups.checks);
-
-  const duplicateResults = collectDuplicateResultIssues(executionSteps, isMultiStep);
-  issues.push(...duplicateResults);
-  checks.push({ id: 'noDuplicateResults', satisfied: duplicateResults.length === 0 });
+  const resultSets = collectResultSetReadiness(executionSteps, isMultiStep, options.progressive);
+  issues.push(...resultSets.issues);
+  checks.push(...resultSets.checks);
 
   // The two blockers the enable path enforces and the generic readiness checks never inspect.
   const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
