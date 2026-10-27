@@ -3966,7 +3966,7 @@ Give `overlayHost` a `position` other than `static` with a size, because it is t
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s and `Modal`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
-A press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding unless the panel's own section says it stops it.
+Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, which states `pointer-events: auto` where its host is the standalone layer, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
@@ -4082,7 +4082,7 @@ A published component draws a control only where its section says so, and each c
 ### Standalone style root
 
 `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
-The panel `Select`, `IconPicker`, `ActionMenu` or `Modal` opens there, with no `overlayHost`, is drawn on the standalone layer, which counts as a Fabricate root, as [Overlays](#overlays) states.
+The panel `Select`, `IconPicker`, `ActionMenu` or `Modal` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.
@@ -4123,7 +4123,7 @@ What it gives you and what it leaves to you:
 - A component is drawn under the standalone style root only where its admission test holds.
   That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws with the same props in the player window, at rest, under keyboard focus, under the pointer and under reduced motion.
   For `Select`, `IconPicker`, `ActionMenu` and `Modal` it compares the open list, menu or dialog too, on the standalone layer against the player window's.
-  A panel on the layer inherits the page body's face and colour, so its face follows the page and not your window; the test page sets one face on its body so both arms compare like with like.
+  A panel on the layer inherits the page body's typeface, size and line height, so those follow the page and not your window; its ink is Fabricate's; the test page sets one face on its body so both arms compare like with like.
   It runs over Fabricate's core-min fixture and, where the harvest exists, Foundry 14.365's core sheet.
   The harvested arm draws under no Foundry theme class.
   Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the component does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the test does not measure them.
