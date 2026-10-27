@@ -1717,7 +1717,7 @@ describe('one managed block per body, read the way the publisher writes it (issu
     });
 
   it('reads a long run of container markers in linear time', () => {
-    const hostile = `${'- '.repeat(5000)}x\n${' '.repeat(20000)}>\n${'> '.repeat(5000)}\n`;
+    const hostile = `${'- '.repeat(5000)}x\n${' '.repeat(20_000)}>\n${'> '.repeat(5000)}\n`;
     const started = Date.now();
     parseScreenshotEvidenceImages(`${hostile}\n${unterminated(PREVIOUS_HEAD)}\n`, { prNumber: PR });
     assert.ok(Date.now() - started < 2000, 'a hostile body must not stall the scanner');
