@@ -604,6 +604,8 @@ A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, 
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.
 The measurement is SPAN-INTERIOR ONLY: a set that simply does not cover every value the die can roll is not a gap, because `2d20` rolls 2–40 and a GM who authors 7–34 has authored a deliberate window.
 Invalid and overlapping ranges are excluded from the measurement first, since both already raise their own `critical` and a `start > end` range would otherwise manufacture a phantom gap.
+A fixed tier's bounds are read as authored and never coerced, so a tier with no finite `start` is not placed: it ranks nowhere, no total matches it, and no forced outcome or tier step lands on it, as a tier with no finite `end` (a null one included) holds nothing.
+A saved tier always has a finite `start`, since the normalizer stores a missing one as 0, so this reaches only unnormalized or draft input.
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value in the check's direction, so a lower `start` ranks higher under.
@@ -613,6 +615,7 @@ Because no tier routes on this failure, the blocked tier's own `breakTools` flag
 The default (null/unset) imposes no override, so the outcome is the final tier.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
+So does one naming a fixed tier with no finite `start`.
 The gate is fixed-type only; relative-type routed checks ignore it.
 It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
 Runtime scope: the minimum-success-tier gate is `routedByCheck`-only.
@@ -895,7 +898,8 @@ It was previously modelled, normalized, GM-authorable, captured onto every salva
 #### Player Result Order (per-user runtime state)
 
 - The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
-- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<componentId>`.
+- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<systemId>:<componentId>`.
+- The salvage key is system-qualified because component ids are not globally unique (copy-mode import preserves them), so a component-id-only key would let two systems' components share one order.
 - One key per recipe, not per step.
 - The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
 - It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
@@ -930,7 +934,7 @@ Capturing the order at start makes the executing user irrelevant, which makes th
 - A salvage with **no run record uses the authored order**, and there is deliberately **no settings fallback**; adding one would reintroduce the executing-user read the capture exists to prevent.
 - Salvage gates on the permission at **read time, not capture time**, so a GM toggling the permission off mid-run takes effect on that run's award.
 The captured order is retained but ignored.
-- The player-facing salvage surface writes only the **standing preference** under `salvage:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
+- The player-facing salvage surface writes only the **standing preference** under `salvage:<systemId>:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
 The "no settings fallback" rule above is unaffected by that surface existing and MUST NOT be relaxed.
 - A pending debounced order write MUST be **flushed before a salvage run starts**: the capture happens once, at start, so a run begun inside the debounce window captures the **stale** order.
 

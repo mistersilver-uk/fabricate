@@ -5,6 +5,7 @@
  * rows and recipe ingredient sets. Collaborators arrive in `io`.
  */
 import { normalizeSelectionIds } from '../../utils/bulkSelectionModel.js';
+import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
 import {
   recipeLostItsShape,
   recipeReferencesAnyComponent,
@@ -255,12 +256,15 @@ export async function deleteRecipeSet(io, system, recipeIds, options = {}) {
   }
   const recipeItemsRewritten = plan.prunes.length;
   if (recipeItemsRewritten > 0) {
+    // `recipeIds` is an indexed field rewritten in place, so the retained index needs the advance.
+    advanceDefinitionRevision(system.recipeItemDefinitions);
     try {
       await io.saveSystems({ put: system, domains: RECIPE_ITEM_FACTS });
     } catch (error) {
       // Restore the live definitions before rethrowing, so this client never shows a prune the
       // world did not receive.
       for (const [definition, recipeIds] of membershipRestore) definition.recipeIds = recipeIds;
+      advanceDefinitionRevision(system.recipeItemDefinitions);
       throw error;
     }
   }

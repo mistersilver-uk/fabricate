@@ -377,7 +377,7 @@
     },
     {
       "case": "manager-gathering-settings-normal",
-      "alt": "The gathering Settings tab for a crafting system, showing the gathering resolution mode card, the limitation mode card with neither limitation turned on, and the system gathering rules in the inspector beside them.",
+      "alt": "The gathering Settings tab for a crafting system, showing the limitation mode card with neither limitation turned on, the times of day panel with its day and night periods, and the system gathering rules in the inspector beside them.",
       "sha256": "e0245cc8dac89bdab5954c9c461e6b631e0f070f16012340ceb958591fb7b864"
     },
     {

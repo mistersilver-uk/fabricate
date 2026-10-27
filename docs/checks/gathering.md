@@ -13,6 +13,11 @@ nav_order: 3
 The gathering check is authored once for the whole crafting system, beside the crafting and salvage checks.
 Individual gathering tasks do not carry their own check.
 
+{: .warning }
+> **Known limitation ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).**
+> This page still chooses its editor from a system-level gathering mode that no screen can set any more, rather than from your tasks.
+> On a system left at the default it shows a read-only **Fixed d100 roll**, and the roll cannot be authored here.
+
 {% include screenshot.html case="manager-checks-gathering" %}
 
 ## Authoring the check
@@ -20,24 +25,24 @@ Individual gathering tasks do not carry their own check.
 The page is laid out in the same five sections the Crafting page uses — **The roll**, **Outcomes**, **Triggers**, **Modifiers**, and **On failure** — and they behave identically.
 See [The Checks screen]({% link checks/index.md %}#the-checks-screen) for the editor, and [Check modifiers]({% link checks/index.md %}#check-modifiers) for the named-modifier library all three activities select from.
 
-Set the gathering check to **Which way is better** → **Lower is better**, or its **What the roll is measured against** to **Character value**, to grade a routed roll under a target or against the gathering character's own value instead of a fixed DC.
-See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including a **Routed** task's own **Target** or **Adjustment** override.
+Set the gathering check to **Which way is better** → **Lower is better**, or its **What the roll is measured against** to **Character value**, to grade a Check task's roll under a target or against the gathering character's own value instead of a fixed DC.
+See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including a **Check** task's own **Target** or **Adjustment** override.
 
 Set the gathering check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
-See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including a **Routed** task's own **Successes needed override**.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including a **Check** task's own **Successes needed override**.
 A counting gathering check can also let a player buy additional dice.
 A gathering check the Game Master resolves from the Journal, because the task is timed, reads and spends on the Game Master's own computer.
 See [Additional dice]({% link checks/crafting.md %}#additional-dice).
 
 ## What the check decides
 
-A **routed** gathering task is resolved by this check.
+A gathering task set to **Check** is resolved by this check.
 The check rolls, produces a named outcome, and that outcome name is matched to one of the task's result sets by name.
-A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
+A Check task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 See [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection).
 
-A **progressive** gathering task needs an award mode and a check formula of its own, set on the task.
-See [Progressive Checks]({% link gathering/tasks.md %}#progressive-checks).
+A legacy **Progressive** gathering task also rolls this check, and spends it under the system's award mode.
+See [Legacy Progressive Tasks]({% link gathering/tasks.md %}#legacy-progressive-tasks).
 
-The system's gathering resolution mode decides which of these applies.
-See [Gathering Resolution Mode]({% link gathering/settings.md %}#gathering-resolution-mode).
+When a task is attempted, its own **Gathering resolution** card decides which of these applies.
+See [Gathering Resolution]({% link gathering/settings.md %}#gathering-resolution).

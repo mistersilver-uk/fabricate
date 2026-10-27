@@ -794,7 +794,7 @@ A gathering task's choice among `d100`, `straight` and `routed` resolution; `pro
 
 #### Gathering Resolution Mode (system-level economy)
 
-The system-wide default gathering resolution carried on the per-system gathering economy block as `economy.resolutionMode` (valid set `d100 | progressive | routed`, default `d100`), normalized on both the read and persist paths so an absent/invalid/wrong-shape value (including a stray `simple`) falls back to `d100`.
+A system-level compatibility field carried on the per-system gathering economy block as `economy.resolutionMode` (valid set `d100 | progressive | routed`, default `d100`) that no UI edits and the engine never lets override a task's own `resolutionMode`, normalized on both the read and persist paths so an absent/invalid/wrong-shape value (including a stray `simple`) falls back to `d100`.
 
 [Notes](docs/domain/terms.md#gathering-resolution-mode-system-level-economy)
 
@@ -1809,7 +1809,7 @@ Conflicting nonempty evidence leaves that field unknown rather than falling thro
 
 **Completion Mode** is a run-level preference: `manual` asks the player to execute a ready stage, while `worldTime` permits eligible completion when world time advances.
 The switch may appear during a no-check countdown even with unresolved materials; its visibility is not permission to spend them automatically.
-Automatic crafting stops without spending, retaining the preference: the automatic blocker refuses a stage whose selected ingredient set holds any ingredient group, whether an item, a currency option or a choice of options, a stage or recipe Tool, or a player check in the recipe's system; an owed claimable award pick holds the world-time scan; and an essence requirement or any other unmet requirement stops at the stage's own validation.
+Automatic crafting stops without spending, retaining the preference: the automatic blocker refuses a stage whose selected ingredient set holds an ingredient group (an item, a currency option or a choice of options), a set-level essence requirement, or a Tool on a named set in a routed-by-ingredients system, a stage or recipe Tool, or a player check in the recipe's system; an owed claimable award pick holds the world-time scan; and any other unmet requirement stops at the stage's own validation.
 A run **finishes its current stage as time passes** when the world-time scan will take it once its gate passes and that stage carries no automatic blocker; the Journal marks it with a bolt, and a later stage may still stop.
 Pause freezes the remaining gate time, including zero; resume reanchors it at the current world time, and neither manual nor automatic execution advances a paused run.
 Cancellation remains possible while paused, retains completed spending and awards, and forfeits elapsed time without refunding unspent inputs.
@@ -2037,6 +2037,8 @@ The gathering implementation checkpoints are in [the domain history](docs/domain
 - Startup migration runner with checkpoint and rollback
 - Canonical-write and legacy-read normalization
 - Cleanup of stale runs, learned recipes, and preferences
+- A **writeback leg** is one payload value the startup pass reads, snapshots, change-detects and writes back, in the order of `WRITEBACK_LEGS`, which is a requirement and not an implementation detail; the version bump is not a leg.
+  It is not a **Slot** (an `IngredientGroup`), and not a leg of a persisted map such as the re-key or merge map.
 
 ### 8. Module Integration (Infrastructure)
 

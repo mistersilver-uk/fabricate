@@ -883,7 +883,7 @@
   background: var(--fab-bg-2);
 }
 
-/* `:focus-visible` ONLY. The hover half was byte-identical to `.fabricate-button.is-danger:not(:disabled):hover`, which states the same three values at (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the one state the pair still has to declare for itself. */
+/* `:focus-visible` only: hover is the `danger` role's own `.fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover` at (0,5,0) in `styles/fabricate-manager-rail-gathering.css`. */
 .fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete:focus-visible,
 .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);

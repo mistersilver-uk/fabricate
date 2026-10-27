@@ -1853,3 +1853,40 @@ test('(g) no tracked file under scripts, src, openspec, tests or docs names a mo
     'a sourceMatches pattern still names a moved file by its old path; point it at the new path'
   );
 });
+
+/** A `file:line` cite, a prototype `proto:N` cite, or a bare `:N` continuation of either. */
+const LINE_CITE = /\b[\w.-]+\.(?:html|css|js|mjs|svelte|md):\d+|\bproto:\d+|(?<![\w.]):\d{2,}/g;
+
+const lineCitesIn = (text) => [...text.matchAll(LINE_CITE)].map((match) => match[0]);
+
+test('the line-cite pattern sees every cite shape and no contrast ratio', () => {
+  assert.deepEqual(
+    lineCitesIn('`library.html:12`, `Callout.svelte:122`, `proto:4741` and `:1406`'),
+    ['library.html:12', 'Callout.svelte:122', 'proto:4741', ':1406']
+  );
+  assert.deepEqual(lineCitesIn('4.5:1 against 3.01-3.98:1'), []);
+});
+
+test('no register row cites a line number', () => {
+  const offenders = Object.entries({
+    designSystemPrimitives: DESIGN_SYSTEM_PRIMITIVES,
+    notAPrimitive: NOT_A_PRIMITIVE,
+    ruledOut: RULED_OUT,
+  }).flatMap(([table, rows]) =>
+    rows.flatMap((row) =>
+      Object.entries(row).flatMap(([field, value]) =>
+        [value]
+          .flat()
+          .filter((text) => typeof text === 'string')
+          .flatMap(lineCitesIn)
+          .map((cite) => `${table} ${row.path ?? row.name} ${field}: ${cite}`)
+      )
+    )
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'AGENTS.md allows no line-number code citations: name the library entry, selector or symbol ' +
+      'instead, because a line number is stale the moment the file is edited'
+  );
+});
