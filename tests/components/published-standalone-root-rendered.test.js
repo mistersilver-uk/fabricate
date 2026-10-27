@@ -51,6 +51,7 @@ import {
   PUBLISHED_RAW_MODULES,
   PUBLISHED_RUNE_MODULES,
   PUBLISHED_SEAM,
+  settle,
   shippedSeam,
 } from '../helpers/publishedComponentModules.js';
 import { renderedPageHead } from '../helpers/renderedPageHead.js';
@@ -164,7 +165,7 @@ const SPECIMENS = Object.entries(STANDALONE_SPECIMENS).flatMap(([name, specimens
 const FOCUSED = SPECIMENS.filter(({ reach }) => reach.focus !== null);
 const HOVERED = SPECIMENS.filter(({ reach }) => reach.hover !== null);
 const SWITCHES = SPECIMENS.filter(({ name }) => name === 'StatusToggle');
-/** The specimens drawn with a panel open: each with opening steps, and every `Modal`, drawn open. */
+/** The specimens drawn with a panel open: each with opening steps, and every `Modal`. */
 const OPENED = SPECIMENS.filter(({ name, open }) => Boolean(open) || name === 'Modal');
 
 /** The keys whose every value the specimens draw, and the values no literal in a component names. */
@@ -185,7 +186,7 @@ const VOCABULARY_KEYS = Object.freeze([
 ]);
 const DECLARED_VOCABULARIES = Object.freeze({ columns: Object.freeze(['1', '2', '3']) });
 
-/** The keys of the object literal `name` declares in a component's instance script, frozen or not. */
+/** The keys of the object literal `name` declares in a component's script, frozen or not. */
 function objectKeysOf(ast, name) {
   for (const node of walkNodes(ast.instance)) {
     if (node.type !== 'VariableDeclarator' || node.id?.name !== name) continue;
@@ -374,11 +375,12 @@ function writeFieldState(target) {
   }
 }
 
-const settle = () => new Promise((done) => setTimeout(done, 0));
-
 /**
  * happy-dom lays nothing out, so the window's frame measures as the viewport the standalone layer
- * measures as, and a panel's private placement is computed from the same host box in both.
+ * measures as, and a panel's private placement is computed from the same host box in both. In
+ * Chromium the frame is no containing block in either arm, as core-min positions no
+ * `.application` and `HOSTS_IN_FLOW` lays it static, so its panel too is placed from the page's
+ * origin, where the viewport starts.
  */
 function viewportOf() {
   const { innerWidth: width, innerHeight: height } = document.defaultView;
@@ -422,14 +424,12 @@ function drawnPanel(frame, content) {
  * One specimen's target and open panel as drawn under a frame classed `classes`, with companion
  * content in its slots and a panel opened by its steps.
  */
-async function drawnMarkup(ui, specimen, { classes, palette }) {
+async function drawnMarkup(ui, specimen, { host, classes, palette }) {
   const { name, props, width, slot, slots, nest, open } = specimen;
   const frame = document.createElement('div');
   frame.className = classes;
-  if (palette) {
-    frame.setAttribute(THEME, palette);
-    frame.getBoundingClientRect = viewportOf;
-  }
+  if (palette) frame.setAttribute(THEME, palette);
+  if (host === 'window') frame.getBoundingClientRect = viewportOf;
   const content = document.createElement('div');
   content.className = 'window-content';
   const target = document.createElement('div');
@@ -487,10 +487,11 @@ async function mountSpecimens() {
       for (const specimen of SPECIMENS) {
         markup[palette][specimen.id] = {
           window: await drawnMarkup(ui, specimen, {
+            host: 'window',
             classes: 'application fabricate fabricate-app',
             palette,
           }),
-          bare: await drawnMarkup(ui, specimen, { classes: 'application' }),
+          bare: await drawnMarkup(ui, specimen, { host: 'bare', classes: 'application' }),
         };
       }
     }
@@ -704,7 +705,10 @@ const hostOf = (id, host) => `[data-host="${id}-${host}"]`;
 const panelOf = (id, host) => `[data-panel="${id}-${host}"]`;
 const scopesOf = (id, host) => [hostOf(id, host), panelOf(id, host)];
 
-/** A reach selector as `{ scope, selector }`: inside the target, or the open panel where written `{ panel }`. */
+/**
+ * A reach selector as `{ scope, selector }`: inside the target, or inside the open panel where it
+ * is written `{ panel }`.
+ */
 const scoped = (selector) => {
   if (selector === null) return null;
   if (typeof selector === 'string') return { scope: 'target', selector };
@@ -894,6 +898,64 @@ async function rootedReads(tab, id) {
   return { stripped, rooted, classes };
 }
 
+/** Each open panel, shown alone, lies inside the viewport in both hosts. */
+async function assertPanelsInViewport(tab) {
+  for (const { id } of OPENED) {
+    for (const host of HOSTS) {
+      await showPanel(tab, id, host);
+      const inside = await tab.evaluate(
+        (shown) => {
+          const { container } = globalThis.standaloneParts(shown.id, shown.host);
+          const box = container.firstElementChild.getBoundingClientRect();
+          const { innerWidth, innerHeight } = globalThis;
+          return (
+            box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight
+          );
+        },
+        { id, host }
+      );
+      assert.ok(inside, `${id}'s panel in the ${host} host lies inside the viewport`);
+    }
+  }
+}
+
+/**
+ * What the pointer hits at the centre of an element of the page beside an open bare panel, and at
+ * the panel's own centre: whether each hit lies on the standalone layer, and in the panel.
+ */
+function layerHits({ id }) {
+  const { container } = globalThis.standaloneParts(id, 'bare');
+  const panel = container.firstElementChild.getBoundingClientRect();
+  const centre = (box) => [box.left + box.width / 2, box.top + box.height / 2];
+  const outsidePanel = ([x, y]) =>
+    x < panel.left || x > panel.right || y < panel.top || y > panel.bottom;
+  const beside = [`[data-sentinel="${id}-bare"]`, `[data-host="${id}-bare"]`, '[data-probe-inputs]']
+    .map((selector) => centre(document.querySelector(selector).getBoundingClientRect()))
+    .find(outsidePanel);
+  const hit = (point) => (point ? document.elementFromPoint(point[0], point[1]) : null);
+  const onLayer = (node) => Boolean(node?.closest('.fabricate-standalone-overlay'));
+  const besideHit = hit(beside);
+  const panelHit = hit(centre(panel));
+  return {
+    beside: Boolean(beside),
+    besideOnLayer: onLayer(besideHit),
+    panelInPanel: Boolean(panelHit && container.contains(panelHit)),
+  };
+}
+
+/** The standalone layer takes no pointer beside an open panel, and the panel takes it. */
+async function assertLayerPassesPointer(tab) {
+  for (const { id } of OPENED) {
+    await showPanel(tab, id, 'bare');
+    const hits = await tab.evaluate(layerHits, { id });
+    assert.deepEqual(
+      hits,
+      { beside: true, besideOnLayer: false, panelInPanel: true },
+      `${id}: a press beside the panel reaches the page, and one on it the panel`
+    );
+  }
+}
+
 const STATES = Object.freeze(['rest', 'focus', 'hover', 'reduced', 'forced']);
 
 /** Each state's reads, both hosts equal, element by element. */
@@ -1069,26 +1131,11 @@ for (const palette of PALETTES) {
     });
 
     it('lays each open panel inside the viewport in both hosts, the bare one where its layer measured it', async () => {
-      for (const { id } of OPENED) {
-        for (const host of HOSTS) {
-          await showPanel(measured.tab, id, host);
-          const inside = await measured.tab.evaluate(
-            (shown) => {
-              const { container } = globalThis.standaloneParts(shown.id, shown.host);
-              const box = container.firstElementChild.getBoundingClientRect();
-              const { innerWidth, innerHeight } = globalThis;
-              return (
-                box.left >= 0 &&
-                box.top >= 0 &&
-                box.right <= innerWidth &&
-                box.bottom <= innerHeight
-              );
-            },
-            { id, host }
-          );
-          assert.ok(inside, `${id}'s panel in the ${host} host lies inside the viewport`);
-        }
-      }
+      await assertPanelsInViewport(measured.tab);
+    });
+
+    it('passes a press beside an open bare panel through the standalone layer, and holds one on the panel', async () => {
+      await assertLayerPassesPointer(measured.tab);
     });
 
     it('lays the core sheets in order: each bare text, number and search input takes core’s input height', () => {
@@ -1192,15 +1239,18 @@ const skip = skipWithoutHarvest(chrome);
 /**
  * Layout only, written on both hosts alike: core places every `.application` as a window, absolute
  * and stacked, and may fix and clip the page, so the page grows to its content and each host is
- * laid back in flow, unclipped, beside its sentinel. None of these is inherited or compared, and
- * every box offset is measured from `target`, so a difference core makes between the hosts stays.
+ * laid back in flow, unclipped, beside its sentinel, and is no containing block, as in the
+ * core-min arm, so an open panel is placed from the page's origin as `viewportOf` measures it.
+ * None of these is inherited or compared, and every box offset is measured from `target` or the
+ * panel, so a difference core makes between the hosts stays.
  */
 const HOSTS_IN_FLOW = `html, body {
   display: block; position: static; inset: auto; width: auto; height: auto;
   min-height: 0; max-height: none; overflow: visible; transform: none;
 }
 [data-host] {
-  position: relative; inset: auto; transform: none; z-index: auto;
+  position: static; inset: auto; transform: none; z-index: auto; contain: none;
+  container-type: normal; filter: none; perspective: none; will-change: auto;
   margin: 0; height: auto; max-height: none; min-width: 0; overflow: visible;
 }
 [data-host] > .window-content { overflow: visible; }`;
@@ -1236,5 +1286,10 @@ describe('the widened entries over Foundry’s harvested sheet and Font Awesome'
 
   it('computes the same styles, pseudo elements and border box in both hosts, in every state', () => {
     assertHostsAlike(measured.reads, 'harvested');
+  });
+
+  it('lays each open panel inside the viewport, and passes a press beside a bare one to the page', async () => {
+    await assertPanelsInViewport(measured.tab);
+    await assertLayerPassesPointer(measured.tab);
   });
 });
