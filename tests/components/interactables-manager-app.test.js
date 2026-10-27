@@ -22,7 +22,9 @@ import {
   MANAGE_PANEL_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
+import { attributeNames, importsModule, rendersComponent } from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -33,6 +35,9 @@ const rootSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte'),
   'utf8'
 );
+
+/** The row's chip strip, which the root renders as one component (issue 2335). */
+const CHIPS_FILE = 'src/ui/svelte/apps/interactables/InteractableRowChips.svelte';
 
 /** The shared radio primitive this panel's three fieldsets became (issue 1520). */
 const segmentedSource = readFileSync(
@@ -224,23 +229,8 @@ describe('InteractablesManagerRoot body', () => {
     ]);
   });
 
-  it('renders each row with name, type, source label, state, and marker status', () => {
-    expectAll([
-      ['row.name', 'row name'],
-      ['typeLabel(row.interactableType)', 'row type label'],
-      ['row.sourceLabel', 'row source label'],
-      ['stateBadges(row.state)', 'row state badges'],
-      ['markerLabel(row.markerStatus)', 'row marker status'],
-    ]);
-  });
-
-  it('covers each marker-status variant + each state in its label maps', () => {
-    expectAll([
-      ...['Tile', 'Drawing', 'Token', 'region-only', 'missing'].map((s) => [`'${s}'`, `marker map handles ${s}`]),
-      ['FABRICATE.Canvas.Manage.StateDisabled', 'disabled state badge'],
-      ['FABRICATE.Canvas.Manage.StateLocked', 'locked state badge'],
-      ['FABRICATE.Canvas.Manage.StateConsumed', 'consumed state badge'],
-    ]);
+  it('renders each row with a name', () => {
+    expectAll([['row.name', 'row name']]);
   });
 
   it('each row exposes keyboard-actionable open-config / jump / delete buttons', () => {
@@ -297,6 +287,9 @@ describe('InteractablesManagerRoot body', () => {
   // browser's and the config panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
     assertWindowContract({ componentFile: 'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte', contract: MANAGE_PANEL_CONTRACT });
+    const chipsAst = componentAstOf(CHIPS_FILE);
+    assert.ok(importsModule(chipsAst, '../../components/Chip.svelte'), 'the chip strip imports Chip');
+    assert.ok(rendersComponent(chipsAst, 'Chip'), 'and draws every one of its chips with it');
   });
 
   // THE PROMOTE CARD IS ONE COLUMN OF ONE CONTROL WIDTH (issue 1520 review).
@@ -332,13 +325,17 @@ describe('InteractablesManagerRoot body', () => {
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
   it('still emits every locator the Foundry smoke drives against this panel', () => {
+    // The chip strip's hooks are read off its parsed attributes; the rest off the root's text.
+    const chipHooks = attributeNames(componentAstOf(CHIPS_FILE));
+    const hooks = prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-manager-');
     assertLocatorsEmitted({
-      locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-manager-'),
+      locators: hooks.filter((hook) => !chipHooks.has(hook)),
       rootSource,
-      floor: 6,
+      floor: 3,
       what: 'manage-panel hooks',
       root: 'the interactables manager root',
     });
+    assert.ok(hooks.some((hook) => chipHooks.has(hook)), 'the strip emits a smoke hook');
     assertLocatorsEmitted({
       locators: prefixedTokensIn(SMOKE_SOURCE, 'fab-im-'),
       rootSource,

@@ -65,6 +65,79 @@ describe('assignInteractableConfigSheet', () => {
     };
     assert.equal(assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet }), false);
   });
+
+  describe('reports a refusal to the injected onError (issue 1103)', () => {
+    const reporter = () => {
+      const errors = [];
+      const onError = (error) => {
+        errors.push(error);
+      };
+      return { errors, onError };
+    };
+
+    it('hands the thrown error itself to onError and still returns false', () => {
+      const thrown = new Error('FakeSheet must be either a foundry.appv1.api.Application or a foundry.applications.api.DocumentSheetV2');
+      const registrar = { registerSheet() { throw thrown; } };
+      const { errors, onError } = reporter();
+      const did = assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet, onError });
+      assert.equal(did, false);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0] === thrown, 'the bound error, not a copy');
+    });
+
+    it('reports an API-shape refusal as an Error naming what is not a function', () => {
+      const cases = [
+        [{ registrar: {}, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet }, /registrar\.registerSheet/],
+        [{ registrar: fakeRegistrar(), RegionBehavior: null, SheetClass: FakeSheet }, /RegionBehavior/],
+        [{ registrar: fakeRegistrar(), RegionBehavior: FakeRegionBehavior, SheetClass: undefined }, /SheetClass/],
+      ];
+      for (const [args, named] of cases) {
+        const { errors, onError } = reporter();
+        assert.equal(assignInteractableConfigSheet({ ...args, onError }), false);
+        assert.equal(errors.length, 1);
+        assert.ok(errors[0] instanceof Error);
+        assert.match(errors[0].message, named);
+      }
+    });
+
+    it('stays silent for the already-registered marker and for a fresh registration', () => {
+      const registrar = fakeRegistrar();
+      const { errors, onError } = reporter();
+      const args = { registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet, onError };
+      assert.equal(assignInteractableConfigSheet(args), true);
+      assert.equal(assignInteractableConfigSheet(args), false);
+      assert.deepEqual(errors, []);
+    });
+
+    it('leaves no marker on a failure, so each failed retry reports and a later success is silent', () => {
+      let failing = true;
+      const calls = [];
+      const registrar = {
+        registerSheet(...args) {
+          if (failing) throw new Error('rejected');
+          calls.push(args);
+        },
+      };
+      const { errors, onError } = reporter();
+      const args = { registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet, onError };
+      assert.equal(assignInteractableConfigSheet(args), false);
+      assert.equal(assignInteractableConfigSheet(args), false);
+      assert.equal(errors.length, 2, 'the ready backstop reports its own failed attempt');
+      failing = false;
+      assert.equal(assignInteractableConfigSheet(args), true);
+      assert.equal(errors.length, 2);
+      assert.equal(calls.length, 1);
+    });
+
+    it('does not let a throwing onError escape the no-throw contract', () => {
+      const registrar = { registerSheet() { throw new Error('rejected'); } };
+      const onError = () => { throw new Error('logger broke'); };
+      assert.doesNotThrow(() => {
+        assert.equal(assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet, onError }), false);
+        assert.equal(assignInteractableConfigSheet({ registrar: {}, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet, onError }), false);
+      });
+    });
+  });
 });
 
 describe('resolveInteractableConfigTarget', () => {

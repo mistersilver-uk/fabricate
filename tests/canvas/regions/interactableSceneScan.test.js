@@ -107,19 +107,24 @@ describe('buildInteractableRow', () => {
     );
   });
 
-  it('falls back to the raw sourceUuid when label, name, and id are all blank', () => {
+  it('never surfaces the unconfigured sentinel: no id, no name, not configured', () => {
     const row = buildInteractableRow(
       behavior({
         name: '',
         toolId: '',
         taskId: null,
-        sourceUuid: 'Fabricate.sys.tool.lonely',
+        sourceUuid: 'Fabricate.unconfigured.tool',
+        systemId: 'Fabricate.unconfigured.system',
         linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' },
       }),
       { resolveSourceLabel: () => '', resolveVisualResolved: () => false }
     );
-    assert.equal(row.sourceLabel, 'Fabricate.sys.tool.lonely');
-    assert.equal(row.name, 'Fabricate.sys.tool.lonely');
+    assert.equal(row.sourceConfigured, false);
+    assert.equal(row.sourceResolved, false);
+    assert.equal(row.sourceId, '');
+    assert.equal(row.sourceLabel, '');
+    assert.equal(row.name, '');
+    assert.ok(!JSON.stringify(row).includes('Fabricate.unconfigured'), 'the sentinel is on no field');
   });
 
   it('builds a row with ref, name, type, source label, state, and marker status', () => {
@@ -138,14 +143,34 @@ describe('buildInteractableRow', () => {
     assert.deepEqual(row.state, { enabled: true, locked: false, consumed: false });
   });
 
-  it('falls back name → source label → id when fields are blank', () => {
-    const row = buildInteractableRow(behavior({ name: '' }), {
-      resolveSourceLabel: () => '',
+  it('names the row by its stored name, else the resolved label, else the id', () => {
+    const resolved = { resolveSourceLabel: () => "Smith's Anvil", resolveVisualResolved: () => false };
+    const unresolved = { resolveSourceLabel: () => null, resolveVisualResolved: () => false };
+    assert.equal(buildInteractableRow(behavior({ name: 'Old Anvil' }), resolved).name, 'Old Anvil');
+    assert.equal(buildInteractableRow(behavior({ name: '' }), resolved).name, "Smith's Anvil");
+    assert.equal(buildInteractableRow(behavior({ name: '' }), unresolved).name, 'tool-1');
+  });
+
+  it('a Tool the resolver cannot find is unresolved, keeps its stored name and reports its id', () => {
+    const row = buildInteractableRow(behavior({ name: 'Orphaned smelter', toolId: 'gone-tool' }), {
+      resolveSourceLabel: () => null,
       resolveVisualResolved: () => false,
     });
-    // No label, no name ⇒ falls to the bare toolId.
-    assert.equal(row.sourceLabel, 'tool-1');
-    assert.equal(row.name, 'tool-1');
+    assert.equal(row.sourceResolved, false);
+    assert.equal(row.sourceConfigured, true);
+    assert.equal(row.sourceLabel, '', 'the title is not repeated as the source label');
+    assert.equal(row.sourceId, 'gone-tool');
+    assert.equal(row.name, 'Orphaned smelter');
+  });
+
+  it('a resolved label equal to the stored name is still resolved', () => {
+    const row = buildInteractableRow(behavior({ name: "Smith's Anvil" }), {
+      resolveSourceLabel: () => "Smith's Anvil",
+      resolveVisualResolved: () => false,
+    });
+    assert.equal(row.sourceResolved, true);
+    assert.equal(row.sourceLabel, "Smith's Anvil");
+    assert.equal(row.sourceId, 'tool-1');
   });
 
   it('reflects locked + consumed state flags', () => {
@@ -156,10 +181,11 @@ describe('buildInteractableRow', () => {
     assert.deepEqual(row.state, { enabled: false, locked: true, consumed: true });
   });
 
-  it('reports a gathering-task taskId fallback label', () => {
+  it('a Task the resolver cannot find is unresolved and reports its taskId', () => {
     const row = buildInteractableRow(
       behavior({
         interactableType: 'gatheringTask',
+        name: 'Mossbed',
         toolId: null,
         taskId: 'task-9',
         sourceUuid: 'Fabricate.sys.gatheringTask.task-9',
@@ -168,8 +194,25 @@ describe('buildInteractableRow', () => {
       { resolveSourceLabel: () => '', resolveVisualResolved: () => false }
     );
     assert.equal(row.interactableType, 'gatheringTask');
-    assert.equal(row.sourceLabel, 'task-9');
+    assert.equal(row.sourceResolved, false);
+    assert.equal(row.sourceLabel, '');
+    assert.equal(row.sourceId, 'task-9');
+    assert.equal(row.name, 'Mossbed');
     assert.equal(row.markerStatus, MARKER_STATUS.REGION_ONLY);
+  });
+
+  it('a resolved row reports the id it resolved from', () => {
+    const row = buildInteractableRow(
+      behavior({
+        interactableType: 'gatheringTask',
+        toolId: null,
+        taskId: 'task-9',
+        sourceUuid: 'Fabricate.sys.gatheringTask.task-9',
+      }),
+      { resolveSourceLabel: () => 'Forage', resolveVisualResolved: () => true }
+    );
+    assert.equal(row.sourceResolved, true);
+    assert.equal(row.sourceId, 'task-9');
   });
 });
 
