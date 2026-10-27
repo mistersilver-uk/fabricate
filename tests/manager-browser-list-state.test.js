@@ -209,18 +209,20 @@ describe('browserListState', () => {
     assert.deepEqual(page.pageRows, [5, 6, 7, 8]);
   });
 
-  it('answers an out-of-range index with nothing rather than with the last page', () => {
-    // The shipped divergence from `ui-manager-shell`'s "clamped to the last valid page":
-    // `paginateRows` would answer [9, 10] here, and adopting it would be a behaviour change.
+  it('answers an out-of-range index with the last page, as paginateRows does', () => {
     const { page } = openWindow({ seed: { pageIndex: 7, pageSize: 4 }, rows: numbers(10) });
 
-    assert.deepEqual(page.pageRows, []);
+    assert.deepEqual(page.pageRows, [9, 10]);
   });
 
   it('re-projects when the corpus grows after construction', () => {
     const { page, corpus } = openWindow({ seed: { pageIndex: 1, pageSize: 2 }, rows: numbers(2) });
 
-    assert.deepEqual(page.pageRows, [], 'the control: the second page holds nothing yet');
+    assert.deepEqual(
+      page.pageRows,
+      [1, 2],
+      'the control: the missing second page reads as the last'
+    );
 
     corpus.replace(numbers(4));
     flushSync();
@@ -244,7 +246,11 @@ describe('browserListState', () => {
     const onBoundary = openWindow({ seed: { pageIndex: 3, pageSize: 5 }, rows: numbers(15) });
     onBoundary.page.clampPage();
     flushSync();
-    assert.equal(onBoundary.state.pageIndex, 0, '15 rows do not reach a page starting at row 16');
+    assert.equal(
+      onBoundary.state.pageIndex,
+      2,
+      '15 rows do not reach a page starting at row 16, so the last page that holds rows wins'
+    );
 
     const inRange = openWindow({ seed: { pageIndex: 2, pageSize: 5 }, rows: numbers(15) });
     inRange.page.clampPage();
@@ -252,17 +258,27 @@ describe('browserListState', () => {
     assert.equal(inRange.state.pageIndex, 2, 'while the last page that holds rows is left alone');
   });
 
-  it('resets to page zero when the corpus narrows under a non-zero index', () => {
+  it('clamps to the last valid page when the corpus narrows under a non-zero index', () => {
     const { page, state, corpus } = openWindow({
       seed: { pageIndex: 2, pageSize: 4 },
       rows: numbers(12),
     });
 
-    corpus.replace(numbers(3));
+    corpus.replace(numbers(7));
     page.clampPage();
     flushSync();
 
-    assert.equal(state.pageIndex, 0);
+    assert.equal(
+      state.pageIndex,
+      1,
+      '7 rows at size 4 are two pages, so page three becomes page two'
+    );
+
+    corpus.replace([]);
+    page.clampPage();
+    flushSync();
+
+    assert.equal(state.pageIndex, 0, 'and an empty corpus has only page one');
   });
 
   it('writes nothing at all over an empty corpus while pageIndex is unset', () => {

@@ -97,16 +97,20 @@ export function describeBrowserListState(view) {
     });
 
     if (view.clampsPage) {
-      it('drops to the first page when the corpus narrows under it', async () => {
-        const browserState = liftedState('sys-first', { pageIndex: 1, pageSize: 2 });
-        await mountSettled({ rowCount: 4, browserState });
-        assert.equal(browserState.pageIndex, 1, 'the control: that page still holds rows');
+      it('clamps to the last valid page when the corpus narrows under it', async () => {
+        const browserState = liftedState('sys-first', { pageIndex: 2, pageSize: 2 });
+        await mountSettled({ rowCount: 6, browserState });
+        assert.equal(browserState.pageIndex, 2, 'the control: that page still holds rows');
 
         await harness.setProps(
-          view.props({ rowCount: 1, selectedSystemId: 'sys-first', browserState })
+          view.props({ rowCount: 3, selectedSystemId: 'sys-first', browserState })
         );
 
-        assert.equal(browserState.pageIndex, 0, 'the page the GM was reading no longer exists');
+        assert.equal(
+          browserState.pageIndex,
+          1,
+          'the page the GM was reading no longer exists, so the last page that holds rows wins'
+        );
       });
     }
 

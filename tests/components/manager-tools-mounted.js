@@ -247,8 +247,8 @@ export function registerToolsCases() {
     mountToolsBrowser({ tools: twelveTools, browserState: unreachable });
     assert.equal(
       unreachable.pageIndex,
-      0,
-      'twelve tools over a page of eight is two pages, so page three holds nothing'
+      1,
+      'twelve tools over a page of eight is two pages, so page three clamps to page two'
     );
 
     unmount(mounted);

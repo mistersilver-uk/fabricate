@@ -23,9 +23,17 @@ export function createBrowserListState({ state, resetAxes = {}, onSystemSwitch }
   return { syncSystem };
 }
 
+// Local rather than shared with `paginateRows`: a new import here must be added to every mounted
+// harness manifest that reaches this module, and an omission hangs those suites.
+function clampPageIndex(rowCount, pageSize, pageIndex) {
+  const lastPage = Math.max(0, Math.ceil(rowCount / pageSize) - 1);
+  return Math.min(Math.max(0, pageIndex), lastPage);
+}
+
 /**
- * The page window over `rows()`, resetting to page zero where `ui-manager-shell` § Manager browse
- * view-state says the last valid page. `defaultPageSize` is only the unset fallback: Tools keeps 8.
+ * The page window over `rows()`, clamping an out-of-range page to the last valid one, as
+ * `ui-manager-shell` § Manager browse view-state says. `defaultPageSize` is only the unset
+ * fallback: Tools keeps 8.
  */
 export function createBrowserPageWindow({
   state,
@@ -37,13 +45,15 @@ export function createBrowserPageWindow({
 
   const pageRows = $derived.by(() => {
     const size = sizeOf();
-    const index = indexOf();
-    return rows().slice(index * size, (index + 1) * size);
+    const all = rows();
+    const index = clampPageIndex(all.length, size, indexOf());
+    return all.slice(index * size, (index + 1) * size);
   });
 
   function clampPage() {
     const index = indexOf();
-    if (index > 0 && index * sizeOf() >= rows().length) state().pageIndex = 0;
+    const clamped = clampPageIndex(rows().length, sizeOf(), index);
+    if (clamped !== index) state().pageIndex = clamped;
   }
 
   return {
