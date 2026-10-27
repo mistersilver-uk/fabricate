@@ -1355,6 +1355,32 @@ describe('RecipeBrowserInspector (mounted)', () => {
     ]);
   });
 
+  it('names a currency requirement by its denomination label, never the generated unit id', async () => {
+    const recipe = makeAuthoredRecipe({
+      id: 'r1',
+      ingredientSets: [
+        {
+          id: 'set-1',
+          ingredientGroups: [
+            {
+              id: 'g1',
+              options: [
+                { id: 'o1', quantity: 1, match: { type: 'currency', unit: 'kB45g8G7uUeiLATc', amount: 8 } }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const root = await inspector.mount({
+      selectedRecipe: recipe,
+      recipeCount: 1,
+      currencyUnits: [{ id: 'kB45g8G7uUeiLATc', label: 'Handfuls' }]
+    });
+    const name = root.querySelector('[data-recipe-requirement="currency"] .manager-recipe-flow-name');
+    assert.equal(name.textContent.trim(), '8 Handfuls');
+  });
+
   it('says outright that a recipe with no results makes nothing on a successful craft', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', resultGroups: [], resultItemCount: 0 }),

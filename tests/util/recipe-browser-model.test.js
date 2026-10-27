@@ -740,6 +740,29 @@ describe('recipeBrowserModel — the inspector Requires list', () => {
     assert.equal(essence.setId, 'set-1');
   });
 
+  it('names a currency requirement by its denomination label, never the generated unit id', () => {
+    const recipe = {
+      ingredientSets: [
+        {
+          id: 's',
+          ingredientGroups: [
+            {
+              id: 'g',
+              options: [
+                { id: 'o', match: { type: 'currency', unit: 'kB45g8G7uUeiLATc', amount: 8 } }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const units = [{ id: 'kB45g8G7uUeiLATc', label: 'Handfuls' }];
+    const [row] = buildRecipeRequirementRows(recipe, { currencyUnits: units });
+    assert.equal(row.name, '8 Handfuls');
+    const [orphan] = buildRecipeRequirementRows(recipe, { currencyUnits: [] });
+    assert.equal(orphan.name, '8 kB45g8G7uUeiLATc', 'only an orphaned reference shows the raw id');
+  });
+
   it('leaves an unresolvable component NAMELESS rather than inventing one', () => {
     const [row] = buildRecipeRequirementRows(
       {

@@ -3188,7 +3188,6 @@
           "UnknownEssence": "Unknown essence",
           "TagsAny": "Any of: {tags}",
           "TagsAll": "All of: {tags}",
-          "CurrencyCost": "{amount} {unit}",
           "DismissFlash": "Dismiss",
           "General": "General",
           "ResultGroups": "Result sets",
