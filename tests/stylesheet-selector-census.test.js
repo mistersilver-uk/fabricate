@@ -457,8 +457,9 @@ test('the scoped walk reads the same interval with its endpoints in either order
 
 /**
  * Blocks that open inside a style rule's block: a nested style rule (exact, by offset) or a nested
- * at-rule (by line, strictly after the rule's own line). `ruleBlocks` and `scopedBlockerWalk` read
- * a nested rule as a bogus selector, so the module sheet must hold none.
+ * at-rule (by line, strictly after the rule's own line, so a single-line `.a { @media (x) { } }`
+ * is not seen). `ruleBlocks` and `scopedBlockerWalk` read a nested rule as a bogus selector, so
+ * the module sheet must hold none.
  */
 function blocksNestedInStyleRules(css) {
   const rules = ruleBlocks(css);

@@ -2736,7 +2736,9 @@ test('every declared `data-gap` rung takes the spacing token of the same rung', 
   const rungs = [];
   for (const rule of sheetRules()) {
     for (const member of rule.selectors) {
-      for (const [, utility, rung] of member.matchAll(/\.(fab-[\w-]+)\[data-gap='([^']+)'\]/gu)) {
+      for (const [, utility, rung] of member.matchAll(
+        /\.(fab-[\w-]+)\[data-gap=['"]([^'"]+)['"]\]/gu
+      )) {
         rungs.push({ utility, rung, value: declarationMap(rule)[`--${utility}-gap`] });
       }
     }
