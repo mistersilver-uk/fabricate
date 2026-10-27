@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
+    'src/ui/model/browserPagination.js',
   ],
   runeModules: ['src/ui/svelte/apps/manager/browserListState.svelte.js'],
   compiledModules: [

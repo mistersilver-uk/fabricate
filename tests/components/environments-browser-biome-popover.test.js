@@ -49,6 +49,7 @@ const harness = createMountedComponentHarness({
     // The browse view-state the environments browser and its two gathering children
     // read (issue 1438).
     'src/ui/model/managerBrowserViewState.js',
+    'src/ui/model/browserPagination.js',
     // The shared colour-token constant + its localized labels (issue 1036). Both colour
     // components import it, and both are compiled below.
     'src/ui/svelte/util/managerColorTokens.js',

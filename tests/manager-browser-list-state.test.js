@@ -282,15 +282,14 @@ describe('browserListState', () => {
   });
 
   it('writes nothing at all over an empty corpus while pageIndex is unset', () => {
-    // The only observation that separates the `index > 0` guard from its absence: with no rows
-    // the mutant writes 0 over an already-zero index, which Svelte drops, so a value assertion
-    // passes on it either way.
+    // A clamp that already agrees with the index must not write: an unconditional write of 0 over
+    // an unset index is dropped by Svelte, so only the absence of a write observes the guard.
     const { page, state, written } = openWindow({ seed: {}, rows: [] });
 
     page.clampPage();
     flushSync();
 
-    assert.deepEqual(written, [], 'the guard returned before touching the lifted state');
+    assert.deepEqual(written, [], 'the clamp found nothing to change and wrote nothing');
     assert.equal(state.pageIndex, undefined, 'so the field the caller never set stays unset');
   });
 });
