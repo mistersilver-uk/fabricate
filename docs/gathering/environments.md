@@ -52,6 +52,8 @@ The card shows the scene's thumbnail and name.
 Gathering weather and time of day are global gathering conditions, not environment browse filters.
 GMs can set the current weather and current time of day in the gathering settings panel.
 Only a GM can change them, and the value must be one of the weather or time-of-day options the system has configured.
+Setting a condition also updates every system that offers that option.
+A system whose options do not include it keeps its own current value, and the listing and the gate both use that system's value.
 Changing a condition refreshes the gathering listings for everyone.
 Players cannot change conditions.
 

@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { test } from 'node:test';
+import { before, test } from 'node:test';
 
 /**
  * A seeded id counter, reset exactly once per scenario before the first pass and never before the
@@ -69,12 +69,28 @@ function freshManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
+/** The first pass, sampled by the helper itself so no caller statement can sit between the two. */
+function firstPass(manager, system) {
+  const pass = manager._normalizeSystem(system);
+  return { pass, mintedByPass: mintedIds };
+}
+
+/**
+ * The idempotence re-feed. It reads the counter first, so the discipline assertions see a reset
+ * placed anywhere before this call and not only one placed after the caller's own sample.
+ */
+function refeed(manager, pass) {
+  const mintedAtRefeed = mintedIds;
+  return { mintedAtRefeed, output: manager._normalizeSystem(pass) };
+}
+
 /** Run the whole corpus once, in a fixed order, so every minted id is reproducible. */
 function runCorpus() {
   const manager = freshManager();
   const members = {};
   const systems = {};
   const systemRefeed = {};
+  const discipline = {};
 
   for (const scenario of memberScenarios()) {
     resetMintedIds();
@@ -83,28 +99,35 @@ function runCorpus() {
 
   for (const scenario of systemScenarios()) {
     resetMintedIds();
-    const pass = manager._normalizeSystem(scenario.system);
+    const { pass, mintedByPass } = firstPass(manager, scenario.system);
+    const again = refeed(manager, pass);
     systems[scenario.name] = pass;
-    systemRefeed[scenario.name] = manager._normalizeSystem(pass);
+    systemRefeed[scenario.name] = again.output;
+    discipline[scenario.name] = { mintedByPass, mintedAtRefeed: again.mintedAtRefeed };
   }
 
-  return { members, systems, systemRefeed };
+  return { members, systems, systemRefeed, discipline };
 }
 
-const actual = runCorpus();
-const recorded = { members: encode(actual.members), systems: encode(actual.systems) };
+// Built in a hook, not at module load, so a throw is reported against the tests rather than
+// aborting the file with no named failure.
+let actual;
+let golden;
 
-if (process.env[RECORD_ENV] === '1') {
-  assert.deepStrictEqual(
-    roundTrip(actual),
-    actual,
-    'a normalized value does not survive a JSON round-trip, so the golden would record a shape ' +
-      'the manager never emitted; fix the corpus or the normalizer before recording'
-  );
-  writeFileSync(GOLDEN_URL, `${JSON.stringify(recorded, null, 2)}\n`);
-}
-
-const golden = JSON.parse(readFileSync(GOLDEN_URL, 'utf8'));
+before(() => {
+  actual = runCorpus();
+  if (process.env[RECORD_ENV] === '1') {
+    assert.deepStrictEqual(
+      roundTrip(actual),
+      actual,
+      'a normalized value does not survive a JSON round-trip, so the golden would record a shape ' +
+        'the manager never emitted; fix the corpus or the normalizer before recording'
+    );
+    const recorded = { members: encode(actual.members), systems: encode(actual.systems) };
+    writeFileSync(GOLDEN_URL, `${JSON.stringify(recorded, null, 2)}\n`);
+  }
+  golden = JSON.parse(readFileSync(GOLDEN_URL, 'utf8'));
+});
 
 test('the corpus covers every retained member and is not vacuous', () => {
   const scenarios = memberScenarios();
@@ -166,4 +189,25 @@ for (const scenario of systemScenarios()) {
       `${scenario.name} no longer re-normalizes to itself; an id was re-minted or a read alias round-trips`
     );
   });
+
+  test(`the re-feed of ${scenario.name} runs after the first pass, on the same counter, over a fresh result`, () => {
+    const { mintedByPass, mintedAtRefeed } = actual.discipline[scenario.name];
+    assert.strictEqual(
+      mintedAtRefeed,
+      mintedByPass,
+      'the id counter moved between the first pass and the re-feed, so a re-mint could reproduce the first pass'
+    );
+    assert.notStrictEqual(
+      actual.systemRefeed[scenario.name],
+      actual.systems[scenario.name],
+      'the re-feed returned the first pass itself instead of normalizing it again'
+    );
+  });
 }
+
+test('the re-feed discipline is not vacuous: some scenario mints ids on its first pass', () => {
+  assert.ok(
+    Object.values(actual.discipline).some(({ mintedByPass }) => mintedByPass > 0),
+    'no scenario minted an id on its first pass, so a counter reset before the re-feed would go unseen'
+  );
+});

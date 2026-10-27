@@ -319,6 +319,7 @@
           "RemoveVisualCancel": "Cancel",
           "NoSelection": "Select a tile, drawing, or token on the canvas first.",
           "NoVisual": "This interactable has no linked marker to jump to.",
+          "TestNeedsToken": "Select a token that has an actor first. Test as player checks that actor's tokens on this scene.",
           "Node": {
             "Heading": "Resource node",
             "LinkLabel": "Task node link",
@@ -373,6 +374,7 @@
         "MarkerToken": "Token",
         "MarkerRegionOnly": "Region only",
         "MarkerMissing": "Missing",
+        "UnresolvedSourceId": "Source not found: {id}",
         "OpenConfig": "Open configuration",
         "JumpToRegion": "Jump to region",
         "Delete": "Delete interactable",

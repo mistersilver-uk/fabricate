@@ -10,6 +10,7 @@ import {
   MARKER_STATUS,
   scanSceneInteractables,
 } from '../src/canvas/regions/interactableSceneScan.js';
+import { resolveInteractableSourceLabel } from '../src/ui/interactableSourceLibrary.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import {
   LAB_INTERACTABLE_SCENE_ID,
@@ -43,11 +44,20 @@ function scanSeededRows() {
   };
   seedLabInteractables(world);
 
+  // The lookups `InteractablesManagerApp` injects, over the lab's own systems and tasks.
+  const sourceDeps = {
+    getCraftingSystemManager: () => ({
+      getSystem: (id) => world.content.systems.find((system) => system.id === id) ?? null,
+    }),
+    getGatheringConfig: () => world.content.gatheringConfig,
+  };
+
   const previous = globalThis.fromUuidSync;
   globalThis.fromUuidSync = (uuid) => documents.get(uuid) ?? null;
   try {
     const scene = world.scenes[0];
     return scanSceneInteractables(scene, {
+      resolveSourceLabel: ({ system }) => resolveInteractableSourceLabel(sourceDeps, system),
       resolveVisualResolved: ({ system }) => resolveLinkedVisual(system, { scene }) !== null,
     });
   } finally {
@@ -96,5 +106,32 @@ test('the lab world seeds a row for every state badge the manager list can draw'
     rows.every((row) => row.state.consumed === false),
     'a seeded interactable is now consumed — the `Consumed` badge is reachable, so add it to the ' +
       'assertions above and stop recording it as the one badge the lab does not cover'
+  );
+});
+
+test('the lab world seeds each source chip the manager list can draw', () => {
+  const rows = scanSeededRows();
+
+  assert.ok(
+    rows.some((row) => row.sourceConfigured && row.sourceResolved && row.sourceLabel),
+    'no seeded interactable names its resolved source, so the neutral chip is unphotographed'
+  );
+  const orphaned = rows.filter((row) => row.sourceConfigured && !row.sourceResolved);
+  assert.ok(
+    orphaned.length > 0,
+    'no seeded interactable is a configured Tool or Task that no longer resolves, so the ' +
+      '`Unresolved` chip is unphotographed'
+  );
+  for (const row of orphaned) {
+    assert.ok(row.sourceId, 'an unresolved row offers the id it could not find');
+    assert.ok(row.name, 'and keeps a stored name as its title');
+  }
+  assert.ok(
+    rows.some((row) => !row.sourceConfigured && row.sourceId === '' && row.name === ''),
+    'no seeded interactable is unconfigured, so `Needs configuration` is unphotographed'
+  );
+  assert.ok(
+    rows.every((row) => !JSON.stringify(row).includes('Fabricate.unconfigured')),
+    'a seeded row leaks the unconfigured sentinel'
   );
 });

@@ -99,7 +99,7 @@ export const MANAGE_PANEL_CONTRACT = Object.freeze({
   classPrefix: 'fab-im-',
   residueDescription: "this window's own layout",
   primitives: Object.freeze([
-    ['Chip', '../../components/Chip.svelte'],
+    ['InteractableRowChips', './InteractableRowChips.svelte'],
     ['EmptyState', '../../components/EmptyState.svelte'],
     ['Field', '../../components/Field.svelte'],
     ['IconButton', '../../components/IconButton.svelte'],

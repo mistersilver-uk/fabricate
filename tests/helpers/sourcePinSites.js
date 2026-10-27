@@ -5,7 +5,7 @@
  */
 import { posix } from 'node:path';
 
-import { calledName, identifierNames, literalStrings, walkNodes } from './moduleAst.js';
+import { calledName, literalStrings, walkNodes } from './moduleAst.js';
 
 /** The reads that bring `src/` text into a test, before local wrappers are added per module. */
 const BASE_READERS = Object.freeze([
@@ -120,17 +120,6 @@ const functionReturns = memoised((fn) => {
   return returns;
 });
 
-/** Every name bound as a function parameter anywhere in the module. */
-function parameterNames(functions) {
-  const names = new Set();
-  for (const node of functions) {
-    for (const parameter of node.params ?? []) {
-      for (const name of identifierNames(parameter)) names.add(name);
-    }
-  }
-  return names;
-}
-
 /** Map every declaration and reference to the variable it binds, so names cannot be conflated. */
 function variableIndex(scopeManager) {
   const index = new Map();
@@ -156,7 +145,6 @@ const moduleIndex = memoised((ast) => {
   return {
     named,
     aliases: destructuredReaders(nodes),
-    parameters: parameterNames(functions),
     calls: nodes.filter((node) => node.type === 'CallExpression'),
     declarators: nodes.filter(
       (node) => node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && node.init
@@ -357,7 +345,7 @@ const matchesLiteral = (node) => {
 
 /** Whether this call asserts the shape of source text, and so is one pin site. */
 function isPinSite(node, context) {
-  const { readers, paths, sources, keyFor, parameters } = context;
+  const { readers, paths, sources, keyFor, isParameter } = context;
   if (isReader(node, readers)) return readsSrc(node, paths, keyFor);
   const called = calledName(node);
   const receiver = receiverNode(node, context);
@@ -376,7 +364,8 @@ function isPinSite(node, context) {
   if (sources.has(keyFor(receiver))) return true;
   // A parameter is reached without resolving to a read, so it needs a literal needle to stay clear
   // of ordinary membership checks, and only counts where scanning handed-in source is the job.
-  return matchesLiteral(node) && parameters.has(receiver.name);
+  // It is the receiver's own binding that must be a parameter, not a same-named local elsewhere.
+  return matchesLiteral(node) && isParameter(receiver);
 }
 
 /** The local binding or re-exported kinds behind each name one export statement makes public. */
@@ -453,8 +442,10 @@ function analyseModule(ast, { file = '', scopeManager, exportsOf = NO_EXPORTS } 
   const { paths, sources } = resolveBindings(ast, index, { readers, keyFor, seeds });
   // Counted everywhere, the parameter shape sweeps up ordinary array membership in behavioural
   // tests: 425 sites across 94 files, against 11 under `tests/helpers/`.
-  const parameters = file.startsWith('tests/helpers/') ? index.parameters : new Set();
-  const context = { readers, paths, sources, keyFor, parameters };
+  const isParameter = (node) =>
+    file.startsWith('tests/helpers/') &&
+    (variables.get(node)?.defs.some((definition) => definition.type === 'Parameter') ?? false);
+  const context = { readers, paths, sources, keyFor, isParameter };
   // A local wrapper's body calls one of these, so they alone decide whether the module reads files.
   const direct = new Set([...readers, ...seeds.wrappers]);
   const siteLines = [];
