@@ -139,8 +139,9 @@
     chosenGroupIds: Object.keys(store?.selectedIngredientOptions ?? {}),
     openSlotId: railReadOnly ? null : (store?.openSlotId ?? null),
     readOnly: railReadOnly,
-    // `railFor` withholds this rail from non-active steps, so a read-only rail here is the active step's.
-    inProgress: railReadOnly,
+    // The step list marks its own active step; this rail marks only an armed gate on the active step.
+    inProgress:
+      selectedRecipe?.activeStepTimeGateArmed === true && activeStepId === displayedStepId,
     announcement: store?.slotAnnouncement ?? '',
     onChooseOption,
     onOpenSlot,

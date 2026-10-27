@@ -278,7 +278,11 @@ describe('CraftingView mounted behavior', () => {
   it('renders the rail read-only when the displayed step is not the active step', async () => {
     const store = fakeCraftingStore({ recipes: [railRecipe({ activeStepId: 'step-2' })] });
     const target = await harness.mount({ services: services(store) });
-    assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
+    assert.equal(
+      target.querySelector('[data-requirement-rail-readonly]')?.textContent.trim(),
+      'FABRICATE.App.Crafting.Slots.ReadOnly',
+      'a single rail that is not the active step\'s keeps the not-being-crafted copy'
+    );
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'), 'no chooser opens');
   });
 
