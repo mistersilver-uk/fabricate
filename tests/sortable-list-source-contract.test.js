@@ -21,8 +21,8 @@ const read = (file) => readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
 /**
  * The amended published set, in the order the component destructures it. `handles` is retired
- * because `reorderable` subsumes it; `announcement` and `onReorderSettled` are issue 2381's. The
- * library's API block is amended in the same commit as each change.
+ * because `reorderable` subsumes it; `announcement` and `onReorderSettled` are issue 2381's, and
+ * `itemKey` issue 2169's. The library's API block is amended in the same commit as each change.
  */
 const DECLARED_PROPS = Object.freeze([
   'items',
@@ -45,6 +45,7 @@ const DECLARED_PROPS = Object.freeze([
   'ariaLabel',
   'announcement',
   'onReorderSettled',
+  'itemKey',
 ]);
 
 /** The component's `$props()` destructuring, comments stripped, in source order. */

@@ -11,8 +11,10 @@
   is a finished state rather than a draft (issue 1907).
 
   Invariants:
-  - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
-    `tests/components/recipe-result-card-mounted.test.js`.
+  - Rows, flat and staged, are keyed by `resultRowKeys`: an id's first occurrence by the id, a
+    duplicate or id-less row by a unique stand-in, because a row's Fixed | Rolled state is per
+    instance. Deleting the first of two rows sharing an id hands its instance to the survivor —
+    pinned by `tests/components/recipe-result-card-mounted.test.js`.
   - A row's amount error is the save path's own floor, `quantityFormulaErrors` (`resultRows.js`).
 -->
 <script>
@@ -22,12 +24,20 @@
   import { emptyResult, fromValue } from '../../../components/pickerRowKinds.js';
   import { newDraftId as newId } from '../../../util/draftId.js';
   import { createPendingFocus } from '../../../util/pendingFocus.js';
-  import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
+  import {
+    componentCatalogue,
+    resultRowKeys,
+    withAddedResult,
+  } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
   import RouteSources from '../../../components/RouteSources.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import SetCard from '../../../components/SetCard.svelte';
   import ProgressiveStageList from '../ProgressiveStageList.svelte';
+  import {
+    complicationMacroNames,
+    complicationTriggerLabels,
+  } from '../complicationVocabularies.js';
   import { defaultSetName } from './setDrafts.js';
 
   let {
@@ -71,7 +81,13 @@
     onRemove = () => {},
     // Deep link from a progressive row's read-only difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The system's script macros and check triggers, which a stage's complication sentence names.
+    macroOptions = [],
+    complicationTriggerOptions = [],
   } = $props();
+
+  const macroNames = $derived(complicationMacroNames(macroOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
 
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
@@ -80,6 +96,7 @@
   const validationTarget = $derived(group?.id ? `result-group-${group.id}` : undefined);
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
+  const rowKeys = $derived(resultRowKeys(results));
 
   // A splice emits the reordered group; the drag and keyboard halves are the list's (issue 1512).
   function reorderItem(from, to) {
@@ -289,6 +306,7 @@
          address a stage's delete by. -->
     <ProgressiveStageList
       items={results}
+      itemKey={(_item, index) => rowKeys[index]}
       {componentOptions}
       activity="crafting"
       {kinds}
@@ -308,6 +326,8 @@
       editLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}
       editTitle={openComponentHint}
       editAriaLabel={(item) => `${openComponentHint} — ${componentOf(item)?.name}`}
+      {macroNames}
+      {triggerLabels}
       adderClass="fabricate-set-card-adder"
       onItemChange={(item, index, value) => updateItem(index, fromValue(item, value))}
       onReorder={(from, to) => reorderItem(from, to)}
@@ -317,7 +337,7 @@
     />
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
-      {#each results as item, index (item?.id || index)}
+      {#each results as item, index (rowKeys[index])}
         <ChoiceGroup
           side="result"
           group={item}

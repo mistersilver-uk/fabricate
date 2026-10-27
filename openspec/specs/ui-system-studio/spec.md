@@ -307,7 +307,8 @@ The odds and the track window use the check's own modifier placement from the sh
 Each separately rolled modifier is enumerated JOINTLY with the main dice under the same positive whitelist and the shared 50,000-outcome cap; one the whitelist rejects abstains as `modifier-preroll-not-enumerable`, a joint space above the cap as `too-many-outcomes`, and no average is ever substituted.
 The odds heading of a roll-under or character-value check reads "exact · {formula}" with the authored formula, and a joint space also names each separately rolled bonus it crosses in ("exact · 1d20 with 1d4").
 Routed rows list the unrouted bucket first and then the tiers worst to best by the routing's own ranking; summed roll-over against a fixed DC keeps the order totals reach them in.
-Each bar takes its row's hue on the tier strip's five-stop ramp (danger, warning, success, info, accent) by position, worst first, and the unrouted bucket is always danger.
+Each bar takes its row's hue on the five-stop ramp (danger, warning, success, info, accent) by position, worst first, bounded by its outcome: a botch row and the unrouted bucket are always danger, a lone row is success when it succeeds and danger when it fails, and a failing row never takes a hue above warning.
+A succeeding row never takes a hue below success, except on a progressive award-count chart, whose ramp reads progress through the stages and so stays by position.
 
 The preview ABSTAINS — no odds, no target, no margin, no bar and Roll disabled — with one reason shared by the odds panel and the simulator.
 With no actor chosen, a check whose target or formula reads the character abstains first as `needs-preview-actor`, with the no-actor note `PreviewAs.NoActorCharacter` and the simulator hint `Simulator.NeedsCharacter`.

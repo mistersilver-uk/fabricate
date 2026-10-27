@@ -40,6 +40,7 @@ manager-component-complications-macro-missing
 manager-component-complications-check-trigger
 manager-component-complications-salvage-stage-strip
 manager-recipe-complications-stage-strip
+manager-recipe-complications-stage-strip-named
 manager-component-edit-salvage-override-fixed-over
 manager-component-edit-salvage-override-fixed-under
 manager-component-edit-salvage-override-add

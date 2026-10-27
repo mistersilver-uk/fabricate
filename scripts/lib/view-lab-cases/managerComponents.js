@@ -1237,6 +1237,29 @@ export const CASES = Object.freeze([
       PROGRESSIVE_STAGE_LIST_MATCH,
     ],
   }),
+  managerCase({
+    id: 'manager-recipe-complications-stage-strip-named',
+    label: 'Manager — Recipe complications stage strip, macro named',
+    // The same strip with Choking dust linked to a listed script macro, so its sentence names it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', scriptMacros: '1', namedComplicationMacro: '1' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-stage-complications]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager [data-recipe-result-row] ul[data-stage-complications] [data-complication-row="readonly-gm"] .fab-complication-row-body[title*="runs Read Momentum"]',
+    kinds: ['manager', 'recipes', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/complicationVocabularies\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResults(?:Tab|Section)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+    ],
+  }),
   overrideCase({
     id: 'manager-component-edit-salvage-override-fixed-over',
     label: 'higher is better, fixed DC',

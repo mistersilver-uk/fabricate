@@ -14,7 +14,7 @@
 <script>
   import BandedBar from '../../../components/BandedBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { bandToneFor } from './checkBandModel.js';
+  import { oddsRowTone } from './checkBandModel.js';
   import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
   import { PREVIEW_ABSTENTIONS } from './checkPreviewModel.js';
   import { interpolate } from './checksCopy.js';
@@ -140,14 +140,14 @@
   });
 
   const rows = $derived(Array.isArray(odds?.rows) ? odds.rows : []);
-  // Rows run worst to best, so each bar takes its rank's hue on the tier strip's ramp; the
-  // unrouted bucket is the hazard whatever its position.
+  // Rows run worst to best, so each bar takes its rank's hue on the ramp, bounded by its outcome.
+  const progressive = $derived(odds?.kind === 'progressive');
   const bands = $derived(
     rows.map((row, index) => ({
       id: row.id,
       name: row.label,
       percent: row.percent,
-      fill: row.id === 'unrouted' ? 'danger' : bandToneFor(index, rows.length),
+      fill: oddsRowTone(row, index, rows.length, { progressive }),
     }))
   );
 </script>

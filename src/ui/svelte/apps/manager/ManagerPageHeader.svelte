@@ -209,21 +209,21 @@
         <p class="manager-subtitle">{header.subtitle}</p>
       {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
-        <div class="manager-environment-header-pills" data-environment-status-pills>
+        <div class="manager-environment-header-pills" data-environment-status-chips>
           <Chip
             tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'}
-            data-status-pill="active"
+            data-environment-status="active"
           >
             {environmentDraftForDisplay.enabled === false
               ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
               : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
           </Chip>
-          <Chip tone="info" data-status-pill="selection">
+          <Chip tone="info" data-environment-status="selection">
             {environmentDraftForDisplay.selectionMode === 'blind'
               ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind')
               : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
           </Chip>
-          <Chip tone="info" data-status-pill="composition">
+          <Chip tone="info" data-environment-status="composition">
             {environmentDraftForDisplay.compositionMode === 'manual'
               ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual')
               : text(

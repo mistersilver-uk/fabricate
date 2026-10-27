@@ -157,6 +157,11 @@ const oddsRows = (root) =>
     cell.dataset.bandedBarPercent,
     cell.textContent.trim(),
   ]);
+const oddsTones = (root) =>
+  [...odds(root).querySelectorAll('[data-banded-bar-track]')].map((track) => [
+    track.dataset.bandedBarTrack,
+    track.dataset.fillBarTone,
+  ]);
 
 describe('count odds and the simulator readout', () => {
   it('charts outcomes with a Botch split, and heads the panel with the expected net', async () => {
@@ -168,6 +173,12 @@ describe('count odds and the simulator readout', () => {
       ['botch', '12.2%'],
       ['failure', '43.5%'],
       ['success', '44.4%'],
+    ]);
+    // Each bar's tone is bounded by its outcome (issue 2185): the Failure bar is never green.
+    assert.deepEqual(oddsTones(root), [
+      ['botch', 'danger'],
+      ['failure', 'warning'],
+      ['success', 'accent'],
     ]);
     const domain = root.querySelector('[data-checks-odds-domain]');
     assert.equal(domain.textContent.trim(), 'nearly exact · expected 1.33');
@@ -330,6 +341,7 @@ describe('count odds and the simulator readout', () => {
     // A one-outcome chart is the single-row `BandedBar`, a meter, rather than a histogram (issue 1782).
     const only = odds(root).querySelector('[data-banded-bar-track]');
     assert.equal(only.dataset.bandedBarTrack, 'botch');
+    assert.equal(only.dataset.fillBarTone, 'danger', 'a lone botch is danger (issue 2185)');
     assert.equal(only.closest('[role="meter"]').getAttribute('aria-valuenow'), '100');
     assert.ok(
       only.closest('.fab-banded-bar-band[data-banded-bar-row="botch"]'),

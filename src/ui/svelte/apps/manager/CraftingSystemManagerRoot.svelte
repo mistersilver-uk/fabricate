@@ -664,9 +664,6 @@
       }));
   }
 
-  // The macro picker's options.
-  const complicationMacroOptions = $derived(selectedSystem?.availableScriptMacros || []);
-
   $effect(() => checks.reseed());
 
   const selectedCounts = $derived({
@@ -4848,7 +4845,7 @@
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}
-          macroOptions={complicationMacroOptions}
+          macroOptions={selectedSystem?.availableScriptMacros || []}
           saving={componentEditSaving}
           showDifficulty={componentDifficultyShown}
           difficulty={componentDifficultyDraft}
@@ -4938,6 +4935,8 @@
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}
+        macroOptions={selectedSystem?.availableScriptMacros || []}
+        {complicationTriggerOptions}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         visibilityEffect={recipeVisibilityEffect}
         accessPlayers={recipeAccessRoster.players}

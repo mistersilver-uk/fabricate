@@ -62,6 +62,9 @@
     onChange = () => {},
     // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The system's vocabularies a progressive stage's complication sentence names.
+    macroOptions = [],
+    complicationTriggerOptions = [],
     // The failure-results callout's link to the Checks tab, drawn while the policy forbids them.
     onOpenChecks = () => {},
     idPrefix = '',
@@ -295,6 +298,8 @@
         {progressive}
         {isTerminalStep}
         {onOpenComponent}
+        {macroOptions}
+        {complicationTriggerOptions}
         onChange={(nextGroup) => onChange(withSoleEntry(groups, nextGroup))}
       />
     </div>
@@ -336,6 +341,8 @@
             {progressive}
             {isTerminalStep}
             {onOpenComponent}
+            {macroOptions}
+            {complicationTriggerOptions}
             sources={rows[index].sources}
             candidates={rows[index].candidates}
             assigned={rows[index].assigned}

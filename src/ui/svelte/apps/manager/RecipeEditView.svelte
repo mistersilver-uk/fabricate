@@ -93,6 +93,8 @@
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
     // a progressive result row deep-links to the component editor rather than stepping it here.
     onOpenComponent = () => {},
+    macroOptions = [],
+    complicationTriggerOptions = [],
     // The system's resolution mode. Never per-recipe: the mode callout reports it on the tabs it
     // shapes and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
@@ -150,9 +152,7 @@
   function stepById(stepId) {
     return steps.find((step) => step.id === stepId) || null;
   }
-  function stepToolIds(step) {
-    return Array.isArray(step?.toolIds) ? step.toolIds : [];
-  }
+  const stepToolIds = (step) => arrayOrEmpty(step?.toolIds);
 
   // The scope writers every tab shares: a null stepId patches the recipe, and a collapsed chain's
   // groups and set routing write through to its final step (issue 710).
@@ -269,9 +269,7 @@
     const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
     return groups.reduce((total, group) => total + arrayOrEmpty(group?.results).length, 0);
   }
-  function countTools(scope) {
-    return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
-  }
+  const countTools = (scope) => arrayOrEmpty(scope?.toolIds).length;
   function sumOverScopes(counter) {
     if (isMultiStep) return steps.reduce((total, step) => total + counter(step), 0);
     return counter(recipe || {});
@@ -511,6 +509,8 @@
             {progressive}
             {onOpenComponent}
             {onOpenChecks}
+            {macroOptions}
+            {complicationTriggerOptions}
             outcomeTierOptions={routedOutcomeTierOptions}
             {routedOutcomeTiers}
             routedMinimum={minimum}

@@ -53,6 +53,9 @@
     progressive = false,
     // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The system's vocabularies a progressive stage's complication sentence names.
+    macroOptions = [],
+    complicationTriggerOptions = [],
     // The two-slot editor's link to the Checks tab, forwarded to every section.
     onOpenChecks = () => {},
     onAssignIngredientSet = () => {},
@@ -214,6 +217,8 @@
             isTerminalStep={index === steps.length - 1}
             {onOpenComponent}
             {onOpenChecks}
+            {macroOptions}
+            {complicationTriggerOptions}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {routedOutcomeTiers}
@@ -238,6 +243,8 @@
       {progressive}
       {onOpenComponent}
       {onOpenChecks}
+      {macroOptions}
+      {complicationTriggerOptions}
       {ingredientSets}
       {outcomeTierOptions}
       {routedOutcomeTiers}

@@ -622,19 +622,28 @@ function seedDepletedImage(content) {
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(withImage);
 }
 
-/** Choking dust's macro names `Macro.lab-retired`, which no lab document answers, so the macro
- *  zone draws its missing face with Relink (issue 2466). */
-function seedMissingComplicationMacro(content) {
-  const retire = (entry) =>
-    entry.id === 'hb-comp-dust-cloud' ? { ...entry, macroUuid: 'Macro.lab-retired' } : entry;
-  const withRetired = (components) =>
+/** Choking dust's macro names `macroUuid`: `Macro.lab-retired`, which no lab document answers, so
+ *  the macro zone draws its missing face with Relink (issue 2466), or the lab's script macro, so a
+ *  stage complication sentence names it (issue 2446). */
+function seedComplicationMacro(content, macroUuid) {
+  const relink = (entry) => (entry.id === 'hb-comp-dust-cloud' ? { ...entry, macroUuid } : entry);
+  const withRelinked = (components) =>
     components.map((entry) =>
       entry.id === 'hb-mortar-dust'
-        ? { ...entry, complications: entry.complications.map(retire) }
+        ? { ...entry, complications: entry.complications.map(relink) }
         : entry
     );
-  for (const system of content.systems) system.components = withRetired(system.components ?? []);
-  content.components = withRetired(content.components);
+  for (const system of content.systems) system.components = withRelinked(system.components ?? []);
+  content.components = withRelinked(content.components);
+}
+
+/** Each Choking dust macro seed behind its own flag; with neither, the macro stays unlinked. */
+export function seedComplicationMacros(
+  content,
+  { missingComplicationMacro, namedComplicationMacro }
+) {
+  if (missingComplicationMacro) seedComplicationMacro(content, 'Macro.lab-retired');
+  if (namedComplicationMacro) seedComplicationMacro(content, LAB_MACRO_UUIDS.readMomentum);
 }
 
 function seedCheckOverride(content, state) {
@@ -909,7 +918,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
  * @param {boolean} [options.scriptMacros] List the lab's script macro in `game.macros`, so a macro
  *   picker offers an option (issue 2466).
- * @param {boolean} [options.missingComplicationMacro] See {@link seedMissingComplicationMacro}.
+ * @param {boolean} [options.missingComplicationMacro] See {@link seedComplicationMacro}.
+ * @param {boolean} [options.namedComplicationMacro] Link Choking dust to the lab's script macro.
  * @param {string} [options.timeOfDayBar] `'1'` or `'fallback'`: the time-of-day bar's periods,
  *   and the world clock at 14:34. See {@link seedTimeOfDayBar}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -936,6 +946,7 @@ export async function buildLabWorld({
   depletedImage = false,
   scriptMacros = false,
   missingComplicationMacro = false,
+  namedComplicationMacro = false,
   tagStacks = false,
   timeOfDayBar = '',
 } = {}) {
@@ -953,7 +964,7 @@ export async function buildLabWorld({
   seedCheckOverride(content, checkOverride);
   if (systemBlocked) blockHerbalism(content);
   if (depletedImage) seedDepletedImage(content);
-  if (missingComplicationMacro) seedMissingComplicationMacro(content);
+  seedComplicationMacros(content, { missingComplicationMacro, namedComplicationMacro });
   if (tagStacks) seedTagStacks(content);
   seedTimeOfDayBar(content, timeOfDayBar);
   if (noTools) stripTools(content);

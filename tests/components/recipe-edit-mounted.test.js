@@ -156,6 +156,8 @@ const RAW_MODULES = [
   ...CHOICE_GROUP_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
+  // The system's macro and trigger names a stage's complication sentence reads (issue 2446).
+  'src/ui/svelte/apps/manager/complicationVocabularies.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
   // The tag adder's exact component counts (issue 2430).
@@ -3892,6 +3894,33 @@ describe('RecipeEditView (mounted)', () => {
     assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
     // The severity WORD, as the chip alone (issue 2445).
     assert.match(rows[0].textContent, /Severe/, 'the severity is named, not only tinted');
+    editHarness.remount();
+  });
+
+  // RED 2446: each hop from the editor to the stage list carries the system's two vocabularies.
+  it('RED 2446: a stage complication’s sentence names its macro and its check trigger', async () => {
+    const named = {
+      ...CRAFTING_COMPLICATION,
+      when: { checkTrigger: 'trig-snap' },
+      macroUuid: 'Macro.burst',
+    };
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [{ ...COMPLICATED_COMPONENT_OPTIONS[0], complications: [named] }],
+          macroOptions: [{ uuid: 'Macro.burst', name: 'Shrapnel Burst' }],
+          complicationTriggerOptions: [
+            { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+          ],
+        },
+      }
+    );
+    const sentence = stageStrips(target)[0]
+      .querySelector('.fab-complication-row-body')
+      .getAttribute('title');
+    assert.match(sentence, /the spring snaps fires/, 'the trigger is named, not "a check trigger"');
+    assert.match(sentence, /runs Shrapnel Burst/, 'the macro is named, not "runs a macro"');
     editHarness.remount();
   });
 

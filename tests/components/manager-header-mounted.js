@@ -518,7 +518,7 @@ const CENSUS_STATES = {
       target.querySelector('[aria-label="Edit Quiet Cavern"]').click();
       await settleHeader();
     },
-    prove: () => hook('[data-environment-status-pills]', 'the editor drew no status pills'),
+    prove: () => hook('[data-environment-status-chips]', 'the editor drew no status chips'),
   },
   'the gathering task editor, dirty and valid, whose Save carries an empty title': {
     view: 'gathering-task-edit',
@@ -1366,10 +1366,10 @@ const HEADER_CENSUS = Object.freeze({
       "- 3 span | Create",
       "+ 2 h1 class=\"manager-title\" | Edit environment",
       "+ 2 p class=\"manager-subtitle\" | Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.",
-      "+ 2 div class=\"manager-environment-header-pills\" data-environment-status-pills=\"\"",
-      "+ 3 span class=\"manager-chip is-neutral svelte-1vupdsz\" data-status-pill=\"active\" | Off",
-      "+ 3 span class=\"manager-chip is-info svelte-1vupdsz\" data-status-pill=\"selection\" | Blind",
-      "+ 3 span class=\"manager-chip is-info svelte-1vupdsz\" data-status-pill=\"composition\" | Automatic",
+      "+ 2 div class=\"manager-environment-header-pills\" data-environment-status-chips=\"\"",
+      "+ 3 span class=\"manager-chip is-neutral svelte-1vupdsz\" data-environment-status=\"active\" | Off",
+      "+ 3 span class=\"manager-chip is-info svelte-1vupdsz\" data-environment-status=\"selection\" | Blind",
+      "+ 3 span class=\"manager-chip is-info svelte-1vupdsz\" data-environment-status=\"composition\" | Automatic",
       "+ 1 div aria-label=\"Environment actions\" class=\"manager-header-actions\" role=\"group\"",
       "+ 2 button class=\"fabricate-button is-ghost is-size-38\" data-environment-edit-back=\"true\" data-keyboard-focus=\"true\" type=\"button\"",
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",

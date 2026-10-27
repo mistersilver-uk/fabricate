@@ -2317,8 +2317,8 @@ export function registerEnvironmentsCases() {
       'subtitle should be the static help text, not the environment description'
     );
     assert.ok(
-      target.querySelector('[data-environment-status-pills]'),
-      'chrome header should render environment status pills'
+      target.querySelector('[data-environment-status-chips]'),
+      'chrome header should render environment status chips'
     );
     assert.ok(
       target.querySelector('[data-action="delete-environment"]'),
