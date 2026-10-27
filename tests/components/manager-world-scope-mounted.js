@@ -1480,6 +1480,14 @@ export function registerWorldScopeCases() {
           !target.querySelector('[data-tool-inspector-add]'),
           'the other system is on its own cohort, so the old Add action is gone'
         );
+
+        chooseSelectOption(target, '[data-manager-scope-select]', 'sys1');
+        await settle(store);
+
+        assert.ok(
+          !target.querySelector('[data-tool-inspector-add]'),
+          'returning to the first system does not revive a selection its reset list no longer shows'
+        );
       });
     });
 
