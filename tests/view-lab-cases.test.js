@@ -427,6 +427,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedModal.svelte',
   'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
+  'tests/view-lab/fixtures/publishedStandaloneSpecimen.js',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -3870,6 +3871,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
+  'manager-published-select-layer',
   'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
@@ -3900,6 +3902,9 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-crafting-sources-picker',
   'player-inventory-sort-list',
   'player-journal-sort-list',
+  'published-standalone-action-menu-open',
+  'published-standalone-icon-picker-open',
+  'published-standalone-select-open',
   'world-tool-entry-on-break-repair-suggestions',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
@@ -6284,6 +6289,23 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
       specimens,
       `a shifted "${region}" patch must select the same frames`
     );
+  }
+});
+
+// The anchored-popover seam's share of the open ones is pinned with `ANCHORED_POPOVER_FRAMES`.
+test('the standalone layer’s host selects the frames that draw on that layer', () => {
+  const selected = selectedIds(['src/ui/svelte/util/overlayHost.js'], {});
+  for (const id of [
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+    'manager-published-select-layer',
+    'published-standalone-select-open',
+    'published-standalone-icon-picker-open',
+    'published-standalone-action-menu-open',
+    'published-standalone-modal-open',
+  ]) {
+    assert.ok(selected.includes(id), `a change to overlayHost.js does not select ${id}`);
   }
 });
 
@@ -8730,9 +8752,8 @@ test('the tabs specimen case presses ArrowRight on the strip the fixture mounts 
 });
 
 test('the standalone specimen cases draw the entries that state a standalone root with and without a Fabricate root above their target', () => {
-  const { instance, fragment } = componentAstOf(
-    'tests/view-lab/fixtures/PublishedStandalone.svelte'
-  );
+  const { fragment } = componentAstOf('tests/view-lab/fixtures/PublishedStandalone.svelte');
+  const { ast: instance } = moduleAstOf('tests/view-lab/fixtures/publishedStandaloneSpecimen.js');
   const mounted = [...walkNodes(instance)].flatMap((node) =>
     node.type === 'CallExpression' && node.callee?.name === 'mount' ? [node.arguments[0].value] : []
   );

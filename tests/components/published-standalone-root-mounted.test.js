@@ -3,9 +3,9 @@
  * widened entry draws under one in a target with no Fabricate root and under none in a Fabricate
  * window, judged through the content slots that own a target, a stepper in a bare field's slot
  * included; an entry at the `'fabricate'` root, which no shipped entry states, nested there is
- * still refused (M16), as is a shadow root, in this realm and a second window's; radio groups drawn side by side in one bare form keep their own names; and
- * `destroy`, a fault and a companion's re-render leave `target` as it was. The theme is read as
- * the overlay layer reads it.
+ * still refused (M16), as is a shadow root, in this realm and a second window's; radio groups
+ * drawn side by side in one bare form keep their own names; and `destroy`, a fault and a
+ * companion's re-render leave `target` as it was. The theme is read as the overlay layer reads it.
  * Limit: happy-dom resolves no cascade, so what the root draws is
  * `published-standalone-root-rendered.test.js`'s.
  */
@@ -16,6 +16,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { applyFabricateTheme } from '../../src/ui/theme.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
@@ -40,6 +41,10 @@ import {
   standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  COLUMNS,
+  mountStandaloneSpecimen,
+} from '../view-lab/fixtures/publishedStandaloneSpecimen.js';
 
 const REFUSAL = 'Fabricate | published components: ';
 const THEME = 'data-fabricate-theme';
@@ -277,7 +282,7 @@ describe('a widened entry and the standalone style root', () => {
     flushSync();
     const holder = document.createElement('div');
     card.slot('children').append(holder);
-    seam.mount('Select', { target: holder, props: WIDENED.Select });
+    const select = seam.mount('Select', { target: holder, props: WIDENED.Select });
     flushSync();
     assert.equal(target.querySelectorAll(ROOT).length, 1, "one root, in the card's target");
     holder.querySelector('button').click();
@@ -285,6 +290,7 @@ describe('a widened entry and the standalone style root', () => {
     await settle();
     const layer = document.querySelector('.fabricate.fabricate-standalone-overlay');
     assert.ok(layer?.querySelector('[role="listbox"]'), 'the list opens on the layer');
+    select.destroy();
     card.destroy();
     await settle();
     assert.equal(target.childNodes.length, 0, "the card's target is empty");
@@ -588,4 +594,81 @@ describe('leaving the target as it was', () => {
     assert.equal(deferred.childNodes.length, 0, 'the deferred unmount, after the runtime settles');
     assert.equal(reports.length, 2);
   });
+});
+
+describe('the standalone View Lab specimen cases against the DOM the fixture draws', () => {
+  const count = (selector) => document.querySelectorAll(selector).length;
+
+  /** The fixture's ground and columns under a shell classed `classes`, mounted as the lab does. */
+  function drawFixture(classes) {
+    const ground = document.createElement('div');
+    ground.setAttribute('data-lab-standalone-ground', '');
+    const byKey = {};
+    for (const [index, keys] of COLUMNS.entries()) {
+      const column = document.createElement('div');
+      column.setAttribute('data-lab-standalone-column', String(index + 1));
+      for (const key of keys) {
+        byKey[key] = document.createElement('div');
+        byKey[key].setAttribute('data-lab-standalone-target', key);
+        column.append(byKey[key]);
+      }
+      ground.append(column);
+    }
+    const shell = document.createElement('section');
+    shell.className = classes;
+    shell.append(ground);
+    document.body.append(shell);
+    targets.push(shell);
+    const teardown = mountStandaloneSpecimen({ mount: ui().mount, targets: byKey });
+    flushSync();
+    return teardown;
+  }
+
+  /** Runs each of the case's steps on the one element it names; a key is pressed, Enter clicks. */
+  async function runSteps(viewCase) {
+    for (const [at, step] of viewCase.steps.entries()) {
+      assert.equal(count(step.selector), 1, `step ${at} names one element`);
+      const node = document.querySelector(step.selector);
+      node.focus();
+      const { KeyboardEvent } = document.defaultView;
+      const init = { key: step.press, bubbles: true, cancelable: true };
+      const event = step.press ? new KeyboardEvent('keydown', init) : null;
+      if (event) node.dispatchEvent(event);
+      flushSync();
+      if (!step.press || (step.press === 'Enter' && !event.defaultPrevented)) node.click();
+      flushSync();
+      await settle();
+    }
+  }
+
+  // `published-standalone` and its light twin are left to the lab: happy-dom answers
+  // `:has(.a .b)` true where no `.b` under the subject has an `.a` above it, and they rule that out.
+  for (const [id, classes] of [
+    ['published-standalone-in-window', 'fabricate fabricate-app'],
+    ['published-standalone-select-open', 'companion-sheet'],
+    ['published-standalone-icon-picker-open', 'companion-sheet'],
+    ['published-standalone-action-menu-open', 'companion-sheet'],
+    ['published-standalone-modal-open', 'companion-sheet'],
+  ]) {
+    const viewCase = getCaseById(id);
+
+    it(`${id} waits on exactly one element once its steps have run`, async () => {
+      const teardown = drawFixture(classes);
+      await settle();
+      if (viewCase.steps.length > 0) {
+        assert.equal(count(viewCase.expectSelector), 0, 'not before the steps');
+      }
+      await runSteps(viewCase);
+      assert.equal(count(viewCase.expectSelector), 1, 'one element after them');
+      if (viewCase.expectCenterHit) {
+        assert.equal(count(viewCase.expectCenterHit), 1, `${viewCase.expectCenterHit} names one`);
+      }
+      for (const { target } of viewCase.expectContained) {
+        assert.equal(count(target), 1, `${target} names one element`);
+      }
+      teardown();
+      await settle();
+      assert.ok(!document.querySelector('.fabricate-standalone-overlay'), 'no layer is left');
+    });
+  }
 });

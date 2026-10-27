@@ -722,7 +722,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The dialog mounted through the published seam: open, and closed from its close glyph (issue 2656).
     'manager-published-modal-specimen',
     'manager-published-modal-close',
-    // The one that opens it with no Fabricate root above its target, on the standalone layer (issue 2680).
+    // The one that opens it with no Fabricate root above its target, on the standalone layer
+    // (issue 2680).
     'published-standalone-modal-open',
   ]),
   // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
