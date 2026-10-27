@@ -1,11 +1,12 @@
 /**
  * The published `Select` on Fabricate's real Svelte runtime (issue 2454), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window roots it needs: the trigger
+ * registered with the adapter's own table, under a Fabricate window root: the trigger
  * drawn alone and named, a choice by pointer and by key reaching `onChange` with the value as
  * passed, Escape and an outside press closing without one, an `update` and a render fault while
  * open, the list hosted by the `overlayHost` option, by the nearest `.fabricate-manager` or
  * `.fabricate-app` and by the standalone layer, `destroy` while open, the keys the trigger keeps,
- * values unique as strings, and every refusal the entry adds. The trigger is held here because the
+ * values unique as strings, every refusal the entry adds, and the standalone style root and layer
+ * it is drawn under in a companion's own shell (issue 2680). The trigger is held here because the
  * static gates pin it to the defaults of the picker's other trigger forms, its names and its
  * choice because they cross into the picker, which the gates do not follow.
  */
@@ -30,6 +31,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -586,17 +588,35 @@ describe('the published Select refuses', () => {
     }
   });
 
-  it('a target outside a Fabricate window (M16), and an overlayHost of another kind (M18)', () => {
-    assertRefused(
-      { ...NAMED, onChange: () => {} },
-      'Select needs a Fabricate window ancestor',
-      companionTarget(shells)
-    );
+  it('an overlayHost of another kind (M18)', () => {
     assertRefused(
       { ...NAMED, onChange: () => {} },
       "overlayHost must be an element in the target's document",
       fabricateTarget(shells),
       document.createTextNode('host')
     );
+  });
+});
+
+describe('the published Select in a companion’s own shell', () => {
+  it('draws its trigger in one standalone style root and its list on the standalone layer, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(shells);
+    const { handle, calls, trigger } = mountSelect({ value: 10 }, { target });
+    const picker = standaloneRootIn(target).firstElementChild;
+    assert.ok(picker.contains(trigger()), 'the trigger is drawn under the root');
+    const panel = await open(trigger());
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer?.parentElement === document.body, 'the list opens on the layer');
+    assert.ok(layer.contains(panel) && !target.contains(panel), 'outside the target');
+    rows()[1].click();
+    flushSync();
+    await settle();
+    assert.deepEqual(calls, [[25]], 'a choice on the layer reaches onChange');
+    assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
+    await open(trigger());
+    handle.destroy();
+    await settle();
+    assert.equal(target.childNodes.length, 0, 'the shell is empty');
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
   });
 });

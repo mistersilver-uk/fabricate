@@ -107,6 +107,7 @@ describe('an entry drawn under the standalone style root', () => {
     'StatusToggle',
     'Stepper',
     'SearchField',
+    'Select',
     'Field',
     'Well',
     'IconButton',
@@ -114,6 +115,9 @@ describe('an entry drawn under the standalone style root', () => {
     'RadioCardGroup',
     'SegmentedControl',
     'Pagination',
+    'IconPicker',
+    'ActionMenu',
+    'Modal',
   ];
 
   it('describes the entry without standaloneRoot, which only its group states', () => {

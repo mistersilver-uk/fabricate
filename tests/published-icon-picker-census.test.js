@@ -30,6 +30,7 @@ import {
   byName,
   declarationsOf,
   everyStylesheet,
+  gatedRoot,
 } from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn } from './helpers/styleBlockScan.js';
 import {
@@ -110,7 +111,7 @@ describe('the module sheet and every component style against the published IconP
     assert.deepEqual(writtenOf(reachingOf(panel)), inSheet(PANEL_FAMILY));
     const entry = entryNamed('IconPicker');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root, entry.rest],
+      [Object.keys(entry.props), gatedRoot(entry), entry.rest],
       [
         [
           'value',

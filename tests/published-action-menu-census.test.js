@@ -22,7 +22,13 @@ import {
   spelledStrings,
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
-import { SHIPPED, byName, declarationsOf, moduleRing } from './helpers/publishedComponentGate.js';
+import {
+  SHIPPED,
+  byName,
+  declarationsOf,
+  gatedRoot,
+  moduleRing,
+} from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from './helpers/styleBlockScan.js';
 import {
   declaredToken,
@@ -113,7 +119,7 @@ describe('the module sheet and every component style against the published Actio
     );
     const entry = entryNamed('ActionMenu');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root, entry.rest],
+      [Object.keys(entry.props), gatedRoot(entry), entry.rest],
       [['items', 'ariaLabel', 'align', 'onSelect'], 'fabricate', false],
       'a published heading, menuClass, triggerClass, class, rest or wider root reopens the census'
     );

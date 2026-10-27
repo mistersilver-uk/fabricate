@@ -1,9 +1,9 @@
 /**
- * The standalone style root (issues 2456, 2679) on Fabricate's real Svelte runtime: each widened
- * entry draws under one in a target with no Fabricate root and under none in a Fabricate window,
- * judged through the content slots that own a target, a stepper in a bare field's slot included;
- * an unwidened entry nested there is still refused (M16), as is a shadow root, in this realm and a
- * second window's; radio groups drawn side by side in one bare form keep their own names; and
+ * The standalone style root (issues 2456, 2679, 2680) on Fabricate's real Svelte runtime: each
+ * widened entry draws under one in a target with no Fabricate root and under none in a Fabricate
+ * window, judged through the content slots that own a target, a stepper in a bare field's slot
+ * included; an entry at the `'fabricate'` root, which no shipped entry states, nested there is
+ * still refused (M16), as is a shadow root, in this realm and a second window's; radio groups drawn side by side in one bare form keep their own names; and
  * `destroy`, a fault and a companion's re-render leave `target` as it was. The theme is read as
  * the overlay layer reads it.
  * Limit: happy-dom resolves no cascade, so what the root draws is
@@ -16,6 +16,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { applyFabricateTheme } from '../../src/ui/theme.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import {
@@ -23,6 +24,7 @@ import {
   pagerProps,
   segmentedProps,
 } from '../fixtures/published-components/standaloneSpecimens.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import {
   FAULT_REPORT,
   PUBLISHED_ADAPTER,
@@ -60,6 +62,7 @@ const WIDENED = Object.freeze({
   Well: { label: 'Chosen reagents', children: true },
   Stepper: STEPPER,
   SearchField: { ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+  Select: { options: [{ value: 'iron', label: 'Iron' }], ariaLabel: 'Metal', onChange() {} },
   Field: { as: 'div', children: true },
   EditorTabs: {
     tabs: [
@@ -74,6 +77,20 @@ const WIDENED = Object.freeze({
   RadioCardGroup: cardsProps({}),
   SegmentedControl: segmentedProps({}),
   Pagination: pagerProps({}),
+  IconPicker: {
+    value: 'fas fa-flask',
+    ariaLabel: 'Reagent icon',
+    listLabel: 'Reagent icons',
+    searchLabel: 'Search reagent icons',
+    noMatchesText: 'No reagent icon matches.',
+    onChange() {},
+  },
+  ActionMenu: {
+    items: [{ id: 'duplicate', label: 'Duplicate reagent' }],
+    ariaLabel: 'Reagent actions',
+    onSelect() {},
+  },
+  Modal: { open: true, title: 'Rename the reagent', closeLabel: 'Close', onClose() {} },
 });
 const BUTTON = WIDENED.Button;
 /** Each slot owner a nested target sits in, with its props but the slot. */
@@ -82,11 +99,6 @@ const OWNERS = Object.freeze({
   InspectorCard: {},
   Well: { label: 'Chosen reagents' },
   Field: { as: 'div' },
-});
-const SELECT = Object.freeze({
-  options: [{ value: 'iron', label: 'Iron' }],
-  ariaLabel: 'Metal',
-  onChange() {},
 });
 
 const harness = createMountedComponentHarness({
@@ -152,6 +164,22 @@ afterEach(() => {
   assert.deepEqual(escaped, [], 'nothing was thrown past the seam');
 });
 
+/**
+ * A seam over the shipped card and well beside the probe at the `'fabricate'` root, which no
+ * shipped entry states.
+ */
+function windowedSeam() {
+  const { createPublishedComponents, runtime, components } = seamParts;
+  const owners = PUBLISHED_COMPONENT_MANIFEST.filter(({ name }) => Object.hasOwn(OWNERS, name));
+  const table = [...owners, { ...PROBE_ENTRY, name: 'WindowProbe', root: 'fabricate' }];
+  const instance = createPublishedComponents({ table, isReady: () => true, report });
+  instance.register({
+    ...runtime,
+    components: { ...components, [PROBE_ENTRY.path]: probe.default },
+  });
+  return instance.publicApi;
+}
+
 /** A mount of `outer` into `target` whose content slot is requested and not yet drawn, holding a fresh target. */
 function detachedSlotTarget(seam, outer, target) {
   const handle = seam.mount(outer, { target, props: { ...OWNERS[outer], children: false } });
@@ -181,6 +209,14 @@ const SHADOW_REFUSAL = Object.freeze({
 });
 
 describe('a widened entry and the standalone style root', () => {
+  it('mounts every entry the manifest draws under it, and no other', () => {
+    const stated = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.standaloneRoot === true);
+    assert.deepEqual(
+      Object.keys(WIDENED).sort(byCodePoint),
+      stated.map(({ name }) => name).sort(byCodePoint)
+    );
+  });
+
   for (const [name, props] of Object.entries(WIDENED)) {
     it(`${name} writes exactly one in a bare target, and none in a Fabricate window`, () => {
       const seam = ui();
@@ -198,11 +234,12 @@ describe('a widened entry and the standalone style root', () => {
         assert.equal(button.getAttribute('type'), 'button', `${name}'s button is typed`);
       }
       const windowed = fabricateTarget(targets, 'fabricate fabricate-app');
-      seam.mount(name, { target: windowed, props });
+      const inWindow = seam.mount(name, { target: windowed, props });
       flushSync();
       assert.ok(!windowed.parentElement.querySelector(ROOT), 'none in a Fabricate window');
       assert.ok(!windowed.firstElementChild.matches(ROOT));
       drawn.destroy();
+      inWindow.destroy();
       assert.equal(bare.childNodes.length, 0, 'destroy leaves the bare target empty');
     });
   }
@@ -233,8 +270,29 @@ describe('a widened entry and the standalone style root', () => {
     card.handle.destroy();
   });
 
-  it('refuses an unwidened entry in a slot of a mount drawn under it, drawn or detached (M16)', () => {
+  it('a Select in a bare card’s drawn slot writes no second root, and opens its list on the layer', async () => {
     const seam = ui();
+    const target = companionTarget(targets);
+    const card = seam.mount('InspectorCard', { target, props: { children: true } });
+    flushSync();
+    const holder = document.createElement('div');
+    card.slot('children').append(holder);
+    seam.mount('Select', { target: holder, props: WIDENED.Select });
+    flushSync();
+    assert.equal(target.querySelectorAll(ROOT).length, 1, "one root, in the card's target");
+    holder.querySelector('button').click();
+    flushSync();
+    await settle();
+    const layer = document.querySelector('.fabricate.fabricate-standalone-overlay');
+    assert.ok(layer?.querySelector('[role="listbox"]'), 'the list opens on the layer');
+    card.destroy();
+    await settle();
+    assert.equal(target.childNodes.length, 0, "the card's target is empty");
+    assert.ok(!document.querySelector('.fabricate-standalone-overlay'), 'and no layer is left');
+  });
+
+  it('refuses an entry at the fabricate root in a slot of a mount drawn under it, drawn or detached (M16)', () => {
+    const seam = windowedSeam();
     const card = seam.mount('InspectorCard', {
       target: companionTarget(targets),
       props: { children: true },
@@ -244,11 +302,11 @@ describe('a widened entry and the standalone style root', () => {
     assert.ok(drawnSlot.closest(ROOT), 'the drawn slot is inside the standalone style root');
     const needs = {
       name: 'TypeError',
-      message: `${REFUSAL}Select needs a Fabricate window ancestor`,
+      message: `${REFUSAL}WindowProbe needs a Fabricate window ancestor`,
     };
-    assert.throws(() => seam.mount('Select', { target: drawnSlot, props: SELECT }), needs);
+    assert.throws(() => seam.mount('WindowProbe', { target: drawnSlot, props: {} }), needs);
     const { handle, inner } = detachedSlotTarget(seam, 'Well', companionTarget(targets));
-    assert.throws(() => seam.mount('Select', { target: inner, props: SELECT }), needs);
+    assert.throws(() => seam.mount('WindowProbe', { target: inner, props: {} }), needs);
     assert.equal(inner.childNodes.length, 0);
     card.destroy();
     handle.destroy();
