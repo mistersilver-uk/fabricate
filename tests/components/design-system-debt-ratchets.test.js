@@ -1730,8 +1730,9 @@ test('no hover raises a surface to the fill its own rest rule already takes', (t
     HOVER_RESTATES_GATE,
     'A hover raises a surface off its rest fill, so a rest rule already on `--fab-surface-raised` ' +
       'leaves the pointer nothing to show. Rest takes the `soft` rung, or the hover does not raise. ' +
-      'This reads the hover item against a rest rule in the same file and at-context only; a ' +
-      'panel with no hover rule at all is held by review.'
+      'This reads the hover item against a rest rule in the same file and at-context only, ' +
+      'pairing loosely across differing `:not(...)` groups (rest `.h:not(.x)` raised with hover ' +
+      '`.h:hover` is flagged); a panel with no hover rule at all is held by review.'
   );
 });
 
@@ -3193,5 +3194,15 @@ test('the hover-restates gate fails a hover over a raised rest and passes the re
       },
       failures: [],
     },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h:not(.x)', 'raised'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [failure],
+    },
+    { head: { [MODULE_SHEET]: sheetWith(rule('.fabricate .h:hover', 'raised')) }, failures: [] },
   ]);
 });
