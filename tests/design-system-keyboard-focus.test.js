@@ -80,7 +80,7 @@ function focusPopulations(corpus = templates()) {
       }
 
       // (b) a button Foundry does not recognise, because it has no form.
-      if (element.type === 'RegularElement' && tag === 'button' && !inForm) {
+      if (elementTag(element) === 'button' && !inForm) {
         formlessButtons.push(target);
       }
     });
@@ -119,6 +119,28 @@ describe('design system: a programmatic focus target declares itself focused to 
       targets.length >= 20,
       `the walk reached ${targets.length} focus targets. A walk that reaches an empty or ` +
         'truncated set passes every assertion below while proving nothing.'
+    );
+  });
+
+  it('reads a static `<svelte:element this="button">` as a button, in a form or outside one', () => {
+    const markup =
+      '<svelte:element this="button" tabindex="-1"></svelte:element>\n' +
+      '<form><svelte:element this="button" tabindex="-1"></svelte:element></form>\n' +
+      '<svelte:element this={tag} tabindex="-1"></svelte:element>\n' +
+      '<Button tabindex="-1" />';
+    const { negativeOne, formlessButtons } = focusPopulations(
+      templatesOf(() => markup, ['src/ui/svelte/Probe.svelte'])
+    );
+
+    assert.deepEqual(
+      formlessButtons.map((target) => target.line),
+      [1],
+      'a static button tag outside a form is a formless button; a component is not'
+    );
+    assert.deepEqual(
+      negativeOne.map((target) => target.line),
+      [1, 3, 4],
+      'a static button inside a form is recognised by Foundry and is no focus target'
     );
   });
 

@@ -1823,6 +1823,18 @@ test('a converted select file renders no native <select>, marked or not', () => 
     1,
     'the scan must count a marked native `<select>`, or every file below passes on nothing'
   );
+  const dynamicProbe = (markup) =>
+    nativeSelectSites(templatesOf(() => markup, ['src/ui/svelte/Probe.svelte'])).length;
+  assert.equal(
+    dynamicProbe('<svelte:element this="select"></svelte:element>'),
+    1,
+    'a static `this="select"` is a native select'
+  );
+  assert.equal(
+    dynamicProbe('<svelte:element this={tag}></svelte:element>'),
+    0,
+    'a tag known only at runtime names no select'
+  );
   const { readFile } = workingTree(TEMPLATE_CORPUS);
   for (const file of CONVERTED) {
     const source = readFile(file);
