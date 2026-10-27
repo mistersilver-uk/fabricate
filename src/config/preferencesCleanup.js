@@ -39,14 +39,18 @@ export function isGatheringActorSelectableByUser(actor, user) {
 
 /**
  * Whether a `salvage:` key's id still names a held component. The id is `<systemId>:<componentId>`,
- * live while that system holds that component; the pre-766 bare `<componentId>` form is live while
- * any system holds it.
+ * live while that system holds that component, whichever `:` splits the two, so an id containing
+ * one is never pruned; the pre-766 bare `<componentId>` form is live while any system holds it.
  */
 function _isLiveSalvageOrderId(id, validSalvageComponentsBySystem) {
-  const separator = id.indexOf(':');
-  if (separator !== -1) {
-    const held = validSalvageComponentsBySystem.get(id.slice(0, separator));
-    if (held?.has(id.slice(separator + 1))) return true;
+  for (
+    let separator = id.indexOf(':');
+    separator !== -1;
+    separator = id.indexOf(':', separator + 1)
+  ) {
+    if (validSalvageComponentsBySystem.get(id.slice(0, separator))?.has(id.slice(separator + 1))) {
+      return true;
+    }
   }
   for (const components of validSalvageComponentsBySystem.values()) {
     if (components.has(id)) return true;

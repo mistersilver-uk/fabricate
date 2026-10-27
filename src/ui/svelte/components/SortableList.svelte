@@ -25,6 +25,8 @@
     It re-speaks a value only when it differs from what the region shows, which a list move
     between two reverts guarantees.
   - Only the grip arms a drag; any other origin in the row, art or bare text, arms nothing.
+  - Rows sharing an id repeat their `data-sortable-*` attributes; that is only safe under `alwaysOpen`,
+    where nothing addresses a row by them.
   - The family is rooted at `fabricate-sortable-list` in `styles/fabricate.css`, never in a scoped
     block.
 -->
@@ -159,8 +161,8 @@
   }
 
   /**
-   * Emit one move, naming the record before the caller round-trips the array.
-   * @returns {{id: string, sentence: string}|null} Null when the move would change nothing.
+   * Emit one move, naming the record before the caller round-trips the array. Null when the move
+   * would change nothing.
    */
   function moveFrom(index, target) {
     if (!ordered) return null;

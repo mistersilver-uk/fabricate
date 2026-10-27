@@ -72,7 +72,7 @@ describe('composeStartupPassList', () => {
 
   /** Issue 1196's failure mode, at the composition site rather than at the function. */
   test('stale preferences keeps legacy bare salvage keys live in any system', async () => {
-    // A `salvage:` key belonging to the SECOND system (issue 1196).
+    // The component-id-only form that predates issue 766, held by either system.
     const stored = {
       'salvage:c-1': ['a'],
       'salvage:c-3': ['b'],
@@ -139,6 +139,30 @@ describe('composeStartupPassList', () => {
       stale[1](),
       'the composition dropped validSalvageComponentsBySystem and the pass now refuses on every boot'
     );
+  });
+
+  test('a system with no components, or an empty list, prunes its keys without failing', async () => {
+    const stored = {
+      'salvage:s-bare:c-1': ['a'],
+      'salvage:s-empty:c-1': ['b'],
+      'salvage:s-1:c-1': ['c'],
+    };
+    const writes = [];
+    const { options } = harness({
+      systems: [{ id: 's-bare' }, { id: 's-empty', components: [] }, system('s-1', ['c-1'])],
+    });
+    const stale = composeStartupPassList({
+      ...options,
+      getSetting: (key) => (key === 'progressiveResultOrder' ? stored : null),
+      setSetting: (key, value) => {
+        writes.push([key, value]);
+        return Promise.resolve();
+      },
+    }).find(([label]) => label === 'stale preferences');
+    await stale[1]();
+    assert.deepEqual(Object.keys(writes.find(([key]) => key === 'progressiveResultOrder')[1]), [
+      'salvage:s-1:c-1',
+    ]);
   });
 
   test('each pass calls its own collaborator, with the corpus-derived id sets', async () => {

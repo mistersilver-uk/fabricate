@@ -463,14 +463,15 @@ function makeSystemFixture() {
 }
 
 test('the preference sweep KEEPS the live salvage key while dropping the stale one', async () => {
-  // The open direction, and it also pins a defect this gate exposed: the component ids were never
-  // passed, so `validComponentIds` took its empty-set default and EVERY `salvage:` key
-  // was dropped on every resolution-mode change and every system deletion — a corpus-derived prune
-  // against a basis of nothing (issue 1261).
+  // The open direction: the sweep is handed the per-system component ids, so it keeps the live
+  // key instead of pruning against a basis of nothing (issue 1261).
   const fixture = makeSystemFixture();
   try {
     await fixture.manager._cleanupCraftingPreferences();
-    assert.deepEqual(Object.keys(fixture.order()).sort(), ['recipe:r-kept', `salvage:${SYSTEM_ID}:c-1`]);
+    assert.deepEqual(Object.keys(fixture.order()).sort(), [
+      'recipe:r-kept',
+      `salvage:${SYSTEM_ID}:c-1`,
+    ]);
   } finally {
     fixture.restore();
   }

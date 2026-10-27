@@ -140,6 +140,24 @@ describe('ComponentSalvageStages', () => {
     harness.remount();
   });
 
+  it('names a salvage trigger by its own label when a crafting trigger shares its id (issue 2713)', async () => {
+    const [scrap, dust] = COMPONENTS;
+    const snapped = { ...dust.complications[0], when: { checkTrigger: 'trig-snap' } };
+    const { target } = await mountWith({
+      componentOptions: [scrap, { ...dust, complications: [snapped] }],
+      complicationTriggerOptions: [
+        { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+        { id: 'trig-snap', label: 'the salvage jams', activity: 'salvage' },
+      ],
+    });
+    const sentence = stage(target, 2)
+      .querySelector('.fab-complication-row-body')
+      .getAttribute('title');
+    assert.match(sentence, /the salvage jams fires/, 'the salvage trigger keeps its own label');
+    assert.ok(!/spring snaps/.test(sentence), 'a crafting trigger does not overwrite it');
+    harness.remount();
+  });
+
   // GUARD: red when the salvage activity filter is dropped.
   it('GUARD: draws each stage’s DC and only its yield’s salvage complications', async () => {
     const { target } = await mountWith();

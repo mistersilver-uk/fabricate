@@ -348,6 +348,21 @@ test('keeps a system-qualified salvage key only while that system holds that com
   ]);
 });
 
+test('keeps a salvage key whose system id itself contains a colon', async () => {
+  const { store, getSetting, setSetting } = makeSettings({
+    progressiveResultOrder: {
+      'salvage:world:sys-a:comp-1': ['r1'],
+      'salvage:world:sys-a:comp-gone': ['r2']
+    }
+  });
+
+  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
+    validSalvageComponentsBySystem: new Map([['world:sys-a', new Set(['comp-1'])]])
+  });
+
+  assert.deepEqual(Object.keys(store.get('progressiveResultOrder')), ['salvage:world:sys-a:comp-1']);
+});
+
 test('does not call setSetting when every namespaced entry is live (recipe AND salvage)', async () => {
   const order = { 'recipe:recipe-a': ['r1'], 'salvage:comp-a': ['r2'] };
   const { calls, getSetting, setSetting } = makeSettings({ progressiveResultOrder: order });

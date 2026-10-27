@@ -1133,6 +1133,18 @@ describe('a result id repeated within one scope (issue 2713)', () => {
     assert.deepEqual(found.map(i => i.stepId), ['sa', 'sb']);
   });
 
+  it('reads a success group and a failure group of one step as one scope', () => {
+    const { issues } = duplicates({
+      resultGroups: [
+        { id: 's1', results: results('dup') },
+        { id: 'f1', role: 'failure', results: results('dup') }
+      ]
+    });
+    const found = issues.filter(i => i.id === 'resultDuplicate');
+    assert.equal(found.length, 1);
+    assert.equal(found[0].focusTarget, 'result-group-f1');
+  });
+
   it('is satisfied for distinct ids, and ignores results that have no id yet', () => {
     const { checks, issues } = duplicates({
       resultGroups: [{ id: 'g1', results: [{ id: 'a' }, { id: 'b' }, {}, {}] }]
