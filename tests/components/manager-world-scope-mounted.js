@@ -1459,10 +1459,13 @@ export function registerWorldScopeCases() {
         navButton('Tool Rules').click();
         await tick();
         flushSync();
-        target.querySelector('[data-tool-membership-option="all"] input').click();
+        target.querySelector('[data-tool-membership-option="all"]').querySelector('input').click();
         await tick();
         flushSync();
-        target.querySelector('[data-manager-tool-id="tool-1"] .manager-tools-select-target').click();
+        target
+          .querySelector('[data-manager-tool-id="tool-1"]')
+          .querySelector('.manager-tools-select-target')
+          .click();
         await tick();
         flushSync();
         assert.ok(

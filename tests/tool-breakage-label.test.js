@@ -1,8 +1,6 @@
 /** The one breakage badge copy the Tool rows and the behaviour facts both read. */
-import test from 'node:test';
 import assert from 'node:assert/strict';
-
-globalThis.foundry = globalThis.foundry || { utils: { getProperty: () => undefined } };
+import test from 'node:test';
 
 const { projectToolBehaviorFacts, toolBreakageLabel, toolBreakageSummary } =
   await import('../src/ui/svelte/apps/manager/tools/toolStudio.js');
