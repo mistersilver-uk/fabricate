@@ -83,7 +83,7 @@ It creates nothing until you finish adding the value.
 If two times of day share a start hour, or a start hour falls outside the day, the bar cannot be drawn.
 The panel shows a note naming the times of day to fix instead.
 Give each time of day its own start hour within the day and the bar returns.
-The note is also read out by screen readers when the bar falls back, so the problem is not signalled by sight alone.
+Assistive tools announce that note when it appears.
 
 When gathering is enabled and you have not set up your own values, Fabricate provides default lists for biomes, danger, weather, and time of day.
 There is no region list any more.

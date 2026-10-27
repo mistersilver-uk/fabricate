@@ -117,13 +117,15 @@ Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
 Under **Inherit system default** the pill row is replaced by a read-only line naming the inherited set through the active language's list formatting (or stating that the system default set is empty, so no check modifier applies to this recipe).
 
-**Deleted-modifier note.** A stored pick naming a modifier that is no longer in the Modifiers library SHALL be counted apart from a pick the check merely un-marked, through `partitionPickedModifierIds` (`checkModifierResolver.js`), which splits stored picks into eligible, un-marked and missing.
-When any stored pick names a deleted modifier, the control SHALL show a note saying that one or more chosen modifiers no longer exist in the Modifiers library, so they are hidden and do nothing.
-That note SHALL tell the GM to set Eligible modifiers to Inherit system default or No modifiers to clear it, and SHALL say that doing so resets the other picks too, because the deleted pick has no chip to remove.
-The note SHALL NOT promise that the modifier returns, because nothing returns a deleted modifier, and it SHALL be described by the control's accessible description alongside the cap and un-marked notes.
-The all-hidden placeholder, which promises a return when the check marks the picks again, SHALL NOT replace the row's text while any stored pick names a deleted modifier.
-A pick the check has merely un-marked keeps its own note, which does promise a return.
-The cap SHALL count only the picks the GM can see, so neither kind of hidden pick uses up a slot.
+**Deleted-modifier note.**
+The control SHALL count a stored pick as eligible, un-marked or missing, through `partitionPickedModifierIds` in `checkModifierResolver.js`.
+WHEN a stored pick names a modifier that is no longer in the Modifiers library, the control SHALL show a note that the chosen modifier no longer exists, so it is hidden and does nothing.
+The note SHALL say how to clear it, because the deleted pick has no chip to remove: set Eligible modifiers to Inherit system default or No modifiers, which resets the other picks too.
+The note SHALL NOT promise that the modifier returns.
+The all-hidden placeholder SHALL NOT replace the row text while any stored pick is missing.
+The cap SHALL count only eligible picks.
+The note SHALL be part of the control's accessible description.
+WHEN a stored pick is in the Modifiers library but not marked by the check, the control SHALL show the un-marked note, which promises its return.
 
 **Pick cap disclosure.** When the system's cap is bounded, the picker states it in words beneath the pills ("This system lets a recipe pick one check modifier." at a cap of 1, otherwise "…up to N check modifiers."), and adds an at-cap clause once the recipe has picked that many.
 An unbounded (absent) cap renders no sentence at all, because there is nothing to disclose.
@@ -263,9 +265,15 @@ The inherit sentences name the ACTIVITY's check rather than "the system", becaus
 - **The cap is stated STANDING**, not only once the add button has already gone dead, with an at-cap clause appended when it is reached.
 It is read through `resolveMaxModifierPicks`, so a stored `0`, `-2` or `"three"` shows no cap at all — the picker bounds exactly what the engine bounds.
 A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeCraftingModifierField` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
-- **A pick naming a deleted modifier gets its own note.** The picker SHALL count a stored pick that names no Modifiers library entry apart from one the check has merely un-marked, through the same `partitionPickedModifierIds` the recipe control uses.
-The note SHALL say the chosen modifier no longer exists in the Modifiers library and so is hidden and does nothing, and SHALL say how to clear it: untick "Pick check modifiers" and tick it again, which resets the other picks too.
-The all-hidden placeholder SHALL NOT stand in for this note, and the group's accessible description SHALL include it.
+- **A pick naming a deleted modifier gets its own note.**
+The picker SHALL count a stored pick as eligible, un-marked or missing, through `partitionPickedModifierIds` in `checkModifierResolver.js`.
+WHEN a stored pick names a modifier that is no longer in the Modifiers library, the picker SHALL show a note that the chosen modifier no longer exists, so it is hidden and does nothing.
+The note SHALL say how to clear it, because the deleted pick has no chip to remove: turn off Pick check modifiers and turn it on again, which resets the other picks too.
+The note SHALL NOT promise that the modifier returns.
+The all-hidden placeholder SHALL NOT replace the row text while any stored pick is missing.
+The cap SHALL count only eligible picks.
+The note SHALL be part of the picker's accessible description.
+WHEN a stored pick is in the Modifiers library but not marked by the check, the picker SHALL show the un-marked note, which promises its return.
 - **The accessible control is the `SelectionCheckbox` and it carries the whole accessible name; the visible sentence beside it is `aria-hidden`.** One of the two, never both — the same rule the eligibility pill above follows, for the same reason.
 
 ### Tools tab
