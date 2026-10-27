@@ -141,7 +141,7 @@
 
   const stagedStatus = $derived(draft?.status || 'unchanged');
   const stagedLock = $derived(draft?.lock || 'unchanged');
-  const inert = $derived(applying === true);
+  const inert = $derived(applying === true || deleting === true);
   const canApply = $derived(bulkRecipeDraftHasChanges(draft) && !inert);
 
   const headingLabel = $derived(

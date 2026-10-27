@@ -977,6 +977,43 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
   });
 });
 
+describe('RecipeBulkEditPanel in-flight delete (issue 1844)', () => {
+  it('goes inert while the armed set delete is being confirmed, as it does for an apply', async () => {
+    const { root } = await mountPanel({
+      deleteImpact: {
+        deletable: 3,
+        deletableIds: ['r1', 'r2', 'r3'],
+        recipeItemsAffected: 0,
+        recipeItemIds: [],
+        learnersAffected: 0,
+        learnerIds: []
+      },
+      draft: { ...createRecipeBulkDraft(), status: 'enable', bookAdd: ['book-alchemy'] },
+      onArmDelete: () => {},
+      onDelete: () => {}
+    });
+    await panel.setProps({ deleteArmed: true });
+    await panel.setProps({ deleting: true, deleteArmed: false });
+
+    assert.equal(root.querySelector('[data-recipe-bulk-category]').disabled, true);
+    assert.equal(tierSelect(root).disabled, true);
+    assert.equal(bookTrigger(root).disabled, true, 'the picker cannot be opened mid-delete');
+    for (const axis of ['status', 'lock']) {
+      assert.ok(
+        [...root.querySelectorAll(`[data-recipe-bulk-${axis}-option] input`)].every(
+          (radio) => radio.disabled
+        ),
+        `a live ${axis} segment would stage an edit while the set delete is still confirming`
+      );
+    }
+    assert.equal(
+      applyButton(root).disabled,
+      true,
+      'and Apply is inert even though the draft has changes'
+    );
+  });
+});
+
 /*
  * ── THE SET DELETE (issue 1132) ──────────────────────────────────────────────────
  * The card itself is `BulkDeleteCard`, and its behaviours — the zero-row gate, the subject
