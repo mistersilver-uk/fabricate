@@ -1048,9 +1048,9 @@ export class GatheringRichStateService {
       nodes,
       stamina,
       risk: task?.riskOverride || environment?.risk || 'safe',
-      conditions: this.getConditions().weather
-        ? cloneJson(this._config().conditions)
-        : cloneJson(environment?.conditions || {}),
+      conditions: conditionSettingsToCurrent(
+        resolveSystemConditionSettings(this._config(), environment?.craftingSystemId)
+      ),
       events: opaqueBlind
         ? normalizeList(environment?.events).map(() => ({ matched: true }))
         : normalizeList(environment?.events).map((event) => ({
