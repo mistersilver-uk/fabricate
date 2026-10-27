@@ -488,6 +488,69 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     );
   });
 
+  it('keeps a staged book visible, as missing, once it is deleted from the system (issue 1020)', async () => {
+    const { root, state } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    await panel.setProps({ books: BOOKS.filter((book) => book.id !== 'book-forge') });
+
+    assert.deepEqual(stagedIds(root), ['book-alchemy', 'book-forge'], 'no staged id loses its row');
+    const row = stagedRow(root, 'book-forge');
+    assert.match(row.textContent, /This book or scroll is no longer in this system/);
+    assert.ok(!row.textContent.includes('book-forge'), 'a raw definition id never reaches the GM');
+    const nameStyle = (id) =>
+      globalThis.getComputedStyle(stagedRow(root, id).querySelector('.fab-bulk-book-staged-name'));
+    assert.equal(nameStyle('book-forge').whiteSpace, 'normal', 'the long copy wraps, not ellipsised');
+    assert.equal(nameStyle('book-forge').fontStyle, 'italic');
+    assert.equal(nameStyle('book-alchemy').whiteSpace, 'nowrap', 'a real book keeps its one line');
+    assert.ok(row.hasAttribute('data-bulk-book-missing'), 'the row is marked as a missing book');
+    assert.ok(row.classList.contains('is-missing'), 'and claims neither the add nor remove tone');
+    assert.ok(!stagedRow(root, 'book-alchemy').hasAttribute('data-bulk-book-missing'));
+    assert.match(row.textContent, /no change/, 'and it says nothing will be written for it');
+    assert.equal(applyButton(root).disabled, false, 'Apply is armed, and every change is on screen');
+
+    root.querySelector('[data-recipe-bulk-book-unstage="book-forge"]').click();
+    flushSync();
+    assert.deepEqual(state.draft.bookAdd, [], 'the GM can still unstage the missing book');
+    assert.deepEqual(stagedIds(root), ['book-alchemy']);
+  });
+
+  it('keeps focus inside the panel after unstaging the last row with no books left (issue 1020)', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+    await panel.setProps({ books: [] });
+    assert.ok(!bookTrigger(root), 'the control: with no books there is no trigger to fall back to');
+
+    press(root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]'));
+    await settleFocus();
+
+    assert.ok(!stagedList(root), 'the last row is gone');
+    assert.ok(
+      Boolean(document.activeElement?.closest?.('[data-recipe-bulk-panel]')),
+      `focus stays in the panel rather than on ${focusHolder()}`
+    );
+  });
+
+  it('orders two missing rows by id so the list is deterministic (issue 1020)', async () => {
+    const { root } = await mountPanel({
+      draft: { ...createRecipeBulkDraft(), bookAdd: ['gone-b', 'gone-a'] },
+      books: []
+    });
+
+    assert.deepEqual(stagedIds(root), ['gone-a', 'gone-b']);
+  });
+
+  it('keeps every staged row visible when the last book is deleted from the system (issue 1020)', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+
+    await panel.setProps({ books: [] });
+
+    assert.deepEqual(stagedIds(root), ['book-alchemy']);
+    assert.match(stagedRow(root, 'book-alchemy').textContent, /This book or scroll is no longer in this system/);
+  });
+
   it('unstages one book without disturbing the others', async () => {
     const { root, state } = await mountPanel();
     stageBook(root, 'book-alchemy', 'remove');
@@ -969,6 +1032,43 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
       root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]').disabled,
       'and a staged book cannot be unstaged out from under an in-flight write'
     );
+    assert.equal(
+      applyButton(root).disabled,
+      true,
+      'and Apply is inert even though the draft has changes'
+    );
+  });
+});
+
+describe('RecipeBulkEditPanel in-flight delete (issue 1844)', () => {
+  it('goes inert while the set delete is running, as it does for an apply', async () => {
+    const { root } = await mountPanel({
+      deleteImpact: {
+        deletable: 3,
+        deletableIds: ['r1', 'r2', 'r3'],
+        recipeItemsAffected: 0,
+        recipeItemIds: [],
+        learnersAffected: 0,
+        learnerIds: []
+      },
+      draft: { ...createRecipeBulkDraft(), status: 'enable', bookAdd: ['book-alchemy'] },
+      onArmDelete: () => {},
+      onDelete: () => {}
+    });
+    await panel.setProps({ deleteArmed: true });
+    await panel.setProps({ deleting: true, deleteArmed: false });
+
+    assert.equal(root.querySelector('[data-recipe-bulk-category]').disabled, true);
+    assert.equal(tierSelect(root).disabled, true);
+    assert.equal(bookTrigger(root).disabled, true, 'the picker cannot be opened mid-delete');
+    for (const axis of ['status', 'lock']) {
+      assert.ok(
+        [...root.querySelectorAll(`[data-recipe-bulk-${axis}-option] input`)].every(
+          (radio) => radio.disabled
+        ),
+        `a live ${axis} segment would stage an edit while the set delete is still confirming`
+      );
+    }
     assert.equal(
       applyButton(root).disabled,
       true,

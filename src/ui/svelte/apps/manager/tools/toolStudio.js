@@ -35,6 +35,35 @@ export function toolBreakageSummary(tool, authority = 'toolSpecific') {
   return 'limitedUses';
 }
 
+/** The breakage badge one system Tool row wears, for the summary `kind` `toolBreakageSummary` names. */
+export function toolBreakageLabel(tool, kind, text) {
+  if (kind === 'immune') return text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
+  if (kind === 'breakable')
+    return text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
+  if (kind === 'breakageChance') {
+    return text('FABRICATE.Admin.Manager.Tools.SummaryChanceValue', '{count}% break').replace(
+      '{count}',
+      String(tool?.breakage?.breakageChance ?? 0)
+    );
+  }
+  if (kind === 'diceExpression') {
+    return text('FABRICATE.Admin.Manager.Tools.SummaryDiceValue', '{formula} roll').replace(
+      '{formula}',
+      String(tool?.breakage?.formula || '—')
+    );
+  }
+  const maxUses = Number(tool?.breakage?.maxUses);
+  if (Number.isInteger(maxUses) && maxUses > 0) {
+    return text(
+      maxUses === 1
+        ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
+        : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
+      maxUses === 1 ? '{count} use' : '{count} uses'
+    ).replace('{count}', String(maxUses));
+  }
+  return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
+}
+
 /**
  * THE ONE ANSWER TO "what breakage mechanic does this Tool author", including the state the radio
  * group had no option for: `limitedUses` with a null `maxUses` is UNLIMITED. Splitting one MODE
@@ -70,38 +99,7 @@ export function projectToolBehaviorFacts(
   }
 ) {
   const breakageKind = toolBreakageSummary(tool, authority);
-  let breakageTitle = text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
-  if (breakageKind === 'immune') {
-    breakageTitle = text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
-  } else if (breakageKind === 'breakable') {
-    breakageTitle = text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
-  } else if (breakageKind === 'breakageChance') {
-    breakageTitle = format(
-      'FABRICATE.Admin.Manager.Tools.SummaryChanceValue',
-      { count: tool?.breakage?.breakageChance ?? 0 },
-      '{count}% break'
-    );
-  } else if (breakageKind === 'diceExpression') {
-    breakageTitle = format(
-      'FABRICATE.Admin.Manager.Tools.SummaryDiceValue',
-      { formula: tool?.breakage?.formula || '—' },
-      '{formula} roll'
-    );
-  } else if (
-    Number.isInteger(Number(tool?.breakage?.maxUses)) &&
-    Number(tool?.breakage?.maxUses) > 0
-  ) {
-    // A SINGULAR FORM, because switching to `Limited uses` seeds `maxUses` at 1, so `1 uses` is
-    // the state a GM lands on the moment they choose the option.
-    const useCount = Number(tool.breakage.maxUses);
-    breakageTitle = format(
-      useCount === 1
-        ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
-        : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
-      { count: useCount },
-      useCount === 1 ? '{count} use' : '{count} uses'
-    );
-  }
+  const breakageTitle = toolBreakageLabel(tool, breakageKind, text);
 
   const immune = authority === 'checkDriven' && tool?.checkBreakable === false;
   const onBreakKey = toolOnBreakSummary(tool);

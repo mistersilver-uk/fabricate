@@ -17,7 +17,11 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/ui/model/essenceBulkEditModel.js';
+import {
+  createEssenceBulkDraft,
+  setBulkEssenceIcon,
+  toBulkEssenceEdit,
+} from '../../src/ui/model/essenceBulkEditModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -424,6 +428,22 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
       Boolean(second?.matches('[data-essence-bulk-delete-card]')),
       'and the delete card follows it inside the dock'
     );
+    harness.remount();
+  });
+});
+
+describe('1844 EssenceBulkEditPanel — in-flight delete', () => {
+  it('goes inert while the armed delete is being confirmed, as it does for an apply', async () => {
+    const staged = setBulkEssenceIcon(createEssenceBulkDraft(), 'icons/svg/fire.svg');
+    const root = await harness.mount(props(SELECTION, { draft: staged, deleteArmed: true }));
+    const iconReset = () => root.querySelector('[data-essence-bulk-icon-reset]');
+    assert.equal(iconReset().disabled, false, 'the control: a staged axis is live while idle');
+    assert.equal(applyButton(root).disabled, false, 'and so is Apply');
+
+    await harness.setProps(props(SELECTION, { draft: staged, deleting: true }));
+
+    assert.equal(iconReset().disabled, true, 'an axis cannot be re-staged under a running delete');
+    assert.equal(applyButton(root).disabled, true, 'and Apply cannot race the delete');
     harness.remount();
   });
 });

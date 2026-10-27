@@ -824,6 +824,7 @@ The row and inspector derive `Ready` or `Needs attention` from the canonical `To
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 When Tools exist and the current selection is absent or stale, the library selects the first MEMBER row of the rendered page exactly once, reading the membership filter, search term, sort key, sort direction and page slice the GM is actually looking at rather than the unsorted authored array.
 It skips unadopted world rows, so a deliberate selection of one is never snapped away from the `Add {tool} to {system}` action that is its only purpose.
+The unadopted selection belongs to the crafting system it was made in: on any other system it is not selected, and no `Add {tool} to {system}` action is offered for it there.
 A valid current selection is preserved and an empty library emits no selection.
 The result list scrolls independently above a full-width pagination footer that remains outside the scrolling region, and that footer's bar renders only for a multi-page result set, so a single page draws no pagination band.
 
@@ -1108,6 +1109,7 @@ The recipe-book axis is a search-and-pick control over the system's AUTHORED rec
 Picking one shows how many of the selected recipes it holds and offers add and remove, each labelled with the number of recipes it would actually affect and each unavailable when that number is zero.
 The held count is resolved on the same basis every other membership reader uses (see `## Books & Scrolls Surface`), so a system on the legacy basis reports its real membership rather than reporting none and making removal unavailable.
 Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
+A staged item whose book or scroll has since been deleted from the system keeps its row, names it as no longer in this system, reads `no change`, and keeps its own control to leave it unchanged.
 This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
 The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
 Under a fixed roll-under target each tier reads `{name} (Target {dc})`, the default `Default target`, and the hint, default hint and dynamic and no-tier statements name a target; under a character value each tier reads its adjustment, `{name} (−2)` or `{name} (×½)`, the default `Default · base adjustment`, and those statements name the base adjustment, never a DC.
@@ -1145,6 +1147,7 @@ The card additionally carries a standing, always-rendered sentence that deleting
 
 Deletion is WARNED, not BLOCKED: no recipe is refused and no set member is skipped on account of the recipe items containing it or the characters who have learned it.
 The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set, while a staged bulk edit survives a selection change that leaves the selection non-empty.
+While the set delete is running, every axis and Apply are inert, as they are for an in-flight apply, so a staged edit cannot race the delete.
 The set write persists through AT MOST one recipes write and AT MOST one crafting-system write regardless of set size, in that order, followed by one actor-flag clean-up for the whole set rather than one per recipe.
 The crafting-system write and the crafting-systems change signal are both skipped when the prune rewrote no definition, which on a legacy-basis system is every time; the recipes change signal is emitted for the delete itself.
 The actor-flag clean-up is one clean-up, not one write pass: it clears the run store and the learned-recipe store, each over the actors the deleting client may write.

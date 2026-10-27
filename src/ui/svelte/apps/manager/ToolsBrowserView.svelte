@@ -10,7 +10,7 @@
   import SearchField from '../../components/SearchField.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import Select from '../../components/Select.svelte';
-  import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
+  import { projectToolRow, toolBreakageLabel, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
     INHERIT_BREAK_MODE,
@@ -20,7 +20,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createToolsBrowserState,
   } from '../../../model/managerBrowserViewState.js';
-  import { createBrowserPageWindow } from './browserListState.svelte.js';
+  import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     tools = [],
@@ -255,6 +255,16 @@
     page.clampPage();
   });
 
+  // Tool rules are per system, so the search, cohort and page do not outlive a switch; the sort
+  // is a preference and survives it.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: { searchTerm: '', membershipFilter: 'in', pageIndex: 0 },
+  });
+  $effect(() => {
+    list.syncSystem(systemId);
+  });
+
   /** Whether one row is the inspected one, across BOTH selection kinds. */
   function rowSelected(toolId) {
     return selectedUnadoptedToolId ? selectedUnadoptedToolId === toolId : selectedToolId === toolId;
@@ -284,34 +294,6 @@
       `Add {tool} to {system}` action, so refusing the click withholds that row's one affordance. */
   function chooseTool(entry) {
     onSelectTool(entry.id);
-  }
-
-  function breakageLabel(tool, kind) {
-    if (kind === 'immune') return text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
-    if (kind === 'breakable')
-      return text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
-    if (kind === 'breakageChance') {
-      return text('FABRICATE.Admin.Manager.Tools.SummaryChanceValue', '{count}% break').replace(
-        '{count}',
-        String(tool?.breakage?.breakageChance ?? 0)
-      );
-    }
-    if (kind === 'diceExpression') {
-      return text('FABRICATE.Admin.Manager.Tools.SummaryDiceValue', '{formula} roll').replace(
-        '{formula}',
-        String(tool?.breakage?.formula || '—')
-      );
-    }
-    const maxUses = Number(tool?.breakage?.maxUses);
-    if (Number.isInteger(maxUses) && maxUses > 0) {
-      return text(
-        maxUses === 1
-          ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
-          : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
-        maxUses === 1 ? '{count} use' : '{count} uses'
-      ).replace('{count}', String(maxUses));
-    }
-    return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
   }
 </script>
 
@@ -555,7 +537,7 @@
                         <!-- ONE breakage chip, not two: the on-break action is a WORLD default. The
                              enabled half of that pair is the toggle in the action cluster. -->
                         <Chip tone="neutral" density="list" class="manager-tools-breakage-chip"
-                          >{breakageLabel(entry.tool, row.breakage)}</Chip
+                          >{toolBreakageLabel(entry.tool, row.breakage, text)}</Chip
                         >
                       {/if}
                       {#if inherit}

@@ -4,6 +4,7 @@
  * inside this module's own `$derived.by` to subscribe across the boundary.
  */
 
+import { paginateRows } from '../../../model/browserPagination.js';
 import { DEFAULT_BROWSER_PAGE_SIZE } from '../../../model/managerBrowserViewState.js';
 
 /**
@@ -24,8 +25,9 @@ export function createBrowserListState({ state, resetAxes = {}, onSystemSwitch }
 }
 
 /**
- * The page window over `rows()`, resetting to page zero where `ui-manager-shell` § Manager browse
- * view-state says the last valid page. `defaultPageSize` is only the unset fallback: Tools keeps 8.
+ * The page window over `rows()`, clamping an out-of-range page to the last valid one, as
+ * `ui-manager-shell` § Manager browse view-state says. `defaultPageSize` is only the unset
+ * fallback: Tools keeps 8.
  */
 export function createBrowserPageWindow({
   state,
@@ -35,15 +37,13 @@ export function createBrowserPageWindow({
   const sizeOf = () => state().pageSize || defaultPageSize;
   const indexOf = () => state().pageIndex || 0;
 
-  const pageRows = $derived.by(() => {
-    const size = sizeOf();
-    const index = indexOf();
-    return rows().slice(index * size, (index + 1) * size);
-  });
+  const windowOf = () => paginateRows(rows(), { pageSize: sizeOf(), pageIndex: indexOf() });
+  const pageRows = $derived.by(() => windowOf().rows);
 
   function clampPage() {
     const index = indexOf();
-    if (index > 0 && index * sizeOf() >= rows().length) state().pageIndex = 0;
+    const clamped = windowOf().pageIndex;
+    if (clamped !== index) state().pageIndex = clamped;
   }
 
   return {

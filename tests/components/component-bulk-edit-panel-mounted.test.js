@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createComponentBulkDraft } from '../../src/ui/model/componentBulkEditModel.js';
+import { createComponentBulkDraft, setBulkCategory } from '../../src/ui/model/componentBulkEditModel.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -678,5 +678,20 @@ describe('ComponentBulkEditPanel remove leg (issue 1371 r16-list)', () => {
     await panel.setProps({ applying: false, deleting: true });
     flushSync();
     assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Removing…');
+  });
+
+  it('goes inert on its axes while the armed remove is being confirmed (issue 1844)', async () => {
+    const { root } = await mountPanel({
+      draft: setBulkCategory(createComponentBulkDraft(), 'Metal'),
+      deleteArmed: true,
+    });
+    const clearCategory = () => root.querySelector('[data-component-bulk-clear-category]');
+    assert.equal(clearCategory().disabled, false, 'the control: a staged axis is live while idle');
+    assert.equal(applyButton(root).disabled, false, 'and so is Apply');
+
+    await panel.setProps({ deleting: true, deleteArmed: false });
+
+    assert.equal(clearCategory().disabled, true, 'an axis cannot be re-staged under a running remove');
+    assert.equal(applyButton(root).disabled, true, 'and Apply cannot race the remove');
   });
 });

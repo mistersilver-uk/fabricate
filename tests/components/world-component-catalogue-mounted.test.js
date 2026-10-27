@@ -1251,6 +1251,44 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    it('goes inert on its axes while the armed delete is still writing (issue 1844)', async () => {
+      const { actions } = recordingComponentActions();
+      let release;
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { ...actions, deleteEntity: () => pending },
+      });
+      for (const id of ['resin', 'ingot']) {
+        target.querySelector(`[data-scoped-list-select="${id}"]`).click();
+        await drain();
+      }
+      const modeState = () =>
+        target
+          .querySelector('[data-world-component-bulk-mode-state]')
+          .getAttribute('data-world-component-bulk-mode-state');
+      const chooseMode = async (mode) => {
+        target.querySelector(`[data-world-component-bulk-mode-option="${mode}"]`).click();
+        await drain();
+      };
+
+      await chooseMode('remove');
+      assert.equal(modeState(), 'remove', 'the control: an idle panel takes a staged mode');
+
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      await chooseMode('add');
+      assert.equal(modeState(), 'remove', 'a mode cannot be re-staged under a running delete');
+
+      release(true);
+      await drain();
+    });
+
     it('refuses the members the ENTRY refuses, and names them and their systems', async () => {
       // Epic decision 7. The world Component entry will not delete a record any system still has
       // rules for; this panel deleted exactly those records without asking, which made the same
