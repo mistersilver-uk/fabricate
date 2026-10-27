@@ -87,7 +87,7 @@
 
   // The emitted move whose focus has not landed. State, not a local: the effect reads it after the
   // caller has round-tripped the array, which is a later render.
-  let pendingFocusId = $state('');
+  let pendingMove = $state.raw(null);
   let pendingSentence = $state('');
   let pendingFocusSelector = $state(GRIP_SELECTOR);
 
@@ -167,16 +167,16 @@
     if (index < 0 || index >= list.length) return null;
     if (target < 0 || target >= list.length || target === index) return null;
     const sentence = reorderAnnouncementText(nameOf(list[index]), target + 1, list.length);
-    const id = idOf(list[index]);
+    const item = list[index];
     onReorder(index, target);
-    return { id, sentence };
+    return { id: idOf(item), item, from: index, target, sentence };
   }
 
   /** Move, follow the row with `selector`'s control, announce once that focus has landed. */
   function moveAndFollow(index, delta, selector) {
     const moved = moveFrom(index, index + delta);
     if (!moved) return;
-    pendingFocusId = moved.id;
+    pendingMove = moved;
     pendingSentence = moved.sentence;
     pendingFocusSelector = selector;
   }
@@ -220,20 +220,34 @@
     moveByKeyboard(index, delta);
   }
 
+  // Ids may repeat, so the moved row is found by the record, then by the position the move asked
+  // for, and only then by id. The record still at its source means the caller has not
+  // round-tripped yet, and its row is where the move began.
+  function rowOfMoved({ id, item, from, target }) {
+    const rows = Array.from(listElement?.children ?? []).filter((element) =>
+      element.classList?.contains('fabricate-sortable-list-row')
+    );
+    let index;
+    if (list[target] === item) index = target;
+    else if (list[from] === item) index = from;
+    else if (idOf(list[target]) === id) index = target;
+    else index = list.findIndex((entry) => idOf(entry) === id);
+    return rows[index] ?? null;
+  }
+
   // `list` is read so the effect re-runs once the caller has round-tripped the array, which is
   // when the grip is in its new position; the region is written after the focus lands.
   $effect(() => {
     void list;
-    if (!pendingFocusId) return;
-    const movedId = pendingFocusId;
+    if (!pendingMove) return;
     const sentence = pendingSentence;
     const selector = pendingFocusSelector;
-    pendingFocusId = '';
+    const move = pendingMove;
+    pendingMove = null;
     pendingSentence = '';
     pendingFocusSelector = GRIP_SELECTOR;
-    const grips = listElement?.querySelectorAll?.(GRIP_SELECTOR) ?? [];
-    const grip = Array.from(grips).find((element) => element.getAttribute(GRIP_ATTR) === movedId);
-    const row = grip?.closest?.('.fabricate-sortable-list-row') ?? null;
+    const row = rowOfMoved(move);
+    const grip = row?.querySelector?.(GRIP_SELECTOR) ?? null;
     const wanted = row?.querySelector?.(selector) ?? null;
     // A chevron that has just disabled itself at an end cannot take focus, so the grip takes it.
     const focusTarget = wanted && wanted.disabled !== true ? wanted : grip;
