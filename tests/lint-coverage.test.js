@@ -11,8 +11,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
+import stylelint from 'stylelint';
 
 import { ABSOLUTE_RULES } from '../scripts/lib/newViolations.js';
+
+import { assertGateArgv } from './helpers/gateScope.js';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -193,7 +196,7 @@ test('the lint job runs both gates against a base, and no debt job is left', () 
   const end = workflow.indexOf('\n  validate-bindings:');
   assert.ok(start !== -1 && end > start, 'could not locate the lint job in ci.yml');
   const job = workflow.slice(start, end);
-  for (const gate of ['lint', 'format:check']) {
+  for (const gate of ['lint', 'lint:svelte', 'lint:css', 'format:check']) {
     const step = new RegExp(String.raw`^\s*run: npm run ${gate}$`, 'mu');
     assert.match(job, step, `the lint job runs ${gate}`);
   }
@@ -239,4 +242,36 @@ test('the npm scripts cover the repository, and are short enough to read', () =>
     '`test:shard` must be the `test` script with `--test-shard` inserted before its glob'
   );
   assert.notEqual(scripts['test:shard'], scripts.test, 'the shard flag was not inserted');
+});
+
+// `--config` is not in the pinned argv, so the config stylelint finds beside a stylesheet is the one
+// `npm run lint:css` runs (issue 947).
+const LINT_CSS_ARGV = ['stylelint', 'styles/**/*.{css,scss}', '--max-warnings=0'];
+
+function packageScripts() {
+  return JSON.parse(readFileSync(path.join(REPOSITORY_ROOT, 'package.json'), 'utf8')).scripts;
+}
+
+test('lint:css is pinned by argv equality, and the config it finds enforces a rule', async () => {
+  assertGateArgv({ scripts: packageScripts() }, 'lint:css', LINT_CSS_ARGV);
+
+  // An emptied config or a .stylelintignore covering styles/ would let lint:css pass while checking nothing.
+  const { errored, results } = await stylelint.lint({
+    code: '.fabricate-probe { color: red; color: blue; }\n',
+    codeFilename: path.join(REPOSITORY_ROOT, 'styles', 'lint-css-probe.css'),
+    cwd: REPOSITORY_ROOT,
+  });
+  const rules = results.flatMap((result) => result.warnings.map((warning) => warning.rule));
+  assert.ok(errored, `a duplicated property beside styles/fabricate.css must fail, got ${rules}`);
+  assert.ok(rules.includes('declaration-block-no-duplicate-properties'), `got ${rules}`);
+});
+
+test('the lint:css argv pin fails when a --config decoy is appended', () => {
+  const scripts = packageScripts();
+  const withDecoy = { scripts: { 'lint:css': `${scripts['lint:css']} --config decoy.config.js` } };
+  assert.throws(
+    () => assertGateArgv(withDecoy, 'lint:css', LINT_CSS_ARGV),
+    /parsed argv must equal/,
+    'an appended --config must break the argv pin'
+  );
 });

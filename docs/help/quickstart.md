@@ -135,7 +135,7 @@ They are authored once and composed into environments.
 
 {% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor on its Overview tab, with the task identity and Gathering resolution cards." %}
 
-{% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering Settings tab, with the resolution mode and limitation cards on the left and the system gathering rules on the right." %}
+{% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering Settings tab, with the limitation and times of day cards on the left and the system gathering rules on the right." %}
 
 {: .note }
 Stamina costs, modifiers, and drop rates accept **formulas** (numbers, ability modifiers, dice).

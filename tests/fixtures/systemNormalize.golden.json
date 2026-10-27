@@ -796,6 +796,30 @@
       "associatedSystemItemId": "comp-7"
     },
     "essenceDefinitionNonObject": null,
+    "essenceDefinitionUnsluggableId": {
+      "id": "essence",
+      "name": "essence",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionUnsluggableIdCollides": {
+      "id": "essence-2",
+      "name": "essence-2",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
     "looksLikeDocumentUuidItem": true,
     "looksLikeDocumentUuidCompendium": true,
     "looksLikeDocumentUuidBareWord": false,

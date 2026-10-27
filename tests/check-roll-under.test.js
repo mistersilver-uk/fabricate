@@ -337,6 +337,22 @@ test('R6: the minimum gate compares starts in the direction, and equal starts pa
   assert.equal(await outcomeOf(5, options), 'fine', 'overlapping ranges tie on start, first authored');
 });
 
+test('R6: a minimum naming a tier with no start blocks nothing, under and over (issue 2521)', async () => {
+  const ranges = [
+    { id: 'draft', name: 'Draft', success: true, start: null, end: 8 },
+    { id: 'fine', name: 'Fine', success: true, start: 9, end: 15 },
+    { id: 'great', name: 'Great', success: true, start: 16, end: 20 },
+  ];
+  for (const evaluation of [SUM_UNDER, SUM_OVER]) {
+    const result = await routed(18, { type: 'fixed', evaluation, outcomes: ranges, minOutcomeId: 'draft' });
+    assert.deepEqual(
+      [result.data.outcomeId, result.success, result.data.minTierFailed],
+      ['great', true, undefined],
+      evaluation.direction
+    );
+  }
+});
+
 // ── the prepared evaluator (QE6) ──────────────────────────────────────────────
 
 /** A prepared check whose decision policy captured `target` and whose config carries `evaluation`. */

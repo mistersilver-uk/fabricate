@@ -499,6 +499,26 @@ describe('the case registry is coherent', () => {
     }
   });
 
+  it('every recipe-corpus size the prose states is the size the profile pins (issue 1205)', () => {
+    // These descriptions are what a reader of a recorded measurement interprets its counts by.
+    const STATED_CORPUS =
+      /(\d[\d,]*)-recipe corpus|corpus (?:is )?pinned at (\d[\d,]*)|pinned (\d[\d,]*)-row corpus/giu;
+    let checked = 0;
+    for (const [name, profile] of Object.entries(SCALE_PROFILES)) {
+      const pinned = profile.scale?.recipes;
+      if (typeof pinned !== 'number') continue;
+      const cases = casesForProfile(name).map((entry) => entry.description);
+      for (const text of [profile.description, profile.ceiling, ...cases]) {
+        for (const match of String(text ?? '').matchAll(STATED_CORPUS)) {
+          const stated = Number((match[1] ?? match[2] ?? match[3]).replaceAll(',', ''));
+          assert.equal(stated, pinned, `${name} states "${match[0]}" but pins ${pinned} recipes`);
+          checked += 1;
+        }
+      }
+    }
+    assert.ok(checked > 0, 'no stated corpus size was found, so nothing was compared');
+  });
+
   it('the miss case and the hit case are BOTH present at every series point', () => {
     // The acceptance criterion names the miss case specifically, and the pair is what makes it
     // meaningful: a miss number with no hit number to compare it to says nothing.

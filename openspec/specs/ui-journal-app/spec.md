@@ -128,7 +128,7 @@ Waiting on MATERIALS MUST read differently from waiting on a choice on every one
 A crafting run that will finish its current stage as time passes MUST carry a bolt on its Active list row, before its status chip.
 It will finish its current stage as time passes only when the world-time scan takes it once its gate passes, and that stage carries no automatic blocker.
 The scan takes a run on the current lifecycle contract whose completion preference is `worldTime`, that is not paused, that is waiting on its stage's time gate, whose execution and award-choice journals, if any, are committed, and that owes no award pick with a claimable alternative.
-The automatic blocker is any input in the selected ingredient set, a stage or recipe tool, or a player check in the recipe's system.
+The automatic blocker is any input in the selected ingredient set (an ingredient group, a set-level essence requirement, or a Tool on a named set in a routed-by-ingredients system), a stage or recipe Tool, or a player check in the recipe's system.
 The projection MUST answer both from the predicates the engine itself uses, the scan's due rule (`worldTimeDueStep`) without its clock and the automatic-execute refusal (`automaticStageBlocker`), so the bolt never promises what the engine would refuse.
 The bolt speaks for the current stage only, because a later stage can still carry a blocker of its own.
 Gathering runs are out of scope for the bolt in this slice and never carry it, although versioned gathering may also complete automatically.

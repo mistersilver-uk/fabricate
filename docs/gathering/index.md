@@ -21,12 +21,13 @@ When the feature is on, the Crafting Admin panel's left rail grows a **Gathering
 | [Environments]({% link gathering/environments.md %}) | The places themselves: their fields, their conditions, and which library tasks and events compose into them. |
 | [Tasks]({% link gathering/tasks.md %}) | The reusable Gathering Task library: drop rows, availability, checks, timing, and required tools. |
 | [Events]({% link gathering/events.md %}) | The reusable event library that fires alongside a gathering attempt. |
-| [Settings]({% link gathering/settings.md %}) | System-level gathering rules: resolution mode, limitations, reward and event rules, and blind mode. |
+| [Settings]({% link gathering/settings.md %}) | System-level gathering rules: limitations, reward and event rules, and blind mode. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The gathering check itself is authored beside the crafting and salvage checks.
 See [Checks › Gathering]({% link checks/gathering.md %}).
+Known limitation: that page still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
 
 The stamina, modifier and visibility-gate fields on these pages accept roll expressions.
 Those are not a gathering concept — the same syntax runs the crafting checks, tool bonuses and complications too.

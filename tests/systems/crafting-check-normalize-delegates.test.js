@@ -6,24 +6,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-let mintedIds = 0;
-globalThis.foundry = {
-  utils: { randomID: () => `rid-${String(++mintedIds).padStart(4, '0')}` },
-};
-globalThis.game = { user: { isGM: true }, system: { id: 'dnd5e' }, actors: [], fabricate: null };
-globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
+import { seeded } from '../helpers/seededNormalizeCounter.js';
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
 const normalize = await import('../../src/systems/normalize/craftingCheck.js');
 const { craftingCheckScenarios, knownModifierBasis } = await import(
   '../helpers/craftingCheckNormalizeCorpus.js'
 );
-
-/** Both sides of every comparison mint from the same seed, so ids cannot diverge spuriously. */
-function seeded(call) {
-  mintedIds = 0;
-  return call();
-}
 
 const scenario = (name) => craftingCheckScenarios().find((entry) => entry.name === name).check;
 

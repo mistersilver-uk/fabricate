@@ -12,6 +12,9 @@ import { describeRecipeDeleteImpact } from '../src/utils/recipeDeleteImpact.js';
 installFoundryEnv();
 
 const { SETTING_KEYS } = await import('../src/config/settings.js');
+const { findByRecipeId, getDefinitionIndex, readDefinitionRevision } = await import(
+  '../src/utils/definitionIndex.js'
+);
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -440,6 +443,70 @@ describe('CraftingSystemManager.deleteRecipes — a refused world write', () => 
       'and no membership was rewritten'
     );
     assert.equal(hookCalls.length, 0, 'nothing was announced');
+  });
+});
+
+describe('CraftingSystemManager.deleteRecipes — the retained definition index', () => {
+  const bookIds = (definitions, recipeId) =>
+    findByRecipeId(getDefinitionIndex(definitions), recipeId).map((definition) => definition.id);
+
+  it('serves the pruned membership, not the pre-prune buckets', async () => {
+    const fixture = makeFixture({
+      system: systemData({
+        definitions: [bookDefinition('book-a', ['r1', 'r3']), bookDefinition('book-b', ['r1'])],
+      }),
+    });
+    const definitions = fixture.manager.getSystem(SYSTEM_ID).recipeItemDefinitions;
+    assert.deepEqual(bookIds(definitions, 'r1'), ['book-a', 'book-b'], 'the index is warm');
+
+    await fixture.manager.deleteRecipes(SYSTEM_ID, ['r1']);
+
+    assert.equal(fixture.manager.getSystem(SYSTEM_ID).recipeItemDefinitions, definitions);
+    assert.deepEqual(bookIds(definitions, 'r1'), []);
+    assert.deepEqual(bookIds(definitions, 'r3'), ['book-a']);
+    assert.equal(readDefinitionRevision(definitions), 1, 'one advance for one prune');
+  });
+
+  it('advances nothing when the prune rewrites nothing', async () => {
+    const fixture = makeFixture({
+      system: systemData({ definitions: [bookDefinition('book-a', ['r2'])] }),
+    });
+    const definitions = fixture.manager.getSystem(SYSTEM_ID).recipeItemDefinitions;
+    const before = readDefinitionRevision(definitions);
+
+    await fixture.manager.deleteRecipes(SYSTEM_ID, ['r1']);
+
+    assert.equal(readDefinitionRevision(definitions), before);
+    assert.deepEqual(bookIds(definitions, 'r2'), ['book-a']);
+  });
+
+  it('serves the restored membership after a refused systems write, advancing on the prune and the rollback', async () => {
+    const fixture = makeFixture({
+      system: systemData({ definitions: [bookDefinition('book-a', ['r1', 'r3'])] }),
+    });
+    const definitions = fixture.manager.getSystem(SYSTEM_ID).recipeItemDefinitions;
+    assert.deepEqual(bookIds(definitions, 'r1'), ['book-a']);
+    const before = readDefinitionRevision(definitions);
+
+    // A reader that lands mid-save rebuilds the index from the pruned arrays; the rollback must
+    // still invalidate it.
+    const midSave = [];
+    const realSet = game.settings.set;
+    game.settings.set = async (namespace, key, value) => {
+      if (key !== SETTING_KEYS.CRAFTING_SYSTEMS) return realSet(namespace, key, value);
+      midSave.push(bookIds(definitions, 'r1'));
+      throw new Error('systems write refused');
+    };
+
+    await assert.rejects(
+      () => fixture.manager.deleteRecipes(SYSTEM_ID, ['r1']),
+      /systems write refused/
+    );
+
+    assert.deepEqual(midSave, [[]], 'the mid-save reader saw the pruned membership');
+    assert.deepEqual(definitions[0].recipeIds, ['r1', 'r3']);
+    assert.deepEqual(bookIds(definitions, 'r1'), ['book-a'], 'the restored bucket is served');
+    assert.equal(readDefinitionRevision(definitions), before + 2);
   });
 });
 
