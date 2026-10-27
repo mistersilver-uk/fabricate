@@ -1024,6 +1024,7 @@ The `Field` family, the compact search field and the chance slider's percent hal
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
 The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
+The `Stepper` input's unset placeholder inks `--fab-text-muted` and clears 4.5:1 in all seven themes on its soft well over `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, where the user-agent placeholder grey measures 2.3:1 to 3.8:1 (issue 2358).
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
