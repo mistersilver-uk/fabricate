@@ -405,6 +405,26 @@ const PROBES = Object.freeze([
     source: ['export function pins(source) {', "  return source.includes('export const');", '}'],
   },
   {
+    name: 'a local of the same name as another function’s parameter is not a handed-in source',
+    file: 'tests/helpers/thing.js',
+    sites: 0,
+    source: [
+      'export function pins(key) {',
+      '  return key;',
+      '}',
+      'export function other(entries) {',
+      '  let key = entries[0];',
+      "  return key.includes('.');",
+      '}',
+    ],
+  },
+  {
+    name: 'a closure over an outer function’s parameter still counts as handed-in source',
+    file: 'tests/helpers/thing.js',
+    sites: 1,
+    source: ['export function pins(text) {', "  return [1].some(() => text.includes('x'));", '}'],
+  },
+  {
     name: 'the same shape in a behavioural test is membership, not a source pin',
     file: 'tests/thing.test.js',
     sites: 0,
