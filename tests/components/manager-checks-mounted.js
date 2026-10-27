@@ -4071,6 +4071,40 @@ export function registerChecksCases() {
     );
   });
 
+  it('stays on the Checks route with the draft intact when navigation chooses Keep editing', async () => {
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'simple',
+      confirmDiscardChecksResult: 'cancel',
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    navButton('Component Rules').click();
+    await settleRouteExit();
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyChecksDraft'),
+      'a dirty draft prompts on the way out'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting',
+      'Keep editing leaves the GM on the studio'
+    );
+    assert.equal(
+      target.querySelector('[data-check-roll-formula]').value,
+      '1d20 + 7',
+      'the edited formula survives'
+    );
+    assert.equal(
+      calls.filter((call) => call[0] === 'saveCraftingCheckSimple').length,
+      0,
+      'Keep editing saves nothing'
+    );
+  });
+
   it('navigates away when the Save-on-navigate DOES land', async () => {
     // The positive control for the gate above: without it, "always false" would pass.
     const calls = [];

@@ -249,7 +249,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     // The disable is what moves focus away in a real browser.
     document.body.focus();
     // ANTI-VACUITY, asserted before the claim it bounds.
-    assert.notEqual(document.activeElement, button(root), 'the write really did drop focus');
+    assert.ok(document.activeElement !== button(root), 'the write really did drop focus');
 
     await harness.setProps(
       props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
@@ -262,9 +262,8 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     // never hear. That is not observable here (no engine in this repo runs a screen reader),
     // but the ORDER is, and it is what the shared rule in `util/announceAfterFocus.js` fixes.
     await Promise.resolve();
-    assert.equal(
-      document.activeElement,
-      button(root),
+    assert.ok(
+      document.activeElement === button(root),
       'and the GM is put back on the control they were using, not left on <body>'
     );
     assert.equal(

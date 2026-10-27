@@ -206,9 +206,8 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
       ?.click();
     flushSync();
     await new Promise((done) => setTimeout(done, 0));
-    assert.equal(
-      harness.target.ownerDocument.activeElement,
-      trigger,
+    assert.ok(
+      harness.target.ownerDocument.activeElement === trigger,
       'focus must come back to the control the GM pressed'
     );
     harness.remount();

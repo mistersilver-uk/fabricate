@@ -594,7 +594,7 @@ export function registerTagsCases() {
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addCategory' && call[1] === 'Elixirs'));
     assert.equal(categoryInput.value, 'Elixirs');
-    assert.equal(document.activeElement, categoryInput);
+    assert.ok(document.activeElement === categoryInput, 'focus is on the category input');
     assert.ok(target.textContent.includes('Category could not be added.'));
 
     const tagInput = target.querySelector('#manager-tag-add');
@@ -607,7 +607,7 @@ export function registerTagsCases() {
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
     assert.equal(tagInput.value, 'spice');
-    assert.equal(document.activeElement, tagInput);
+    assert.ok(document.activeElement === tagInput, 'focus is on the tag input');
     assert.ok(target.textContent.includes('Tag could not be added.'));
   });
 

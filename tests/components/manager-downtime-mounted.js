@@ -161,32 +161,32 @@ export function registerDowntimeCases() {
     await tick();
     flushSync();
     const activitiesTab = target.querySelector('[data-downtime-tab="activities"]');
-    assert.equal(document.activeElement, activitiesTab);
+    assert.ok(document.activeElement === activitiesTab, 'focus is on the Activities tab');
     assert.equal(activitiesTab.getAttribute('aria-selected'), 'true');
 
     activitiesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(document.activeElement, tabs[0]);
+    assert.ok(document.activeElement === tabs[0], 'focus is on the first tab');
     assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
 
     tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     await tick();
     flushSync();
     const settingsTab = target.querySelector('[data-downtime-tab="settings"]');
-    assert.equal(document.activeElement, settingsTab);
+    assert.ok(document.activeElement === settingsTab, 'focus is on the Settings tab');
     assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
 
     settingsTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(document.activeElement, tabs[0]);
+    assert.ok(document.activeElement === tabs[0], 'focus is on the first tab');
     assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
 
     tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(document.activeElement, settingsTab);
+    assert.ok(document.activeElement === settingsTab, 'focus is on the Settings tab');
     assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
     assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
     const cta = target.querySelector('.downtime-cta');
@@ -533,18 +533,16 @@ export function registerDowntimeCases() {
 
     const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
     mountedPanel.focus();
-    assert.equal(
-      document.activeElement,
-      mountedPanel,
+    assert.ok(
+      document.activeElement === mountedPanel,
       'the companion panel owns focus before removal'
     );
     unregister();
     await settleDowntimeProvider();
     assert.deepEqual(cleanups, ['tracking', 'activities']);
     assert.ok(target.querySelector('[data-downtime-panel="activities"]'));
-    assert.equal(
-      document.activeElement,
-      target.querySelector('[data-downtime-tab="activities"]'),
+    assert.ok(
+      document.activeElement === target.querySelector('[data-downtime-tab="activities"]'),
       'provider removal returns a focused companion panel to its active Core tab'
     );
   });
