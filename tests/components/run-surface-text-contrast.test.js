@@ -66,20 +66,11 @@ const STATES = Object.freeze({
   hover: `.fabricate-list-row:not(.is-danger):has(${OPEN}:enabled:hover:not([aria-pressed='true']))`,
   danger: '.fabricate-list-row.is-danger',
 });
-const SELECTED_SELECTOR = `.fabricate-list-row:has(${OPEN}[aria-pressed='true'])`;
 
 test('a selected, hovered or danger row inks secondary and clears 4.5:1 on its wash over each ground', () => {
-  const inkRule = rulesIn(corpus[SHEET]).find(
-    (rule) =>
-      splitSelectorList(rule.selector).includes(STATES.danger) && propertiesOf(rule).has('color')
-  );
-  assert.ok(inkRule, 'one rule inks the three states');
-  assert.deepEqual(splitSelectorList(inkRule.selector), [
-    STATES.danger,
-    SELECTED_SELECTOR,
-    STATES.hover,
-  ]);
-  assert.equal(propertiesOf(inkRule).get('color'), 'var(--fab-text-secondary)');
+  for (const selector of Object.values(STATES)) {
+    assert.equal(token(SHEET, selector, 'color'), '--fab-text-secondary', selector);
+  }
   for (const [state, selector] of Object.entries(STATES)) {
     const wash = token(SHEET, selector, 'background');
     for (const ground of PANE_GROUNDS) {
@@ -121,4 +112,11 @@ test('a muted row’s name inks muted and clears 4.5:1 on the row and on the car
     const ground = token(SHEET, selector, 'background');
     assert.deepEqual(shortfalls(themes, ink, [ground]), [], ground);
   }
+});
+
+test('the data table count shares the row quantity ink and clears 4.5:1 on the table ground', () => {
+  const ink = token(SHEET, '.fabricate-data-table .fabricate-data-table-count', 'color');
+  assert.equal(ink, '--fab-text-muted');
+  const ground = token(SHEET, '.fabricate-data-table', 'background');
+  assert.deepEqual(shortfalls(themes, ink, [ground]), []);
 });

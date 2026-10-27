@@ -7,19 +7,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
-import { declaredToken, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
+import {
+  PANE_GROUNDS,
+  shortfalls,
+  themePalettes,
+  tokenReader,
+} from '../helpers/themePaletteContrast.js';
 
 const CARD = 'src/ui/svelte/components/StageCard.svelte';
 const NAV = 'src/ui/svelte/components/StageNav.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
 
-const token = (file, selector, property) =>
-  declaredToken(rulesIn(corpus[file]), selector, property, file);
+const token = tokenReader(corpus);
 
 /** The card's own ground, and the pane grounds an inactive (unpainted) card sits on. */
 const cardGround = () => token(CARD, '.fab-stage-card', 'background');
-const PANE_GROUNDS = ['--fab-bg-1', '--fab-surface'];
 
 for (const [label, selector] of [
   ['note', '.fab-stage-card-note'],
