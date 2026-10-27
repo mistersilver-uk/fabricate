@@ -7,7 +7,7 @@
 const BLOCK_MARKER_LINE = /^[ \t]*<!-- fabricate:screenshots:(start|end) -->[ \t]*$/;
 
 /** List-item and blockquote markers in front of a fence, which still renders as one. */
-const CONTAINER_PREFIX = /^(?:[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+|[ \t]*>[ \t]?)+/;
+const CONTAINER_MARKER = /^[ \t]*(?:[-*+]|\d{1,9}[.)]|>)[ \t]+|^[ \t]*>/;
 
 /** A fence opener; CommonMark forbids a backtick in a backtick fence's info string. */
 const FENCE_OPENER = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
@@ -17,7 +17,16 @@ const TOP_LEVEL_HEADING = /^#{1,2}\s/;
 const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*#*$/;
 const NEXT_HEADING_PATTERN = /^(#{1,6})\s/;
 
-const fenceText = (line) => line.replace(CONTAINER_PREFIX, '');
+/** `line` with its leading list-item and blockquote markers removed, one marker per step. */
+function fenceText(line) {
+  let text = line;
+  for (let step = 0; step < 16; step += 1) {
+    const stripped = text.replace(CONTAINER_MARKER, '');
+    if (stripped === text) return text;
+    text = stripped;
+  }
+  return text;
+}
 
 /** The line closing a fence `run` opened at `from`, or -1. */
 function closerIndex(lines, from, run) {

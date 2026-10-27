@@ -1716,6 +1716,13 @@ describe('one managed block per body, read the way the publisher writes it (issu
       captureEligible: false,
     });
 
+  it('reads a long run of container markers in linear time', () => {
+    const hostile = `${'- '.repeat(5000)}x\n${' '.repeat(20000)}>\n${'> '.repeat(5000)}\n`;
+    const started = Date.now();
+    parseScreenshotEvidenceImages(`${hostile}\n${unterminated(PREVIOUS_HEAD)}\n`, { prNumber: PR });
+    assert.ok(Date.now() - started < 2000, 'a hostile body must not stall the scanner');
+  });
+
   it('reads an unterminated block as the block, up to the next top-level heading', () => {
     const body = `Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n\n## Notes\n\nKept.\n\n${HUMAN_SECTION}`;
     const parsed = parseScreenshotEvidenceImages(body, { prNumber: PR });
