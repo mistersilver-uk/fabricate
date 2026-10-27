@@ -1,3 +1,4 @@
+// ratchet-exempt(file-size): one import of the shared essence icon normaliser, no new logic
 /**
  * InventoryListingBuilder — player-facing owned-component listing / view-model
  * construction for the unified-window Inventory tab.

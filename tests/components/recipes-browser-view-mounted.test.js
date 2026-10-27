@@ -49,6 +49,11 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // ... which reads a stored essence icon through the shared normaliser and its catalogue.
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   // ... which names a reward row by its glyph and its unit's display name, and draws a choice
   // group as one row of its alternatives (issue 1773).
   'src/ui/presenters/resultKindGlyphs.js',

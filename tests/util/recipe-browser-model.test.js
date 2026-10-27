@@ -951,6 +951,33 @@ describe('recipeBrowserModel — multi-step recipes', () => {
   });
 });
 
+describe('recipeBrowserModel — a stored Sharp essence icon', () => {
+  it('reaches the Requires list on a face Foundry 14 draws, for an option and a set-level essence', () => {
+    const rows = buildRecipeRequirementRows(
+      {
+        id: 'r',
+        ingredientSets: [
+          {
+            id: 's',
+            essences: { fire: 1 },
+            ingredientGroups: [
+              {
+                id: 'g',
+                options: [{ id: 'o', quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }]
+              }
+            ]
+          }
+        ]
+      },
+      { essenceOptions: [{ id: 'fire', name: 'Fire', icon: 'fass fa-fire' }], componentOptions: [] }
+    );
+    assert.deepEqual(
+      rows.map((row) => row.icon),
+      ['fas fa-fire', 'fas fa-fire']
+    );
+  });
+});
+
 describe('buildRecipeStepModel', () => {
   const COMPS = [
     { id: 'cmp-herb', name: 'Mountain Herb' },

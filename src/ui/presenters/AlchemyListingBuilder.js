@@ -582,7 +582,7 @@ export class AlchemyListingBuilder {
       essenceId: stringOrNull(essenceId),
       name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
       img: null,
-      icon: stringOrNull(def?.icon),
+      icon: essenceIconOrNull(def?.icon),
       colorToken: stringOrNull(def?.colorToken),
       quantity: Math.max(1, Number(match.amount) || 1),
     };
