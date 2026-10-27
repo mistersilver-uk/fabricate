@@ -139,6 +139,7 @@
     chosenGroupIds: Object.keys(store?.selectedIngredientOptions ?? {}),
     openSlotId: railReadOnly ? null : (store?.openSlotId ?? null),
     readOnly: railReadOnly,
+    // `railFor` withholds this rail from non-active steps, so a read-only rail here is the active step's.
     inProgress: railReadOnly,
     announcement: store?.slotAnnouncement ?? '',
     onChooseOption,

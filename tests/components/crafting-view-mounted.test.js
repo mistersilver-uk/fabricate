@@ -288,7 +288,11 @@ describe('CraftingView mounted behavior', () => {
       recipes: [railRecipe({ activeStepTimeGateArmed: true })]
     });
     const target = await harness.mount({ services: services(store) });
-    assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
+    assert.equal(
+      target.querySelector('[data-requirement-rail-readonly]')?.textContent.trim(),
+      'FABRICATE.App.Crafting.Slots.ReadOnlyInProgress',
+      'the active step is being crafted, so it never says it is not'
+    );
   });
 
   // 1615: step 2 is the step being crafted, so only step 1 may say it is not.
