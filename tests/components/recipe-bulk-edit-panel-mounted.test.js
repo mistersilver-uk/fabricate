@@ -488,6 +488,36 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     );
   });
 
+  it('keeps a staged book visible, as missing, once it is deleted from the system (issue 1020)', async () => {
+    const { root, state } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    await panel.setProps({ books: BOOKS.filter((book) => book.id !== 'book-forge') });
+
+    assert.deepEqual(stagedIds(root), ['book-alchemy', 'book-forge'], 'no staged id loses its row');
+    const row = stagedRow(root, 'book-forge');
+    assert.match(row.textContent, /This item no longer exists/);
+    assert.ok(!row.textContent.includes('book-forge'), 'a raw definition id never reaches the GM');
+    assert.match(row.textContent, /no change/, 'and it says nothing will be written for it');
+    assert.equal(applyButton(root).disabled, false, 'Apply is armed, and every change is on screen');
+
+    root.querySelector('[data-recipe-bulk-book-unstage="book-forge"]').click();
+    flushSync();
+    assert.deepEqual(state.draft.bookAdd, [], 'the GM can still unstage the missing book');
+    assert.deepEqual(stagedIds(root), ['book-alchemy']);
+  });
+
+  it('keeps every staged row visible when the last book is deleted from the system (issue 1020)', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+
+    await panel.setProps({ books: [] });
+
+    assert.deepEqual(stagedIds(root), ['book-alchemy']);
+    assert.match(stagedRow(root, 'book-alchemy').textContent, /This item no longer exists/);
+  });
+
   it('unstages one book without disturbing the others', async () => {
     const { root, state } = await mountPanel();
     stageBook(root, 'book-alchemy', 'remove');

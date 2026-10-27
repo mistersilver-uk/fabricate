@@ -452,27 +452,23 @@
 
   // ── The book axis ────────────────────────────────────────────────────────────────
 
-  // `books` is the PROJECTION, which emits `resolvedName` and never a bare `name`, in BOTH
-  // publishes the panel can render against — so a `name`-first chain falls through to the id and
-  // paints `sm-book` where the GM wrote "Forgecraft Folio". The chain is
-  // `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, with `id` as a last resort because an
-  // unnamed option is neither readable nor nameable by speech input.
+  // `books` is the PROJECTION, which emits `resolvedName` and never a bare `name`, so a
+  // `name`-first chain would paint `sm-book` for "Forgecraft Folio". The chain is
+  // `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, with `id` last: an unnamed option is
+  // neither readable nor nameable by speech input.
   function bookLabel(book) {
     return book?.resolvedName || book?.name || book?.id || '';
   }
 
-  // How many of the SELECTED recipes this book holds, from the caller's basis-aware map and NEVER
-  // from `book.recipeIds`: while the membership-basis marker is unset, membership resolves through
-  // the legacy scalar and a book holding every selected recipe still carries an EMPTY `recipeIds`,
-  // which would disable Remove on exactly the worlds that most need this axis. Clamped to the
-  // selection size, so a stale map cannot render "holds 5 of 3 selected".
+  // How many SELECTED recipes this book holds, from the caller's basis-aware map and NEVER from
+  // `book.recipeIds`, which stays EMPTY while the membership-basis marker is unset and would disable
+  // Remove on exactly the worlds that need it. Clamped to the selection size.
   function holdsCount(bookId) {
     return Math.min(Number(bookMembership?.get?.(bookId)) || 0, count);
   }
 
   // The `kind` half of an option's second line. `Incomplete` is deliberately NOT surfaced: the
-  // synchronous publish emits it for EVERY book unconditionally, so it is untrue one publish in
-  // two, and it names a validation state rather than a kind — on the commonest Add target there is.
+  // synchronous publish emits it for EVERY book, so it is untrue one publish in two.
   function bookKind(book) {
     const type = String(book?.derivedType || '');
     if (type === 'Book') {
@@ -601,30 +597,36 @@
     );
   }
 
+  const missingBookName = text(
+    'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookMissing',
+    'This item no longer exists'
+  );
+
   // THE STAGED LIST, which the prototype computes and never renders — leaving a one-book-at-a-time
   // control with no record of what the other books were told to do. It is the confirmation, the
-  // undo, and the only surface a mixed add/remove draft can be read on. Sorted by name, so it is
-  // stable under re-staging rather than ordered by which book the GM picked first.
+  // undo, and the only surface a mixed add/remove draft can be read on, so it walks the draft's ids
+  // and a book deleted while staged keeps its row. Sorted by name, so it is stable under re-staging.
   const stagedBooks = $derived.by(() =>
-    books
-      .filter((book) => bulkRecipeBookOp(draft, book.id) !== 'none')
-      .map((book) => {
-        const op = bulkRecipeBookOp(draft, book.id);
-        const holds = holdsCount(book.id);
-        const affected = op === 'add' ? count - holds : holds;
+    [...(draft?.bookAdd ?? []), ...(draft?.bookRemove ?? [])]
+      .map((id) => {
+        const book = books.find((entry) => entry.id === id);
+        const op = bulkRecipeBookOp(draft, id);
+        const holds = holdsCount(id);
+        // "no change" is reachable — Add on a book that already holds every selected recipe, or
+        // one that no longer exists — and is the only warning before Apply reports nothing.
+        const affected = !book ? 0 : op === 'add' ? count - holds : holds;
+        const name = book ? bookLabel(book) : missingBookName;
         return {
-          id: book.id,
+          id,
           op,
-          name: bookLabel(book),
+          name,
           opLabel: opWord(op),
           icon: op === 'add' ? 'fas fa-plus' : 'fas fa-minus',
-          // "no change" is reachable — Add on a book that already holds every selected recipe —
-          // and this is the only warning before Apply reports nothing happened.
           countLabel: stagedCountLabel(affected),
           unstageLabel: format(
             'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookUnstage',
             '{book} — leave this book unchanged.',
-            { book: bookLabel(book) }
+            { book: name }
           ),
         };
       })
@@ -737,11 +739,9 @@
     focusAfterRerender([BOOK_TRIGGER]);
   }
 
-  // Staging CLEARS the pick, the one place this control departs from the prototype's BEHAVIOUR
-  // rather than its defects: keeping the book picked leaves two surfaces claiming authority over
-  // one fact and costs an extra dismissal per book. With the staged list rendered, the row IS the
-  // confirmation and carries the undo, so the pick card is a transient composer. Focus follows the
-  // gesture to that row's undo, with the trigger as the fallback when no row renders.
+  // Staging CLEARS the pick: keeping it leaves two surfaces claiming authority over one fact and
+  // costs an extra dismissal per book. The staged row IS the confirmation and carries the undo, so
+  // the pick card is a transient composer; focus follows to that row's undo, else the trigger.
   function stageBook(op) {
     if (!pickedBook) return;
     const bookId = pickedBook.id;
@@ -962,37 +962,37 @@
         onSelect={(id) => pickBook(id)}
       />
     {/if}
-    {#if stagedBooks.length > 0}
-      <!-- A LIST rather than a chip row: rows of record, each carrying an operation, an affected
-           count and its own undo, read down the rail rather than scanned across it. -->
-      <ul class="fab-bulk-book-staged" aria-label={booksLabel} data-recipe-bulk-books-staged>
-        {#each stagedBooks as entry (entry.id)}
-          <li
-            class={`fab-bulk-book-staged-row is-${entry.op}`}
-            data-bulk-book={entry.id}
-            data-bulk-book-state={entry.op}
+  {/if}
+  {#if stagedBooks.length > 0}
+    <!-- A LIST rather than a chip row: rows of record, each carrying an operation, an affected
+         count and its own undo, read down the rail rather than scanned across it. -->
+    <ul class="fab-bulk-book-staged" aria-label={booksLabel} data-recipe-bulk-books-staged>
+      {#each stagedBooks as entry (entry.id)}
+        <li
+          class={`fab-bulk-book-staged-row is-${entry.op}`}
+          data-bulk-book={entry.id}
+          data-bulk-book-state={entry.op}
+        >
+          <span class="fab-bulk-book-staged-op">
+            <i class={entry.icon} aria-hidden="true"></i>{entry.opLabel}
+          </span>
+          <span class="fab-bulk-book-staged-copy">
+            <span class="fab-bulk-book-staged-name">{entry.name}</span>
+            <span class="fab-bulk-book-staged-count">{entry.countLabel}</span>
+          </span>
+          <button
+            type="button"
+            class="fab-bulk-book-unstage fab-hit-area"
+            data-recipe-bulk-book-unstage={entry.id}
+            aria-label={entry.unstageLabel}
+            disabled={inert}
+            onclick={() => unstageBook(entry.id)}
           >
-            <span class="fab-bulk-book-staged-op">
-              <i class={entry.icon} aria-hidden="true"></i>{entry.opLabel}
-            </span>
-            <span class="fab-bulk-book-staged-copy">
-              <span class="fab-bulk-book-staged-name">{entry.name}</span>
-              <span class="fab-bulk-book-staged-count">{entry.countLabel}</span>
-            </span>
-            <button
-              type="button"
-              class="fab-bulk-book-unstage fab-hit-area"
-              data-recipe-bulk-book-unstage={entry.id}
-              aria-label={entry.unstageLabel}
-              disabled={inert}
-              onclick={() => unstageBook(entry.id)}
-            >
-              <i class="fas fa-xmark" aria-hidden="true"></i>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+            <i class="fas fa-xmark" aria-hidden="true"></i>
+          </button>
+        </li>
+      {/each}
+    </ul>
   {/if}
 </BulkEditPanelShell>
 
