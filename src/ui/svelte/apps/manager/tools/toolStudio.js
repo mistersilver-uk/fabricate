@@ -35,6 +35,35 @@ export function toolBreakageSummary(tool, authority = 'toolSpecific') {
   return 'limitedUses';
 }
 
+/** The breakage badge one system Tool row wears, for the summary `kind` `toolBreakageSummary` names. */
+export function toolBreakageLabel(tool, kind, text) {
+  if (kind === 'immune') return text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
+  if (kind === 'breakable')
+    return text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
+  if (kind === 'breakageChance') {
+    return text('FABRICATE.Admin.Manager.Tools.SummaryChanceValue', '{count}% break').replace(
+      '{count}',
+      String(tool?.breakage?.breakageChance ?? 0)
+    );
+  }
+  if (kind === 'diceExpression') {
+    return text('FABRICATE.Admin.Manager.Tools.SummaryDiceValue', '{formula} roll').replace(
+      '{formula}',
+      String(tool?.breakage?.formula || '—')
+    );
+  }
+  const maxUses = Number(tool?.breakage?.maxUses);
+  if (Number.isInteger(maxUses) && maxUses > 0) {
+    return text(
+      maxUses === 1
+        ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
+        : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
+      maxUses === 1 ? '{count} use' : '{count} uses'
+    ).replace('{count}', String(maxUses));
+  }
+  return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
+}
+
 /**
  * THE ONE ANSWER TO "what breakage mechanic does this Tool author", including the state the radio
  * group had no option for: `limitedUses` with a null `maxUses` is UNLIMITED. Splitting one MODE

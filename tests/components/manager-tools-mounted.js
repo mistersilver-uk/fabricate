@@ -243,7 +243,8 @@ export function registerToolsCases() {
       label: `Tool ${String(index + 1).padStart(2, '0')}`,
     }));
 
-    const unreachable = { ...createToolsBrowserState(), pageIndex: 2 };
+    // The sentinel names the mounted system, so seeding a page is not read as a system switch.
+    const unreachable = { ...createToolsBrowserState(), systemId: 'sys-forge', pageIndex: 2 };
     mountToolsBrowser({ tools: twelveTools, browserState: unreachable });
     assert.equal(
       unreachable.pageIndex,
@@ -255,7 +256,7 @@ export function registerToolsCases() {
     mounted = null;
     target.remove();
 
-    const reachable = { ...createToolsBrowserState(), pageIndex: 1 };
+    const reachable = { ...createToolsBrowserState(), systemId: 'sys-forge', pageIndex: 1 };
     mountToolsBrowser({ tools: twelveTools, browserState: reachable });
     assert.equal(
       reachable.pageIndex,

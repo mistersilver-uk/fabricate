@@ -242,6 +242,7 @@ Because both routes render all three vocabularies at once, sequential focus trav
 Where a surface resets its filters on a genuine crafting-system change, the remembered system id MUST live beside the filters it guards.
 A sentinel held by the surface re-initialises when the surface remounts, so returning from an editor reads as a system switch and clears the state the lift exists to preserve — a lift whose sentinel stays behind is inert.
 The same rule governs a page-to-the-selection guard, which otherwise pages away from the restored page.
+The tool library lists one system's rules, so a genuine crafting-system switch clears its search term, cohort filter and page and keeps its sort key and direction as a preference.
 
 This state MUST NOT live in the store the list renders from, for the reason `design-system/spec.md` states for row disclosure state: every persisted edit refreshes that store, and a refresh must never be able to reset the GM's filter bar.
 

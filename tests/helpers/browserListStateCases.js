@@ -19,6 +19,8 @@
  * @property {Record<string, unknown>} preservedAxes the axes the effect deliberately does not
  *   reset. Seeded before the mount, because a page position has to be in range for the clamp
  *   effect to leave it alone.
+ * @property {string} [systemProp] the prop naming the crafting system; `selectedSystemId` unless
+ *   the view reads another.
  * @property {{props: Function, selector: string, typed: string, why: string}} [localDraft] a
  *   component-local draft input the switch must clear, with the props that render it.
  */
@@ -29,7 +31,7 @@ const SWITCHED_TO = 'sys-switched';
 
 /** Register the crafting-system switch cases against one browser view. */
 export function describeBrowserListState(view) {
-  const { harness, resetAxes, preservedAxes } = view;
+  const { harness, resetAxes, preservedAxes, systemProp = 'selectedSystemId' } = view;
   const dirtyAxes = Object.entries(resetAxes).map(([axis, [dirty]]) => [axis, dirty]);
   const restoredAxes = Object.entries(resetAxes).map(([axis, [, restored]]) => [axis, restored]);
 
@@ -55,7 +57,7 @@ export function describeBrowserListState(view) {
       await mountSettled({ browserState });
       for (const [axis, dirty] of dirtyAxes) browserState[axis] = dirty;
 
-      await harness.setProps({ selectedSystemId: SWITCHED_TO });
+      await harness.setProps({ [systemProp]: SWITCHED_TO });
 
       assert.deepEqual(
         axisValues(browserState, restoredAxes),
@@ -69,7 +71,7 @@ export function describeBrowserListState(view) {
       const browserState = liftedState('sys-first');
       await mountSettled({ browserState });
 
-      await harness.setProps({ selectedSystemId: SWITCHED_TO });
+      await harness.setProps({ [systemProp]: SWITCHED_TO });
 
       assert.deepEqual(
         Object.fromEntries(Object.keys(preservedAxes).map((axis) => [axis, browserState[axis]])),
@@ -126,7 +128,7 @@ export function describeBrowserListState(view) {
         input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
         assert.equal(root.querySelector(selector).value, typed, 'and it holds what was typed');
 
-        await harness.setProps({ selectedSystemId: SWITCHED_TO });
+        await harness.setProps({ [systemProp]: SWITCHED_TO });
 
         assert.equal(root.querySelector(selector).value, '', why);
       });
