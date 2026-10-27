@@ -2,7 +2,11 @@
  * System scope: knowledge, progressive components, the import report and the remaining settings routes.
  */
 
-import { BULK_EDIT_CHROME_PATTERN, COMPONENT_EDITOR_MATCHES } from './caseConstants.js';
+import {
+  BULK_EDIT_CHROME_PATTERN,
+  COMPONENT_BULK_EDIT_MODEL_MATCH,
+  COMPONENT_EDITOR_MATCHES,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -216,6 +220,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       BULK_EDIT_CHROME_PATTERN,
+      COMPONENT_BULK_EDIT_MODEL_MATCH,
     ],
   }),
   managerCase({
@@ -334,6 +339,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
+      /^src\/ui\/model\/matchFolderVocabulary\.js$/,
     ],
   }),
   managerCase({

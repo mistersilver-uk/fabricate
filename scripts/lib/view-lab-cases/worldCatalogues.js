@@ -3,11 +3,16 @@
  */
 
 import {
+  BROWSER_PAGINATION_MATCH,
   INSPECTOR_PANEL_PATTERN,
   PREMIUM_ICONS_AD_PATTERN,
+  VOCABULARY_USAGE_MATCH,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
+
+/** The world currency ladder's store section (issue 1891). */
+const ADMIN_CURRENCY_SECTION_MATCH = /^src\/ui\/svelte\/stores\/adminCurrencySection\.js$/;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -24,7 +29,10 @@ export const CASES = Object.freeze([
     expectView: 'world-currency',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      ADMIN_CURRENCY_SECTION_MATCH,
+    ],
   }),
   managerCase({
     id: 'currency-macro',
@@ -41,7 +49,10 @@ export const CASES = Object.freeze([
     expectView: 'world-currency',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      ADMIN_CURRENCY_SECTION_MATCH,
+    ],
   }),
   managerCase({
     id: 'currency-actor-inventory',
@@ -58,7 +69,10 @@ export const CASES = Object.freeze([
     expectView: 'world-currency',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      ADMIN_CURRENCY_SECTION_MATCH,
+    ],
   }),
   managerCase({
     // The sub-unit chip, which no frame held (issue 1515).
@@ -81,7 +95,10 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      ADMIN_CURRENCY_SECTION_MATCH,
+    ],
   }),
   managerCase({
     id: 'world-prerequisites',
@@ -316,6 +333,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
       INSPECTOR_PANEL_PATTERN,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   managerCase({
@@ -667,6 +685,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
       WORLD_SCOPE_MODEL_PATTERN,
+      VOCABULARY_USAGE_MATCH,
     ],
   }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.

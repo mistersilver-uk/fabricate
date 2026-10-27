@@ -1585,7 +1585,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     const salvage = target.querySelector('[data-inventory-detail-tab="salvage"]');
     assert.equal(salvage.getAttribute('aria-selected'), 'true', 'selection moved');
-    assert.equal(document.activeElement, salvage, 'and focus moved with it');
+    assert.ok(document.activeElement === salvage, 'and focus moved with it');
     assert.equal(salvage.getAttribute('aria-controls'), 'inventory-detail-panel-salvage');
     assert.ok(
       !target.querySelector('[data-inventory-detail-tab="info"]').hasAttribute('aria-controls'),

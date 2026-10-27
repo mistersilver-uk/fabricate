@@ -698,6 +698,35 @@ export function registerWorldScopeCases() {
     );
   });
 
+  it("names the selected map region's linked realm in the map-links inspector", async () => {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      currentSceneUuid: 'Scene.s1',
+      currentSceneRegions: [
+        {
+          sceneRegionUuid: 'Scene.s1.Region.a',
+          name: 'Northwood',
+          color: '',
+          linkedRegionId: 'realm-forest',
+          partiesInMapRegion: [],
+          partiesInFabricateRealm: [],
+        },
+      ],
+    });
+    target.querySelector('#manager-travel-toggle').click();
+    await settle();
+    worldTravelItem('map').click();
+    await settleRouteExit();
+
+    const inspector = target.querySelector('.manager-travel-inspector');
+    assert.equal(inspector.getAttribute('data-travel-inspector'), 'map');
+    assert.equal(
+      inspector.querySelector('.manager-travel-region-item-name').textContent.trim(),
+      'Green March',
+      'the linked realm resolves against the world realm library, not the Unknown-realm fallback'
+    );
+  });
+
   it('keeps the realm library and the party list global across a scope switch', async () => {
     mountManager([], {
       gatheringRealmsEnabled: true,

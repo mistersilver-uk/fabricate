@@ -220,3 +220,24 @@ export const COUNT_ADVANTAGE_FOOTER =
   ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1 die"))' +
   ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
   ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1 die"))';
+
+/** The GM library browsers' category totals and page window (issue 1790). */
+export const BROWSER_GROUP_COUNTS_MATCH = /^src\/ui\/model\/browserGroupCounts\.js$/;
+export const BROWSER_PAGINATION_MATCH = /^src\/ui\/model\/browserPagination\.js$/;
+
+/** The eight manager browsers' lifted-list wiring, and the bulk selection three of them share (issue 1901). */
+export const BROWSER_LIST_STATE_MATCH =
+  /^src\/ui\/svelte\/apps\/manager\/browserListState\.svelte\.js$/;
+export const BULK_SELECTION_MATCH = /^src\/ui\/svelte\/apps\/manager\/bulkSelection\.svelte\.js$/;
+
+/** The component bulk-edit staging model (issue 1790). */
+export const COMPONENT_BULK_EDIT_MODEL_MATCH = /^src\/ui\/model\/componentBulkEditModel\.js$/;
+
+/** The vocabulary reference counts the tag pickers and both vocabulary screens draw (issue 1790). */
+export const VOCABULARY_USAGE_MATCH = /^src\/ui\/model\/vocabularyUsage\.js$/;
+
+/** The environment editor's draft, writes, validation and composition (issue 1891). */
+export const ENVIRONMENT_EDITOR_STATE_MATCHES = Object.freeze([
+  /^src\/ui\/svelte\/stores\/adminEnvironment(?:DraftSection|WriteActions)\.js$/,
+  /^src\/ui\/model\/environment(?:Validation|Composition)\.js$/,
+]);

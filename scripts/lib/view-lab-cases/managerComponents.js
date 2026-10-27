@@ -4,8 +4,11 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_LIST_STATE_MATCH,
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
+  BULK_SELECTION_MATCH,
+  COMPONENT_BULK_EDIT_MODEL_MATCH,
   COMPONENT_EDITOR_MATCHES,
   PREMIUM_ICONS_AD_PATTERN,
   PROGRESSIVE_STAGE_LIST_MATCH,
@@ -15,6 +18,9 @@ import {
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+
+/** The complication trigger sentence every complication row draws (issue 1790). */
+const COMPLICATION_SUMMARY_MATCH = /^src\/ui\/model\/complicationSummary\.js$/;
 
 /** A simple salvage's result rows (issue 1516), all of them and the `n`th from the page. */
 const SALVAGE_LIST = '[data-salvage-group] .manager-recipe-ingredient-set-groups';
@@ -167,6 +173,7 @@ export const CASES = Object.freeze([
       // Builds the attribution note the inspector's Shared identity card draws (issue 2218).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
       PREMIUM_ICONS_AD_PATTERN,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
@@ -494,6 +501,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       BULK_EDIT_CHROME_PATTERN,
+      COMPONENT_BULK_EDIT_MODEL_MATCH,
+      BULK_SELECTION_MATCH,
     ],
   }),
   managerCase({
@@ -564,6 +573,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       BULK_EDIT_CHROME_PATTERN,
+      COMPONENT_BULK_EDIT_MODEL_MATCH,
     ],
   }),
   managerCase({
@@ -1049,6 +1059,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+      COMPLICATION_SUMMARY_MATCH,
     ],
   }),
   managerCase({
@@ -1211,6 +1222,7 @@ export const CASES = Object.freeze([
       STAGE_COMPLICATION_LIST_MATCH,
       ...COMPONENT_EDITOR_MATCHES,
       PROGRESSIVE_STAGE_LIST_MATCH,
+      COMPLICATION_SUMMARY_MATCH,
     ],
   }),
   managerCase({
@@ -1235,6 +1247,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
       STAGE_COMPLICATION_LIST_MATCH,
       PROGRESSIVE_STAGE_LIST_MATCH,
+      COMPLICATION_SUMMARY_MATCH,
     ],
   }),
   managerCase({

@@ -4,7 +4,10 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_LIST_STATE_MATCH,
   BULK_DELETE_CARD_PATTERN,
+  BULK_SELECTION_MATCH,
   INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
@@ -38,6 +41,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
       WORLD_SCOPE_MODEL_PATTERN,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
@@ -198,6 +203,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
       INSPECTOR_PANEL_PATTERN,
+      BULK_SELECTION_MATCH,
     ],
   }),
   managerCase({

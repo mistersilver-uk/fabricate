@@ -4,7 +4,11 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_LIST_STATE_MATCH,
+  BROWSER_PAGINATION_MATCH,
   BULK_DELETE_CARD_PATTERN,
+  BULK_SELECTION_MATCH,
   CHECKS_ROUTE_MODEL_PATTERN,
   INSPECTOR_PANEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
@@ -47,6 +51,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
@@ -112,6 +117,30 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  // Issue 1589: the inspector's chip row on the recipe that is off and cannot be enabled.
+  managerCase({
+    id: 'manager-recipes-inspector-cant-enable',
+    label: "Manager — Recipes inspector, Can't enable chip",
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"] .manager-recipe-identity',
+      },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '[data-recipe-inspector] .manager-chip-row .manager-chip:has-text("Can\'t enable")',
+    expectContained: [{ container: '[data-recipe-inspector]', target: '.manager-chip-row' }],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
     ],
   }),
   // Issue 1773: the inspector's Produces rows name a currency reward by its label and amount with
@@ -218,6 +247,54 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
+  // Issue 1589: both of a row's status pills at the narrow window, where the name row has the least room.
+  managerCase({
+    id: 'manager-recipes-narrow-status-row',
+    label: 'Manager — Recipes narrow, off and un-enableable row',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
+      ':has(.manager-recipe-name-row .manager-chip:has-text("Disabled"))' +
+      ':has(.manager-recipe-name-row .manager-chip:has-text("Can\'t enable"))',
+    expectContained: [
+      {
+        container: '.manager-main',
+        target: '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]',
+      },
+    ],
+    position: { width: 900, height: 700 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+    ],
+  }),
+  // Issue 1816: the library with grouping switched off, so the rows stand in one ungrouped list.
+  managerCase({
+    id: 'manager-recipes-grouped-off',
+    label: 'Manager — Recipes with grouping off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: ['Crafting', { selector: '[data-recipe-group-toggle]' }],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-group-toggle][aria-pressed="false"])' +
+      ' .manager-main:not(:has([data-group-header])) .manager-recipe-row',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      /^src\/ui\/model\/entityBrowserModel\.js$/,
+    ],
+  }),
   managerCase({
     id: 'manager-recipes-no-check',
     label: 'Manager — Recipes no check',
@@ -279,6 +356,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   // Three frames, because the panel's five axes cannot be photographed in one.
@@ -311,7 +390,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
     kinds: ['manager', 'recipes'],
-    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN],
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN, BULK_SELECTION_MATCH],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-unstaged',

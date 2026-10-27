@@ -275,19 +275,22 @@ describe('mounted roll prompt', () => {
   it('moves focus in, traps Tab, and returns focus to the opener on close', async () => {
     const { root, opener, dialog, pending } = await openThroughHost(base, true);
     const bonus = dialog.querySelector('input[name="situationalBonus"]');
-    assert.equal(document.activeElement, bonus, 'focus enters on the bonus field');
+    assert.ok(document.activeElement === bonus, 'focus enters on the bonus field');
     const close = dialog.querySelector('[data-manager-modal-close]');
     const advantage = dialog.querySelector('button[data-action="advantage"]');
     advantage.focus();
     advantage.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
-    assert.equal(document.activeElement, close, 'Tab from the last control wraps to the first');
+    assert.ok(document.activeElement === close, 'Tab from the last control wraps to the first');
     close.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
-    assert.equal(document.activeElement, advantage, 'Shift+Tab from the first control wraps to the last');
+    assert.ok(
+      document.activeElement === advantage,
+      'Shift+Tab from the first control wraps to the last'
+    );
     close.click();
     assert.deepEqual(await pending, { confirmed: false });
     assert.ok(!dialogOf(root), 'the prompt unmounted');
     await nextFrame();
-    assert.equal(document.activeElement, opener, 'focus returned to the opener');
+    assert.ok(document.activeElement === opener, 'focus returned to the opener');
   });
 
   it('dismisses on Escape without letting Foundry see the key, and ignores an outside click', async () => {
@@ -587,9 +590,15 @@ describe('mounted roll prompt', () => {
         assert.ok(!input, 'no bonus input');
         assert.ok(!dialog.querySelector('.bonus-group'), 'and no group around one');
         assert.doesNotMatch(dialog.textContent, /Situational bonus|A bonus adds/, 'no caption or help');
-        assert.equal(document.activeElement, dialog.querySelector('button[type="submit"]'));
+        assert.ok(
+          document.activeElement === dialog.querySelector('button[type="submit"]'),
+          'focus is on the submit button'
+        );
       } else {
-        assert.equal(document.activeElement, input, 'positive control: the offer focuses the field');
+        assert.ok(
+          document.activeElement === input,
+          'positive control: the offer focuses the field'
+        );
       }
       dialog.querySelector('form').requestSubmit();
       const answer = await pending;
@@ -651,7 +660,11 @@ describe('mounted roll prompt', () => {
       });
       const { dialog, pending } = await openThroughHost(view, false, noChoice);
       assert.equal(Boolean(dialog.querySelector('input[name="situationalBonus"]')), shown, JSON.stringify(offers));
-      if (!shown) assert.equal(document.activeElement, dialog.querySelector('button[type="submit"]'));
+      if (!shown)
+        assert.ok(
+          document.activeElement === dialog.querySelector('button[type="submit"]'),
+          'focus is on the submit button'
+        );
       dialog.querySelector('[data-manager-modal-close]').click();
       await pending;
     }
@@ -1107,7 +1120,10 @@ describe('mounted roll prompt', () => {
         [blockNote(dialog).getAttribute('role'), roll.getAttribute('aria-describedby')],
         ['status', blockNote(dialog).id]
       );
-      assert.equal(document.activeElement, dialog.querySelector('input[name="situationalBonus"]'));
+      assert.ok(
+        document.activeElement === dialog.querySelector('input[name="situationalBonus"]'),
+        'focus is on the situational bonus input'
+      );
       const state = answered(pending);
       dialog.querySelector('form').requestSubmit();
       roll.click();
@@ -1160,9 +1176,8 @@ describe('mounted roll prompt', () => {
         'never "Cannot reach" beside an Advantage that can'
       );
       assert.equal(stepperInput(dialog).disabled, true, 'nothing to buy');
-      assert.equal(
-        document.activeElement,
-        actionOf(dialog, 'advantage'),
+      assert.ok(
+        document.activeElement === actionOf(dialog, 'advantage'),
         'never the close control or a blocked action'
       );
       const state = answered(pending);

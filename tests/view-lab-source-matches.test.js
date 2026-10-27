@@ -24,6 +24,7 @@ import {
   rendersCapture,
 } from '../scripts/lib/viewLabCases.js';
 
+import { alternativesOf } from './helpers/patternAlternatives.js';
 import { parseJobs } from './helpers/workflow-source.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -133,23 +134,6 @@ test('the capture workflow selects for every PR and renders on rendersCapture, n
   const ids = parseJobs(workflow).select.steps.map((step) => step.id);
   assert.ok(ids.includes('library') && ids.indexOf('library') < ids.indexOf('select'));
 });
-
-/**
- * The first unescaped group holding no nested group, with the quantifier after it. A lookaround
- * is never one: its branches are not paths.
- */
-const INNERMOST_GROUP = /(?<!\\)\((?:\?:)?(?!\?)((?:[^()\\]|\\.)*)\)([?*+]?)/;
-
-/** Every group-free path through a pattern; an optional group also takes its empty branch. */
-function alternativesOf(pattern, source = pattern.source) {
-  const group = INNERMOST_GROUP.exec(source);
-  if (!group) return source === pattern.source ? [] : [new RegExp(source, pattern.flags)];
-  const branches = group[1].split(/(?<!\\)\|/);
-  if (group[2] === '?' || group[2] === '*') branches.push('');
-  const head = source.slice(0, group.index);
-  const tail = source.slice(group.index + group[0].length);
-  return branches.flatMap((branch) => alternativesOf(pattern, `${head}${branch}${tail}`));
-}
 
 /** One result per distinct pattern source, since cases share most of their patterns. */
 function memoizedBySource(compute) {

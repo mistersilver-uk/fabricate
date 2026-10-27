@@ -3,6 +3,7 @@
  */
 
 import {
+  BROWSER_PAGINATION_MATCH,
   INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
   WORLD_TOOL_SEARCH_MISS_TERM,
@@ -170,6 +171,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       // The page window itself, restated on the lifted view-state so a change there cannot publish another screen.
       /^src\/ui\/model\/managerBrowserViewState\.js$/,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   managerCase({

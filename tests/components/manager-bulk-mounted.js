@@ -794,6 +794,48 @@ export function registerBulkCases() {
     );
   });
 
+  // The panel's blocked-enable count and the book picker's `holds n of {total}` figure are
+  // projections of the live selection, so the corpus is bigger than the selection.
+  it('derives the blocked count and book membership from the live recipe selection', async () => {
+    const row = (id, extra) => ({
+      id,
+      name: `Recipe ${id}`,
+      category: 'potions',
+      enabled: false,
+      locked: false,
+      enableBlocked: false,
+      recipeItemIds: [],
+      ...extra,
+    });
+    await openRecipesBrowser([], {
+      recipes: [
+        row('r1', { enableBlocked: true, recipeItemIds: ['ri1', 'ri2'] }),
+        row('r2', { enableBlocked: true, recipeItemIds: ['ri1'] }),
+        row('r3', {}),
+        row('r4', { enableBlocked: true, recipeItemIds: ['ri1', 'ri2'] }),
+      ],
+    });
+    for (const id of ['r1', 'r2', 'r3']) tickRecipeRow(id);
+    const enableOption = target.querySelector('[data-recipe-bulk-status-option="enable"]');
+    enableOption.querySelector('input').dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.equal(
+      target
+        .querySelector('[data-recipe-bulk-blocked-warning]')
+        ?.getAttribute('data-recipe-bulk-blocked-warning'),
+      '2',
+      'two selected recipes would be refused; the unselected blocked recipe is not counted'
+    );
+
+    target.querySelector('.fab-bulk-book-trigger').click();
+    flushSync();
+    const holds = (bookId) =>
+      target.querySelector(`[data-popover-option="${bookId}"]`)?.textContent ?? '';
+    assert.match(holds('ri1'), /holds 2 of 3 selected/);
+    assert.match(holds('ri2'), /holds 1 of 3 selected/);
+  });
+
   async function deleteSelectedRecipeRows(ids, options = {}) {
     const messages = [];
     const calls = [];

@@ -19,6 +19,7 @@ import {
 import {
   BROAD_SIGNAL_CASE_OVERRIDES,
   BROAD_SIGNAL_PATTERN,
+  FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
@@ -694,7 +695,11 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
     [
       'src/ui/svelte/components/Chip.svelte',
       ['player-crafting-simple'],
-      ['manager-published-leaves-specimen'],
+      [
+        'manager-published-leaves-specimen',
+        'manager-recipes-narrow-status-row',
+        'manager-recipes-inspector-cant-enable',
+      ],
     ],
     [
       'src/ui/svelte/components/Button.svelte',
@@ -1552,6 +1557,48 @@ test("(c) no 'targeted' row is matched by BROAD_SIGNAL_PATTERN", () => {
         'lives there, which is the defect issue 1378 names.'
     );
   }
+});
+
+/** The paths no publishing case (other than the app-shell fallback) names in its `sourceMatches`. */
+function unclaimedTargetedPaths(cases, paths) {
+  const claimants = cases.filter(
+    (viewCase) => viewCase.publish && viewCase.id !== FALLBACK_CASE_ID
+  );
+  const names = (viewCase, file) => viewCase.sourceMatches?.some((re) => re.test(file)) ?? false;
+  return paths.filter((file) => claimants.every((viewCase) => !names(viewCase, file)));
+}
+
+test("every 'targeted' row is claimed by a publishing case", () => {
+  const targeted = primitivePathsByEvidence('targeted');
+  assert.ok(targeted.length > 0, "no row carries evidence 'targeted', so this property is vacuous");
+  assert.deepEqual(
+    unclaimedTargetedPaths(VIEW_LAB_CASES, targeted),
+    [],
+    "these 'targeted' rows are named by no publishing case's sourceMatches, so a change to one " +
+      `falls back to ${FALLBACK_CASE_ID} and photographs the player app shell`
+  );
+});
+
+test("the 'targeted' claimant guard flags a row once no publishing case names it", () => {
+  const file = 'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte';
+  const claimant = { id: 'x', publish: true, sourceMatches: [/ScopedEntrySystemsCard\.svelte$/] };
+  assert.deepEqual(unclaimedTargetedPaths([claimant], [file]), []);
+  assert.deepEqual(unclaimedTargetedPaths([], [file]), [file]);
+  assert.deepEqual(
+    unclaimedTargetedPaths([{ ...claimant, sourceMatches: [/Other\.svelte$/] }], [file]),
+    [file],
+    'a case whose sourceMatches miss the path does not claim it'
+  );
+  assert.deepEqual(
+    unclaimedTargetedPaths([{ ...claimant, id: FALLBACK_CASE_ID, sourceMatches: [/./] }], [file]),
+    [file],
+    'the app-shell fallback never counts as a claimant'
+  );
+  assert.deepEqual(
+    unclaimedTargetedPaths([{ ...claimant, publish: false, sourceMatches: [/./] }], [file]),
+    [file],
+    'a case that does not publish never counts as a claimant'
+  );
 });
 
 test('the two studio recipes share one bulk-surface pattern, and it names only targeted rows', () => {

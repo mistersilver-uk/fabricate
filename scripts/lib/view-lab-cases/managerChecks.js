@@ -4,11 +4,17 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_PAGINATION_MATCH,
   COMPONENT_EDITOR_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
+  VOCABULARY_USAGE_MATCH,
 } from './caseConstants.js';
 import { choosePageSize, managerCase, previewAsActor } from './caseFactories.js';
+
+/** Category and tag deletion's cascade planning, which these frames' delete controls drive (issue 1790). */
+const VOCABULARY_CASCADE_MATCH = /^src\/ui\/model\/vocabularyCascade\.js$/;
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -1163,6 +1169,85 @@ export const CASES = Object.freeze([
       GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
+  // The suppressed-pick note on the two hosts (issue 1616): the authored pick stays, one entry is un-marked.
+  managerCase({
+    id: 'manager-component-edit-salvage-modifier-suppressed',
+    label: 'Manager — Component edit salvage modifier suppressed pick',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', subjectModifierPicks: 'suppressed' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Un-marks `hb-mod-tools`, one of the alembic's two authored picks.
+      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-tools"]' },
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
+          '[data-component-edit]',
+      },
+      { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The count, not merely the note: a click that toggled nothing leaves both picks eligible and no note.
+    expectSelector:
+      '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
+      '[data-subject-modifier-suppressed="1"]',
+    expectContained: [
+      {
+        container: '[data-component-edit-panel]',
+        target: '[data-subject-modifier-suppressed]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-edit-modifier-suppressed',
+    label: 'Manager — Gathering task edit modifier suppressed pick',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', subjectModifierPicks: 'suppressed' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Un-marks `hb-mod-tools`, one of the task's two authored picks.
+      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-tools"]' },
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-tab="requirements"]' },
+      { selector: '[data-gathering-task-check-modifiers]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager [data-gathering-task-check-modifiers] ' +
+      '[data-subject-modifier-picker="gathering-check-modifier"] ' +
+      '[data-subject-modifier-suppressed="1"]',
+    expectContained: [
+      {
+        container: '[data-gathering-task-editor]',
+        target: '[data-subject-modifier-suppressed]',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
+    ],
+  }),
   managerCase({
     id: 'manager-checks-crafting-modifiers-narrow',
     label: 'Manager — Checks crafting modifiers narrow',
@@ -1220,6 +1305,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   // THE THREE VOCABULARY FRAMES, all three kept through issue 1915's convergence. `-tags-tab` is
@@ -1255,6 +1342,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_USAGE_MATCH,
+      VOCABULARY_CASCADE_MATCH,
     ],
   }),
   managerCase({
@@ -1279,6 +1368,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_USAGE_MATCH,
     ],
   }),
   managerCase({
@@ -1320,6 +1410,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_CASCADE_MATCH,
     ],
   }),
   parityCase({

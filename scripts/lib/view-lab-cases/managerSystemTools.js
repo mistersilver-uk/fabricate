@@ -4,11 +4,15 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_LIST_STATE_MATCH,
   TOOL_EDITOR_SHELL_MATCHES,
   TOOL_LIST_MATCHES,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, choosePageSize, managerCase } from './caseFactories.js';
+
+/** The Tool rules editor's draft (issue 1891). */
+const ADMIN_TOOL_DRAFT_SECTION_MATCH = /^src\/ui\/svelte\/stores\/adminToolDraftSection\.js$/;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -21,7 +25,7 @@ export const CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES],
+    sourceMatches: [...TOOL_LIST_MATCHES, BROWSER_LIST_STATE_MATCH],
   }),
   managerCase({
     id: 'manager-tool-adopted-world-tool-1280x720',
@@ -404,6 +408,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      ADMIN_TOOL_DRAFT_SECTION_MATCH,
     ],
   }),
   managerCase({
@@ -426,7 +431,10 @@ export const CASES = Object.freeze([
       '[data-tool-editor-panel="validation"] > [data-notice-position] > [data-tool-save-error]',
     expectCenterHit: '[data-notice-position] > [data-tool-save-error]',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      ADMIN_TOOL_DRAFT_SECTION_MATCH,
+    ],
   }),
   managerCase({
     // The overview frame is gone because the overview tab is (issue 1373).
@@ -491,6 +499,7 @@ export const CASES = Object.freeze([
       ...TOOL_EDITOR_SHELL_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+      ADMIN_TOOL_DRAFT_SECTION_MATCH,
     ],
   }),
   managerCase({
@@ -705,6 +714,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       ...TOOL_EDITOR_SHELL_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+      ADMIN_TOOL_DRAFT_SECTION_MATCH,
     ],
   }),
   managerCase({

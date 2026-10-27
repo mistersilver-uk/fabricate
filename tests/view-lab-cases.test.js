@@ -49,15 +49,22 @@ import {
   MODIFIER_INCOMPATIBLE_VERBS as RUNNER_MODIFIER_INCOMPATIBLE_VERBS,
   PRESS_KEYS as RUNNER_PRESS_KEYS,
 } from '../scripts/lib/viewLabSteps.js';
-import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
+import {
+  CHECK_TO_ISSUES as RECIPE_CHECK_TO_ISSUES,
+  evaluateRecipeReadiness,
+} from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
-import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import {
+  CHECK_READINESS_ISSUE_IDS,
+  CHECK_SECTION_IDS,
+} from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   CHECKS_VIEWS,
   buildChecksNavItems,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+import { ACTION_TONES, managerHeaderActionClass } from '../src/ui/managerExtensions.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -2483,7 +2490,7 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Eleven selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
+  // Thirteen selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
   // go stale (issue 1095).
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
@@ -2501,8 +2508,8 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
   // NON-EMPTY, and of the EXPECTED CARDINALITY (issue 1095).
   assert.equal(
     found.length,
-    11,
-    `expected 11 combination-rule selectors in the registry, found ${found.length} — ` +
+    13,
+    `expected 13 combination-rule selectors in the registry, found ${found.length} — ` +
       `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
       'renamed here, or cases carrying it were added or deleted'
   );
@@ -2536,6 +2543,96 @@ test('the combination-rule scan reads expectSelector, not only steps', () => {
   ).map((viewCase) => viewCase.id);
   assert.ok(fromSteps.length > 0, 'no case CLICKS a combination rule any more');
   assert.notDeepEqual(fromExpect, fromSteps, 'the two fields must be genuinely distinct sets');
+});
+
+// Environment and recipe-only ids (`EnvironmentValidationTab`, `RecipeValidationTab`) are outside
+// this union: a case naming one adds it here, or exports its list from the product (issue 1105).
+const DECLARED_ISSUE_IDS = new Set([
+  ...CHECK_READINESS_ISSUE_IDS,
+  ...Object.values(RECIPE_CHECK_TO_ISSUES).flat(),
+]);
+const isDeclaredIssueId = (value) => DECLARED_ISSUE_IDS.has(value);
+
+/**
+ * Every exact `[attr="value"]` a registry selector names; a prefix match (`^=`) is not one. It reads
+ * the fields `caseSelectors` does: steps, expectSelector and expectLayout.
+ */
+function exactAttributeValues(attr) {
+  const pattern = new RegExp(String.raw`\[${escapeForRegExp(attr)}="([^"]*)"\]`, 'g');
+  const found = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const selector of caseSelectors(viewCase)) {
+      for (const match of selector.matchAll(pattern))
+        found.push({ id: viewCase.id, value: match[1] });
+    }
+  }
+  return found;
+}
+
+test('every data-issue and data-manager-view value a registry selector names is declared', () => {
+  const issues = exactAttributeValues('data-issue');
+  const views = exactAttributeValues('data-manager-view');
+  // Occurrences, not distinct values: the registry names few distinct ids many times.
+  assert.ok(issues.length >= 40, `only ${issues.length} data-issue selectors found`);
+  assert.ok(views.length > 0, 'no data-manager-view selector found');
+
+  const { accepts } = buildExpectViewPredicate();
+  const describe = (entries) =>
+    entries.map((entry) => `${entry.id}: "${entry.value}"`).join('\n  ');
+  const badIssues = issues.filter((entry) => !isDeclaredIssueId(entry.value));
+  const badViews = views.filter((entry) => !accepts(entry.value));
+  assert.deepEqual(
+    badIssues,
+    [],
+    `these selectors name a readiness id no product list declares, so they match nothing:\n  ${describe(badIssues)}`
+  );
+  assert.deepEqual(
+    badViews,
+    [],
+    `these selectors name a manager view the shell never renders:\n  ${describe(badViews)}`
+  );
+});
+
+test('the issue-id and manager-view predicates reject a value nothing declares', () => {
+  assert.equal(isDeclaredIssueId('neverEver'), false);
+  assert.equal(isDeclaredIssueId('noRollFormula'), true);
+  assert.equal(isDeclaredIssueId('noName'), true);
+  assert.equal(buildExpectViewPredicate().accepts('neverEver'), false);
+  assert.equal(buildExpectViewPredicate().accepts('components'), true);
+});
+
+test('every header-action class pin equals a class managerHeaderActionClass can produce', () => {
+  const producible = new Set(ACTION_TONES.map((tone) => managerHeaderActionClass({ tone })));
+  const pins = VIEW_LAB_CASES.flatMap((viewCase) =>
+    (viewCase.expectAttributes ?? [])
+      .filter((pin) => pin.name === 'class' && pin.selector.includes('[data-manager-header-action'))
+      .map((pin) => ({ id: viewCase.id, selector: pin.selector, value: pin.value }))
+  );
+  assert.ok(pins.length >= 3, `only ${pins.length} header-action class pins found`);
+  assert.deepEqual(
+    pins.filter((pin) => !producible.has(pin.value)),
+    [],
+    'these pins are no class string managerHeaderActionClass produces for any ACTION_TONES member'
+  );
+
+  // Membership alone would pass a swap, so each companion action is pinned to its own tone.
+  const chrome = getCaseById('manager-world-downtime-test-companion-chrome');
+  const tonesBySelector = {
+    '[data-manager-header-action="lab-back"]': 'ghost',
+    '[data-manager-header-action="lab-delete"]': 'danger',
+    '[data-manager-header-action="lab-save"]': 'primary',
+  };
+  for (const [selector, tone] of Object.entries(tonesBySelector)) {
+    const pin = chrome.expectAttributes.find(
+      (entry) => entry.name === 'class' && entry.selector === selector
+    );
+    assert.ok(Boolean(pin), `${selector} no longer pins a class`);
+    assert.equal(
+      pin.value,
+      managerHeaderActionClass({ tone }),
+      `${selector} is not the ${tone} tone`
+    );
+  }
 });
 
 test('the hooks the capture driver hard-codes still exist in the UI', () => {
