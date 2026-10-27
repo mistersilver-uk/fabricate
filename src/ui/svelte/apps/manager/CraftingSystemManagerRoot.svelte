@@ -1783,14 +1783,15 @@
     libraryToolsList.find((tool) => tool.id === focusedToolDraft?.id) || null
   );
 
-  // WHICH WORLD TOOL THE RULES LIST HAS SELECTED THAT THIS SYSTEM HAS NO RECORD FOR.
+  // The world Tool the rules list has selected that this system has no record for; a switch drops it.
   let unadoptedToolId = $state('');
+  $effect.pre(() => {
+    if (selectedSystemId) unadoptedToolId = '';
+  });
   const unadoptedWorldTool = $derived(
-    unadoptedToolId
-      ? ((worldScope.worldScopeState.tool?.entries ?? []).find(
-          (entry) => entry.id === unadoptedToolId
-        ) ?? null)
-      : null
+    (worldScope.worldScopeState.tool?.entries ?? []).find(
+      (entry) => unadoptedToolId && entry.id === unadoptedToolId
+    ) ?? null
   );
 
   /** The Tool the browser inspector describes. */
@@ -3760,8 +3761,7 @@
     if (!toolId) return false;
     const id = String(toolId);
     const opened = store?.openToolDraft?.(id, selectedSystemId) ?? false;
-    // A WORLD TOOL THIS SYSTEM HAS NO RULES RECORD FOR CANNOT OPEN A DRAFT, and that is not a
-    // failure to swallow.
+    // A world Tool this system has no rules record for cannot open a draft: that is the unadopted one.
     unadoptedToolId = opened === false ? id : '';
     return opened;
   }
