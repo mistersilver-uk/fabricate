@@ -13,12 +13,24 @@ import {
   isInteractableVisual,
 } from './interactableRegionFlags.js';
 
+/** Hand an error to the injected reporter; a throwing reporter must not break the no-throw contract. */
+function report(onError, error) {
+  try {
+    onError?.(error);
+  } catch {
+    // The reporter is a diagnostic only.
+  }
+}
+
 /**
  * Register the core sheet for the subtype, with the registrar and document class injected so a
  * fake records the call. Defensive, idempotent and no-throw: registration is tracked by a private
  * marker on the registrar, because Foundry's `registerSheet` overwrites happily but re-running
  * `makeDefault` re-shuffles every sibling sheet's default flag. V14 also throws on a non-sheet
  * class, so any throw is caught to stay robust across versions.
+ * The return is `true` only for a fresh registration. A thrown error and an API-shape refusal go to
+ * the optional `onError(error)`; the already-registered marker never does, and a failed attempt
+ * leaves no marker, so a retry reports again.
  */
 export function assignInteractableConfigSheet({
   registrar,
@@ -26,10 +38,17 @@ export function assignInteractableConfigSheet({
   SheetClass,
   scope = 'fabricate',
   makeDefault = true,
+  onError = null,
 } = {}) {
-  if (typeof registrar?.registerSheet !== 'function') return false;
-  if (typeof RegionBehavior !== 'function') return false;
-  if (typeof SheetClass !== 'function') return false;
+  const refusal = [
+    ['registrar.registerSheet', registrar?.registerSheet],
+    ['RegionBehavior', RegionBehavior],
+    ['SheetClass', SheetClass],
+  ].find(([, value]) => typeof value !== 'function');
+  if (refusal) {
+    report(onError, new Error(`Sheet registration refused: ${refusal[0]} is not a function`));
+    return false;
+  }
 
   // Idempotent guard: avoid redundant `makeDefault` re-shuffle on repeat calls.
   const marker = '_fabricateInteractableConfigSheetRegistered';
@@ -41,8 +60,9 @@ export function assignInteractableConfigSheet({
       makeDefault: makeDefault === true,
       label: 'FABRICATE.Canvas.Interactable.Config.SheetLabel',
     });
-  } catch {
+  } catch (error) {
     // Defensive: a differing API shape, or a double-register race, must not throw into init.
+    report(onError, error);
     return false;
   }
 

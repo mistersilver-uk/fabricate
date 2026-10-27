@@ -124,6 +124,11 @@ It is the single place to see and manage every interactable on the current scene
 **List.** The panel lists every interactable on the current scene with its **name**, **type** (tool or gathering task), **source**, **state** (enabled, locked, or used up), and **marker status** (tile, drawing, token, region-only, or missing).
 A tool's source reads as its **Display label** (see [Tools]({% link tools.md %})), else its name, else its linked component's name.
 The interactable's config panel names its linked tool the same way.
+A row's title is the interactable's own name, else its source label, else the source id.
+A row with no name and no source configured yet is titled "Untitled interactable".
+If the Tool or Gathering task a row points at has been deleted, the source shows a warning **Unresolved** chip.
+Hover the chip to see the missing source's id, which is also read out to screen readers as "Source not found" followed by the id.
+A row with no source chosen yet shows a warning **Needs configuration** chip instead.
 Each row offers:
 
 - **Open configuration** opens the config panel for that interactable.
@@ -272,6 +277,9 @@ It can be opened from the Manage Interactables panel, or from a button on a link
 From it a GM can:
 
 - **Test as Player** activates the interactable as if a player had walked in.
+  Select a token that has an actor first.
+  The check uses that actor's tokens on the scene.
+  With no such token selected, a warning tells you to select one and nothing is requested.
 - **Jump** pans the camera to the interactable's region.
 - **Relink** points the interactable at a different existing marker (tile, drawing, or token).
 - **Create / Recreate marker** makes a fresh tile or drawing marker (for example after the original was deleted, or to add a marker to a region-only interactable).

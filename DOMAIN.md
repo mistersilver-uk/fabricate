@@ -847,6 +847,20 @@ Task duration declaration for gathering.
 
 [Notes](docs/domain/terms.md#gathering-time-requirement)
 
+#### Global Current Condition
+
+The GM-set weather and time of day held in the gathering config's top-level `conditions`.
+A validated change sets the **System Current Condition** of every system whose own values offer the tag.
+
+[Notes](docs/domain/terms.md#global-current-condition)
+
+#### System Current Condition
+
+A crafting system's `current` option id under `systems[systemId].conditions[kind]`.
+The runtime gate, the composed environment's `conditions`, and the player listing's `rich.conditions` all read it.
+
+[Notes](docs/domain/terms.md#system-current-condition)
+
 #### Required Tool Display State
 
 The per-tool, per-actor state shown on the player "Required tools" panel: `present` (actor holds a matching, non-broken item), `damaged` (rendered as "Broken"), or `missing`.
@@ -2037,6 +2051,8 @@ The gathering implementation checkpoints are in [the domain history](docs/domain
 - Startup migration runner with checkpoint and rollback
 - Canonical-write and legacy-read normalization
 - Cleanup of stale runs, learned recipes, and preferences
+- A **writeback leg** is one payload value the startup pass reads, snapshots, change-detects and writes back, in the order of `WRITEBACK_LEGS`, which is a requirement and not an implementation detail; the version bump is not a leg.
+  It is not a **Slot** (an `IngredientGroup`), and not a leg of a persisted map such as the re-key or merge map.
 
 ### 8. Module Integration (Infrastructure)
 

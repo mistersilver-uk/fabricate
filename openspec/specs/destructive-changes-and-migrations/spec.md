@@ -241,7 +241,7 @@ The action's stated purpose and its confirmation prompt must name description re
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
 - Each migration receives a thirteen-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries, componentScope, essenceScope, toolScope, worldScopeRekeyMap, worldEssenceMergeMap }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, `CHARACTER_LIBRARIES`, `COMPONENT_SCOPE`, `ESSENCE_SCOPE`, `TOOL_SCOPE`, `WORLD_SCOPE_REKEY_MAP` and `WORLD_ESSENCE_MERGE_MAP` settings) and returns the transformed payload **or a subset of its keys**.
 - The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, `1.28.0` from seven to eight, `1.30.0` from eight to twelve, and `1.34.0` from twelve to thirteen.
-  Threading a key is FOUR edits, not one — the raw read, the snapshot, the `data` literal and the change detection — and omitting any one of them is SILENT.
+  Threading a setting is one row of `WRITEBACK_LEGS` in `src/migration/migrationWritebackLegs.js`; the runner reads, snapshots, change-detects and writes back every row, in array order, and that order is a requirement.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
@@ -273,7 +273,7 @@ On module initialization (on the primary-GM client):
 2. Filter the migration registry for entries where `migration.version > migrationVersion` using numeric semver comparison.
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
-5. Read all eight current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, and `fabricate.characterLibraries`.
+5. Read all thirteen current settings, listed in writeback-leg order: `fabricate.worldScopeRekeyMap`, `fabricate.worldEssenceMergeMap`, `fabricate.recipes`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`, `fabricate.componentScope`, `fabricate.essenceScope`, `fabricate.toolScope`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`.
 6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
 8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
@@ -284,14 +284,15 @@ On module initialization (on the primary-GM client):
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist each of the twelve settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`, `fabricate.componentScope`, `fabricate.essenceScope`, `fabricate.toolScope`, `fabricate.worldScopeRekeyMap`).
-13. Each of the twelve write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+12. Persist each of the thirteen settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`, `fabricate.componentScope`, `fabricate.essenceScope`, `fabricate.toolScope`, `fabricate.worldScopeRekeyMap`, `fabricate.worldEssenceMergeMap`).
+13. Each of the thirteen write-on-change comparisons is independent, so an unchanged setting is never rewritten.
     Every DESTINATION of a world-scope lift is written BEFORE the `craftingSystems` SOURCE it was lifted from, so a tear between the two legs is recoverable rather than destructive; `currencyConfig`, `travelConfig`, `characterLibraries`, `componentScope`, `essenceScope` and `toolScope` are all written ahead of it.
 
-    **`fabricate.worldScopeRekeyMap` is the ONE leg written ahead of `recipes`**, and therefore ahead of every other leg.
-    It is the `1.30.0` pass's durable DECISION RECORD rather than a migrated setting, so writing it first is what makes a tear at ANY later leg recoverable — including the `craftingSystems`-then-`gatheringConfig` tear, where `craftingSystems` no longer holds the old ids and a re-derived map would answer EMPTY.
+    **`fabricate.worldScopeRekeyMap` and then `fabricate.worldEssenceMergeMap` are the two legs written ahead of `recipes`**, and therefore ahead of every other leg.
+    `worldScopeRekeyMap` is the `1.30.0` pass's durable DECISION RECORD rather than a migrated setting, so writing it first is what makes a tear at ANY later leg recoverable — including the `craftingSystems`-then-`gatheringConfig` tear, where `craftingSystems` no longer holds the old ids and a re-derived map would answer EMPTY.
     Writing it ahead of `recipes` is strictly safer than the ordering constraint the recipes-first rule below records, because it touches neither `recipes` nor `systems`, and a rejection there abandons everything under the same deferral disposition.
-    It carries its OWN containment: it sits outside both shipped `try` blocks, and an escaping rejection out of the async `ready` callback fires no error hook and no notification, leaves the readiness promise unsettled and the module with no managers.
+    `worldEssenceMergeMap` is the second leg (see § Equivalent World Essence Merge (`1.34.0`) requirement 10).
+    Every writeback leg and the version bump carries its own containment, and an escaping rejection out of the async `ready` callback fires no error hook and no notification, leaves the readiness promise unsettled and the module with no managers.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
@@ -361,7 +362,7 @@ Every data-migration GM notice is a concise toast plus a console detail (issue 1
 
 ### Write-on-Change Persistence
 
-- Each of the eight migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`, `travelConfig`, `characterLibraries`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
+- Each of the thirteen migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`, `travelConfig`, `characterLibraries`, `componentScope`, `essenceScope`, `toolScope`, `worldScopeRekeyMap`, `worldEssenceMergeMap`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
 - On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
 - On aborted migration passes, `migrationVersion` is unchanged.
@@ -746,7 +747,7 @@ The `1.26.0` settings-data migration (`src/migration/migrateCurrencyToWorldScope
 10. **Mutated setting keys:** `currencyConfig` (created) and `craftingSystems` (shrunk).
     This is the migration that took the runner's payload from five settings to six; `currencyConfig` is read, snapshotted, passed, change-detected and written back exactly like the five that preceded it.
 11. **The `currencyConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 8's is.
-    Systems are the SOURCE of the lift and `currencyConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Systems are the SOURCE of the lift and `currencyConfig` is the DESTINATION, and a rejected leg abandons every leg after it.
     Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldCurrencyConfig` lifts nothing, and requirement 7's no-churn guard correctly declines to write — so the ladder, strategy, provider and macros are gone with no error and no recoverable copy.
     Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world ladder, requirement 6's guard keeps it, and the shrink it re-applies is idempotent by construction.
 12. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
@@ -798,7 +799,7 @@ The `1.27.0` settings-data migration (`src/migration/migrateTravelToWorldScope.j
 13. **Mutated setting keys:** `travelConfig` (created), `craftingSystems` (shrunk) and `gatheringParties` (overrides collapsed).
     This is the migration that took the runner's payload from six settings to seven; `travelConfig` is read, snapshotted, passed, change-detected and written back exactly like the six that preceded it.
 14. **The `travelConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 11 of `1.26.0` is.
-    Systems are the SOURCE of the lift and `travelConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Systems are the SOURCE of the lift and `travelConfig` is the DESTINATION, and a rejected leg abandons every leg after it.
     Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldTravelConfig` lifts nothing, and requirement 9's no-churn guard correctly declines to write — so the library and every Scene Region link are gone with no error and no recoverable copy.
     Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world library, requirement 8's guard keeps it, and the shrink it re-applies is idempotent by construction.
 15. **Each of those four legs is mutation-checked** — suppressing the payload read, the writeback, the writeback ORDER, or requirement 8's idempotence guard must each turn a test red.
@@ -843,7 +844,7 @@ The `1.28.0` settings-data migration (`src/migration/migrateCharacterLibrariesTo
 9. **Mutated setting keys:** `characterLibraries` (created) and `craftingSystems` (shrunk).
    This is the migration that took the runner's payload from seven settings to eight; `characterLibraries` is read, snapshotted, passed, change-detected and written back exactly like the seven that preceded it, and omitting any one of those four threading points is silent — omit the read and the idempotence guard never sees the GM's edits, omit the snapshot and the setting is written on every boot.
 10. **The `characterLibraries` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 11 of `1.26.0` and requirement 14 of `1.27.0` are.
-    Systems are the SOURCE of the lift and `characterLibraries` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Systems are the SOURCE of the lift and `characterLibraries` is the DESTINATION, and a rejected leg abandons every leg after it.
     Write the source first and a tear between the two destroys both libraries irrecoverably: `migrationVersion` stays behind, the re-run finds systems already stripped, the build lifts nothing, and requirement 5's no-churn guard correctly declines to write — so every prerequisite and every modifier in the world is gone with no error and no recoverable copy.
     Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world library, requirement 5's guard keeps it, and the strip it re-applies is idempotent by construction.
 11. **The pass is NOT what protects an unmigrated client**, and reading it as such is the mistake this requirement exists to foreclose.
