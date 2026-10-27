@@ -131,13 +131,13 @@
   }
 
   .fab-outcome-hint {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     line-height: 1.5;
   }
 
   .fab-outcome-empty {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10px;
   }
 

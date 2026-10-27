@@ -15,6 +15,7 @@ import {
   contrast,
   declaredToken,
   propertiesOf,
+  shortfalls,
   stackGround,
   themePalettes,
 } from '../helpers/themePaletteContrast.js';
@@ -91,6 +92,19 @@ test('the No-colour cell rings in the text ink at 3:1 on its own fill in every t
   const { lowest, short } = measure(ink, [fill]);
   t.diagnostic(`lowest No-colour ring ratio ${lowest.toFixed(2)}:1`);
   assert.deepEqual(short, [], 'a selected No-colour cell would be under WCAG 1.4.11');
+});
+
+test('the No-colour glyph inks secondary and clears 3:1 on its own fill in every theme (issue 2368)', () => {
+  const ink = declaredToken(rulesIn(corpus[PICKER]), '.manager-color-swatch-none', 'color', PICKER);
+  assert.equal(ink, '--fab-text-secondary');
+  const fill = declaredToken(
+    rulesIn(corpus[PICKER]),
+    '.manager-color-swatch-none',
+    'background',
+    PICKER
+  );
+  assert.deepEqual(shortfalls(themes, ink, [fill], 3), []);
+  assert.notDeepEqual(shortfalls(themes, '--fab-text-muted', [fill], 3), [], 'muted falls short');
 });
 
 const CURSOR = '.fabricate-color-picker-popover .manager-color-preset:focus-visible';

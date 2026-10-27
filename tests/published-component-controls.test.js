@@ -1173,6 +1173,10 @@ const SCOPED_RINGS = Object.freeze({
         declarations: [['color', 'var(--fab-text-muted)']],
       },
       {
+        selector: '.fab-stepper-input:not(:focus-visible)::placeholder',
+        declarations: [['color', 'var(--fab-text-muted)']],
+      },
+      {
         selector: '.fab-stepper-input:focus-visible',
         declarations: [
           ['outline', '2px solid var(--fab-accent)'],

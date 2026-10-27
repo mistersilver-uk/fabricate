@@ -451,6 +451,11 @@
     color: var(--fab-text-muted);
   }
 
+  /* The unset placeholder is text: muted clears 4.5:1 where the user-agent grey does not. */
+  .fab-stepper-input:not(:focus-visible)::placeholder {
+    color: var(--fab-text-muted);
+  }
+
   .fab-stepper-input::-webkit-outer-spin-button,
   .fab-stepper-input::-webkit-inner-spin-button {
     appearance: none;

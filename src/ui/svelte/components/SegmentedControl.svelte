@@ -145,7 +145,7 @@
 
   /* `:not(.is-active)` is load-bearing: (0,3,0) against `.is-active`'s (0,2,0). */
   .manager-segmented.is-compact .manager-segment:not(.is-active) {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-weight: 500;
   }
 
@@ -168,7 +168,7 @@
 
   /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
   .manager-segmented.is-field .manager-segment:not(.is-active) {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-weight: 500;
   }
 
@@ -196,7 +196,7 @@
 
   /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
   .manager-segmented.is-inline .manager-segment:not(.is-active) {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-weight: 500;
   }
 
@@ -226,7 +226,7 @@
   /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. The
      weight is restated because `is-inline` and `is-field` set an idle 500 at the same specificity. */
   .manager-segmented.is-tag .manager-segment:not(.is-active) {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-weight: 600;
   }
 
@@ -359,7 +359,7 @@
   }
 
   /* THE CHOSEN SEGMENT'S TALLY, and only the chosen one's. THE IDLE ONE IS DELIBERATELY NOT
-     RESTATED: `.manager-segment-count.is-badge` already declares `--fab-text-subtle`, and a
+     RESTATED: `.manager-segment-count.is-badge` already declares `--fab-text-muted`, and a
      `:not(.is-active)` rule here would out-specify it and pull the idle numeral brighter. */
   .manager-segmented.is-accent-soft .manager-segment.is-active .manager-segment-count {
     color: inherit;
@@ -394,7 +394,7 @@
     font-family: var(--fab-font-mono);
     font-weight: 500;
     font-size: 0.6rem;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
   }
 
   .manager-segment-input:checked ~ .manager-segment-count.is-badge {

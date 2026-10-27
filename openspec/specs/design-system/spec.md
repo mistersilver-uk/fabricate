@@ -70,6 +70,7 @@ Their default absent-snippet forms retain existing geometry and behavior.
 A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
 A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
 The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
+A `ListRow`'s quantity and detail inherit its ink, `--fab-text-muted` at rest and `--fab-text-secondary` on the positive tone's success wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes (issue 2329).
 
 #### Scenario: A player app draws its own selectable control
 
@@ -131,6 +132,7 @@ It localizes only the severity names it builds for a Validation tab, through the
 `SegmentedControl`'s radios share `groupName`, or a name unique to the mounted instance when the caller passes none, so two controls never uncheck each other and the arrow keys move within one control.
 When `onChange` returns, `SegmentedControl` sets each radio's check from `value` inside the same `change`, so a change the caller declines leaves the check on `value`'s segment.
 The `SegmentedControl` segment keeps its own ring, the 2px accent at a 2px offset drawn on the segment around its visually hidden radio, which the `tag` tone turns inward to a -2px offset.
+An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted` on every density and tone, and clear 4.5:1 in all seven themes on its track's ground, or on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` where a tag track paints none (issues 2685 and 2368).
 `SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644).
 
 #### Scenario: A caller's key has no translation
@@ -769,6 +771,7 @@ A caller routes by MEANING and never by matching a tone name to a token name: `m
 `--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
+A component's small text MUST take the first of `--fab-text-muted` and `--fab-text-secondary` that clears 4.5:1 on every flattened ground it is drawn on, in all seven themes (issue 2257 D13).
 `EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
 `tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
@@ -1027,6 +1030,7 @@ A text input carrying a `tabindex` attribute still matches the module ring's `[t
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
 An auto-focused field therefore never draws its placeholder, and that is accepted rather than opted out of: the shared picker's search is named by its trigger and its `aria-label`, and an opt-out would put the caret back over the glyph.
+The `Stepper` input's unset placeholder inks `--fab-text-muted` while the input is not keyboard-focused, and clears 4.5:1 in all seven themes on its soft well over `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` (issue 2358).
 A borderless input inside a box-drawing wrapper MUST stretch to that wrapper's height rather than size to its own text line, because an input exactly one line tall clips the caret an empty field draws.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
@@ -1064,6 +1068,7 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+The No-colour cell's slash inks `--fab-text-secondary` and clears 3:1 against its `--fab-bg-3` ground on all seven themes (issue 2368).
 In the popover the swatch is the content of a square tile of the picker's grid form: the selected tile states its own ground, `--fab-surface-soft`, by the descendant rule the square-tile rule reserves for a caller, so the inset ring is the mark; the cursor and hover are the square tile's own.
 The inline strip's cells keep the states above.
 A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
@@ -1425,6 +1430,7 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
+The manager's `.manager-kicker` inks `--fab-text-muted` and no manager rule restates its colour, which clears 4.5:1 in all seven themes (issue 2298).
 A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
 It inherits the host's face and line height, which a `Kicker` states for itself.
 At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.
@@ -2976,6 +2982,7 @@ It MUST disable a candidate only when it is held but the stage claims it elsewhe
 `SlotTile`'s open face, when its caller supplies no glyph and no art, MUST draw the empty ring `fa-regular fa-circle` at 15px (the face of an unchosen choice slot), never a solid disc, inked `--fab-accent-text` at no less than 3:1 on the tile's ground in every theme (ruling 2026-10-11).
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
+`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, MUST ink `--fab-text-muted`, and an inactive card's numeral MUST ink `--fab-text-secondary`, each clearing 4.5:1 in all seven themes on the ground it is drawn on (issue 2353).
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
 Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
 Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
@@ -2992,6 +2999,7 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 Its band is optional, and a tier with no band MUST draw no band.
 Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
 `OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
+`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note MUST ink `--fab-text-muted` and clear 4.5:1 in all seven themes on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, and the empty-tier text on its tier (issue 2329).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard

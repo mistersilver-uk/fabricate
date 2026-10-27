@@ -477,7 +477,7 @@
       "presetsKey": "FABRICATE.Admin.Manager.Essence.Colour.Presets",
       "noneKey": "FABRICATE.Admin.Manager.Essence.Colour.None"
     },
-    "note": "Wired as `EssenceIdentityTab` wires its colour strip: the No-colour cell first, pressed because the row is `unset`. The No-colour cell's shipped `fa-slash` is `--fab-text-muted`, under 3:1 on bg-3 in ironblood-forge and hearth-herb, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368."
+    "note": "Wired as `EssenceIdentityTab` wires its colour strip: the No-colour cell first, pressed because the row is `unset`. The No-colour cell's fa-slash inks --fab-text-secondary, which clears 3:1 on bg-3 in all seven themes (issue 2368)."
   },
   {
     "spec": "<TintPicker> <Menu>",

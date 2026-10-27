@@ -156,7 +156,7 @@
   .fab-stage-card-note {
     margin: 0;
     padding: 0 var(--fab-space-3);
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
   }
 
@@ -184,7 +184,7 @@
 
   .fab-stage-card.is-inactive .fab-stage-card-number {
     background: var(--fab-surface-active);
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-secondary);
   }
 
   .fab-stage-card-number.is-complete {
@@ -216,13 +216,13 @@
   }
 
   .fab-stage-card-summary {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     overflow-wrap: anywhere;
   }
 
   .fab-stage-card.is-inactive .fab-stage-card-name {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
   }
 
   .fab-stage-card-body,
@@ -255,7 +255,7 @@
     gap: var(--fab-space-2);
     padding-top: var(--fab-space-1);
     border-top: 1px solid var(--fab-border);
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
   }
 

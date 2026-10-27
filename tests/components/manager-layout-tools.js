@@ -871,8 +871,8 @@ test('the Tool rule card eyebrow carries the reference type, not the shared kick
   assert.match(declarations, /text-transform: uppercase/, 'and the reference casing');
   assert.match(
     declarations,
-    /color: var\(--fab-text-subtle\)/,
-    'and inks it `--subtle`, one rung quieter than the muted this shipped with'
+    /color: var\(--fab-text-muted\)/,
+    'and inks it muted, the one ink every manager kicker shares (issue 2298)'
   );
 
   // AND NOTHING RESTATES A SECOND SIZE FOR IT. The eyebrow was 35% oversized for as long as it

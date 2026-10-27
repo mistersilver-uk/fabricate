@@ -1,7 +1,7 @@
 /** The module sheet's seven theme palettes, and WCAG contrast read over them (issues 2047, 2257). */
 import assert from 'node:assert/strict';
 
-import { declarationsIn, splitSelectorList } from './styleBlockScan.js';
+import { declarationsIn, rulesIn, splitSelectorList } from './styleBlockScan.js';
 
 /** One rule's declarations, keyed by property. */
 export const propertiesOf = (rule) =>
@@ -100,3 +100,10 @@ export function shortfalls(themes, ink, stack, floor = 4.5) {
       : [];
   });
 }
+
+/** The grounds a pane's small text sits on: the page rungs a panel is drawn over. */
+export const PANE_GROUNDS = Object.freeze(['--fab-bg-1', '--fab-bg-2', '--fab-surface']);
+
+/** `declaredToken` over the rules of `file` in a style `corpus`, as `(file, selector, property)`. */
+export const tokenReader = (corpus) => (file, selector, property) =>
+  declaredToken(rulesIn(corpus[file]), selector, property, file);

@@ -211,7 +211,7 @@
   }
 
   .manager-color-swatch-none {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-secondary);
     background: var(--fab-bg-3);
     font-size: 0.6rem;
   }
