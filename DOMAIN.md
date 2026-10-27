@@ -794,7 +794,7 @@ A gathering task's choice among `d100`, `straight` and `routed` resolution; `pro
 
 #### Gathering Resolution Mode (system-level economy)
 
-The system-wide default gathering resolution carried on the per-system gathering economy block as `economy.resolutionMode` (valid set `d100 | progressive | routed`, default `d100`), normalized on both the read and persist paths so an absent/invalid/wrong-shape value (including a stray `simple`) falls back to `d100`.
+A system-level compatibility field carried on the per-system gathering economy block as `economy.resolutionMode` (valid set `d100 | progressive | routed`, default `d100`) that no UI edits and the engine never lets override a task's own `resolutionMode`, normalized on both the read and persist paths so an absent/invalid/wrong-shape value (including a stray `simple`) falls back to `d100`.
 
 [Notes](docs/domain/terms.md#gathering-resolution-mode-system-level-economy)
 

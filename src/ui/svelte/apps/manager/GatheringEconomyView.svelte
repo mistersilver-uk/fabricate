@@ -552,8 +552,7 @@
   }
 
   /* Span the full settings grid so the economy reads as one card above the Times-of-day, Weather
-     and Regions panels, with the resolution-mode card and the limitation card stacked at the same
-     gap the cards use internally. */
+     and Regions panels. */
   .manager-gathering-economy {
     grid-column: 1 / -1;
     display: flex;

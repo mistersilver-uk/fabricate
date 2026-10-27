@@ -146,7 +146,7 @@ A merge that fails this rule is not refused outright — a merge commit closing 
 
 Anything else is refused by sha, with its subject, its author, and which rule it failed.
 
-Every unverifiable state — an unreadable evidence file, an API error, a rate limit, a page that may be truncated, an association naming another repository, a range above 200 commits, a `per_page` above the 100 GitHub honours, a git too old for the predicate — exits 2 and refuses, because an absence of evidence is not an absence of unreviewed content.
+Every unverifiable state — an unreadable evidence file, an API error, a rate limit, a page that may be truncated, an association naming another repository, a range above 200 commits, a `per_page` above the 100 GitHub honours, a git too old for the predicate, a blob the resolution checks find recorded but cannot read — exits 2 and refuses, because an absence of evidence is not an absence of unreviewed content.
 `allow_content` does **not** apply to any of them, and the override hint is not printed under them either: there is no established refusal to vouch for, and telling a reader to override a state that established nothing is how an absence of evidence gets accepted as an absence of unreviewed content.
 The first-run failure most likely to reach this branch is the release-bot App installation missing **Pull requests: Read**, which is a 403 and a configuration fault no retry fixes.
 

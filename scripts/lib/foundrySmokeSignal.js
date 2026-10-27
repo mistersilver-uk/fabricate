@@ -93,7 +93,11 @@ export function formatFailedStep(step) {
   return `${step?.step}: ${step?.error || 'failed'}`;
 }
 
-/** Decide the smoke run's terminal throw, mirroring the harness's final block. */
+/**
+ * Decide the smoke run's terminal throw, mirroring the harness's final block. A console-error
+ * outcome carries `errors`, a fresh copy of the captured list the harness may append to without
+ * touching the list it persists (issue 1064).
+ */
 export function evaluateSmokeOutcome(results) {
   const steps = Array.isArray(results?.steps) ? results.steps : [];
   const consoleErrors = Array.isArray(results?.consoleErrors) ? results.consoleErrors : [];
@@ -117,6 +121,7 @@ export function evaluateSmokeOutcome(results) {
       throws: true,
       reason: 'console-errors',
       message: `${consoleErrors.length} runtime console error(s) captured.`,
+      errors: [...consoleErrors],
     };
   }
 
