@@ -359,7 +359,7 @@
   }
 
   /* THE CHOSEN SEGMENT'S TALLY, and only the chosen one's. THE IDLE ONE IS DELIBERATELY NOT
-     RESTATED: `.manager-segment-count.is-badge` already declares `--fab-text-subtle`, and a
+     RESTATED: `.manager-segment-count.is-badge` already declares `--fab-text-muted`, and a
      `:not(.is-active)` rule here would out-specify it and pull the idle numeral brighter. */
   .manager-segmented.is-accent-soft .manager-segment.is-active .manager-segment-count {
     color: inherit;
@@ -394,7 +394,7 @@
     font-family: var(--fab-font-mono);
     font-weight: 500;
     font-size: 0.6rem;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
   }
 
   .manager-segment-input:checked ~ .manager-segment-count.is-badge {

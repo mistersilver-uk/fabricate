@@ -132,7 +132,7 @@ It localizes only the severity names it builds for a Validation tab, through the
 `SegmentedControl`'s radios share `groupName`, or a name unique to the mounted instance when the caller passes none, so two controls never uncheck each other and the arrow keys move within one control.
 When `onChange` returns, `SegmentedControl` sets each radio's check from `value` inside the same `change`, so a change the caller declines leaves the check on `value`'s segment.
 The `SegmentedControl` segment keeps its own ring, the 2px accent at a 2px offset drawn on the segment around its visually hidden radio, which the `tag` tone turns inward to a -2px offset.
-An unselected `SegmentedControl` segment inks `--fab-text-muted` on every density and tone and clears 4.5:1 in all seven themes on the ground its track paints, because `--fab-text-subtle` falls under that floor at these sizes (issues 2685 and 2368).
+An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted` on every density and tone, and clear 4.5:1 in all seven themes on its track's ground, or on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` where a tag track paints none (issues 2685 and 2368).
 `SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644).
 
 #### Scenario: A caller's key has no translation

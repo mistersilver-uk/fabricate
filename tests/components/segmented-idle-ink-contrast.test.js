@@ -1,5 +1,5 @@
 /**
- * Issues 2685 and 2368: an unselected `SegmentedControl` segment inks `--fab-text-muted` on every
+ * Issues 2685 and 2368: an unselected `SegmentedControl` segment and its badge numeral ink `--fab-text-muted` on every
  * rung and tone, and clears 4.5:1 in all seven themes on the ground its track paints, or on the
  * grounds a bare tag track sits on.
  */
@@ -46,4 +46,18 @@ test('the default rung inks muted and clears 4.5:1 on its soft well over each gr
   for (const ground of ['--fab-bg-1', '--fab-bg-2', '--fab-surface']) {
     assert.deepEqual(shortfalls(themes, ink, [well, ground]), [], ground);
   }
+});
+
+test('the idle badge numeral inks muted and clears 4.5:1 on every ground a track paints', () => {
+  const ink = token('.manager-segment-count.is-badge', 'color');
+  assert.equal(ink, '--fab-text-muted');
+  const well = token('.manager-segmented', 'background');
+  for (const ground of ['--fab-bg-1', '--fab-bg-2', '--fab-surface']) {
+    assert.deepEqual(shortfalls(themes, ink, [well, ground]), [], ground);
+    assert.deepEqual(shortfalls(themes, ink, [ground]), [], ground);
+  }
+  assert.deepEqual(
+    shortfalls(themes, ink, [token('.manager-segmented.is-inline', 'background')]),
+    []
+  );
 });
