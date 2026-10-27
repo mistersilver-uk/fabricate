@@ -1377,7 +1377,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1,
       currencyUnits: [{ id: 'kB45g8G7uUeiLATc', label: 'Handfuls' }]
     });
-    const name = root.querySelector('[data-recipe-requirement="currency"] .manager-recipe-flow-name');
+    const name = root.querySelector(':scope [data-recipe-requirement="currency"] .manager-recipe-flow-name');
     assert.equal(name.textContent.trim(), '8 Handfuls');
     inspector.remount();
 
@@ -1385,7 +1385,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const orphan = await inspector.mount({ selectedRecipe: recipe, recipeCount: 1, currencyUnits: [] });
     assert.equal(
       orphan
-        .querySelector('[data-recipe-requirement="currency"] .manager-recipe-flow-name')
+        .querySelector(':scope [data-recipe-requirement="currency"] .manager-recipe-flow-name')
         .textContent.trim(),
       '8 kB45g8G7uUeiLATc'
     );
