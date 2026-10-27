@@ -1681,6 +1681,61 @@ test('no hover in the sheet and every scoped block tints its edge over a rung fi
   );
 });
 
+const HOVER_STATE_EVERYWHERE = new RegExp(HOVER_STATE.source, 'gu');
+const BACKGROUND_FILL = /^background(?:-color)?$/u;
+
+/**
+ * Each in-scope hover item that raises its surface, with the fills its own rest rule takes in the
+ * same file and at-context (`null` when the sheet holds no such rest rule: the item is unpaired).
+ */
+function hoverRaises(corpus) {
+  const fills = declarationsOf(corpus, (property) => BACKGROUND_FILL.test(property))
+    .filter(unmarkedInScope(corpus))
+    .map((d) => ({ ...d, value: normaliseValue(d.value) }));
+  const keyOf = (d, item) => `${d.file}|${d.context}|${oneLine(item.replaceAll(NEGATION, ''))}`;
+  const rests = new Map();
+  const restItems = fills.flatMap((d) =>
+    splitSelectorList(d.selector)
+      .filter((one) => stateOf(one) === null)
+      .map((item) => ({ key: keyOf(d, item), value: d.value }))
+  );
+  for (const { key, value } of restItems) rests.set(key, [...(rests.get(key) ?? []), value]);
+  const raised = fills.filter((d) => d.value === STATE_FILL.hover);
+  return raised.flatMap((d) =>
+    splitSelectorList(d.selector)
+      .filter((item) => stateOf(item) === 'hover')
+      .map((item) => ({
+        d,
+        item,
+        rest: rests.get(keyOf(d, item.replaceAll(HOVER_STATE_EVERYWHERE, ''))) ?? null,
+      }))
+  );
+}
+
+/** A hover that raises to the rung its own rest rule already takes changes nothing under the pointer. */
+const HOVER_RESTATES_GATE = styleGate((corpus) =>
+  hoverRaises(corpus)
+    .filter(({ rest }) => rest?.includes(STATE_FILL.hover))
+    .map(({ d, item }) => declarationSite('hover restates its rest fill', { ...d, selector: item }))
+);
+
+test('no hover raises a surface to the fill its own rest rule already takes', (t) => {
+  const hovers = hoverRaises(treeStyles());
+  const paired = hovers.filter(({ rest }) => rest !== null).length;
+  // Measured on this tree: 73 hover items read and 65 paired with a rest rule; none restates it.
+  assert.ok(hovers.length >= 60, `only ${hovers.length} in-scope hover raises were read`);
+  assert.ok(paired >= 50, `only ${paired} hover raises met a rest rule of their own`);
+  checkGate(
+    t,
+    HOVER_RESTATES_GATE,
+    'A hover raises a surface off its rest fill, so a rest rule already on `--fab-surface-raised` ' +
+      'leaves the pointer nothing to show. Rest takes the `soft` rung, or the hover does not raise. ' +
+      'This reads the hover item against a rest rule in the same file and at-context only, ' +
+      'pairing loosely across differing `:not(...)` groups (rest `.h:not(.x)` raised with hover ' +
+      '`.h:hover` is flagged); a panel with no hover rule at all is held by review.'
+  );
+});
+
 test('each surface check reads every channel a state can tint through', () => {
   const css = [
     ".a[aria-checked='true'] { background: var(--fab-accent-soft); }",
@@ -1768,6 +1823,18 @@ test('a converted select file renders no native <select>, marked or not', () => 
     nativeSelectSites(templatesOf(() => probe, ['src/ui/svelte/Probe.svelte'])).length,
     1,
     'the scan must count a marked native `<select>`, or every file below passes on nothing'
+  );
+  const dynamicProbe = (markup) =>
+    nativeSelectSites(templatesOf(() => markup, ['src/ui/svelte/Probe.svelte'])).length;
+  assert.equal(
+    dynamicProbe('<svelte:element this="select"></svelte:element>'),
+    1,
+    'a static `this="select"` is a native select'
+  );
+  assert.equal(
+    dynamicProbe('<svelte:element this={tag}></svelte:element>'),
+    0,
+    'a tag known only at runtime names no select'
   );
   const { readFile } = workingTree(TEMPLATE_CORPUS);
   for (const file of CONVERTED) {
@@ -2156,9 +2223,10 @@ const cornersOf = (radii, definitions) => [
  * Every in-scope rule pairing a banded size with a corner off its band, and how many paired rules
  * were judged. Read: each `height`, `min-height` and `width` (logical twins too) in px, in rem at
  * Foundry's 16px root or through `var()`; every radius shorthand and longhand. A marker exempts
- * only the radius or size declaration it sits on. Unseen, so the rendered corner audit holds them:
- * a size and a corner split across two rules, an inherited corner, a size set by markup or a
- * prop, and a `calc()` size.
+ * only the radius or size declaration it sits on. Unseen here: a size and a corner split across
+ * two rules, an inherited corner, a size set by markup or a prop, and a `calc()` size. The View Lab
+ * computed census (`scripts/lib/viewLabComputedCensus.js`) judges controls so sized; an unsized
+ * card, panel or well is held by review.
  */
 function offBandCorners({ declarations, definitions, sources }) {
   const rules = new Map();
@@ -2656,6 +2724,52 @@ test('every emitted `data-gap` rung is declared, and each default is written as 
   }
 });
 
+/** The rung rules whose `--<utility>-gap` is not `var(--fab-space-<rung>)`, as `utility=rung`. */
+const rungsOffTheirToken = (rungs) =>
+  rungs
+    .filter(({ rung, value }) => value !== undefined && value !== `var(--fab-space-${rung})`)
+    .map(({ utility, rung }) => gapRungKey(utility, rung));
+
+test('every declared `data-gap` rung takes the spacing token of the same rung', () => {
+  // The default-rung check above pins one rung per utility. This one binds all of them, so
+  // `[data-gap='3']` cannot be re-pointed at `--fab-space-1` and still read as rung 3.
+  const rungs = [];
+  for (const rule of sheetRules()) {
+    for (const member of rule.selectors) {
+      for (const [, utility, rung] of member.matchAll(
+        /\.(fab-[\w-]+)\[data-gap=['"]([^'"]+)['"]\]/gu
+      )) {
+        rungs.push({ utility, rung, value: declarationMap(rule)[`--${utility}-gap`] });
+      }
+    }
+  }
+
+  assert.ok(
+    rungs.length >= 7,
+    `only ${rungs.length} \`data-gap\` rung rules reached this scan, below the 7 the sheet held when ` +
+      'this was written. A selector that stopped matching reads as a clean sheet.'
+  );
+  assert.deepEqual(
+    rungsOffTheirToken(rungs),
+    [],
+    'a rung R must set `--<utility>-gap` to `var(--fab-space-R)`. A rung on another token makes ' +
+      'the attribute name a step that the rule does not take.'
+  );
+  assert.deepEqual(
+    rungs.filter(({ value }) => value === undefined),
+    [],
+    'every rung rule sets its utility’s gap property, or the rung paints the base default.'
+  );
+  assert.deepEqual(
+    rungsOffTheirToken([
+      { utility: 'fab-stack', rung: '3', value: 'var(--fab-space-1)' },
+      { utility: 'fab-stack', rung: '2xs', value: 'var(--fab-space-2xs)' },
+    ]),
+    ['fab-stack=3'],
+    'the check reports a rung on the wrong token and passes a named rung on its own'
+  );
+});
+
 test('each half of the module focus pair is declared exactly once, at the module root', () => {
   for (const { half, compound, declarations } of MODULE_FOCUS_PAIR) {
     const blocks = sheetRules().filter(
@@ -3046,5 +3160,51 @@ test('a reasoned marker at the site exempts it, and an empty one fails', (t) => 
       head: { [PROBE]: probeWith({ markup: [...marked.markup, '<select></select>'] }) },
       failures: [`${PROBE}: native <select> rose from 1 to 2`],
     },
+  ]);
+});
+
+test('the hover-restates gate fails a hover over a raised rest and passes the rest it can raise from', (t) => {
+  const restates = '.fabricate .h:hover | var(--fab-surface-raised)';
+  const failure = `${MODULE_SHEET}: hover restates its rest fill ${restates} is new (1)`;
+  const rule = (selector, fill) => `${selector} { background: var(--fab-surface-${fill}); }`;
+
+  assertGateCases(t, HOVER_RESTATES_GATE, WIRING_BASE, [
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'raised'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [failure],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'soft'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h', 'raised'),
+          `@container (min-width: 1px) { ${rule('.fabricate .h:hover', 'raised')} }`
+        ),
+      },
+      failures: [],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(
+          rule('.fabricate .h:not(.x)', 'raised'),
+          rule('.fabricate .h:hover', 'raised')
+        ),
+      },
+      failures: [failure],
+    },
+    { head: { [MODULE_SHEET]: sheetWith(rule('.fabricate .h:hover', 'raised')) }, failures: [] },
   ]);
 });

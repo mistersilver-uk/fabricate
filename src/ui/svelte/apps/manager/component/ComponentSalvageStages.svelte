@@ -14,6 +14,10 @@
   import Button from '../../../components/Button.svelte';
   // The ordered stage list, shared with the Recipe Studio's progressive stages (issue 2511).
   import ProgressiveStageList from '../ProgressiveStageList.svelte';
+  import {
+    complicationMacroNames,
+    complicationTriggerLabels,
+  } from '../complicationVocabularies.js';
 
   let {
     text,
@@ -37,21 +41,8 @@
 
   // The macro and trigger vocabularies are SYSTEM-scoped, so this view's own lists resolve the
   // referenced component's names too; without them the sentence names nothing a GM recognises.
-  const complicationMacroNames = $derived(
-    new Map(
-      (macroOptions || [])
-        .filter((macro) => macro?.uuid)
-        .map((macro) => [macro.uuid, macro.name || macro.uuid])
-    )
-  );
-
-  const complicationTriggerLabels = $derived(
-    new Map(
-      (complicationTriggerOptions || [])
-        .filter((option) => option?.id)
-        .map((option) => [option.id, option.label || option.id])
-    )
-  );
+  const macroNames = $derived(complicationMacroNames(macroOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
 </script>
 
 <!-- `data-add-salvage-group` rides this button only while there is no backing group,
@@ -118,9 +109,9 @@
       text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
         'Edit difficulty and complications on {name}'
-      ).replace('{name}', componentName(result.componentId))}
-    macroNames={complicationMacroNames}
-    triggerLabels={complicationTriggerLabels}
+      ).replace('{name}', () => componentName(result.componentId))}
+    {macroNames}
+    {triggerLabels}
     adderClass="manager-salvage-stage-add"
     onItemChange={(result, _index, value) => onUpdateResult(stageGroup.id, result, value)}
     onReorder={(from, to) => onMoveStage(from, to)}

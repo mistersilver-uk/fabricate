@@ -17,7 +17,7 @@ import {
   rulesIn,
   styleTextFor,
 } from './styleBlockScan.js';
-import { lineOf, walkElements } from './svelteTemplateScan.js';
+import { elementTag, lineOf, walkElements } from './svelteTemplateScan.js';
 import { copyTempGitRepo, createTempGitRepo } from './temp-git-repo.js';
 
 export const DESIGN_SYSTEM_FAMILY = 'design-system';
@@ -160,7 +160,7 @@ export function nativeSelectSites(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
     walkElements(ast.fragment, (element) => {
-      if (element.type !== 'RegularElement' || element.name.toLowerCase() !== 'select') return;
+      if (elementTag(element) !== 'select') return;
       found.push({ file, line: lineOf(source, element.start) });
     });
   }

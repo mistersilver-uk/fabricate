@@ -16,6 +16,7 @@ import {
   readCraftingDataFallbackCount,
   resetCraftingDataFallbackCount,
 } from '../../src/ui/svelte/util/foundryHooks.js';
+import { FakeForcedDeletion, FakeForcedReplacement } from '../helpers/forcedDeletion.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -323,13 +324,13 @@ describe('subscribeActorRunFlagChange', () => {
     assert.doesNotThrow(() => subscribeActorRunFlagChange(() => {})());
   });
 
-  // Update-operator spellings, and the mirror that must not drift (issue 1654). An update operator
-  // is part of the last path segment, so a write using one arrives under a different key: the
-  // 1.34.0 remap force-replaces each run container, reaching this diff as
-  // `flags.fabricate.fabricate.==craftingRuns`.
+  // Update-operator spellings, and the mirror that must not drift (issue 1654). A V13 update
+  // operator is part of the last path segment, so the 1.34.0 remap's forced replacement reaches
+  // this diff as `flags.fabricate.fabricate.==craftingRuns`; V14 carries an operator value at the
+  // plain path instead (issue 2052).
 
   /** The expanded diff Foundry hands `updateActor` for one flattened update key. */
-  const diffFor = (updateKey) => {
+  const diffFor = (updateKey, value) => {
     const segments = updateKey.split('.');
     const diff = {};
     let node = diff;
@@ -337,14 +338,14 @@ describe('subscribeActorRunFlagChange', () => {
       node[segment] = {};
       node = node[segment];
     }
-    node[segments.at(-1)] = { active: {}, history: [] };
+    node[segments.at(-1)] = value;
     return diff;
   };
 
-  const firesFor = (updateKey) => {
+  const firesFor = (updateKey, value = { active: {}, history: [] }) => {
     let calls = 0;
     const unsubscribe = subscribeActorRunFlagChange(() => (calls += 1));
-    hooks.fire('updateActor', { id: 'a' }, diffFor(updateKey));
+    hooks.fire('updateActor', { id: 'a' }, diffFor(updateKey, value));
     unsubscribe();
     return calls === 1;
   };
@@ -371,6 +372,18 @@ describe('subscribeActorRunFlagChange', () => {
       assert.ok(firesFor(`flags.fabricate.fabricate.${operator}craftingRuns`), 'crafting');
       assert.ok(firesFor(`flags.fabricate.fabricate.${operator}salvageRuns`), 'salvage');
       assert.ok(firesFor(`flags.fabricate.${operator}gatheringRuns`), 'gathering');
+    });
+  }
+
+  for (const [label, operator] of [
+    ['ForcedReplacement', () => FakeForcedReplacement.create({ active: {}, history: [] })],
+    ['ForcedDeletion', () => new FakeForcedDeletion()],
+  ]) {
+    it(`fires for a V14 ${label} value at the plain path, at both flag depths`, () => {
+      assert.ok(firesFor('flags.fabricate.fabricate.craftingRuns', operator()), 'crafting');
+      assert.ok(firesFor('flags.fabricate.fabricate.salvageRuns', operator()), 'salvage');
+      assert.ok(firesFor('flags.fabricate.gatheringRuns', operator()), 'gathering');
+      assert.ok(!firesFor('flags.fabricate.craftingRuns', operator()), 'not at the wrong depth');
     });
   }
 

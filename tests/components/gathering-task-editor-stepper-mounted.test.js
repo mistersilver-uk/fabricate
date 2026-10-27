@@ -60,6 +60,8 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
+    // The result card's stage-list vocabularies (issue 2446).
+    'src/ui/svelte/apps/manager/complicationVocabularies.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',

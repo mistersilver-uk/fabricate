@@ -7,9 +7,10 @@
 
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
-import { describe, it, afterEach, before } from 'node:test';
+import { describe, it, afterEach, before, beforeEach } from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { InteractableManager } from '../../src/canvas/InteractableManager.js';
 import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
 import {
   planSetEnabled,
@@ -121,11 +122,20 @@ describe('InteractableConfigApp shell', () => {
     }
   );
 
-  defineStructureContract('test-as-player runs the activation pipeline with gmTest', seam('testAsPlayer'), {
-    calls: ['_assertGM', '_resolveBehavior', '_controlledActorId'],
-    reads: ['InteractableManager.instance._requestActivation'],
-    property: [['activationSource', 'gmTest']],
+  defineStructureContract('test-as-player is the shell\'s own method', seam('testAsPlayer'), {
+    calls: ['_testAsPlayer'],
   });
+
+  defineStructureContract(
+    'test-as-player runs the activation pipeline with gmTest',
+    { file: APP, member: '_testAsPlayer' },
+    {
+      calls: ['_assertGM', '_resolveBehavior', '_controlledActorId', '_warn'],
+      reads: ['InteractableManager.instance._requestActivation'],
+      property: [['activationSource', 'gmTest']],
+      spells: ['FABRICATE.Canvas.Interactable.Config.TestNeedsToken'],
+    }
+  );
 
   defineStructureContract('jump pans the camera', { file: APP, member: '_panToRegion' }, {
     calls: ['animatePan', '_shapeCenter'],
@@ -477,6 +487,61 @@ describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)',
       'locking writes the behaviour and touches no marker'
     );
     assert.equal(tile.hidden, false);
+  });
+
+  describe('testAsPlayer needs a controlled token that has an actor (issue 1004)', () => {
+    let requests;
+    let warnings;
+    let realRequest;
+
+    beforeEach(() => {
+      requests = [];
+      warnings = [];
+      realRequest = InteractableManager.instance._requestActivation;
+      InteractableManager.instance._requestActivation = (behavior, context) => {
+        requests.push({ behavior, context });
+      };
+      const warn = (message) => {
+        warnings.push(message);
+      };
+      Object.assign(globalThis, { ui: { notifications: { warn } } });
+    });
+
+    afterEach(() => {
+      InteractableManager.instance._requestActivation = realRequest;
+      delete globalThis.ui;
+      delete globalThis.canvas;
+    });
+
+    function testWithControlled(controlled) {
+      const { behavior } = fakeBehaviorGraph({ system: { interactableType: 'tool' } });
+      Object.assign(globalThis, { canvas: { tokens: { controlled } } });
+      const panel = new InteractableConfigApp({
+        ref: { sceneId: 'scn1', regionId: 'reg1', behaviorId: 'beh1' },
+      });
+      panel._buildServices().testAsPlayer();
+      return behavior;
+    }
+
+    for (const [name, controlled] of [
+      ['no token is controlled', []],
+      ['the controlled token has no actor', [{ document: { actor: null, actorId: null } }]],
+    ]) {
+      it(`warns and requests nothing when ${name}`, () => {
+        testWithControlled(controlled);
+        assert.deepEqual(requests, [], 'no activation is requested without an actor to test');
+        assert.deepEqual(warnings, ['FABRICATE.Canvas.Interactable.Config.TestNeedsToken']);
+      });
+    }
+
+    it('requests a gmTest activation for the controlled token\'s actor', () => {
+      const behavior = testWithControlled([{ document: { actor: { id: 'actor-7' } } }]);
+      assert.equal(requests.length, 1);
+      assert.ok(requests[0].behavior === behavior, 'against the panel\'s own behaviour');
+      assert.equal(requests[0].context.actorId, 'actor-7');
+      assert.equal(requests[0].context.activationSource, 'gmTest');
+      assert.deepEqual(warnings, []);
+    });
   });
 });
 

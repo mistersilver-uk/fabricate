@@ -4,7 +4,7 @@
   five-mode status pill, the Produces panel, and the full-width Brew button with a
   last-brew banner. Self-contained + prop-driven: it derives the status/Brew copy
   from `mode` + `targetName` so it can be mounted in isolation and asserts the
-  mode -> status-pill + Brew-disabled binding.
+  mode -> status chip + Brew-disabled binding.
 
   Below the component signature it shows the bench's AGGREGATE ESSENCE readout
   (`benchEssences`) whenever the placed components carry essences. An

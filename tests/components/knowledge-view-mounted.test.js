@@ -681,6 +681,51 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.deepEqual(erased, [['a1', 'r1']]);
   });
 
+  // `$&`, `` $` `` and `$'` are `String.prototype.replace` replacement patterns (issue 1292): a
+  // label built by `replace` would print the placeholder, or the text around it, for each.
+  const DOLLAR_NAME = "Tome $& $` $' end";
+
+  it('names an owned copy whose name carries $ patterns literally in every label', async () => {
+    const target = await harness.mount(
+      makeProps({
+        knowledge: makeKnowledge({
+          characters: [rawCharacter({ ownedCopies: [rawCopy({ name: DOLLAR_NAME })] })],
+        }),
+      })
+    );
+    const deleteButton = () => target.querySelector('[data-arm-token="delete:i1"]');
+    assert.equal(
+      deleteButton().getAttribute('aria-label'),
+      `Delete ${DOLLAR_NAME} from this character`
+    );
+    assert.equal(
+      target.querySelector('[data-knowledge-expend="i1"]').getAttribute('title'),
+      `Spend one use of ${DOLLAR_NAME}`
+    );
+
+    deleteButton().click();
+    await harness.setProps({});
+    assert.equal(
+      deleteButton().getAttribute('aria-label'),
+      `Confirm deleting ${DOLLAR_NAME}. This removes the whole document and cannot be undone.`
+    );
+  });
+
+  it('names a learned recipe whose name carries $ patterns literally in its erase label', async () => {
+    const target = await harness.mount(
+      makeProps({
+        knowledge: makeKnowledge({
+          defaultTab: KNOWLEDGE_TAB_LEARNED_RECIPES,
+          characters: [rawCharacter({ learnedRecipes: [rawLearned({ recipeName: DOLLAR_NAME })] })],
+        }),
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-arm-token="erase:r1"]').getAttribute('aria-label'),
+      `Erase ${DOLLAR_NAME} from this character's memory`
+    );
+  });
+
   // The GM-grant rungs (issue 1289, criterion 16).
   // All six rows sit on ONE character and are read from ONE mount, because the thing
   // under test is a three-way DISCRIMINANT: a per-case mount would prove each arm
@@ -1024,7 +1069,6 @@ describe('KnowledgeLearnedRow untrusted-text contract', () => {
     // `String.prototype.replace` interprets `$&`.
     assert.ok(!/\.replace\(/.test(source), 'no replace-based substitution');
     assert.ok(!/localize\([^)]*,/.test(source), 'no format-based substitution');
-    assert.ok(source.includes('.split(`{${name}}`).join('), 'fill substitutes by split/join');
     assert.ok(
       source.includes('<span data-knowledge-source-name>'),
       'the label is rendered as its own text node between the translated fragments'

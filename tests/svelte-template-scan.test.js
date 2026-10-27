@@ -11,6 +11,7 @@ import {
   UI_TEMPLATE_ROOT,
   attributeNamed,
   attributeText,
+  elementTag,
   lineOf,
   parsedTemplates,
   svelteFiles,
@@ -74,6 +75,57 @@ test('a Component tag is visited, because a rest spread makes it the rendered el
     ['Component FilterBar'],
     'a component tag was not visited, so any attribute it forwards through a rest spread is ' +
       'invisible to every gate built on this walk'
+  );
+});
+
+test('the dynamic tag forms are visited under their own node types', () => {
+  const seen = visited(
+    [
+      '<svelte:element this={tag} class="a" />',
+      '<svelte:component this={Panel} />',
+      '<svelte:self />',
+    ].join('\n')
+  );
+
+  assert.deepEqual(
+    seen.map((element) => element.type),
+    ['SvelteElement', 'SvelteComponent', 'SvelteSelf'],
+    'a dynamic tag form was not visited, so any attribute it carries is invisible to every gate ' +
+      'built on this walk'
+  );
+});
+
+test('elementTag names a static tag and nothing else', () => {
+  const tags = elementsOf(
+    [
+      '<select></select>',
+      '<svelte:element this="select"></svelte:element>',
+      '<svelte:element this={tag}></svelte:element>',
+      "<svelte:element this={'select'}></svelte:element>",
+      '<Select></Select>',
+    ].join('\n')
+  ).map(elementTag);
+
+  assert.deepEqual(
+    tags,
+    ['select', 'select', null, 'select', null],
+    'a static tag reads as its lower-cased name, and a dynamic or component tag reads as null'
+  );
+});
+
+test('a static `this="form"` opens a form and a dynamic `this` does not', () => {
+  const seen = visited(
+    [
+      '<svelte:element this="form"><button id="static"></button></svelte:element>',
+      '<svelte:element this={tag}><button id="dynamic"></button></svelte:element>',
+    ].join('\n')
+  );
+
+  assert.deepEqual(
+    seen.filter((element) => element.name === 'button').map((element) => element.inForm),
+    [true, false],
+    'a static form tag must open a form for its descendants, and a tag known only at runtime ' +
+      'must not'
   );
 });
 

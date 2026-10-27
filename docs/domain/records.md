@@ -404,12 +404,12 @@ Spec reference: openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/
 
 ## Discovered Gathering Realms
 
-Logical shape `{ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } }`, where `source` is one of `manual` | `partyToken` | `import` | `api` (the `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are kept verbatim).
+Logical shape `{ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } }` (world-wide since issue 1282), where `source` is one of `manual` | `partyToken` | `import` | `api` (the `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are kept verbatim).
 Discovery follows the character across party changes.
-**SHIPPED:** the flag helpers and GM reveal/hide mutators (writes validate the realm belongs to the referenced system); reads never throw on stale `partyId`, and reads accept the legacy `discoveredGatheringRegions` flag as a fallback while every write persists only `discoveredGatheringRealms`.
+**SHIPPED:** the flag helpers and GM reveal/hide mutators (writes validate the realm exists in the world realm library); reads never throw on stale `partyId`, and reads accept the legacy `discoveredGatheringRegions` flag as a fallback while every write force-replaces the whole `discoveredGatheringRealms` map and force-deletes a present legacy key.
 Player-facing discovery controls and `partyToken` auto-discovery are later-phase follow-ups.
 
-Canonical mapping: `discoveredGatheringRealms`; `revealGatheringRealm`/`hideGatheringRealm`/`getDiscoveredRealmIdsForSystem` in `src/systems/gatheringRealmDiscovery.js`; `src/config/flags.js`
+Canonical mapping: `discoveredGatheringRealms`; `revealGatheringRealm`/`hideGatheringRealm`/`getDiscoveredRealmIds` in `src/systems/gatheringRealmDiscovery.js`; `src/config/flags.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 

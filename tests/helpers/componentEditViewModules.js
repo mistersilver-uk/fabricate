@@ -31,6 +31,8 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
+  // The salvage stage list's macro and trigger vocabularies (issue 2446).
+  'src/ui/svelte/apps/manager/complicationVocabularies.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
   // (issue 1050); the tree reaches it through the salvage check override's custom field.
   'src/ui/svelte/components/stepperLabels.js',

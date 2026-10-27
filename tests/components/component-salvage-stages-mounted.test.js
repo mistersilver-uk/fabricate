@@ -101,6 +101,16 @@ describe('ComponentSalvageStages', () => {
     harness.remount();
   });
 
+  it('names the row Edit link literally for a component whose name carries $ patterns (issue 1292)', async () => {
+    const name = "Dust $& $` $' end";
+    const { target } = await mountWith({ componentName: (id) => (id === 'cmp-dust' ? name : '') });
+    assert.equal(
+      stage(target, 2).querySelector('[data-salvage-result-edit]').getAttribute('aria-label'),
+      `Edit difficulty and complications on ${name}`
+    );
+    harness.remount();
+  });
+
   // GUARD: red when the yield's macro names are not passed to the list.
   it('GUARD: the list’s trigger sentence names the macro the complication runs', async () => {
     const [scrap, dust] = COMPONENTS;

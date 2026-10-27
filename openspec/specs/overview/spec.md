@@ -159,7 +159,7 @@ User (per user, per world):
 - `flags.fabricate.gatheringRuns.active` for in-progress time-gated gathering runs
 - `flags.fabricate.gatheringRuns.history` for completed/failed/cancelled gathering run history
 - `flags.fabricate.learnedRecipes` for learned recipe records
-- `flags.fabricate.discoveredGatheringRealms` for actor-scoped gathering realm discovery (keyed by system then realm)
+- `flags.fabricate.discoveredGatheringRealms` for actor-scoped gathering realm discovery (keyed by realm)
 
 Clean-up semantics for stale runs/learned records are defined in `destructive-changes-and-migrations/spec.md`.
 

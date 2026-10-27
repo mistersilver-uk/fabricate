@@ -539,12 +539,12 @@
                 ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.ToggleNamed',
                   'Toggle {name}'
-                ).replace('{name}', eventName(event))}
-                onclick={(event) => {
-                  event.stopPropagation();
+                ).replace('{name}', () => eventName(event))}
+                onclick={(domEvent) => {
+                  domEvent.stopPropagation();
                   onToggleEventEnabled(selectedSystemId, event.id, event.enabled === false);
                 }}
-                onkeydown={(event) => event.stopPropagation()}
+                onkeydown={(domEvent) => domEvent.stopPropagation()}
               />
             </span>
             <span
@@ -555,7 +555,7 @@
                 ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.EditNamed',
                   'Edit {name}'
-                ).replace('{name}', eventName(event))}
+                ).replace('{name}', () => eventName(event))}
                 onclick={() => onEditEvent(event.id)}
                 icon="fas fa-edit"
               />
@@ -571,7 +571,7 @@
                 ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
                   'Gathering event actions for {name}'
-                ).replace('{name}', eventName(event))}
+                ).replace('{name}', () => eventName(event))}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
                   else if (action === 'delete') onDeleteEvent(selectedSystemId, event.id);

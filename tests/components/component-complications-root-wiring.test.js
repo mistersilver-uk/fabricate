@@ -17,14 +17,16 @@ const editorSource = readFileSync(
   'utf8'
 );
 
-/** The `<ComponentEditView … />` element, so a prop is proved AT ITS CALL SITE. */
-function componentEditViewCall() {
-  const start = rootSource.indexOf('<ComponentEditView');
-  assert.ok(start !== -1, 'the root still renders ComponentEditView');
+/** The `<tag … />` element the root renders, so a prop is proved AT ITS CALL SITE. */
+function elementCall(tag) {
+  const start = rootSource.indexOf(`<${tag}`);
+  assert.ok(start !== -1, `the root still renders ${tag}`);
   const end = rootSource.indexOf('/>', start);
   assert.ok(end > start, 'the element is still self-closing');
   return rootSource.slice(start, end);
 }
+
+const componentEditViewCall = () => elementCall('ComponentEditView');
 
 describe('1286 the manager root wires the complications section', () => {
   it('passes the whole progressive-activity bag, not just the salvage axis it could derive', () => {
@@ -69,14 +71,17 @@ describe('1286 the manager root wires the complications section', () => {
     assert.match(rootSource, /activity,\s*\n\s*label: complicationTriggerPhrase\(/);
   });
 
-  it('passes the EXISTING script-macro projection rather than minting a second one', () => {
-    assert.match(componentEditViewCall(), /macroOptions=\{complicationMacroOptions\}/);
-    assert.match(
-      rootSource,
-      /const complicationMacroOptions = \$derived\(\s*selectedSystem\?\.availableScriptMacros \|\| \[\]\s*\)/,
-      'the store already publishes this list script-filtered and name-sorted; two lists ' +
-        'would disagree the first time either filter moved'
-    );
+  it('passes the existing script-macro projection to both studios rather than minting a second one', () => {
+    // Both studios name a stage complication's macro and trigger from these lists (issue 2446).
+    for (const call of [componentEditViewCall(), elementCall('RecipeEditView')]) {
+      assert.match(
+        call,
+        /macroOptions=\{selectedSystem\?\.availableScriptMacros \|\| \[\]\}/,
+        'the store already publishes this list script-filtered and name-sorted; two lists ' +
+          'would disagree the first time either filter moved'
+      );
+      assert.match(call, /\{complicationTriggerOptions\}/);
+    }
   });
 
   it('carries updates.complications through the save path to the store', () => {

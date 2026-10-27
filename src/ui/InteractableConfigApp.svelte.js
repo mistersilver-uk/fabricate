@@ -248,17 +248,7 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
       },
 
       // --- Action seams (each owns its live edge) ---------------------------
-      testAsPlayer: () => {
-        if (!this._assertGM()) return undefined;
-        const behavior = this._resolveBehavior();
-        if (!behavior) return undefined;
-        const actorId = this._controlledActorId();
-        return InteractableManager.instance?._requestActivation?.(behavior, {
-          actorId,
-          userId: globalThis.game?.user?.id ?? null,
-          activationSource: 'gmTest'
-        });
-      },
+      testAsPlayer: () => this._testAsPlayer(),
       jumpToRegion: () => this._panToRegion(),
       jumpToVisual: () => this._panToVisual(),
       // Generic "Relink selected" — relinks to a controlled Tile OR Drawing OR
@@ -574,6 +564,22 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
       if (doc) return doc;
     }
     return null;
+  }
+
+  /** Request a `gmTest` activation as the controlled token's actor; with no actor, warn and request nothing. */
+  _testAsPlayer() {
+    const behavior = this._assertGM() ? this._resolveBehavior() : null;
+    if (!behavior) return undefined;
+    const actorId = this._controlledActorId();
+    if (actorId) {
+      return InteractableManager.instance?._requestActivation?.(behavior, {
+        actorId,
+        userId: globalThis.game?.user?.id ?? null,
+        activationSource: 'gmTest'
+      });
+    }
+    this._warn('FABRICATE.Canvas.Interactable.Config.TestNeedsToken');
+    return undefined;
   }
 
   _controlledActorId() {

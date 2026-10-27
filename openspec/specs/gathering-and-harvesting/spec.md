@@ -449,15 +449,15 @@ Known destinations are disclosed safely; secret/undiscovered destinations are su
 
 ### Actor Realm Discovery
 
-Realm discovery is tracked on actor flags under the module flag namespace via the bare key `discoveredGatheringRealms`, with logical shape `{ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } }` where `source` is one of `manual` | `partyToken` | `import` | `api`.
+Realm discovery is tracked on actor flags under the module flag namespace via the bare key `discoveredGatheringRealms`, with logical shape `{ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } }` (world-wide since issue 1282) where `source` is one of `manual` | `partyToken` | `import` | `api`.
 The `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are not renamed.
 
 #### Requirements
 
 1. Discovery is actor-scoped so realm knowledge follows the character across party changes.
-2. Discovery writes must validate that the realm belongs to the referenced crafting system; reads never throw on stale `partyId` references.
+2. Discovery writes must validate that the realm exists in the world realm library; reads never throw on stale `partyId` references.
 3. GM reveal/hide mutators add or remove discovery entries. `partyToken` auto-discovery and player-facing discovery controls are later-phase follow-ups.
-4. Because this is an actor flag (not a world setting), it is not rewritten by the `1.1.0` migration runner: reads accept the legacy `discoveredGatheringRegions` flag as a fallback and writes persist only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
+4. Because this is an actor flag (not a world setting), it is not rewritten by the `1.1.0` migration runner: reads accept the legacy `discoveredGatheringRegions` flag as a fallback, and writes persist only the new `discoveredGatheringRealms` key by forced replacement of the whole flat map, force-deleting a present legacy key in the same update, upgrading each actor lazily (see `data-models`).
 
 ### Reserved Records (Not Yet Applied)
 
@@ -2070,7 +2070,7 @@ That redaction applies to what is written as well as to what is read: a persiste
 3a.
 Fabricate exposes location-aware gathering APIs: `getPartyStore()`, `getRealmStore()`, and `getLocationService()` (support seams); the player-callable `getLocationForActor({ actorId | actor, systemId })` returning a redaction-safe current-realm summary; and the GM-only mutators `setPartyRealmOverride({ partyId, systemId, realmIds })`, `clearPartyRealmOverride({ partyId, systemId })`, `revealRealmForActor({ actor | actorId, systemId, realmId, source?, partyId? })`, and `hideRealmForActor({ actor | actorId, systemId, realmId })`.
 The old `*Region*` helper names (`getRegionStore`, `setPartyRegionOverride`, `clearPartyRegionOverride`, `revealRegionForActor`, `hideRegionForActor`) are retained as deprecated delegates that warn once and forward. `getLocationForActor` returns raw realm ids only to GM viewers and routes every realm label through the disclosure-safe model.
-The GM mutators reject non-GM callers, and `revealRealmForActor` validates the realm belongs to the referenced crafting system before writing.
+The GM mutators reject non-GM callers, and `revealRealmForActor` validates that the realm exists in the world realm library before writing; `systemId` only gates whether realms are enabled for that system.
 3b.
 Fabricate exposes a **player-safe selectable-actor listing API** for the unified-window Actor selection bar.
 For the calling user it returns the **player-character** actors — the actor type(s) a system designates as player characters — that the user owns (non-GM) or all such actors (GM), as redaction-safe display records of the form `{ id, uuid, name, img }` and no other actor internals. "Player character" is a CONCEPT whose actor-type set is GM-configurable per world through the predicate `isPlayerCharacterActor`: `'character'` always counts, and a GM may add further actor types the active game system declares (`resolvePlayerCharacterTypes()`) through a settings-menu picker.

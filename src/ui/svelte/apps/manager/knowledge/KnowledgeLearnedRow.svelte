@@ -14,6 +14,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { fill } from '../../../../../utils/fillPlaceholders.js';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
@@ -45,15 +46,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  // `split`/`join`, never `replace`, which interprets `$&`, `` $` ``, `$'` and `$1` in the
-  // REPLACEMENT — a value carrying one would rewrite the sentence instead of appearing in it.
-  function fill(value, data) {
-    return Object.entries(data).reduce(
-      (result, [name, replacement]) => result.split(`{${name}}`).join(String(replacement)),
-      value
-    );
   }
 
   // A sentence split around its one placeholder, so the value renders as its OWN text node. A

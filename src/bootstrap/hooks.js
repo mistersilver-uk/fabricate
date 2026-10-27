@@ -86,6 +86,15 @@ function describeStackQuantityProbe(report) {
   return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
 }
 
+// Console-only: `ui.notifications` does not exist at `init`. The `ready` backstop retries and warns
+// again if the failure persists.
+function warnSheetRegistrationFailed(error) {
+  console.warn(
+    "Fabricate | Interactable config sheet registration failed; Foundry's default sheet stays in use",
+    error
+  );
+}
+
 // The CONFIG entries. Idempotent, so safe from both `init` and the `ready` backstop.
 function registerFabricateConfig() {
   // A no-op when the Foundry region APIs are unavailable.
@@ -114,10 +123,14 @@ function registerFabricateConfig() {
         registrar: DocumentSheetConfig,
         RegionBehavior,
         SheetClass: RegionBehaviorConfig,
+        onError: warnSheetRegistrationFailed,
       });
+    } else if (RegionBehavior && DocumentSheetConfig) {
+      warnSheetRegistrationFailed(new Error('RegionBehaviorConfig is unavailable'));
     }
-  } catch {
+  } catch (error) {
     // A sheet-registration shape mismatch must not break init.
+    warnSheetRegistrationFailed(error);
   }
 }
 

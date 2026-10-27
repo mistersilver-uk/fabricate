@@ -44,6 +44,11 @@ import {
 
 import { CANVAS_APPS } from '../scripts/lib/view-lab-cases/caseConstants.js';
 import { chooseSelectOption } from '../scripts/lib/view-lab-cases/caseFactories.js';
+import {
+  CLICK_MODIFIERS as RUNNER_CLICK_MODIFIERS,
+  MODIFIER_INCOMPATIBLE_VERBS as RUNNER_MODIFIER_INCOMPATIBLE_VERBS,
+  PRESS_KEYS as RUNNER_PRESS_KEYS,
+} from '../scripts/lib/viewLabSteps.js';
 import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
@@ -175,7 +180,7 @@ const sourceFiles = Object.keys(sourceCorpus);
  */
 const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const DRIVER_HOOKS = [
-  RAIL_BUTTON_CLASS, // `runSteps` clicks every rail label through this — 1 file
+  RAIL_BUTTON_CLASS, // `runCaseSteps` clicks every rail label through this — 1 file
   'data-manager-view', // the attribute the `expectView` probe reads — 1 file
   'fabricate-app-shell', // the player readiness root — 1 file
   'data-active-tab', // the attribute `expectTab` reads — 1 file
@@ -270,8 +275,8 @@ function navDeclarationScope(sources, template) {
 }
 
 /**
- * The step keys `runSteps` dispatches on. Hoisted out of the step test so the drift check below can
- * compare them against the runner's own lists.
+ * The step keys `runCaseSteps` dispatches on. Hoisted out of the step test so the drift check
+ * below can compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
 const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
@@ -2314,7 +2319,10 @@ test('the two alert frames assert their alert is inside the box that clips it', 
   // that cannot fail, which is the same defect one level down.
   const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
   assert.match(driver, /expectContained: viewCase\.expectContained \?\? \[\]/);
-  assert.match(driver, /for \(const expectation of expectContained\)/);
+  assert.match(
+    driver,
+    /for \(const expectation of expectContained\) await assertContained\(page, expectation, label\);/
+  );
 });
 
 test('resource-node interval evidence reaches over-time controls at both required window sizes', () => {
@@ -2547,28 +2555,21 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
 });
 
 test('the modifier vocabulary this file enforces is the one the capture driver enforces', () => {
-  // The pairing rule and the modifier names are checked twice: statically above, and in `runSteps`
-  // at capture time.
-  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
-  const declaredArray = (name) => {
-    const match = new RegExp(String.raw`const ${name} = \[([^\]]*)]`).exec(driver);
-    assert.ok(match, `\`scripts/view-lab-screenshots.mjs\` no longer declares \`${name}\``);
-    return [...match[1].matchAll(/'([^']+)'/g)].map(([, entry]) => entry).sort();
-  };
-
+  // The pairing rule and the modifier names are checked twice: statically above, and in
+  // `runCaseSteps` at capture time.
   assert.deepEqual(
-    declaredArray('CLICK_MODIFIERS'),
-    [...CLICK_MODIFIERS].sort(),
+    [...RUNNER_CLICK_MODIFIERS].sort(byCodePoint),
+    [...CLICK_MODIFIERS].sort(byCodePoint),
     'the driver accepts a different set of click modifiers than this file admits'
   );
   assert.deepEqual(
-    declaredArray('MODIFIER_INCOMPATIBLE_VERBS'),
-    [...VERBS].sort(),
+    [...RUNNER_MODIFIER_INCOMPATIBLE_VERBS].sort(byCodePoint),
+    [...VERBS].sort(byCodePoint),
     'the driver refuses to pair `modifiers` with a different set of verbs than this file knows'
   );
   assert.deepEqual(
-    declaredArray('PRESS_KEYS'),
-    [...PRESS_KEYS].sort(),
+    [...RUNNER_PRESS_KEYS].sort(byCodePoint),
+    [...PRESS_KEYS].sort(byCodePoint),
     'the driver accepts a different press-key vocabulary than this file admits'
   );
 });
@@ -3190,6 +3191,7 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'expectVisible: viewCase.expectVisible ?? null',
     'expectContained: viewCase.expectContained ?? []',
     'expectCenterHit: viewCase.expectCenterHit ?? null',
+    'await assertCentreHit(page, selector, label)',
     'expectClick: viewCase.expectClick ?? null',
     'expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null',
     'expectOverflowY: viewCase.expectOverflowY ?? null',
@@ -4402,6 +4404,8 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
+    'scripts/lib/viewLabSteps.js',
+    'scripts/lib/viewLabClaims.js',
     'scripts/lib/viewLabRenderPool.js',
     'scripts/lib/viewLabShards.js',
     'scripts/lib/viewLabComputedCensus.js',

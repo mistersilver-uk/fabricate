@@ -5,7 +5,11 @@
  * exclusion and the dotted-`systemId` guard. NO KEY IS EVER REMOVED HERE.
  */
 
-import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  forcedReplacementEntry,
+  isSafeFlagKeySegment,
+} from '../config/flags.js';
 import { composeFindingsNotice } from '../migration/migrationNoticeDetail.js';
 import { compareSemver } from '../migration/MigrationRunner.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
@@ -514,14 +518,17 @@ export function remapEssenceRunContainer(container, legs) {
 }
 
 /**
- * The forced-replacement update path, spelled once. `==` on the last segment is Foundry's
- * replace-wholesale prefix across the declared `minimum: 13` / `verified: 14` band, not an operator.
+ * The `1.34.0` remap's write seams at both flag depths, each one update built by
+ * `forcedReplacementEntry` (V13 `==<key>`, V14 the operator at the bare key). A write that did
+ * not throw counts as landed; the overstatement reaches no gate.
  */
-export function forcedReplacementFlagPath(key, { bare = false } = {}) {
-  const scope = bare
-    ? FABRICATE_FLAG_NAMESPACE
-    : `${FABRICATE_FLAG_NAMESPACE}.${FABRICATE_FLAG_NAMESPACE}`;
-  return `flags.${scope}.==${key}`;
+export function forcedReplacementFlagWriters() {
+  const writer = (parentPath) => (document, key, value) =>
+    document?.update?.(Object.fromEntries([forcedReplacementEntry(parentPath, key, value)]));
+  return {
+    replaceFabricateFlag: writer(`flags.${FABRICATE_FLAG_NAMESPACE}.${FABRICATE_FLAG_NAMESPACE}`),
+    replaceBareFlag: writer(`flags.${FABRICATE_FLAG_NAMESPACE}`),
+  };
 }
 
 /** Apply the item-override arm to one owned Item. */
