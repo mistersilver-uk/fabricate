@@ -91,10 +91,11 @@ function resolveTextFixture(source, state, field) {
  * @param {object[]|Function} [fixture.runs] The `workflow_runs` array per poll.
  * @param {string|Function} [fixture.body] The live body per read.
  * @param {string|Function} [fixture.headOid] The live head SHA.
+ * @param {string} [fixture.headOidFails] When set, the head read fails with this text as its stderr.
  * @returns {{runGh: Function, calls: string[][], state: {runListCalls: number, bodyReads: number}}}
  * The runner, its call log, and its counters.
  */
-export function makeGhFake({ runs = [], body = '', headOid = '' } = {}) {
+export function makeGhFake({ runs = [], body = '', headOid = '', headOidFails } = {}) {
   const calls = [];
   const state = { runListCalls: 0, bodyReads: 0 };
   const ok = (stdout) => ({ status: 0, stdout, stderr: '' });
@@ -106,7 +107,10 @@ export function makeGhFake({ runs = [], body = '', headOid = '' } = {}) {
       state.runListCalls += 1;
       return ok(JSON.stringify({ total_count: workflowRuns.length, workflow_runs: workflowRuns }));
     }
-    if (args.includes('headRefOid')) return ok(resolveTextFixture(headOid, state, 'headOid'));
+    if (args.includes('headRefOid')) {
+      if (headOidFails !== undefined) return { status: 1, stdout: '', stderr: headOidFails };
+      return ok(resolveTextFixture(headOid, state, 'headOid'));
+    }
     if (args.includes('body')) {
       const value = resolveTextFixture(body, state, 'body');
       state.bodyReads += 1;
