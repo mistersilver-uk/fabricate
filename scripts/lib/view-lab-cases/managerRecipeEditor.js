@@ -1605,6 +1605,23 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: [...GROUP_SOURCES],
   }),
+  // A result listed twice under one id, which save refuses: the Validation tab blocks on it.
+  managerCase({
+    id: 'manager-recipe-edit-validation-duplicate-result',
+    label: 'Manager — Recipe edit validation, a result id repeated in a set',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-duplicate' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+      { selector: '#recipe-tab-validation' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: '[data-recipe-tab="validation"] [data-issue="resultDuplicate"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
   // A failed check's reserved set holds a choice group on the same terms as any other set.
   managerCase({
     id: 'manager-recipe-edit-results-group-failure-role',

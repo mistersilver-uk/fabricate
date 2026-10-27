@@ -13,6 +13,10 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
+/** The store module whose errors the task editor's blocking Validation rows read. */
+const TASK_RESULT_VALIDATION_PATTERN =
+  /^src\/ui\/svelte\/stores\/adminGatheringResultValidation\.js$/;
+
 /**
  * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
  * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
@@ -287,6 +291,7 @@ export const CASES = Object.freeze([
   ...[
     ['validation', {}, [], 'pass', null],
     ['validation-warnings', { gatheringTaskMode: 'reward-rule' }, [], 'warn', null],
+    ['validation-duplicate-result', { gatheringTaskMode: 'straight-duplicate' }, [], 'block', null],
     ['validation-blocking', { gatheringTaskMode: 'routed-unmatched' }, BLANK_NAME, 'block', null],
     [
       'validation-narrow',
@@ -308,7 +313,11 @@ export const CASES = Object.freeze([
       expectSelector: `.fabricate-manager[data-gathering-task-layout="full"] [data-gathering-task-panel="validation"] [data-editor-validation-summary="${verdict}"]`,
       expectCenterHit: '[data-gathering-task-tab="validation"]',
       kinds: ['manager', 'environments'],
-      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        GATHERING_TASK_EDITOR_PATTERN,
+        TASK_RESULT_VALIDATION_PATTERN,
+      ],
     })
   ),
   ...[
