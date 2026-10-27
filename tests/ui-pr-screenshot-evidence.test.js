@@ -25,6 +25,7 @@ import {
   SMOKE_SOURCE_SEGMENTS,
   withinOneModule,
 } from './helpers/interactablesSmokeLocators.js';
+import { alternativesOf } from './helpers/patternAlternatives.js';
 
 import {
   buildScreenshotMarkdown,
@@ -52,6 +53,8 @@ import {
 // `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while `tests/**` duplication
 // counts against the new-code gate.
 import {
+  BLOCK_END,
+  BLOCK_START,
   captureConsole,
   gateCheckArgv,
   makeGateClock,
@@ -2040,6 +2043,22 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
+  it('keeps every recipe match pattern, and each of its alternatives, pointed at a tracked file', () => {
+    const tracked = spawnSync('git', ['ls-files'], { encoding: 'utf8' })
+      .stdout.split(/\r?\n/)
+      .map(line => line.replaceAll('\\', '/'))
+      .filter(Boolean);
+    const strands = regex => tracked.every(file => !regex.test(file));
+    const expansions = VIEW_RECIPES.flatMap(recipe => recipe.matches.flatMap(pattern => alternativesOf(pattern)));
+    assert.ok(expansions.length > 100, `only ${expansions.length} expansions; the guard is near-vacuous`);
+    const stranded = VIEW_RECIPES.flatMap(recipe =>
+      recipe.matches.flatMap(pattern =>
+        [pattern, ...alternativesOf(pattern)].filter(strands).map(regex => `${recipe.id}: ${pattern} → ${regex}`),
+      ),
+    );
+    assert.deepEqual(stranded, [], 'point each at the current path of its file, or remove it');
+  });
+
   it('keeps every recipe smoke label backed by a real smoke-harness screenshot', () => {
     const emitted = new Set();
     // Per MODULE, never over the concatenation: a lazy `[\s\S]*?` would otherwise run out of one
@@ -2251,6 +2270,113 @@ describe('UI PR screenshot evidence', () => {
     assert.match(second, /assets\/bbbbbbbb/);
     assert.doesNotMatch(second, /assets\/aaaaaaaa/);
     assert.match(second, /Body text\./);
+  });
+
+  describe('one managed block per body (issue 1174)', () => {
+    const frame = (tag) => `![pr-1 ${tag}](https://cdn.example.test/${tag}.png)`;
+    const blockOf = (tag) => `${BLOCK_START}\n## Screenshots\n\n${frame(tag)}\n${BLOCK_END}`;
+    const countOf = (text, marker) => text.split(marker).length - 1;
+
+    it('publishes in place below a stray end marker, however many times', () => {
+      const body = `## Description\n\nIntro.\n\n${BLOCK_END}\n\n## Testing\n\nRan.`;
+      const twice = upsertScreenshotsBlock(upsertScreenshotsBlock(body, frame('head-a')), frame('head-b'));
+      assert.equal(countOf(twice, BLOCK_START), 1, twice);
+      assert.equal(twice, `${body}\n\n${blockOf('head-b')}\n`);
+    });
+
+    it('replaces the first block and deletes later ones, keeping the text between them', () => {
+      const body = `Intro.\n\n${blockOf('a')}\n\nBetween.\n\n${blockOf('b')}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `Intro.\n\n${blockOf('c')}\n\nBetween.\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('leaves everything below the block alone when a stray end marker sits further down', () => {
+      const below = `## Testing\n\nRan.\n\n${BLOCK_END}\n\n## Screenshots\n\n${frame('by-hand')}\n`;
+      assert.equal(
+        upsertScreenshotsBlock(`Intro.\n\n${blockOf('a')}\n\n${below}`, frame('c')),
+        `Intro.\n\n${blockOf('c')}\n\n${below}`
+      );
+    });
+
+    it('deletes an unterminated block that follows a complete one', () => {
+      const body = `${blockOf('a')}\n\n${BLOCK_START}\n## Screenshots\n\n${frame('b')}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `${blockOf('c')}\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('closes a block only at an end marker before the next start marker', () => {
+      const body =
+        `${BLOCK_START}\n## Screenshots\n\n${frame('a')}\n\n## Notes\n\nKept.\n\n${blockOf('b')}\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('c')),
+        `${blockOf('c')}\n\n## Notes\n\nKept.\n`
+      );
+    });
+
+    it('stops an unterminated block at the next start marker', () => {
+      const body = `${BLOCK_START}\n## Screenshots\n\n${frame('a')}\n\n${BLOCK_START}\n${frame('b')}\n${BLOCK_END}\n\nKept.\n`;
+      assert.equal(upsertScreenshotsBlock(body, frame('c')), `${blockOf('c')}\n\nKept.\n`);
+    });
+
+    it('finds the block past a fence it cannot mistake for one GitHub never draws', () => {
+      const later = '\n\n```\nlater\n```\n';
+      for (const [before, after] of [
+        ['1. Run:\n2. ```bash\n   npm test\n   ```\n\n', later],
+        ['```js\nnever closed\n\n', '\n'],
+        ['```inline``` prose opens no fence.\n\n', later],
+      ]) {
+        assert.equal(
+          upsertScreenshotsBlock(`${before}${blockOf('a')}${after}`, frame('c')),
+          `${before}${blockOf('c')}${after}`,
+          before
+        );
+      }
+    });
+
+    it('replaces an unterminated block up to the next top-level heading, keeping what follows', () => {
+      const body =
+        `Intro.\n\n${BLOCK_START}\n## Screenshots\n\n${frame('stale')}\n\n### Library\n\n` +
+        `${frame('stale-library')}\n\n## Notes\n\nKept.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `Intro.\n\n${blockOf('fresh')}\n\n## Notes\n\nKept.\n`
+      );
+    });
+
+    it('replaces an unterminated block that runs to the end of the body', () => {
+      const body = `Intro.\n\n${BLOCK_START}\n## Screenshots\n\n${frame('stale')}\n`;
+      assert.equal(upsertScreenshotsBlock(body, frame('fresh')), `Intro.\n\n${blockOf('fresh')}\n`);
+    });
+
+    it('takes only the start line of an unterminated block no Screenshots heading follows', () => {
+      const body = `${BLOCK_START}\n\n## Testing\n\nRan.\n`;
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `${blockOf('fresh')}\n\n## Testing\n\nRan.\n`
+      );
+    });
+
+    it('recognises a marker only on a line of its own, outside a code fence', () => {
+      const inline = `Mentions \`${BLOCK_START}\` and \`${BLOCK_END}\` inline.`;
+      const fenced = ['```md', BLOCK_START, BLOCK_END, '```'].join('\n');
+      const tildeFenced = ['~~~~', BLOCK_START, '~~~', BLOCK_END, '~~~~'].join('\n');
+      for (const body of [inline, fenced, tildeFenced, `${fenced}\n\n## Testing\n\nRan.`]) {
+        assert.equal(upsertScreenshotsBlock(body, frame('fresh')), `${body}\n\n${blockOf('fresh')}\n`);
+      }
+    });
+
+    it('replaces a block in a CRLF body without disturbing the lines around it', () => {
+      const lines = ['Intro.', '', BLOCK_START, '## Screenshots', '', frame('stale'), BLOCK_END];
+      const body = [...lines, '', '## Testing', 'Ran.'].join('\r\n');
+      assert.equal(
+        upsertScreenshotsBlock(body, frame('fresh')),
+        `Intro.\r\n\r\n${blockOf('fresh')}\r\n\r\n## Testing\r\nRan.`
+      );
+    });
   });
 
   const S3_CONFIG = {

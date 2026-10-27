@@ -33,6 +33,8 @@ import {
   hasUiChanges,
   isExemptByLabel,
   main,
+  mapChangedFilesToViews,
+  upsertScreenshotsBlock,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -46,6 +48,7 @@ import {
   makeGateClock,
   makeGhFake,
   managedScreenshotBlock,
+  publishedFrameMarkdown,
   runPreservingExitCode,
   workflowRun,
   writeGateCliInputs,
@@ -1575,6 +1578,7 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
     'src/ui/model/componentBrowserModel.js',
+    'src/utils/bulkSelectionModel.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
     'scripts/lib/viewLabCases.js',
     REGISTRY_PATH,
@@ -1695,4 +1699,307 @@ test('CONTRIBUTING lists every failing gate code, and only those (issue 1176)', 
     [...failing].sort(byCodePoint),
     'the gate codes CONTRIBUTING.md lists have drifted from GATE_CODES'
   );
+});
+
+describe('one managed block per body, read the way the publisher writes it (issue 1174)', () => {
+  const HUMAN_URL = 'https://github.test/attachments/1174';
+  const HUMAN_SECTION = `## Screenshots\n\n![by hand](${HUMAN_URL})\n`;
+  const stale = (headSha) =>
+    managedScreenshotBlock({ prNumber: PR, caseIds: EXPECTED_CASE_IDS, headSha });
+  const unterminated = (headSha) => stale(headSha).replace(`\n${BLOCK_END}`, '');
+  const decideOn = (body) =>
+    decide({
+      gh: makeGhFake({}),
+      clock: makeGateClock({}),
+      body,
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+  it('reads a long run of container markers in linear time', () => {
+    const hostile = `${'- '.repeat(5000)}x\n${' '.repeat(20_000)}>\n${'> '.repeat(5000)}\n`;
+    const started = Date.now();
+    parseScreenshotEvidenceImages(`${hostile}\n${unterminated(PREVIOUS_HEAD)}\n`, { prNumber: PR });
+    assert.ok(Date.now() - started < 2000, 'a hostile body must not stall the scanner');
+  });
+
+  it('reads an unterminated block as the block, up to the next top-level heading', () => {
+    const body = `Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n\n## Notes\n\nKept.\n\n${HUMAN_SECTION}`;
+    const parsed = parseScreenshotEvidenceImages(body, { prNumber: PR });
+    assert.deepEqual(
+      parsed.inBlock.map((frame) => frame.caseId),
+      EXPECTED_CASE_IDS
+    );
+    assert.deepEqual(parsed.outsideBlock, [HUMAN_URL]);
+    assert.equal(parsed.hasManagedBlock, true);
+  });
+
+  it('fails an unterminated stale block for this head instead of passing it as hand-supplied', async () => {
+    const decision = await decideOn(`Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n`);
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('masks two blocks as one, so no frame of the second counts as outside it', async () => {
+    const body = `Intro.\n\n${stale(PREVIOUS_HEAD)}\n\n${stale(NEXT_HEAD)}\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assertFailedWith(await decideOn(body), GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('keeps a stray end marker from turning two publishes into a pass on stale frames', async () => {
+    let body = `Intro.\n\n${BLOCK_END}\n\n## Testing\n\nRan.\n`;
+    for (const headSha of [PREVIOUS_HEAD, NEXT_HEAD]) {
+      const frames = publishedFrameMarkdown({ prNumber: PR, caseIds: EXPECTED_CASE_IDS, headSha });
+      body = upsertScreenshotsBlock(body, frames);
+    }
+    assert.equal(body.split(BLOCK_START).length - 1, 1, body);
+    const decision = await decideOn(body);
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+    assert.match(decision.message, new RegExp(NEXT_HEAD));
+  });
+
+  it('fails a complete block followed by an unterminated stale one, not passing it as hand-supplied', async () => {
+    const body = `${stale(PREVIOUS_HEAD)}\n\n${unterminated(NEXT_HEAD)}\n\n## Notes\n\nKept.\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assertFailedWith(await decideOn(body), GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+  });
+
+  it('ends an unterminated block at the next start marker, so what follows that block is read', () => {
+    const human = `### Screenshots\n\n![by hand](${HUMAN_URL})\n`;
+    const body = `${unterminated(PREVIOUS_HEAD)}\n\n${BLOCK_START}\n${BLOCK_END}\n\n${human}`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, [
+      HUMAN_URL,
+    ]);
+  });
+
+  it('fails closed on a block a fence hides, rather than counting its frames as hand-supplied', async () => {
+    const body = `\`\`\`md\n${stale(PREVIOUS_HEAD)}\n\`\`\`\n`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, []);
+    assert.equal((await decideOn(body)).exitCode, 1);
+  });
+
+  it('names a missing end marker when the block carries no frame it can identify', async () => {
+    const library = `![pr-${PR} Library](https://cdn.example.test/pr-screenshots/${PR}/${HEAD}/library/1.png)`;
+    const decision = await decideOn(`${BLOCK_START}\n## Screenshots\n\n${library}\n`);
+    assertFailedWith(decision, GATE_CODES.NO_SCREENSHOTS_SECTION);
+    assert.match(decision.message, /no end marker/);
+  });
+
+  it('still counts hand-supplied images below a marker quoted in prose', async () => {
+    const body = `Quotes \`${BLOCK_START}\` in passing.\n\n${HUMAN_SECTION}`;
+    assert.deepEqual(parseScreenshotEvidenceImages(body, { prNumber: PR }).outsideBlock, [
+      HUMAN_URL,
+    ]);
+    assert.equal((await decideOn(body)).exitCode, 0);
+  });
+
+  /** Bodies the publisher must replace one block in and the gate must read one block out of. */
+  const EDGE_BODIES = Object.freeze({
+    'a stray end above': `Intro.\n\n${BLOCK_END}\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'two blocks': `${stale(PREVIOUS_HEAD)}\n\n${stale(NEXT_HEAD)}\n`,
+    'an unterminated block': `Intro.\n\n${unterminated(PREVIOUS_HEAD)}\n`,
+    'a marker quoted inline': `Quotes \`${BLOCK_START}\`.\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'markers in a code fence': `\`\`\`md\n${BLOCK_START}\n${BLOCK_END}\n\`\`\`\n\n${stale(PREVIOUS_HEAD)}\n`,
+    'CRLF line endings': `${stale(PREVIOUS_HEAD)}\n`.replaceAll('\n', '\r\n'),
+    'a stray end below': `${stale(PREVIOUS_HEAD)}\n\n## Testing\n\nRan.\n\n${BLOCK_END}\n`,
+    'a complete block, then an unterminated one': `${stale(PREVIOUS_HEAD)}\n\n${unterminated(NEXT_HEAD)}\n`,
+    'a fence opened on a list item': `1. \`\`\`bash\n   npm test\n   \`\`\`\n\n${stale(PREVIOUS_HEAD)}\n\n\`\`\`\nlater\n\`\`\`\n`,
+    'an unclosed fence': `\`\`\`js\nnever closed\n\n${stale(PREVIOUS_HEAD)}\n`,
+  });
+
+  for (const [shape, body] of Object.entries(EDGE_BODIES)) {
+    it(`reads what the publisher wrote as the one block, in a body with ${shape}`, () => {
+      const frames = publishedFrameMarkdown({
+        prNumber: PR,
+        caseIds: ['probe-case'],
+        headSha: HEAD,
+      });
+      const published = upsertScreenshotsBlock(`${body}\n${HUMAN_SECTION}`, frames);
+      const parsed = parseScreenshotEvidenceImages(published, { prNumber: PR });
+      assert.deepEqual(
+        parsed.inBlock.map((frame) => frame.caseId),
+        ['probe-case'],
+        published
+      );
+      assert.deepEqual(parsed.outsideBlock, [HUMAN_URL], published);
+    });
+  }
+});
+
+/** The Tool Studio's own views: the recipes `toolStudio.js`, a file no other recipe names, maps to. */
+const TOOL_STUDIO_VIEW_IDS = mapChangedFilesToViews([
+  'src/ui/svelte/apps/manager/tools/toolStudio.js',
+]).map((view) => view.id);
+
+const ENVIRONMENT_EDITOR_FRAMES = Object.freeze({
+  cases: [
+    'manager-environment-edit-placeholder',
+    'manager-environment-edit-events',
+    'manager-environment-validation',
+  ],
+  views: ['manager-environments'],
+});
+
+/**
+ * Render modules that are not themselves `.svelte` files, each with the exact View Lab cases and
+ * gate views a change to it alone selects (issues 1790, 1891, 1901): a representative frame per
+ * screen it feeds, never the shell's whole set.
+ */
+const MODULE_FRAMES = Object.freeze({
+  'src/ui/model/browserGroupCounts.js': {
+    cases: [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+      'manager-essences-normal',
+    ],
+    views: ['manager-recipes-grouped-continuation', 'manager-components-grouped-continuation'],
+  },
+  'src/ui/model/browserPagination.js': {
+    cases: [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+      'world-tool-catalogue-page-two',
+      'world-component-catalogue-bulk',
+    ],
+    views: ['manager-recipes-grouped-continuation', 'manager-components-grouped-continuation'],
+  },
+  'src/ui/model/complicationSummary.js': {
+    cases: [
+      'manager-component-complications-collapsed',
+      'manager-component-complications-salvage-stage-strip',
+      'manager-recipe-complications-stage-strip',
+    ],
+    views: ['manager-component-edit'],
+  },
+  'src/ui/model/componentBulkEditModel.js': {
+    cases: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ],
+    views: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ],
+  },
+  'src/ui/model/matchFolderVocabulary.js': {
+    cases: ['manager-import-folder-mapping'],
+    views: ['manager-import-folder-mapping'],
+  },
+  'src/ui/model/recipeAccessRoster.js': {
+    cases: ['manager-recipe-edit-access-rail', 'manager-recipe-edit-access-inspector'],
+    views: ['manager-recipe-edit-access-rail'],
+  },
+  'src/ui/model/vocabularyCascade.js': {
+    cases: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
+    views: ['manager-tags-categories'],
+  },
+  'src/ui/model/vocabularyUsage.js': {
+    cases: [
+      'manager-tags-categories-normal',
+      'manager-tags-categories-tags-tab',
+      'world-vocabulary-tags',
+      'manager-recipe-edit-tag-picker',
+    ],
+    views: ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
+  },
+  'src/ui/model/environmentComposition.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/model/environmentValidation.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminEnvironmentDraftSection.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminEnvironmentWriteActions.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminCurrencySection.js': {
+    cases: [
+      'currency-actor-property',
+      'currency-macro',
+      'currency-actor-inventory',
+      'manager-world-currency-subunit-expanded',
+    ],
+    views: ['manager-currency'],
+  },
+  'src/ui/svelte/stores/adminToolDraftSection.js': {
+    cases: [
+      'manager-tool-editor-dirty-1280x720',
+      'manager-tool-editor-save-failed',
+      'manager-tool-parity-03-breakage-1280x720',
+      'manager-tool-parity-05-validation-1280x720',
+    ],
+    views: TOOL_STUDIO_VIEW_IDS,
+  },
+  'src/ui/svelte/stores/adminKnowledgeSection.js': {
+    cases: [
+      'manager-knowledge-scope-switch',
+      'manager-knowledge-loading',
+      'manager-knowledge-error',
+    ],
+    views: ['manager-knowledge', 'manager-knowledge-delete-armed'],
+  },
+  'src/ui/svelte/apps/manager/browserListState.svelte.js': {
+    cases: [
+      'manager-default-selection',
+      'manager-environments-browse-normal',
+      'manager-gathering-tasks-browse-normal',
+      'manager-gathering-events-normal',
+      'manager-tool-parity-01-library-1280x720',
+      'manager-components-normal',
+      'manager-essences-normal',
+      'manager-recipes-normal',
+    ],
+    views: [
+      'manager-systems',
+      'manager-environments',
+      'manager-gathering-tasks',
+      'manager-gathering-events',
+      'manager-components-grouped-continuation',
+      'manager-essences',
+      'manager-recipes-grouped-continuation',
+      ...TOOL_STUDIO_VIEW_IDS,
+    ],
+  },
+  'src/ui/svelte/apps/manager/bulkSelection.svelte.js': {
+    cases: [
+      'manager-components-bulk-edit',
+      'manager-essences-bulk-edit',
+      'manager-recipes-bulk-edit',
+    ],
+    views: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-essences',
+      'manager-recipes-bulk-edit',
+      'manager-recipes-bulk-edit-unstaged',
+    ],
+  },
+});
+
+/** A module selects a representative frame per screen it feeds; this many is a whole surface. */
+const MODULE_FRAME_CEILING = 8;
+
+/** The shells whose selections a module must not inherit wholesale. */
+const SHELL_FILES = Object.freeze([
+  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  'src/ui/svelte/stores/adminStore.js',
+]);
+
+describe('a render module selects the frames that draw it (issues 1790, 1891, 1901)', () => {
+  const sorted = (ids) => [...ids].sort(byCodePoint);
+  const shellSelections = SHELL_FILES.map((file) =>
+    mapChangedFilesToCases([file]).map((viewCase) => viewCase.id)
+  );
+
+  for (const [path, expected] of Object.entries(MODULE_FRAMES)) {
+    it(`${path} selects its own cases and views, and arms the gate`, () => {
+      assert.ok(hasUiChanges([path]), `${path} no longer arms the gate, so this row is moot`);
+      const cases = mapChangedFilesToCases([path]).map((viewCase) => viewCase.id);
+      assert.ok(cases.length <= MODULE_FRAME_CEILING, `${cases.length} cases is a whole surface`);
+      for (const [index, shell] of shellSelections.entries()) {
+        assert.ok(
+          shell.some((id) => !cases.includes(id)),
+          `${path} inherits every frame ${SHELL_FILES[index]} selects`
+        );
+      }
+      assert.deepEqual(sorted(cases), sorted(expected.cases));
+      const views = mapChangedFilesToViews([path]).map((view) => view.id);
+      assert.deepEqual(sorted(views), sorted(expected.views));
+    });
+  }
 });

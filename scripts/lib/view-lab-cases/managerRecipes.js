@@ -4,7 +4,11 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_LIST_STATE_MATCH,
+  BROWSER_PAGINATION_MATCH,
   BULK_DELETE_CARD_PATTERN,
+  BULK_SELECTION_MATCH,
   CHECKS_ROUTE_MODEL_PATTERN,
   INSPECTOR_PANEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
@@ -47,6 +51,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
@@ -279,6 +284,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   // Three frames, because the panel's five axes cannot be photographed in one.
@@ -311,7 +318,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
     kinds: ['manager', 'recipes'],
-    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN],
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN, BULK_SELECTION_MATCH],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-unstaged',

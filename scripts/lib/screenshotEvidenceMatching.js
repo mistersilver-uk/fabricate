@@ -3,6 +3,7 @@
  * then decide whether what it published is evidence for this head and these views.
  */
 
+import { locateManagedBlocks, maskSpans, screenshotSections } from './screenshotBlock.js';
 import { mapChangedFilesToCases } from './viewLabCases.js';
 
 /**
@@ -56,10 +57,6 @@ export const GATE_CODES = Object.freeze({
   PULL_REQUEST_READ_FAILED: 'pull-request-read-failed',
 });
 
-/** The managed screenshot block's delimiters, as `upsertScreenshotsBlock` writes them. */
-const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
-const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
-
 /** What the body says about evidence, independent of what the producer's run did. */
 const EVIDENCE = Object.freeze({
   SATISFIED: 'satisfied',
@@ -76,55 +73,7 @@ const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)]*)\)/g;
 /** A whole `<img …>` tag's attribute text, up to the closing `>` or the end of the input. */
 const HTML_IMAGE_TAG_PATTERN = /<img\b([^>]*)/gi;
 
-const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*#*$/;
-const NEXT_HEADING_PATTERN = /^(#{1,6})\s/;
-
 // Pure parsing: what the body carries, and which frame each published URL is.
-
-/** The managed block's text, or `''` when the body carries no complete block. */
-function managedBlockText(text) {
-  const start = text.indexOf(SCREENSHOTS_BLOCK_START);
-  if (start === -1) return '';
-  const end = text.indexOf(SCREENSHOTS_BLOCK_END, start);
-  if (end === -1) return '';
-  return text.slice(start, end + SCREENSHOTS_BLOCK_END.length);
-}
-
-/** The body with the managed block blanked out, line count preserved. */
-function maskManagedBlock(text) {
-  const block = managedBlockText(text);
-  if (!block) return text;
-  return text.replaceAll(block, block.replaceAll(/[^\n]/g, ' '));
-}
-
-/**
- * The body of the Markdown section a heading opens, running to the next heading of the same or a
- * higher level.
- */
-function sectionBody(lines, headingIndex, level) {
-  const collected = [];
-  for (let index = headingIndex + 1; index < lines.length; index += 1) {
-    const next = NEXT_HEADING_PATTERN.exec(lines[index]);
-    if (next && next[1].length <= level) break;
-    collected.push(lines[index]);
-  }
-  return collected.join('\n');
-}
-
-/** Every "Screenshots" section of a body. */
-function screenshotSections(body) {
-  const lines = String(body || '')
-    .replaceAll('\r\n', '\n')
-    .split('\n');
-  const sections = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const heading = HEADING_PATTERN.exec(lines[index]);
-    if (!heading) continue;
-    if (!/^screenshots?\b/i.test(heading[2].trim())) continue;
-    sections.push(sectionBody(lines, index, heading[1].length));
-  }
-  return sections;
-}
 
 /** The URL half of a Markdown image target, dropping the optional `"title"` that may follow it. */
 function markdownImageUrl(target) {
@@ -197,15 +146,22 @@ export function classifyPublishedFrameUrl(url, prNumber) {
  */
 export function parseScreenshotEvidenceImages(body = '', { prNumber } = {}) {
   const text = String(body || '').replaceAll('\r\n', '\n');
-  const block = managedBlockText(text);
-  const inBlock = imageUrlsIn(block).map((url) => ({
-    url,
-    ...(classifyPublishedFrameUrl(url, prNumber) ?? { caseId: null, headSha: null }),
-  }));
-  const outsideBlock = screenshotSections(maskManagedBlock(text)).flatMap((section) =>
+  const blocks = locateManagedBlocks(text);
+  const inBlock = blocks
+    .flatMap(({ start, end }) => imageUrlsIn(text.slice(start, end)))
+    .map((url) => ({
+      url,
+      ...(classifyPublishedFrameUrl(url, prNumber) ?? { caseId: null, headSha: null }),
+    }));
+  const outsideBlock = screenshotSections(maskSpans(text, blocks)).flatMap((section) =>
     imageUrlsIn(section)
   );
-  return { inBlock, outsideBlock, hasManagedBlock: block !== '' };
+  return {
+    inBlock,
+    outsideBlock,
+    hasManagedBlock: blocks.length > 0,
+    unterminatedBlock: blocks.some((block) => !block.terminated),
+  };
 }
 
 // Run selection: `head_sha` identifies a commit, not a run.
@@ -256,13 +212,10 @@ function framesForThisHead(identified, context) {
  * Whether the automatically published frames in the block are evidence for this head and these
  * views.
  */
-function matchPublishedFrames({ inBlock, hasManagedBlock }, context) {
-  const identified = inBlock.filter((frame) => frame.caseId);
+function matchPublishedFrames(images, context) {
+  const identified = images.inBlock.filter((frame) => frame.caseId);
   if (identified.length === 0) {
-    return {
-      state: EVIDENCE.NONE,
-      message: publishedNothingIdentifiable(context, hasManagedBlock),
-    };
+    return { state: EVIDENCE.NONE, message: publishedNothingIdentifiable(context, images) };
   }
 
   const forThisHead = framesForThisHead(identified, context);
@@ -330,11 +283,14 @@ function headSuffix(context) {
 }
 
 /** The diagnostic for a body whose Screenshots section produced no identifiable published frame. */
-function publishedNothingIdentifiable(context, hasManagedBlock) {
+function publishedNothingIdentifiable(context, { hasManagedBlock, unterminatedBlock }) {
   if (!hasManagedBlock) {
     return `This pull request's body carries no managed screenshot block, and the image markup under its Screenshots heading supplies no image URL — an \`<img>\` with an empty \`src\`, or an \`![alt]()\` with an empty target, is markup without an image. Embed an image with a real URL, or let the ${context.captureWorkflow} capture publish the block.`;
   }
-  return `The managed screenshot block carries no frame this gate can identify as belonging to pull request #${context.prNumber}. Auto-published frames are identified by their published location (\`<prefix>/<pr>/<head-sha>/<case-id>.png\`), not by their caption.`;
+  const unterminated = unterminatedBlock
+    ? ' It has no end marker, so it runs to the next start marker or level-1 or level-2 heading; restore the `<!-- fabricate:screenshots:end -->` line, or delete the block and let the capture republish it.'
+    : '';
+  return `The managed screenshot block carries no frame this gate can identify as belonging to pull request #${context.prNumber}. Auto-published frames are identified by their published location (\`<prefix>/<pr>/<head-sha>/<case-id>.png\`), not by their caption.${unterminated}`;
 }
 
 /**

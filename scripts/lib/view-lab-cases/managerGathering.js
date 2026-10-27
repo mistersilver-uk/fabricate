@@ -4,7 +4,9 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_LIST_STATE_MATCH,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+  ENVIRONMENT_EDITOR_STATE_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
   TYPEAHEAD_COMBOBOX_SOURCE,
@@ -88,6 +90,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
@@ -150,6 +153,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   // The gathering toolbars' open-panel frame (issue 1510), on the tightest of their six lists:
@@ -782,6 +786,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/(?:EnvironmentOverviewTab|CompositionModeControl)\.svelte$/,
       GATHERING_ROUTE_MODEL_PATTERN,
+      ...ENVIRONMENT_EDITOR_STATE_MATCHES,
     ],
   }),
   ...[
@@ -901,6 +906,7 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      ...ENVIRONMENT_EDITOR_STATE_MATCHES,
     ],
   }),
   // Issue 1522: a composition row's overrides open in place in that row, and the scene link is
@@ -1063,6 +1069,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({
