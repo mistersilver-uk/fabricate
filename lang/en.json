@@ -3558,7 +3558,7 @@
             "BookStagedRecipes": "{count} recipes",
             "BookStagedRecipesOne": "1 recipe",
             "BookStagedNoChange": "no change",
-            "BookMissing": "This item no longer exists",
+            "BookMissing": "This book or scroll is no longer in this system",
             "BookUnstage": "{book} — leave this book unchanged.",
             "Apply": "Apply to {count} recipes",
             "ApplyOne": "Apply to 1 recipe",

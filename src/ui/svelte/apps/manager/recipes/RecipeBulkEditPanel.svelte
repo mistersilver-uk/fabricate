@@ -10,24 +10,16 @@
   so this panel and the Component Studio's render the same controls rather than two implementations
   of one meaning. What is here is about RECIPES: the category, status, lock, check-tier and book axes.
 
-  THE BOOK AXIS IS A PICKER, NOT A CHIP RUN, and the divergence from the Component Studio is
-  maintainer-decided: a chip per book stops being readable at the eight-plus recipe items a real
-  system carries, where a tag vocabulary is small and flat by nature. So it is a SEARCH AND PICK
-  control over one book at a time, with a STAGED LIST accumulating the answers. The divergence is
-  confined to the staged AXIS — the chrome and the staged SHAPE are unchanged, and one book on
-  screen is a property of the CONTROL, never of the staged set. Accepted consequence: Edit and
-  Duplicate live only in `RecipeBrowserInspector`, so ticking one box hides them until the selection
-  clears, with `Clear selection` as the documented escape. Delete is not in that list, because the
-  swap was making the one DESTRUCTIVE affordance harder to reach exactly when a GM had selected the
-  rows they wanted rid of.
+  The book axis is a picker, not a chip run (maintainer-decided): a chip per book stops being
+  readable at the eight-plus recipe items a real system carries. It is a search-and-pick control
+  over one book at a time with a staged list accumulating the answers; the chrome and the staged
+  shape match the Component Studio's. Edit and Duplicate live only in `RecipeBrowserInspector`, so
+  ticking one box hides them until `Clear selection`; Delete stays reachable here.
 
-  THE BULK DELETE IS ARMED, AND IT IS PAIRED WITH AN IMPACT STATEMENT. `AGENTS.md` reserves
-  `confirmDialog` for bulk actions EXCEPT where the panel states the pending impact in view before
-  the control is armed. Do not substitute a `confirmDialog`, and do not remove the impact list and
-  leave the arm: the carve-out is the pair, not the button. The impact list is the immediately
-  preceding sibling INSIDE the same card, so no scroll position reaches the arm without it. The card
-  is the shared `BulkDeleteCard`; what is left here is the four sentences, the standing hint and the
-  impact prop.
+  The bulk delete is armed and paired with an impact statement. `AGENTS.md` reserves `confirmDialog`
+  for bulk actions except where the panel states the pending impact in view before the control is
+  armed: the carve-out is the pair, not the button. The card is the shared `BulkDeleteCard`; what is
+  left here is the four sentences, the standing hint and the impact prop.
 
   THE STANDING HINT IS NOT A COUNT, which is why it always renders. Deleting a recipe is
   irreversible in a way deleting a component is not: an orphan learned entry frees no budget, a
@@ -452,7 +444,7 @@
 
   // ── The book axis ────────────────────────────────────────────────────────────────
 
-  // `books` is the PROJECTION, which emits `resolvedName` and never a bare `name`, so a
+  // `books` is the projection, which emits `resolvedName` and never a bare `name`, so a
   // `name`-first chain would paint `sm-book` for "Forgecraft Folio". The chain is
   // `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, with `id` last: an unnamed option is
   // neither readable nor nameable by speech input.
@@ -460,15 +452,15 @@
     return book?.resolvedName || book?.name || book?.id || '';
   }
 
-  // How many SELECTED recipes this book holds, from the caller's basis-aware map and NEVER from
-  // `book.recipeIds`, which stays EMPTY while the membership-basis marker is unset and would disable
+  // How many selected recipes this book holds, from the caller's basis-aware map and never from
+  // `book.recipeIds`, which stays empty while the membership-basis marker is unset and would disable
   // Remove on exactly the worlds that need it. Clamped to the selection size.
   function holdsCount(bookId) {
     return Math.min(Number(bookMembership?.get?.(bookId)) || 0, count);
   }
 
-  // The `kind` half of an option's second line. `Incomplete` is deliberately NOT surfaced: the
-  // synchronous publish emits it for EVERY book, so it is untrue one publish in two.
+  // The `kind` half of an option's second line. `Incomplete` is deliberately not surfaced: the
+  // synchronous publish emits it for every book, so it is untrue one publish in two.
   function bookKind(book) {
     const type = String(book?.derivedType || '');
     if (type === 'Book') {
@@ -599,13 +591,12 @@
 
   const missingBookName = text(
     'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookMissing',
-    'This item no longer exists'
+    'This book or scroll is no longer in this system'
   );
 
-  // THE STAGED LIST, which the prototype computes and never renders — leaving a one-book-at-a-time
-  // control with no record of what the other books were told to do. It is the confirmation, the
-  // undo, and the only surface a mixed add/remove draft can be read on, so it walks the draft's ids
-  // and a book deleted while staged keeps its row. Sorted by name, so it is stable under re-staging.
+  // The staged list is the confirmation, the undo, and the only surface a mixed add/remove draft
+  // can be read on. It walks the draft's ids, so a book deleted while staged keeps its row, and is
+  // sorted by name (then id) so it is stable under re-staging.
   const stagedBooks = $derived.by(() =>
     [...(draft?.bookAdd ?? []), ...(draft?.bookRemove ?? [])]
       .map((id) => {
@@ -619,6 +610,7 @@
         return {
           id,
           op,
+          missing: !book,
           name,
           opLabel: opWord(op),
           icon: op === 'add' ? 'fas fa-plus' : 'fas fa-minus',
@@ -630,7 +622,7 @@
           ),
         };
       })
-      .sort((left, right) => left.name.localeCompare(right.name))
+      .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
   );
 
   function stagedCountLabel(affected) {
@@ -709,6 +701,8 @@
   const PANEL_ATTR = 'data-recipe-bulk-panel';
   const PANEL_HOOK = `[${PANEL_ATTR}]`;
   const BOOK_TRIGGER = '.fab-bulk-book-trigger';
+  // Last resort when no row or trigger remains, so focus stays inside the panel.
+  const FOCUS_FALLBACKS = [BOOK_TRIGGER, '[data-recipe-bulk-clear]'];
 
   // First candidate that exists, is attached and is not disabled; otherwise focus is left where it
   // is rather than parked on an inert control.
@@ -739,15 +733,14 @@
     focusAfterRerender([BOOK_TRIGGER]);
   }
 
-  // Staging CLEARS the pick: keeping it leaves two surfaces claiming authority over one fact and
-  // costs an extra dismissal per book. The staged row IS the confirmation and carries the undo, so
-  // the pick card is a transient composer; focus follows to that row's undo, else the trigger.
+  // Staging clears the pick: keeping it leaves two surfaces claiming authority over one fact. The
+  // staged row is the confirmation and carries the undo; focus follows to it, else a fallback.
   function stageBook(op) {
     if (!pickedBook) return;
     const bookId = pickedBook.id;
     onDraftChange(setBulkRecipeBookOp(draft, bookId, op));
     pickedBookId = '';
-    focusAfterRerender([`[data-recipe-bulk-book-unstage="${bookId}"]`, BOOK_TRIGGER]);
+    focusAfterRerender([`[data-recipe-bulk-book-unstage="${bookId}"]`, ...FOCUS_FALLBACKS]);
   }
 
   // Read BEFORE the mutation, because afterwards this row and its position are gone: the row that
@@ -757,9 +750,10 @@
     const index = order.indexOf(bookId);
     const neighbour = index < 0 ? '' : (order[index + 1] ?? order[index - 1] ?? '');
     onDraftChange(setBulkRecipeBookOp(draft, bookId, 'none'));
-    focusAfterRerender(
-      neighbour ? [`[data-recipe-bulk-book-unstage="${neighbour}"]`, BOOK_TRIGGER] : [BOOK_TRIGGER]
-    );
+    focusAfterRerender([
+      ...(neighbour ? [`[data-recipe-bulk-book-unstage="${neighbour}"]`] : []),
+      ...FOCUS_FALLBACKS,
+    ]);
   }
 </script>
 
@@ -969,9 +963,10 @@
     <ul class="fab-bulk-book-staged" aria-label={booksLabel} data-recipe-bulk-books-staged>
       {#each stagedBooks as entry (entry.id)}
         <li
-          class={`fab-bulk-book-staged-row is-${entry.op}`}
+          class={`fab-bulk-book-staged-row is-${entry.missing ? 'missing' : entry.op}`}
           data-bulk-book={entry.id}
           data-bulk-book-state={entry.op}
+          data-bulk-book-missing={entry.missing ? '' : undefined}
         >
           <span class="fab-bulk-book-staged-op">
             <i class={entry.icon} aria-hidden="true"></i>{entry.opLabel}
@@ -1224,6 +1219,11 @@
 
   .fab-bulk-book-staged-row.is-remove .fab-bulk-book-staged-op {
     color: var(--fab-danger-text);
+  }
+
+  .fab-bulk-book-staged-row.is-missing .fab-bulk-book-staged-name {
+    color: var(--fab-text-muted);
+    font-style: italic;
   }
 
   .fab-bulk-book-staged-copy {

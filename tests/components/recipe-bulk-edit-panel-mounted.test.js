@@ -497,8 +497,11 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
 
     assert.deepEqual(stagedIds(root), ['book-alchemy', 'book-forge'], 'no staged id loses its row');
     const row = stagedRow(root, 'book-forge');
-    assert.match(row.textContent, /This item no longer exists/);
+    assert.match(row.textContent, /This book or scroll is no longer in this system/);
     assert.ok(!row.textContent.includes('book-forge'), 'a raw definition id never reaches the GM');
+    assert.ok(row.hasAttribute('data-bulk-book-missing'), 'the row is marked as a missing book');
+    assert.ok(row.classList.contains('is-missing'), 'and claims neither the add nor remove tone');
+    assert.ok(!stagedRow(root, 'book-alchemy').hasAttribute('data-bulk-book-missing'));
     assert.match(row.textContent, /no change/, 'and it says nothing will be written for it');
     assert.equal(applyButton(root).disabled, false, 'Apply is armed, and every change is on screen');
 
@@ -508,6 +511,31 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     assert.deepEqual(stagedIds(root), ['book-alchemy']);
   });
 
+  it('keeps focus inside the panel after unstaging the last row with no books left (issue 1020)', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+    await panel.setProps({ books: [] });
+    assert.ok(!bookTrigger(root), 'the control: with no books there is no trigger to fall back to');
+
+    press(root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]'));
+    await settleFocus();
+
+    assert.ok(!stagedList(root), 'the last row is gone');
+    assert.ok(
+      Boolean(document.activeElement?.closest?.('[data-recipe-bulk-panel]')),
+      `focus stays in the panel rather than on ${focusHolder()}`
+    );
+  });
+
+  it('orders two missing rows by id so the list is deterministic (issue 1020)', async () => {
+    const { root } = await mountPanel({
+      draft: { ...createRecipeBulkDraft(), bookAdd: ['gone-b', 'gone-a'] },
+      books: []
+    });
+
+    assert.deepEqual(stagedIds(root), ['gone-a', 'gone-b']);
+  });
+
   it('keeps every staged row visible when the last book is deleted from the system (issue 1020)', async () => {
     const { root } = await mountPanel();
     stageBook(root, 'book-alchemy', 'add');
@@ -515,7 +543,7 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     await panel.setProps({ books: [] });
 
     assert.deepEqual(stagedIds(root), ['book-alchemy']);
-    assert.match(stagedRow(root, 'book-alchemy').textContent, /This item no longer exists/);
+    assert.match(stagedRow(root, 'book-alchemy').textContent, /This book or scroll is no longer in this system/);
   });
 
   it('unstages one book without disturbing the others', async () => {
