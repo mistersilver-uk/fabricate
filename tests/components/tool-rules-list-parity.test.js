@@ -679,7 +679,7 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     assert.equal(measured.search.height, 38, 'the search box is the library’s 38px shell');
     assert.equal(measured.search.borderRadius, '9px', 'at the 34-38px band’s corner');
 
-    // `proto:2519` — `Sort by` is the kicker treatment in the SUBTLE ink, not the muted one.
+    // `proto:2519` — `Sort by` is the kicker treatment, in the muted kicker ink (issue 2298).
     assert.equal(measured['sort-label'].fontSize, '8.5px', 'proto:2519 size');
     assert.equal(measured['sort-label'].fontWeight, '700', 'proto:2519 weight');
 
