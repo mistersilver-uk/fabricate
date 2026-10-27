@@ -1065,6 +1065,7 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+The No-colour cell's slash inks `--fab-text-secondary` and clears 3:1 against its `--fab-bg-3` ground on all seven themes (issue 2368).
 In the popover the swatch is the content of a square tile of the picker's grid form: the selected tile states its own ground, `--fab-surface-soft`, by the descendant rule the square-tile rule reserves for a caller, so the inset ring is the mark; the cursor and hover are the square tile's own.
 The inline strip's cells keep the states above.
 A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
