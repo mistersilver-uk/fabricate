@@ -1028,6 +1028,10 @@ The **inspector** is one column on the panel background, not a stack of bordered
 Section headings are uppercase micro-labels sitting directly on the panel — `Selected recipe`, `Requires`, `Produces` — not `<h3>` titles inside nested `fabricate-card` boxes, and there is no invented "Recipe details" heading over the stat grid.
 Only the things that are objects keep a box: the 2×2 stat grid (Ingredients / Results / Steps / Crafting check) and the Requires / Produces flow rows.
 
+The inspector's Requires list SHALL name a currency requirement as its amount followed by its denomination's display name, the unit's abbreviation and then its label, through `formatCurrencyRequirement`.
+A currency requirement SHALL show the unit's raw id only when the unit is no longer in the world's currency configuration, because a stale id reads better than a blank cost.
+The Requires row SHALL NOT repeat the amount in its quantity column.
+
 The hero chip row carries exactly two chips on one line: the category and a status pill (a dot plus `On`/`Off`, naming the state exactly as the row's switch does).
 There is no chip for the _absence_ of a state — the retired `Unlocked` chip named a non-state and forced the row to wrap; `Locked`, `Incomplete` and `Can't enable` are shown only when true.
 The flavour text is shown whole, in the one surface with room for it.
@@ -1386,6 +1390,10 @@ Current GM editor behavior:
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion; each time-of-day pill and the time-of-day add form also carry a start-hour `Stepper`.
 - The Times of day panel draws the time-of-day bar: the shared range bar over one calendar day, starting at the first-listed period's start hour, with each period's name and hours inside the track and the periods in day order; the value pills keep their authored order.
   The Times of day panel spans the settings grid's full width, so the time-of-day bar has room for its periods; the Weather panel follows on its own row.
+  When the periods cannot be drawn on the bar (two share a start hour, or one falls outside the calendar's day), the bar SHALL be replaced by a note naming the periods to fix.
+  The Times of day panel SHALL hold one persistent, visually hidden, polite live region from mount, beside the bar.
+  That live region SHALL carry the fallback note's text while the bar has fallen back and SHALL be empty otherwise.
+  The announcement SHALL NOT rely on a status role inserted with the note, because a live region created in the same mutation as its content is not reliably announced.
   Dragging or keying a divider sets the start hour of the period that begins there, and a drag released at that period's stored start hour writes nothing; the first-listed period's start, at the bar's two ends, is set by its stepper only.
   When the world calendar reports the time, a fixed line marks the world clock.
   A draggable dot is the current time of day: it rests at its period's centre, moves between periods, edits the same value as the current-time selector, and may sit in a different period from the clock.

@@ -66,6 +66,10 @@ The headline **Produces** row reads the recipe's last step, so a recipe whose ea
 Routed by check recipes have no single Produces row.
 They list one outcome per check result instead, and that list also reads the recipe's last step for the same reason.
 
+Only the step being crafted lets the player choose which materials it uses.
+While a run is in progress, that step's choices are locked, including while it waits on a time requirement, and a note says that a run is in progress, so its requirements can't be changed.
+Every other step is a preview, and its note says that it isn't the step being crafted, so its requirements can't be changed yet.
+
 The **Craft** button reflects the first step.
 A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
 
