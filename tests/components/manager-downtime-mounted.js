@@ -224,6 +224,13 @@ export function registerDowntimeCases() {
       'PREMIUM',
       'the premium mark is a WORD, not an icon a sighted reader loses'
     );
+    assert.ok(!parent.hasAttribute('aria-label'), 'no override silences the chip');
+    assert.equal(
+      parent.getAttribute('aria-labelledby'),
+      null,
+      'and nothing else replaces the contents as the name'
+    );
+    assert.equal(downtimeParentName(), 'Downtime PREMIUM', 'the preview name carries the chip');
     assert.ok(
       parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-premium'),
       'the premium chip is a vehicle of its own (issue 1515), named by the collapsed-rail hide'
@@ -2141,7 +2148,19 @@ export function registerDowntimeCases() {
 
   const downtimeBadge = (tabId) => target.querySelector(`[data-world-downtime-badge="${tabId}"]`);
   const downtimeRollup = () => target.querySelector('[data-world-downtime-badge-total]');
-  const downtimeParentAriaLabel = () => worldNavItem('downtime').getAttribute('aria-label');
+  // The accessible name of a button with no `aria-label`: its contents, a `role="img"` child
+  // contributing its own label and an `aria-hidden` child contributing nothing.
+  function nameFromContents(node) {
+    const parts = [];
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) parts.push(child.data);
+      else if (child.nodeType === 1 && child.getAttribute('aria-hidden') !== 'true') {
+        parts.push(child.getAttribute('aria-label') ?? nameFromContents(child));
+      }
+    }
+    return parts.join(' ').replaceAll(/\s+/g, ' ').trim();
+  }
+  const downtimeParentName = () => nameFromContents(worldNavItem('downtime'));
   const downtimePremiumState = () =>
     target.querySelector('[data-world-nav-premium]')?.dataset.worldNavPremiumState;
 
@@ -2419,13 +2438,9 @@ export function registerDowntimeCases() {
         'the parent’s single trailing track carries EITHER the chip or the rollup, never both'
       );
 
-      // The parent's `aria-label` replaces its subtree.
-      const visibleLabel = parent.querySelector('.manager-nav-label').textContent.trim();
-      assert.equal(parent.getAttribute('aria-label'), 'Downtime, 5 updates');
-      assert.ok(
-        parent.getAttribute('aria-label').includes(visibleLabel),
-        'Label-in-Name: the composed name contains the text rendered inside the row’s label'
-      );
+      // An `aria-label` on the parent would replace its subtree and silence the rollup.
+      assert.ok(!parent.hasAttribute('aria-label'), 'the name computes from the row’s contents');
+      assert.equal(downtimeParentName(), 'Downtime 5 updates');
     });
 
     it('cell 2 — opening the group removes the rollup, restores the chip, and reverts the name', async () => {
@@ -2440,10 +2455,9 @@ export function registerDowntimeCases() {
       );
       assert.equal(downtimePremiumState(), 'installed', 'and the muted chip has its track back');
       assert.equal(
-        downtimeParentAriaLabel(),
-        'Downtime',
-        'EXACTLY the route name: an unconditional composition would make every GM on every ' +
-          'route hear "Downtime, 0 updates", and nothing else here catches that'
+        downtimeParentName(),
+        'Downtime PREMIUM',
+        'the route name and the chip word, with no rollup count in it'
       );
     });
 
@@ -2479,10 +2493,11 @@ export function registerDowntimeCases() {
       );
       assert.equal(downtimePremiumState(), 'installed');
       assert.equal(
-        downtimeParentAriaLabel(),
-        'Downtime',
-        'and the row keeps the plain route name in every state but the one that earns more'
+        downtimeParentName(),
+        'Downtime PREMIUM',
+        'the installed chip is muted, not silent: its word is part of the row’s name'
       );
+      assert.ok(!worldNavItem('downtime').hasAttribute('aria-label'));
     });
 
     it('cell 5 — the runtime layer OVERRIDES the registered one: 5 → 7 → 5, and never 10', async () => {
@@ -2505,7 +2520,7 @@ export function registerDowntimeCases() {
         'ledger’s runtime 5 REPLACES its registered 3; `sum(registered) + sum(runtime)` would ' +
           'render 10, and "changes the total" would accept it'
       );
-      assert.equal(downtimeParentAriaLabel(), 'Downtime, 7 updates');
+      assert.equal(downtimeParentName(), 'Downtime 7 updates');
       assert.equal(mounts.length, 0, 'with no mount live anywhere');
 
       registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', null);
@@ -2658,38 +2673,31 @@ export function registerDowntimeCases() {
     }
   });
 
-  // AC-23 — the four keys tasks 4 and 5 read. `text(key, fallback)` returns the FALLBACK
+  // AC-23 — the two keys the rollup reads. `text(key, fallback)` returns the FALLBACK
   // whenever `localize` hands the key back, so an implementation that renders every badge
   // correctly and ships none of these keys keeps every other criterion green while leaving
-  // four strings untranslatable in every locale.
-  it('AC-23 — the four new Downtime badge keys are string leaves in the shipped lang file', () => {
+  // two strings untranslatable in every locale.
+  it('AC-23 — the Downtime rollup keys are string leaves, and the retired composed name is gone', () => {
     const base = 'FABRICATE.Admin.Manager.World.Downtime';
-    for (const leaf of [
-      'BadgeTotalOne',
-      'BadgeTotalOther',
-      'NavWithBadgeOne',
-      'NavWithBadgeOther',
-    ]) {
+    for (const leaf of ['BadgeTotalOne', 'BadgeTotalOther']) {
       const key = `${base}.${leaf}`;
       assert.notEqual(
         shippedString(key),
         key,
         `${key} must be a string leaf in lang/en.json, or its fallback is untranslatable`
       );
-    }
-    for (const leaf of ['BadgeTotalOne', 'BadgeTotalOther']) {
       assert.ok(
-        shippedString(`${base}.${leaf}`).includes('{count}'),
+        shippedString(key).includes('{count}'),
         `${leaf} must substitute the total rather than stating a number`
       );
     }
-    // The teeth on Decision 5's SUBSTITUTED noun. Writing the literal word "Downtime" into
-    // these two keys would put the row's noun in three places, where a translator changing one
-    // and not the others silently breaks Label-in-Name with no test able to see it.
     for (const leaf of ['NavWithBadgeOne', 'NavWithBadgeOther']) {
-      const value = shippedString(`${base}.${leaf}`);
-      assert.ok(value.includes('{label}'), `${leaf} must take the row’s label as a token`);
-      assert.ok(value.includes('{count}'), `${leaf} must take the total as a token`);
+      const key = `${base}.${leaf}`;
+      assert.equal(
+        shippedString(key),
+        key,
+        `${key} is retired: the parent's name composes from its contents`
+      );
     }
   });
 

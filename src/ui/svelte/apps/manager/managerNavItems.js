@@ -611,18 +611,6 @@ function downtimeRollupName(count, text) {
   return name.replace('{count}', String(count));
 }
 
-/** The parent row's composed accessible name while the rollup shows. */
-function downtimeParentName(count, label, text) {
-  const name =
-    count === 1
-      ? text('FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOne', '{label}, {count} update')
-      : text(
-          'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOther',
-          '{label}, {count} updates'
-        );
-  return name.replace('{label}', label).replace('{count}', String(count));
-}
-
 /**
  * The parent's one trailing mark: the rollup while a companion's badges sit behind a closed
  * disclosure, else the PREMIUM chip, muted but never removed once a companion holds the surface
@@ -664,7 +652,8 @@ function downtimeParent(input, rollup, text) {
           'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
           'Downtime Studio is unlocked by Fabricate Premium'
         ),
-    ariaLabel: rollup.visible ? downtimeParentName(rollup.total, label, text) : label,
+    // No `aria-label`: the name composes from the label and the trailing mark, so the mark is heard.
+    ariaLabel: undefined,
     current: input.isWorldDowntimeRoute,
     controls: 'manager-downtime-submenu',
     markers: [downtimeParentMarker(input, rollup, text)],

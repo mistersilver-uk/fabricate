@@ -5797,8 +5797,6 @@
             "Nav": "Downtime",
             "BadgeTotalOne": "{count} update",
             "BadgeTotalOther": "{count} updates",
-            "NavWithBadgeOne": "{label}, {count} update",
-            "NavWithBadgeOther": "{label}, {count} updates",
             "Actions": "Downtime actions",
             "Premium": "PREMIUM",
             "PremiumTooltip": "Unlock Downtime Studio with Fabricate Premium",
