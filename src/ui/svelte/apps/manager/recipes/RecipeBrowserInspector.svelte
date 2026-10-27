@@ -122,7 +122,11 @@
   // tested without a DOM.
   const requirementRows = $derived(
     selectedRecipe
-      ? buildRecipeRequirementRows(selectedRecipe, { componentOptions, essenceOptions })
+      ? buildRecipeRequirementRows(selectedRecipe, {
+          componentOptions,
+          essenceOptions,
+          currencyUnits,
+        })
       : []
   );
   // A reward row names its taught recipe and its unit's display name from these rosters.
@@ -359,12 +363,6 @@
       return row.tagMatch === 'all'
         ? format('FABRICATE.Admin.Manager.Recipe.TagsAll', 'All of: {tags}', { tags })
         : format('FABRICATE.Admin.Manager.Recipe.TagsAny', 'Any of: {tags}', { tags });
-    }
-    if (row.kind === 'currency') {
-      return format('FABRICATE.Admin.Manager.Recipe.CurrencyCost', '{amount} {unit}', {
-        amount: row.amount,
-        unit: row.unit,
-      });
     }
     if (row.kind === 'essence') {
       return row.name || text('FABRICATE.Admin.Manager.Recipe.UnknownEssence', 'Unknown essence');

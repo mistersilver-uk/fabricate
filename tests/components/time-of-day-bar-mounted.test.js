@@ -507,6 +507,31 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     ]);
   });
 
+  it('announces the fallback through one persistent live region and clears it when the bar returns (2443)', () => {
+    const panel = mountPanel();
+    const region = () => qa('[data-time-of-day-announce]');
+    assert.equal(region().length, 1, 'the region is present from mount');
+    assert.equal(region()[0].getAttribute('aria-live'), 'polite');
+    assert.equal(region()[0].textContent, '', 'and says nothing while the bar draws');
+    const node = region()[0];
+
+    const gapped = [...DEFAULTS.slice(0, 3), { ...DEFAULTS[3], startHour: 8 }];
+    panel.$set({ setting: { enabled: true, current: 'day', values: gapped } });
+    flushSync();
+    assert.ok(!bar());
+    assert.equal(region().length, 1, 'still one region');
+    assert.ok(region()[0] === node, 'the same node, filled in place rather than inserted');
+    assert.equal(
+      region()[0].textContent.trim(),
+      'Give every time of day its own start hour below 24 to see the time-of-day bar. Check: Day and Night.'
+    );
+
+    panel.$set({ setting: { enabled: true, current: 'day', values: DEFAULTS } });
+    flushSync();
+    assert.ok(Boolean(bar()));
+    assert.equal(region()[0].textContent, '', 'resolving the clash empties the region again');
+  });
+
   it('drops a cleared add hour once the day tiles again', () => {
     const panel = mountPanel({
       values: [...DEFAULTS.slice(0, 3), { ...DEFAULTS[3], startHour: 8 }],

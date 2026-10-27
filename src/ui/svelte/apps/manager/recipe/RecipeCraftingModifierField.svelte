@@ -1,6 +1,6 @@
 <!--
   The recipe Overview's check-modifier picker cell: the eligible-set tri-state, the pill row over
-  the check's mark, and the cap and suppression notes. It writes `recipe.craftingModifier`
+  the check's mark, and the cap, suppression and deleted-modifier notes. It writes `recipe.craftingModifier`
   (`{ modifierIds? } | null`) and authors one axis, which modifiers apply
   (`openspec/specs/data-models/spec.md` `## Recipe` requirement 13a).
 
@@ -21,7 +21,10 @@
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
   import Select from '../../../components/Select.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
-  import { resolveMaxModifierPicks } from '../../../../../systems/checkModifierResolver.js';
+  import {
+    partitionPickedModifierIds,
+    resolveMaxModifierPicks,
+  } from '../../../../../systems/checkModifierResolver.js';
   import { buildModifierSetOptions } from './recipeOverviewSelectOptions.js';
 
   let {
@@ -43,6 +46,7 @@
   const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
   const MODIFIER_CAP_HINT_ID = 'manager-recipe-crafting-modifier-cap';
   const MODIFIER_SUPPRESSED_ID = 'manager-recipe-crafting-modifier-suppressed';
+  const MODIFIER_MISSING_ID = 'manager-recipe-crafting-modifier-missing';
 
   const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
 
@@ -70,10 +74,18 @@
 
   // The cap counts what the GM can SEE: a suppressed pick consuming a slot would disable the add
   // button with no way to free one, the freeing chip's remove button not being rendered.
-  const pickedEligibleIds = $derived(
-    overrideModifierIds.filter((id) => eligibleModifierIds.has(id))
+  // A pick naming a modifier the library no longer holds returns with nothing, so it is counted
+  // apart from one the check merely un-marked.
+  const partition = $derived(
+    partitionPickedModifierIds(
+      overrideModifierIds,
+      craftingModifierOptions,
+      craftingModifierDefaultIds
+    )
   );
-  const suppressedPickCount = $derived(overrideModifierIds.length - pickedEligibleIds.length);
+  const pickedEligibleIds = $derived(partition.eligible);
+  const missingPickCount = $derived(partition.missing.length);
+  const suppressedPickCount = $derived(partition.suppressed.length);
   const atModifierPickCap = $derived(pickedEligibleIds.length >= modifierPickCap);
 
   // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers", following the
@@ -121,7 +133,9 @@
   // also its `aria-live` summary — carries one sentence. "Nothing is added" is true of an
   // unauthored pick and FALSE when every stored pick is suppressed, where it contradicts the note
   // beneath it, so the STATE decides the sentence rather than the emptiness alone.
-  const allPicksSuppressed = $derived(pickedEligibleIds.length === 0 && suppressedPickCount > 0);
+  const allPicksSuppressed = $derived(
+    pickedEligibleIds.length === 0 && suppressedPickCount > 0 && missingPickCount === 0
+  );
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
   const MODIFIER_ADD_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd';
   const emptyRowText = $derived(
@@ -136,6 +150,28 @@
         )
   );
 
+  const MISSING_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissing';
+  // The deleted id has no chip to remove, so the note names the set modes that drop the stored pick.
+  const missingText = $derived.by(() => {
+    const clear = text(
+      'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingClear',
+      'To clear this, set Eligible modifiers to Inherit system default or No modifiers; that resets the other picks too.'
+    );
+    if (missingPickCount === 1) {
+      return `${text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
+        'One chosen modifier no longer exists in the Modifiers library, so it is hidden and does nothing.'
+      )} ${clear}`;
+    }
+    const translated = localize(MISSING_KEY, { count: missingPickCount });
+    const sentence =
+      translated && translated !== MISSING_KEY
+        ? translated
+        : `${missingPickCount} chosen modifiers no longer exist in the Modifiers library, so they are hidden and do nothing.`;
+    return `${sentence} ${clear}`;
+  });
+  const showMissingNote = $derived(missingPickCount > 0);
+
   // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression the GM sees PART of. Once
   // every pick is suppressed the placeholder above IS that explanation, word for word, so
   // rendering both says the same sentence twice in the one state where both co-occur.
@@ -148,6 +184,7 @@
     [
       modifierCapBounded ? MODIFIER_CAP_HINT_ID : '',
       showSuppressedNote ? MODIFIER_SUPPRESSED_ID : '',
+      showMissingNote ? MODIFIER_MISSING_ID : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -326,6 +363,16 @@
         data-recipe-crafting-modifier-suppressed={suppressedPickCount}
       >
         {suppressedText}
+      </p>
+    {/if}
+    {#if showMissingNote}
+      <!-- Shares the suppressed note's spacing rule only; it is a different fact. -->
+      <p
+        class="manager-muted manager-recipe-modifier-suppressed"
+        id={MODIFIER_MISSING_ID}
+        data-recipe-crafting-modifier-missing={missingPickCount}
+      >
+        {missingText}
       </p>
     {/if}
   {/if}

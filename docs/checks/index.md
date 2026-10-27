@@ -320,6 +320,12 @@ It is a deliberate choice, distinct from inheriting an empty set.
 
 The picks are summed at roll time, and nothing is asked of the player.
 
+If a modifier a recipe picked is later deleted from the Modifiers library, the picker hides it and a note says that the chosen modifier no longer exists, so it is hidden and does nothing.
+Nothing brings a deleted modifier back, which is different from a pick the system has simply stopped marking selectable.
+That pick is hidden too, but it returns as soon as the system marks the modifier selectable again.
+To clear a deleted pick on a recipe, set **Eligible modifiers** to **Inherit system default** or **No modifiers**, which also resets the recipe's other picks.
+A component's Salvage section and a gathering task's editor show the same note, and there you clear it by unticking the **Pick check modifiers** checkbox and ticking it again, which also resets the other picks.
+
 **If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
 The control appears only when the system's combination rule is **By recipe** and the system has at least one entry in its Modifiers library.
 Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.

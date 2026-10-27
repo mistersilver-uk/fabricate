@@ -203,6 +203,28 @@ export const CASES = Object.freeze([
       /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   }),
+  managerCase({
+    id: 'manager-recipes-inspector-currency-generated-id',
+    label: 'Manager — Recipes inspector Requires row of a currency with a generated unit id',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', resultRowState: 'currency-generated-id' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="sm-r-horseshoe"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    // The denomination label, not the 16-character id: a raw id would also satisfy a bare
+    // currency-row selector.
+    expectSelector:
+      '[data-recipe-inspector] [data-recipe-requirement="currency"] ' +
+      '.manager-recipe-flow-name:has-text("8 Handfuls")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // The inspector's ingredient-set list (issue 1510), at a 1024 window: the inspector restacks
   // under the list there, so the trigger fills a column far past the `inline` rung's 240px panel
   // ceiling and the frame shows the panel spanning the manager's overlay inset under the call

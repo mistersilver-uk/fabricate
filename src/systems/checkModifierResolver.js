@@ -263,6 +263,25 @@ function takeEligibleModifierIds(source, { known, marked, limit }) {
 }
 
 /**
+ * Splits a record's stored picks against the library and the check's mark: `eligible` are in the
+ * library and marked, `suppressed` are in the library but un-marked (they return when re-marked),
+ * `missing` name no library entry (nothing returns them). A non-array mark bounds nothing.
+ */
+export function partitionPickedModifierIds(pickedIds, catalogueOptions, markedIds) {
+  const known = new Set(
+    (Array.isArray(catalogueOptions) ? catalogueOptions : []).map((option) => option?.id)
+  );
+  const marked = Array.isArray(markedIds) ? new Set(markedIds) : null;
+  const parts = { eligible: [], suppressed: [], missing: [] };
+  for (const id of Array.isArray(pickedIds) ? pickedIds : []) {
+    if (!known.has(id)) parts.missing.push(id);
+    else if (marked && !marked.has(id)) parts.suppressed.push(id);
+    else parts.eligible.push(id);
+  }
+  return parts;
+}
+
+/**
  * An entry's bounds (issue 1095), absence-preserving: only a finite number is a bound, and `0`
  * is real. `inverted` (`min > max`) blocks the entry, raising `modifierBoundsInverted`, rather
  * than reordering the pair. `unsafe` flags a bound the dice grammar cannot express, which would
