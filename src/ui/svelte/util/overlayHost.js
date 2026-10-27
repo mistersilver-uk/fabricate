@@ -135,10 +135,16 @@ export function overlaysOpenedFrom(root) {
   return found;
 }
 
-/** A `display: contents` container in `host` for `chain`, so `host` stays the containing block. */
+/**
+ * A `display: contents` container in `host` for `chain`, so `host` stays the containing block; on
+ * the standalone layer, which takes no pointer, the container's panel takes it.
+ */
 export function createOverlayContainer(host, chain) {
   const container = host.ownerDocument.createElement('div');
   container.style.display = 'contents';
+  if (host.classList?.contains(STANDALONE_OVERLAY_HOST_CLASS)) {
+    container.style.pointerEvents = 'auto';
+  }
   host.append(container);
   containerChains.set(container, chain);
   return container;
@@ -153,13 +159,20 @@ export function createStandaloneOverlayLayer(doc, attributes = {}) {
   return layer;
 }
 
-// One shared layer per document, created on the first acquire and removed on the last release.
+// One shared layer per document, created on the first acquire and removed on the last release. It
+// spans its window's viewport, the box `overlayHostRect` measures it as, so a panel placed by
+// `right` or `bottom` lands where it was measured; it takes no pointer, so the page stays usable.
 const sharedLayers = new WeakMap();
+
+function spanViewport(layer) {
+  Object.assign(layer.style, { right: '0', bottom: '0', pointerEvents: 'none' });
+  return layer;
+}
 
 export function acquireStandaloneOverlayLayer(doc, attributes) {
   let shared = sharedLayers.get(doc);
   if (!shared?.layer.isConnected) {
-    shared = { layer: createStandaloneOverlayLayer(doc, attributes), count: 0 };
+    shared = { layer: spanViewport(createStandaloneOverlayLayer(doc, attributes)), count: 0 };
     sharedLayers.set(doc, shared);
   }
   shared.count += 1;

@@ -349,6 +349,17 @@ describe('acquireStandaloneOverlayLayer', () => {
     assert.ok(!document.querySelector(LAYER), 'gone with the last release');
   });
 
+  it('spans its window’s viewport and takes no pointer, and a container on it takes the pointer', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const { right, bottom, pointerEvents } = layer.host.style;
+    assert.deepEqual([right, bottom, pointerEvents], ['0px', '0px', 'none']);
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.equal(container.style.pointerEvents, 'auto', 'its panel takes the pointer');
+    const framed = createOverlayContainer(element(), standInChain(layer.host));
+    assert.equal(framed.style.pointerEvents, '', 'a container elsewhere states none');
+    layer.release();
+  });
+
   it('makes a new layer when the shared one was removed by another hand', () => {
     const one = acquireStandaloneOverlayLayer(document, {});
     one.host.remove();
