@@ -397,7 +397,10 @@ describe('SubjectModifierPicker (mounted)', () => {
     const describedBy = mixed
       .querySelector('[data-modifier-pill-select]')
       .getAttribute('aria-describedby');
-    assert.match(describedBy, new RegExp(mixed.querySelector('[data-subject-modifier-missing]').id));
+    assert.match(
+      describedBy,
+      new RegExp(mixed.querySelector('[data-subject-modifier-missing]').id)
+    );
     harness.remount();
 
     // only deleted picks: the placeholder must not claim they are kept and return
@@ -432,7 +435,10 @@ describe('SubjectModifierPicker (mounted)', () => {
   });
 
   it('says how many picks name deleted modifiers in the plural (issue 1617)', async () => {
-    const { target } = await mount({ selectedIds: ['med', 'gone', 'gone2'], inheritedIds: MARKED_TWO });
+    const { target } = await mount({
+      selectedIds: ['med', 'gone', 'gone2'],
+      inheritedIds: MARKED_TWO,
+    });
     const missing = target.querySelector('[data-subject-modifier-missing]');
     assert.equal(missing.getAttribute('data-subject-modifier-missing'), '2');
     // this harness's localizer echoes the key and its data rather than interpolating

@@ -369,7 +369,11 @@ test('the suppressed subject-modifier cases reach the seed through the query, mo
   const missingCase = VIEW_LAB_CASES.find(
     (entry) => entry.id === 'manager-component-edit-salvage-modifier-missing'
   );
-  assert.equal(missingCase?.query?.subjectModifierPicks, 'missing', 'the missing case sets its flag');
+  assert.equal(
+    missingCase?.query?.subjectModifierPicks,
+    'missing',
+    'the missing case sets its flag'
+  );
   const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8');
   const mount = read('./view-lab/mount.js');
   assert.match(mount, /subjectModifierPicks: params\.get\('subjectModifierPicks'\)/);
