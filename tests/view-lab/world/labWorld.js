@@ -57,6 +57,22 @@ function seedRewardKinds(content) {
   );
 }
 
+/** `currency-generated-id` (issue 1454): Bend Horseshoe also costs 8 of a unit whose id is a
+ *  generated string and whose label is "Handfuls", so the Requires row must read the label. */
+function seedCurrencyGeneratedId(content) {
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'currency-generated-id');
+  const unitId = 'kB45g8G7uUeiLATc';
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  content.currencyConfig.units = [
+    ...content.currencyConfig.units,
+    { id: unitId, label: 'Handfuls', actorPath: 'system.currency.handfuls', contains: [] },
+  ];
+  recipe.ingredientSets[0].ingredientGroups.push({
+    id: 's1-currency',
+    options: [{ match: { type: 'currency', unit: unitId, amount: 8 } }],
+  });
+}
+
 /** `reward-craft`: the `reward-kinds` horseshoe under a knowledge-visibility Smithing, so the craft
  *  clears the pre-flight, also re-teaching itself, which Brenna knows (`seedRewardCraftLearned`). */
 function seedRewardCraft(content) {
@@ -368,6 +384,7 @@ function seedFailurePolicyNever(content) {
 const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
+  'currency-generated-id': seedCurrencyGeneratedId,
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
   'reward-group': seedRewardGroup,
@@ -480,9 +497,11 @@ function seedGatheringTaskMode(content, mode) {
  * tab and leave the other eligible. Every copy is written: the world list and each system's own.
  */
 function seedSubjectModifierPicks(content, state) {
-  if (state !== 'suppressed') return;
-  const component = { id: 'hb-cracked-alembic', ids: ['hb-mod-medicine', 'hb-mod-tools'] };
-  const task = { id: 'hb-task-slowbloom', ids: ['hb-mod-nature', 'hb-mod-tools'] };
+  if (state !== 'suppressed' && state !== 'missing') return;
+  // `missing` swaps the second pick for an id the catalogue never held, as after a deletion.
+  const second = state === 'missing' ? 'hb-mod-deleted' : 'hb-mod-tools';
+  const component = { id: 'hb-cracked-alembic', ids: ['hb-mod-medicine', second] };
+  const task = { id: 'hb-task-slowbloom', ids: ['hb-mod-nature', second] };
   const pickSalvage = (entry) =>
     entry.id === component.id
       ? { ...entry, salvage: { ...entry.salvage, checkModifierIds: [...component.ids] } }
@@ -930,7 +949,8 @@ function stripAuthoredWorldComponents(content) {
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
- *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
+ *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result,
+ *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
  *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
@@ -938,7 +958,7 @@ function stripAuthoredWorldComponents(content) {
  *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`; or
  *   issue 2514's `failure-policy-never`.
  * @param {string|null} [options.subjectModifierPicks] `suppressed` authors a custom pick on the
- *   herbalism salvage component and gathering task. See {@link seedSubjectModifierPicks}.
+ *   herbalism salvage component and gathering task, `missing` one naming a deleted modifier. See {@link seedSubjectModifierPicks}.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.

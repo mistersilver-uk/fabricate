@@ -76,6 +76,7 @@ player-crafting-pick-for-me
 player-crafting-essence-pool-shared
 player-crafting-consumption-plan
 player-crafting-multistep
+player-crafting-multistep-parked
 player-crafting-routed-multistep
 player-crafting-progressive
 player-crafting-progressive-reordered
