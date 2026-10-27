@@ -131,11 +131,12 @@ Import is a second ingress for exactly the records that migration rescues: `impo
 The MANUAL FOLD is NOT keyed on `schemaVersion` and MUST run branch-independently: the force lists are an old ARRANGEMENT of current fields, so every bundle the shipping build writes carries the current schema and would skip a legacy-branch-only transform.
 It is safe unconditionally because after `1.29.0` no manual environment can carry a force list at all — the control that wrote one does not exist in that mode — so a manual force list is pre-upgrade by construction.
 
-**Clearing an AUTOMATIC force list MUST NOT run on the current-schema branch.**
-That branch runs on every payload forever, so clearing there would delete a legitimate automatic-mode force add on every export/import round-trip, permanently, for the very affordance `1315` moved into that mode.
-The legacy branch MUST still clear, because a bundle carrying no schema marker predates the upgrade and its automatic force entries are the residue `1.29.0` repairs.
-The residual case is a bundle stamped at the current schema but authored before the upgrade: its automatic residue is carried through and, under the new rule, composes.
-That is accepted as the lesser cost — it affects only worlds exporting across the upgrade boundary, whereas clearing would break the feature for every world forever.
+**Clearing an AUTOMATIC force list MUST be keyed on the bundle's OWN `schemaVersion`, never on the current marker: it runs, on either branch, only for a bundle whose `schemaVersion` is absent, not an integer, or below `6`.**
+A bundle at schema `6` or above was written by a build that already carried `1.29.0`, so clearing it would delete a legitimate automatic-mode force add on every export/import round trip, permanently, for the very affordance `1315` moved into that mode.
+Keyed instead on "not the current marker", a bump of `FABRICATE_EXPORT_SCHEMA_VERSION` would clear every bundle written at the outgoing version.
+A bundle below schema `6` MUST still be cleared, because its automatic force entries may be the residue `1.29.0` repairs.
+The residual case is a schema-`5` bundle exported by a build that carried `1.29.0` but not `1.30.0`: schema `5` spans both sides of the upgrade and no marker separates them, so its legitimate automatic force adds are cleared.
+That is accepted as the lesser cost, because the alternative lets pre-`1.29.0` residue silently compose, which `destructive-changes-and-migrations/spec.md` § Manual Composition Force-List Fold requirement 2 forbids.
 It is idempotent, because a second pass finds no manual force list to fold and does not clear what it preserved.
 
 A pre-`6` payload carries no world-scope entity slices at all, and `migrateExportPayload` MUST DERIVE all three from the bundle's own system by applying `migrateWorldScopeEntities` — the SAME `1.30.0` function the world-side migration applies — to a synthesized ONE-SYSTEM corpus, not a second implementation of it.
@@ -164,14 +165,15 @@ A payload whose activity check sits on the `bySubject` rule with an AUTHORED EMP
 Import is a second ingress for exactly the records that migration rescues: a bundle exported before the upgrade carries subject picks the destination's empty mark would bound away, and the world migration cannot reach it (issue 1608, see *destructive-changes-and-migrations/spec.md* § Subject Modifier Mark Seed).
 It MUST run AFTER the character-libraries lift above, because the seed is intersected with the world modifier catalogue and on a pre-`5` bundle that catalogue exists only as the system's own copy until that lift has run.
 
-**This seed MUST NOT run on the current-schema branch.**
-It is the one field-level derivation here that is NOT branch-independent, because it is the one whose guard is a DATA SHAPE that issue 1608 turned into a legitimate ANSWER: an empty mark under `bySubject` now MEANS "nothing is selectable", so a GM who un-marks the last row authors exactly the shape the seed keys on.
-That branch runs on every payload forever, so seeding there would restore that mark and PIN every sibling subject of the activity to an authored `[]` on every export/import round trip, permanently — reverting the GM's own answer and breaking the selection triple's round-trip requirement in § Round-trip integrity.
-The legacy branch MUST still seed, because a bundle carrying no schema marker predates the upgrade by construction and its empty mark is the un-asked question `1.33.0` repairs.
-The residual case is a bundle stamped at the current schema but exported before the upgrade: it is not seeded, so its subjects arrive bound by an empty mark and the destination GM must re-mark them.
-That is accepted as the lesser cost, on exactly the terms the automatic force-list clear above is: it affects only worlds exporting across the upgrade boundary, whereas seeding on the current branch would break the rule for every world forever.
-**Bumping `schemaVersion` to separate the two cohorts MUST NOT be used to remove that residual**, because the branch predicate is shared: every derivation here reads "legacy" as "not the current marker", so a bump reclassifies every bundle at the OUTGOING version as legacy and hands it the whole legacy branch — including the automatic force-list clear above, which would then destroy a legitimate force add in every bundle the shipping build has written since `1315`.
-Trading a residual that costs one re-mark for one that destroys authored data is the worse bargain, and it is why the residual is accepted rather than engineered away.
+**This seed MUST run, on either branch, only for a bundle whose own `schemaVersion` is absent, not an integer, or below `6`.**
+It is keyed on that version rather than run branch-independently because its guard is a DATA SHAPE that issue 1608 turned into a legitimate ANSWER: an empty mark under `bySubject` now MEANS "nothing is selectable", so a GM who un-marks the last row authors exactly the shape the seed keys on.
+Seeding a bundle exported since `1.33.0` would restore that mark and PIN every sibling subject of the activity to an authored `[]` on every export/import round trip, permanently — reverting the GM's own answer and breaking the selection triple's round-trip requirement in § Round-trip integrity.
+A bundle below schema `6` MUST still be seeded, because it predates `1.33.0` by construction and its empty mark is the un-asked question `1.33.0` repairs.
+The residual case is a schema-`6` bundle exported before `1.33.0`: it is not seeded, so its subjects arrive bound by an empty mark and the destination GM must re-mark them.
+That is accepted as the lesser cost: it affects only worlds exporting across the upgrade boundary, whereas seeding every schema-`6` bundle would break the rule for every world forever.
+Both derivations are keyed on the bundle's own `schemaVersion` against the fixed threshold `6`, never on the current marker, so bumping `FABRICATE_EXPORT_SCHEMA_VERSION` reclassifies no bundle for either.
+A bump still cannot remove the seed residual, because a schema-`6` bundle exported before `1.33.0` stays at schema `6`.
+A bundle above the current schema, written by a newer build, still takes the legacy branch and is stamped down to the current marker, but neither derivation runs on it.
 It is idempotent, because a second pass finds the mark already non-empty and returns at the same test that made it so.
 
 ### Currency configuration merge on import

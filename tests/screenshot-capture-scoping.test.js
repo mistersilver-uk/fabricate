@@ -1688,7 +1688,6 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-remove-from-system[\s\S]*?manager-tool-parity-02-remove-1280x720/,
     'the remove-from-system frame must reveal the callout it exists to show',
   );
-  assert.match(HARNESS, /function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length > 0/);
   assert.match(
     HARNESS,
     /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,

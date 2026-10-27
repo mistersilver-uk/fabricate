@@ -847,6 +847,20 @@ Task duration declaration for gathering.
 
 [Notes](docs/domain/terms.md#gathering-time-requirement)
 
+#### Global Current Condition
+
+The GM-set weather and time of day held in the gathering config's top-level `conditions`.
+A validated change sets the **System Current Condition** of every system whose own values offer the tag.
+
+[Notes](docs/domain/terms.md#global-current-condition)
+
+#### System Current Condition
+
+A crafting system's `current` option id under `systems[systemId].conditions[kind]`.
+The runtime gate, the composed environment's `conditions`, and the player listing's `rich.conditions` all read it.
+
+[Notes](docs/domain/terms.md#system-current-condition)
+
 #### Required Tool Display State
 
 The per-tool, per-actor state shown on the player "Required tools" panel: `present` (actor holds a matching, non-broken item), `damaged` (rendered as "Broken"), or `missing`.
@@ -1642,7 +1656,7 @@ Actor State (flags on the Actor document)
 |- craftingRuns
 |- salvageRuns (each active run carries resultOrder — the Player Result Order captured at START; see Result Order Asymmetry)
 |- gatheringRuns
-|- discoveredGatheringRealms ({ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } })
+|- discoveredGatheringRealms ({ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } })
 `- discoveryProgress
 
 Owned Copy (flags on an actor-owned Foundry Item that IS one of a system's recipe items)

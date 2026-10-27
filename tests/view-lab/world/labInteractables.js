@@ -46,6 +46,9 @@ export const LAB_INTERACTABLE_REFS = Object.freeze({
 /** The Tile document the tool interactable's marker resolves to. */
 const MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-marker';
 
+/** A Tool id no lab crafting system carries, for the one behaviour whose source was deleted. */
+const DELETED_TOOL_ID = 'deep-gate-deleted-tool';
+
 /** A Tile uuid that resolves to NOTHING, for the one behaviour whose marker is missing. */
 const DELETED_MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-deleted-marker';
 
@@ -289,6 +292,24 @@ export function seedLabInteractables(world) {
     },
   });
 
+  // A configured Tool whose definition was deleted: its stored name survives and its source does not.
+  const orphan = behaviorDocument({
+    region,
+    id: 'deep-gate-orphan',
+    name: 'Orphaned smelter',
+    system: buildInteractableBehaviorSystem({
+      interactableType: 'tool',
+      sourceUuid: buildInteractableSourceUuid({
+        interactableType: 'tool',
+        systemId: toolSource.systemId,
+        referenceId: DELETED_TOOL_ID,
+      }),
+      systemId: toolSource.systemId,
+      toolId: DELETED_TOOL_ID,
+      name: 'Orphaned smelter',
+    }),
+  });
+
   const draft = behaviorDocument({
     region,
     id: LAB_INTERACTABLE_REFS.unconfigured.behaviorId,
@@ -296,6 +317,6 @@ export function seedLabInteractables(world) {
     system: null,
   });
 
-  region.behaviors = collectionOf([forage, cache, lost, draft]);
+  region.behaviors = collectionOf([forage, cache, lost, orphan, draft]);
   scene.regions = collectionOf([region]);
 }

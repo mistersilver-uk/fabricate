@@ -70,10 +70,10 @@ game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering a
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
 game.fabricate.getHideUnavailableEnvironments() // Player "hide unavailable environments" toggle (per client/device)
 game.fabricate.setHideUnavailableEnvironments(value) // Persist that toggle (per client/device)
-game.fabricate.getGatheringConditions()     // Current gathering weather/time and vocabularies
+game.fabricate.getGatheringConditions()     // Global current gathering weather/time and vocabularies
 game.fabricate.setGatheringWeather(weatherTag) // GM-only gathering weather update
 game.fabricate.setGatheringTimeOfDay(timeOfDayTag) // GM-only gathering time update
-game.fabricate.setGatheringConditions({ weather, timeOfDay }) // GM-only conditions update
+game.fabricate.setGatheringConditions({ weather, timeOfDay }) // GM-only global conditions update
 game.fabricate.getGatheringPartyStore()      // Fabricate-managed gathering parties (world-level)
 game.fabricate.getGatheringRealmStore()      // Per-system gathering realm CRUD and settings (was getGatheringRegionStore — deprecated alias kept)
 game.fabricate.getGatheringLocationService() // Party current-realm resolution
@@ -4182,7 +4182,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Actor flag | `fabricate.gatheringRuns.active` | In-progress gathering runs |
 | Actor flag | `fabricate.gatheringRuns.history` | Completed gathering runs |
 | Actor flag | `fabricate.learnedRecipes` | Learned recipe records |
-| Actor flag | `fabricate.discoveredGatheringRealms` | Per-system gathering realm discovery entries for the actor (legacy `fabricate.discoveredGatheringRegions` flag read as a fallback) |
+| Actor flag | `fabricate.discoveredGatheringRealms` | Gathering realm discovery entries for the actor, keyed by realm (the legacy `fabricate.discoveredGatheringRegions` flag is read as a fallback and removed on the next reveal or hide) |
 | Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
 | Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
 | Item flag | `fabricate.recipeItemUsage` | `{ timesUsed, inert? }` for recipe item tracking. `inert` records that the copy exhausted while its book was set to become inert rather than be destroyed, and nothing in Fabricate clears it once set |

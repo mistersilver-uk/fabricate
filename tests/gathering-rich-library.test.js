@@ -921,6 +921,100 @@ test('player listing exposes current conditions as context without weather/time 
   assert.equal('timeOfDayFilters' in listing, false);
 });
 
+const FOG_TASK = {
+  id: 'task-fog',
+  name: 'Gather Fog Fern',
+  dropRows: [{ id: 'drop-fern', componentId: 'herb', quantity: 1, dropRate: 100 }],
+};
+
+function clearRainWeather() {
+  return {
+    enabled: true,
+    current: 'clear',
+    values: [
+      { id: 'clear', label: 'Clear', icon: '' },
+      { id: 'rain', label: 'Rain', icon: '' },
+    ],
+  };
+}
+
+test('player listing publishes the system current when its options exclude the set global tag', async () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': { tasks: [FOG_TASK], conditions: { weather: clearRainWeather() } },
+      },
+    },
+  });
+  await service.setConditions({ weather: 'fog' });
+  const engine = makeEngine({ richState: service });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const [row] = listing.environments;
+
+  assert.equal(service.getConditions().weather, 'fog');
+  assert.equal(row.conditions.weather, 'clear');
+  assert.equal(row.tasks[0].rich.conditions.weather, 'clear');
+  assert.deepEqual(row.tasks[0].rich.conditions, row.conditions);
+});
+
+test('player listing publishes the global current for a system with no persisted conditions block', async () => {
+  const { service } = makeRichState({
+    config: { systems: { 'system-a': { tasks: [FOG_TASK] } } },
+  });
+  await service.setConditions({ weather: 'fog', timeOfDay: 'dawn' });
+  const engine = makeEngine({ richState: service });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const [row] = listing.environments;
+
+  assert.deepEqual(row.tasks[0].rich.conditions, { weather: 'fog', timeOfDay: 'dawn' });
+  assert.deepEqual(row.tasks[0].rich.conditions, row.conditions);
+});
+
+test('opaque blind listing row carries the system current in rich conditions', async () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': { tasks: [FOG_TASK], conditions: { weather: clearRainWeather() } },
+      },
+    },
+  });
+  await service.setConditions({ weather: 'fog' });
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ selectionMode: 'blind' }),
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.environments[0].tasks[0].rich.conditions.weather, 'clear');
+});
+
+test('economy evidence records the system current that the condition snapshot records', async () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': { tasks: [FOG_TASK], conditions: { weather: clearRainWeather() } },
+      },
+    },
+  });
+  await service.setConditions({ weather: 'fog' });
+  const calls = {};
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ selectionMode: 'blind' }),
+    calls,
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  const { payload } = calls.terminal[0];
+
+  assert.equal(result.accepted, true);
+  assert.equal(payload.conditionSnapshot.weather, 'clear');
+  assert.deepEqual(payload.economyEvidence.conditions, payload.conditionSnapshot);
+});
+
 test('blind player listing redacts matched event identity and drop rates', async () => {
   const { service } = makeRichState({
     config: {

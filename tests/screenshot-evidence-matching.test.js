@@ -1,7 +1,6 @@
 /**
- * The `check-screenshots` gate's composed decision (issue 1133). THE MUTATION MAP IS THE ACCEPTANCE
- * BAR -------------------------------------- Each of the 62 mutations below must flip the named
- * test to FAIL.
+ * The `check-screenshots` gate's composed decision (issue 1133). Each lettered case pins one
+ * direction of the verdict, so a mutation of the gate that inverts it fails that case.
  */
 
 import assert from 'node:assert/strict';
@@ -36,6 +35,7 @@ import {
   main,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   BLOCK_END,
   BLOCK_START,
@@ -336,6 +336,32 @@ describe('decideScreenshotGate', () => {
     assert.ok(
       !gh.calls.some((args) => args.includes('headRefOid')),
       'only a cancelled run raises the question of whether a newer head superseded this one'
+    );
+  });
+
+  it('(f4) fails a cancelled capture whose live head could not be read, rather than passing it as superseded', async () => {
+    // The failed read's stderr is non-empty and differs from HEAD, so a read that handed it back as
+    // the head would pass this head as superseded.
+    const gh = makeGhFake({
+      runs: [workflowRun({ conclusion: 'cancelled' })],
+      headOidFails: 'HTTP 502: Bad Gateway',
+      body: '',
+    });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+
+    let decision;
+    const captured = await captureConsole(async () => {
+      decision = await decide({ gh, clock });
+    });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_CANCELLED);
+    assert.ok(
+      gh.calls.some((args) => args.includes('headRefOid')),
+      'the cancelled run must have asked for the live head'
+    );
+    assert.ok(
+      captured.warn.some((line) => line.includes('Could not read headRefOid')),
+      'the failed head read is warned about'
     );
   });
 
@@ -1653,4 +1679,20 @@ describe('design-library frames are not application evidence (issue 2413)', () =
       assert.doesNotMatch(decision.message, /3-0-stepper/);
     });
   }
+});
+
+test('CONTRIBUTING lists every failing gate code, and only those (issue 1176)', () => {
+  const lead = 'A failing check names which problem it is';
+  const lines = readFileSync(new URL('../CONTRIBUTING.md', import.meta.url), 'utf8')
+    .split('\n')
+    .filter((line) => line.startsWith(lead));
+  assert.equal(lines.length, 1, `CONTRIBUTING.md must state "${lead}" on exactly one line`);
+  // A code is a bare lowercase token, so the `::error::<code>` prefix on the same line is not one.
+  const listed = [...lines[0].matchAll(/`([a-z][a-z-]*)`/g)].map(([, code]) => code);
+  const failing = Object.values(GATE_CODES).filter((code) => code !== GATE_CODES.SUPERSEDED);
+  assert.deepEqual(
+    [...new Set(listed)].sort(byCodePoint),
+    [...failing].sort(byCodePoint),
+    'the gate codes CONTRIBUTING.md lists have drifted from GATE_CODES'
+  );
 });

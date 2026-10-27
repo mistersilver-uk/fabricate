@@ -168,6 +168,9 @@ async function emittedReferences() {
   return unresolvedReferences;
 }
 
+/** The owner types the literal scan finds today; fewer means a scan pattern or `src/systems` moved. */
+const OWNER_TYPE_FLOOR = 9;
+
 /** Owner types written as string literals anywhere under `src/systems/`. */
 function literalOwnerTypesInSystems() {
   const directory = join(ROOT, 'src', 'systems');
@@ -212,7 +215,12 @@ test('every reference kind the report can group has a Kind label', () => {
 
 test('every owner type the import can emit has an OwnerType label', async () => {
   const emitted = new Set((await emittedReferences()).map((reference) => reference.ownerType));
-  for (const ownerType of literalOwnerTypesInSystems()) emitted.add(ownerType);
+  const literal = literalOwnerTypesInSystems();
+  assert.ok(
+    literal.size >= OWNER_TYPE_FLOOR,
+    `the src/systems scan found ${literal.size} literal owner types, against ${OWNER_TYPE_FLOOR}; lower OWNER_TYPE_FLOOR deliberately if modules moved`
+  );
+  for (const ownerType of literal) emitted.add(ownerType);
   // `unknown` is the fallback for an owner-type-less reference.
   emitted.add('unknown');
 

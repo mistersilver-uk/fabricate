@@ -12,6 +12,7 @@ import {
   labQueryFor,
   mapChangedFilesToCases,
 } from '../../scripts/lib/viewLabCases.js';
+import { runCaseSteps } from '../../scripts/lib/viewLabSteps.js';
 import { openViewLab, VIEW_LAB_VITE_CONFIG } from '../../scripts/visual-parity/lib/view-lab.js';
 import {
   harvestedFoundryChromeCss,
@@ -55,30 +56,6 @@ function freePort() {
   });
 }
 
-/** The registry's step verbs this suite's cases use; any other verb fails rather than being skipped. */
-// Mirrors `runSteps` in scripts/view-lab-screenshots.mjs until a follow-up extracts a shared runner.
-async function runSteps(page, steps, caseId) {
-  for (const step of steps) {
-    if (typeof step === 'string') {
-      const label = new RegExp(
-        String.raw`^\s*${step.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}(\s|$)`
-      );
-      await page.locator('.manager-nav-button').filter({ hasText: label }).first().click();
-    } else if ((await page.locator(step.selector).count()) === 0) {
-      throw new Error(
-        `${caseId}: nothing matches "${step.selector}" — the case cannot reach its view state`
-      );
-    } else if ('fill' in step) {
-      await page.locator(step.selector).first().fill(step.fill);
-    } else if (Object.keys(step).length === 1) {
-      await page.locator(step.selector).first().click();
-    } else {
-      throw new Error(`unsupported case step ${JSON.stringify(step)}`);
-    }
-    await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
-  }
-}
-
 /** Each kicker's face beside its window's and its parent's, then again under a forced mono parent. */
 function readKickerFaces() {
   const faceOf = (element) => getComputedStyle(element).fontFamily;
@@ -118,7 +95,7 @@ describe('Kicker draws the host UI face in every case it is captured in', { skip
         query: labQueryFor(viewCase),
         port,
         settleMs: 0,
-        afterOpen: (opened) => runSteps(opened, viewCase.steps ?? [], id),
+        afterOpen: (opened) => runCaseSteps(opened, viewCase.steps ?? [], { label: id }),
       });
       measured.set(id, await page.evaluate(readKickerFaces));
       await dispose();
