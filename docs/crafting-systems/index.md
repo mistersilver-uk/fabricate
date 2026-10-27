@@ -261,6 +261,9 @@ If the actor cannot pay, the craft is stopped before anything is consumed and Fa
 A craft can also stop because the world's currency setup cannot price the cost at all, which is a different problem from the actor being short.
 See [Checking your currency setup]({% link world/rules/currency.md %}#checking-your-currency-setup) for what that looks like and how a GM fixes it.
 
+The recipe browser's inspector lists a currency cost under **Requires** as the amount followed by the coin's abbreviation, or by its label when the coin has no abbreviation.
+If the world's currency setup no longer has that coin, the inspector shows the coin's stored identifier instead of leaving the cost blank.
+
 Currency requirements are off by default.
 You turn them on or off with the **Currency** toggle in the **Optional features** section of the system settings editor, next to the time toggle.
 This toggle only decides whether the system participates.

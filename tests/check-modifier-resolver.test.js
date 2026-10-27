@@ -13,6 +13,7 @@ const {
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
   resolveEligibleModifierIds,
+  partitionPickedModifierIds,
   resolveCheckModifierContribution,
   resolveSelectedCheckModifiers,
   buildCheckModifierChoice,
@@ -302,6 +303,30 @@ test('resolveEligibleModifierIds: a bySubject pick the check no longer MARKS doe
     ['alch', 'med'],
     'the surviving picks keep the order the subject authored them in'
   );
+});
+
+test('partitionPickedModifierIds splits picks into eligible, un-marked and deleted', () => {
+  const picks = ['med', 'herb', 'gone', 'alch'];
+  assert.deepEqual(partitionPickedModifierIds(picks, CATALOGUE, ['med', 'alch']), {
+    eligible: ['med', 'alch'],
+    suppressed: ['herb'],
+    missing: ['gone'],
+  });
+  assert.deepEqual(
+    partitionPickedModifierIds(picks, CATALOGUE, []),
+    { eligible: [], suppressed: ['med', 'herb', 'alch'], missing: ['gone'] },
+    'an empty mark un-marks every catalogued pick, and still cannot revive a deleted one'
+  );
+  assert.deepEqual(
+    partitionPickedModifierIds(picks, CATALOGUE, null),
+    { eligible: ['med', 'herb', 'alch'], suppressed: [], missing: ['gone'] },
+    'a non-array mark bounds nothing'
+  );
+  assert.deepEqual(partitionPickedModifierIds(null, null, null), {
+    eligible: [],
+    suppressed: [],
+    missing: [],
+  });
 });
 
 test('resolveEligibleModifierIds: re-MARKING restores a suppressed pick, unchanged', () => {

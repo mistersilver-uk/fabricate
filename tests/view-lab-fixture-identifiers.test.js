@@ -346,6 +346,15 @@ test('the suppressed subject-modifier seed authors both hosts in every copy, and
   const salvagePick = ['hb-mod-medicine', 'hb-mod-tools'];
   const taskPick = ['hb-mod-nature', 'hb-mod-tools'];
   assert.deepEqual(picksOf(seeded), [salvagePick, salvagePick, taskPick, taskPick]);
+
+  const missing = structuredClone(buildLabContent({}));
+  seed(missing, 'missing');
+  const deletedPick = ['hb-mod-medicine', 'hb-mod-deleted'];
+  assert.ok(
+    !JSON.stringify(buildLabContent({})).includes('hb-mod-deleted'),
+    'the deleted id names no catalogue entry anywhere in the unseeded world'
+  );
+  assert.deepEqual(picksOf(missing)[0], deletedPick);
 });
 
 test('the suppressed subject-modifier cases reach the seed through the query, mount and world', () => {
@@ -357,6 +366,14 @@ test('the suppressed subject-modifier cases reach the seed through the query, mo
     const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
     assert.equal(viewCase?.query?.subjectModifierPicks, 'suppressed', `${id} sets the flag`);
   }
+  const missingCase = VIEW_LAB_CASES.find(
+    (entry) => entry.id === 'manager-component-edit-salvage-modifier-missing'
+  );
+  assert.equal(
+    missingCase?.query?.subjectModifierPicks,
+    'missing',
+    'the missing case sets its flag'
+  );
   const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8');
   const mount = read('./view-lab/mount.js');
   assert.match(mount, /subjectModifierPicks: params\.get\('subjectModifierPicks'\)/);

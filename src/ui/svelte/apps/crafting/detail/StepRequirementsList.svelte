@@ -66,7 +66,9 @@
   }
 
   function railFor(step) {
-    return isActiveStep(step) ? rail : { readOnly: true };
+    return isActiveStep(step)
+      ? { ...rail, inProgress: rail.readOnly === true }
+      : { readOnly: true };
   }
 </script>
 

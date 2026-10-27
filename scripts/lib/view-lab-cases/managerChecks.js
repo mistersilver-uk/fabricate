@@ -1208,6 +1208,42 @@ export const CASES = Object.freeze([
       ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
+  // The deleted-modifier note (issue 1617): the second authored pick names a modifier no longer in the library.
+  managerCase({
+    id: 'manager-component-edit-salvage-modifier-missing',
+    label: 'Manager — Component edit salvage modifier deleted pick',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', subjectModifierPicks: 'missing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
+          '[data-component-edit]',
+      },
+      { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
+      '[data-subject-modifier-missing="1"]',
+    expectContained: [
+      {
+        container: '[data-component-edit-panel]',
+        target: '[data-subject-modifier-missing]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
+    ],
+  }),
   managerCase({
     id: 'manager-gathering-task-edit-modifier-suppressed',
     label: 'Manager — Gathering task edit modifier suppressed pick',

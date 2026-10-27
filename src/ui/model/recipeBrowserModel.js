@@ -4,7 +4,11 @@
  */
 
 import { isFixedSumOver } from '../../systems/checkTarget.js';
-import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
+import {
+  currencyUnitDisplayName,
+  findCurrencyUnit,
+  formatCurrencyRequirement,
+} from '../../systems/currencyProfile.js';
 import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
 import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
 
@@ -345,6 +349,7 @@ function findById(roster, id) {
 export function buildRecipeRequirementRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
   const essences = rosters.essenceOptions;
+  const { currencyUnits } = rosters;
   const requirements = [];
 
   for (const scope of executionScopes(recipe)) {
@@ -359,7 +364,7 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
         if (options.length === 0) continue;
         const groupId = `${setId}:${group?.id || groupIndex}`;
         const members = options.map((option, optionIndex) => ({
-          ...describeRequirementOption(option, components, essences),
+          ...describeRequirementOption(option, components, essences, currencyUnits),
           id: `${groupId}:${option?.id || optionIndex}`,
         }));
 
@@ -388,7 +393,8 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
   return requirements;
 }
 
-function describeRequirementOption(option, components, essences) {
+/** A currency option's `name` is its cost label; only a unit gone from `currencyUnits` shows its raw id. */
+function describeRequirementOption(option, components, essences, currencyUnits) {
   const match = option?.match || {};
   const quantity = Number(option?.quantity) > 0 ? Number(option.quantity) : 1;
 
@@ -418,7 +424,7 @@ function describeRequirementOption(option, components, essences) {
   if (match.type === 'currency') {
     return {
       kind: 'currency',
-      name: '',
+      name: formatCurrencyRequirement(match, currencyUnits),
       unit: match.unit || '',
       amount: Number(match.amount) || 0,
       icon: 'fa-solid fa-coins',

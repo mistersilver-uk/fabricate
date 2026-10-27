@@ -657,6 +657,9 @@ The rail's geometry — a 72px column of labelled 44px icon wells, with the Jour
 - The step block that renders the recomputed craftability the detail is handed is the **displayed** step (`displayedStepId`, the step the model's top-level `ingredientSets` were projected from), never the active step: the two differ while a run is parked past the first step, and every block other than the displayed one renders its own step's baked craftability, so each block always states its own requirements, consumption plan and tools.
 - A step's requirement block is also read-only while its **time gate is armed** — an in-progress timed step whose availability time has not been reached.
   That step's consumption is already committed, so offering a selection would misrepresent what the craft will spend.
+- A read-only requirement block SHALL say why it is read-only.
+  The block of the step the engine would execute next SHALL read "A run is in progress, so this step's requirements can't be changed." while a run is parked on it or its time gate is armed.
+  The block of every other step SHALL read "This isn't the step being crafted, so its requirements can't be changed yet."
 - The projection is presentation-only and is never the enforcement point: the engine remains authoritative and drops any player allocation whose step does not match the step it actually resolved, because the displayed index can move between render and click (a time gate maturing on a world-time tick, or another owner advancing the run).
 - A fully revealed timed implicit recipe projects its positive authored
   `timeRequirement` as `RecipeListingModel.duration`.

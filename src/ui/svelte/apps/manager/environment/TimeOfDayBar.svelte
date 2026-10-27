@@ -18,6 +18,9 @@
   - `onSeed(hour)` — a rail add's start hour; the caller seeds its add form and creates nothing.
 
   Invariants:
+  - A persistent polite live region sits beside the bar from mount: it holds the fallback note's
+    text while the bar is replaced by it and is empty otherwise, because a status role added with
+    the inserted note is not reliably announced.
   - A drag draws from a local draft and writes only on its commit; a draft lasts until `values` or
     `current` is replaced, so keyed commits against a deferred store still step from the last one;
     a commit equal to the last value written, or to the stored one, writes nothing;
@@ -78,6 +81,15 @@
   );
   const shownCurrent = $derived(currentDraft.against === current ? currentDraft.id : current);
   const bar = $derived(timeOfDayBar({ values: drafted, current: shownCurrent, components }));
+
+  const fallbackText = $derived(
+    bar.status === 'fallback'
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayBar.Fallback', undefined, {
+          hours: bar.hoursPerDay,
+          values: formatList(bar.unplaced),
+        })
+      : ''
+  );
 
   const bands = $derived(
     bar.bands.map((band) => ({
@@ -189,15 +201,10 @@
   <ThresholdBandStrip
     binding="start"
     bands={[]}
-    fallbackNote={text(
-      'FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayBar.Fallback',
-      undefined,
-      {
-        hours: bar.hoursPerDay,
-        values: formatList(bar.unplaced),
-      }
-    )}
+    fallbackNote={fallbackText}
     class="manager-time-of-day-bar"
     data-time-of-day-fallback
   />
 {/if}
+
+<p class="visually-hidden" aria-live="polite" data-time-of-day-announce>{fallbackText}</p>

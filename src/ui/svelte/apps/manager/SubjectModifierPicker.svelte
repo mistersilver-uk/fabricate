@@ -19,6 +19,8 @@
     activity marks it again — and `resolveEligibleModifierIds` applies the same intersection at roll
     time. THE INHERITED SET IS NAMED through `foundryBridge.formatList` into a `{list}` PLACEHOLDER,
     never concatenated, because separator, conjunction and Oxford comma vary by locale.
+  - A pick naming a modifier gone from `options` is counted apart from an un-marked one: only the
+    un-marked pick is promised a return.
   - The recipe site is NOT converted: `changeModifierSetMode` in `RecipeCraftingModifierField`
     SEEDS the pick from the system default set where this toggle authors `[]`, which is a
     behaviour decision.
@@ -29,7 +31,10 @@
   import { localizeOr } from '../../util/localizeOr.js';
   import ModifierPillSelect from '../../components/ModifierPillSelect.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import { resolveMaxModifierPicks } from '../../../../systems/checkModifierResolver.js';
+  import {
+    partitionPickedModifierIds,
+    resolveMaxModifierPicks,
+  } from '../../../../systems/checkModifierResolver.js';
 
   let {
     options = [],
@@ -85,6 +90,7 @@
   const LABEL_ID = $derived(`${testId}-label`);
   const CAP_HINT_ID = $derived(`${testId}-cap-hint`);
   const SUPPRESSED_ID = $derived(`${testId}-suppressed`);
+  const MISSING_ID = $derived(`${testId}-missing`);
 
   const authored = $derived(Array.isArray(selectedIds));
   const picked = $derived(authored ? selectedIds : []);
@@ -96,10 +102,13 @@
       ? options.filter((option) => inheritedIds.includes(option?.id))
       : options
   );
-  const eligibleIds = $derived(new Set(eligibleOptions.map((option) => option?.id)));
-  const pickedEligible = $derived(picked.filter((id) => eligibleIds.has(id)));
+  const partition = $derived(partitionPickedModifierIds(picked, options, inheritedIds));
   // The cap counts what the GM can SEE, or the add button deadens against invisible chips.
-  const suppressedCount = $derived(picked.length - pickedEligible.length);
+  const pickedEligible = $derived(partition.eligible);
+  // A pick naming a modifier the catalogue no longer holds returns with nothing, so it is counted
+  // apart from one the check merely un-marked.
+  const missingCount = $derived(partition.missing.length);
+  const suppressedCount = $derived(partition.suppressed.length);
 
   // Routed through the resolver so this surface bounds what the ENGINE bounds.
   const capLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks: maxPicks }));
@@ -134,9 +143,31 @@
     if (translated && translated !== SUPPRESSED_KEY) return translated;
     return `${suppressedCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
   });
+  const MISSING_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissing';
+  // The deleted id has no chip to remove, so the note names the switch that re-authors the pick.
+  const missingText = $derived.by(() => {
+    const clear = localizeOr(
+      'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierMissingClear',
+      'To clear this, turn off Pick check modifiers and turn it on again; that resets the other picks too.'
+    );
+    if (missingCount === 1) {
+      return `${localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
+        'One chosen modifier no longer exists in the Modifiers library, so it is hidden and does nothing.'
+      )} ${clear}`;
+    }
+    const translated = localize(MISSING_KEY, { count: missingCount });
+    const sentence =
+      translated && translated !== MISSING_KEY
+        ? translated
+        : `${missingCount} chosen modifiers no longer exist in the Modifiers library, so they are hidden and do nothing.`;
+    return `${sentence} ${clear}`;
+  });
   // WHICH ZERO THE PILL ROW IS SHOWING: two states draw no chip, and the placeholder is also the
-  // `aria-live` summary.
-  const allPicksSuppressed = $derived(pickedEligible.length === 0 && suppressedCount > 0);
+  // `aria-live` summary. Its all-hidden sentence promises a return, so it needs no deleted pick.
+  const allPicksSuppressed = $derived(
+    pickedEligible.length === 0 && suppressedCount > 0 && missingCount === 0
+  );
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
   const emptyRowText = $derived(
     allPicksSuppressed
@@ -150,11 +181,16 @@
   // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression a GM can see PART of; once
   // every pick is suppressed the placeholder above IS that explanation.
   const showSuppressedNote = $derived(suppressedCount > 0 && !allPicksSuppressed);
+  const showMissingNote = $derived(missingCount > 0);
 
   // `aria-describedby` takes a LIST, and tracks the note's own condition, so the group is never
   // described by an element that is not rendered.
   const describedBy = $derived(
-    [capBounded ? CAP_HINT_ID : '', showSuppressedNote ? SUPPRESSED_ID : '']
+    [
+      capBounded ? CAP_HINT_ID : '',
+      showSuppressedNote ? SUPPRESSED_ID : '',
+      showMissingNote ? MISSING_ID : '',
+    ]
       .filter(Boolean)
       .join(' ')
   );
@@ -261,6 +297,11 @@
           data-subject-modifier-suppressed={suppressedCount}
         >
           {suppressedText}
+        </p>
+      {/if}
+      {#if showMissingNote}
+        <p class="manager-muted" id={MISSING_ID} data-subject-modifier-missing={missingCount}>
+          {missingText}
         </p>
       {/if}
     {:else}

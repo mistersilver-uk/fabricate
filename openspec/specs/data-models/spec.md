@@ -2083,9 +2083,10 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
    A time-gated step that consumes at START records on its run ONLY the spends that actually settled, never the intended plan.
    A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
-6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
-   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the resolved world currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
-   This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
+6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored), then `label`, then `id`, so the raw id shows only for a unit absent from the world currency configuration or one that names itself nowhere.
+   A `requirement.unit` id no longer present in the resolved world currency config is the degenerate orphaned reference, which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
+   This applies to the player crafting-app currency option cost row and to the Requires row of the manager's recipe inspector, which both format the row through `formatCurrencyRequirement`.
+   The inspector row SHALL name an unresolvable unit by its stored id and SHALL NOT render a blank cost.
 
 ### Essence-Alternative Consumption (Craft-Time)
 
