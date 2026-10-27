@@ -824,6 +824,7 @@ The row and inspector derive `Ready` or `Needs attention` from the canonical `To
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 When Tools exist and the current selection is absent or stale, the library selects the first MEMBER row of the rendered page exactly once, reading the membership filter, search term, sort key, sort direction and page slice the GM is actually looking at rather than the unsorted authored array.
 It skips unadopted world rows, so a deliberate selection of one is never snapped away from the `Add {tool} to {system}` action that is its only purpose.
+The unadopted selection belongs to the crafting system it was made in: on any other system it is not selected, and no `Add {tool} to {system}` action is offered for it there.
 A valid current selection is preserved and an empty library emits no selection.
 The result list scrolls independently above a full-width pagination footer that remains outside the scrolling region, and that footer's bar renders only for a multi-page result set, so a single page draws no pagination band.
 

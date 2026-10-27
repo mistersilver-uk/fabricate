@@ -499,6 +499,11 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     const row = stagedRow(root, 'book-forge');
     assert.match(row.textContent, /This book or scroll is no longer in this system/);
     assert.ok(!row.textContent.includes('book-forge'), 'a raw definition id never reaches the GM');
+    const nameStyle = (id) =>
+      globalThis.getComputedStyle(stagedRow(root, id).querySelector('.fab-bulk-book-staged-name'));
+    assert.equal(nameStyle('book-forge').whiteSpace, 'normal', 'the long copy wraps, not ellipsised');
+    assert.equal(nameStyle('book-forge').fontStyle, 'italic');
+    assert.equal(nameStyle('book-alchemy').whiteSpace, 'nowrap', 'a real book keeps its one line');
     assert.ok(row.hasAttribute('data-bulk-book-missing'), 'the row is marked as a missing book');
     assert.ok(row.classList.contains('is-missing'), 'and claims neither the add nor remove tone');
     assert.ok(!stagedRow(root, 'book-alchemy').hasAttribute('data-bulk-book-missing'));
@@ -1036,7 +1041,7 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
 });
 
 describe('RecipeBulkEditPanel in-flight delete (issue 1844)', () => {
-  it('goes inert while the armed set delete is being confirmed, as it does for an apply', async () => {
+  it('goes inert while the set delete is running, as it does for an apply', async () => {
     const { root } = await mountPanel({
       deleteImpact: {
         deletable: 3,

@@ -701,11 +701,9 @@
   const PANEL_ATTR = 'data-recipe-bulk-panel';
   const PANEL_HOOK = `[${PANEL_ATTR}]`;
   const BOOK_TRIGGER = '.fab-bulk-book-trigger';
-  // Last resort when no row or trigger remains, so focus stays inside the panel.
   const FOCUS_FALLBACKS = [BOOK_TRIGGER, '[data-recipe-bulk-clear]'];
 
-  // First candidate that exists, is attached and is not disabled; otherwise focus is left where it
-  // is rather than parked on an inert control.
+  // First candidate that exists, is attached and enabled; otherwise focus stays where it is.
   function focusAfterRerender(selectors) {
     queueMicrotask(() => {
       if (typeof document === 'undefined') return;
@@ -1224,6 +1222,8 @@
   .fab-bulk-book-staged-row.is-missing .fab-bulk-book-staged-name {
     color: var(--fab-text-muted);
     font-style: italic;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .fab-bulk-book-staged-copy {
