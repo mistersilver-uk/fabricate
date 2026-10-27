@@ -953,7 +953,7 @@ test("the tag catalogue's new-tag footer keeps a long name inside the 300px pane
 
 test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm one', async () => {
   // `proto:4628` is `segStyle`: the chosen segment takes the design's own translucent tag value
-  // and `var(--text)`, the unchosen one is transparent over `var(--subtle)`, and `proto:2268`
+  // and `var(--text)`, the unchosen one is transparent over the muted ink (issue 2685), and `proto:2268`
   // edges the track in the same hue at a lower alpha. That hue is the tag family - it is the
   // value the row's own border, the tag chips and the `+ Tag` pill already carry here, which is
   // `--fab-purple` - so a warm track puts the one control that is ABOUT tags in a different
@@ -997,7 +997,7 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
             <span data-probe="edge" style="color: color-mix(in srgb, var(--fab-purple) 40%, transparent)"></span>
             <span data-probe="lit" style="color: var(--fab-purple-soft)"></span>
             <span data-probe="warm" style="color: var(--fab-surface-active)"></span>
-            <span data-probe="resting" style="color: var(--fab-text-subtle)"></span>
+            <span data-probe="resting" style="color: var(--fab-text-muted)"></span>
           </main>
         </body>
       </html>
