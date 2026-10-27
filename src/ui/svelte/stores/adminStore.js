@@ -70,7 +70,6 @@ import {
   normalizeNullableAdjustment,
   normalizeNullableSuccesses,
 } from '../../../systems/normalize/checkEvaluation.js';
-import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { summarizeModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -89,7 +88,6 @@ import {
   permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
 import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
-import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 // The two authority tokens, imported rather than re-spelled (issue 1374): the write path reads
 // any third value as a CLEAR, so tokens, resolver and normalizer must share one set.
@@ -132,6 +130,7 @@ import {
 } from './adminStoreInternals.js';
 import { createEnvironmentDraftSection } from './adminEnvironmentDraftSection.js';
 import { createToolDraftSection } from './adminToolDraftSection.js';
+import { validateGatheringResultGroups } from './adminGatheringResultValidation.js';
 import {
   createCurrencySection,
   emptyWorldCurrencyState,
@@ -4921,37 +4920,6 @@ export function createAdminStore(services) {
     return services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
   }
 
-  function _validateGatheringResultGroups(groups, label, { requireResult = false } = {}) {
-    const errors = [];
-    for (const [groupIndex, group] of (Array.isArray(groups) ? groups : []).entries()) {
-      if (!group || typeof group !== 'object') {
-        errors.push(`${label} result group ${groupIndex + 1} is invalid`);
-        continue;
-      }
-      const groupLabel = String(group.name || '').trim() || group.id || groupIndex + 1;
-      const results = Array.isArray(group.results) ? group.results : [];
-      if (requireResult && results.length === 0) {
-        errors.push(`${label} result group "${groupLabel}" requires at least one result`);
-      }
-      for (const [resultIndex, result] of results.entries()) {
-        const resultLabel = `${label} result group "${groupLabel}" result ${resultIndex + 1}`;
-        const quantity = result?.quantity;
-        const quantityValid =
-          typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0;
-        if (!quantityValid) {
-          errors.push(`${resultLabel} quantity must be a positive finite number`);
-        }
-        // `Result` owns the remaining field contract, and its legacy quantity default is applied
-        // only after the raw check above so zero cannot become one; `Roll` is injected (issue 1645).
-        const candidate = Result.fromJSON({ ...result, quantity: quantityValid ? quantity : 1 });
-        for (const error of candidate.validate({ Roll: diceEngine() }).errors) {
-          errors.push(`${resultLabel}: ${error}`);
-        }
-      }
-    }
-    return errors;
-  }
-
   function _activeGatheringRoutedTiers(system) {
     const routed = system?.gatheringCraftingCheck?.routed;
     const tiers = routed?.type === 'fixed' ? routed.fixedOutcomes : routed?.relativeOutcomes;
@@ -4996,7 +4964,7 @@ export function createAdminStore(services) {
           resultErrors.push(`${label} Direct mode requires exactly one result group`);
         }
         resultErrors.push(
-          ..._validateGatheringResultGroups(groups, label, { requireResult: true })
+          ...validateGatheringResultGroups(groups, label, { requireResult: true })
         );
         break;
       }
@@ -5023,7 +4991,7 @@ export function createAdminStore(services) {
             );
           }
         }
-        resultErrors.push(..._validateGatheringResultGroups(groups, label));
+        resultErrors.push(...validateGatheringResultGroups(groups, label));
         break;
       }
       default: {
