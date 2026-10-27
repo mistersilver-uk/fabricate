@@ -6,31 +6,11 @@
 import { Result } from '../../../models/Result.js';
 import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 
-/** One error per result whose id an earlier result in the task already holds. */
-function duplicateResultErrors(groups, label) {
-  const errors = [];
-  const seen = new Set();
-  for (const [groupIndex, group] of groups.entries()) {
-    const groupLabel = String(group?.name || '').trim() || group?.id || groupIndex + 1;
-    const results = Array.isArray(group?.results) ? group.results : [];
-    for (const [resultIndex, result] of results.entries()) {
-      const id = result?.id;
-      if (!id) continue;
-      if (seen.has(id)) {
-        errors.push(
-          `${label} result group "${groupLabel}" has a duplicate result "${resultIndex + 1}"`
-        );
-      }
-      seen.add(id);
-    }
-  }
-  return errors;
-}
-
 /** The error strings for a task's result groups, `requireResult` demanding one in every group. */
 export function validateGatheringResultGroups(groups, label, { requireResult = false } = {}) {
   const list = Array.isArray(groups) ? groups : [];
   const errors = [];
+  const seenIds = new Set();
   for (const [groupIndex, group] of list.entries()) {
     if (!group || typeof group !== 'object') {
       errors.push(`${label} result group ${groupIndex + 1} is invalid`);
@@ -51,17 +31,15 @@ export function validateGatheringResultGroups(groups, label, { requireResult = f
       }
       // `Result` owns the remaining field contract, and its legacy quantity default is applied
       // only after the raw check above so zero cannot become one; `Roll` is injected (issue 1645).
+      if (result?.id && seenIds.has(result.id)) {
+        errors.push(`${resultLabel} repeats the id of an earlier result`);
+      }
+      seenIds.add(result?.id);
       const candidate = Result.fromJSON({ ...result, quantity: quantityValid ? quantity : 1 });
       for (const error of candidate.validate({ Roll: diceEngine() }).errors) {
         errors.push(`${resultLabel}: ${error}`);
       }
     }
   }
-  errors.push(
-    ...duplicateResultErrors(
-      list.filter((group) => group && typeof group === 'object'),
-      label
-    )
-  );
   return errors;
 }

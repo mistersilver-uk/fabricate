@@ -76,7 +76,7 @@
       'Every recipe it teaches is in this system',
     ],
     choiceGroupsValid: ['CheckChoiceGroupsValid', 'Every choice of rewards is complete'],
-    noDuplicateResults: ['CheckNoDuplicateResults', 'No result is repeated'],
+    noDuplicateResults: ['CheckNoDuplicateResults', 'No result entry is listed twice'],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
     noSignatureCollision: [
       'CheckNoSignatureCollision',

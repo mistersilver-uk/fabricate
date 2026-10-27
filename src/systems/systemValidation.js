@@ -122,7 +122,7 @@ const READINESS_ISSUE_MESSAGES = {
   choiceGroupRanges:
     'A rolled choice of rewards has a missing, backwards, fractional or overlapping range.',
   choiceGroupCount: 'An up-to choice of rewards does not say how many it awards.',
-  resultDuplicate: 'A result id is repeated within one recipe or step.',
+  resultDuplicate: 'A recipe or step lists the same result entry twice, so it cannot be saved.',
   alchemyResultSelection: 'An alchemy recipe does not resolve to exactly one result set.',
   signatureCollision: 'The recipe shares its ingredient signature with another recipe.',
   disabledIncomplete: 'Recipe is disabled and cannot be enabled until its gaps are fixed.',
