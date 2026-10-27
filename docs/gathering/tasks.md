@@ -81,6 +81,7 @@ These rows block saving:
 - A task with no name.
 - A drop rule that is incomplete.
 - Result sets that are incomplete.
+- A result repeated within the task's result sets.
 
 A row that only warns lets the task save.
 The verdict then reads "Saves with warnings".

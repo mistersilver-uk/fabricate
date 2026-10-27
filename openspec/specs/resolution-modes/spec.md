@@ -915,7 +915,8 @@ Reconciling a stored order against the authored list MUST satisfy all of the fol
 - Ids in the stored order that match no authored result are skipped.
 - Authored results the stored order does not name are **tail-appended in authored order**, so an unranked stage can never displace a ranked one: a GM adding a stage cannot silently demote a player's ranked stage, and the new stage is awarded only if budget remains.
 - A result with **no id** is never reorderable and always retains its authored position (it matches nothing and tail-appends).
-- **Duplicate ids: first match wins.** The editor and `Recipe.validateStructure()` refuse a result id repeated within one recipe or step, so this applies only to stored data that predates the refusal. The second copy tail-appends rather than vanishing or doubling.
+- **Duplicate ids: first match wins.** The editor and `Recipe.validateStructure()` refuse a result id repeated within one recipe or step, so this applies only to stored data that predates the refusal.
+  The second copy tail-appends rather than vanishing or doubling.
 - An absent or empty stored order yields the authored list unchanged.
 
 #### Cross-step id uniqueness (assumption)

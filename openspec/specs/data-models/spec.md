@@ -1676,7 +1676,7 @@ Recipe = {
    Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, variable result-mapping and outcome-routing integrity) still block persistence.
    A result id MUST be unique within one recipe (single-step) or within one step (multi-step), across all of that scope's result groups.
    Uniqueness is not required across steps, and a choice group's alternatives need distinct ids only among themselves.
-   The recipe Validation tab surfaces this as the always-present check `noDuplicateResults`, with the same wording the save path raises (`resultDuplicate`).
+   The recipe Validation tab surfaces this as the always-present check `noDuplicateResults`, under the same code the save path raises (`resultDuplicate`).
    Reserved/duplicate `ResultGroup.name` is a reference-integrity rule enforced at the service level for the routed modes and alchemy `tiered` check mode (see the next paragraph), NOT a structural/persistence blocker: `validateStructure()` waives the name checks, so an authoring incomplete shell — or a recipe carrying a stray leftover `resultSelection` — is never blocked on a name error.
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
