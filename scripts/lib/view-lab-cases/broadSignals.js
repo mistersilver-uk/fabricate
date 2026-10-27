@@ -238,6 +238,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The picker mounted through the published seam: the list open, and a keyboard choice (issue 2647).
     'manager-published-icon-picker-specimen',
     'manager-published-icon-picker-choice',
+    // The four that mount it with and without a Fabricate root above its target, one with its list
+    // open on the standalone layer (issue 2680).
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-icon-picker-open',
+    'published-standalone-in-window',
   ]),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
   // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
@@ -614,9 +620,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // body visible is the only state in which the control is more than a chevron.
   'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
-  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), and the two specimens
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), the two specimens
   // that mount it through the published seam open its list in an overlay host and on the
-  // standalone layer (issue 2454).
+  // standalone layer (issue 2454), and the four that mount it with and without a Fabricate root
+  // above its target, one with its list open (issue 2680).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
@@ -624,6 +631,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-select-open',
+    'published-standalone-in-window',
   ]),
   // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
@@ -642,6 +653,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The menu mounted through the published seam: open, and a keyboard choice (issue 2652).
     'manager-published-action-menu-specimen',
     'manager-published-action-menu-choice',
+    // The four that mount it with and without a Fabricate root above its target, one with its menu
+    // open on the standalone layer (issue 2680).
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-action-menu-open',
+    'published-standalone-in-window',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
@@ -705,6 +722,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The dialog mounted through the published seam: open, and closed from its close glyph (issue 2656).
     'manager-published-modal-specimen',
     'manager-published-modal-close',
+    // The one that opens it with no Fabricate root above its target, on the standalone layer (issue 2680).
+    'published-standalone-modal-open',
   ]),
   // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
   // inspector's two groups and the recipe-item editor's preview rail.

@@ -1,22 +1,27 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issues 2456, 2679). It mounts the twelve entries that
-  state `standaloneRoot` through the page-session seam `game.fabricate.api.ui` binds, as a companion
-  does, each into a target of its own but the `Well`, which sits in the `InspectorCard`'s content
-  slot over a line of the companion's own text; the `Field`'s slot holds the companion's caption,
-  text input and hint. Every word is a companion's final text, so none is localized.
+  A View Lab specimen, not a Fabricate surface (issues 2456, 2679, 2680). It mounts the sixteen
+  entries that state `standaloneRoot` through the page-session seam `game.fabricate.api.ui` binds,
+  as a companion does, each into a target of its own but the `Well`, which sits in the
+  `InspectorCard`'s content slot over a line of the companion's own text; the `Field`'s slot holds
+  the companion's caption, text input and hint. The `Modal` is drawn closed, and a published
+  `Button`, the companion's opener, opens it through `update`. Every word is a companion's final
+  text, so none is localized.
   `tests/view-lab/mount.js` mounts it for `?specimen=published-standalone` only.
 
   Under a window with no Fabricate root the seam writes one standalone style root in each target
   and none for the well inside the card; under a Fabricate window it writes none. The props are the
   same in both, so the two frames differ only by the root.
 
-  The ground is two 360px columns on `--fab-bg-1`, the ground the standalone style root paints none
-  of: the five issue 2456 widened, the field and the search field in the first, the stepper, the
-  segmented control, the option cards, the tabs and the pager in the second. Neither carries a `fabricate` class or a
-  theme attribute, so the ink and scheme their content shows are the root's. A case addresses the
-  ground by `data-lab-standalone-ground`, a column by `data-lab-standalone-column` and each target
-  by its `data-lab-standalone-target` key; the targets of the button, icon button, switch, search
-  field and stepper are `display: flex`, as their groups ask of a companion; the rest are blocks.
+  The ground is three 360px columns on `--fab-bg-1`, the ground the standalone style root paints
+  none of: the five issue 2456 widened, the field and the search field in the first, the stepper,
+  the segmented control, the option cards, the tabs and the pager in the second, and the select,
+  the icon picker, the action menu, the opener and the dialog in the third. None carries a
+  `fabricate` class or a theme attribute, so the ink and scheme their content shows are the
+  root's; an open panel is drawn on the standalone layer. A case addresses the ground by
+  `data-lab-standalone-ground`, a column by `data-lab-standalone-column` and each target by its
+  `data-lab-standalone-target` key; the targets of the button, icon button, switch, search field,
+  stepper, action menu and opener are `display: flex`, as their groups ask of a companion; the
+  rest are blocks.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -24,9 +29,16 @@
   const COLUMNS = Object.freeze([
     Object.freeze(['button', 'icon-button', 'toggle', 'card', 'field', 'search']),
     Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager']),
+    Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal']),
   ]);
   const KEYS = COLUMNS.flat();
-  const FLEX = new Set(['button', 'icon-button', 'toggle', 'search', 'stepper']);
+  const FLEX = new Set(['button', 'icon-button', 'toggle', 'search', 'stepper', 'menu', 'opener']);
+  const DIALOG = Object.freeze({
+    title: 'Rename the tonic',
+    subtitle: 'Shown to every player',
+    closeLabel: 'Close',
+    body: true,
+  });
 
   let targets = $state({});
 
@@ -66,7 +78,62 @@
       }),
       drawn(column, 'small', 'Shown to players', { id: 'lab-standalone-field-hint' })
     );
+    const dialogProps = (open) => ({
+      ...DIALOG,
+      open,
+      onClose: () => dialog.update(dialogProps(false)),
+    });
+    const dialog = mount('Modal', { target: targets.modal, props: dialogProps(false) });
+    dialog
+      .slot('body')
+      .append(drawn(dialog.slot('body'), 'p', 'Choose the name the whole table will read.'));
     const handles = [
+      dialog,
+      mount('Button', {
+        target: targets.opener,
+        props: {
+          children: 'Rename the tonic',
+          onclick: () => dialog.update(dialogProps(true)),
+        },
+      }),
+      mount('Select', {
+        target: targets.select,
+        props: {
+          options: [
+            { value: 'forge', label: 'Forge' },
+            { value: 'brew', label: 'Brew' },
+            { value: 'hand', label: 'By hand' },
+          ],
+          value: 'forge',
+          ariaLabel: 'Method',
+          onChange: noop,
+        },
+      }),
+      mount('IconPicker', {
+        target: targets['icon-picker'],
+        props: {
+          value: 'fas fa-flask',
+          ariaLabel: 'Tonic icon',
+          listLabel: 'Tonic icons',
+          searchLabel: 'Search tonic icons',
+          searchPlaceholder: 'Name a glyph',
+          noMatchesText: 'No glyph matches',
+          onChange: noop,
+        },
+      }),
+      mount('ActionMenu', {
+        target: targets.menu,
+        props: {
+          items: [
+            { id: 'duplicate', label: 'Duplicate tonic', icon: 'fas fa-copy' },
+            { id: 'archive', label: 'Archive tonic', icon: 'fas fa-box-archive', disabled: true },
+            { id: 'delete', label: 'Delete tonic', icon: 'fas fa-trash', danger: true },
+          ],
+          ariaLabel: 'Tonic actions',
+          align: 'start',
+          onSelect: noop,
+        },
+      }),
       mount('Button', {
         target: targets.button,
         props: { children: 'Craft the tonic', role: 'primary', onclick: noop },

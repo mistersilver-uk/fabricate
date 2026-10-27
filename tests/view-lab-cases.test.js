@@ -6328,6 +6328,10 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-modal-close',
       'published-standalone',
       'published-standalone-light',
+      'published-standalone-select-open',
+      'published-standalone-icon-picker-open',
+      'published-standalone-action-menu-open',
+      'published-standalone-modal-open',
       'published-standalone-in-window',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
@@ -8745,7 +8749,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 11, 'the fixture lays eleven targets in its columns');
+  assert.equal(columns.flat().length, 16, 'the fixture lays sixteen targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',
@@ -8796,6 +8800,24 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       viewCase.expectSelector.includes(`> ${root}`),
       `${id} asserts that the seam wrote a style root in each target`
     );
+  }
+  for (const [id, key] of [
+    ['published-standalone-select-open', 'select'],
+    ['published-standalone-icon-picker-open', 'icon-picker'],
+    ['published-standalone-action-menu-open', 'menu'],
+    ['published-standalone-modal-open', 'modal'],
+  ]) {
+    const opened = getCaseById(id);
+    const layer = '> .fabricate.fabricate-standalone-overlay >';
+    assert.equal(opened.app, bareApp, `${id} draws in the classless frame`);
+    assert.equal(opened.query.specimen, 'published-standalone');
+    assert.equal(opened.steps.length, 1, `${id} opens its panel in one step`);
+    assert.ok(
+      opened.expectSelector.includes(`[data-lab-standalone-target="${key}"] > ${root}`) &&
+        opened.expectSelector.includes(layer),
+      `${id} asserts the ${key} target's style root and the panel on the standalone layer`
+    );
+    assert.ok(opened.expectCenterHit.startsWith(`body ${layer}`), `${id} hits its panel there`);
   }
   const inWindow = getCaseById('published-standalone-in-window');
   assert.equal(inWindow.app, 'fabricate-app');
