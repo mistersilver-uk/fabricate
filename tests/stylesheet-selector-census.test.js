@@ -8,7 +8,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { ruleBlocks } from '../scripts/lib/stylesheetLiveClasses.js';
 import {
+  atRuleBlocksIn,
   censusBlockerWalk,
   censusRules,
   formatSpecificity,
@@ -18,6 +20,7 @@ import {
   selectorAppearances,
   specificityOf,
 } from '../scripts/lib/stylesheetSelectorCensus.js';
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
 const REPOSITORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -449,5 +452,65 @@ test('the scoped walk reads the same interval with its endpoints in either order
     'a walk that iterates from the first argument upwards examines NOTHING when the endpoints ' +
       'arrive reversed and returns the unblocked shape — a clean bill of health indistinguishable ' +
       'from a real one, which is what a caller gets whenever the utility precedes the donor'
+  );
+});
+
+/**
+ * Blocks that open inside a style rule's block: a nested style rule (exact, by offset) or a nested
+ * at-rule (by line, strictly after the rule's own line, so a single-line `.a { @media (x) { } }`
+ * is not seen). `ruleBlocks` and `scopedBlockerWalk` read a nested rule as a bogus selector, so
+ * the module sheet must hold none.
+ */
+function blocksNestedInStyleRules(css) {
+  const rules = ruleBlocks(css);
+  const nestedRules = rules
+    .filter((inner) => rules.some((outer) => outer.start < inner.start && inner.end <= outer.end))
+    .map((inner) => `rule ${inner.selector} @${inner.line}`);
+  const nestedAtRules = atRuleBlocksIn(css)
+    .filter((at) => at.block)
+    .filter((at) => rules.some((rule) => at.line > rule.line && at.endLine <= rule.endLine))
+    .map((at) => `${at.prelude} @${at.line}`);
+
+  return [...nestedRules, ...nestedAtRules];
+}
+
+test('the module sheet holds no block nested inside a style rule', () => {
+  const css = readStylesheet();
+
+  assert.ok(
+    ruleBlocks(css).length > 1000 && atRuleBlocksIn(css).length > 10,
+    'the walk reached too little of the sheet to call it free of nesting'
+  );
+  assert.deepEqual(
+    blocksNestedInStyleRules(css),
+    [],
+    'native CSS nesting is not read by the census walks, which would report the inner block under a ' +
+      'bogus selector; write the rule flat, or teach scopedBlockerWalk nesting first'
+  );
+});
+
+test('the nesting walk reports a nested rule or at-rule and passes at-rules that hold rules', () => {
+  const flat = sheet(
+    block('.a', 'color: red;'),
+    ['@container (min-width: 10px) {', ...block('.b', 'color: blue;'), '}'],
+    ['@media (x) {', '@supports (y) {', ...block('.c', 'color: green;'), '}', '}']
+  );
+
+  assert.deepEqual(
+    blocksNestedInStyleRules(flat),
+    [],
+    'an at-rule holding style rules is not nesting'
+  );
+  assert.equal(
+    blocksNestedInStyleRules(
+      sheet(['.a {', '  color: red;', ...block('  .b', 'color: blue;'), '}'])
+    ).length,
+    1,
+    'a style rule inside a style rule is reported'
+  );
+  assert.equal(
+    blocksNestedInStyleRules(sheet(['.a {', ...block('  @media (x)', 'color: blue;'), '}'])).length,
+    1,
+    'an at-rule inside a style rule is reported'
   );
 });

@@ -1,7 +1,8 @@
 /**
  * Pure, Foundry-free, idempotent upcast of an export payload to the current schema, so it runs
  * before validation and in tests. `import-export/spec.md` § Migration of older exports owns the
- * ladder and every field-level rule, including why each derivation is BRANCH-INDEPENDENT.
+ * ladder and every field-level rule, including why each derivation is branch-independent except the
+ * automatic force-list clear and the subject-mark seed, which are keyed on the bundle's own version.
  */
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
@@ -137,7 +138,7 @@ function liftCharacterLibrariesToWorldScope(migrated) {
   migrated.system = stripSystemCharacterLibraries([system])[0];
 }
 
-/** Through `1.29.0` itself; the automatic clear is legacy-only (issue 1315). */
+/** Through `1.29.0` itself; the automatic clear is keyed on the bundle's version (issue 1315). */
 function foldManualCompositionForces(migrated, { clearAutomaticForces }) {
   const environments = migrated?.gatheringEnvironments;
   if (!Array.isArray(environments)) return;
@@ -321,7 +322,7 @@ function seedFailureResultPolicy(migrated) {
 
 /**
  * Through `1.33.0`, so imported subject picks keep rolling. After
- * `liftCharacterLibrariesToWorldScope` and legacy-branch only, unlike every sibling
+ * `liftCharacterLibrariesToWorldScope`, and keyed on the bundle's version, unlike every sibling
  * (§ Migration of older exports, § Round-trip integrity, issue 1608).
  */
 function seedSubjectModifierMarks(migrated) {
@@ -332,6 +333,20 @@ function seedSubjectModifierMarks(migrated) {
     tasks: migrated.gatheringConfig?.system?.tasks,
     worldLibraries: migrated.characterLibraries,
   });
+}
+
+/**
+ * Fixed thresholds, never the current marker, so a schema bump reclassifies no bundle (issue 1618).
+ * Schema `6` is the first written by a build that carried `1.29.0`; the seed arrived in `1.33.0`
+ * without a bump, so its threshold is the nearest marker, not the schema that introduced it.
+ */
+const AUTOMATIC_FORCE_CLEAR_BELOW_SCHEMA = 6;
+const SUBJECT_MARK_SEED_BELOW_SCHEMA = 6;
+
+/** Read off the input bundle: the legacy branch re-stamps its clone to the current marker. */
+function predatesSchema(payload, schema) {
+  const { schemaVersion } = payload;
+  return !Number.isInteger(schemaVersion) || schemaVersion < schema;
 }
 
 export function migrateExportPayload(payload) {
@@ -389,8 +404,10 @@ export function migrateExportPayload(payload) {
   liftCurrencyToWorldScope(migrated);
   liftTravelToWorldScope(migrated);
   liftCharacterLibrariesToWorldScope(migrated);
-  seedSubjectModifierMarks(migrated);
-  foldManualCompositionForces(migrated, { clearAutomaticForces: true });
+  if (predatesSchema(payload, SUBJECT_MARK_SEED_BELOW_SCHEMA)) seedSubjectModifierMarks(migrated);
+  foldManualCompositionForces(migrated, {
+    clearAutomaticForces: predatesSchema(payload, AUTOMATIC_FORCE_CLEAR_BELOW_SCHEMA),
+  });
   deriveWorldScopeEntitySlices(migrated);
   mergeEquivalentBundleEssences(migrated);
 

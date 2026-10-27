@@ -17,7 +17,7 @@ import {
   referencesIdentifier as namesIdentifier,
   walkNodes,
 } from './moduleAst.js';
-import { attributeNamed, walkElements } from './svelteTemplateScan.js';
+import { attributeNamed, elementTag, walkElements } from './svelteTemplateScan.js';
 
 /** Directives that genuinely bind a prop; `class:`, `style:`, `use:`, `on:` and friends do not. */
 const PROP_DIRECTIVES = Object.freeze(new Set(['BindDirective']));
@@ -55,22 +55,9 @@ export function rendersComponent(ast, name) {
   return renderedComponents(ast).includes(name);
 }
 
-/** Every raw element the template draws, lower-cased, in source order. */
+/** Every raw element the template draws, lower-cased, in source order; a dynamic tag counts when static. */
 export function renderedElements(ast) {
-  const named = collect(ast, (node) => node.type === 'RegularElement').map((node) => ({
-    start: node.start,
-    tag: node.name.toLowerCase(),
-  }));
-  // `walkElements` visits RegularElement and Component only, so a dynamic tag needs its own pass.
-  const dynamic = [];
-  for (const node of walkNodes(ast.fragment ?? ast)) {
-    if (node.type !== 'SvelteElement') continue;
-    const tag = node.tag;
-    if (tag?.type === 'Literal' && typeof tag.value === 'string') {
-      dynamic.push({ start: node.start, tag: tag.value.toLowerCase() });
-    }
-  }
-  return [...named, ...dynamic].sort((left, right) => left.start - right.start).map((e) => e.tag);
+  return collect(ast, (node) => elementTag(node) !== null).map((node) => elementTag(node));
 }
 
 /** Whether the template draws a raw element of this tag name, ignoring case. */

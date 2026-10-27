@@ -413,7 +413,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
   // for an AREA-SCOPED custom property, declared inside `.fabricate-manager` only, so
   // referencing it makes the declaration invalid at computed-value time anywhere else
-  // (`.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager`) and the
+  // (`.fabricate-app`, `.fabricate-interactables-manager`) and the
   // value silently falls back to inheritance. Nothing fails; it just looks wrong, and the
   // trigger is the reuse the primitive exists to enable. Theme-root tokens (`:root` + all
   // seven theme blocks) resolve everywhere.

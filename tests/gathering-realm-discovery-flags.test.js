@@ -13,7 +13,8 @@ import {
   forEachReplacementForm,
   isForcedReplacement,
   recordWrite,
-  replacedKey
+  replacedKey,
+  toOperatorForm
 } from './helpers/forcedDeletion.js';
 
 function getPathValue(object, path) {
@@ -152,6 +153,7 @@ forEachReplacementForm('hiding on a legacy-key-only actor keeps its other discov
   assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
   assert.deepEqual([...getDiscoveredRealmIds(actor)], ['r2'], 'r1 hidden, nothing else wiped');
   assert.deepEqual(storedDiscoveryMap(actor), { r2: R2 }, 'migrated to the flat key');
+  assert.ok(!Object.hasOwn(actor.flags.fabricate.fabricate, 'discoveredGatheringRegions'));
 });
 
 forEachReplacementForm('hiding a realm inside a legacy bucket removes it', async (form) => {
@@ -265,8 +267,8 @@ test('a realm discovered under two systems keeps the EARLIEST sighting', () => {
 });
 
 test('a HALF-UPGRADED map resolves — both shapes at once', () => {
-  // Reachable in normal use, not hypothetical: upgrade an actor, write, then discover a second
-  // realm, and the map carries a flat entry beside a legacy bucket until the next full read.
+  // An earlier build's merge write could persist a flat entry beside a legacy bucket, so a stored
+  // map may still mix both shapes until the actor's next write (issue 2050).
   const doc = new FakeDocument({
     flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
       r1: { discoveredAt: 50, source: 'manual' },
@@ -284,18 +286,107 @@ test('legacy-read fallback: reads a pre-rename discoveredGatheringRegions flag',
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), true);
 });
 
-test('a write persists ONLY the new flat shape, upgrading the actor lazily', async () => {
-  const doc = new FakeDocument({
-    flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
-      'system-a': { r1: { discoveredAt: 7, source: 'manual' } }
-    } } } }
-  });
-  await revealGatheringRealm(doc, {
+// A reveal writes through the same forced replacement as a hide, because core deep-merges an object
+// flag and a merge write keeps every legacy bucket and the pre-rename key (issue 2050).
+
+const revealR2 = (actor) =>
+  revealGatheringRealm(actor, {
     realmId: 'r2', source: 'api', validateRealmExists: travelConfig, now: () => 9
   });
+const R2_REVEALED = { discoveredAt: 9, source: 'api' };
 
-  const written = doc.flags.fabricate.fabricate.discoveredGatheringRealms;
-  assert.deepEqual(Object.keys(written).sort(), ['r1', 'r2'], 'flat, with the bucket gone');
-  assert.equal(written.r1.discoveredAt, 7, 'the legacy entry survived the flatten');
-  assert.equal(written.r2.discoveredAt, 9);
+/** The one update a reveal sends: the replaced map, plus the legacy deletion when one is stored. */
+function expectedDiscoveryWrite(form, map, { deletesLegacy }) {
+  const replacement = form.expect({ 'flags.fabricate.fabricate.==discoveredGatheringRealms': map });
+  if (!deletesLegacy) return replacement;
+  const deletion = { 'flags.fabricate.fabricate.-=discoveredGatheringRegions': null };
+  return { ...replacement, ...(form.v14 ? toOperatorForm(deletion) : deletion) };
+}
+
+forEachReplacementForm('a write persists only the new flat shape, upgrading the actor lazily', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRealms: { 'system-a': { r1: R1 } } });
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(storedDiscoveryMap(actor), { r1: R1, r2: R2_REVEALED }, 'flat, bucket gone');
+  assert.deepEqual(actor.updateCalls, [
+    expectedDiscoveryWrite(form, { r1: R1, r2: R2_REVEALED }, { deletesLegacy: false })
+  ], 'no legacy key is stored, so none is deleted');
+});
+
+forEachReplacementForm('a reveal over a pre-rename key persists only the flat map', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRegions: { 'system-a': { r1: R1 } } });
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(storedDiscoveryMap(actor), { r1: R1, r2: R2_REVEALED });
+  assert.ok(!Object.hasOwn(actor.flags.fabricate.fabricate, 'discoveredGatheringRegions'));
+  assert.deepEqual(actor.updateCalls, [
+    expectedDiscoveryWrite(form, { r1: R1, r2: R2_REVEALED }, { deletesLegacy: true })
+  ]);
+});
+
+forEachReplacementForm('a reveal with both keys stored drops the shadowed pre-rename key', async (form) => {
+  form.apply();
+  const actor = discoveryActor({
+    discoveredGatheringRealms: { r1: R1 },
+    discoveredGatheringRegions: { 'system-a': { r3: { discoveredAt: 3, source: 'api' } } }
+  });
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(storedDiscoveryMap(actor), { r1: R1, r2: R2_REVEALED });
+  assert.deepEqual(Object.keys(actor.flags.fabricate.fabricate), ['discoveredGatheringRealms']);
+});
+
+forEachReplacementForm('a stored null pre-rename key still counts as present', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRegions: null });
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(actor.flags.fabricate.fabricate, { discoveredGatheringRealms: { r2: R2_REVEALED } });
+  assert.deepEqual(actor.updateCalls, [
+    expectedDiscoveryWrite(form, { r2: R2_REVEALED }, { deletesLegacy: true })
+  ]);
+});
+
+forEachReplacementForm('the legacy key is read from stored source, not prepared flags', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRealms: { r1: R1 } });
+  actor._source = { flags: { fabricate: { fabricate: {
+    discoveredGatheringRealms: { r1: R1 },
+    discoveredGatheringRegions: { 'system-a': { r3: { discoveredAt: 3, source: 'api' } } }
+  } } } };
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(actor.updateCalls, [
+    expectedDiscoveryWrite(form, { r1: R1, r2: R2_REVEALED }, { deletesLegacy: true })
+  ], 'the stored legacy key is deleted even though prepared flags do not show it');
+});
+
+forEachReplacementForm('a reveal on a clean actor sends one replacement and no deletion', async (form) => {
+  form.apply();
+  const actor = new MergingActor();
+  assert.equal(await revealR2(actor), true);
+
+  assert.deepEqual(actor.flags, { fabricate: { fabricate: { discoveredGatheringRealms: { r2: R2_REVEALED } } } });
+  assert.deepEqual(actor.updateCalls, [
+    expectedDiscoveryWrite(form, { r2: R2_REVEALED }, { deletesLegacy: false })
+  ]);
+});
+
+test('a reveal on a non-Document actor gets the setFabricateFlag fallback or a refusal', async () => {
+  const readOnly = { getFlag: () => ({ r1: R1 }) };
+  assert.equal(await revealR2(readOnly), false, 'nothing was written');
+
+  const writes = [];
+  const flagOnly = {
+    getFlag: () => ({ r1: R1 }),
+    setFlag: async (...args) => {
+      writes.push(args);
+    }
+  };
+  assert.equal(await revealR2(flagOnly), true);
+  assert.deepEqual(writes, [
+    ['fabricate', 'fabricate.discoveredGatheringRealms', { r1: R1, r2: R2_REVEALED }]
+  ]);
 });

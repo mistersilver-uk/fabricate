@@ -1656,7 +1656,7 @@ Actor State (flags on the Actor document)
 |- craftingRuns
 |- salvageRuns (each active run carries resultOrder — the Player Result Order captured at START; see Result Order Asymmetry)
 |- gatheringRuns
-|- discoveredGatheringRealms ({ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } })
+|- discoveredGatheringRealms ({ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } })
 `- discoveryProgress
 
 Owned Copy (flags on an actor-owned Foundry Item that IS one of a system's recipe items)

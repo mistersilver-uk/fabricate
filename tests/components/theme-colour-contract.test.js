@@ -152,27 +152,56 @@ function tokensReadByProduct() {
   return read;
 }
 
-function findColourLiteralOffenders() {
+/**
+ * A parenthesised issue number `(#1066)` is a citation, not a colour: all digits, a `(` that does
+ * not close a call such as `url(`, and a closing `)`. The repo's own citation form is `(issue N)`.
+ */
+function isIssueCitation(source, index, text) {
+  return (
+    /^#\d+$/.test(text) &&
+    source[index - 1] === '(' &&
+    !/\w/.test(source[index - 2] ?? ' ') &&
+    source[index + text.length] === ')'
+  );
+}
+
+/** The colour-literal sites of one file's source, as `path:line literal` strings. */
+function colourLiteralOffendersIn(source, filePath) {
   const offenders = [];
 
-  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
-  for (const filePath of productRoots.flatMap(root => collectProductFiles(root))) {
-    const source = readProductFile(filePath);
-    let match;
-
-    while ((match = colourLiteralPattern.exec(source))) {
-      if (
-        isInsideApprovedThemeBlock(filePath, source, match.index) ||
-        isSvelteBlockSyntax(source, match.index)
-      ) {
-        continue;
-      }
-
-      offenders.push(`${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`);
+  for (const match of source.matchAll(colourLiteralPattern)) {
+    if (
+      isInsideApprovedThemeBlock(filePath, source, match.index) ||
+      isSvelteBlockSyntax(source, match.index) ||
+      isIssueCitation(source, match.index, match[1])
+    ) {
+      continue;
     }
+
+    offenders.push(`${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`);
   }
 
   return offenders;
+}
+
+/** The base triples and the rung count one theme block gives an overlay ladder (`dark` or `light`). */
+function overlayBases(block, ladder) {
+  const source = stripCommentedSource(block);
+  const declared = [...source.matchAll(new RegExp(String.raw`--fab-overlay-${ladder}-\d+\s*:`, 'g'))].length;
+  const bases = [...source.matchAll(new RegExp(String.raw`--fab-overlay-${ladder}-\d+:\s*rgba?\(([^/)]+)`, 'g'))]
+    .map(match => match[1].trim());
+
+  return { declared, matched: bases.length, bases: new Set(bases) };
+}
+
+// Exact rung counts: a rung rewritten as hex or `color-mix` drops out of the base match.
+const OVERLAY_RUNGS = Object.freeze({ dark: 11, light: 9 });
+
+function findColourLiteralOffenders() {
+  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
+  return productRoots
+    .flatMap(root => collectProductFiles(root))
+    .flatMap(filePath => colourLiteralOffendersIn(readProductFile(filePath), filePath));
 }
 
 describe('Theme colour contract', () => {
@@ -321,7 +350,58 @@ describe('Theme colour contract', () => {
     assert.deepEqual(
       offenders,
       [],
-      `product UI colour literals must use theme variables outside approved theme blocks:\n${offenders.join('\n')}`
+      `product UI colour literals must use theme variables outside approved theme blocks; cite an `
+        + `issue as \`(issue N)\`, which reads as prose:\n${offenders.join('\n')}`
     );
+  });
+
+  // Issue 1770: `mythwright` bases its ladder on `0 0 0`, not on `--fab-bg-0`, so the invariant is
+  // one base per theme and ladder, never a fixed derivation.
+  it('expresses each overlay ladder of every theme from one base triple', () => {
+    const css = readStylesheet();
+
+    for (const [themeId, selector] of Object.entries(themeSelectors)) {
+      for (const [ladder, rungs] of Object.entries(OVERLAY_RUNGS)) {
+        const { declared, matched, bases } = overlayBases(blockFor(css, selector), ladder);
+
+        assert.equal(declared, rungs, `${themeId} declares ${rungs} --fab-overlay-${ladder}-* rungs`);
+        assert.equal(matched, rungs, `${themeId} writes every ${ladder} rung as rgb(r g b / a)`);
+        assert.equal(
+          bases.size,
+          1,
+          `${themeId} should express every --fab-overlay-${ladder}-* rung from one base triple, found: ${[...bases].join(' | ')}`
+        );
+      }
+    }
+  });
+
+  it('reports a ladder with two bases and a rung that no longer reads as rgb', () => {
+    const twoBases = '--fab-overlay-dark-05: rgb(0 0 0 / 5%);\n--fab-overlay-dark-10: rgb(1 1 1 / 10%);';
+    const hexRung = '--fab-overlay-dark-05: rgb(0 0 0 / 5%);\n--fab-overlay-dark-10: #000;';
+    const commented = '/* --fab-overlay-dark-10: rgb(9 9 9 / 10%); */\n--fab-overlay-dark-05: rgb(0 0 0 / 5%);';
+
+    assert.deepEqual([...overlayBases(twoBases, 'dark').bases], ['0 0 0', '1 1 1']);
+    assert.notEqual(overlayBases(hexRung, 'dark').matched, overlayBases(hexRung, 'dark').declared);
+    assert.deepEqual([...overlayBases(commented, 'dark').bases], ['0 0 0'], 'a commented rung is not read');
+    assert.equal(overlayBases(twoBases, 'light').declared, 0, 'the light ladder is read separately');
+  });
+
+  it('exempts a parenthesised issue citation and flags every other issue-number form', () => {
+    const scan = source => colourLiteralOffendersIn(source, resolve(repoRoot, 'src/ui/x.js'));
+
+    assert.deepEqual(scan('// see (#1066)'), [], 'a parenthesised citation is not a colour');
+    assert.deepEqual(scan('(#1066)'), [], 'a citation at offset 0 is exempt');
+    for (const flagged of [
+      '// see #1066',
+      '/* #1066 */',
+      '(#1a2)',
+      'url(#123)',
+      'fill: url(#1066)',
+      'x(#1066)',
+      '(#1066, #1067)',
+      'a { color: #1066; }'
+    ]) {
+      assert.notDeepEqual(scan(flagged), [], `${flagged} still reads as a colour literal`);
+    }
   });
 });

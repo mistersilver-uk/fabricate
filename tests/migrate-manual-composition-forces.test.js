@@ -8,12 +8,10 @@ import {
   migrateManualCompositionForces,
 } from '../src/migration/migrateManualCompositionForces.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { environmentComposesRecord } from '../src/systems/gatheringComposition.js';
-
-/** The schema version `migrateExportPayload` upcasts to, read off the module under test. */
-const CURRENT_EXPORT_SCHEMA = migrateExportPayload({}).schemaVersion;
 
 /**
  * A manual environment whose picked and forced lists both carry entries, so one fixture exercises
@@ -400,7 +398,7 @@ test('the export upcast applies the SAME fold, on a current-schema bundle', () =
   // Branch-independent: every bundle the shipping build writes carries the current schema, so
   // a transform reachable only from the legacy branch would never run on a real bundle.
   const upcast = migrateExportPayload({
-    schemaVersion: CURRENT_EXPORT_SCHEMA,
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: { id: 'sys' },
     gatheringEnvironments: [manualEnvironment()],
   });
@@ -464,18 +462,56 @@ test('the export upcast applies the SAME fold, on a legacy bundle', () => {
     gatheringEnvironments: [manualEnvironment({ compositionMode: 'automatic' })],
   });
 
-  assert.equal(upcast.schemaVersion, CURRENT_EXPORT_SCHEMA);
+  assert.equal(upcast.schemaVersion, FABRICATE_EXPORT_SCHEMA_VERSION);
   // Automatic residue is cleared here too, for the same reason it is in a world: it composed
   // nothing before the upgrade and must compose nothing after it.
   assert.deepEqual(upcast.gatheringEnvironments[0].enabledTaskIds, ['task-picked']);
   assert.ok(!('forcedTaskIds' in upcast.gatheringEnvironments[0]));
 });
 
+// Literal versions, never the exported constant, so a schema bump cannot move the oracle (issue 1618).
+const AUTOMATIC_CLEAR_CASES = [
+  ['absent', undefined, true],
+  ['0', 0, true],
+  ['5', 5, true],
+  ['"6" (a string)', '6', true],
+  ['6.5', 6.5, true],
+  ['NaN', NaN, true],
+  ['null', null, true],
+  ['6', 6, false],
+  ['7 (a newer build)', 7, false],
+];
+
+for (const [label, schemaVersion, cleared] of AUTOMATIC_CLEAR_CASES) {
+  test(`the automatic force clear is keyed on the bundle's own schemaVersion: ${label}`, () => {
+    const bundle = { system: { id: 'sys' } };
+    if (schemaVersion !== undefined) bundle.schemaVersion = schemaVersion;
+    bundle.gatheringEnvironments = [manualEnvironment({ compositionMode: 'automatic' })];
+
+    const upcast = migrateExportPayload(bundle);
+    const [environment] = upcast.gatheringEnvironments;
+
+    assert.deepEqual(environment.enabledTaskIds, ['task-picked'], 'automatic mode folds nothing');
+    if (cleared) {
+      assert.ok(!('forcedTaskIds' in environment), 'below schema 6 the residue is cleared');
+      assert.ok(!('forcedEventIds' in environment));
+    } else {
+      assert.deepEqual(environment.forcedTaskIds, ['task-forced'], 'a legitimate force add');
+      assert.deepEqual(environment.forcedEventIds, ['event-forced']);
+    }
+    assert.deepEqual(
+      migrateExportPayload(upcast).gatheringEnvironments,
+      upcast.gatheringEnvironments,
+      'a second pass changes nothing further'
+    );
+  });
+}
+
 test('the export upcast reaches the same fixed point as the world migration', () => {
   const environments = [manualEnvironment(), manualEnvironment({ id: 'env-b' })];
   const world = applyManualCompositionForceFold(structuredClone(environments)).environments;
   const bundle = migrateExportPayload({
-    schemaVersion: CURRENT_EXPORT_SCHEMA,
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: { id: 'sys' },
     gatheringEnvironments: structuredClone(environments),
   });
