@@ -19,6 +19,7 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
+  chooseSelectOption,
   selectOptionLabels,
   selectOptionValues,
 } from '../helpers/select-control.js';
@@ -1450,6 +1451,33 @@ export function registerWorldScopeCases() {
       // And it is ITS OWN corpus: lighting the vocabulary up must not disturb the three
       // scoped-entity counts beside it.
       assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    describe('an unadopted world Tool across a crafting-system switch (issue 1902)', () => {
+      it('drops the selection and its Add action once the system changes', async () => {
+        const store = await mountWithRealStore();
+        navButton('Tool Rules').click();
+        await tick();
+        flushSync();
+        target.querySelector('[data-tool-membership-option="all"] input').click();
+        await tick();
+        flushSync();
+        target.querySelector('[data-manager-tool-id="tool-1"] .manager-tools-select-target').click();
+        await tick();
+        flushSync();
+        assert.ok(
+          Boolean(target.querySelector('[data-tool-inspector-add="tool-1"]')),
+          'the control: the unadopted row offers its Add action in this system'
+        );
+
+        chooseSelectOption(target, '[data-manager-scope-select]', 'sys2');
+        await settle(store);
+
+        assert.ok(
+          !target.querySelector('[data-tool-inspector-add]'),
+          'the other system is on its own cohort, so the old Add action is gone'
+        );
+      });
     });
 
     // ── THE RESOLVED TOOL-BREAKAGE AUTHORITY REACHES THE CARD (issue 1374) ──────────────
