@@ -155,19 +155,19 @@
   const missingText = $derived.by(() => {
     const clear = text(
       'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingClear',
-      'To clear it, set Eligible modifiers to Inherit system default or No modifiers; that resets the other picks too.'
+      'To clear this, set Eligible modifiers to Inherit system default or No modifiers; that resets the other picks too.'
     );
     if (missingPickCount === 1) {
       return `${text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
-        'One chosen modifier no longer exists in System settings › Modifiers, so it is hidden and does nothing.'
+        'One chosen modifier no longer exists in the Modifiers library, so it is hidden and does nothing.'
       )} ${clear}`;
     }
     const translated = localize(MISSING_KEY, { count: missingPickCount });
     const sentence =
       translated && translated !== MISSING_KEY
         ? translated
-        : `${missingPickCount} chosen modifiers no longer exist in System settings › Modifiers, so they are hidden and do nothing.`;
+        : `${missingPickCount} chosen modifiers no longer exist in the Modifiers library, so they are hidden and do nothing.`;
     return `${sentence} ${clear}`;
   });
   const showMissingNote = $derived(missingPickCount > 0);

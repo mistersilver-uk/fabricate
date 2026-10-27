@@ -148,19 +148,19 @@
   const missingText = $derived.by(() => {
     const clear = localizeOr(
       'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierMissingClear',
-      'To clear it, switch the custom pick off and on again; that resets the other picks too.'
+      'To clear this, untick "Pick check modifiers" and tick it again; that resets the other picks too.'
     );
     if (missingCount === 1) {
       return `${localizeOr(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
-        'One chosen modifier no longer exists in System settings › Modifiers, so it is hidden and does nothing.'
+        'One chosen modifier no longer exists in the Modifiers library, so it is hidden and does nothing.'
       )} ${clear}`;
     }
     const translated = localize(MISSING_KEY, { count: missingCount });
     const sentence =
       translated && translated !== MISSING_KEY
         ? translated
-        : `${missingCount} chosen modifiers no longer exist in System settings › Modifiers, so they are hidden and do nothing.`;
+        : `${missingCount} chosen modifiers no longer exist in the Modifiers library, so they are hidden and do nothing.`;
     return `${sentence} ${clear}`;
   });
   // WHICH ZERO THE PILL ROW IS SHOWING: two states draw no chip, and the placeholder is also the

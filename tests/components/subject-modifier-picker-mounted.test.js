@@ -365,8 +365,8 @@ describe('SubjectModifierPicker (mounted)', () => {
     const { target } = await mount({ selectedIds: ['med', 'gone'], inheritedIds: MARKED_TWO });
     const missing = target.querySelector('[data-subject-modifier-missing]');
     assert.equal(missing?.getAttribute('data-subject-modifier-missing'), '1');
-    assert.match(missing.textContent, /no longer exists in System settings › Modifiers/);
-    assert.match(missing.textContent, /switch the custom pick off and on again/);
+    assert.match(missing.textContent, /no longer exists in the Modifiers library/);
+    assert.match(missing.textContent, /untick "Pick check modifiers" and tick it again/);
     assert.ok(
       !target.querySelector('[data-subject-modifier-suppressed]'),
       'a deleted modifier is not an un-marked one, so the return-promising note stays away'

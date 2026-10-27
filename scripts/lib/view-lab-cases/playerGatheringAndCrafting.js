@@ -1611,8 +1611,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
-  // Issue 1615: the same recipe parked on step 2. Step 1 is inert ("isn't the step being crafted");
-  // step 2 is the step being crafted and says a run is in progress instead.
+  // Issue 1615: the multistep recipe parked on step 2, whose rail says a run is in progress.
   playerCase({
     id: 'player-crafting-multistep-parked',
     label: 'Player app — Crafting multistep parked on the second step',
@@ -1623,7 +1622,9 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
       { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },
     ],
-    expectSelector: '[data-recipe-step]:nth-of-type(2) [data-requirement-rail-readonly]',
+    expectSelector:
+      '[data-recipe-step]:nth-of-type(2) [data-requirement-rail-readonly]' +
+      ':has-text("A run is in progress")',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),

@@ -1285,7 +1285,7 @@ describe('RecipeEditView (mounted)', () => {
     const deleted = await pickerOf(['med', 'gone']);
     const missing = deleted.querySelector('[data-recipe-crafting-modifier-missing]');
     assert.equal(missing?.getAttribute('data-recipe-crafting-modifier-missing'), '1');
-    assert.match(missing.textContent, /no longer exists in System settings › Modifiers/);
+    assert.match(missing.textContent, /no longer exists in the Modifiers library/);
     assert.match(missing.textContent, /Inherit system default or No modifiers/);
     assert.ok(
       !deleted.querySelector('[data-recipe-crafting-modifier-suppressed]'),
