@@ -107,6 +107,7 @@
       'IssueChoiceGroupCount',
       'An up-to choice of rewards does not say how many it awards.',
     ],
+    resultDuplicate: ['IssueResultDuplicate', 'A result id is repeated within one recipe or step.'],
     alchemyResultSelection: [
       'IssueAlchemyResultSelection',
       'An alchemy recipe does not resolve to exactly one result set.',

@@ -91,6 +91,27 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('flags a repeated result id as a blocking row worded by the save path`s own message (issue 2713)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Brew',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'g1', results: [{ id: 'dup' }, { id: 'solo' }, { id: 'dup' }] }]
+      }
+    });
+    const row = target.querySelector('[data-issue="resultDuplicate"]');
+    assert.ok(Boolean(row), 'the duplicate has a row');
+    assert.ok(row.classList.contains('is-block'), 'it blocks enable');
+    assert.equal(row.dataset.check, 'noDuplicateResults', 'merged into its owning check');
+    assert.match(
+      row.textContent,
+      /IssueResultDuplicate:.*"location":"Recipe".*"result":"3"/,
+      'the save path`s message, labelled by the later duplicate`s position'
+    );
+    harness.remount();
+  });
+
   // ── THE RAIL IS A TALLY OF THE ROWS (issue 1517, docs round) ─────────────────────────────
   const unnamedStepRecipe = {
     name: 'Refine Ore',

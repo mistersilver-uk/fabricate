@@ -24,6 +24,7 @@
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
 import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
+import { buildRecipeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 import { groupProblems } from '../../../components/resultGroupEdits.js';
 
@@ -399,6 +400,44 @@ function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes
   return { issues, checks };
 }
 
+/** A model-style label: the authored name, else the 1-based position. */
+const positionLabel = (entity, index) => trimmed(entity?.name) || String(index + 1);
+
+/**
+ * A result id repeated within one scope (the recipe, or one step), which save refuses: one critical
+ * issue per later duplicate, addressed to the set holding it and worded by the save path's own
+ * `resultDuplicate` message. A result with no id yet is a draft's, not a repeat.
+ */
+function collectDuplicateResultIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const [stepIndex, step] of executionSteps.entries()) {
+    const location = isMultiStep ? `Step "${positionLabel(step, stepIndex)}"` : 'Recipe';
+    const seen = new Set();
+    for (const group of step.resultGroups) {
+      for (const [resultIndex, result] of asArray(group?.results).entries()) {
+        const id = result?.id;
+        if (!id) continue;
+        if (seen.has(id)) {
+          issues.push({
+            id: 'resultDuplicate',
+            severity: 'critical',
+            blocks: 'enable',
+            target: 'results',
+            ...buildRecipeActivationIssue('resultDuplicate', {
+              location,
+              result: positionLabel(result, resultIndex),
+            }),
+            ...focusTag(resultGroupTarget(group)),
+            ...stepTag(step, isMultiStep),
+          });
+        }
+        seen.add(id);
+      }
+    }
+  }
+  return issues;
+}
+
 /** The issue each `groupProblems` code raises, in the order the Validation tab lists them; a set
  *  holding a group under progressive, which awards every stage in order, raises `progressive`. */
 const CHOICE_GROUP_ISSUES = Object.freeze({
@@ -585,6 +624,10 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   issues.push(...choiceGroups.issues);
   checks.push(...choiceGroups.checks);
 
+  const duplicateResults = collectDuplicateResultIssues(executionSteps, isMultiStep);
+  issues.push(...duplicateResults);
+  checks.push({ id: 'noDuplicateResults', satisfied: duplicateResults.length === 0 });
+
   // The two blockers the enable path enforces and the generic readiness checks never inspect.
   const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
   issues.push(...alchemyReadiness.issues);
@@ -631,6 +674,7 @@ export const CHECK_TO_ISSUES = Object.freeze({
   routedResultGroupsReachable: ['unreachableResultGroup'],
   taughtRecipesResolve: ['missingTaughtRecipe'],
   choiceGroupsValid: Object.values(CHOICE_GROUP_ISSUES),
+  noDuplicateResults: ['resultDuplicate'],
   alchemyResultSelection: ['alchemyResultSelection'],
   noSignatureCollision: ['signatureCollision'],
 });

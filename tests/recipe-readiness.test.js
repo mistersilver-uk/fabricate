@@ -786,7 +786,7 @@ describe('evaluateRecipeReadiness: result choice groups', () => {
           ingredientSets: [{ id: 'i2' }],
           resultGroups: [
             { id: 'g2', results: [clean] },
-            { id: 'f2', role: 'failure', results: [clean, { ...clean, id: 'bad', awardStrategy: 'upTo' }] },
+            { id: 'f2', role: 'failure', results: [{ ...clean, id: 'ok-failure' }, { ...clean, id: 'bad', awardStrategy: 'upTo' }] },
           ],
         },
       ],
@@ -1081,3 +1081,64 @@ describe('evaluateRecipeReadiness: a single result set that lists a tier', () =>
     assert.deepEqual(readiness.issues, []);
   });
 });
+
+describe('a result id repeated within one scope (issue 2713)', () => {
+  const results = (...ids) => ids.map(id => ({ id }));
+  const duplicates = (recipe) => evaluateRecipeReadiness({
+    name: 'Dupes',
+    enabled: true,
+    ingredientSets: [{ id: 's1' }],
+    ...recipe
+  });
+
+  it('blocks enable on the later duplicate, addressed to its set and labelled by its position', () => {
+    const { checks, issues } = duplicates({
+      resultGroups: [
+        { id: 'g1', results: results('dup', 'solo') },
+        { id: 'g2', results: results('other', 'dup') }
+      ]
+    });
+    const found = issues.filter(i => i.id === 'resultDuplicate');
+    assert.equal(found.length, 1, 'one issue for the one repeat');
+    assert.equal(found[0].severity, 'critical');
+    assert.equal(found[0].blocks, 'enable');
+    assert.equal(found[0].target, 'results');
+    assert.equal(found[0].focusTarget, 'result-group-g2', 'the set holding the LATER duplicate');
+    assert.equal(found[0].code, 'resultDuplicate', 'worded by the save path`s own message');
+    assert.deepEqual(found[0].params, { location: 'Recipe', result: '2' });
+    assert.equal(check(checks, 'noDuplicateResults').satisfied, false);
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('puts the failing check and its issue on one blocking row', () => {
+    const readiness = duplicates({ resultGroups: [{ id: 'g1', results: results('dup', 'dup') }] });
+    const row = recipeValidationRowStates(readiness).find(r => r.checkId === 'noDuplicateResults');
+    assert.equal(row.status, 'block');
+    assert.equal(row.issue.id, 'resultDuplicate');
+  });
+
+  it('scopes the repeat to a step, naming the step that holds it', () => {
+    const { issues } = duplicates({
+      ingredientSets: undefined,
+      steps: [
+        { id: 'sa', name: 'Forge', ingredientSets: [{ id: 'i1' }], resultGroups: [{ id: 'ga', results: results('a', 'a') }] },
+        { id: 'sb', name: '', ingredientSets: [{ id: 'i2' }], resultGroups: [{ id: 'gb', results: results('a', 'b', 'b') }] }
+      ]
+    });
+    const found = issues.filter(i => i.id === 'resultDuplicate');
+    assert.deepEqual(found.map(i => i.params), [
+      { location: 'Step "Forge"', result: '2' },
+      { location: 'Step "2"', result: '3' }
+    ], 'an id repeated across steps is not a repeat');
+    assert.deepEqual(found.map(i => i.stepId), ['sa', 'sb']);
+  });
+
+  it('is satisfied for distinct ids, and ignores results that have no id yet', () => {
+    const { checks, issues } = duplicates({
+      resultGroups: [{ id: 'g1', results: [{ id: 'a' }, { id: 'b' }, {}, {}] }]
+    });
+    assert.equal(check(checks, 'noDuplicateResults').satisfied, true);
+    assert.equal(issues.some(i => i.id === 'resultDuplicate'), false);
+  });
+});
+

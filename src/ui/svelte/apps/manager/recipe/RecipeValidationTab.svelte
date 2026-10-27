@@ -76,6 +76,7 @@
       'Every recipe it teaches is in this system',
     ],
     choiceGroupsValid: ['CheckChoiceGroupsValid', 'Every choice of rewards is complete'],
+    noDuplicateResults: ['CheckNoDuplicateResults', 'No result is repeated'],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
     noSignatureCollision: [
       'CheckNoSignatureCollision',
@@ -159,6 +160,7 @@
     routedResultGroupsReachable: 'results',
     taughtRecipesResolve: 'results',
     choiceGroupsValid: 'results',
+    noDuplicateResults: 'results',
     alchemyResultSelection: 'resolution',
     hasName: 'requirements',
     stepsNamed: 'requirements',
@@ -178,7 +180,8 @@
   }
 
   function issueTitle(issue) {
-    if (issue.id === 'signatureCollision') {
+    // A coded issue carries the activation message the save path raises for the same fault.
+    if (issue.code) {
       return localizeActivationIssue(
         { code: issue.code, params: issue.params, message: issue.message },
         localize
