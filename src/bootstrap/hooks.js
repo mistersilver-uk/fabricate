@@ -125,7 +125,7 @@ function registerFabricateConfig() {
         SheetClass: RegionBehaviorConfig,
         onError: warnSheetRegistrationFailed,
       });
-    } else {
+    } else if (RegionBehavior && DocumentSheetConfig) {
       warnSheetRegistrationFailed(new Error('RegionBehaviorConfig is unavailable'));
     }
   } catch (error) {
