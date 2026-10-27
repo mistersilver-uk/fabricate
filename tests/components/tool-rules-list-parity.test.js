@@ -847,13 +847,11 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     const tokens = await page.evaluate(READ_TOKENS, [
       '--fab-bg-0',
       '--fab-bg-1',
-      '--fab-text-subtle',
       '--fab-text-muted',
     ]);
     const resolved = {
       bg0: tokens['--fab-bg-0'],
       bg1: tokens['--fab-bg-1'],
-      subtle: tokens['--fab-text-subtle'],
       muted: tokens['--fab-text-muted'],
     };
 
@@ -869,8 +867,8 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
       assert.equal(measured[probe].fontWeight, '700', `${probe} is the design weight`);
       assert.notEqual(measured[probe].letterSpacing, 'normal', `${probe} is tracked`);
     }
-    // The head `.manager-kicker` stays subtle; the Rail section kickers are muted (issue 2257 D11).
-    assert.equal(measured.kicker.color, resolved.subtle, 'the head kicker is the subtle ink');
+    // The head `.manager-kicker` and the Rail section kickers share the muted ink (issues 2257 D11, 2298).
+    assert.equal(measured.kicker.color, resolved.muted, 'the head kicker is the muted ink');
     assert.equal(measured['section-kicker'].color, resolved.muted, 'a section kicker is muted');
     for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight']) {
       assert.equal(measured['section-kicker'][property], measured.kicker[property], property);

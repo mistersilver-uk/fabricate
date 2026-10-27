@@ -1429,6 +1429,7 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
+The manager's `.manager-kicker` inks `--fab-text-muted` wherever it is drawn, and no rule restates it, so every kicker shares one ink that clears 4.5:1 in all seven themes (issue 2298).
 A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
 It inherits the host's face and line height, which a `Kicker` states for itself.
 At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.

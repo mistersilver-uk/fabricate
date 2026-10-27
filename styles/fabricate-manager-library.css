@@ -1697,7 +1697,6 @@
 /* The card's own micro-label is tighter and quieter than a page kicker (issue 1373). */
 .fabricate-manager .manager-scope-card .manager-kicker {
   margin: 0;
-  color: var(--fab-text-subtle);
   font-size: 8px;
   letter-spacing: 0.1em;
 }

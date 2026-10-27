@@ -599,7 +599,6 @@
 .fabricate-manager .manager-checks-rail .manager-kicker {
   margin: 0;
   min-width: 0;
-  color: var(--fab-text-subtle);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.14em;
