@@ -320,6 +320,53 @@ test('the lab seeds game.items from the document index, Items only', async () =>
   );
 });
 
+test('the suppressed subject-modifier seed authors both hosts in every copy, and only behind its flag', () => {
+  const seed = fixtureFunction('./view-lab/world/labWorld.js', 'seedSubjectModifierPicks', {
+    LAB_SYSTEM_IDS,
+  });
+  const picksOf = (content) => {
+    const herbalism = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+    const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
+    const salvage = (list) => list.find((e) => e.id === 'hb-cracked-alembic').salvage;
+    const task = (list) => list.find((e) => e.id === 'hb-task-slowbloom');
+    return [
+      salvage(content.components).checkModifierIds,
+      salvage(herbalism.components).checkModifierIds,
+      task(content.gatheringConfig.tasks).checkModifierIds,
+      task(slice.tasks).checkModifierIds,
+    ];
+  };
+
+  const inherit = structuredClone(buildLabContent({}));
+  seed(inherit, null);
+  assert.deepEqual(picksOf(inherit), [undefined, undefined, undefined, undefined]);
+
+  const seeded = structuredClone(buildLabContent({}));
+  seed(seeded, 'suppressed');
+  const salvagePick = ['hb-mod-medicine', 'hb-mod-tools'];
+  const taskPick = ['hb-mod-nature', 'hb-mod-tools'];
+  assert.deepEqual(picksOf(seeded), [salvagePick, salvagePick, taskPick, taskPick]);
+});
+
+test('the suppressed subject-modifier cases reach the seed through the query, mount and world', () => {
+  const ids = [
+    'manager-component-edit-salvage-modifier-suppressed',
+    'manager-gathering-task-edit-modifier-suppressed',
+  ];
+  for (const id of ids) {
+    const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
+    assert.equal(viewCase?.query?.subjectModifierPicks, 'suppressed', `${id} sets the flag`);
+  }
+  const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8');
+  const mount = read('./view-lab/mount.js');
+  assert.match(mount, /subjectModifierPicks: params\.get\('subjectModifierPicks'\)/);
+  assert.match(mount, /subjectModifierPicks: params\.subjectModifierPicks/);
+  assert.match(
+    read('./view-lab/world/labWorld.js'),
+    /seedSubjectModifierPicks\(content, subjectModifierPicks\)/
+  );
+});
+
 function fixtureFunction(file, name, dependencies = {}) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8');
   const start = source.indexOf(`function ${name}(`);

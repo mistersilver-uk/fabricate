@@ -475,6 +475,30 @@ function seedGatheringTaskMode(content, mode) {
 }
 
 /**
+ * An authored custom check-modifier pick on the herbalism salvage component and gathering task
+ * (issue 1616), each inside that host's own default set so a case can un-mark one on the Checks
+ * tab and leave the other eligible. Every copy is written: the world list and each system's own.
+ */
+function seedSubjectModifierPicks(content, state) {
+  if (state !== 'suppressed') return;
+  const component = { id: 'hb-cracked-alembic', ids: ['hb-mod-medicine', 'hb-mod-tools'] };
+  const task = { id: 'hb-task-slowbloom', ids: ['hb-mod-nature', 'hb-mod-tools'] };
+  const pickSalvage = (entry) =>
+    entry.id === component.id
+      ? { ...entry, salvage: { ...entry.salvage, checkModifierIds: [...component.ids] } }
+      : entry;
+  const pickTask = (entry) =>
+    entry.id === task.id ? { ...entry, checkModifierIds: [...task.ids] } : entry;
+  content.components = content.components.map(pickSalvage);
+  for (const system of content.systems) {
+    if (system.components) system.components = system.components.map(pickSalvage);
+  }
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
+  slice.tasks = slice.tasks.map(pickTask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(pickTask);
+}
+
+/**
  * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
  * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
  * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers. `routed-count` counts
@@ -913,6 +937,8 @@ function stripAuthoredWorldComponents(content) {
  *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
  *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`; or
  *   issue 2514's `failure-policy-never`.
+ * @param {string|null} [options.subjectModifierPicks] `suppressed` authors a custom pick on the
+ *   herbalism salvage component and gathering task. See {@link seedSubjectModifierPicks}.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
@@ -941,6 +967,7 @@ export async function buildLabWorld({
   journalCaseState = null,
   checkPreviewState = null,
   resultRowState = null,
+  subjectModifierPicks = null,
   learnableBook = false,
   systemBlocked = false,
   depletedImage = false,
@@ -959,6 +986,7 @@ export async function buildLabWorld({
   if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
   seedResultRowState(content, resultRowState);
+  seedSubjectModifierPicks(content, subjectModifierPicks);
   if (journalCaseState === 'history-just-resolved-rewards') seedJustResolvedRewards(content);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);

@@ -124,6 +124,8 @@ function readParams() {
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
     // A recipe result naming no component, for the result row's suggestion list (issue 1516).
     resultRowState: params.get('resultRowState') ?? null,
+    // A custom check-modifier pick authored on the herbalism salvage component and gathering task (issue 1616).
+    subjectModifierPicks: params.get('subjectModifierPicks') ?? null,
     // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
     runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
     checkOverride: params.get('checkOverride') ?? null,
@@ -1071,6 +1073,7 @@ async function boot() {
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
         resultRowState: params.resultRowState,
+        subjectModifierPicks: params.subjectModifierPicks,
         runeworkCheckMode: params.runeworkCheckMode,
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
