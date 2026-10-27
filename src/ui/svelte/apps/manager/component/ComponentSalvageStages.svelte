@@ -42,7 +42,7 @@
   // The macro and trigger vocabularies are SYSTEM-scoped, so this view's own lists resolve the
   // referenced component's names too; without them the sentence names nothing a GM recognises.
   const macroNames = $derived(complicationMacroNames(macroOptions));
-  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions, 'salvage'));
 </script>
 
 <!-- `data-add-salvage-group` rides this button only while there is no backing group,

@@ -87,7 +87,7 @@
   } = $props();
 
   const macroNames = $derived(complicationMacroNames(macroOptions));
-  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions, 'crafting'));
 
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as

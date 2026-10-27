@@ -4001,6 +4001,28 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('names a crafting trigger by its own label when a salvage trigger shares its id', async () => {
+    const named = { ...CRAFTING_COMPLICATION, when: { checkTrigger: 'trig-snap' } };
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [{ ...COMPLICATED_COMPONENT_OPTIONS[0], complications: [named] }],
+          complicationTriggerOptions: [
+            { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+            { id: 'trig-snap', label: 'the salvage jams', activity: 'salvage' },
+          ],
+        },
+      }
+    );
+    const sentence = stageStrips(target)[0]
+      .querySelector('.fab-complication-row-body')
+      .getAttribute('title');
+    assert.match(sentence, /the spring snaps fires/, 'the crafting trigger keeps its own label');
+    assert.ok(!/salvage jams/.test(sentence), 'a salvage trigger does not overwrite it');
+    editHarness.remount();
+  });
+
   // GUARD: red when the list is rendered in the `row` snippet beside the PickerRow, not in `body`.
   it('GUARD 1286: the nested list sits in the row BODY — the grip and the ordinal ride the stage line', async () => {
     // The stage row is a column whose line carries the grip, the ordinal and the padding, and

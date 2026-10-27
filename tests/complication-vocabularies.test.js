@@ -44,6 +44,22 @@ describe('complicationTriggerLabels', () => {
     );
   });
 
+  it('keeps only the named activity’s triggers, so a shared id takes that activity’s label', () => {
+    const options = [
+      { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+      { id: 'trig-snap', label: 'the salvage jams', activity: 'salvage' },
+      { id: 'trig-gather', label: 'the node crumbles', activity: 'gathering' },
+    ];
+    assert.deepEqual(
+      [...complicationTriggerLabels(options, 'crafting')],
+      [['trig-snap', 'the spring snaps']]
+    );
+    assert.deepEqual(
+      [...complicationTriggerLabels(options, 'salvage')],
+      [['trig-snap', 'the salvage jams']]
+    );
+  });
+
   it('drops an option with no id, and reads an absent list as empty', () => {
     assert.deepEqual([...complicationTriggerLabels([null, { label: 'Orphan' }, { id: '' }])], []);
     assert.equal(complicationTriggerLabels(undefined).size, 0);
