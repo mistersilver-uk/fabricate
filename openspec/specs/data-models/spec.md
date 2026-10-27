@@ -3831,11 +3831,12 @@ Requirements:
 3. `discoveredAt` must be a timestamp and `source` must be one of the listed values.
 4. Reads never throw on a stale `partyId`; missing or stale realm ids must not disclose secret realm names to non-GM users.
 5. Because this is an actor flag (not a world setting), it is **not** rewritten by the migration runner, which reaches two corpora and four world settings and has no actor access at all.
-   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback, flatten a legacy `[systemId][realmId]` map on read, and every write persists only the current shape, upgrading each actor lazily.
+   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback (read only while `discoveredGatheringRealms` is absent), flatten a legacy `[systemId][realmId]` map on read, and every write to a world actor — a reveal as well as a hide — force-replaces the whole flat map and force-deletes a present `discoveredGatheringRegions` key in the same update, upgrading each actor lazily; a merge write would keep every legacy per-system bucket, because core deep-merges object flags.
+   A write through an unlinked token's synthetic actor lands in its ActorDelta, so this requirement does not promise that it removes a key the base actor holds.
    That is the same mechanism the earlier `discoveredGatheringRegions` rename used, for the same reason.
    Two details make the lazy upgrade safe.
    The DISCRIMINATOR is `discoveredAt`: every entry has one and no `systemId` bucket ever does, so an object carrying a numeric `discoveredAt` is a realm entry and any other object is a legacy bucket.
-   And a HALF-UPGRADED map is reachable in normal use rather than hypothetical — upgrade an actor, write, then discover a second realm, and the map holds both shapes at once until the next full read — so the flattener handles a mixed map rather than assuming one shape.
+   And a HALF-UPGRADED map persisted by an earlier build's merge write stays readable, so the flattener handles a mixed map rather than assuming one shape.
 6. On a collision between two legacy buckets the EARLIEST `discoveredAt` wins.
    Discovery records the first time a character saw a place; a later duplicate recorded under another crafting system is not a re-discovery.
 7. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).

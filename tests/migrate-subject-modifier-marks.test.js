@@ -11,7 +11,6 @@ const { migrateSubjectModifierMarks, applySubjectModifierMarks } = await import(
 );
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
-const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { resolveEligibleModifierIds } = await import('../src/systems/checkModifierResolver.js');
 const { projectComponentSummary } = await import('../src/ui/presenters/summaryProjection.js');
 
@@ -470,7 +469,7 @@ test('the export upcast leaves a CURRENT-schema bundle alone — there an empty 
   // Since issue 1608 an empty mark under `bySubject` MEANS “nothing is selectable”, so a GM who
   // un-marks the last row authors exactly the shape this seed keys on.
   const payload = {
-    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
+    schemaVersion: 6,
     system: system({ components: [component('c-1', ['alch']), component('c-2')] }),
     recipes: [recipe('r-1', ['med']), recipe('r-2')],
     gatheringConfig: { system: { tasks: [task('t-1', ['herb']), task('t-2')] }, shared: {} },
@@ -505,3 +504,36 @@ test('the export upcast leaves a CURRENT-schema bundle alone — there an empty 
     'no gathering task pick is rewritten or pinned'
   );
 });
+
+// Literal versions, never the exported constant, so a schema bump cannot move the oracle (issue 1618).
+const SEED_CASES = [
+  ['absent', undefined, true],
+  ['5', 5, true],
+  ['"6" (a string)', '6', true],
+  ['6.5', 6.5, true],
+  ['NaN', NaN, true],
+  ['null', null, true],
+  ['6', 6, false],
+  ['7 (a newer build)', 7, false],
+];
+
+for (const [label, schemaVersion, seeded] of SEED_CASES) {
+  test(`the export upcast's seed is keyed on the bundle's own schemaVersion: ${label}`, () => {
+    const payload = {
+      system: system(),
+      recipes: [recipe('r-1', ['med']), recipe('r-2')],
+      gatheringConfig: { system: { tasks: [] }, shared: {} },
+      characterLibraries: LIBRARIES,
+    };
+    if (schemaVersion !== undefined) payload.schemaVersion = schemaVersion;
+
+    const upcast = migrateExportPayload(payload);
+
+    assert.deepEqual(upcast.system.craftingCheck.defaultModifierIds, seeded ? ['med'] : []);
+    assert.deepEqual(
+      upcast.recipes[1].craftingModifier,
+      seeded ? { modifierIds: [] } : undefined,
+      seeded ? 'the inheriting recipe is pinned' : 'an empty mark at schema 6 is an answer'
+    );
+  });
+}
