@@ -406,11 +406,11 @@ const WORLD_CATALOGUE_LEAVES = Object.freeze([
   },
 ]);
 
-/** A world row: it names itself, so its accessible name is its label unless it composes one. */
+/** A world row: its accessible name is its label, or the elements its `ariaLabelledBy` names. */
 function worldItem({ token, current, ...fields }) {
+  const named = fields.ariaLabelledBy ? fields : { ariaLabel: fields.label, ...fields };
   return pageRow(current, {
-    ariaLabel: fields.label,
-    ...fields,
+    ...named,
     id: token,
     hooks: { 'data-world-nav-item': token },
   });
@@ -611,6 +611,9 @@ function downtimeRollupName(count, text) {
   return name.replace('{count}', String(count));
 }
 
+const DOWNTIME_LABEL_ID = 'manager-world-nav-downtime-label';
+const DOWNTIME_MARKER_ID = 'manager-world-nav-downtime-mark';
+
 /**
  * The parent's one trailing mark: the rollup while a companion's badges sit behind a closed
  * disclosure, else the PREMIUM chip, muted but never removed once a companion holds the surface
@@ -622,6 +625,7 @@ function downtimeParentMarker({ downtimeCoreFallback: coreFallback }, rollup, te
       kind: 'issues',
       count: rollup.total,
       name: downtimeRollupName(rollup.total, text),
+      domId: DOWNTIME_MARKER_ID,
       hooks: { 'data-world-downtime-badge-total': '' },
     };
   }
@@ -629,6 +633,7 @@ function downtimeParentMarker({ downtimeCoreFallback: coreFallback }, rollup, te
     kind: 'premium',
     text: text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM'),
     installed: !coreFallback,
+    domId: DOWNTIME_MARKER_ID,
     hooks: {
       'data-world-nav-premium': '',
       'data-world-nav-premium-state': coreFallback ? 'preview' : 'installed',
@@ -638,6 +643,7 @@ function downtimeParentMarker({ downtimeCoreFallback: coreFallback }, rollup, te
 
 function downtimeParent(input, rollup, text) {
   const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
+  const marker = downtimeParentMarker(input, rollup, text);
   return worldItem({
     token: 'downtime',
     domId: 'manager-world-nav-downtime',
@@ -652,11 +658,12 @@ function downtimeParent(input, rollup, text) {
           'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
           'Downtime Studio is unlocked by Fabricate Premium'
         ),
-    // No `aria-label`: the name composes from the label and the trailing mark, so the mark is heard.
-    ariaLabel: undefined,
+    labelId: DOWNTIME_LABEL_ID,
+    // Named by reference, so the label and the mark are heard even where a collapsed rail hides them.
+    ariaLabelledBy: `${DOWNTIME_LABEL_ID} ${DOWNTIME_MARKER_ID}`,
     current: input.isWorldDowntimeRoute,
     controls: 'manager-downtime-submenu',
-    markers: [downtimeParentMarker(input, rollup, text)],
+    markers: [marker],
     onSelect: input.openWorldDowntime,
   });
 }

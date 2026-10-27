@@ -227,8 +227,8 @@ export function registerDowntimeCases() {
     assert.ok(!parent.hasAttribute('aria-label'), 'no override silences the chip');
     assert.equal(
       parent.getAttribute('aria-labelledby'),
-      null,
-      'and nothing else replaces the contents as the name'
+      `manager-world-nav-downtime-label ${parent.querySelector('[data-world-nav-premium]').id}`,
+      'the name is the label then the chip, by reference'
     );
     assert.equal(downtimeParentName(), 'Downtime PREMIUM', 'the preview name carries the chip');
     assert.ok(
@@ -2148,19 +2148,27 @@ export function registerDowntimeCases() {
 
   const downtimeBadge = (tabId) => target.querySelector(`[data-world-downtime-badge="${tabId}"]`);
   const downtimeRollup = () => target.querySelector('[data-world-downtime-badge-total]');
-  // The accessible name of a button with no `aria-label`: its contents, a `role="img"` child
-  // contributing its own label and an `aria-hidden` child contributing nothing.
-  function nameFromContents(node) {
+  // A happy-dom approximation of accname (no CSS, so no `display: none`): `aria-labelledby` first,
+  // referenced nodes read even when hidden, then a non-empty `aria-label`, then contents with an
+  // `aria-hidden` child contributing nothing.
+  function accessibleName(node, referenced = false) {
+    const ids = node.getAttribute('aria-labelledby')?.trim();
+    if (ids && !referenced) {
+      const named = ids.split(/\s+/).map((id) => accessibleName(target.querySelector(`#${id}`), true));
+      return named.join(' ').replaceAll(/\s+/g, ' ').trim();
+    }
+    const own = node.getAttribute('aria-label')?.trim();
+    if (own) return own;
     const parts = [];
     for (const child of node.childNodes) {
       if (child.nodeType === 3) parts.push(child.data);
       else if (child.nodeType === 1 && child.getAttribute('aria-hidden') !== 'true') {
-        parts.push(child.getAttribute('aria-label') ?? nameFromContents(child));
+        parts.push(accessibleName(child, true));
       }
     }
     return parts.join(' ').replaceAll(/\s+/g, ' ').trim();
   }
-  const downtimeParentName = () => nameFromContents(worldNavItem('downtime'));
+  const downtimeParentName = () => accessibleName(worldNavItem('downtime'));
   const downtimePremiumState = () =>
     target.querySelector('[data-world-nav-premium]')?.dataset.worldNavPremiumState;
 
@@ -2439,7 +2447,7 @@ export function registerDowntimeCases() {
       );
 
       // An `aria-label` on the parent would replace its subtree and silence the rollup.
-      assert.ok(!parent.hasAttribute('aria-label'), 'the name computes from the row’s contents');
+      assert.ok(!parent.hasAttribute('aria-label'), 'the name is computed, not overridden');
       assert.equal(downtimeParentName(), 'Downtime 5 updates');
     });
 
@@ -2479,6 +2487,13 @@ export function registerDowntimeCases() {
           '`!railGroupExpanded.worldDowntime`: on a collapsed rail the submenu is hidden and ' +
           'the rollup is the group’s only surviving signal'
       );
+      // The collapsed rail hides the label and the mark with `display: none`, which happy-dom
+      // does not apply, so the name is proved by reference: both ids resolve, hidden or not.
+      const parent = worldNavItem('downtime');
+      const [labelId, markId] = parent.getAttribute('aria-labelledby').split(' ');
+      assert.equal(target.querySelector(`#${labelId}`).textContent.trim(), 'Downtime');
+      assert.ok(target.querySelector(`#${markId}`) === downtimeRollup(), 'the mark that shows');
+      assert.equal(downtimeParentName(), 'Downtime 5 updates');
       // Deliberately nothing about the sub-item badges: happy-dom applies no stylesheet.
     });
 
@@ -2521,6 +2536,7 @@ export function registerDowntimeCases() {
           'render 10, and "changes the total" would accept it'
       );
       assert.equal(downtimeParentName(), 'Downtime 7 updates');
+      assert.ok(!worldNavItem('downtime').hasAttribute('aria-label'));
       assert.equal(mounts.length, 0, 'with no mount live anywhere');
 
       registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', null);
@@ -2677,7 +2693,7 @@ export function registerDowntimeCases() {
   // whenever `localize` hands the key back, so an implementation that renders every badge
   // correctly and ships none of these keys keeps every other criterion green while leaving
   // two strings untranslatable in every locale.
-  it('AC-23 — the Downtime rollup keys are string leaves, and the retired composed name is gone', () => {
+  it('AC-23 — the Downtime rollup keys are string leaves in the shipped lang file', () => {
     const base = 'FABRICATE.Admin.Manager.World.Downtime';
     for (const leaf of ['BadgeTotalOne', 'BadgeTotalOther']) {
       const key = `${base}.${leaf}`;
@@ -2689,14 +2705,6 @@ export function registerDowntimeCases() {
       assert.ok(
         shippedString(key).includes('{count}'),
         `${leaf} must substitute the total rather than stating a number`
-      );
-    }
-    for (const leaf of ['NavWithBadgeOne', 'NavWithBadgeOther']) {
-      const key = `${base}.${leaf}`;
-      assert.equal(
-        shippedString(key),
-        key,
-        `${key} is retired: the parent's name composes from its contents`
       );
     }
   });

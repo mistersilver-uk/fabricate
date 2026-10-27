@@ -164,9 +164,9 @@ It survives mount, unmount, tab change, route change and window state, and it do
 Core sums the **resolved** badge count once per tab the rail renders — never the registered and runtime layers added together — suppresses the mark entirely at zero, and renders it as the rail's issue-summary pill with `role="img"` and a Core-owned name that states the total generically, because Core cannot compose a companion's localized noun across tabs.
 It renders in provider mode only, and only while the group is collapsed **or** the rail is collapsed; the collapsed rail is the state in which it is the group's only remaining signal, so neither condition alone is sufficient.
 While it shows it takes the parent's single trailing track, and the rail's muted `PREMIUM` chip is not rendered — the carve-out recorded against the chip rule above.
-- **The parent row carries no `aria-label`; its accessible name computes from its contents.**
-The name is therefore the route name followed by whichever trailing mark shows — the rollup's Core-owned name while the rollup shows, the `PREMIUM` chip's word otherwise — because an `aria-label` would replace the subtree and silence that mark.
-No composed name exists, so the row's noun has exactly one source and no locale is forced into English word order.
+- **The parent row is named by reference, not by an `aria-label`.**
+Its `aria-labelledby` points at the row's label and at whichever trailing mark shows — the rollup or the `PREMIUM` chip — so the name is the route name followed by that mark's name, "Downtime 5 updates" or "Downtime PREMIUM", on an expanded and on a collapsed rail alike.
+The row's `title` stays a description of the premium state and is never its name.
 - **The player navigation seam is unchanged by all of the above.**
 It gains no badge, its tab contract stays permissive, and §Player Navigation Extension's "no premium signal in any state" ruling is untouched.
 - **Entering the route in provider mode scrolls the active Downtime sub-item into view**, so the route's first visible state shows the current screen's rail item rather than none of the group; it scrolls by the smallest amount that reveals it, and repeats only when the active tab changes.
