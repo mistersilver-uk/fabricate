@@ -795,7 +795,7 @@ export function registerBulkCases() {
   });
 
   // The panel's blocked-enable count and the book picker's `holds n of {total}` figure are
-  // projections of the LIVE selection, so the corpus is bigger than the selection.
+  // projections of the live selection, so the corpus is bigger than the selection.
   it('derives the blocked count and book membership from the live recipe selection', async () => {
     const row = (id, extra) => ({
       id,

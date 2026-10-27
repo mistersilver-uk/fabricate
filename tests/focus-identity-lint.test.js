@@ -44,6 +44,7 @@ test('leaves identity checks and value comparisons alone', async () => {
     'assert.equal(document.activeElement.id, "x");',
     'assert.equal(describe(document.activeElement), "x");',
     'assert.equal(node.getAttribute("id"), "x");',
+    'expectLike.equal(document.activeElement, "x");',
   ].join('\n');
   assert.deepEqual(await restrictedSyntaxLines(source), []);
 });
