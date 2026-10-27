@@ -444,7 +444,7 @@
 }
 
 .fabricate-list-row.is-muted .fabricate-list-row-name {
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
 }
 
 /* ListRow's selectable form (issue 1778), on selectors the dense row never carries: one native button whose `::after` covers the row, `trailing` beside it and `aside` beneath it. At the dense density the form insets space-1/space-2 with a space-1 line gap. */
@@ -466,7 +466,6 @@
   flex: 0 0 auto;
   max-width: 40%;
   text-align: end;
-  color: var(--fab-text-muted);
 }
 
 .fabricate-list-row.is-default {
@@ -631,6 +630,13 @@
 
 .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
   background: var(--fab-surface-raised);
+}
+
+/* The selected, hover and danger washes are lighter than the row's own ground, where muted falls under 4.5:1. */
+.fabricate-list-row.is-danger,
+.fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']),
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
+  color: var(--fab-text-secondary);
 }
 
 .fabricate-list-row:has(> .fabricate-list-row-open:disabled) {

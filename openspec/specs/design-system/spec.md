@@ -70,7 +70,7 @@ Their default absent-snippet forms retain existing geometry and behavior.
 A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
 A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
 The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
-A dense `ListRow` inks its quantity and detail `--fab-text-muted`, and `--fab-text-secondary` on a cleared row's success wash, clearing 4.5:1 on the row, the card and the wash in all seven themes (issue 2329).
+A `ListRow` inks its quantity and detail `--fab-text-muted`, and `--fab-text-secondary` on the positive tone's success wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes (issue 2329).
 
 #### Scenario: A player app draws its own selectable control
 

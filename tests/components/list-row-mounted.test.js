@@ -175,7 +175,7 @@ const DENSE_CSS = [
   '}',
   '',
   '.fabricate-list-row.is-muted .fabricate-list-row-name {',
-  '  color: var(--fab-text-subtle);',
+  '  color: var(--fab-text-muted);',
   '}',
 ].join('\n');
 
