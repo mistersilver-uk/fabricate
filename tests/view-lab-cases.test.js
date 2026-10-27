@@ -2559,17 +2559,17 @@ test('the modifier vocabulary this file enforces is the one the capture driver e
   // `runCaseSteps` at capture time.
   assert.deepEqual(
     [...RUNNER_CLICK_MODIFIERS].sort(byCodePoint),
-    [...CLICK_MODIFIERS].sort(),
+    [...CLICK_MODIFIERS].sort(byCodePoint),
     'the driver accepts a different set of click modifiers than this file admits'
   );
   assert.deepEqual(
     [...RUNNER_MODIFIER_INCOMPATIBLE_VERBS].sort(byCodePoint),
-    [...VERBS].sort(),
+    [...VERBS].sort(byCodePoint),
     'the driver refuses to pair `modifiers` with a different set of verbs than this file knows'
   );
   assert.deepEqual(
     [...RUNNER_PRESS_KEYS].sort(byCodePoint),
-    [...PRESS_KEYS].sort(),
+    [...PRESS_KEYS].sort(byCodePoint),
     'the driver accepts a different press-key vocabulary than this file admits'
   );
 });

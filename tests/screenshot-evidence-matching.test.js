@@ -359,7 +359,10 @@ describe('decideScreenshotGate', () => {
       gh.calls.some((args) => args.includes('headRefOid')),
       'the cancelled run must have asked for the live head'
     );
-    assert.ok(captured.warn.length > 0, 'the failed head read is warned about');
+    assert.ok(
+      captured.warn.some((line) => line.includes('Could not read headRefOid')),
+      'the failed head read is warned about'
+    );
   });
 
   it('(g1) fails on the deadline when the capture never concludes and the clock advances', async () => {
