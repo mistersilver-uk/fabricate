@@ -367,9 +367,8 @@ describe('run primitives mounted behavior', () => {
     const keep = target.querySelector('[data-run-action="cancel-keep"]');
     assert.equal(decision.getAttribute('role'), 'group', 'the confirmation announces itself');
     assert.equal(decision.getAttribute('aria-label'), 'Yes, cancel');
-    assert.equal(
-      target.ownerDocument.activeElement,
-      keep,
+    assert.ok(
+      target.ownerDocument.activeElement === keep,
       'and focus is on the non-destructive default, never on the body'
     );
 

@@ -197,6 +197,12 @@ export function registerGatheringCases() {
       target.textContent.includes('Storm Omen'),
       'the single library event should be auto-selected into the inspector'
     );
+    const eventInspector = target.querySelector('[data-gathering-event-inspector]');
+    assert.ok(Boolean(eventInspector), 'the selected event renders its inspector card');
+    assert.ok(
+      eventInspector.querySelector('.manager-chip-row').textContent.includes('deadly'),
+      "the inspector's chip row names the event's danger tag"
+    );
     assert.equal(
       target.querySelector('[data-gathering-event-fact="environments"] strong').textContent.trim(),
       '2',

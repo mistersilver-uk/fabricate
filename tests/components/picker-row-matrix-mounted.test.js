@@ -552,7 +552,10 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
     // A checked radio is where Tab lands in its group; happy-dom has no sequential navigation, so
     // only that it takes focus is read here.
     checked.focus();
-    assert.equal(first.target.ownerDocument.activeElement, checked);
+    assert.ok(
+      first.target.ownerDocument.activeElement === checked,
+      'focus is on the checked option'
+    );
     assert.ok(
       Boolean(checked.closest('.manager-segment')),
       'inside the segment whose `:has(:focus-visible)` rule draws the ring'
@@ -573,7 +576,7 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
     rolled.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     await settle();
     assert.equal(changes.length, 0);
-    assert.equal(target.ownerDocument.activeElement, rolled, 'focus stayed on the radio');
+    assert.ok(target.ownerDocument.activeElement === rolled, 'focus stayed on the radio');
     const slot = (node) => {
       if (node.matches('[role="radiogroup"]')) return 'toggle';
       return node.matches(FORMULA) ? 'formula' : 'remove';
@@ -849,7 +852,7 @@ describe('PickerRow: the remaining branches', () => {
     assert.equal(trigger.getAttribute('aria-disabled'), 'true');
     assert.ok(!trigger.disabled, 'read-only, so it still takes focus');
     trigger.focus();
-    assert.equal(target.ownerDocument.activeElement, trigger);
+    assert.ok(target.ownerDocument.activeElement === trigger, 'focus is on the trigger');
     await click(trigger);
     assert.equal(trigger.getAttribute('aria-expanded'), 'false');
     assert.ok(!target.ownerDocument.querySelector('[role="option"]'), 'no kind is offered');
@@ -1292,9 +1295,8 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
     assert.equal(active()?.title, '#herb', 'and the re-add');
     await press('Escape');
     assert.ok(!target.ownerDocument.querySelector('.fabricate-picker-popover'), 'Escape closes');
-    assert.equal(
-      target.ownerDocument.activeElement,
-      target.querySelector('[data-recipe-add-tag]'),
+    assert.ok(
+      target.ownerDocument.activeElement === target.querySelector('[data-recipe-add-tag]'),
       'and focus returns to the adder'
     );
   });

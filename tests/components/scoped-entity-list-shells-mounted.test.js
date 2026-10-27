@@ -916,9 +916,9 @@ describe('the shells own the list state machine', () => {
     assert.equal(inspector.getAttribute('tabindex'), '-1');
     root.querySelector('[data-scoped-list-inspect="component-1"]').click();
     await catalogueHarness.setProps({});
-    assert.equal(
-      root.ownerDocument.activeElement,
-      root.querySelector('[data-scoped-list-inspector]')
+    assert.ok(
+      root.ownerDocument.activeElement === root.querySelector('[data-scoped-list-inspector]'),
+      'focus is on the inspector'
     );
   });
 

@@ -238,9 +238,8 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
 
       assert.deepEqual(chosen, ['beaker']);
       assert.ok(!panel(), 'choosing closes the panel');
-      assert.equal(
-        document.activeElement,
-        button,
+      assert.ok(
+        document.activeElement === button,
         'focus returns to the element the attachment handed over, which is the caller’s button'
       );
       harness.remount();
