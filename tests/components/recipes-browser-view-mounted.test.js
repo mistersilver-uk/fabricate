@@ -1379,6 +1379,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
     const name = root.querySelector('[data-recipe-requirement="currency"] .manager-recipe-flow-name');
     assert.equal(name.textContent.trim(), '8 Handfuls');
+    inspector.remount();
+
+    // a unit gone from the currency config keeps its raw id
+    const orphan = await inspector.mount({ selectedRecipe: recipe, recipeCount: 1, currencyUnits: [] });
+    assert.equal(
+      orphan
+        .querySelector('[data-recipe-requirement="currency"] .manager-recipe-flow-name')
+        .textContent.trim(),
+      '8 kB45g8G7uUeiLATc'
+    );
   });
 
   it('says outright that a recipe with no results makes nothing on a successful craft', async () => {
