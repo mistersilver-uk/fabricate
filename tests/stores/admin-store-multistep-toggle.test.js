@@ -56,7 +56,7 @@ function buildStore({ recipes, confirmResult = true }) {
     renderImportDialog: async () => {},
   });
 
-  return { store: createAdminStore(services), updateCalls, confirmCalls, recipes };
+  return { store: createAdminStore(services), services, updateCalls, confirmCalls, recipes };
 }
 
 describe('adminStore — disable multi-step confirm (issue 710)', () => {
@@ -77,7 +77,7 @@ describe('adminStore — disable multi-step confirm (issue 710)', () => {
   });
 
   it('persists the disable when the GM confirms, leaving step data byte-for-byte intact', async () => {
-    const { store, updateCalls, confirmCalls, recipes } = buildStore({
+    const { store, services, updateCalls, confirmCalls, recipes } = buildStore({
       recipes: [multiStepRecipe('r1')],
       confirmResult: true,
     });
@@ -87,6 +87,11 @@ describe('adminStore — disable multi-step confirm (issue 710)', () => {
     const result = await store.toggleFeature('multiStepRecipes', false);
 
     assert.equal(result, true, 'the toggle proceeds');
+    assert.equal(
+      services.getCraftingSystemManager().getSystem('sys-ms').features.multiStepRecipes,
+      false,
+      'the write is applied to the system the store reads back'
+    );
     assert.equal(confirmCalls.length, 1, 'the warning dialog was shown once');
     assert.equal(updateCalls.length, 1, 'the feature flag is written after confirm');
     assert.deepEqual(updateCalls[0].updates, { features: { multiStepRecipes: false } });
@@ -123,5 +128,24 @@ describe('adminStore — disable multi-step confirm (issue 710)', () => {
     assert.equal(confirmCalls.length, 0, 'enabling the feature is never gated by a dialog');
     assert.equal(updateCalls.length, 1, 'the flag is written directly');
     assert.deepEqual(updateCalls[0].updates, { features: { multiStepRecipes: true } });
+  });
+
+  // Pins the shared services double to the real manager's `updateSystem`; the store never reaches
+  // either path.
+  it('the services double throws on an unknown system id and merges features', async () => {
+    const { services } = buildStore({ recipes: [] });
+    const manager = services.getCraftingSystemManager();
+
+    await assert.rejects(
+      () => manager.updateSystem('absent', { name: 'x' }),
+      /Crafting system not found: absent/,
+      'the real manager throws for an unknown id rather than resolving null'
+    );
+    await manager.updateSystem('sys-ms', { features: { extraFeature: true } });
+    assert.deepEqual(
+      manager.getSystem('sys-ms').features,
+      { multiStepRecipes: true, extraFeature: true },
+      'features merge into the stored set, as the real manager spreads them'
+    );
   });
 });

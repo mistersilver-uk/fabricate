@@ -9,11 +9,10 @@ import {
   revealGatheringRealm
 } from '../src/systems/gatheringRealmDiscovery.js';
 import {
-  deletedKey,
+  applyFaithfulWrite,
   forEachReplacementForm,
   isForcedReplacement,
   recordWrite,
-  replacedKey,
   toOperatorForm
 } from './helpers/forcedDeletion.js';
 
@@ -53,35 +52,15 @@ class FakeDocument {
   }
 }
 
-const isObject = (value) => Boolean(value) && typeof value === 'object';
-
-function mergeNeverDeleting(target, source) {
-  for (const [key, value] of Object.entries(source)) {
-    if (isObject(value) && isObject(target[key])) mergeNeverDeleting(target[key], value);
-    else target[key] = value;
-  }
-}
-
 // `Actor#update` as core runs it: a recursive merge that removes a key only for a forced
 // deletion, never because the written map omits it (issue 2012), and assigns a forced
-// replacement wholesale. A missing parent on the path is created, as core's diff creates one.
+// replacement wholesale.
 class MergingActor extends FakeDocument {
   updateCalls = [];
   updateSource() {}
   async update(changes) {
     recordWrite(this.updateCalls, changes);
-    for (const [path, value] of Object.entries(changes)) {
-      const parts = path.split('.');
-      const last = parts.pop();
-      let node = this;
-      for (const part of parts) node = node[part] ??= {};
-      const deleted = deletedKey(last, value);
-      const replaced = replacedKey(last, value);
-      if (deleted !== null) delete node[deleted];
-      else if (replaced) node[replaced.key] = structuredClone(replaced.value);
-      else if (isObject(value) && isObject(node[last])) mergeNeverDeleting(node[last], value);
-      else node[last] = value;
-    }
+    for (const [path, value] of Object.entries(changes)) applyFaithfulWrite(this, path, value);
     return this;
   }
 }

@@ -98,3 +98,12 @@ export const withSystem = (env, systemId, rewrite) =>
   storedSystems(env).map((system) => (system.id === systemId ? rewrite(system) : system));
 export const withRecipe = (env, recipeId, rewrite) =>
   storedRecipes(env).map((recipe) => (recipe.id === recipeId ? rewrite(recipe) : recipe));
+
+/**
+ * A repository seam whose replicated snapshot a test can withdraw between two reloads, standing in
+ * for a document-backed adapter that has none.
+ */
+export function withdrawableSnapshot(records) {
+  const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
+  return seam;
+}

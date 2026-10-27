@@ -56,6 +56,12 @@ describe('adminStore character prerequisites (system-owned)', () => {
   // case below goes through `storeFor`, which selects one. This is the case that holds it.
   it('adds a prerequisite with NO crafting system selected', async () => {
     const services = createServices();
+    assert.equal(
+      services.getSetting('lastManagedCraftingSystem'),
+      '',
+      'pins the double, not the store: a supplied settings record is its only source, with no sys1 ' +
+        'fallback (the store still adopts allSystems[0] on refresh)'
+    );
     const store = createAdminStore(services);
     await store.refresh();
     const added = await store.addCharacterPrerequisite({ name: 'Unselected' });

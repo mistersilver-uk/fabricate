@@ -1,11 +1,12 @@
 /**
  * Pins the observable revision, attribution and reload-delta behaviour of both crafting-data
  * managers (issue 1694), so the same assertions prove the `RevisionBookkeeping` extraction
- * changed nothing. Authored against the unchanged managers and unmodified afterwards.
+ * changed nothing. Authored against the unchanged managers; later edits only add pins.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { handleFabricateSettingChange } from '../../src/config/settingChangeBridge.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
 import { ALL_INVALIDATION_DOMAINS } from '../../src/systems/invalidationDomains.js';
 import {
@@ -18,6 +19,7 @@ import {
   SYS_A,
   SYS_B,
   twoSystemWorld,
+  withdrawableSnapshot,
   withRecipe,
   withSystem,
 } from '../helpers/scopedInvalidationWorld.js';
@@ -85,12 +87,6 @@ const announcements = (calls) =>
 
 /** A recipe no fixture holds, born disabled so the alchemy signature gate is not the subject. */
 const newRecipe = () => persistedRecipe('r-new', SYS_A, `${SYS_A}-c0`, { enabled: false });
-
-/** A repository seam whose replicated snapshot a test can withdraw between two reloads. */
-function withdrawable(records) {
-  const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
-  return seam;
-}
 
 describe('CraftingSystemManager save advances exactly the scopes its change names', () => {
   it('advances every stored system for the whole-corpus save, which names nothing', async () => {
@@ -325,7 +321,7 @@ describe('the reload delta is one-shot', () => {
 
   it('leaves nothing readable when the reload reads no snapshot at all', () => {
     twoSystemWorld();
-    const seam = withdrawable([{ id: SYS_A, name: 'A' }]);
+    const seam = withdrawableSnapshot([{ id: SYS_A, name: 'A' }]);
     const systemManager = new CraftingSystemManager(new RecipeManager(), { repository: seam });
 
     assert.equal(systemManager.reload(), true);
@@ -437,14 +433,22 @@ describe('the announcement carries exactly what was attributed since the last on
     const calls = await onHookBus(async () => {
       await systemManager.save({ put: systemManager.getSystem(SYS_A), domains: LABELLING });
       write(withSystem(env, SYS_B, (system) => ({ ...system, description: 'Prose' })));
-      assert.equal(systemManager.reload(), true, 'the interleaved reload must be a real one');
+      // The production leg: the setting-change bridge reloads, then announces from the delta, on
+      // the same ordered bus as the local notifier below.
+      handleFabricateSettingChange('fabricate.craftingSystems', {
+        craftingSystemManager: systemManager,
+        callAll: (hook, payload) => globalThis.Hooks.callAll(hook, payload),
+      });
       systemManager._notifySystemsChanged();
     });
 
     assert.deepEqual(
       announcements(calls),
-      [{ source: 'systems', scopes: [{ systemId: SYS_A, domains: LABELLING }] }],
-      'a replicated change is announced from the delta, never from the pending set'
+      [
+        { source: 'systems', scopes: [{ systemId: SYS_B, domains: NARRATIVE }] },
+        { source: 'systems', scopes: [{ systemId: SYS_A, domains: LABELLING }] },
+      ],
+      'the replicated change is announced from the delta and the local one from the pending set'
     );
   });
 

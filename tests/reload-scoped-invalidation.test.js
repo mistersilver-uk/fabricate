@@ -14,6 +14,7 @@ import {
   SYS_A,
   SYS_B,
   twoSystemWorld,
+  withdrawableSnapshot,
   withRecipe,
   withSystem,
 } from './helpers/scopedInvalidationWorld.js';
@@ -39,15 +40,6 @@ const recipeTokens = (recipeManager) => ({
 function installPack(packId, documents) {
   const packs = new Map([[packId, { getDocuments: async () => documents }]]);
   globalThis.game.packs = { get: (id) => packs.get(id) ?? null };
-}
-
-/**
- * A repository seam whose replicated snapshot a test can WITHDRAW between two reloads, standing in
- * for a document-backed adapter that has none.
- */
-function withdrawableSnapshot(records) {
-  const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
-  return seam;
 }
 
 /** How many full signature audits have been compiled since the last reset. */

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringStaminaService } from '../src/systems/GatheringStaminaService.js';
 import { FakeActor } from './helpers/run-manager-fakes.js';
-import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
+import { applyFaithfulWrite, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
 
 const HOUR = 3600;
 
@@ -231,20 +231,14 @@ class MergingStaminaActor extends FakeActor {
 
   /**
    * Foundry's flattened-path `Document#update`, reduced to what the service uses: a dotted path
-   * below the `flags` root, deleting on a `-=` LAST segment or a forced-deletion operator.
+   * below the `flags` root.
    */
   async update(patch) {
     recordWrite(this.updateCalls, patch);
     for (const [path, value] of Object.entries(patch)) {
       const segments = path.split('.');
       assert.equal(segments.shift(), 'flags', 'stamina deletions address the flags root');
-      const leaf = segments.pop();
-      let node = this._flags;
-      for (const segment of segments) node = node?.[segment];
-      if (!node || typeof node !== 'object') continue;
-      const deleted = deletedKey(leaf, value);
-      if (deleted !== null) delete node[deleted];
-      else node[leaf] = value;
+      applyFaithfulWrite(this._flags, segments.join('.'), value);
     }
     return this;
   }
