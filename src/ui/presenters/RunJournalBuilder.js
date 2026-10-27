@@ -1,4 +1,3 @@
-// ratchet-exempt(file-size): one import of the shared essence icon normaliser, no new logic
 import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
@@ -107,7 +106,6 @@ function gatheringActualAwards(run) {
       ? null
       : run.createdResults;
   }
-  if (run.checkResult?.blind === true) return null;
   const effects = normalizeList(run.executionJournal?.effects).filter(
     (effect) => effect?.effectId === 'results' && effect?.kind === 'createGatheredResults'
   );

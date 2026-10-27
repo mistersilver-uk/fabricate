@@ -1,4 +1,3 @@
-// ratchet-exempt(file-size): one import of the shared essence icon normaliser, no new logic
 /**
  * InventoryListingBuilder — player-facing owned-component listing / view-model
  * construction for the unified-window Inventory tab.
@@ -96,8 +95,7 @@ import {
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
 import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourceUuid.js';
-// Single-sourced with the GM UI so the builder and the recipe-item editor share one
-// item-bag literal (the "treat as no image" sentinel).
+// Single-sourced with the GM UI: the item-bag literal that means "treat as no image".
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 

@@ -6398,6 +6398,22 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('968: a stored Sharp essence icon is drawn on a face Foundry 14 has, chosen and suggested', async () => {
+    const sharp = [{ id: 'ess-fire', name: 'Fire', icon: 'fass fa-fire' }];
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-fire', amount: 1 } }],
+      { props: { essenceOptions: sharp } }
+    );
+    const row = target.querySelector('[data-recipe-option]');
+    const marks = (node) => [...node.querySelectorAll('.manager-recipe-option-mark')].map((m) => m.className);
+    assert.ok(marks(row).every((name) => !/\bfass\b/.test(name)), 'no Sharp prefix reaches the DOM');
+    assert.ok(
+      marks(row).some((name) => /\bfas fa-fire\b/.test(name)),
+      'the chosen essence draws the solid face'
+    );
+    editHarness.remount();
+  });
+
   // REWRITTEN from `the set-level essence picker withholds a disabled essence, and offers an
   // enabled one`. The set-level adder is not a picker any more, so the same claim is made about
   // the row it creates — end to end, from the button the GM presses.
