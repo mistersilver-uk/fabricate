@@ -18,6 +18,7 @@
   import KindAdder from '../../../components/KindAdder.svelte';
   import SetCard from '../../../components/SetCard.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   import { newDraftId as newId } from '../../../util/draftId.js';
   import { createPendingFocus } from '../../../util/pendingFocus.js';
   import {
@@ -57,6 +58,7 @@
   const displayName = $derived(set?.name?.trim() ? set.name : defaultName);
 
   const groups = $derived(Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []);
+  const groupKeys = $derived(uniqueRowKeys(groups));
 
   // The kind select's own subset, essence gated on the UNFILTERED roster (see the import note).
   const kinds = $derived(
@@ -161,7 +163,7 @@
     <!-- Requirements stack with no invented "AND" dividers: the tab intro already says they
          are AND'd. -->
     <div class="manager-recipe-ingredient-set-groups">
-      {#each groups as group, index (group?.id || index)}
+      {#each groups as group, index (groupKeys[index])}
         <ChoiceGroup
           {group}
           {componentOptions}

@@ -60,6 +60,16 @@ describe('ComponentSalvageStages', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
+  it('draws every stage when two of them share an id (issue 2713)', async () => {
+    const twins = [
+      { id: 'dup', componentId: 'cmp-scrap', quantity: 1 },
+      { id: 'dup', componentId: 'cmp-dust', quantity: 1 },
+    ];
+    const { target } = await mountWith({ stages: twins, stageGroup: { ...GROUP, results: twins } });
+    assert.ok(Boolean(stage(target, 1)) && Boolean(stage(target, 2)), 'both stages draw');
+    harness.remount();
+  });
+
   it('RED: forwards add, remove, move, a cleared pick and the one row Edit link', async () => {
     const { calls, target } = await mountWith();
     target.querySelector(':scope .manager-salvage-stage-add [data-add-salvage-result]').click();
