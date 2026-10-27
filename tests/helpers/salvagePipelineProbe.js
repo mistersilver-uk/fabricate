@@ -66,13 +66,20 @@ function makeSalvageJournal() {
   return journal;
 }
 
-/** The real `SalvageRunManager` behind the recording proxy, plus the two hooks a scenario arms on
- * a named call: the world clock tick, and the rejection that pins the settlement `try` boundary. */
+/** The real `SalvageRunManager` behind the recording proxy, plus the three hooks a scenario arms on
+ * a named call: the world clock tick, the rejection that pins the settlement `try` boundary, and an
+ * arbitrary effect. Each fires once, synchronously, after the journal entry and before the call. */
 function probeSalvageRunManager(journal) {
   const real = new SalvageRunManager();
   let tick = null;
   let failure = null;
+  let effect = null;
   const onCall = (call) => {
+    if (effect && call === effect.call) {
+      const { run } = effect;
+      effect = null;
+      run();
+    }
     if (tick && call === tick.call) {
       globalThis.game.time.worldTime += tick.seconds;
       journal.push('clock.advance', tick.seconds);
@@ -92,6 +99,9 @@ function probeSalvageRunManager(journal) {
     },
     armCallFailure: (call, message) => {
       failure = { call, message };
+    },
+    armCallEffect: (call, run) => {
+      effect = { call, run };
     },
   };
 }
@@ -308,7 +318,13 @@ export function salvageRunProbe(spec = {}) {
   const record = (result) => {
     // The display projection (issue 2005) is pinned by the evidence suites, not this effect journal.
     const { check: _check, ...returned } = result;
-    journal.push('returned', { ...returned, salvageRun: salvageRunDigest(result.salvageRun) });
+    // Key presence is journalled as is: an absent `salvageRun` must not read as `null`.
+    journal.push(
+      'returned',
+      Object.hasOwn(returned, 'salvageRun')
+        ? { ...returned, salvageRun: salvageRunDigest(returned.salvageRun) }
+        : returned
+    );
     return result;
   };
   const recordThrow = (error) => {
@@ -328,6 +344,14 @@ export function salvageRunProbe(spec = {}) {
     runManager: manager.real,
     armClockTick: manager.armClockTick,
     armCallFailure: manager.armCallFailure,
+    armCallEffect: manager.armCallEffect,
+    /** Remove an active run as a concurrent completion would. It writes `_cache` directly because
+     * `_getContainer` answers a clone and `discardRun` is async. */
+    dropActiveRun(runId) {
+      const container = manager.real._getContainer(actor);
+      delete container.active[runId];
+      manager.real._cache.set(actor.id, container);
+    },
     advanceClock(seconds) {
       globalThis.game.time.worldTime += seconds;
       journal.push('clock.advance', seconds);

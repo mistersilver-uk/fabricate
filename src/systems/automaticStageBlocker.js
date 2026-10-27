@@ -4,6 +4,7 @@
  */
 import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import { owesClaimablePick } from './choiceGroupAward.js';
+import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 import { worldTimeDueStep } from './worldTimeDueStep.js';
 
 /** The stage's chosen ingredient set, or its first authored one when none is chosen. */
@@ -21,9 +22,14 @@ export function automaticStageBlocker({ run, recipe, step, selectedSet, system }
   if (Array.isArray(selectedSet?.ingredients) && selectedSet.ingredients.length > 0) {
     return { code: 'materials', message: 'Automatic completion requires a no-input stage.' };
   }
+  if (Object.keys(selectedSet?.essences ?? {}).length > 0) {
+    return { code: 'essences', message: 'Automatic completion cannot spend essences.' };
+  }
+  const setToolIds = ingredientSetToolsAreActive(system, selectedSet) ? selectedSet.toolIds : null;
   if (
     (Array.isArray(step?.toolIds) && step.toolIds.length > 0) ||
-    (Array.isArray(recipe?.toolIds) && recipe.toolIds.length > 0)
+    (Array.isArray(recipe?.toolIds) && recipe.toolIds.length > 0) ||
+    (Array.isArray(setToolIds) && setToolIds.length > 0)
   ) {
     return { code: 'tools', message: 'Automatic completion cannot use crafting tools.' };
   }

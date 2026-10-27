@@ -183,8 +183,10 @@ The region-as-composition-axis vocabulary has been removed.
 Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs when `dangerLevel` is absent; canonical writes should use `dangerLevel`.
 10a. `risk` may remain as optional player-facing risk evidence for older data, but new matching behavior must not depend on `risk` when `dangerLevel` is present.
 11. Weather and time of day are not environment fields.
-They are global gathering conditions used as **runtime gates** — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection.
+They are gathering conditions the GM sets globally (see *Global Gathering Conditions* requirement 15); a validated change sets each configured system's own current where that system offers the tag.
+They act as **runtime gates** through the crafting system's own current condition (`systems[systemId].conditions[kind].current`, inherited from the global value when the system has no persisted `conditions` block) — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by that system's current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection.
 Matching itself is decided by biome (and, for events, danger) only — geography (`GatheringRealm`) is not a composition axis.
+The public `updateGatheringConditions({ environmentId, conditions })` branch persists an `environment.conditions` value with no vocabulary validation, and composition always overwrites that field with the system current condition, so the write is inert for gating and the listing.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledEventIds`, and `disabledEventIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `compositionMode` controls reusable task/event composition, and each of the three id lists belongs to exactly one mode.
 In **automatic** mode, the environment composes every library-enabled record matching its biome (and, for events, danger) context, minus the records listed in `disabledTaskIds` / `disabledEventIds`, plus the records listed in `forcedTaskIds` / `forcedEventIds`; stale `enabled*Ids` entries are ignored.
@@ -581,10 +583,11 @@ An entry whose normalized id is the lower-cased stringification of a plain objec
 8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes, and a time-of-day option may also store a start hour (requirement 25).
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
 10. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night` as option records.
-11. Legacy top-level `conditions`, per-system string condition values, and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
+11. Per-system string condition values and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
+Top-level `conditions` is not legacy: it is the **global current condition** the GM sets (requirement 15), and it supplies the current of any system with no persisted `conditions` block.
 12. Deleting a per-system condition value removes it from Gathering Tasks and events in that system only.
 13. Deleting the last value of an enabled per-system condition dimension must be rejected; GMs may disable that dimension instead.
-14. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
+14. `game.fabricate.gathering.getConditions()` returns the **global** current conditions and available tag vocabularies for GM and player-facing callers.
 15. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
 A validated change also sets `systems[systemId].conditions[kind].current` for every configured system whose own `values` contain that id, so the global setter drives the per-system current condition the runtime gates on.
 A system whose values do not contain the id keeps its current unchanged; per-system `values` are never modified; `enabled: false` does not exempt a dimension: it is updated on the same values-membership condition, because `enabled` governs runtime gating (requirement 19), not storage.
@@ -1622,6 +1625,9 @@ Event redaction follows the effective `eventVisibility` tier for the viewer (§S
 Because a GM viewer always resolves to `full` and a non-GM viewer defaults to `encounterChance`, by default a non-GM viewer of a **targeted** environment receives `events: []` while a GM viewer receives the full list; `[]` is also emitted for locked entries.
 The listing additionally emits the effective `eventVisibility` tier as a field so the player UI can render the appropriate event affordance.
 Event models are informational only: they carry no attempt action and no provider diagnostics.
+12. A task row's `rich.conditions` (`{ weather, timeOfDay }`) is the owning crafting system's current condition — `systems[systemId].conditions[kind].current`, falling back to the global current only when the system has no persisted `conditions` block — the same value the runtime gate and the environment-level `conditions` read, never the global value alone.
+It names no task, weight or drop data and is emitted unchanged on an opaque blind row.
+The same value is recorded as `economyEvidence.conditions` for a new attempt.
 
 ## Tool Usage Semantics
 

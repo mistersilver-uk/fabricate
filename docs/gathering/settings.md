@@ -9,13 +9,12 @@ nav_order: 4
 
 The system's gathering **Settings** page carries the rules that apply to every environment, task, and event in the system.
 
-## Gathering Resolution Mode
+## Gathering Resolution
 
-The system's gathering **Settings** tab has a **Gathering resolution mode** card above the Limitation card.
-It chooses how a gathering attempt decides its outcome.
-
-The only mode available today is **d100**, which is selected by default.
-**Progressive** and **Routed by check** are shown but disabled with a "Coming soon" label, because they are planned and not yet available.
+The gathering **Settings** tab has no resolution control.
+Each Gathering Task chooses how its own attempts are resolved, on the **Gathering resolution** card of its **Overview** tab.
+That card offers **Direct**, **d100** and **Check**.
+See [Editor tabs]({% link gathering/tasks.md %}#editor-tabs) for the task editor.
 
 ## Gathering Limitations
 
@@ -23,9 +22,9 @@ Each crafting system decides how often its gathering tasks can be attempted thro
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Limitation         | Toggle                  | What it caps                                                                                                                                                                |
-| :----------------- | :---------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Stamina**        | **Stamina** pill        | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
+| Limitation | Toggle | What it caps |
+| :--- | :--- | :--- |
+| **Stamina** | **Stamina** pill | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
 | **Resource nodes** | **Resource nodes** pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node. Once a pool is empty the task is blocked until its nodes respawn over world time. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -62,16 +61,16 @@ Once authored, they apply to every gathering environment in that system.
 
 {% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering rules for a system, in the inspector beside the Settings tab." %}
 
-| Rule                     | Values                                                                                                                                       |
-| :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Rewards**              | Highest ranked successful drop, all drops, or a limited number of drops                                                                      |
-| **Reward limit**         | A positive number used when Rewards is set to a limited number of drops                                                                      |
-| **Events**               | Highest ranked successful event, all events, or a limited number of events                                                                   |
-| **Event limit**          | A positive number used when Events is set to a limited number of events                                                                      |
-| **Event outcome**        | Whether a triggered event still lets the attempt succeed, or makes it fail                                                                   |
+| Rule | Values |
+| :--- | :--- |
+| **Rewards** | Highest ranked successful drop, all successful drops, or a limited number of successful drops |
+| **Reward limit** | A positive number used when Rewards is set to a limited number of successful drops |
+| **Events** | Highest ranked triggered event, all triggered events, or a limited number of triggered events |
+| **Event limit** | A positive number used when Events is set to a limited number of triggered events |
+| **Event outcome** | Whether a triggered event still lets the attempt succeed, or makes it fail |
 | **Blind candidate gate** | Whether a blind action only draws from tasks the character can attempt right now (the default), or from every matching task (see Blind Mode) |
-| **Blind reveal**         | When a blind task is revealed to the player: never (the default), on success, or on any attempt                                              |
-| **Reveal scope**         | Who learns a revealed task: the character, the player, the party, or everyone                                                                |
+| **Blind reveal** | When a blind task is revealed to the player: never (the default), on success, or on any attempt |
+| **Reveal scope** | Who learns a revealed task: the character, the player, the party, or everyone |
 
 ## Blind Mode
 
