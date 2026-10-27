@@ -35,30 +35,39 @@ const FOUNDRY_14_MAJOR = 14;
 const UNDETERMINED_FOUNDRY_MAJOR = null;
 const BACKSLASH = '\\';
 
-const STYLE_PREFIXES = Object.freeze(new Set([
+// The face prefixes an essence icon may keep. Foundry 14 ships no Sharp webfonts and Foundry 13
+// does, so a vocabulary both can draw is the classic faces; `SHARP_PREFIX_FACES` maps older Sharp
+// data onto them.
+export const ESSENCE_ICON_STYLE_PREFIXES = Object.freeze(new Set([
   'fas',
   'far',
   'fal',
   'fat',
   'fad',
   'fab',
-  'fass',
-  'fasr',
-  'fasl',
-  'fast',
-  'fasds',
-  'fasdr',
-  'fasdl',
-  'fasdt',
   'fa-solid',
   'fa-regular',
   'fa-light',
   'fa-thin',
   'fa-duotone',
-  'fa-brands',
-  'fa-sharp',
-  'fa-sharp-duotone'
+  'fa-brands'
 ]));
+
+// Sharp solid, regular, light and thin land on the classic weight; every Sharp duotone lands on
+// the one duotone face.
+const SHARP_PREFIX_FACES = Object.freeze({
+  fass: 'fas',
+  fasr: 'far',
+  fasl: 'fal',
+  fast: 'fat',
+  fasds: 'fad',
+  fasdr: 'fad',
+  fasdl: 'fad',
+  fasdt: 'fad'
+});
+const SHARP_DUOTONE_FAMILY_TOKEN = 'fa-sharp-duotone';
+
+const sharpFaceFor = token => (Object.hasOwn(SHARP_PREFIX_FACES, token) ? SHARP_PREFIX_FACES[token] : '');
 
 const NON_ICON_TOKENS = Object.freeze(new Set([
   'fa',
@@ -245,7 +254,9 @@ function humanizeIconName(iconName) {
 function normalizePrefix(prefix) {
   const trimmed = String(prefix || '').trim();
   if (!trimmed) return DEFAULT_ICON_PREFIX;
-  return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
+  return sharpFaceFor(trimmed)
+    || PREFIX_ALIASES[trimmed]
+    || (ESSENCE_ICON_STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
 let foundryReleaseReader = null;
@@ -659,7 +670,8 @@ export function getEssenceAllIconOptions() {
 
 export function getEssenceIconPrefix(iconClass) {
   const tokens = String(iconClass || '').trim().split(/\s+/).filter(Boolean);
-  const prefix = tokens.find(token => STYLE_PREFIXES.has(token));
+  if (tokens.includes(SHARP_DUOTONE_FAMILY_TOKEN)) return SHARP_PREFIX_FACES.fasds;
+  const prefix = tokens.find(token => ESSENCE_ICON_STYLE_PREFIXES.has(token) || sharpFaceFor(token));
   return normalizePrefix(prefix);
 }
 

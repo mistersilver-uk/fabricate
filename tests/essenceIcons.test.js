@@ -164,6 +164,42 @@ describe('essenceIcons utility', () => {
     assert.equal(normalizeEssenceIcon('fa-duotone fa-flask'), 'fa-duotone fa-flask');
   });
 
+  // Foundry 14 ships no Sharp webfonts, so a stored Sharp prefix would otherwise draw a fallback glyph.
+  it('maps stored Sharp prefixes onto the classic face of the same weight', () => {
+    const expected = {
+      fass: 'fas',
+      fasr: 'far',
+      fasl: 'fal',
+      fast: 'fat',
+      fasds: 'fad',
+      fasdr: 'fad',
+      fasdl: 'fad',
+      fasdt: 'fad',
+    };
+    for (const [sharp, classic] of Object.entries(expected)) {
+      assert.equal(normalizeEssenceIcon(`${sharp} fa-fire`), `${classic} fa-fire`, sharp);
+      assert.equal(getEssenceIconPrefix(`${sharp} fa-fire`), classic, sharp);
+    }
+  });
+
+  it('maps the long Sharp forms onto the classic face and never reads the family as the icon', () => {
+    assert.equal(normalizeEssenceIcon('fa-sharp fa-solid fa-fire'), 'fas fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp fa-regular fa-fire'), 'far fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp-duotone fa-solid fa-fire'), 'fad fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp fa-fire'), 'fas fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-sharp-duotone fa-fire'), 'fad fa-fire');
+  });
+
+  it('keeps every supported prefix a Sharp mapping did not touch', () => {
+    for (const prefix of ['fal', 'fat', 'fad', 'fab']) {
+      assert.equal(normalizeEssenceIcon(`${prefix} fa-fire`), `${prefix} fa-fire`, prefix);
+    }
+  });
+
+  it('does not read an inherited object key as a style prefix', () => {
+    assert.equal(normalizeEssenceIcon('constructor fa-fire'), 'fas fa-fire');
+  });
+
   // The membership IS this module's product, and it is what the icon-vocabulary API publishes, so
   // the size is pinned EXACTLY rather than to a band.
   it('pins the curated vocabulary to an exact size', () => {
