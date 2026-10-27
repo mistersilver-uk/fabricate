@@ -2980,6 +2980,7 @@ It MUST disable a candidate only when it is held but the stage claims it elsewhe
 `SlotTile`'s open face, when its caller supplies no glyph and no art, MUST draw the empty ring `fa-regular fa-circle` at 15px (the face of an unchosen choice slot), never a solid disc, inked `--fab-accent-text` at no less than 3:1 on the tile's ground in every theme (ruling 2026-10-11).
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
+`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, MUST ink `--fab-text-muted`, and an inactive card's numeral MUST ink `--fab-text-secondary`, each clearing 4.5:1 in all seven themes on the ground it is drawn on (issue 2353).
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
 Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
 Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.

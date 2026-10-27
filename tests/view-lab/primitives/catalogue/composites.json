@@ -1739,7 +1739,7 @@
       "positionKey": "FABRICATE.App.Journal.Stage.Position",
       "returnKey": "FABRICATE.App.Journal.Stage.Return"
     },
-    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. Its numerals and position line ship in `--fab-text-subtle`, under the 4.5:1 floor in six themes, so the drawing inks them `--fab-text-muted`; issue 2353 owns that debt."
+    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. Its numerals and position line ink `--fab-text-muted`, which clears the 4.5:1 floor in all seven themes (issue 2353)."
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",

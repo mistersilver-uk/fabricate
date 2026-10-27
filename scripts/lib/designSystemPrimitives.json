@@ -30,7 +30,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match. `shipped` at issue 2257 (D22): re-measured on those frames, its specimen is redrawn to the one 12px region inset issue 1648 chose and to io as the four-column truncated `ListRow` grid. DEBT: its 10.5px summary, note and fact label, its inactive 12px/600 name and 11px numeral, and its io rows' 10.5px quantity (the row ink `ListRow` sets), all in `--fab-text-subtle`, measure 3.01-3.98:1, under the 4.5:1 floor, and are not redrawn; owned by issue 2353."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match. `shipped` at issue 2257 (D22): re-measured on those frames, its specimen is redrawn to the one 12px region inset issue 1648 chose and to io as the four-column truncated `ListRow` grid. Issue 2353: its summary, note, fact label, inactive name and io quantity ink `--fab-text-muted`, and its inactive numeral `--fab-text-secondary`, at 4.5:1 or more in all seven themes."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",

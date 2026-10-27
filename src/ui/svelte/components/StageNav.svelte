@@ -107,7 +107,7 @@
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-surface-soft);
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
   }
 
@@ -134,7 +134,7 @@
     min-width: 0;
     flex: 1 1 auto;
     padding-left: var(--fab-space-2);
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
   }
 
