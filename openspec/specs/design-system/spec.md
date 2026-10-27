@@ -771,6 +771,7 @@ A caller routes by MEANING and never by matching a tone name to a token name: `m
 `--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
+A component's small text MUST take the first of `--fab-text-muted` and `--fab-text-secondary` that clears 4.5:1 on every flattened ground it is drawn on, in all seven themes (issue 2257 D13).
 `EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
 `tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
@@ -1025,11 +1026,11 @@ The `Field` family, the compact search field and the chance slider's percent hal
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
 The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
-The `Stepper` input's unset placeholder inks `--fab-text-muted` and clears 4.5:1 in all seven themes on its soft well over `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, where the user-agent placeholder grey measures 2.3:1 to 3.8:1 (issue 2358).
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
 An auto-focused field therefore never draws its placeholder, and that is accepted rather than opted out of: the shared picker's search is named by its trigger and its `aria-label`, and an opt-out would put the caret back over the glyph.
+The `Stepper` input's unset placeholder inks `--fab-text-muted` while the input is not keyboard-focused, and clears 4.5:1 in all seven themes on its soft well over `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` (issue 2358).
 A borderless input inside a box-drawing wrapper MUST stretch to that wrapper's height rather than size to its own text line, because an input exactly one line tall clips the caret an empty field draws.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
@@ -1429,7 +1430,7 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
-The manager's `.manager-kicker` inks `--fab-text-muted` wherever it is drawn, and no rule restates it, so every kicker shares one ink that clears 4.5:1 in all seven themes (issue 2298).
+The manager's `.manager-kicker` inks `--fab-text-muted` and no manager rule restates its colour, which clears 4.5:1 in all seven themes (issue 2298).
 A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
 It inherits the host's face and line height, which a `Kicker` states for itself.
 At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.
@@ -2981,7 +2982,7 @@ It MUST disable a candidate only when it is held but the stage claims it elsewhe
 `SlotTile`'s open face, when its caller supplies no glyph and no art, MUST draw the empty ring `fa-regular fa-circle` at 15px (the face of an unchosen choice slot), never a solid disc, inked `--fab-accent-text` at no less than 3:1 on the tile's ground in every theme (ruling 2026-10-11).
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
-`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, MUST ink `--fab-text-muted`, and an inactive card's numeral MUST ink `--fab-text-secondary`, each clearing 4.5:1 in all seven themes on the ground it is drawn on (issue 2353).
+`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, ink `--fab-text-muted`, and an inactive card's numeral inks `--fab-text-secondary` (issue 2353).
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
 Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
 Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
@@ -2998,7 +2999,7 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 Its band is optional, and a tier with no band MUST draw no band.
 Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
 `OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
-`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note MUST ink `--fab-text-muted` and clear 4.5:1 in all seven themes on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, and the empty-tier text on its tier (issue 2329).
+`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note ink `--fab-text-muted` (issue 2329).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard
