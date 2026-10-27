@@ -178,13 +178,13 @@
   }
 
   .fab-yield-hint {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     line-height: 1.5;
   }
 
   .fab-yield-cut-note {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 9.5px;
   }
 

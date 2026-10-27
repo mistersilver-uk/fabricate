@@ -70,6 +70,7 @@ Their default absent-snippet forms retain existing geometry and behavior.
 A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
 A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
 The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
+A dense `ListRow` inks its quantity and detail `--fab-text-muted`, and `--fab-text-secondary` on a cleared row's success wash, clearing 4.5:1 on the row, the card and the wash in all seven themes (issue 2329).
 
 #### Scenario: A player app draws its own selectable control
 
@@ -2995,6 +2996,7 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 Its band is optional, and a tier with no band MUST draw no band.
 Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
 `OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
+`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note MUST ink `--fab-text-muted` and clear 4.5:1 in all seven themes on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, and the empty-tier text on its tier (issue 2329).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard

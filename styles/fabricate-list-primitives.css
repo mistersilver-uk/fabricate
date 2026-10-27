@@ -396,7 +396,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-1);
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
   font-size: 10.5px;
 }
 
@@ -436,6 +436,7 @@
 .fabricate-list-row.is-positive {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
+  color: var(--fab-text-secondary);
 }
 
 .fabricate-list-row.is-muted {
