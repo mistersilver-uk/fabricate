@@ -529,8 +529,8 @@ const panelWrapper = (id, host, panel) =>
 
 /**
  * The page: `sheets` laid down first, then core-min, the module sheet and the scoped styles. The
- * body states the face the player window draws in, as Foundry's body does for every window, so a
- * panel on the standalone layer inherits that face.
+ * body states the typeface the player window draws in, so the bare host's target, the window's
+ * frame and a panel on the standalone layer all start from one face.
  */
 function pageFor(markup, palette, sheets) {
   const head = renderedPageHead(SCOPED);

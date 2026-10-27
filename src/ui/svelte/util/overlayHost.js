@@ -136,14 +136,24 @@ export function overlaysOpenedFrom(root) {
 }
 
 /**
+ * What a container on the standalone layer states: the pointer, which the layer does not take, and
+ * a Fabricate window's typeface and Foundry's application size, which `<body>` does not state.
+ */
+const ON_STANDALONE_LAYER = Object.freeze({
+  pointerEvents: 'auto',
+  fontFamily: 'var(--font-primary)',
+  fontSize: 'var(--font-size-14)',
+});
+
+/**
  * A `display: contents` container in `host` for `chain`, so `host` stays the containing block; on
- * the standalone layer, which takes no pointer, the container's panel takes it.
+ * the standalone layer its panel takes the pointer and draws in a Fabricate window's face.
  */
 export function createOverlayContainer(host, chain) {
   const container = host.ownerDocument.createElement('div');
   container.style.display = 'contents';
   if (host.classList?.contains(STANDALONE_OVERLAY_HOST_CLASS)) {
-    container.style.pointerEvents = 'auto';
+    Object.assign(container.style, ON_STANDALONE_LAYER);
   }
   host.append(container);
   containerChains.set(container, chain);

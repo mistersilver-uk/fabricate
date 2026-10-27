@@ -290,6 +290,12 @@ describe('a widened entry and the standalone style root', () => {
     await settle();
     const layer = document.querySelector('.fabricate.fabricate-standalone-overlay');
     assert.ok(layer?.querySelector('[role="listbox"]'), 'the list opens on the layer');
+    const { fontFamily, fontSize } = layer.firstElementChild.style;
+    assert.deepEqual(
+      [fontFamily, fontSize],
+      ['var(--font-primary)', 'var(--font-size-14)'],
+      "its container states a Fabricate window's typeface and size, not the page body's"
+    );
     select.destroy();
     card.destroy();
     await settle();

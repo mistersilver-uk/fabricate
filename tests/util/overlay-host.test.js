@@ -361,10 +361,22 @@ describe('acquireStandaloneOverlayLayer', () => {
     layer.release();
   });
 
+  it('gives a container on it a Fabricate window’s typeface and size, and one elsewhere neither', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const face = ({ style }) => [style.fontFamily, style.fontSize];
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.deepEqual(face(container), ['var(--font-primary)', 'var(--font-size-14)']);
+    assert.deepEqual(face(layer.host), ['', ''], 'the layer itself states none');
+    const framed = createOverlayContainer(element(), standInChain(layer.host));
+    assert.deepEqual(face(framed), ['', ''], 'a container elsewhere states none');
+    layer.release();
+  });
+
   it('leaves a layer made directly, as the roll prompt makes its own, unspanned', () => {
     const own = createStandaloneOverlayLayer(document);
-    const { right, bottom, pointerEvents } = own.style;
+    const { right, bottom, pointerEvents, fontFamily, fontSize } = own.style;
     assert.deepEqual([right, bottom, pointerEvents], ['', '', ''], 'no inline geometry');
+    assert.deepEqual([fontFamily, fontSize], ['', ''], 'and no face');
     own.remove();
   });
 
