@@ -1274,6 +1274,55 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(two.text.includes('2'), 'and the number reaches the sentence a GM reads');
   });
 
+  it('counts a stored pick naming a DELETED modifier apart, and never promises it returns (issue 1617)', async () => {
+    const pickerOf = async (modifierIds) => {
+      const target = await editHarness.mount(
+        markProps({ recipe: { ...RECIPE, craftingModifier: { modifierIds } } })
+      );
+      return target.querySelector('[data-recipe-crafting-modifier-picker]');
+    };
+
+    const deleted = await pickerOf(['med', 'gone']);
+    const missing = deleted.querySelector('[data-recipe-crafting-modifier-missing]');
+    assert.equal(missing?.getAttribute('data-recipe-crafting-modifier-missing'), '1');
+    assert.match(missing.textContent, /no longer exists/i);
+    assert.ok(
+      !deleted.querySelector('[data-recipe-crafting-modifier-suppressed]'),
+      'a deleted modifier is not an un-marked one, so the return-promising note stays away'
+    );
+    assert.ok(!/return/i.test(deleted.textContent), 'no sentence says the deleted pick returns');
+    editHarness.remount();
+
+    // THE UN-MARKED CASE KEEPS ITS COPY AND COUNT, beside a deleted pick.
+    const mixed = await pickerOf(['med', 'herb', 'gone']);
+    assert.equal(
+      mixed
+        .querySelector('[data-recipe-crafting-modifier-suppressed]')
+        ?.getAttribute('data-recipe-crafting-modifier-suppressed'),
+      '1'
+    );
+    assert.equal(
+      mixed
+        .querySelector('[data-recipe-crafting-modifier-missing]')
+        ?.getAttribute('data-recipe-crafting-modifier-missing'),
+      '1'
+    );
+    assert.match(
+      mixed.querySelector('[data-modifier-pill-select]').getAttribute('aria-describedby'),
+      new RegExp(mixed.querySelector('[data-recipe-crafting-modifier-missing]').id)
+    );
+    editHarness.remount();
+
+    // Only deleted picks: the placeholder must not claim they are kept and return.
+    const only = await pickerOf(['gone']);
+    assert.ok(
+      !/hidden/i.test(only.querySelector('.manager-availability-any').textContent),
+      'the all-hidden placeholder promises a return, which a deleted pick cannot keep'
+    );
+    assert.ok(Boolean(only.querySelector('[data-recipe-crafting-modifier-missing]')));
+    editHarness.remount();
+  });
+
   it('says the picks are HIDDEN rather than absent when the check marks NONE of them (issue 1608)', async () => {
     // THE ZERO POINT of the suppression cohort, which every case above steps around.
     const target = await editHarness.mount(

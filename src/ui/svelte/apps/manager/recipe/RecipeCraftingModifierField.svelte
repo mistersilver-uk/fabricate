@@ -43,6 +43,7 @@
   const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
   const MODIFIER_CAP_HINT_ID = 'manager-recipe-crafting-modifier-cap';
   const MODIFIER_SUPPRESSED_ID = 'manager-recipe-crafting-modifier-suppressed';
+  const MODIFIER_MISSING_ID = 'manager-recipe-crafting-modifier-missing';
 
   const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
 
@@ -73,7 +74,15 @@
   const pickedEligibleIds = $derived(
     overrideModifierIds.filter((id) => eligibleModifierIds.has(id))
   );
-  const suppressedPickCount = $derived(overrideModifierIds.length - pickedEligibleIds.length);
+  // A pick naming a modifier the library no longer holds returns with nothing, so it is counted
+  // apart from one the check merely un-marked.
+  const catalogueIds = $derived(new Set(craftingModifierOptions.map((option) => option?.id)));
+  const missingPickCount = $derived(
+    overrideModifierIds.filter((id) => !catalogueIds.has(id)).length
+  );
+  const suppressedPickCount = $derived(
+    overrideModifierIds.length - pickedEligibleIds.length - missingPickCount
+  );
   const atModifierPickCap = $derived(pickedEligibleIds.length >= modifierPickCap);
 
   // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers", following the
@@ -121,7 +130,9 @@
   // also its `aria-live` summary — carries one sentence. "Nothing is added" is true of an
   // unauthored pick and FALSE when every stored pick is suppressed, where it contradicts the note
   // beneath it, so the STATE decides the sentence rather than the emptiness alone.
-  const allPicksSuppressed = $derived(pickedEligibleIds.length === 0 && suppressedPickCount > 0);
+  const allPicksSuppressed = $derived(
+    pickedEligibleIds.length === 0 && suppressedPickCount > 0 && missingPickCount === 0
+  );
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
   const MODIFIER_ADD_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd';
   const emptyRowText = $derived(
@@ -136,6 +147,20 @@
         )
   );
 
+  const MISSING_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissing';
+  const missingText = $derived.by(() => {
+    if (missingPickCount === 1) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
+        'One chosen modifier no longer exists in the world library, so it is hidden and does nothing.'
+      );
+    }
+    const translated = localize(MISSING_KEY, { count: missingPickCount });
+    if (translated && translated !== MISSING_KEY) return translated;
+    return `${missingPickCount} chosen modifiers no longer exist in the world library, so they are hidden and do nothing.`;
+  });
+  const showMissingNote = $derived(missingPickCount > 0);
+
   // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression the GM sees PART of. Once
   // every pick is suppressed the placeholder above IS that explanation, word for word, so
   // rendering both says the same sentence twice in the one state where both co-occur.
@@ -148,6 +173,7 @@
     [
       modifierCapBounded ? MODIFIER_CAP_HINT_ID : '',
       showSuppressedNote ? MODIFIER_SUPPRESSED_ID : '',
+      showMissingNote ? MODIFIER_MISSING_ID : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -326,6 +352,15 @@
         data-recipe-crafting-modifier-suppressed={suppressedPickCount}
       >
         {suppressedText}
+      </p>
+    {/if}
+    {#if showMissingNote}
+      <p
+        class="manager-muted manager-recipe-modifier-suppressed"
+        id={MODIFIER_MISSING_ID}
+        data-recipe-crafting-modifier-missing={missingPickCount}
+      >
+        {missingText}
       </p>
     {/if}
   {/if}

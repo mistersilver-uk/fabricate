@@ -361,6 +361,53 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
   });
 
+  it('counts a pick naming a DELETED modifier apart, and never promises it returns (issue 1617)', async () => {
+    const { target } = await mount({ selectedIds: ['med', 'gone'], inheritedIds: MARKED_TWO });
+    const missing = target.querySelector('[data-subject-modifier-missing]');
+    assert.equal(missing?.getAttribute('data-subject-modifier-missing'), '1');
+    assert.match(missing.textContent, /no longer exists/i);
+    assert.ok(
+      !target.querySelector('[data-subject-modifier-suppressed]'),
+      'a deleted modifier is not an un-marked one, so the return-promising note stays away'
+    );
+    assert.ok(
+      !/return/i.test(target.querySelector('[data-subject-modifier-picker]').textContent),
+      'no sentence on screen says the deleted pick comes back'
+    );
+    harness.remount();
+
+    // THE UN-MARKED CASE KEEPS ITS COPY AND COUNT, beside a deleted pick.
+    const { target: mixed } = await mount({
+      selectedIds: ['med', 'herb', 'gone'],
+      inheritedIds: MARKED_TWO,
+    });
+    assert.equal(
+      mixed
+        .querySelector('[data-subject-modifier-suppressed]')
+        ?.getAttribute('data-subject-modifier-suppressed'),
+      '1'
+    );
+    assert.equal(
+      mixed
+        .querySelector('[data-subject-modifier-missing]')
+        ?.getAttribute('data-subject-modifier-missing'),
+      '1'
+    );
+    const describedBy = mixed
+      .querySelector('[data-modifier-pill-select]')
+      .getAttribute('aria-describedby');
+    assert.match(describedBy, new RegExp(mixed.querySelector('[data-subject-modifier-missing]').id));
+    harness.remount();
+
+    // Only deleted picks: the placeholder must not claim they are kept and return.
+    const { target: only } = await mount({ selectedIds: ['gone'], inheritedIds: MARKED_TWO });
+    assert.ok(
+      !/hidden/i.test(only.querySelector('.manager-availability-any').textContent),
+      'the all-hidden placeholder promises a return, which a deleted pick cannot keep'
+    );
+    assert.ok(Boolean(only.querySelector('[data-subject-modifier-missing]')));
+  });
+
   it('says the picks are HIDDEN rather than absent when the activity marks NONE of them (issue 1608)', async () => {
     // THE ZERO POINT of the suppression cohort: the activity marks nothing.
     const { target } = await mount({ selectedIds: ['med', 'alch'], inheritedIds: [] });
