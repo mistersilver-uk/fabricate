@@ -70,7 +70,7 @@ Their default absent-snippet forms retain existing geometry and behavior.
 A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
 A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
 The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
-A `ListRow` inks its quantity and detail `--fab-text-muted`, and `--fab-text-secondary` on the positive tone's success wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes (issue 2329).
+A `ListRow`'s quantity and detail inherit its ink, `--fab-text-muted` at rest and `--fab-text-secondary` on the positive tone's success wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes (issue 2329).
 
 #### Scenario: A player app draws its own selectable control
 
@@ -2982,7 +2982,7 @@ It MUST disable a candidate only when it is held but the stage claims it elsewhe
 `SlotTile`'s open face, when its caller supplies no glyph and no art, MUST draw the empty ring `fa-regular fa-circle` at 15px (the face of an unchosen choice slot), never a solid disc, inked `--fab-accent-text` at no less than 3:1 on the tile's ground in every theme (ruling 2026-10-11).
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
-`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, ink `--fab-text-muted`, and an inactive card's numeral inks `--fab-text-secondary` (issue 2353).
+`StageCard`'s summary, note, fact label and value and inactive name, and `StageNav`'s numerals and position line, MUST ink `--fab-text-muted`, and an inactive card's numeral MUST ink `--fab-text-secondary`, each clearing 4.5:1 in all seven themes on the ground it is drawn on (issue 2353).
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
 Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
 Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
@@ -2999,7 +2999,7 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 Its band is optional, and a tier with no band MUST draw no band.
 Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
 `OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
-`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note ink `--fab-text-muted` (issue 2329).
+`OutcomeLadder`'s hint and empty-tier text and `YieldScale`'s hint and cut note MUST ink `--fab-text-muted` and clear 4.5:1 in all seven themes on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface`, and the empty-tier text on its tier (issue 2329).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard
