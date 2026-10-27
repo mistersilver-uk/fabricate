@@ -19,6 +19,7 @@
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeToolsSection from './RecipeToolsSection.svelte';
   import SetCard from '../../../components/SetCard.svelte';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   import { localizeOr } from '../../../util/localizeOr.js';
 
   let {
@@ -206,7 +207,9 @@
           onAddTool={(toolId) => onAddStepTool(step.id, toolId)}
           onRemoveTool={(toolId) => onRemoveStepTool(step.id, toolId)}
         />
-        {#each toolEligibleIngredientSets(step) as set (set.id)}
+        {@const stepSets = toolEligibleIngredientSets(step)}
+        {@const stepSetKeys = uniqueRowKeys(stepSets)}
+        {#each stepSets as set, index (stepSetKeys[index])}
           {@render setTools(step.id, step, set, `step-${step.id}-set-${set.id}-`)}
         {/each}
       {/snippet}
@@ -219,7 +222,9 @@
       {onAddTool}
       {onRemoveTool}
     />
-    {#each toolEligibleIngredientSets(recipe) as set (set.id)}
+    {@const recipeSets = toolEligibleIngredientSets(recipe)}
+    {@const recipeSetKeys = uniqueRowKeys(recipeSets)}
+    {#each recipeSets as set, index (recipeSetKeys[index])}
       {@render setTools(null, recipe, set, `set-${set.id}-`)}
     {/each}
   {/if}

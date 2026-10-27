@@ -65,6 +65,29 @@ describe('ComponentSalvageCard', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
+  it('draws every result set and result when two of them share an id (issue 2713)', async () => {
+    const twins = [
+      { id: 'dup', name: 'One', results: [{ id: 'res', componentId: 'cmp-scrap', quantity: 1 }] },
+      {
+        id: 'dup',
+        name: 'Two',
+        results: [
+          { id: 'res', componentId: 'cmp-dust', quantity: 1 },
+          { id: 'res', componentId: 'cmp-scrap', quantity: 1 },
+        ],
+      },
+    ];
+    const { target } = await mountWith({
+      salvageDraft: { enabled: true, outcomeRouting: {}, resultGroups: twins },
+    });
+    assert.equal(target.querySelectorAll(':scope [data-salvage-group="dup"]').length, 2);
+    assert.equal(
+      target.querySelectorAll(':scope [data-salvage-group] [data-recipe-option-chosen]').length,
+      3
+    );
+    harness.remount();
+  });
+
   it('forwards the switch, every result-set edit and an outcome route', async () => {
     const { calls, target } = await mountWith();
     target.querySelector('[data-recipe-field="salvageEnabled"]').click();

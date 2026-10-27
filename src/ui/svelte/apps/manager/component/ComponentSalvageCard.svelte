@@ -26,7 +26,11 @@
   import SubjectModifierPicker from '../SubjectModifierPicker.svelte';
   import PickerRow from '../../../components/PickerRow.svelte';
   import { toValue } from '../../../components/pickerRowKinds.js';
-  import { componentCatalogue, resultAmountInvalid } from '../../../components/resultRows.js';
+  import {
+    componentCatalogue,
+    resultAmountInvalid,
+    uniqueRowKeys,
+  } from '../../../components/resultRows.js';
   // The salvage check override (issue 2005): the DC or the character-value adjustment.
   import CheckOverrideField from './CheckOverrideField.svelte';
   import ComponentSalvageStages from './ComponentSalvageStages.svelte';
@@ -279,7 +283,7 @@
       {/if}
       {#if salvageDraft.resultGroups.length > 0}
         <ul class="manager-recipe-ingredient-sets">
-          {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
+          {#each salvageDraft.resultGroups as group, groupIndex (uniqueRowKeys(salvageDraft.resultGroups)[groupIndex])}
             <!-- The name writes on input, so Save enables as the GM types. -->
             <li>
               <SetCard
@@ -318,7 +322,7 @@
                 {/snippet}
                 {#if (group.results || []).length > 0}
                   <div class="manager-recipe-ingredient-set-groups">
-                    {#each group.results as result (result.id)}
+                    {#each group.results as result, resultIndex (uniqueRowKeys(group.results)[resultIndex])}
                       <!-- The quantity STAYS in simple and routed: these modes award the
                            whole group as authored. Only progressive drops it. -->
                       <PickerRow

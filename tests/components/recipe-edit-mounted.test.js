@@ -2216,10 +2216,10 @@ describe('RecipeEditView (mounted)', () => {
       cards.map((card) => card.querySelector('[data-route-sources-implicit]').textContent),
       ['a passed check — no assignment', 'a failed check — no assignment']
     );
-    assert.deepEqual(
-      cards.map((card) => visibleText(lineOf(card))),
-      ['Produced by a passed check — no assignment', 'Produced by a failed check — no assignment']
-    );
+    assert.deepEqual(cards.map((card) => visibleText(lineOf(card))), [
+      'Produced by a passed check — no assignment',
+      'Produced by a failed check — no assignment',
+    ]);
     for (const card of cards) {
       const summary = lineOf(card).querySelector('[data-route-sources-summary]').textContent;
       assert.equal(summary.match(/Produced by/g)?.length, 1, `"${summary}" says it once`);
@@ -2324,10 +2324,7 @@ describe('RecipeEditView (mounted)', () => {
       const [success, failure, ...rest] = patches[0].resultGroups;
       assert.deepEqual(success, SUCCESS);
       assert.equal(rest.length, 0);
-      assert.deepEqual(
-        { ...failure, id: 'minted' },
-        { id: 'minted', name: '', role: 'failure', results: [] }
-      );
+      assert.deepEqual({ ...failure, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
       assert.ok(failure.id, 'the group is minted an id');
       const card = target.querySelector(FAILURE_CARD);
       assert.ok(card?.classList.contains('is-reserved'), 'the reserved failure card is drawn');
@@ -2350,19 +2347,9 @@ describe('RecipeEditView (mounted)', () => {
 
       const [group, ...rest] = patches[0].resultGroups;
       assert.equal(rest.length, 0);
-      assert.deepEqual(
-        { ...group, id: 'minted' },
-        { id: 'minted', name: '', role: 'failure', results: [] }
-      );
-      assert.equal(
-        target.querySelectorAll(':scope [data-recipe-result-alchemy-simple] [data-recipe-set]')
-          .length,
-        2
-      );
-      assert.ok(
-        Boolean(target.querySelector('[data-recipe-set-role="success"]')),
-        'the success card draws'
-      );
+      assert.deepEqual({ ...group, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
+      assert.equal(target.querySelectorAll(':scope [data-recipe-result-alchemy-simple] [data-recipe-set]').length, 2);
+      assert.ok(Boolean(target.querySelector('[data-recipe-set-role="success"]')), 'the success card draws');
       editHarness.remount();
     });
 
@@ -2381,10 +2368,7 @@ describe('RecipeEditView (mounted)', () => {
       await addResultRow(target, '[data-recipe-set-role="success"]');
 
       const groups = patches.at(-1).resultGroups;
-      assert.deepEqual(
-        groups.map((group) => group.role ?? 'success'),
-        ['success', 'failure']
-      );
+      assert.deepEqual(groups.map((group) => group.role ?? 'success'), ['success', 'failure']);
       assert.deepEqual(groups[1], FAILURE);
       editHarness.remount();
     });
@@ -2408,10 +2392,7 @@ describe('RecipeEditView (mounted)', () => {
       assert.ok(!card.querySelector('[data-recipe-result-empty]'), 'no "Nothing produced" panel');
       assert.ok(!card.querySelector('.fabricate-set-card-body'), 'no empty body');
       assert.ok(Boolean(card.querySelector('[data-recipe-failure-set-note="optional"]')));
-      assert.match(
-        card.textContent,
-        /Optional\. Leave it empty and a failed check produces nothing\./u
-      );
+      assert.match(card.textContent, /Optional\. Leave it empty and a failed check produces nothing\./u);
 
       await addResultRow(target, FAILURE_CARD);
       const groups = patches.at(-1).resultGroups;
@@ -2450,9 +2431,7 @@ describe('RecipeEditView (mounted)', () => {
       const toggle = target.querySelector(FAILURE_TOGGLE);
       assert.equal(toggle.disabled, false, 'a present set can still be removed');
       assert.equal(toggle.getAttribute('aria-pressed'), 'true');
-      assert.ok(
-        Boolean(target.querySelector(`${FAILURE_CARD} [data-recipe-failure-set-note="policy"]`))
-      );
+      assert.ok(Boolean(target.querySelector(`${FAILURE_CARD} [data-recipe-failure-set-note="policy"]`)));
       assert.ok(!target.querySelector('[data-recipe-failure-set-note="optional"]'));
 
       await toggleFailure(target);
@@ -3960,7 +3939,9 @@ describe('RecipeEditView (mounted)', () => {
     Object.freeze({ id: 'cmp-water', name: 'Pure Water', img: 'icons/water.webp' }),
   ]);
 
-  const stageStrips = (target) => [...target.querySelectorAll('[data-stage-complications]')];
+  const stageStrips = (target) => [
+    ...target.querySelectorAll('[data-stage-complications]'),
+  ];
 
   // RED: the nested list replaces the band, and its rows draw no severity tile (issue 2445).
   it('RED 1286: a progressive stage whose component authors crafting complications nests a list', async () => {
@@ -4053,7 +4034,9 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
-    const banded = target.querySelector('[data-recipe-result-row]:has([data-stage-complications])');
+    const banded = target.querySelector(
+      '[data-recipe-result-row]:has([data-stage-complications])'
+    );
     assert.ok(Boolean(banded), 'the herb stage draws a list');
 
     // The line is the shared list's as of issue 1512, and so is the body the list renders into.
@@ -4066,8 +4049,9 @@ describe('RecipeEditView (mounted)', () => {
       'the list is a sibling of the line, not part of it'
     );
     assert.equal(
-      banded.querySelector('[data-stage-complications]').closest('.fabricate-sortable-list-body')
-        .parentElement,
+      banded
+        .querySelector('[data-stage-complications]')
+        .closest('.fabricate-sortable-list-body').parentElement,
       line.parentElement,
       'the list sits in the row`s BODY, the line`s own sibling'
     );
@@ -4487,9 +4471,9 @@ describe('RecipeEditView (mounted)', () => {
     const options = componentReq.querySelectorAll('[data-recipe-option]');
     assert.equal(options.length, 2, 'both component alternatives render');
     assert.ok(
-      [
-        ...componentReq.querySelector('.manager-recipe-ingredient-requirement-options').children,
-      ].every((child) => child.hasAttribute('data-recipe-option')),
+      [...componentReq.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
       'the alternatives sit in their box with nothing between them'
     );
     assert.match(
@@ -5250,10 +5234,7 @@ describe('RecipeEditView (mounted)', () => {
         assert.equal(rows.length, 2, `${token} turns the row into the box`);
         const expected = rows[1].querySelector(field);
         assert.ok(Boolean(expected), `the new row draws ${field}`);
-        assert.ok(
-          document.activeElement === expected,
-          `focus lands on the ${token} row's name field`
-        );
+        assert.ok(document.activeElement === expected, `focus lands on the ${token} row's name field`);
       } finally {
         editHarness.remount();
       }
@@ -5797,7 +5778,11 @@ describe('RecipeEditView (mounted)', () => {
       'the set adder offers no Currency'
     );
     await openOrMenu(target, 'grp-1');
-    assert.deepEqual(menuHooks(), ['alternative-component', 'alternative-tag'], 'nor does the row');
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
+      'nor does the row'
+    );
     editHarness.remount();
   });
 
@@ -7041,18 +7026,16 @@ describe('RecipeEditView (mounted)', () => {
       const { target } = await mountResultGroups([{ id: 'grp-1', name: 'Primary', results: [] }], {
         props,
       });
-      const adder = target.querySelector(
-        ':scope [data-recipe-result-set-id="grp-1"] [data-recipe-add="result-item"]'
-      );
+      const adder = target.querySelector(':scope [data-recipe-result-set-id="grp-1"] [data-recipe-add="result-item"]');
       if (adder.getAttribute('aria-haspopup') !== 'menu') {
         editHarness.remount();
         return ['component'];
       }
       adder.click();
       await flushRender();
-      const kinds = [
-        ...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]'),
-      ].map((entry) => entry.getAttribute('data-recipe-add'));
+      const kinds = [...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')].map(
+        (entry) => entry.getAttribute('data-recipe-add')
+      );
       editHarness.remount();
       return kinds.map((hook) => hook.replace('result-', ''));
     };
@@ -7063,14 +7046,8 @@ describe('RecipeEditView (mounted)', () => {
       knowledgeObservable: true,
     };
     assert.deepEqual(await offered(AWARDS), ['component', 'currency', 'knowledge']);
-    assert.deepEqual(await offered({ ...AWARDS, currencyEnabled: false }), [
-      'component',
-      'knowledge',
-    ]);
-    assert.deepEqual(await offered({ ...AWARDS, knowledgeObservable: false }), [
-      'component',
-      'currency',
-    ]);
+    assert.deepEqual(await offered({ ...AWARDS, currencyEnabled: false }), ['component', 'knowledge']);
+    assert.deepEqual(await offered({ ...AWARDS, knowledgeObservable: false }), ['component', 'currency']);
     assert.deepEqual(await offered({ ...AWARDS, currencyUnits: [], knowledgeObservable: false }), [
       'component',
     ]);
@@ -7116,12 +7093,7 @@ describe('RecipeEditView (mounted)', () => {
         groups: [],
         recipe: {
           steps: [
-            {
-              id: 'st-1',
-              name: 'Smelt',
-              ingredientSets: [],
-              resultGroups: [{ id: 'grp-gold', results: [GOLD] }],
-            },
+            { id: 'st-1', name: 'Smelt', ingredientSets: [], resultGroups: [{ id: 'grp-gold', results: [GOLD] }] },
           ],
         },
         props: { multiStepEnabled: true },
@@ -7141,15 +7113,14 @@ describe('RecipeEditView (mounted)', () => {
         props: { simpleFailureSlot: true },
       },
       'alchemy success': {
-        groups: [{ id: 'grp-gold', name: '', results: [GOLD] }],
+        groups: [
+          { id: 'grp-gold', name: '', results: [GOLD] },
+        ],
         props: { alchemySimple: true },
       },
     };
     for (const [path, { groups, recipe = {}, props }] of Object.entries(PATHS)) {
-      const { target } = await mountResultGroups(groups, {
-        recipe,
-        props: { ...AWARDS, ...props },
-      });
+      const { target } = await mountResultGroups(groups, { recipe, props: { ...AWARDS, ...props } });
       const set = target.querySelector('[data-recipe-result-set-id="grp-gold"]');
       assert.ok(set, `${path}: PRE-CONDITION, the set renders`);
       assert.ok(
@@ -7158,9 +7129,9 @@ describe('RecipeEditView (mounted)', () => {
       );
       set.querySelector('[data-recipe-add="result-item"]').click();
       await flushRender();
-      const kinds = [
-        ...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]'),
-      ].map((entry) => entry.getAttribute('data-recipe-add'));
+      const kinds = [...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')].map(
+        (entry) => entry.getAttribute('data-recipe-add')
+      );
       assert.deepEqual(kinds, ['result-component', 'result-currency', 'result-knowledge'], path);
       editHarness.remount();
     }
@@ -7372,15 +7343,9 @@ describe('RecipeEditView (mounted)', () => {
 
   it('round-trips authored resultGroups through Recipe.fromJSON().toJSON(), keeping componentId/quantity', async () => {
     const { target, patches } = await mountResultGroups([
-      {
-        id: 'grp-1',
-        name: 'Primary',
-        results: [{ id: 'res-open', componentId: null, quantity: 1 }],
-      },
+      { id: 'grp-1', name: 'Primary', results: [{ id: 'res-open', componentId: null, quantity: 1 }] },
     ]);
-    const field = target.querySelector(
-      ':scope [data-recipe-result-item] [data-recipe-option-search]'
-    );
+    const field = target.querySelector(':scope [data-recipe-result-item] [data-recipe-option-search]');
     field.focus();
     await typeInto(field, 'Pure');
     document.querySelector('[data-recipe-option-suggestion="cmp-water"]').click();
@@ -8881,12 +8846,7 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
   });
 
   it('writes a multi-step tier re-point to that step through onUpdateStep', async () => {
-    const step = (id) => ({
-      id,
-      name: id,
-      ingredientSets: [],
-      resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])],
-    });
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
     const { target, stepPatches, recipePatches } = await mountRouted(
       { ...RECIPE, steps: [step('s1'), step('s2')] },
       { multiStepEnabled: true }
@@ -8902,12 +8862,7 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
   });
 
   it('writes a collapsed chain’s re-point to its final step, not the recipe', async () => {
-    const step = (id) => ({
-      id,
-      name: id,
-      ingredientSets: [],
-      resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])],
-    });
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
     const { target, stepPatches, recipePatches } = await mountRouted(
       { ...RECIPE, steps: [step('s1'), step('s2')] },
       { multiStepEnabled: false }
@@ -8985,6 +8940,8 @@ describe('RecipeEditView — keyed lists tolerate repeated ids (issue 2713, moun
       { id: 'dup-grp', options: [water] },
     ],
   });
+  // Alternatives sharing an id are corrupt data (`Result.validate` refuses them); this fixture
+  // covers that the editor still renders them rather than crashing.
   const choice = (id) => ({
     id,
     alternatives: [
@@ -9012,6 +8969,53 @@ describe('RecipeEditView — keyed lists tolerate repeated ids (issue 2713, moun
     );
     assert.equal(target.querySelectorAll(':scope [data-recipe-set-id="dup"]').length, 2);
     assert.equal(target.querySelectorAll(':scope [data-recipe-group]').length, 4);
+    editHarness.remount();
+  });
+
+  it('draws the per-set tools of two ingredient sets that repeat an id', async () => {
+    const named = (name) => ({ id: 'dup', name, toolIds: [], ingredientGroups: [] });
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        toolsLibrary: TOOLS_LIBRARY,
+        recipe: { ...RECIPE, ingredientSets: [named('Hot forge'), named('Cold forge')] },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.equal(
+      target.querySelectorAll(':scope [data-recipe-tools-ingredient-set="dup"]').length,
+      2
+    );
+    editHarness.remount();
+  });
+
+  it('draws the per-set tools of a step whose ingredient sets repeat an id', async () => {
+    const named = (name) => ({ id: 'dup', name, toolIds: [], ingredientGroups: [] });
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        toolsLibrary: TOOLS_LIBRARY,
+        recipe: {
+          ...RECIPE,
+          steps: [
+            {
+              id: 'step-1',
+              name: 'Forge',
+              ingredientSets: [named('Hot forge'), named('Cold forge')],
+              resultGroups: [],
+              toolIds: [],
+            },
+          ],
+        },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.equal(
+      target.querySelectorAll(':scope [data-recipe-tools-ingredient-set="dup"]').length,
+      2
+    );
     editHarness.remount();
   });
 
