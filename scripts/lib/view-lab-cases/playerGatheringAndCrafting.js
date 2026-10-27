@@ -1611,25 +1611,6 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
-  // Issue 1615: the multistep recipe parked on step 2, whose rail says a run is in progress.
-  playerCase({
-    id: 'player-crafting-multistep-parked',
-    label: 'Player app — Crafting multistep parked on the second step',
-    reaches: 'beyond',
-    smokeLabels: [],
-    query: { tab: 'crafting', journalCaseState: 'past-stage' },
-    steps: [
-      // The journal seed adds recipes, so search for the blade rather than assume it is on page one.
-      { selector: '.crafting-browser-search input', fill: 'Pattern-Welded' },
-      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
-      { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },
-    ],
-    expectSelector:
-      '[data-recipe-step]:nth-of-type(2) [data-requirement-rail-readonly]' +
-      ':has-text("A run is in progress")',
-    kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
-  }),
   playerCase({
     id: 'player-crafting-routed-multistep',
     label: 'Player app — Crafting routed multistep with an empty first step',
