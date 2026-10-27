@@ -14,6 +14,7 @@ const {
   acquireOverlayHost,
   acquireStandaloneOverlayLayer,
   createOverlayContainer,
+  createStandaloneOverlayLayer,
   heldBy,
   overlayHostRect,
   overlaysOpenedFrom,
@@ -358,6 +359,13 @@ describe('acquireStandaloneOverlayLayer', () => {
     const framed = createOverlayContainer(element(), standInChain(layer.host));
     assert.equal(framed.style.pointerEvents, '', 'a container elsewhere states none');
     layer.release();
+  });
+
+  it('leaves a layer made directly, as the roll prompt makes its own, unspanned', () => {
+    const own = createStandaloneOverlayLayer(document);
+    const { right, bottom, pointerEvents } = own.style;
+    assert.deepEqual([right, bottom, pointerEvents], ['', '', ''], 'no inline geometry');
+    own.remove();
   });
 
   it('makes a new layer when the shared one was removed by another hand', () => {

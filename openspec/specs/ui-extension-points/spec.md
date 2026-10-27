@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published entry's root is `'fabricate'`, which completes the widening in phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published entry's root is `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -569,6 +569,7 @@ Fabricate's gate holds this, because the runtime does not refuse the resync's `f
 - `'fabricate'`: `target` needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root.
 Fabricate's window frames carry it (the player window, the Manager and the interactable windows), so both extension targets have it; Foundry writes an application's `classes` on the frame element, above `.window-content`.
 - `'manager'`: `target` needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
+- No entry published at version 1 states `'fabricate'` or `'manager'`; the values remain for a later entry, and M16's ancestor refusals apply to it.
 - `mount` and `mountMany` decide it by class, with `target.closest`, and refuse a target outside the root with M16, `mountMany` judging each item.
 It is checked at `mount` and `mountMany` only.
 A Foundry 14 detached window's target is judged the same way.
@@ -592,8 +593,9 @@ It is removed by reference, wherever it then is; a companion's re-render that al
 - A document sheet disables every control in its form when the document is not editable, so a companion mounts after `super._onRender`.
 - A Font Awesome glyph's box follows the Font Awesome the running build ships, which the admission clause does not measure.
 - An entry is drawn under the standalone style root only where its admission clause holds: mounted in a bare ApplicationV2 `.window-content`, every element it draws computes the same styles and border box as with the same props in the player window, over the core-min fixture and, where the harvest exists, Foundry 14.365's core sheet, at rest, under keyboard focus, under the pointer and under reduced motion.
-An overlay entry's clause reads its open panel too: the panel the seam draws on the standalone layer computes the same styles and border box, measured from the panel's own box, as the one it draws in the player window, with the page's body stating the face the player window draws in, as Foundry's body states it for every window.
-- An overlay entry drawn under the standalone style root opens its panel on the standalone layer where the companion passes no `overlayHost`, as Overlays states; the layer carries `.fabricate`, so a target in a content slot drawn inside that panel is under a Fabricate root and takes no standalone style root of its own.
+An overlay entry's clause reads its open panel too: the panel the seam draws on the standalone layer computes the same styles and border box, measured from the panel's own box, as the one it draws in the player window.
+A panel on the layer inherits the page body's face and colour, so its face follows the page and not the companion's window; the test page sets one face on its body so both arms compare like with like.
+- An overlay entry drawn under the standalone style root opens its panel on the standalone layer where the companion passes no `overlayHost`, as Overlays states; the layer counts as a Fabricate root, so a target in a content slot drawn inside that panel is under a Fabricate root and takes no standalone style root of its own.
 Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the entry does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the admission clause does not measure them, core's `fieldset`, `legend`, radio and `textarea` rules are measured only where the harvest exists, an ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.
 The harvested arm draws under no Foundry theme class.
 - Chromium draws a search field's cancel button and a number field's spin buttons itself, in the dark colour scheme, and computes no author style for them, so the admission clause does not read them.
@@ -612,9 +614,10 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
   1. `overlayHost`, while it is connected and in `target`'s document;
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
   3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
-- The standalone layer spans the viewport of its window, the box its panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input (issue 2680).
+- The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input (issue 2680).
+- A press or a key in a panel on the standalone layer bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding unless the panel's own group says it stops it.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
-The `<div>` carries `display: contents`, and `pointer-events: auto` on the standalone layer, and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
+The `<div>` carries `display: contents` and, where its host is the standalone layer, `pointer-events: auto`, and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 - An overlay's outside-press, Escape and scroll listeners, and the watch an open `Select`, `IconPicker` or `ActionMenu` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
@@ -651,7 +654,7 @@ A pointer press acts on release, as a `click`, never on pointer down, so a point
 Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
-Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
+Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops every key, as each group states.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
 An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states.
@@ -1097,6 +1100,7 @@ Each group states the accepted values of every key that entry publishes.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
     Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
   - The trigger stops the propagation of every key pressed while it holds focus, so a companion's listener above `target` receives no key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
+    In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
     Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the trigger still closes the list, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
     A press on the trigger does not bubble out of it as a `click`, and a press inside the open list does not bubble out of the list, so a companion's `click` listener above `target` or the `overlayHost` hears neither.
   - The list is the entry's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
@@ -1432,6 +1436,7 @@ Each group states the accepted values of every key that entry publishes.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
     Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
   - The trigger stops the propagation of every key pressed while it holds focus and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears none of them; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
+    In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
     Every key pressed in the query field, Escape included, may reach a companion's listener on the `overlayHost` or above it.
   - The no-match line is a polite live region, so it is announced when a query empties the list; the picker announces nothing else.
   - The list is the entry's overlay, so `describe('IconPicker').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
@@ -1511,7 +1516,7 @@ Each group states the accepted values of every key that entry publishes.
     It is for one step the user finishes or dismisses before going on.
     It draws nothing focusable inside `target`, so the companion returns focus to an element of its own, the control that opened the dialog.
   - `open` is `true` to draw the dialog and `false` or absent to draw none, and the companion opens and closes it only through `update`.
-    While `open` is `false`, `target` holds no element, and while it is `true`, `target` holds one empty element of Fabricate's, which is private.
+    While `open` is `false`, `target` is empty under a Fabricate root and holds only the empty standalone style root elsewhere, and while it is `true`, `target` holds one empty element of Fabricate's, inside that root where it is written, which is private.
     `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
     An `update` that passes `open: false` detaches the slot elements with their contents intact, and `open: true` attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and a companion's components, effects and listeners in them keep running.
     An overlay entry the companion mounts in a slot closes its open panel when such an `update` detaches the slot, as Overlays states, so when the dialog opens again that entry's trigger has `aria-expanded` `"false"`.
@@ -1526,6 +1531,7 @@ Each group states the accepted values of every key that entry publishes.
     A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
   - `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
     With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+    In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; the companion passes `false`, stops Escape in its own listener, or moves focus into the dialog first.
     A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
     A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as a `Select`'s list, an `IconPicker`'s list and query field and an `ActionMenu`'s menu that the companion mounts in a slot.
     A press in such a panel does not call `onClose`, and the panel takes it as its own group states, so a click on an option chooses it as it does outside a dialog.
@@ -1774,7 +1780,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate destroys the second mount first, and its `update` answers `false`
 - **AND** the slot element is detached with its remaining children untouched, and `handle.slot` answers `null`
 
-#### Scenario: A required ancestor root
+#### Scenario: A target in a shadow root
 
 - **WHEN** a companion mounts `Button` into a target in an open shadow root, under no Fabricate root
 - **THEN** `mount` throws `Button cannot be drawn in a shadow root`, and nothing is rendered
@@ -1791,6 +1797,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `ActionMenu` with its required keys into a target in its own ApplicationV2 window, under no Fabricate root and with no `overlayHost`, and the user presses its trigger
 - **THEN** the trigger is drawn inside one standalone style root in `target`, and the menu opens on the standalone layer, inside the viewport where it was measured
 - **AND** the trigger and the open menu compute the same styles as the same props mounted and opened in the player window
+- **AND** a press on an element of the companion's window outside the menu reaches that element
 - **AND** `destroy` leaves `target` empty and no standalone layer
 
 #### Scenario: A labelled stepper in a companion's window

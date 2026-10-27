@@ -65,7 +65,7 @@ describe('the module sheet and every component style against the published Modal
         'fabricate',
         false,
       ],
-      'a published dialogProps, width, class, rest or wider root reopens the census'
+      'a published dialogProps, width, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });
 

@@ -351,7 +351,7 @@ describe('the module sheet and every component style against the published Selec
     assert.deepEqual(
       [Object.keys(entry.props), gatedRoot(entry), entry.rest],
       [['options', 'value', 'onChange', 'ariaLabel', 'placeholder', 'size'], 'fabricate', false],
-      'a published label, mono, readonly, disabled, class, rest or wider root reopens the census'
+      'a published label, mono, readonly, disabled, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });
 });
