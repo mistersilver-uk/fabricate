@@ -270,6 +270,14 @@ describe('the published Modal opens and closes only through update', () => {
     assert.equal(target.firstElementChild.childNodes.length, 0, 'and it is empty');
     const dialog = dialogIn();
     assert.ok(!target.contains(dialog), 'the dialog is drawn outside target');
+    const bare = companionTarget(shells);
+    mountModal({ open: false }, { target: bare });
+    await settle();
+    assert.equal(
+      standaloneRootIn(bare).children.length,
+      0,
+      'a companion’s shell holds only the empty standalone style root while closed'
+    );
     assert.ok(dialog.parentElement.parentElement === target.parentElement, 'in the chain’s host');
   });
 

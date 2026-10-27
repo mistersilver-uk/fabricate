@@ -1251,6 +1251,7 @@ const HOSTS_IN_FLOW = `html, body {
 [data-host] {
   position: static; inset: auto; transform: none; z-index: auto; contain: none;
   container-type: normal; filter: none; perspective: none; will-change: auto;
+  backdrop-filter: none; translate: none; rotate: none; scale: none;
   margin: 0; height: auto; max-height: none; min-width: 0; overflow: visible;
 }
 [data-host] > .window-content { overflow: visible; }`;
