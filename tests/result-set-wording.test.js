@@ -116,9 +116,9 @@ const RESULT_GROUP_ALLOWED = [
   'src/ui/model/environmentValidation.js: requires at least one result group|exactly one result group',
   'src/ui/model/environmentValidation.js: result group "([^"]+)"',
   'src/ui/model/environmentValidation.js: result groups require names',
+  'src/ui/svelte/stores/adminGatheringResultValidation.js:  result group ',
+  'src/ui/svelte/stores/adminGatheringResultValidation.js:  result group "',
   'src/ui/svelte/stores/adminStore.js:  Direct mode requires exactly one result group',
-  'src/ui/svelte/stores/adminStore.js:  result group ',
-  'src/ui/svelte/stores/adminStore.js:  result group "',
   'src/ui/svelte/stores/adminStore.js: " allows at most one matching result group',
   'src/ui/svelte/stores/adminStore.js: " requires exactly one matching result group',
 ];
