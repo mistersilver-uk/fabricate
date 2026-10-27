@@ -420,11 +420,11 @@ A progressive craft fires the component complications its committed award earned
 - When the last step succeeds, mark run complete and clean up run state.
 - On step failure, mark run failed and clean up run state.
 
-#### Player-Initiated Advance ("Trigger Next Step")
+#### Player-Initiated Advance
 
 This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
 A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
-The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-journal-app/spec.md` *Journal App*).
+The player-facing Journal exposes this as its primary advance button (Complete stage, Complete on the final stage, Roll check for a disclosed check, Brew for alchemy), which routes a legacy run to `advanceCraftingRun` (see `ui-journal-app/spec.md` *Journal App (Player)*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId, presentTools })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
@@ -753,7 +753,7 @@ The failure branch builds the salvage recipe view the success branch builds.
   The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
   The Inventory tab's salvage panel (`InventorySalvagePanel.svelte`) is the first UI caller of
   `CraftingEngine.salvage`: players reorder Progressive stages via the store's reorder/reset
-  actions persisted under the `salvage:<componentId>` scope, honouring
+  actions persisted under the `salvage:<systemId>:<componentId>` scope, honouring
   `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-crafting-app` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
 
