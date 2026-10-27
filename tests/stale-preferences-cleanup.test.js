@@ -41,7 +41,7 @@ function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] 
     // REQUIRED (issue 1261). `cleanupStalePreferences` throws without it rather than pruning
     // every `salvage:` key against an empty set, so every fixture must state the component
     // corpus it is pruning against — here, an empty one.
-    validComponentIds: new Set(),
+    validSalvageComponentsBySystem: new Map(),
     resolveGatheringActor: (actorId) => actorsById[actorId] ?? null,
     isSelectableGatheringActor: (actor) => selectable.has(actor?.id)
   };
@@ -55,7 +55,7 @@ test('resets lastManagedCraftingSystem to empty when it references a missing sys
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
@@ -70,7 +70,7 @@ test('leaves lastManagedCraftingSystem unchanged when it references a valid syst
   });
 
   await cleanupStalePreferences(new Set(['system-a', 'system-b']), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.equal(store.get('lastManagedCraftingSystem'), 'system-a');
@@ -84,7 +84,7 @@ test('resets lastAlchemySystem when it references a missing system', async () =>
   });
 
   await cleanupStalePreferences(new Set(['system-other']), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.equal(store.get('lastAlchemySystem'), '');
@@ -99,7 +99,7 @@ test('leaves lastAlchemySystem unchanged when it references a valid system', asy
   });
 
   await cleanupStalePreferences(new Set(['system-a']), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.equal(store.get('lastAlchemySystem'), 'system-a');
@@ -113,7 +113,7 @@ test('leaves lastManagedCraftingSystem unchanged when it is already empty', asyn
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
@@ -198,7 +198,7 @@ test('preserves lastGatheringActor when cleanup runs without gathering actor res
     new Set(),
     getSetting,
     setSetting,
-    { validComponentIds: new Set() }
+    { validSalvageComponentsBySystem: new Map() }
   );
 
   assert.equal(store.get('lastGatheringActor'), 'actor-1');
@@ -272,7 +272,7 @@ test('removes progressive-order entries for missing recipes', async () => {
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   const result = store.get('progressiveResultOrder');
@@ -286,7 +286,7 @@ test('retains all progressive-order entries when all recipes are valid', async (
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-a', 'recipe-b']), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.deepEqual(store.get('progressiveResultOrder'), order);
@@ -302,7 +302,7 @@ test('does not call setSetting for progressiveResultOrder when no entries need r
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-x']), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   const setKeys = calls.set.map(c => c.key);
@@ -318,10 +318,34 @@ test('keeps a salvage: entry for a valid component and prunes it for an invalid 
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(['comp-live'])
+    validSalvageComponentsBySystem: new Map([['sys-a', new Set(['comp-live'])]])
   });
 
   assert.deepEqual(store.get('progressiveResultOrder'), { 'salvage:comp-live': ['r1', 'r2'] });
+});
+
+test('keeps a system-qualified salvage key only while that system holds that component', async () => {
+  const { store, getSetting, setSetting } = makeSettings({
+    progressiveResultOrder: {
+      'salvage:sys-a:comp-1': ['r1'],
+      'salvage:sys-b:comp-2': ['r2'],
+      'salvage:sys-b:comp-1': ['r3'],
+      'salvage:sys-gone:comp-1': ['r4'],
+      'salvage:sys-a:comp-gone': ['r5']
+    }
+  });
+
+  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
+    validSalvageComponentsBySystem: new Map([
+      ['sys-a', new Set(['comp-1'])],
+      ['sys-b', new Set(['comp-2'])]
+    ])
+  });
+
+  assert.deepEqual(Object.keys(store.get('progressiveResultOrder')), [
+    'salvage:sys-a:comp-1',
+    'salvage:sys-b:comp-2'
+  ]);
 });
 
 test('does not call setSetting when every namespaced entry is live (recipe AND salvage)', async () => {
@@ -329,7 +353,7 @@ test('does not call setSetting when every namespaced entry is live (recipe AND s
   const { calls, getSetting, setSetting } = makeSettings({ progressiveResultOrder: order });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-a']), getSetting, setSetting, {
-    validComponentIds: new Set(['comp-a'])
+    validSalvageComponentsBySystem: new Map([['sys-a', new Set(['comp-a'])]])
   });
 
   const setKeys = calls.set.map(c => c.key);
@@ -346,7 +370,7 @@ test('scopes the two namespaces separately — a component id does not validate 
 
   // `shared-id` is a live COMPONENT but not a live recipe: only the salvage: key survives.
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(['shared-id'])
+    validSalvageComponentsBySystem: new Map([['sys-a', new Set(['shared-id'])]])
   });
 
   assert.deepEqual(store.get('progressiveResultOrder'), { 'salvage:shared-id': ['r2'] });
@@ -366,7 +390,7 @@ test('drops unknown-prefix and legacy BARE-id keys (D14 policy)', async () => {
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.deepEqual(
@@ -392,7 +416,7 @@ test('cleans both stale system and stale recipe preferences in one call', async 
     new Set(['live-recipe']),
     getSetting,
     setSetting,
-    { validComponentIds: new Set() }
+    { validSalvageComponentsBySystem: new Map() }
   );
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
@@ -414,7 +438,7 @@ test('does nothing when all preferences are valid — no setSetting calls for ei
     new Set(['recipe-1']),
     getSetting,
     setSetting,
-    { validComponentIds: new Set() }
+    { validSalvageComponentsBySystem: new Map() }
   );
 
   assert.equal(calls.set.length, 0, 'setSetting should not be called at all when all preferences are valid');
@@ -422,7 +446,7 @@ test('does nothing when all preferences are valid — no setSetting calls for ei
 
 // Group 5: the component id set is REQUIRED (issue 1261)
 
-test('omitting validComponentIds throws rather than pruning every salvage: key', async () => {
+test('omitting validSalvageComponentsBySystem throws rather than pruning every salvage: key', async () => {
   // Issue 1196's shape reached through an omitted ARGUMENT rather than an incomplete corpus.
   const { store, calls, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: { 'salvage:comp-live': ['r1', 'r2'] }
@@ -430,7 +454,7 @@ test('omitting validComponentIds throws rather than pruning every salvage: key',
 
   await assert.rejects(
     () => cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting),
-    /validComponentIds/,
+    /validSalvageComponentsBySystem/,
     'the omission is refused by name'
   );
 
@@ -442,13 +466,13 @@ test('omitting validComponentIds throws rather than pruning every salvage: key',
   );
 });
 
-test('an explicitly empty validComponentIds still prunes, so the guard is not a blanket refusal', async () => {
+test('an explicitly empty validSalvageComponentsBySystem still prunes, so the guard is not a blanket refusal', async () => {
   const { store, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: { 'salvage:comp-gone': ['r1'] }
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set()
+    validSalvageComponentsBySystem: new Map()
   });
 
   assert.deepEqual(

@@ -71,7 +71,7 @@ describe('composeStartupPassList', () => {
   });
 
   /** Issue 1196's failure mode, at the composition site rather than at the function. */
-  test('stale preferences prunes against the flat union, keeping other systems salvage keys', async () => {
+  test('stale preferences keeps legacy bare salvage keys live in any system', async () => {
     // A `salvage:` key belonging to the SECOND system (issue 1196).
     const stored = {
       'salvage:c-1': ['a'],
@@ -101,16 +101,43 @@ describe('composeStartupPassList', () => {
     );
   });
 
+  test('stale preferences keeps a system-qualified salvage key only while that system holds the component', async () => {
+    const stored = {
+      'salvage:s-1:c-1': ['a'],
+      'salvage:s-2:c-3': ['b'],
+      'salvage:s-2:c-1': ['c'],
+      'salvage:s-gone:c-1': ['d'],
+      'salvage:s-1:c-gone': ['e'],
+    };
+    const writes = [];
+    const { options } = harness({
+      systems: [system('s-1', ['c-1', 'c-2']), system('s-2', ['c-3'])],
+    });
+    const stale = composeStartupPassList({
+      ...options,
+      getSetting: (key) => (key === 'progressiveResultOrder' ? stored : null),
+      setSetting: (key, value) => {
+        writes.push([key, value]);
+        return Promise.resolve();
+      },
+    }).find(([label]) => label === 'stale preferences');
+    await stale[1]();
+
+    const write = writes.find(([key]) => key === 'progressiveResultOrder');
+    assert.ok(write, 'the stale keys were not pruned');
+    assert.deepEqual(Object.keys(write[1]), ['salvage:s-1:c-1', 'salvage:s-2:c-3']);
+  });
+
   /**
    * The required-parameter guard `preferencesCleanup` gained in issue 1261 throws when
-   * `validComponentIds` is missing.
+   * `validSalvageComponentsBySystem` is missing.
    */
-  test('the stale-preferences thunk supplies validComponentIds, so it does not refuse', async () => {
+  test('the stale-preferences thunk supplies validSalvageComponentsBySystem, so it does not refuse', async () => {
     const { options } = harness({ systems: [system('s-1', ['c-1'])] });
     const stale = composeStartupPassList(options).find(([label]) => label === 'stale preferences');
     await assert.doesNotReject(
       stale[1](),
-      'the composition dropped validComponentIds and the pass now refuses on every boot'
+      'the composition dropped validSalvageComponentsBySystem and the pass now refuses on every boot'
     );
   });
 

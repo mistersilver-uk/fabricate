@@ -43,12 +43,6 @@ export function composeStartupPassList({
       new Set((system.components || []).map((component) => component.id)), // ratchet-exempt(world-scope): destructive-basis
     ])
   );
-  // One flat id set, because the progressive-order map's `salvage:<componentId>` keys are not
-  // system-scoped.
-  const validComponentIds = new Set(
-    [...validSalvageComponentsBySystem.values()].flatMap((ids) => [...ids])
-  );
-
   const candidates = [
     ['crafting runs', () => craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
     // A single-step recipe with no time requirement never legitimately persists an active run, so
@@ -68,7 +62,7 @@ export function composeStartupPassList({
         cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
           resolveGatheringActor,
           isSelectableGatheringActor,
-          validComponentIds,
+          validSalvageComponentsBySystem,
         }),
     ],
   ];
