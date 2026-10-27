@@ -349,7 +349,7 @@ describe('KnowledgeView mounted behaviour', () => {
     expend.click();
     assert.deepEqual(expended, [['a1', 'i1']]);
     // Expend is NOT destructive: the row survives.
-    assert.equal(target.ownerDocument.activeElement, expend, 'Expend keeps its own focus');
+    assert.ok(target.ownerDocument.activeElement === expend, 'Expend keeps its own focus');
     // The type pill carries the count for a multi-recipe item.
     // renders a separate "N recipe(s) inside" chip stating the same number twice.
     assert.match(
@@ -564,9 +564,8 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.deepEqual(deleted, [['a1', 'i1']]);
     assert.equal(armedState(target, 'delete:i1'), 'false');
     // A destructive action DOES unmount the row that held focus.
-    assert.equal(
-      target.ownerDocument.activeElement,
-      target.querySelector('[data-knowledge-panel]'),
+    assert.ok(
+      target.ownerDocument.activeElement === target.querySelector('[data-knowledge-panel]'),
       'focus lands on the owning tab panel after a destructive row action'
     );
   });

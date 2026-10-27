@@ -1030,6 +1030,33 @@ describe('RecipeDetail mounted behavior', () => {
     assert.deepEqual(toolNames(steps[1]), ["Jeweler's Tools"]);
   });
 
+  // With no `displayedStepId` the baked projection is attributed to no step, so every
+  // step block fails closed to its own projection rather than inheriting the active step's.
+  it('renders each step from its own projection when displayedStepId is omitted', async () => {
+    const fixture = steppedEssenceRecipe({ activeStepIndex: 1, activeStepId: 'step-ess-2' });
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps,
+      activeStepId: fixture.activeStepId,
+      rail: { readOnly: true }
+    });
+
+    const steps = target.querySelectorAll('[data-recipe-step]');
+    assert.equal(steps.length, 2, 'both step blocks rendered');
+    assert.equal(
+      steps[0].querySelectorAll('[data-requirement-slot]').length,
+      2,
+      'the first step shows its own two requirements'
+    );
+    assert.equal(
+      steps[1].querySelectorAll('[data-requirement-slot]').length,
+      1,
+      "the active step shows its own single requirement, not the first step's two"
+    );
+  });
+
   it('falls back to a single IoTable when steps is empty (single-step parity)', async () => {
     // The multi-step body is gated on steps.length > 1. With an empty steps prop the
     // model renders unchanged: one IoTable, no ordered step list. This documents the

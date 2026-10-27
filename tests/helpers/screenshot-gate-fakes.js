@@ -225,7 +225,12 @@ export async function runPreservingExitCode(fn) {
  * @param {string} [frame.prefix] The S3 screenshot prefix.
  * @returns {string} The block.
  */
-export function managedScreenshotBlock({
+export function managedScreenshotBlock(frame) {
+  return `${BLOCK_START}\n## Screenshots\n\n${publishedFrameMarkdown(frame)}\n${BLOCK_END}`;
+}
+
+/** The frames alone, as `upsertScreenshotsBlock` takes them; options as {@link managedScreenshotBlock}. */
+export function publishedFrameMarkdown({
   prNumber,
   caseIds,
   headSha = null,
@@ -233,10 +238,7 @@ export function managedScreenshotBlock({
   prefix = 'pr-screenshots',
 }) {
   const scope = headSha ? `${prefix}/${prNumber}/${headSha}` : `${prefix}/${prNumber}`;
-  const images = caseIds
-    .map((id) => `![pr-${prNumber} ${id}](${baseUrl}/${scope}/${id}.png)`)
-    .join('\n\n');
-  return `${BLOCK_START}\n## Screenshots\n\n${images}\n${BLOCK_END}`;
+  return caseIds.map((id) => `![pr-${prNumber} ${id}](${baseUrl}/${scope}/${id}.png)`).join('\n\n');
 }
 
 /**

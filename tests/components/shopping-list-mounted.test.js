@@ -293,9 +293,8 @@ describe('ShoppingList mounted behavior', () => {
 
     const entry = target.querySelector('[data-shopping-entry="recipe-1"]');
     entry.focus();
-    assert.equal(
-      target.ownerDocument.activeElement,
-      entry,
+    assert.ok(
+      target.ownerDocument.activeElement === entry,
       'the button is focusable with no tabindex of its own'
     );
 

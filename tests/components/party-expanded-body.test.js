@@ -747,9 +747,8 @@ describe('PartyExpandedBody (mounted)', () => {
     flushSync();
     await tick();
     await tick();
-    assert.equal(
-      document.activeElement,
-      root.querySelector('[data-manager-party-actor-trigger="p1"]'),
+    assert.ok(
+      document.activeElement === root.querySelector('[data-manager-party-actor-trigger="p1"]'),
       'the remounted trigger takes focus back'
     );
     harness.remount();
@@ -765,7 +764,7 @@ describe('PartyExpandedBody (mounted)', () => {
     flushSync();
     await tick();
     await tick();
-    assert.equal(document.activeElement, trigger, 'the shipped mode still restores focus');
+    assert.ok(document.activeElement === trigger, 'the shipped mode still restores focus');
   });
 
   it('sets the travel actor from the picker', async () => {

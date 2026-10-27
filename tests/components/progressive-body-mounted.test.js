@@ -225,7 +225,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
       MOVED_MASTER_TO_2,
       'the shared sentence names the stage that MOVED, read before the move'
     );
-    assert.equal(globalThis.document.activeElement, up, 'focus stays on the pressed chevron');
+    assert.ok(globalThis.document.activeElement === up, 'focus stays on the pressed chevron');
   });
 
   it('a grip arrow key moves the stage, keeps focus on the grip and announces', async () => {
