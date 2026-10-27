@@ -31,7 +31,10 @@
   import { localizeOr } from '../../util/localizeOr.js';
   import ModifierPillSelect from '../../components/ModifierPillSelect.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import { resolveMaxModifierPicks } from '../../../../systems/checkModifierResolver.js';
+  import {
+    partitionPickedModifierIds,
+    resolveMaxModifierPicks,
+  } from '../../../../systems/checkModifierResolver.js';
 
   let {
     options = [],
@@ -99,14 +102,13 @@
       ? options.filter((option) => inheritedIds.includes(option?.id))
       : options
   );
-  const eligibleIds = $derived(new Set(eligibleOptions.map((option) => option?.id)));
-  const pickedEligible = $derived(picked.filter((id) => eligibleIds.has(id)));
+  const partition = $derived(partitionPickedModifierIds(picked, options, inheritedIds));
   // The cap counts what the GM can SEE, or the add button deadens against invisible chips.
+  const pickedEligible = $derived(partition.eligible);
   // A pick naming a modifier the catalogue no longer holds returns with nothing, so it is counted
   // apart from one the check merely un-marked.
-  const catalogueIds = $derived(new Set(options.map((option) => option?.id)));
-  const missingCount = $derived(picked.filter((id) => !catalogueIds.has(id)).length);
-  const suppressedCount = $derived(picked.length - pickedEligible.length - missingCount);
+  const missingCount = $derived(partition.missing.length);
+  const suppressedCount = $derived(partition.suppressed.length);
 
   // Routed through the resolver so this surface bounds what the ENGINE bounds.
   const capLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks: maxPicks }));
@@ -142,16 +144,24 @@
     return `${suppressedCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
   });
   const MISSING_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissing';
+  // The deleted id has no chip to remove, so the note names the switch that re-authors the pick.
   const missingText = $derived.by(() => {
+    const clear = localizeOr(
+      'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierMissingClear',
+      'To clear it, switch the custom pick off and on again; that resets the other picks too.'
+    );
     if (missingCount === 1) {
-      return localizeOr(
+      return `${localizeOr(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
-        'One chosen modifier no longer exists in the world library, so it is hidden and does nothing.'
-      );
+        'One chosen modifier no longer exists in System settings › Modifiers, so it is hidden and does nothing.'
+      )} ${clear}`;
     }
     const translated = localize(MISSING_KEY, { count: missingCount });
-    if (translated && translated !== MISSING_KEY) return translated;
-    return `${missingCount} chosen modifiers no longer exist in the world library, so they are hidden and do nothing.`;
+    const sentence =
+      translated && translated !== MISSING_KEY
+        ? translated
+        : `${missingCount} chosen modifiers no longer exist in System settings › Modifiers, so they are hidden and do nothing.`;
+    return `${sentence} ${clear}`;
   });
   // WHICH ZERO THE PILL ROW IS SHOWING: two states draw no chip, and the placeholder is also the
   // `aria-live` summary. Its all-hidden sentence promises a return, so it needs no deleted pick.

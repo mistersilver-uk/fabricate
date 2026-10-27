@@ -1274,7 +1274,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(two.text.includes('2'), 'and the number reaches the sentence a GM reads');
   });
 
-  it('counts a stored pick naming a DELETED modifier apart, and never promises it returns (issue 1617)', async () => {
+  it('counts a stored pick naming a deleted modifier apart, and never promises it returns (issue 1617)', async () => {
     const pickerOf = async (modifierIds) => {
       const target = await editHarness.mount(
         markProps({ recipe: { ...RECIPE, craftingModifier: { modifierIds } } })
@@ -1285,15 +1285,16 @@ describe('RecipeEditView (mounted)', () => {
     const deleted = await pickerOf(['med', 'gone']);
     const missing = deleted.querySelector('[data-recipe-crafting-modifier-missing]');
     assert.equal(missing?.getAttribute('data-recipe-crafting-modifier-missing'), '1');
-    assert.match(missing.textContent, /no longer exists/i);
+    assert.match(missing.textContent, /no longer exists in System settings › Modifiers/);
+    assert.match(missing.textContent, /Inherit system default or No modifiers/);
     assert.ok(
       !deleted.querySelector('[data-recipe-crafting-modifier-suppressed]'),
       'a deleted modifier is not an un-marked one, so the return-promising note stays away'
     );
-    assert.ok(!/return/i.test(deleted.textContent), 'no sentence says the deleted pick returns');
+    assert.ok(!/returns?\b/i.test(deleted.textContent), 'no sentence says the deleted pick returns');
     editHarness.remount();
 
-    // THE UN-MARKED CASE KEEPS ITS COPY AND COUNT, beside a deleted pick.
+    // the un-marked case keeps its copy and count, beside a deleted pick
     const mixed = await pickerOf(['med', 'herb', 'gone']);
     assert.equal(
       mixed
@@ -1313,13 +1314,40 @@ describe('RecipeEditView (mounted)', () => {
     );
     editHarness.remount();
 
-    // Only deleted picks: the placeholder must not claim they are kept and return.
+    // only deleted picks: the placeholder must not claim they are kept and return
     const only = await pickerOf(['gone']);
     assert.ok(
       !/hidden/i.test(only.querySelector('.manager-availability-any').textContent),
       'the all-hidden placeholder promises a return, which a deleted pick cannot keep'
     );
     assert.ok(Boolean(only.querySelector('[data-recipe-crafting-modifier-missing]')));
+    editHarness.remount();
+
+    // an un-marked pick beside a deleted one, nothing eligible: both notes, no all-hidden sentence
+    const both = await pickerOf(['herb', 'gone']);
+    assert.equal(
+      both
+        .querySelector('[data-recipe-crafting-modifier-suppressed]')
+        ?.getAttribute('data-recipe-crafting-modifier-suppressed'),
+      '1'
+    );
+    assert.equal(
+      both
+        .querySelector('[data-recipe-crafting-modifier-missing]')
+        ?.getAttribute('data-recipe-crafting-modifier-missing'),
+      '1'
+    );
+    assert.ok(
+      !/currently hidden/i.test(both.querySelector('.manager-availability-any').textContent),
+      'the placeholder does not promise the deleted pick returns'
+    );
+    editHarness.remount();
+
+    const plural = await pickerOf(['med', 'gone', 'gone2']);
+    const pluralNote = plural.querySelector('[data-recipe-crafting-modifier-missing]');
+    assert.equal(pluralNote.getAttribute('data-recipe-crafting-modifier-missing'), '2');
+    // this harness's localizer echoes the key and its data rather than interpolating
+    assert.match(pluralNote.textContent, /CraftingModifierMissing:\{"count":2\}/);
     editHarness.remount();
   });
 

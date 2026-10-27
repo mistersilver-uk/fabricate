@@ -1,6 +1,6 @@
 <!--
   The recipe Overview's check-modifier picker cell: the eligible-set tri-state, the pill row over
-  the check's mark, and the cap and suppression notes. It writes `recipe.craftingModifier`
+  the check's mark, and the cap, suppression and deleted-modifier notes. It writes `recipe.craftingModifier`
   (`{ modifierIds? } | null`) and authors one axis, which modifiers apply
   (`openspec/specs/data-models/spec.md` `## Recipe` requirement 13a).
 
@@ -21,7 +21,10 @@
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
   import Select from '../../../components/Select.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
-  import { resolveMaxModifierPicks } from '../../../../../systems/checkModifierResolver.js';
+  import {
+    partitionPickedModifierIds,
+    resolveMaxModifierPicks,
+  } from '../../../../../systems/checkModifierResolver.js';
   import { buildModifierSetOptions } from './recipeOverviewSelectOptions.js';
 
   let {
@@ -71,18 +74,18 @@
 
   // The cap counts what the GM can SEE: a suppressed pick consuming a slot would disable the add
   // button with no way to free one, the freeing chip's remove button not being rendered.
-  const pickedEligibleIds = $derived(
-    overrideModifierIds.filter((id) => eligibleModifierIds.has(id))
-  );
   // A pick naming a modifier the library no longer holds returns with nothing, so it is counted
   // apart from one the check merely un-marked.
-  const catalogueIds = $derived(new Set(craftingModifierOptions.map((option) => option?.id)));
-  const missingPickCount = $derived(
-    overrideModifierIds.filter((id) => !catalogueIds.has(id)).length
+  const partition = $derived(
+    partitionPickedModifierIds(
+      overrideModifierIds,
+      craftingModifierOptions,
+      craftingModifierDefaultIds
+    )
   );
-  const suppressedPickCount = $derived(
-    overrideModifierIds.length - pickedEligibleIds.length - missingPickCount
-  );
+  const pickedEligibleIds = $derived(partition.eligible);
+  const missingPickCount = $derived(partition.missing.length);
+  const suppressedPickCount = $derived(partition.suppressed.length);
   const atModifierPickCap = $derived(pickedEligibleIds.length >= modifierPickCap);
 
   // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers", following the
@@ -148,16 +151,24 @@
   );
 
   const MISSING_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissing';
+  // The deleted id has no chip to remove, so the note names the set modes that drop the stored pick.
   const missingText = $derived.by(() => {
+    const clear = text(
+      'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingClear',
+      'To clear it, set Eligible modifiers to Inherit system default or No modifiers; that resets the other picks too.'
+    );
     if (missingPickCount === 1) {
-      return text(
+      return `${text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierMissingOne',
-        'One chosen modifier no longer exists in the world library, so it is hidden and does nothing.'
-      );
+        'One chosen modifier no longer exists in System settings › Modifiers, so it is hidden and does nothing.'
+      )} ${clear}`;
     }
     const translated = localize(MISSING_KEY, { count: missingPickCount });
-    if (translated && translated !== MISSING_KEY) return translated;
-    return `${missingPickCount} chosen modifiers no longer exist in the world library, so they are hidden and do nothing.`;
+    const sentence =
+      translated && translated !== MISSING_KEY
+        ? translated
+        : `${missingPickCount} chosen modifiers no longer exist in System settings › Modifiers, so they are hidden and do nothing.`;
+    return `${sentence} ${clear}`;
   });
   const showMissingNote = $derived(missingPickCount > 0);
 
@@ -355,6 +366,7 @@
       </p>
     {/if}
     {#if showMissingNote}
+      <!-- Shares the suppressed note's spacing rule only; it is a different fact. -->
       <p
         class="manager-muted manager-recipe-modifier-suppressed"
         id={MODIFIER_MISSING_ID}
