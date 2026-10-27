@@ -21,13 +21,25 @@ const NO_CHECK = {
 };
 const STEP = { id: 'cure', toolIds: [], ingredientSets: [{ id: 'empty', ingredients: [] }] };
 const HERB = { componentId: 'herb' };
+const EMPTY_SET = STEP.ingredientSets[0];
+const ROUTED = { resolutionMode: 'routedByIngredients' };
+const ROUTED_SET_TOOL = { ...EMPTY_SET, name: 'Forged', toolIds: ['hammer'] };
 
 /** One eligible stage, and each way the engine refuses it, as `[label, code, overrides]`. */
 const CASES = [
   ['eligible', null, {}],
   ['a manual run', 'manualPreference', { run: { completionMode: 'manual' } }],
   ['an input stage', 'materials', { sets: [{ id: 'empty', ingredients: [HERB] }] }],
+  ['a set essence requirement', 'essences', { sets: [{ ...EMPTY_SET, essences: { fire: 1 } }] }],
+  ['an empty essence map', null, { sets: [{ ...EMPTY_SET, essences: {} }] }],
   ['a stage tool', 'tools', { step: { toolIds: ['hammer'] } }],
+  ['a named set Tool in routed mode', 'tools', { sets: [ROUTED_SET_TOOL], system: ROUTED }],
+  ['a set Tool in a simple system', null, { sets: [ROUTED_SET_TOOL] }],
+  [
+    'an unnamed set Tool in routed mode',
+    null,
+    { sets: [{ ...ROUTED_SET_TOOL, name: '' }], system: ROUTED },
+  ],
   ['a recipe tool', 'tools', { recipe: { toolIds: ['hammer'] } }],
   [
     'a usable check',

@@ -174,6 +174,61 @@ test('recipeLostItsShape reads STEP sets and results, not only the recipe-level 
   );
 });
 
+/** A step with one set offering `option` and one result group offering `result`. */
+function stepOf(id, { option = 'tin', result = 'bar' } = {}) {
+  return {
+    id,
+    ingredientSets: [
+      { id: `${id}-set`, ingredientGroups: [{ options: [{ componentId: option }] }] },
+    ],
+    resultGroups: [{ id: `${id}-rg`, results: [{ componentId: result }] }],
+  };
+}
+
+test('a cascade that empties one step of a multi-step recipe clamps the whole recipe', () => {
+  const threeStep = {
+    id: 'r-three',
+    craftingSystemId: 'sys',
+    enabled: true,
+    ingredientSets: [],
+    resultGroups: [],
+    steps: [stepOf('step-1'), stepOf('step-2', { result: 'doomed' }), stepOf('step-3')],
+  };
+
+  const { json, changed } = stripComponentsFromRecipeJson(threeStep, new Set(['doomed']));
+
+  assert.equal(changed, true);
+  assert.deepEqual(json.steps[1].resultGroups, [], 'step 2 lost its only result group');
+  assert.equal(recipeLostItsShape(json), true, 'steps 1 and 3 keep theirs, yet the recipe is lost');
+  assert.equal(describeComponentDeleteImpact(['doomed'], [threeStep]).recipesDisabled, 1);
+});
+
+test('a cascade that empties one step of its ingredient sets clamps the recipe', () => {
+  const twoStep = {
+    id: 'r-two',
+    craftingSystemId: 'sys',
+    enabled: true,
+    ingredientSets: [],
+    resultGroups: [],
+    steps: [stepOf('step-1'), stepOf('step-2', { option: 'doomed' })],
+  };
+
+  const { json } = stripComponentsFromRecipeJson(twoStep, new Set(['doomed']));
+
+  assert.deepEqual(json.steps[1].ingredientSets, []);
+  assert.equal(recipeLostItsShape(json), true);
+  assert.equal(describeComponentDeleteImpact(['doomed'], [twoStep]).recipesDisabled, 1);
+});
+
+test('recipeLostItsShape reads a stepless recipe from its own sets and flat results', () => {
+  assert.equal(
+    recipeLostItsShape({ ingredientSets: [{ id: 's' }], results: [{ componentId: 'bar' }] }),
+    false,
+    'the legacy flat results still count'
+  );
+  assert.equal(recipeLostItsShape({ ingredientSets: [{ id: 's' }], steps: [] }), true);
+});
+
 test('describeComponentDeleteImpact counts recipes as a DISTINCT union, never a per-component sum', () => {
   // One recipe naming BOTH selected components. A sum would say 2.
   const recipes = [recipe('r1', { options: ['iron', 'tin'] })];
