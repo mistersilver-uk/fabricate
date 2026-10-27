@@ -262,6 +262,11 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   // essence offer (read by its ingredient form) it imports.
   'src/ui/svelte/components/resultGroupEdits.js',
   'src/ui/model/essenceValidation.js',
+  // ... and normalises an essence option's icon through the shared normaliser and its catalogue.
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   // Issue 2511: the shared draft-id mint and pending focus the card and the group read.
   'src/ui/svelte/util/draftId.js',
   'src/ui/svelte/util/pendingFocus.js'
@@ -300,6 +305,11 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/components/resultRows.js',
   'src/ui/svelte/components/pickerRowKinds.js',
   'src/ui/svelte/util/recipeCurrency.js',
+  // The essence option icon is read through the normaliser and its catalogue.
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   'src/utils/choiceGroupShape.js',
   'src/models/Result.js',
   'src/models/reconstructibleDefaults.js',

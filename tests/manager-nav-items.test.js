@@ -548,11 +548,16 @@ describe('the Downtime group', () => {
         kind: 'premium',
         text: 'PREMIUM',
         installed: false,
+        domId: 'manager-world-nav-downtime-mark',
         hooks: { 'data-world-nav-premium': '', 'data-world-nav-premium-state': 'preview' },
       },
     ]);
     assert.equal(group.parent.title, 'Unlock Downtime Studio with Fabricate Premium');
-    assert.equal(group.parent.ariaLabel, 'Downtime');
+    assert.ok(!('ariaLabel' in group.parent), 'an aria-label would replace the chip in the name');
+    assert.equal(
+      group.parent.ariaLabelledBy,
+      `${group.parent.labelId} ${group.parent.markers[0].domId}`
+    );
     for (const child of group.children) {
       assert.deepEqual(child.markers, [], 'the padlock is not a mark');
       assert.equal(child.tierGated, true, 'it is the tier gate, drawn by the row');
@@ -574,6 +579,7 @@ describe('the Downtime group', () => {
       kind: 'premium',
       text: 'PREMIUM',
       installed: true,
+      domId: 'manager-world-nav-downtime-mark',
       hooks: { 'data-world-nav-premium': '', 'data-world-nav-premium-state': 'installed' },
     });
     assert.equal(group.parent.title, 'Downtime Studio is unlocked by Fabricate Premium');
@@ -607,11 +613,7 @@ describe('the Downtime group', () => {
       text
     );
     assert.equal(group.children[1].markers[0].count, 9);
-    assert.equal(
-      group.parent.ariaLabel,
-      'Downtime, 12 updates',
-      'and the rollup sums what resolves'
-    );
+    assert.equal(group.parent.markers[0].count, 12, 'and the rollup sums what resolves');
   });
 
   it('summarises the hidden badges on the parent only while the children are hidden', () => {
@@ -621,17 +623,25 @@ describe('the Downtime group', () => {
         kind: 'issues',
         count: 5,
         name: '5 updates',
+        domId: 'manager-world-nav-downtime-mark',
         hooks: { 'data-world-downtime-badge-total': '' },
       },
     ]);
-    assert.equal(closed.parent.ariaLabel, 'Downtime, 5 updates');
+    assert.ok(!('ariaLabel' in closed.parent));
+    assert.equal(
+      closed.parent.ariaLabelledBy,
+      `${closed.parent.labelId} ${closed.parent.markers[0].domId}`
+    );
 
     const open = managerDowntimeNavGroup(
       downtimeProps({ ...PROVIDER, navRail: navRail({ expanded: { worldDowntime: true } }) }),
       text
     );
     assert.deepEqual(markerKinds(open.parent), ['premium']);
-    assert.equal(open.parent.ariaLabel, 'Downtime');
+    assert.equal(
+      open.parent.ariaLabelledBy,
+      `${open.parent.labelId} ${open.parent.markers[0].domId}`
+    );
 
     const collapsedRail = managerDowntimeNavGroup(
       downtimeProps({

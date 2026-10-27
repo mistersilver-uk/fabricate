@@ -44,6 +44,7 @@
     {...item.hooks}
     title={item.title ?? item.disabledReason}
     aria-label={item.ariaLabel}
+    aria-labelledby={item.ariaLabelledBy}
     aria-current={item.current}
     aria-controls={item.controls}
     aria-expanded={expanded}
@@ -81,6 +82,7 @@
         <!-- The chip is muted, never removed, once a companion holds the surface (issue 1185). -->
         <span
           class={`manager-nav-premium ${marker.installed ? 'is-installed' : ''}`}
+          id={marker.domId}
           {...marker.hooks}>{marker.text}</span
         >
       {/if}

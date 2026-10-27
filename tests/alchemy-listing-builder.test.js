@@ -274,6 +274,39 @@ test('an essence-type ingredient option projects the essence NAME + AMOUNT + ico
   assert.equal(water.icon, 'fas fa-droplet');
 });
 
+test('an essence-type ingredient option maps a stored Sharp icon onto a face Foundry 14 draws', () => {
+  const venom = {
+    id: 'venom',
+    name: 'Venom',
+    img: null,
+    description: '',
+    enabled: true,
+    craftingSystemId: 'sys-a',
+    ingredientSets: [
+      {
+        id: 'v-set',
+        ingredientGroups: [
+          {
+            id: 'v-g',
+            options: [{ match: { type: 'essence', essenceId: 'toxic-id', amount: 2 }, componentId: null, quantity: 1 }],
+          },
+        ],
+        essences: {},
+        resultGroupId: 'v-rg',
+      },
+    ],
+    resultGroups: [{ id: 'v-rg', name: 'Venom result', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
+  };
+  const system = makeSystem('sys-a', 'Herbalism', [venom], COMPONENTS);
+  system.essenceDefinitions = [{ id: 'toxic-id', name: 'Toxic', icon: 'fasl fa-skull' }];
+  const listing = build([{ system, recipes: [venom] }], {
+    craftingActor: makeActor('pc', { learned: { venom: {} } }),
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  assert.equal(listing.recipes[0].signatureSummary[0].groups[0].options[0].icon, 'fal fa-skull');
+});
+
 test('an essence option with a missing definition falls back to the raw id as the name', () => {
   const recipe = {
     id: 'orphan',
@@ -654,6 +687,22 @@ test('_projectOwnedComponents omits essences when the system has essences disabl
 
   const ember = listing.components.find((c) => c.componentId === 'emberroot');
   assert.deepEqual(ember.essences, [], 'essences are omitted when the system disables essences');
+});
+
+test('_projectOwnedComponents maps a stored Sharp essence icon onto a face Foundry 14 draws', () => {
+  const emberEss = { ...component('emberroot', 'Emberroot'), essences: { fire: 2 } };
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1 }, 'emberroot', 1);
+  const system = {
+    ...makeSystem('sys-a', 'Herbalism', [vigor], [emberEss]),
+    features: { essences: true },
+    essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fasr fa-fire' }],
+  };
+  const listing = build([{ system, recipes: [vigor] }], {
+    craftingActor: makeActor('pc', { learned: { vigor: {} }, owned: { Emberroot: 3 } }),
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  assert.equal(listing.components[0].essences[0].icon, 'far fa-fire');
 });
 
 // Reserved failure-group leak invariant + checkMode projection (issue 554)

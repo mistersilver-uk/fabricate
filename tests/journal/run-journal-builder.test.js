@@ -2486,6 +2486,18 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   assert.equal(runAttentionPresentation(picked).kind, 'start', 'and now it says so on the row');
 });
 
+test('a stored Sharp essence icon reaches the journal on a face Foundry 14 draws', () => {
+  const carrier = { id: 'coal', uuid: 'Actor.actor-1.Item.coal', name: 'Coal', system: { quantity: 3 } };
+  const system = { ...SYSTEM, essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fass fa-fire' }] };
+  const run = untimedStage([essenceSet()], { selectionPlan: { selectedIngredientSetId: 'ess' } },
+    { actor: { ...ACTOR, isOwner: true, items: [carrier] },
+      dependencies: { system, resolveItemEssences: () => ({ fire: 1 }) } });
+  const availability = run.currentStep.selectionAvailability;
+  assert.equal(availability.choices[0].options[0].icon, 'fas fa-fire', 'the ingredient option');
+  assert.equal(availability.requirements[0].option.icon, 'fas fa-fire', 'the requirement option');
+  assert.equal(availability.essencePool.requirements[0].icon, 'fas fa-fire', 'the pool requirement');
+});
+
 test('an untimed stage keeps its choices open for its whole life and says so', () => {
   const carrier = { id: 'coal', uuid: 'Actor.actor-1.Item.coal', name: 'Coal', system: { quantity: 3 } };
   const run = untimedStage([essenceSet()], { selectionPlan: { selectedIngredientSetId: 'ess',

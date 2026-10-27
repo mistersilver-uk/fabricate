@@ -20,6 +20,7 @@
   // The add-new essence offer reaches a row as its catalogue's `offered` flag. `essenceOptions`
   // itself stays unfiltered, because `hasEssences` gates the whole essence match type on it.
   import { visibleEssenceOptions } from '../../model/essenceValidation.js';
+  import { normalizeEssenceIcon } from '../util/essenceIcons.js';
   import { currencyUnitIcon, currencyUnitLabel } from '../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
   import KindAdder from './KindAdder.svelte';
@@ -113,7 +114,7 @@
       essence: (essenceOptions || []).map((essence) => ({
         id: essence.id,
         label: essence.name,
-        icon: essence.icon || 'fas fa-flask-vial',
+        icon: normalizeEssenceIcon(essence.icon || 'fas fa-flask-vial'),
         offered: offered.has(essence.id),
       })),
       currency: (currencyUnits || []).map((unit) => ({

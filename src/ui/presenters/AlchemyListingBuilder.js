@@ -46,6 +46,7 @@ import {
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
+import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;
@@ -581,7 +582,7 @@ export class AlchemyListingBuilder {
       essenceId: stringOrNull(essenceId),
       name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
       img: null,
-      icon: stringOrNull(def?.icon),
+      icon: essenceIconOrNull(def?.icon),
       colorToken: stringOrNull(def?.colorToken),
       quantity: Math.max(1, Number(match.amount) || 1),
     };
@@ -645,7 +646,7 @@ export class AlchemyListingBuilder {
       out.push({
         id: stringOrNull(essenceId),
         name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
-        icon: stringOrNull(def?.icon),
+        icon: essenceIconOrNull(def?.icon),
         colorToken: stringOrNull(def?.colorToken),
         quantity: qty,
       });

@@ -690,6 +690,20 @@ describe('InventoryListingBuilder — multi-system + essences', () => {
     ]);
   });
 
+  it('maps a stored Sharp essence icon onto a face Foundry 14 draws, on the pip and the source row', () => {
+    const { builder } = makeBuilder({
+      systems: [
+        makeSystem({
+          essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fass fa-fire' }],
+        }),
+      ],
+    });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.equal(rowByComponent(listing, 'c1').essences[0].icon, 'fas fa-fire');
+    const fire = listing.rows.find((r) => r.isEssenceSource && r.componentId === 'fire');
+    assert.equal(fire.icon, 'fas fa-fire');
+  });
+
   it('carries the essence definition colorToken on a component’s essence pip too (issue 1036)', () => {
     // The same colour the synthetic essence row carries (see the sibling test above it),
     // folded onto the CARRYING COMPONENT's own `essences[]` pip, so the player inventory

@@ -11,6 +11,7 @@ import {
 } from '../../systems/currencyProfile.js';
 import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
 import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
+import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
 import {
   buildEntityBrowserModel,
@@ -382,7 +383,7 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
           type: 'essence',
           kind: 'essence',
           name: findById(essences, essenceId)?.name || '',
-          icon: findById(essences, essenceId)?.icon || 'fas fa-flask-vial',
+          icon: essenceIconOrNull(findById(essences, essenceId)?.icon) || 'fas fa-flask-vial',
           img: '',
           quantity: Number(amount) || 0,
         });
@@ -405,7 +406,7 @@ function describeRequirementOption(option, components, essences, currencyUnits) 
       essenceId: match.essenceId || '',
       name: essence?.name || '',
       amount: Number(match.amount) || 0,
-      icon: essence?.icon || 'fas fa-flask-vial',
+      icon: essenceIconOrNull(essence?.icon) || 'fas fa-flask-vial',
       img: '',
       quantity,
     };

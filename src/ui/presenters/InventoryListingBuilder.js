@@ -95,9 +95,9 @@ import {
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
 import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourceUuid.js';
-// Single-sourced with the GM UI so the builder and the recipe-item editor share one
-// item-bag literal (the "treat as no image" sentinel).
+// Single-sourced with the GM UI: the item-bag literal that means "treat as no image".
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
+import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
 import { salvageCheckTarget, salvageDisplayDc, withSalvageBands } from './salvageCheckNeed.js';
 
@@ -1186,7 +1186,7 @@ export class InventoryListingBuilder {
         systemName,
         name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
         img: null,
-        icon: stringOrNull(def?.icon),
+        icon: essenceIconOrNull(def?.icon),
         // The essence's chosen palette token (a bare `--fab-tag-*` key, or null when unset)
         // so the player tile can tint its glyph to the essence colour, mirroring the
         // manager Medallion. Unset stays null → the card falls back to the accent.
@@ -2085,7 +2085,7 @@ export class InventoryListingBuilder {
       out.push({
         id: stringOrNull(essenceId),
         name: stringOrEmpty(def.name) || stringOrEmpty(essenceId),
-        icon: stringOrNull(def.icon),
+        icon: essenceIconOrNull(def.icon),
         // Issue 1036: the essence's own colour token, shaped exactly like the synthetic
         // essence-source row's `colorToken`, so a carrying component's pip tints to it
         // instead of the fixed `--fab-text` glyph.

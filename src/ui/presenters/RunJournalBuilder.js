@@ -44,6 +44,7 @@ import {
 import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.js';
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
+import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
 import {
   activeModeLabelKey,
@@ -105,7 +106,6 @@ function gatheringActualAwards(run) {
       ? null
       : run.createdResults;
   }
-  if (run.checkResult?.blind === true) return null;
   const effects = normalizeList(run.executionJournal?.effects).filter(
     (effect) => effect?.effectId === 'results' && effect?.kind === 'createGatheredResults'
   );
@@ -1677,7 +1677,7 @@ export class RunJournalBuilder {
         stringOrNull(component?.img) ||
         (kind === 'item' ? stringOrNull(candidates[0]?.img) : null) ||
         (kind === 'tag' ? stringOrNull(candidates[0]?.img) : null),
-      icon: stringOrNull(definition?.icon),
+      icon: essenceIconOrNull(definition?.icon),
       colorToken: stringOrNull(definition?.colorToken),
       need: ingredientNeed(option),
       available: available === true,
@@ -1719,7 +1719,7 @@ export class RunJournalBuilder {
           groupId: stringOrNull(requirement?.groupId),
           essenceId: stringOrNull(requirement?.essenceId),
           name: stringOrEmpty(definition?.name) || stringOrEmpty(requirement?.essenceId),
-          icon: stringOrNull(definition?.icon),
+          icon: essenceIconOrNull(definition?.icon),
           colorToken: stringOrNull(definition?.colorToken),
           need: numberOrNull(requirement?.need) ?? 0,
           delivered: numberOrNull(requirement?.delivered) ?? 0,
