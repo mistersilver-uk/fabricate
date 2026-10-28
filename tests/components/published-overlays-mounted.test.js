@@ -166,7 +166,11 @@ function trackListeners(windows = []) {
     };
   }
   return {
-    still: () => bound.map(({ type }) => type).sort((a, b) => a.localeCompare(b)),
+    still: (owner) =>
+      bound
+        .filter((entry) => owner === undefined || entry.on === owner)
+        .map(({ type }) => type)
+        .sort((a, b) => a.localeCompare(b)),
     stop() {
       for (const [index, owner] of owners.entries()) {
         const [add, remove] = originals[index];
@@ -581,14 +585,13 @@ describe('in a second window', () => {
     try {
       const { handle, panel } = openProbe(detachedTarget());
       const container = containerOf(panel);
-      assert.ok(
-        ['resize', 'scroll'].every((type) => listeners.still().includes(type)),
-        'the popover is bound while open'
-      );
+      assert.ok(listeners.still(second).includes('resize'), 'its window hears the resize');
+      assert.ok(listeners.still(second.document).includes('scroll'), 'its document the scroll');
+      assert.ok(!listeners.still(document.defaultView).includes('resize'), 'this window none');
       handle.destroy();
       await settle();
       assert.ok(!panel.isConnected && !container.isConnected, 'no panel and no container');
-      assert.deepEqual(listeners.still(), [], 'no listener in either window');
+      assert.deepEqual(listeners.still(), [], 'no listener in any window or document');
     } finally {
       listeners.stop();
     }
