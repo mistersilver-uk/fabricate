@@ -1469,6 +1469,28 @@ describe('JournalView mounted behavior', () => {
       assert.ok(document.activeElement === kindTrigger(target), 'focus moves on from the trigger');
     });
 
+    it('closes the panel onto its trigger once "Show all run types" is pressed from the keyboard', async () => {
+      const { store, target } = await mountStore();
+      await showOnly(target, ['salvage']);
+      openKinds(target);
+      kindTrigger(target).focus();
+      kindTrigger(target).dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      );
+      flushSync();
+      const showAll = document.activeElement;
+      assert.ok(showAll.matches('[data-journal-kind-show-all]'), 'focus is on the footer action');
+      showAll.click();
+      flushSync();
+      await settle();
+      assert.deepEqual([...store.kindFilter], RUN_KINDS, 'every kind shows again');
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.ok(
+        document.activeElement === kindTrigger(target),
+        'focus is back on the trigger, not on the disabled action or the page'
+      );
+    });
+
     it('draws the empty state for both lists when no kind is shown', async () => {
       const { target } = await mountStore();
       await showOnly(target, []);
