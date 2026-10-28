@@ -249,7 +249,7 @@
   .manager-party-member-name {
     overflow: hidden;
     color: var(--fab-text);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 12px;
     font-weight: 600;
     text-overflow: ellipsis;
@@ -260,7 +260,7 @@
     margin-top: 1px;
     overflow: hidden;
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 9.5px;
     font-weight: 400;
     text-overflow: ellipsis;
@@ -306,7 +306,7 @@
 
   .manager-party-move-eyebrow {
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -342,7 +342,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--fab-text);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11px;
     font-weight: 500;
     text-overflow: ellipsis;
@@ -352,14 +352,14 @@
   .manager-party-move-target-meta {
     flex: 0 0 auto;
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 9.5px;
     font-weight: 400;
   }
 
   .manager-party-move-none {
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 400;
   }
@@ -370,7 +370,7 @@
     border: 0;
     color: var(--fab-text-subtle);
     background: none;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 600;
   }

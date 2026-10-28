@@ -168,7 +168,7 @@
   }
 
   .alchemy-inventory-title {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 15px;
     font-weight: 600;
     color: var(--fab-text);
