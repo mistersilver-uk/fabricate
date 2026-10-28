@@ -29,6 +29,7 @@ export function journalLifecycleCases() {
     'waiting-auto-eligible',
     'waiting-auto-completes',
     'waiting-open-choice',
+    'open-choice-focused',
     'stage-not-started',
     'awaiting-choice',
     'stage-consumed',
@@ -101,7 +102,10 @@ export function journalLifecycleCases() {
     'history-settling',
   ];
   // A state with no fixture of its own walks another state's world.
-  const fixtureStates = { 'kind-filter-open': 'kind-toggles' };
+  const fixtureStates = {
+    'kind-filter-open': 'kind-toggles',
+    'open-choice-focused': 'waiting-open-choice',
+  };
   const fixtureOf = (state) => fixtureStates[state] ?? state.replace(/-finished$/, '');
   // The run-type filter's closed and open faces claim it, rather than every lifecycle frame.
   const kindFilterSources = [
@@ -188,6 +192,11 @@ export function journalLifecycleCases() {
     // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
+    // Issue 2345: a key on the pressed tile hands it keyboard focus without toggling it.
+    'open-choice-focused': [
+      { selector: '[data-slot-row] button.fab-slot-tile' },
+      { selector: '[data-slot-row] button.fab-slot-tile', press: 'ArrowRight' },
+    ],
     // Started and matured, which an enabled roll requires, and therefore locked: no open tile is left to walk.
     'check-route': [],
     'material-shortage': [
@@ -330,6 +339,13 @@ export function journalLifecycleCases() {
       has(
         `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt} + [data-run-status="waiting"]`,
         `${detail} [data-run-completion-switch] input[value="worldTime"]:checked`
+      ),
+    // The pressed tile, once a key has put focus on it: only keyboard focus draws the second ring.
+    'open-choice-focused':
+      detail +
+      has(
+        '[data-slot-row] button.fab-slot-tile[aria-pressed="true"]:focus',
+        '[data-choice-id]:not(:disabled)'
       ),
     // An open requirement rail belongs to an unbegun stage (D-028), which offers the begin decision instead.
     'waiting-open-choice':

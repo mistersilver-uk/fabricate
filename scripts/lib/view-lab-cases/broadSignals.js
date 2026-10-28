@@ -58,6 +58,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   'src/ui/svelte/components/SlotTile.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
+    'fabricate-journal-lifecycle-open-choice-focused',
     'fabricate-journal-lifecycle-material-shortage',
     'player-crafting-essence-pool-shared',
     'player-crafting-essence-shopping',

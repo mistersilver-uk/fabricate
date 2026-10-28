@@ -1853,6 +1853,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
         if (Object.hasOwn(action, 'fill')) {
           control.value = action.fill;
           control.dispatchEvent(new window.Event('input', { bubbles: true }));
+        } else if (Object.hasOwn(action, 'press')) {
+          control.focus();
+          control.dispatchEvent(
+            new globalThis.KeyboardEvent('keydown', { key: action.press, bubbles: true })
+          );
         } else control.click();
         await settleAction();
         if (state === 'command-timeout') {

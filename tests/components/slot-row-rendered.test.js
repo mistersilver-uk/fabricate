@@ -201,6 +201,59 @@ describe('SlotTile faces, rendered (issue 2257 D16)', () => {
     }
   });
 
+  // Issue 2345: the module ring repeats the pressed outline, so a keyed pressed tile adds a second one.
+  describe('a pressed tile under keyboard focus', () => {
+    const PROPERTIES = ['content', 'top', 'left', 'border-top-width', 'border-top-style'];
+    const ring = (id) =>
+      tab.evaluate(
+        ([at, names]) => {
+          const style = getComputedStyle(document.querySelector(at), '::after');
+          return names.map((name) => style.getPropertyValue(name));
+        },
+        [tile(id), PROPERTIES]
+      );
+    const keyFocus = async (id) => {
+      await tab.keyboard.press('Tab');
+      const focused = await tab.evaluate((at) => {
+        const button = document.querySelector(at);
+        button.focus();
+        return button.matches(':focus-visible');
+      }, tile(id));
+      assert.ok(focused, `${id}'s tile holds keyboard focus`);
+    };
+    const release = () => tab.evaluate(() => document.activeElement?.blur());
+
+    it('draws a second accent ring beyond the pressed outline, unlike the unfocused tile', async () => {
+      await release();
+      const resting = await ring('binder');
+      await keyFocus('binder');
+      const focused = await ring('binder');
+      assert.notDeepEqual(focused, resting, 'a focused pressed tile differs from an unfocused one');
+      assert.deepEqual(focused, ['""', '-8px', '-8px', '2px', 'solid']);
+      await release();
+    });
+
+    it('insets the ring one more pixel on the open face, whose dashed border is 1px', async () => {
+      await tab.evaluate(
+        (at) => document.querySelector(at).classList.add('is-selected'),
+        tile('solvent')
+      );
+      await keyFocus('solvent');
+      assert.deepEqual((await ring('solvent')).slice(1, 3), ['-9px', '-9px']);
+      await tab.evaluate(
+        (at) => document.querySelector(at).classList.remove('is-selected'),
+        tile('solvent')
+      );
+      await release();
+    });
+
+    it('leaves an unpressed tile on the module ring alone', async () => {
+      await keyFocus('flux');
+      assert.equal((await ring('flux'))[0], 'none');
+      await release();
+    });
+  });
+
   it('names the row with the shared Kicker over a 1.5 hint line', async () => {
     const style = await computed('.fab-slot-row-heading .fab-kicker', ['font-size', 'color']);
     assert.deepEqual(style, {

@@ -115,6 +115,21 @@
     outline-offset: 2px;
   }
 
+  /* The module focus ring repeats the pressed outline's width and offset, so a keyed pressed tile
+     adds a second accent ring 4px outside it; the open face's 1px border shifts the inset to match. */
+  .fab-slot-tile.is-selected:focus-visible::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border: 2px solid var(--fab-accent);
+    border-radius: 19px;
+    pointer-events: none;
+  }
+
+  .fab-slot-tile.is-open.is-selected:focus-visible::after {
+    inset: -9px;
+  }
+
   .fab-slot-tick {
     position: absolute;
     right: -5px;
