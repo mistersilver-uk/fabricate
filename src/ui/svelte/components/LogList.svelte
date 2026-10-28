@@ -130,9 +130,11 @@
     border-color: var(--fab-danger-border);
   }
 
-  /* A hovered failed entry stays on its danger ground, raised toward the neutral hover ground. */
+  /* A hovered failed entry layers the neutral hover ground over its danger ground, so it rises by the
+     same step and keeps its hue. */
   .fab-log-list-entry.is-danger.is-open:not(.is-selected):hover {
-    background: color-mix(in srgb, var(--fab-danger-soft) 85%, var(--fab-surface-raised));
+    background:
+      linear-gradient(var(--fab-surface-raised), var(--fab-surface-raised)), var(--fab-danger-soft);
   }
 
   .fab-log-list-entry.is-selected {
