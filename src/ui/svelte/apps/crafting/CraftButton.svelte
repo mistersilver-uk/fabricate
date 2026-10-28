@@ -2,7 +2,8 @@
 <!--
   The run summary's craft action: "Craft another", or "Craft next step" on a progressive run. It
   is a ghost, because the pane's one primary is the recipe header's. A blocked craft names its
-  reason in the title and the accessible name, and `busy` reflects store.craftInFlight.
+  reason in the title and the accessible name. `busy` reflects store.craftInFlight and is the
+  Button's busy state, never `disabled`, so the pressed control keeps focus and ignores a second press.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -18,6 +19,7 @@
   } = $props();
 
   const blocked = $derived(disabled || busy);
+  const refused = $derived(disabled && !busy);
   const accessibleLabel = $derived(
     busy
       ? localize('FABRICATE.App.Crafting.Button.Crafting')
@@ -32,7 +34,8 @@
   fullWidth
   data-crafting-craft=""
   data-crafting-craft-disabled={blocked ? 'true' : 'false'}
-  disabled={blocked}
+  disabled={refused}
+  {busy}
   title={accessibleLabel}
   aria-label={accessibleLabel}
   onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}

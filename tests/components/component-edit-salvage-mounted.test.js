@@ -975,7 +975,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
   });
 
   // Issue 1036, criteria 2 and 18. The editor's grid is both the add-new offer and the
-  // editing surface for what is already carried, and `buildComponentEditorUpdates` rebuilds
+  // editing surface for what is already carried, and `essenceMapFromRows` rebuilds
   // `updates.essences` SOLELY from these rows — so the offer narrows and the DRAFT does not.
   const MIXED_ESSENCES = [
     { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false, quantity: 0 },

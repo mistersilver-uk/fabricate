@@ -36,7 +36,7 @@ function toEssenceQuantityMap(currentEssences) {
 // why `enabled` is here (issue 1036) — without it every option row reads as enabled, and
 // `selectableEssenceOptions` (src/ui/model/essenceValidation.js) can withhold NOTHING no
 // matter how correct the persisted field, the normalizer and the store projection are.
-// The rows stay UNFILTERED: `buildComponentEditorUpdates` rebuilds `updates.essences`
+// The rows stay UNFILTERED: `essenceMapFromRows` rebuilds `updates.essences`
 // SOLELY from these rows, so dropping a disabled essence here would destroy its authored
 // quantity on the very next component save. Filtering belongs to the offer, never the data.
 export function buildEditableEssenceOptions(essenceDefinitions = [], currentEssences = {}) {
@@ -123,28 +123,14 @@ export function buildComponentEditorState(system, item) {
   };
 }
 
-export function buildComponentEditorUpdates(draft = {}) {
-  const updates = {};
-
-  if (draft.showTags) {
-    updates.tags = Array.isArray(draft.tagOptions)
-      ? draft.tagOptions.filter(opt => opt?.checked).map(opt => opt.tag)
-      : [];
+// The essence map a set of rows persists: the carried entries first, then every row with a positive
+// clamped quantity on top. A rendered row never shares an id with a carried one, because
+// `carriedComponentEssences` excludes every offered id, so the order is documentation, not precedence.
+export function essenceMapFromRows(rows, carried = {}) {
+  const essences = { ...carried };
+  for (const option of Array.isArray(rows) ? rows : []) {
+    const quantity = clampComponentEssenceQuantity(option?.quantity);
+    if (quantity > 0 && option?.id) essences[option.id] = quantity;
   }
-
-  if (draft.showEssences) {
-    // THE CARRIED ENTRIES FIRST, then the rows on top (issue 1371 r20-store3). A rendered row
-    // never shares an id with a carried one — `carriedComponentEssences` excludes every offered id
-    // — so the order is documentation rather than precedence.
-    const essences = { ...draft.carriedEssences };
-    for (const option of Array.isArray(draft.essenceOptions) ? draft.essenceOptions : []) {
-      const quantity = clampComponentEssenceQuantity(option?.quantity);
-      if (quantity > 0 && option?.id) {
-        essences[option.id] = quantity;
-      }
-    }
-    updates.essences = essences;
-  }
-
-  return updates;
+  return essences;
 }

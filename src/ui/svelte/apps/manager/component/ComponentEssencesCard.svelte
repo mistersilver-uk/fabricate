@@ -13,7 +13,7 @@
   import EssenceQuantityCard from '../components/EssenceQuantityCard.svelte';
   import { clampComponentEssenceQuantity } from '../../../util/componentEditor.js';
   // The add-new offer projection (issue 1036): only what this grid RENDERS is narrowed. The draft
-  // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
+  // stays unfiltered — it is the sole source `essenceMapFromRows` rebuilds essences from.
   import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
 
   // The card's heading names it, so a validation landing here speaks its destination.

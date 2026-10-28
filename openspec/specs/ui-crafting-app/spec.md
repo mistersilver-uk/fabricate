@@ -1058,6 +1058,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   affordance that returns the rail to the Shopping List without losing the recorded
   outcome.
 - The Run Summary's craft action — "Craft another", or "Craft next step" on a progressive run — is a ghost button, so the recipe's identity header keeps the pane's one primary.
+  A craft in flight leaves it busy, like the header primary: it keeps focus, announces `aria-busy`, reads "Crafting…" and ignores a second press, and is never `disabled`.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
 - The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.

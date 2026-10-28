@@ -243,8 +243,8 @@ export function componentSourceBroken(entry, worldItems) {
 
 /**
  * The catalogue's SYSTEM-RELATIVE membership filter, as a lane descriptor. `proto:578`-`586`'s
- * four options are the UNION of the frame's two closed vocabularies, so they are a lane FILTER
- * rather than a third vocabulary. The system-relative pair is withheld with no system in scope.
+ * four options extend the frame's closed world vocabulary with a system-relative pair, so they
+ * are a lane FILTER rather than a second vocabulary. The system-relative pair is withheld with no system in scope.
  */
 export function componentMembershipScopeFilter({ systemId, systemName }, phrase) {
   const addressed = String(systemId ?? '').trim();

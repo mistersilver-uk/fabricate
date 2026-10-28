@@ -3,7 +3,7 @@
   The ONE list-plus-inspector composition behind every scoped-entity list (issue 1380, epic 1357).
   Issue 1050 shipped the SonarCloud duplication gate red at 5.3% with 93 of 98 duplicated lines
   inside one component, and `.svelte` IS duplication-analysed. So the composition is built once
-  here and configured per scope; `EntityCatalogueShell` is its caller and may not inline it.
+  here and configured by its caller; `EntityCatalogueShell` is its caller and may not inline it.
 -->
 <script>
   import { paginateRows } from '../../../../model/browserPagination.js';
@@ -17,7 +17,6 @@
     createScopedEntityListModel,
     defaultScopedSearchText,
     scopedEntryName,
-    SYSTEM_MEMBERSHIP_FILTERS,
     WORLD_MEMBERSHIP_FILTERS,
   } from '../../../../model/scopedEntityListModel.js';
   import Button from '../../../components/Button.svelte';
@@ -41,7 +40,6 @@
   let {
     scope = null,
     systems = [],
-    systemId = '',
     title = '',
     subtitle = '',
     icon = 'fas fa-cubes-stacked',
@@ -178,10 +176,6 @@
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
   const roster = $derived(Array.isArray(systems) ? systems : []);
 
-  const membershipOptions = $derived(
-    systemId ? SYSTEM_MEMBERSHIP_FILTERS : WORLD_MEMBERSHIP_FILTERS
-  );
-
   // The selection band's population, resolved once.
   const shownScope = $derived(selectAllScope === 'shown');
 
@@ -207,7 +201,6 @@
       searchOf,
       query,
       membership,
-      systemId,
       filters: laneFilters,
       filterValues,
       sort,
@@ -377,14 +370,10 @@
    * The context every snippet receives. IT CARRIES THE WHOLE PROJECTION, on purpose.
    */
   function rowContext(entry) {
-    const systemRow = entry ? (projected.systemRows.get(entry.id) ?? null) : null;
     return {
       scope,
       systems: roster,
-      systemId,
       selected: entry ? selectedIds.has(entry.id) : false,
-      member: systemRow?.member === true,
-      systemRow,
       clearSelection,
     };
   }
@@ -422,16 +411,14 @@
     all: text('FABRICATE.Admin.Manager.Scoped.List.MembershipAll', 'All'),
     member: text('FABRICATE.Admin.Manager.Scoped.List.MembershipMember', 'In a system'),
     unused: text('FABRICATE.Admin.Manager.Scoped.List.MembershipUnused', 'Unused'),
-    in: text('FABRICATE.Admin.Manager.Scoped.List.MembershipIn', 'In this system'),
-    out: text('FABRICATE.Admin.Manager.Scoped.List.MembershipOut', 'Not here'),
   });
 
   /** The membership filter's segments, each carrying the number of rows it would show. */
   const membershipSegments = $derived(
-    membershipOptions.map((option) => ({
+    WORLD_MEMBERSHIP_FILTERS.map((option) => ({
       value: option,
       label: membershipLabels[option],
-      count: model.project({ entries, searchOf, membership: option, systemId }).rows.length,
+      count: model.project({ entries, searchOf, membership: option }).rows.length,
     }))
   );
 
@@ -975,7 +962,7 @@
   }
 
   /* 340px AND NO COLUMN GAP, matching the shared aside this column stands in for, so a GM sees ONE
-     inspector across both scopes rather than learning a second one per screen. */
+     inspector across every catalogue rather than learning a second one per screen. */
   .manager-scoped-list-layout.has-inspector {
     grid-template-columns: minmax(0, 1fr) 340px;
     column-gap: 0;

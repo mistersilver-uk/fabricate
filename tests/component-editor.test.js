@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildComponentEditorState,
-  buildComponentEditorUpdates,
   clampComponentEssenceQuantity,
+  essenceMapFromRows,
   getComponentEditorHintKey,
   getDefaultEssenceIcon
 } from '../src/ui/svelte/util/componentEditor.js';
@@ -86,7 +86,7 @@ test('1036/2: buildEditableEssenceOptions carries a FALSE enabled onto its optio
   // And the row is still THERE, carrying its authored quantity: the offer withholds a disabled
   // essence, the DATA never does.
   assert.equal(state.essenceOptions.length, 2, 'the option list is unfiltered');
-  assert.deepEqual(buildComponentEditorUpdates(state).essences, { 'ess-fire': 3 });
+  assert.deepEqual(essenceMapFromRows(state.essenceOptions), { 'ess-fire': 3 });
 });
 
 test('buildComponentEditorState sorts essence options alphabetically by display name', () => {
@@ -161,23 +161,14 @@ test('buildComponentEditorState keeps tags editable when the essences feature is
   assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.HintTagsOnly');
 });
 
-test('buildComponentEditorUpdates clamps quantities and omits disabled features', () => {
-  const updates = buildComponentEditorUpdates({
-    showTags: false,
-    showEssences: true,
-    tagOptions: [{ tag: 'fire', checked: true }],
-    essenceOptions: [
-      { id: 'ess-fire', quantity: '3.8' },
-      { id: 'ess-water', quantity: -1 },
-      { id: 'ess-air', quantity: 0 }
-    ]
-  });
+test('essenceMapFromRows clamps quantities and omits non-positive rows', () => {
+  const essences = essenceMapFromRows([
+    { id: 'ess-fire', quantity: '3.8' },
+    { id: 'ess-water', quantity: -1 },
+    { id: 'ess-air', quantity: 0 }
+  ]);
 
-  assert.deepEqual(updates, {
-    essences: {
-      'ess-fire': 3
-    }
-  });
+  assert.deepEqual(essences, { 'ess-fire': 3 });
 });
 
 test('buildComponentEditorState reads quantities from the item-card array essence shape', () => {
@@ -228,12 +219,9 @@ test('item-card essences round-trip through open then save without loss', () => 
   });
 
   const state = buildComponentEditorState(system, itemCard);
-  const updates = buildComponentEditorUpdates({
-    showEssences: true,
-    essenceOptions: state.essenceOptions
-  });
+  const essences = essenceMapFromRows(state.essenceOptions);
 
-  assert.deepEqual(updates.essences, {
+  assert.deepEqual(essences, {
     'ess-fire': 4,
     'ess-water': 2
   });

@@ -2,16 +2,11 @@
  * Filter and sort for the shared scoped-entity list shells (issue 1380, epic 1357): the pure half
  * answering which projected entries a list shows and in what order, reading no Foundry global.
  * Selection reduction stays in `bulkSelectionModel.js` and page arithmetic in
- * `browserPagination.js`. Its real job is two memos — the per-entry search index and the POSITIONAL
- * system-row resolution, verified per read so a projection that stopped emitting a uniform row
- * order degrades to a scan rather than a wrong answer. Membership vocabularies are closed per scope.
+ * `browserPagination.js`. Its real job is the per-entry search index memo.
  */
 
 /** The membership filter a WORLD catalogue offers. */
 export const WORLD_MEMBERSHIP_FILTERS = Object.freeze(['all', 'member', 'unused']);
-
-/** The membership filter a SYSTEM-SCOPE rules list offers. */
-export const SYSTEM_MEMBERSHIP_FILTERS = Object.freeze(['all', 'in', 'out']);
 
 /** The sorts every scoped list offers before a lane adds its own. */
 export const SCOPED_LIST_SORTS = Object.freeze([
@@ -39,20 +34,6 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-/** Resolve one entry's row for `systemId`, positionally where the roster order allows it. */
-function rowAt(entry, index, systemId) {
-  const rows = asArray(entry?.systems);
-  // ONE indexed read on the happy path.
-  const candidate = index >= 0 ? rows[index] : null;
-  if (candidate && candidate.systemId === systemId) return candidate;
-  // The projection emits a uniform row order, so this is the degraded path rather than the normal
-  // one.
-  for (const row of rows) {
-    if (row?.systemId === systemId) return row;
-  }
-  return null;
-}
-
 /** Does this entry pass the world-scope membership filter? */
 function passesWorldMembership(entry, membership) {
   const count = Number(entry?.membershipCount) || 0;
@@ -61,17 +42,9 @@ function passesWorldMembership(entry, membership) {
   return true;
 }
 
-/** Does this entry pass the system-scope membership filter? */
-function passesSystemMembership(systemRow, membership) {
-  if (membership === 'in') return systemRow?.member === true;
-  if (membership === 'out') return systemRow?.member !== true;
-  return true;
-}
-
-/** A list model instance, owning the two memos for one mounted list. */
+/** A list model instance, owning the search-index memo for one mounted list. */
 export function createScopedEntityListModel() {
   let searchCache = null;
-  let systemRowCache = null;
 
   /** The search string and the sort key for every entry, one `searchOf` call each. */
   function indexOf(entries, searchOf) {
@@ -89,27 +62,6 @@ export function createScopedEntityListModel() {
     return searchCache;
   }
 
-  /** Every entry's row for `systemId`, or an empty map in world scope. */
-  function systemRowsOf(entries, systemId) {
-    if (
-      systemRowCache &&
-      systemRowCache.entries === entries &&
-      systemRowCache.systemId === systemId
-    ) {
-      return systemRowCache.rows;
-    }
-    const rows = new Map();
-    if (systemId) {
-      // ONE probe over ONE entry's rows decides the position; every other entry is a single indexed
-      // read.
-      const probe = asArray(entries[0]?.systems);
-      const index = probe.findIndex((row) => row?.systemId === systemId);
-      for (const entry of entries) rows.set(entry.id, rowAt(entry, index, systemId));
-    }
-    systemRowCache = { entries, systemId, rows };
-    return rows;
-  }
-
   return {
     /** The rows this list shows, filtered and sorted. */
     project({
@@ -117,7 +69,6 @@ export function createScopedEntityListModel() {
       searchOf = defaultScopedSearchText,
       query = '',
       membership = 'all',
-      systemId = '',
       filters = [],
       filterValues = {},
       sort = 'name-asc',
@@ -125,7 +76,6 @@ export function createScopedEntityListModel() {
     } = {}) {
       const all = asArray(entries);
       const index = indexOf(all, searchOf);
-      const systemRows = systemRowsOf(all, systemId);
       const needle = String(query ?? '')
         .trim()
         .toLowerCase();
@@ -136,13 +86,9 @@ export function createScopedEntityListModel() {
 
       const rows = all.filter((entry) => {
         if (needle && !(index.text.get(entry.id) ?? '').includes(needle)) return false;
-        const systemRow = systemRows.get(entry.id) ?? null;
-        if (systemId) {
-          if (!passesSystemMembership(systemRow, membership)) return false;
-        } else if (!passesWorldMembership(entry, membership)) return false;
+        if (!passesWorldMembership(entry, membership)) return false;
         for (const filter of activeFilters) {
-          if (!filter.matches(entry, filterValues[filter.id], { systemId, systemRow }))
-            return false;
+          if (!filter.matches(entry, filterValues[filter.id])) return false;
         }
         return true;
       });
@@ -183,7 +129,7 @@ export function createScopedEntityListModel() {
         }
       }
 
-      return { rows, systemRows, searchText: index.text };
+      return { rows, searchText: index.text };
     },
   };
 }

@@ -278,7 +278,7 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
    **AND ONLY A WORLD ADDRESS IS EVER REPORTED BROKEN.** A `Compendium.…` address is not in the world's Items and never will be, so testing one against that roster would flag every pack-linked component in a module-shipped corpus; a pack address answers `false` rather than being reported as a miss no reader could distinguish from a real one.
    The source pill names WHICH KIND of address the record carries — `Foundry item`, `Compendium`, or `No source item` — and renders on EVERY row rather than on the unlinked one alone, so the shared frame's own presence badge is withheld and one row never carries two answers to one question.
    The row's own exit is a 28px icon control titled `Open catalogue entry`, and the inspector's pinned foot action carries that same verb with its label drawn.
-   **THE TOOLBAR IS TWO ROWS, and its `Membership` filter is a LANE filter relative to the RAIL'S SELECTED SYSTEM** rather than the shells' own membership filter, which is system-relative in a way a world catalogue — passing no system — cannot answer.
+   **THE TOOLBAR IS TWO ROWS, and its `Membership` filter is a LANE filter relative to the RAIL'S SELECTED SYSTEM** rather than the shell's own membership filter, which answers only whether a record is in any system.
    Its options are `Any system`, `Has rules in {system}`, `No rules in {system}` and `In no system at all`, and the two middle ones are WITHHELD entirely where no system is selected rather than offered against an empty referent, on the same rule requirement 8 states for the `Inherit from world` option.
    The other two are answerable with no system at all, so the filter degrades rather than disappearing.
    **THE SOURCE FILTER OFFERS THE REFERENCE'S FOUR OPTIONS IN THE REFERENCE'S OWN WORDS — `Any source`, `World items`, `Compendium`, `Broken link` — AND ONE PREDICATE ANSWERS THE ROW PILL, THE FILTER AND THE SORT** (issue 1371, revision 11).
@@ -480,7 +480,7 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
 3. **A world-defaults `effectSource` picker offers ONLY world-addressable referents** — a world component id or a document UUID — and never a system's own component list.
    This is requirement 7 of `## Scoped entity editor patterns` applied to the one field that carries it.
 4. **The System Essence Rules list filters membership with exactly TWO options**, `In this system` and `All world essences`, each carrying its count.
-   The shared list model offers three for a system-scope list; this screen offers two, because "not in this system" alone is a list a GM can only add from, and "all" already contains it with the members for context.
+   It offers no "not in this system" option, because that alone is a list a GM can only add from, and "all" already contains it with the members for context.
 5. **The System Essence Rules editor renders the shared inherit row over `effectSource` and `macro` and LOCKS the corresponding value card read-only while that section is inherited**, so the editor never presents an edit affordance for a value the system does not own.
    Turning that section's switch off is the one action that unlocks it.
    Each switch is rendered INSIDE the value card it governs, between that card's explanation and its value, because the switch decides whether the value below it is this system's to change and a GM reading a locked value must find the control that unlocks it without leaving the card.
@@ -846,6 +846,8 @@ The world catalogues share ONE list composition, built once and configured per s
 14. **Membership rows come from the projection's joined rows, and the roster prop supplies ONLY `id` and `name`**, with an id fallback.
     The shells read `entries` and never the corpus roster `entities`.
 15. **The snippet parameter lists are part of the contract**, carrying the whole projection so a lane reaches a conditionally present field without adding a shell prop or reaching around the shells.
+    The context a row, inspector or bulk snippet receives after its entry or selection is exactly `scope`, `systems`, `selected` and `clearSelection`.
+    The list frame addresses no single system, so the context carries no system id, member flag or system row.
 16. **The shells render no route hook and no provenance.**
     The page owns the route; `normalizeMembership` discards a `from` key, so recording where a copy came from is a data-model change.
 17. **Generic chrome copy is noun-free.**
