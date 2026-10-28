@@ -29,6 +29,16 @@ export const WHOLE_CORPUS_ID_BASIS = Object.freeze({
   components: true,
 });
 
+/** Each system's component ids by system id, the basis a salvage-keyed prune is checked against. */
+export function componentIdsBySystem(systems) {
+  return new Map(
+    systems.map((system) => [
+      system.id,
+      new Set((system.components || []).map((component) => component.id)), // ratchet-exempt(world-scope): destructive-basis
+    ])
+  );
+}
+
 /**
  * The candidates whose id basis is known-complete, in order (issue 1224, `data-models/spec.md`
  * § Valid Id Basis). Pure, and it omits rather than throws, since `runStartupMaintenance` catches a

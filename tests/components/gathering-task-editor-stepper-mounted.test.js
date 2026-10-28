@@ -1242,6 +1242,21 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
     assert.deepEqual(validationMarks(root), [['warning', '1']], 'a d100 reward rule');
   });
 
+  it('draws both routed result sets when two of them repeat an id (issue 2713)', async () => {
+    const group = (name) => ({
+      id: 'dup',
+      name,
+      results: [{ id: 'res', componentId: 'c1', quantity: 1 }],
+    });
+    const { root } = await mountControlled({
+      task: { ...taskFixture(), resultGroups: [group('Rich'), group('Poor')] },
+      resolutionMode: 'routed',
+      routedOutcomeTiers: ROUTED_TIERS,
+      activeTab: 'results',
+    });
+    assert.equal(root.querySelectorAll('[data-recipe-result-set-id="dup"]').length, 2);
+  });
+
   // Each Results notice belongs to one mode; another mode with the same inputs raises none.
   const OUT_OF_MODE = [
     { mode: 'straight', props: { routedOutcomeTiers: [] }, absent: '[data-gathering-routed-no-tiers]' },

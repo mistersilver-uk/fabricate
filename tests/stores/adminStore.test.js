@@ -4946,6 +4946,86 @@ describe('createAdminStore', () => {
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].dropRows, []);
     });
 
+    it('rejects a straight or routed gathering task that repeats a result id (issue 2713)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const result = (id) => ({ id, componentId: 'herb', quantity: 1 });
+      const repeated = store.validateGatheringLibraryTask({
+        id: 't-dup',
+        name: 'Gather',
+        resolutionMode: 'straight',
+        resultGroups: [{ id: 'g1', name: 'Haul', results: [result('dup'), result('dup')] }],
+      });
+      assert.equal(repeated.valid, false);
+      assert.deepEqual(repeated.resultErrors, [
+        'Task "Gather" result group "Haul" result 2 repeats the id of an earlier result',
+      ]);
+
+      const acrossSets = store.validateGatheringLibraryTask({
+        id: 't-dup-sets',
+        name: 'Gather',
+        resolutionMode: 'routed',
+        resultGroups: [
+          { id: 'g1', name: 'Rich', results: [result('dup')] },
+          { id: 'g2', name: 'Poor', results: [result('dup')] },
+        ],
+      });
+      assert.ok(
+        acrossSets.resultErrors.includes(
+          'Task "Gather" result group "Poor" result 1 repeats the id of an earlier result'
+        )
+      );
+
+      const distinct = store.validateGatheringLibraryTask({
+        id: 't-ok',
+        name: 'Gather',
+        resolutionMode: 'straight',
+        resultGroups: [{ id: 'g1', name: 'Haul', results: [result('a'), result('b')] }],
+      });
+      assert.equal(distinct.valid, true);
+    });
+
+    it('refuses an update to a stored task that repeats a result id until the later duplicate is removed (issue 2713)', async () => {
+      const services = createMockServices({ notify: { error: () => {} } });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      const result = (id) => ({ id, componentId: 'herb', quantity: 1 });
+      const stored = services._store.gatheringConfig.systems.sys1.tasks[0];
+      Object.assign(stored, {
+        name: 'Forage',
+        resolutionMode: 'straight',
+        resultGroups: [{ id: 'g1', name: 'Haul', results: [result('dup'), result('dup')] }],
+      });
+
+      assert.equal(
+        await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage again' }),
+        false,
+        'an edit is refused while the stored repeat stands'
+      );
+
+      const cleared = [{ id: 'g1', name: 'Haul', results: [result('dup')] }];
+      assert.equal(
+        await store.updateGatheringLibraryTask('sys1', task.id, { resultGroups: cleared }),
+        true,
+        'deleting the later duplicate clears it'
+      );
+      assert.equal(
+        await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage again' }),
+        true,
+        'and the task saves again'
+      );
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].name, 'Forage again');
+    });
+
     it('rejects gathering library task save when drops are missing or unresolved', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');

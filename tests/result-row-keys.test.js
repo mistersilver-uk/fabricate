@@ -1,12 +1,12 @@
-/** `resultRowKeys`: a unique `{#each}` key per result row, whatever its ids (issue 2169). */
+/** `uniqueRowKeys`: a unique `{#each}` key per result row, whatever its ids (issue 2169). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resultRowKeys } from '../src/ui/svelte/components/resultRows.js';
+import { uniqueRowKeys } from '../src/ui/svelte/components/resultRows.js';
 
-const keysOf = (...ids) => resultRowKeys(ids.map((id) => (id === undefined ? {} : { id })));
+const keysOf = (...ids) => uniqueRowKeys(ids.map((id) => (id === undefined ? {} : { id })));
 
-describe('resultRowKeys', () => {
+describe('uniqueRowKeys', () => {
   it('keys each result by its id when every id is unique', () => {
     assert.deepEqual(keysOf('a', 'b', 'c'), ['a', 'b', 'c']);
   });
@@ -30,7 +30,7 @@ describe('resultRowKeys', () => {
   });
 
   it('reads anything but an array as no results', () => {
-    assert.deepEqual(resultRowKeys(undefined), []);
-    assert.deepEqual(resultRowKeys({ id: 'a' }), []);
+    assert.deepEqual(uniqueRowKeys(undefined), []);
+    assert.deepEqual(uniqueRowKeys({ id: 'a' }), []);
   });
 });

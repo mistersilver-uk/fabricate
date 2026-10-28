@@ -124,7 +124,7 @@ Every one of its clauses reads a storage layout, a storage target, or a half-fin
 It is deleted rather than kept, because a gate that cannot fail is worse than no gate: it reads as protection while protecting nothing.
 
 What issue 1261 keeps in its place is the structure the gate fed, none of which reads a storage concept: `buildStartupPassList` omits a destructive pass that no entity kind declares and requires a declared kind positively, the pass-to-entity-kind declaration tables including their union rule, and the corpus-derived sweep with its subject-targeted fallback — together with the whole-tree source scans in `tests/mutation-time-valid-id-basis.test.js` that fail if any destructive cleanup call appears outside a corpus-derived sweep, and their non-vacuity control.
-Issue 1261 also makes `cleanupStalePreferences`'s `validComponentIds` a required parameter rather than one defaulting to an empty set, which closes by construction the omitted-argument shape of issue 1196 — a shape the gate never covered, because it stopped a pass on an incomplete corpus, not on an omitted argument.
+Issue 1261 also makes `cleanupStalePreferences`'s `validComponentIds` (renamed `validSalvageComponentsBySystem` and keyed per system by issue 2701) a required parameter rather than one defaulting to an empty set, which closes by construction the omitted-argument shape of issue 1196 — a shape the gate never covered, because it stopped a pass on an incomplete corpus, not on an omitted argument.
 
 The **measurement instruments** are not kept either; § Consequences states what happened to each and § The write cost transcribes what the headless ones measured.
 

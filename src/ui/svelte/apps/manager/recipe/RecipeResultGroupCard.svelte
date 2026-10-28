@@ -11,7 +11,7 @@
   is a finished state rather than a draft (issue 1907).
 
   Invariants:
-  - Rows, flat and staged, are keyed by `resultRowKeys`: an id's first occurrence by the id, a
+  - Rows, flat and staged, are keyed by `uniqueRowKeys`: an id's first occurrence by the id, a
     duplicate or id-less row by a unique stand-in, because a row's Fixed | Rolled state is per
     instance. Deleting the first of two rows sharing an id hands its instance to the survivor —
     pinned by `tests/components/recipe-result-card-mounted.test.js`.
@@ -26,7 +26,7 @@
   import { createPendingFocus } from '../../../util/pendingFocus.js';
   import {
     componentCatalogue,
-    resultRowKeys,
+    uniqueRowKeys,
     withAddedResult,
   } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
@@ -87,7 +87,7 @@
   } = $props();
 
   const macroNames = $derived(complicationMacroNames(macroOptions));
-  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions, 'crafting'));
 
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
@@ -96,7 +96,7 @@
   const validationTarget = $derived(group?.id ? `result-group-${group.id}` : undefined);
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
-  const rowKeys = $derived(resultRowKeys(results));
+  const rowKeys = $derived(uniqueRowKeys(results));
 
   // A splice emits the reordered group; the drag and keyboard halves are the list's (issue 1512).
   function reorderItem(from, to) {

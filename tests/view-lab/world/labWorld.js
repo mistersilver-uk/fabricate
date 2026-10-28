@@ -87,6 +87,14 @@ function seedRewardCraft(content) {
   });
 }
 
+/** `reward-duplicate`: Bend Horseshoe's first result listed twice under one id, a repeat save refuses. */
+function seedRewardDuplicate(content) {
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-duplicate');
+  const [first] = recipe.resultGroups[0].results;
+  first.id ||= 'sm-r-horseshoe-shoe';
+  recipe.resultGroups[0].results.push({ ...first });
+}
+
 /** `reward-missing`: the `reward-craft` horseshoe also teaching a recipe Smithing no longer holds. */
 function seedRewardMissing(content) {
   seedRewardCraft(content);
@@ -387,6 +395,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'currency-generated-id': seedCurrencyGeneratedId,
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
+  'reward-duplicate': seedRewardDuplicate,
   'reward-group': seedRewardGroup,
   'reward-group-rolled': seedRewardGroupRolled,
   'reward-tiers': seedRewardTiers,
@@ -440,6 +449,7 @@ function seedGatheringTaskMode(content, mode) {
     'routed',
     'routed-unmatched',
     'routed-no-tiers',
+    'straight-duplicate',
     ...Object.keys(keepsDrops),
     ...Object.keys(underEvaluations),
   ];
@@ -457,7 +467,7 @@ function seedGatheringTaskMode(content, mode) {
     content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
     return;
   }
-  task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
+  task.resolutionMode = mode.startsWith('straight') ? 'straight' : 'routed';
   task.resultGroups = [
     {
       id: 'lab-gathering-yield',
@@ -465,9 +475,14 @@ function seedGatheringTaskMode(content, mode) {
       results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
     },
   ];
+  // `straight-duplicate`: the same result listed twice under one id, which Save refuses.
+  if (mode === 'straight-duplicate') {
+    const [first] = task.resultGroups[0].results;
+    task.resultGroups[0].results.push({ ...first });
+  }
   // `routed-under`: issue 2073, a roll-under target read from Brenna's Intelligence, difficulty -1.
   if (mode === 'routed-under') task.adjustmentOverride = -1;
-  if (mode !== 'straight') {
+  if (!mode.startsWith('straight')) {
     const evaluation = underEvaluations[mode];
     system.gatheringCraftingCheck = {
       ...system.gatheringCraftingCheck,
@@ -952,7 +967,7 @@ function stripAuthoredWorldComponents(content) {
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result,
  *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
- *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
+ *   holds, `reward-duplicate` for its first result listed twice, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
  *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
  *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`; or

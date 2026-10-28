@@ -13,11 +13,15 @@ export function complicationMacroNames(macroOptions) {
   );
 }
 
-/** Trigger id to label, the id standing in for an unlabelled trigger; an option with no id is dropped. */
-export function complicationTriggerLabels(triggerOptions) {
+/**
+ * Trigger id to label, the id standing in for an unlabelled trigger; an option with no id is
+ * dropped. A trigger id is only unique within its activity, so a studio passes its own `activity`
+ * and another activity's trigger can never take the label of its own.
+ */
+export function complicationTriggerLabels(triggerOptions, activity) {
   return new Map(
     (triggerOptions || [])
-      .filter((option) => option?.id)
+      .filter((option) => option?.id && (!activity || option.activity === activity))
       .map((option) => [option.id, option.label || option.id])
   );
 }

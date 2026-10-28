@@ -4,6 +4,7 @@
  * the copy. Pinned by `tests/routing-overview-rows.test.js`.
  */
 import { shownAmount, toValue } from '../../../components/pickerRowKinds.js';
+import { uniqueRowKeys } from '../../../components/resultRows.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -93,8 +94,9 @@ export function overviewRows({
 }) {
   const groups = asArray(scope?.groups);
   if (provider === 'ingredientSet') {
+    const setKeys = uniqueRowKeys(model.sources);
     return model.sources.map((entry, index) =>
-      sourceRow(`set:${entry.id || `#${index}`}`, entry, groups, { index })
+      sourceRow(`set:${entry.id ? setKeys[index] : `#${index}`}`, entry, groups, { index })
     );
   }
   if (provider !== 'check') return [];

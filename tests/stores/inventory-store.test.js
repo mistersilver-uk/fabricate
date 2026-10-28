@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { cleanupStalePreferences } from '../../src/config/preferencesCleanup.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
@@ -874,6 +875,25 @@ describe('inventoryStore', () => {
       flushSync();
       assert.deepEqual(flush, { ok: true });
       assert.deepEqual(log, [['setProgressiveResultOrder', 'salvage:sys:c1', ['s2', 's1']]]);
+
+      // The key it wrote is one the stale-preference sweep keeps while its system holds the component.
+      const [, key, order] = log[0];
+
+      const settings = { progressiveResultOrder: { [key]: order } };
+      const sweep = (held) =>
+        cleanupStalePreferences(
+          new Set(),
+          new Set(),
+          (name) => settings[name] ?? null,
+          async (name, value) => {
+            settings[name] = value;
+          },
+          { validSalvageComponentsBySystem: held }
+        );
+      await sweep(new Map([['sys', new Set(['c1'])]]));
+      assert.deepEqual(Object.keys(settings.progressiveResultOrder), [key], 'the live key survives');
+      await sweep(new Map([['sys', new Set(['other'])]]));
+      assert.deepEqual(settings.progressiveResultOrder, {}, 'and goes once the component does');
     });
 
     // The threshold is CUMULATIVE - a property of a stage's POSITION, not of the stage.

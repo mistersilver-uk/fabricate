@@ -100,18 +100,18 @@ export function resultAmountInvalid(result, text) {
 }
 
 /**
- * A keyed `{#each}` key per result: its id on that id's first occurrence, `id#n` for a later
+ * A keyed `{#each}` key per record: its id on that id's first occurrence, `id#n` for a later
  * duplicate with `n` counting up from its index past every id and key in the set, and the index for
- * a missing id, so a repeated result id cannot throw `each_key_duplicate` (issue 2169).
+ * a missing id, so a repeated id cannot throw `each_key_duplicate` (issues 2169, 2713).
  */
-export function resultRowKeys(results) {
-  const list = Array.isArray(results) ? results : [];
-  const ids = new Set(list.map((result) => (result?.id ? String(result.id) : '')));
+export function uniqueRowKeys(records) {
+  const list = Array.isArray(records) ? records : [];
+  const ids = new Set(list.map((record) => (record?.id ? String(record.id) : '')));
   const used = new Set();
   const taken = (key) => used.has(key) || ids.has(key);
-  return list.map((result, index) => {
-    if (!result?.id) return index;
-    const id = String(result.id);
+  return list.map((record, index) => {
+    if (!record?.id) return index;
+    const id = String(record.id);
     let key = id;
     for (let n = index; used.has(key); n += 1) {
       if (!taken(`${id}#${n}`)) key = `${id}#${n}`;

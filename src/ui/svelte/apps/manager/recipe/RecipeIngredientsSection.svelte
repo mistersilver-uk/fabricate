@@ -16,6 +16,7 @@
     rendersBare,
     withSoleEntry,
   } from './setDrafts.js';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   import { addIngredientSet } from './recipeRoutingEdits.js';
 
   let {
@@ -43,6 +44,7 @@
   }
 
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
+  const setKeys = $derived(uniqueRowKeys(sets));
 
   // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: a
   // single set (or none yet) renders CHROMELESS, its requirements on the tab background.
@@ -109,7 +111,7 @@
     {/if}
   {:else}
     <ul class="manager-recipe-ingredient-sets">
-      {#each sets as set, index (set?.id || index)}
+      {#each sets as set, index (setKeys[index])}
         <li class="manager-recipe-ingredient-set-item">
           {#if index > 0}
             <div class="manager-recipe-ingredient-set-or" aria-hidden="true">

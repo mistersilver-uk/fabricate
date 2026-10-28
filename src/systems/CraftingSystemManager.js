@@ -159,7 +159,7 @@ import {
   extractSourceDescription,
   rawSourceDescription,
 } from './sourceIdentitySnapshots.js';
-import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
+import { componentIdsBySystem, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 /** The Valid Id Basis for one world-scope entity type (issue 1359): the world roster unioned with
@@ -1747,16 +1747,15 @@ export class CraftingSystemManager {
    * (issue 1226): a corpus-derived whole-value replacement, and `progressiveResultOrder` is a
    * replicated `user`-scope write. `targeted: null` is the preference exemption named by
    * `data-models/spec.md`: a stale preference is bounded and self-healing, so no targeted prune
-   * writes here. Component ids are passed, or every `salvage:<componentId>` key would be dropped;
-   * `MUTATION_CLEANUP_ENTITY_KINDS` declares the union because one map holds both key scopes.
+   * writes here. The per-system component ids are passed, or every
+   * `salvage:<systemId>:<componentId>` key would be dropped; `MUTATION_CLEANUP_ENTITY_KINDS`
+   * declares the union because one map holds both key scopes.
    */
   async _cleanupCraftingPreferences({ subject = 'a crafting-system change' } = {}) {
     const systems = this.getSystems();
     const validSystemIds = new Set(systems.map((system) => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((recipe) => recipe.id));
-    const validComponentIds = new Set(
-      systems.flatMap((system) => (system.components || []).map((component) => component.id)) // ratchet-exempt(world-scope): destructive-basis
-    );
+    const validSalvageComponentsBySystem = componentIdsBySystem(systems);
     await runGatedMutationCleanup({
       passes: [
         {
@@ -1766,7 +1765,7 @@ export class CraftingSystemManager {
               resolveGatheringActor: (actorId) => game.actors?.get?.(actorId) ?? null,
               isSelectableGatheringActor: (actor) =>
                 isGatheringActorSelectableByUser(actor, game.user),
-              validComponentIds,
+              validSalvageComponentsBySystem,
             }),
           targeted: null,
         },

@@ -1876,6 +1876,7 @@ path, and a `ResultGroup.name` may not collide with any of them):
 2. `resultGroups` must contain at least one entry.
 3. `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
 4. `ResultGroup.name` may not collide with any reserved failure keyword.
+5. A straight or routed gathering task's result ids MUST be unique across all of the task's result groups, and the task editor refuses to save such a task that repeats one, because its result rows are addressed by result id.
 
 ## Progressive Task Resolution
 

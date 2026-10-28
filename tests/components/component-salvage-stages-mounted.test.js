@@ -60,6 +60,16 @@ describe('ComponentSalvageStages', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
+  it('draws every stage when two of them share an id (issue 2713)', async () => {
+    const twins = [
+      { id: 'dup', componentId: 'cmp-scrap', quantity: 1 },
+      { id: 'dup', componentId: 'cmp-dust', quantity: 1 },
+    ];
+    const { target } = await mountWith({ stages: twins, stageGroup: { ...GROUP, results: twins } });
+    assert.ok(Boolean(stage(target, 1)) && Boolean(stage(target, 2)), 'both stages draw');
+    harness.remount();
+  });
+
   it('RED: forwards add, remove, move, a cleared pick and the one row Edit link', async () => {
     const { calls, target } = await mountWith();
     target.querySelector(':scope .manager-salvage-stage-add [data-add-salvage-result]').click();
@@ -127,6 +137,24 @@ describe('ComponentSalvageStages', () => {
       stage(target, 2).querySelector('.fab-complication-row-body').getAttribute('title'),
       /runs Shrapnel Burst/
     );
+    harness.remount();
+  });
+
+  it('names a salvage trigger by its own label when a crafting trigger shares its id (issue 2713)', async () => {
+    const [scrap, dust] = COMPONENTS;
+    const snapped = { ...dust.complications[0], when: { checkTrigger: 'trig-snap' } };
+    const { target } = await mountWith({
+      componentOptions: [scrap, { ...dust, complications: [snapped] }],
+      complicationTriggerOptions: [
+        { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+        { id: 'trig-snap', label: 'the salvage jams', activity: 'salvage' },
+      ],
+    });
+    const sentence = stage(target, 2)
+      .querySelector('.fab-complication-row-body')
+      .getAttribute('title');
+    assert.match(sentence, /the salvage jams fires/, 'the salvage trigger keeps its own label');
+    assert.ok(!/spring snaps/.test(sentence), 'a crafting trigger does not overwrite it');
     harness.remount();
   });
 

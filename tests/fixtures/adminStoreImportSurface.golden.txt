@@ -66,7 +66,6 @@ import {
   normalizeNullableAdjustment,
   normalizeNullableSuccesses,
 } from '../../../systems/normalize/checkEvaluation.js';
-import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { summarizeModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -85,7 +84,6 @@ import {
   permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
 import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
-import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
@@ -122,6 +120,7 @@ import {
 } from './adminStoreInternals.js';
 import { createEnvironmentDraftSection } from './adminEnvironmentDraftSection.js';
 import { createToolDraftSection } from './adminToolDraftSection.js';
+import { validateGatheringResultGroups } from './adminGatheringResultValidation.js';
 import {
   createCurrencySection,
   emptyWorldCurrencyState,

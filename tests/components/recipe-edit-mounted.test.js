@@ -4001,6 +4001,28 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('names a crafting trigger by its own label when a salvage trigger shares its id', async () => {
+    const named = { ...CRAFTING_COMPLICATION, when: { checkTrigger: 'trig-snap' } };
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [{ ...COMPLICATED_COMPONENT_OPTIONS[0], complications: [named] }],
+          complicationTriggerOptions: [
+            { id: 'trig-snap', label: 'the spring snaps', activity: 'crafting' },
+            { id: 'trig-snap', label: 'the salvage jams', activity: 'salvage' },
+          ],
+        },
+      }
+    );
+    const sentence = stageStrips(target)[0]
+      .querySelector('.fab-complication-row-body')
+      .getAttribute('title');
+    assert.match(sentence, /the spring snaps fires/, 'the crafting trigger keeps its own label');
+    assert.ok(!/salvage jams/.test(sentence), 'a salvage trigger does not overwrite it');
+    editHarness.remount();
+  });
+
   // GUARD: red when the list is rendered in the `row` snippet beside the PickerRow, not in `body`.
   it('GUARD 1286: the nested list sits in the row BODY — the grip and the ordinal ride the stage line', async () => {
     // The stage row is a column whose line carries the grip, the ordinal and the padding, and
@@ -8900,6 +8922,120 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
     view.target.querySelector('[data-recipe-routing-add="ingredientSet"]').click();
     await flushRender();
     assert.equal(view.target.querySelectorAll('[data-routing-overview-row]').length, 1);
+    editHarness.remount();
+  });
+});
+
+describe('RecipeEditView — keyed lists tolerate repeated ids (issue 2713, mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const herb = { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } };
+  const water = { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } };
+  const sharedIdSet = () => ({
+    id: 'dup',
+    name: 'Set',
+    ingredientGroups: [
+      { id: 'dup-grp', options: [herb] },
+      { id: 'dup-grp', options: [water] },
+    ],
+  });
+  // Alternatives sharing an id are corrupt data (`Result.validate` refuses them); this fixture
+  // covers that the editor still renders them rather than crashing.
+  const choice = (id) => ({
+    id,
+    alternatives: [
+      { id: 'alt', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'alt', componentId: 'cmp-water', quantity: 1 },
+    ],
+  });
+
+  async function mountRecipe(recipe, tab) {
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: { ...RECIPE, ...recipe },
+      })
+    );
+    clickTab(target, tab);
+    await flushRender();
+    return target;
+  }
+
+  it('draws two ingredient sets and their requirements when each repeats an id', async () => {
+    const target = await mountRecipe(
+      { ingredientSets: [sharedIdSet(), sharedIdSet()] },
+      'ingredients'
+    );
+    assert.equal(target.querySelectorAll(':scope [data-recipe-set-id="dup"]').length, 2);
+    assert.equal(target.querySelectorAll(':scope [data-recipe-group]').length, 4);
+    editHarness.remount();
+  });
+
+  it('draws the per-set tools of two ingredient sets that repeat an id', async () => {
+    const named = (name) => ({ id: 'dup', name, toolIds: [], ingredientGroups: [] });
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        toolsLibrary: TOOLS_LIBRARY,
+        recipe: { ...RECIPE, ingredientSets: [named('Hot forge'), named('Cold forge')] },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.equal(
+      target.querySelectorAll(':scope [data-recipe-tools-ingredient-set="dup"]').length,
+      2
+    );
+    editHarness.remount();
+  });
+
+  it('draws the per-set tools of a step whose ingredient sets repeat an id', async () => {
+    const named = (name) => ({ id: 'dup', name, toolIds: [], ingredientGroups: [] });
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        toolsLibrary: TOOLS_LIBRARY,
+        recipe: {
+          ...RECIPE,
+          steps: [
+            {
+              id: 'step-1',
+              name: 'Forge',
+              ingredientSets: [named('Hot forge'), named('Cold forge')],
+              resultGroups: [],
+              toolIds: [],
+            },
+          ],
+        },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.equal(
+      target.querySelectorAll(':scope [data-recipe-tools-ingredient-set="dup"]').length,
+      2
+    );
+    editHarness.remount();
+  });
+
+  it('draws two result sets, and the alternatives of a choice, when each repeats an id', async () => {
+    const target = await mountRecipe(
+      {
+        resultGroups: [
+          { id: 'dup', name: 'One', results: [choice('cg')] },
+          { id: 'dup', name: 'Two', results: [choice('cg')] },
+        ],
+      },
+      'results'
+    );
+    assert.equal(target.querySelectorAll(':scope [data-recipe-result-set-id="dup"]').length, 2);
+    assert.equal(target.querySelectorAll(':scope [data-recipe-result-group]').length, 2);
+    assert.equal(
+      target.querySelectorAll(':scope [data-recipe-result-group] [data-recipe-option-chosen]')
+        .length,
+      4
+    );
     editHarness.remount();
   });
 });

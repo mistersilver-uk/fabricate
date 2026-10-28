@@ -303,6 +303,11 @@ describe('overviewRows: set rows and markers', () => {
     assert.deepEqual(keys(blank), ['set:#0', 'set:#1', 'set:0']);
   });
 
+  it('keys sets that repeat an id apart, so the overview can draw them (issue 2713)', () => {
+    const twins = setRows([{ id: 'dup' }, { id: 'dup' }, { id: 'solo' }], [{ id: 'g1' }]);
+    assert.deepEqual(keys(twins), ['set:dup', 'set:dup#1', 'set:solo']);
+  });
+
   it('marks a tier routed by the single-group exemption or by name as default', () => {
     const routed = {
       type: 'relative',

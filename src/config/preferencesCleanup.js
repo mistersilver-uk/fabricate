@@ -37,8 +37,29 @@ export function isGatheringActorSelectableByUser(actor, user) {
   return actor.testUserPermission(user, 'OWNER') === true;
 }
 
+/**
+ * Whether a `salvage:` key's id still names a held component. The id is `<systemId>:<componentId>`,
+ * live while that system holds that component, whichever `:` splits the two, so an id containing
+ * one is never pruned; the pre-766 bare `<componentId>` form is live while any system holds it.
+ */
+function _isLiveSalvageOrderId(id, validSalvageComponentsBySystem) {
+  for (
+    let separator = id.indexOf(':');
+    separator !== -1;
+    separator = id.indexOf(':', separator + 1)
+  ) {
+    if (validSalvageComponentsBySystem.get(id.slice(0, separator))?.has(id.slice(separator + 1))) {
+      return true;
+    }
+  }
+  for (const components of validSalvageComponentsBySystem.values()) {
+    if (components.has(id)) return true;
+  }
+  return false;
+}
+
 /** Decide whether one `progressiveResultOrder` key still names something that exists. */
-function _isLiveProgressiveOrderKey(key, validRecipeIds, validComponentIds) {
+function _isLiveProgressiveOrderKey(key, validRecipeIds, validSalvageComponentsBySystem) {
   if (typeof key !== 'string') return false;
   const separator = key.indexOf(':');
   if (separator === -1) return false;
@@ -46,7 +67,7 @@ function _isLiveProgressiveOrderKey(key, validRecipeIds, validComponentIds) {
   const id = key.slice(separator + 1);
   if (id === '') return false;
   if (scope === 'recipe') return validRecipeIds.has(id);
-  if (scope === 'salvage') return validComponentIds.has(id);
+  if (scope === 'salvage') return _isLiveSalvageOrderId(id, validSalvageComponentsBySystem);
   return false;
 }
 
@@ -56,11 +77,15 @@ export async function cleanupStalePreferences(
   validRecipeIds,
   getSetting,
   setSetting,
-  { resolveGatheringActor = null, isSelectableGatheringActor = null, validComponentIds } = {}
+  {
+    resolveGatheringActor = null,
+    isSelectableGatheringActor = null,
+    validSalvageComponentsBySystem,
+  } = {}
 ) {
-  if (!(validComponentIds instanceof Set)) {
+  if (!(validSalvageComponentsBySystem instanceof Map)) {
     throw new TypeError(
-      'cleanupStalePreferences requires validComponentIds: a corpus-derived prune with no component ids drops every salvage: preference key.'
+      'cleanupStalePreferences requires validSalvageComponentsBySystem: a corpus-derived prune with no component ids drops every salvage: preference key.'
     );
   }
   // 1.
@@ -97,7 +122,7 @@ export async function cleanupStalePreferences(
     const cleaned = {};
     let changed = false;
     for (const [key, order] of Object.entries(progressiveOrder)) {
-      if (_isLiveProgressiveOrderKey(key, validRecipeIds, validComponentIds)) {
+      if (_isLiveProgressiveOrderKey(key, validRecipeIds, validSalvageComponentsBySystem)) {
         cleaned[key] = order;
       } else {
         changed = true;
