@@ -101,8 +101,11 @@
 
 {#snippet badges()}
   {#if showDiscovered}
-    <span class="gathering-env-card-discovered" aria-label={discoveredLabel} title={discoveredLabel}
-      >({discoveredTaskCount}/{composedTaskCount})</span
+    <span
+      class="gathering-env-card-discovered"
+      role="img"
+      aria-label={discoveredLabel}
+      title={discoveredLabel}>({discoveredTaskCount}/{composedTaskCount})</span
     >
   {/if}
   {#if blind}
@@ -119,7 +122,7 @@
       >
     </span>
   {/if}
-  <span class={`gathering-env-card-event ${dangerRiskClass}`} aria-label={dangerAria}>
+  <span class={`gathering-env-card-event ${dangerRiskClass}`} role="img" aria-label={dangerAria}>
     <i class="fas fa-skull" aria-hidden="true"></i>
     <span class="gathering-env-card-event-label">{dangerLabel}</span>
   </span>

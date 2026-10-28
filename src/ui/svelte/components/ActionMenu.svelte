@@ -31,7 +31,7 @@
     Enter/Space/ArrowDown on the trigger open and focus the FIRST item, ArrowUp the LAST, arrows
     wrap, Home/End jump, and Escape closes and RETURNS FOCUS TO THE TRIGGER.
   - TWO DELIBERATE DEVIATIONS FROM THE APG: a disabled `menuitem` is a native `<button disabled>`, so
-    arrow navigation SKIPS it; and Tab returns focus to the TRIGGER, the panel being portaled.
+    arrow navigation SKIPS it; and Tab returns focus to the TRIGGER, kept as published (issue 2700).
   - IT IS PORTALED, AND THAT IS MEASURED RATHER THAN HYPOTHETICAL: a row menu opened near the bottom
     of a long list inside an `overflow: auto` panel is cut off by that panel's own edge, and
     `tests/components/overlay-portal-host-position.test.js` measures it with `elementFromPoint`,

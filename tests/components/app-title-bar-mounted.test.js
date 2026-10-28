@@ -1,5 +1,6 @@
 /** Issue 2420 — the library's `<AppTitleBar>`: the manager's title band, its mark and its caption. */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
@@ -10,6 +11,7 @@ import {
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const APP_TITLE_BAR = 'src/ui/svelte/components/AppTitleBar.svelte';
 
 const harness = createMountedComponentHarness({
@@ -115,7 +117,9 @@ describe('AppTitleBar', () => {
       const [word, name] = markOf(root).children;
       assert.equal(word.textContent, 'PREMIUM');
       assert.equal(name.textContent, 'Fabricate Premium is installed and connected');
-      assert.equal(statusOf(root).firstElementChild.textContent, 'Selected system resolution');
+      const prefix = statusOf(root).firstElementChild.textContent;
+      assert.equal(prefix, 'Selected system resolution:');
+      assert.equal(prefix, lang.FABRICATE.Admin.Manager.Titlebar.Status, 'the key says the same');
     });
   });
 });

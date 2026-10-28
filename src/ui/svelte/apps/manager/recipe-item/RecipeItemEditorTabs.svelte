@@ -23,8 +23,11 @@
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
+  import { TAB_COUNT_UNITS, nameTabCounts } from '../../../util/tabCountMark.js';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
+
+  const COUNT_UNITS = { contents: TAB_COUNT_UNITS.linkedRecipes };
 
   const TABS = [
     {
@@ -57,7 +60,7 @@
 <EditorTabs
   tabs={localizeTabs(TABS)}
   {activeTab}
-  {badges}
+  badges={nameTabCounts(badges, COUNT_UNITS)}
   {onSelect}
   ariaLabel={localizeOr(
     'FABRICATE.Admin.Manager.RecipeItem.Tabs.Label',

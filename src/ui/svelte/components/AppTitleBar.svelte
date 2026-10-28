@@ -37,7 +37,10 @@
   {#if statusLabel}
     <span class="manager-titlebar-status" data-manager-titlebar-status title={statusLabel}>
       <span class="visually-hidden"
-        >{localizeOr('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}</span
+        >{localizeOr(
+          'FABRICATE.Admin.Manager.Titlebar.Status',
+          'Selected system resolution:'
+        )}</span
       >
       <!-- An information glyph, because the line is a caption, not a dice-roll control (issue 1373). -->
       <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>

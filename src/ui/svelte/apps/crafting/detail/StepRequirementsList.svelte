@@ -13,9 +13,9 @@
   outside this list. `simple` mode enforces exactly one ingredient set per step, so
   each step has exactly one IoTable.
 
-  This is deliberately distinct from ProgressiveStageList (which carries
-  player-reorder + per-stage status semantics irrelevant to a read-only preview):
-  there are no drag/keyboard/reorder affordances here.
+  This is deliberately distinct from ProgressiveBody (which carries player-reorder
+  + per-stage status semantics irrelevant to a read-only preview): there are no
+  drag/keyboard/reorder affordances here.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -94,6 +94,7 @@
             <span
               class="crafting-step-duration"
               data-recipe-step-duration
+              role="img"
               title={durationTitle}
               aria-label={`${durationTitle}: ${formatTimeRequirementCompact(step.duration)}`}
             >

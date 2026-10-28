@@ -299,6 +299,30 @@ describe('1504 Select — the select every screen renders', () => {
       );
       harness.remount();
     });
+
+    it('Tab closes the open list without choosing and goes on to the window (issue 2598)', async () => {
+      await mountSelect({ options: PAGE_SIZES, value: 10 });
+      trigger().focus();
+      await openPanel();
+      pressKey('ArrowDown');
+      const heard = [];
+      const listen = (event) => {
+        heard.push(event.key);
+      };
+      document.defaultView.addEventListener('keydown', listen);
+      try {
+        const event = pressKey('Tab');
+        await settle();
+        assert.equal(event.defaultPrevented, false, 'the browser moves focus on');
+        assert.deepEqual(heard, ['Tab'], 'a listener above the trigger hears the Tab');
+      } finally {
+        document.defaultView.removeEventListener('keydown', listen);
+      }
+      assert.ok(!panel(), 'the list is closed');
+      assert.equal(trigger().getAttribute('aria-expanded'), 'false');
+      assert.deepEqual(changed, [], 'and nothing was chosen');
+      harness.remount();
+    });
   });
 
   describe('readonly takes focus and refuses; disabled does neither', () => {

@@ -364,6 +364,7 @@
     {#if usageItems.length > 0}
       <div
         class="manager-essence-usage-grid"
+        role="group"
         aria-label={text(
           'FABRICATE.Admin.Manager.Essence.ComponentUsageGrid',
           'Components using this essence'

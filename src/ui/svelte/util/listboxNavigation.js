@@ -231,6 +231,38 @@ export function holderKeyIntent(event, context = {}) {
   return index === null ? PASS_THROUGH : { kind: 'move-cursor', index };
 }
 
+const TAB_STOP = 'input, button, textarea, select, [href], [tabindex]';
+
+/** The panel's tab stops in document order: enabled, not hidden, not inert, not `tabindex="-1"`. */
+function panelTabStops(panel) {
+  return [...(panel?.querySelectorAll?.(TAB_STOP) ?? [])].filter(
+    (stop) =>
+      stop.tabIndex >= 0 && !stop.disabled && stop.type !== 'hidden' && !stop.closest('[inert]')
+  );
+}
+
+/** Whether the key is Tab or Shift+Tab with no other modifier, outside a composition. */
+function plainTab(event) {
+  return (
+    event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing
+  );
+}
+
+/** `null` for a key but a plain Tab; else `{ entry }`, the stop of `panel` a forward Tab enters. */
+export function triggerTab(event, panel) {
+  if (!plainTab(event)) return null;
+  return { entry: (!event.shiftKey && panelTabStops(panel)[0]) || null };
+}
+
+/** A Tab leaving the panel: `'forward'` from its last stop, `'back'` from its first, or `null`. */
+export function panelTabExit(event, panel) {
+  if (!plainTab(event)) return null;
+  const stops = panelTabStops(panel);
+  if (stops.length === 0) return null;
+  if (event.shiftKey) return event.target === stops[0] ? 'back' : null;
+  return event.target === stops.at(-1) ? 'forward' : null;
+}
+
 // One function for the row id AND the holder's `aria-activedescendant`, so the two cannot drift.
 // `prefix` is per component instance, because two pickers both indexing from 0 would emit the same
 // DOM id; `undefined` is what makes Svelte OMIT the attribute rather than point it at no element.

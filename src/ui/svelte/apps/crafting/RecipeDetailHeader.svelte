@@ -133,6 +133,7 @@
           class="crafting-detail-duration-chip"
           data-recipe-duration
           data-recipe-duration-kind={isMultiStep ? 'total' : 'recipe'}
+          role="img"
           title={durationTitle}
           aria-label={`${durationTitle}: ${durationLabel}`}
         >
