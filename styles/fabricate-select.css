@@ -214,7 +214,7 @@
   line-height: 1.5;
 }
 
-/* The standalone roll-prompt host (`overlayHost.js`): a companion or macro prompt opened while no Fabricate window is open. A zero-size fixed layer, so it lifts the modal it hosts above Foundry's windows without blocking the page around it. */
+/* The standalone overlay layer (`overlayHost.js`). The roll prompt's own layer, for a companion or macro prompt opened while no Fabricate window is open, is a zero-size fixed layer, so it lifts the modal it hosts above Foundry's windows without blocking the page around it. The published seam's shared layer also spans the viewport and takes no pointer, through inline styles `overlayHost.js` sets, so a panel placed from either edge lands where it was measured. */
 .fabricate.fabricate-standalone-overlay {
   position: fixed;
   top: 0;

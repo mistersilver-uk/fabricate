@@ -427,6 +427,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedModal.svelte',
   'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
+  'tests/view-lab/fixtures/publishedStandaloneSpecimen.js',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -3870,6 +3871,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
+  'manager-published-select-layer',
   'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
@@ -3900,6 +3902,9 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-crafting-sources-picker',
   'player-inventory-sort-list',
   'player-journal-sort-list',
+  'published-standalone-action-menu-open',
+  'published-standalone-icon-picker-open',
+  'published-standalone-select-open',
   'world-tool-entry-on-break-repair-suggestions',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
@@ -6287,6 +6292,23 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
+// The anchored-popover seam's share of the open ones is pinned with `ANCHORED_POPOVER_FRAMES`.
+test('the standalone layer’s host selects the frames that draw on that layer', () => {
+  const selected = selectedIds(['src/ui/svelte/util/overlayHost.js'], {});
+  for (const id of [
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+    'manager-published-select-layer',
+    'published-standalone-select-open',
+    'published-standalone-icon-picker-open',
+    'published-standalone-action-menu-open',
+    'published-standalone-modal-open',
+  ]) {
+    assert.ok(selected.includes(id), `a change to overlayHost.js does not select ${id}`);
+  }
+});
+
 test('every published component seam module, and the host, selects the specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
@@ -6328,6 +6350,10 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-modal-close',
       'published-standalone',
       'published-standalone-light',
+      'published-standalone-select-open',
+      'published-standalone-icon-picker-open',
+      'published-standalone-action-menu-open',
+      'published-standalone-modal-open',
       'published-standalone-in-window',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
@@ -8726,9 +8752,8 @@ test('the tabs specimen case presses ArrowRight on the strip the fixture mounts 
 });
 
 test('the standalone specimen cases draw the entries that state a standalone root with and without a Fabricate root above their target', () => {
-  const { instance, fragment } = componentAstOf(
-    'tests/view-lab/fixtures/PublishedStandalone.svelte'
-  );
+  const { fragment } = componentAstOf('tests/view-lab/fixtures/PublishedStandalone.svelte');
+  const { ast: instance } = moduleAstOf('tests/view-lab/fixtures/publishedStandaloneSpecimen.js');
   const mounted = [...walkNodes(instance)].flatMap((node) =>
     node.type === 'CallExpression' && node.callee?.name === 'mount' ? [node.arguments[0].value] : []
   );
@@ -8745,7 +8770,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 11, 'the fixture lays eleven targets in its columns');
+  assert.equal(columns.flat().length, 16, 'the fixture lays sixteen targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',
@@ -8796,6 +8821,24 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       viewCase.expectSelector.includes(`> ${root}`),
       `${id} asserts that the seam wrote a style root in each target`
     );
+  }
+  for (const [id, key] of [
+    ['published-standalone-select-open', 'select'],
+    ['published-standalone-icon-picker-open', 'icon-picker'],
+    ['published-standalone-action-menu-open', 'menu'],
+    ['published-standalone-modal-open', 'modal'],
+  ]) {
+    const opened = getCaseById(id);
+    const layer = '> .fabricate.fabricate-standalone-overlay >';
+    assert.equal(opened.app, bareApp, `${id} draws in the classless frame`);
+    assert.equal(opened.query.specimen, 'published-standalone');
+    assert.equal(opened.steps.length, 1, `${id} opens its panel in one step`);
+    assert.ok(
+      opened.expectSelector.includes(`[data-lab-standalone-target="${key}"] > ${root}`) &&
+        opened.expectSelector.includes(layer),
+      `${id} asserts the ${key} target's style root and the panel on the standalone layer`
+    );
+    assert.ok(opened.expectCenterHit.startsWith(`body ${layer}`), `${id} hits its panel there`);
   }
   const inWindow = getCaseById('published-standalone-in-window');
   assert.equal(inWindow.app, 'fabricate-app');

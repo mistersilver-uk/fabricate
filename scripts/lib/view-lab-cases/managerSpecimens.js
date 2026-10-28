@@ -4,7 +4,7 @@
  * depicts a state no GM can reach today, so each label says so; it is not a smoke counterpart.
  */
 
-import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
+import { ANCHORED_POPOVER_SOURCES, INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
 import { managerCase, playerCase } from './caseFactories.js';
 
 /**
@@ -22,6 +22,17 @@ const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
+]);
+
+/** The seam's own sources, and the standalone layer's host, for a case that draws on that layer. */
+const STANDALONE_LAYER_SOURCES = Object.freeze([
+  ...PUBLISHED_SEAM_SOURCES,
+  /^src\/ui\/svelte\/util\/overlayHost\.js$/,
+]);
+/** And the positioning seam, for a case that opens an anchored panel there. */
+const OPEN_PANEL_SOURCES = Object.freeze([
+  ...STANDALONE_LAYER_SOURCES,
+  ...ANCHORED_POPOVER_SOURCES,
 ]);
 
 /** The leaves fixture mounts two empty panels, so a selector says which: the hero, or the filtered. */
@@ -425,10 +436,13 @@ const MODAL_DONE = `${MODAL_GROUND} [data-lab-modal-footer] button`;
 /** Wider and taller than the 560px dialog, which is sized from the viewport and clipped past it. */
 const MODAL_WINDOW = Object.freeze({ width: 720, height: 560 });
 
-/** The standalone fixture's ground, its two columns, one target by key, the style root the seam writes in it, and the player window's root. */
+/**
+ * The standalone fixture's ground, its three columns, one target by key, the style root the seam
+ * writes in it, and the player window's root.
+ */
 const STANDALONE_GROUND = '[data-lab-standalone-ground]';
 const STANDALONE_COLUMNS = Object.freeze(
-  [1, 2].map((column) => `${STANDALONE_GROUND} > [data-lab-standalone-column="${column}"]`)
+  [1, 2, 3].map((column) => `${STANDALONE_GROUND} > [data-lab-standalone-column="${column}"]`)
 );
 const STANDALONE_TARGET = (key) => `[data-lab-standalone-target="${key}"]`;
 const STANDALONE_ROOT = '.fabricate.fabricate-standalone-root';
@@ -437,7 +451,9 @@ const FABRICATE_WINDOW = '.fabricate.fabricate-app';
 /**
  * What each target draws, column by column: the three controls, the companion's line in the card's
  * well, its input in the field's slot and the search input; then the stepper's input, the chosen
- * segment, the chosen card, the selected tab and the pager's page-size control.
+ * segment, the chosen card, the selected tab and the pager's page-size control; then the select's,
+ * the icon picker's and the action menu's triggers, the opener, and the closed dialog's `null`,
+ * which draws nothing in its target.
  */
 const STANDALONE_DRAWN = Object.freeze([
   Object.freeze({
@@ -455,13 +471,21 @@ const STANDALONE_DRAWN = Object.freeze([
     tabs: '.fabricate-tabs [role="tab"][aria-selected="true"]',
     pager: '.fabricate-pagination [data-pagination-size]',
   }),
+  Object.freeze({
+    select: '.fabricate-select .fabricate-select-trigger',
+    'icon-picker': '.fabricate-icon-picker .essence-icon-picker-trigger',
+    menu: '.fabricate-action-menu .fabricate-icon-button',
+    opener: '.fabricate-button',
+    modal: null,
+  }),
 ]);
-const holdingDrawn = (within) =>
+/** Each drawing `within` its target, and each target that draws nothing `closed`. */
+const holdingDrawn = (within, closed) =>
   STANDALONE_DRAWN.flatMap((column, index) =>
-    Object.entries(column).map(
-      ([key, drawn]) =>
-        `:has(> [data-lab-standalone-column="${index + 1}"] > ${STANDALONE_TARGET(key)}${within}${drawn})`
-    )
+    Object.entries(column).map(([key, drawn]) => {
+      const target = `> [data-lab-standalone-column="${index + 1}"] > ${STANDALONE_TARGET(key)}`;
+      return drawn ? `:has(${target}${within}${drawn})` : `:has(${target}${closed})`;
+    })
   ).join('');
 
 /** A drawing directly under the style root the seam wrote in its target. */
@@ -469,16 +493,25 @@ const UNDER_STANDALONE_ROOT = ` > ${STANDALONE_ROOT} `;
 
 /**
  * A ground with no `.fabricate` on it or above it, so none above a target, holding each drawing
- * directly under the style root the seam wrote in its target, and none inside the card or the
- * field, so the well mounted in the card's slot and the field's own content wrote none.
+ * directly under the style root the seam wrote in its target, the closed dialog's root empty, and
+ * none inside the card or the field, so the well mounted in the card's slot and the field's own
+ * content wrote none.
  */
-const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT)}:not(:has(.fabricate-card ${STANDALONE_ROOT})):not(:has(.fabricate-field ${STANDALONE_ROOT}))`;
+const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT, ` > ${STANDALONE_ROOT}:empty`)}:not(:has(.fabricate-card ${STANDALONE_ROOT})):not(:has(.fabricate-field ${STANDALONE_ROOT}))`;
 
 /** The same ground under the player window's Fabricate root, with no style root written in it. */
-const STANDALONE_IN_WINDOW = `${FABRICATE_WINDOW} ${STANDALONE_GROUND}:not(:has(${STANDALONE_ROOT}))${holdingDrawn(' ')}`;
+const STANDALONE_IN_WINDOW = `${FABRICATE_WINDOW} ${STANDALONE_GROUND}:not(:has(${STANDALONE_ROOT}))${holdingDrawn(' ', ':empty')}`;
 
-/** Sized to the companion frame, which is also the player window's own floor. */
-const STANDALONE_WINDOW = Object.freeze({ width: 1024, height: 640 });
+/** Wide enough for the three columns, and as tall as the player window's own floor. */
+const STANDALONE_WINDOW = Object.freeze({ width: 1200, height: 640 });
+
+/** The standalone layer's panel, in the container the seam mounts there, of the class `panel`. */
+const STANDALONE_LAYER_PANEL = (panel) =>
+  `body > .fabricate.fabricate-standalone-overlay > div > ${panel}`;
+
+/** The trigger `part` drawn under the style root in the target `key`, while it is expanded. */
+const EXPANDED_UNDER_ROOT = (key, part) =>
+  `${STANDALONE_TARGET(key)} > ${STANDALONE_ROOT} ${part}[aria-expanded="true"]`;
 
 /** Each column inside the window's content, so a column the window clips fails the capture. */
 const STANDALONE_CONTAINMENT = Object.freeze(
@@ -496,7 +529,7 @@ const standaloneCase = (entry) => ({
   expectContained: STANDALONE_CONTAINMENT,
   position: STANDALONE_WINDOW,
   kinds: ['standalone', 'specimen'],
-  sourceMatches: PUBLISHED_SEAM_SOURCES,
+  sourceMatches: STANDALONE_LAYER_SOURCES,
   ...entry,
 });
 
@@ -979,7 +1012,7 @@ export const CASES = Object.freeze([
     position: SELECT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
-    sourceMatches: PUBLISHED_SEAM_SOURCES,
+    sourceMatches: OPEN_PANEL_SOURCES,
   }),
   managerCase({
     id: 'manager-published-stage-bars-specimen',
@@ -1608,21 +1641,70 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone',
     label:
-      'Specimen, mounted through the published seam — the twelve entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it, in two 360px columns on a --fab-bg-1 ground the companion paints, because the style root paints none: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column. The seam wrote one style root in each of the eleven targets and none for the well in the card or the field’s content; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the rendered suite’s',
+      'Specimen, mounted through the published seam — the sixteen entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it, in three 360px columns on a --fab-bg-1 ground the companion paints, because the style root paints none: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target. The seam wrote one style root in each of the sixteen targets, the closed dialog’s empty, and none for the well in the card or the field’s content; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the rendered suite’s',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with no Fabricate root.
     query: { specimen: 'published-standalone' },
   }),
   standaloneCase({
     id: 'published-standalone-light',
     label:
-      'Specimen, mounted through the published seam — the same twelve entries and two columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot read in that ink on the dark ground, and the card descriptions and the pager’s summary on their own fills',
+      'Specimen, mounted through the published seam — the same sixteen entries and three columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot read in that ink on the dark ground, and the card descriptions and the pager’s summary on their own fills',
     // Beyond the smoke: Foundry’s light theme is a condition the smoke never walks.
     query: { specimen: 'published-standalone', colorScheme: 'light' },
+  }),
+  standaloneCase({
+    id: 'published-standalone-select-open',
+    label:
+      'Specimen, mounted through the published seam — the same sixteen entries in the classless companion frame, after one step: a press on the Method select at the top of the third column, whose target has no Fabricate root, so its trigger is drawn under the style root and its list opened on the standalone layer over the window. The list reads Forge, ticked and filled as the chosen row, then Brew and By hand, below the trigger; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
+    // Beyond the smoke: a companion opens a select it mounted through `api.ui`.
+    query: { specimen: 'published-standalone' },
+    steps: [{ selector: `${STANDALONE_TARGET('select')} .fabricate-select-trigger` }],
+    expectSelector: `body:has(${EXPANDED_UNDER_ROOT('select', '.fabricate-select-trigger')}) > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover [data-popover-option="forge"][aria-selected="true"]`,
+    expectCenterHit: `${STANDALONE_LAYER_PANEL('.fabricate-select-popover')} [data-popover-option="brew"]`,
+    sourceMatches: OPEN_PANEL_SOURCES,
+  }),
+  standaloneCase({
+    id: 'published-standalone-icon-picker-open',
+    label:
+      'Specimen, mounted through the published seam — the same sixteen entries in the classless companion frame, after one step: Enter pressed on the Tonic icon picker in the third column, whose target has no Fabricate root, so its list opened on the standalone layer over the window with focus in its query field, which shows the accent border and the placeholder hidden while it holds focus. The flask row is pinned first and selected, above the vocabulary’s first glyphs; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
+    // Beyond the smoke: a companion opens an icon picker it mounted through `api.ui`.
+    query: { specimen: 'published-standalone' },
+    steps: [
+      {
+        selector: `${STANDALONE_TARGET('icon-picker')} .essence-icon-picker-trigger`,
+        press: 'Enter',
+      },
+    ],
+    expectSelector: `body:has(${EXPANDED_UNDER_ROOT('icon-picker', '.essence-icon-picker-trigger')}) > .fabricate.fabricate-standalone-overlay > div > .fabricate-icon-picker-popover .essence-icon-picker-option.pinned[aria-selected="true"]`,
+    expectCenterHit: `${STANDALONE_LAYER_PANEL('.fabricate-icon-picker-popover')} .essence-icon-picker-option.pinned`,
+    sourceMatches: OPEN_PANEL_SOURCES,
+  }),
+  standaloneCase({
+    id: 'published-standalone-action-menu-open',
+    label:
+      'Specimen, mounted through the published seam — the same sixteen entries in the classless companion frame, after one step: Enter pressed on the Tonic actions trigger in the third column, whose target has no Fabricate root, so its menu opened on the standalone layer over the window, lined up with the trigger’s start edge, with focus on Duplicate tonic, which takes the raised fill and the 1px accent ring inside its edge. Archive tonic is dimmed and Delete tonic is in the danger ink; the frame is the evidence that the layer draws the menu where it was measured, and the measured equality with the player window’s menu is the rendered suite’s',
+    // Beyond the smoke: a companion opens an action menu it mounted through `api.ui`.
+    query: { specimen: 'published-standalone' },
+    steps: [{ selector: `${STANDALONE_TARGET('menu')} .fabricate-icon-button`, press: 'Enter' }],
+    expectSelector: `body:has(${EXPANDED_UNDER_ROOT('menu', '.fabricate-icon-button')}) > .fabricate.fabricate-standalone-overlay > div > .fabricate-action-menu-panel button.manager-action-menu-item[data-action-menu-focused]`,
+    expectCenterHit: `${STANDALONE_LAYER_PANEL('.fabricate-action-menu-panel')} button.manager-action-menu-item.is-danger`,
+    sourceMatches: OPEN_PANEL_SOURCES,
+  }),
+  standaloneCase({
+    id: 'published-standalone-modal-open',
+    label:
+      'Specimen, mounted through the published seam — the same sixteen entries in the classless companion frame, after one step: a press on the companion’s Rename the tonic opener, a published Button whose callback passed open true to the Modal mounted closed below it, whose target has no Fabricate root, so its dialog opened on the standalone layer, centred in the viewport above the window. The dialog’s header band reads Rename the tonic over Shown to every player beside its close glyph, and its body the companion’s line Choose the name the whole table will read; the frame is the evidence that the layer draws it, and the measured equality with the player window’s dialog is the rendered suite’s',
+    // Beyond the smoke: a companion opens a dialog it mounted through `api.ui`.
+    query: { specimen: 'published-standalone' },
+    steps: [{ selector: `${STANDALONE_TARGET('opener')} .fabricate-button` }],
+    expectSelector: `body:has(${STANDALONE_TARGET('modal')} > ${STANDALONE_ROOT}) > .fabricate.fabricate-standalone-overlay > div > .fabricate-modal[aria-label="Rename the tonic"] .manager-modal-body p`,
+    expectCenterHit: `${STANDALONE_LAYER_PANEL('.fabricate-modal')} [data-manager-modal-close]`,
+    sourceMatches: STANDALONE_LAYER_SOURCES,
   }),
   playerCase({
     id: 'published-standalone-in-window',
     label:
-      'Specimen, mounted through the published seam — the twelve entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it, in two 360px columns on a --fab-bg-1 ground: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
+      'Specimen, mounted through the published seam — the sixteen entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it, in three 360px columns on a --fab-bg-1 ground: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with a Fabricate root.
     reaches: 'beyond',
     smokeLabels: [],
@@ -1632,6 +1714,6 @@ export const CASES = Object.freeze([
     expectContained: STANDALONE_CONTAINMENT,
     position: STANDALONE_WINDOW,
     kinds: ['standalone', 'specimen'],
-    sourceMatches: PUBLISHED_SEAM_SOURCES,
+    sourceMatches: STANDALONE_LAYER_SOURCES,
   }),
 ]);

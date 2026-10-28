@@ -16,6 +16,7 @@ import {
   SHIPPED,
   byName,
   declarationsOf,
+  gatedRoot,
   importClosure,
 } from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from './helpers/styleBlockScan.js';
@@ -49,7 +50,7 @@ describe('the module sheet and every component style against the published Modal
     ]);
     const entry = entryNamed('Modal');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root, entry.rest],
+      [Object.keys(entry.props), gatedRoot(entry), entry.rest],
       [
         [
           'open',
@@ -64,7 +65,7 @@ describe('the module sheet and every component style against the published Modal
         'fabricate',
         false,
       ],
-      'a published dialogProps, width, class, rest or wider root reopens the census'
+      'a published dialogProps, width, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });
 

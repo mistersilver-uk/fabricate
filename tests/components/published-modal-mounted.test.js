@@ -1,11 +1,13 @@
 /**
  * The published `Modal` on Fabricate's real Svelte runtime (issue 2656), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs, with the
+ * registered with the adapter's own table, under a Fabricate window root, with the
  * module sheet loaded: `open` drawing and removing the dialog only through `update`, the names the
  * companion's strings give it, its two content slots kept across a close, `onClose` reached by the
  * close control, Escape and outside presses, the focus it never moves, the dialog hosted by the
  * `overlayHost` option, the nearest `.fabricate-app` and the standalone layer, a second window,
- * every refusal the entry adds, and both View Lab specimens.
+ * every refusal the entry adds, the standalone style root and layer it is drawn under in a
+ * companion's own shell with a published entry in its slot (issue 2680), and both View Lab
+ * specimens.
  * Limit: happy-dom activates no button on a key, so a press by key is its click.
  * Limit: happy-dom's synchronous `dispatchEvent` runs no microtask checkpoint between listeners, so
  * no clause here claims what Foundry does after a close made inside `onClose`.
@@ -32,6 +34,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
@@ -267,6 +270,14 @@ describe('the published Modal opens and closes only through update', () => {
     assert.equal(target.firstElementChild.childNodes.length, 0, 'and it is empty');
     const dialog = dialogIn();
     assert.ok(!target.contains(dialog), 'the dialog is drawn outside target');
+    const bare = companionTarget(shells);
+    mountModal({ open: false }, { target: bare });
+    await settle();
+    assert.equal(
+      standaloneRootIn(bare).children.length,
+      0,
+      'a companion’s shell holds only the empty standalone style root while closed'
+    );
     assert.ok(dialog.parentElement.parentElement === target.parentElement, 'in the chain’s host');
   });
 
@@ -433,8 +444,7 @@ describe('the published Modal refuses', () => {
     }
   });
 
-  it('a target outside a Fabricate window (M16), and an overlayHost of another document (M18)', async () => {
-    assertRefused(required(), 'Modal needs a Fabricate window ancestor', companionTarget(shells));
+  it('an overlayHost of another document (M18)', async () => {
     const other = new Window({ url: 'http://localhost/other' });
     try {
       assertRefused(
@@ -446,6 +456,51 @@ describe('the published Modal refuses', () => {
     } finally {
       await other.happyDOM.close();
     }
+  });
+});
+
+describe('the published Modal in a companion’s own shell', () => {
+  it('keeps its one empty element in one standalone style root and draws its dialog on the standalone layer, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(shells);
+    const { handle, calls } = mountModal({}, { target });
+    await settle();
+    const kept = standaloneRootIn(target).firstElementChild;
+    assert.equal(kept.childNodes.length, 0, 'the element it keeps in target is empty');
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer?.parentElement === document.body, 'the dialog opens on the layer');
+    assert.ok(layer.contains(dialogIn()) && !target.contains(dialogIn()), 'outside the target');
+    closeIn().click();
+    flushSync();
+    assert.deepEqual(calls, [[]], 'the close control on the layer reaches onClose');
+    handle.destroy();
+    await settle();
+    assert.equal(target.childNodes.length, 0, 'the shell is empty');
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
+  });
+
+  it('counts a target in its body slot as under a root, so a Select there writes none and opens its list on the same layer', async () => {
+    const { api, handle } = mountModal({}, { target: companionTarget(shells) });
+    await settle();
+    const chosen = recorder();
+    const nested = mountIn(api, handle.slot('body'), 'Select', {
+      ...SELECT,
+      onChange: chosen.record,
+    });
+    const trigger = nested.target.querySelector('button');
+    assert.ok(
+      trigger.parentElement.parentElement === nested.target,
+      'drawn with no root of its own'
+    );
+    assert.ok(!nested.target.querySelector('.fabricate-standalone-root'), 'no root in the slot');
+    trigger.click();
+    flushSync();
+    await settle();
+    const layers = document.querySelectorAll(LAYER);
+    assert.equal(layers.length, 1, 'one layer holds the dialog and the list');
+    assert.ok(layers[0].contains(listboxIn()), 'the list opens on that layer');
+    handle.destroy();
+    await settle();
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
   });
 });
 

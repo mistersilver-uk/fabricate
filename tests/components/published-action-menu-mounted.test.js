@@ -1,12 +1,13 @@
 /**
  * The published `ActionMenu` on Fabricate's real Svelte runtime (issue 2652), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs: the trigger,
+ * registered with the adapter's own table, under a Fabricate window root: the trigger,
  * menu and items named by the companion's strings, an item's `data` dropped, the menu opening with
  * focus on an item, the keys among the items, Escape and Tab closing it, the held Enter it cancels,
  * a choice reaching `onSelect` with the item's `id`, the keys and presses that stop at the trigger
  * and the menu, the menu hosted by the `overlayHost` option, the nearest `.fabricate-app` and the
  * standalone layer, `destroy` and `update` while open, a second window, every refusal the entry
- * adds, both View Lab specimens, and the marker on each focus the menu moves.
+ * adds, the standalone style root and layer it is drawn under in a companion's own shell (issue
+ * 2680), both View Lab specimens, and the marker on each focus the menu moves.
  * Limit: happy-dom has no `:focus-visible` heuristic and paints nothing, so the marker clauses
  * prove where the stamp lands, not that a pointer-opened menu needs it or that it draws a ring.
  * Limit: happy-dom activates no button on a key, so a choice by key is its click.
@@ -35,6 +36,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -896,12 +898,7 @@ describe('the published ActionMenu refuses', () => {
     }
   });
 
-  it('a target outside a Fabricate window (M16), and an overlayHost of another document (M18)', async () => {
-    assertRefused(
-      required(),
-      'ActionMenu needs a Fabricate window ancestor',
-      companionTarget(shells)
-    );
+  it('an overlayHost of another document (M18)', async () => {
     const other = new Window({ url: 'http://localhost/other' });
     try {
       assertRefused(
@@ -913,6 +910,30 @@ describe('the published ActionMenu refuses', () => {
     } finally {
       await other.happyDOM.close();
     }
+  });
+});
+
+describe('the published ActionMenu in a companion’s own shell', () => {
+  it('draws its trigger in one standalone style root and its menu on the standalone layer, with focus on its first item, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(shells);
+    const { handle, calls, trigger } = mountMenu({}, { target });
+    const root = standaloneRootIn(target).firstElementChild;
+    assert.ok(root.contains(trigger()), 'the trigger is drawn under the root');
+    const menu = await open(trigger());
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer?.parentElement === document.body, 'the menu opens on the layer');
+    assert.ok(layer.contains(menu) && !target.contains(menu), 'outside the target');
+    assertMarks(itemsIn()[0], 'the first item');
+    itemIn('delete').click();
+    flushSync();
+    await settle();
+    assert.deepEqual(calls, [['delete']], 'a choice on the layer reaches onSelect');
+    assert.ok(focused(trigger()) === trigger(), 'focus returns to the trigger');
+    await open(trigger());
+    handle.destroy();
+    await settle();
+    assert.equal(target.childNodes.length, 0, 'the shell is empty');
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
   });
 });
 

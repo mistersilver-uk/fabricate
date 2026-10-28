@@ -876,7 +876,7 @@ test('(a) a Stepper change publishes its two frames, then the two specimens that
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam', () => {
+test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Select.svelte';
   const frames = [
     'manager-recipes-bulk-edit-check-tier',
@@ -885,6 +885,10 @@ test('(a) a Select change publishes its four frames, then the two specimens that
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-select-open',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
@@ -1071,17 +1075,21 @@ test('(a) a Pagination change publishes its four frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconPicker change publishes its frame, then the two specimens that mount it through the seam', () => {
+test('(a) an IconPicker change publishes its frame, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconPicker.svelte';
   const frames = [
     'manager-system-edit-lists',
     'manager-published-icon-picker-specimen',
     'manager-published-icon-picker-choice',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-icon-picker-open',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Modal change publishes its five frames, then the two specimens that mount it through the seam', () => {
+test('(a) a Modal change publishes its five frames, then the two specimens that mount it through the seam, then the one that opens it with no Fabricate root', () => {
   const file = 'src/ui/svelte/components/Modal.svelte';
   const frames = [
     'player-crafting-roll-prompt-basic',
@@ -1091,11 +1099,12 @@ test('(a) a Modal change publishes its five frames, then the two specimens that 
     'manager-import-folder-mapping',
     'manager-published-modal-specimen',
     'manager-published-modal-close',
+    'published-standalone-modal-open',
   ];
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam', () => {
+test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/ActionMenu.svelte';
   const frames = [
     'manager-environment-edit-automatic-force-add',
@@ -1106,6 +1115,10 @@ test('(a) an ActionMenu change publishes its six frames, then the two specimens 
     'manager-recipe-edit-ingredients-adder-menu',
     'manager-published-action-menu-specimen',
     'manager-published-action-menu-choice',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-action-menu-open',
+    'published-standalone-in-window',
   ];
   assertBroadSignalFrames(file, frames);
 });

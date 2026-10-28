@@ -1,12 +1,13 @@
 /**
  * The published `IconPicker` on Fabricate's real Svelte runtime (issue 2647), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window roots it needs: the trigger,
+ * registered with the adapter's own table, under a Fabricate window root: the trigger,
  * the list and its query field named by the companion's strings, the list opening with focus in
  * its query field, a choice by pointer and by key reaching `onChange` with the glyph's class
  * string, Escape and an outside press closing without one, the keys and presses that stop at the
  * picker, the list hosted by the `overlayHost` option, the nearest `.fabricate-app` and the
  * standalone layer, `destroy` and `update` while open, a second window, every refusal the entry
- * adds, and both View Lab specimens. The query field and the panel's names are held here because
+ * adds, the standalone style root and layer it is drawn under in a companion's own shell (issue
+ * 2680), and both View Lab specimens. The query field and the panel's names are held here because
  * the static gates pin them to the picker's defaults and keys, and the choice because it crosses
  * into the shared picker.
  */
@@ -34,6 +35,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -669,18 +671,37 @@ describe('the published IconPicker refuses', () => {
     }
   });
 
-  it('a target outside a Fabricate window (M16), and an overlayHost of another kind (M18)', () => {
-    assertRefused(
-      required(),
-      'IconPicker needs a Fabricate window ancestor',
-      companionTarget(shells)
-    );
+  it('an overlayHost of another kind (M18)', () => {
     assertRefused(
       required(),
       "overlayHost must be an element in the target's document",
       fabricateTarget(shells),
       document.createTextNode('host')
     );
+  });
+});
+
+describe('the published IconPicker in a companion’s own shell', () => {
+  it('draws its trigger in one standalone style root and its list on the standalone layer, with focus in its query field, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(shells);
+    const { handle, calls, trigger } = mountPicker({}, { target });
+    const picker = standaloneRootIn(target).firstElementChild;
+    assert.ok(picker.contains(trigger()), 'the trigger is drawn under the root');
+    const panel = await open(trigger());
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer?.parentElement === document.body, 'the list opens on the layer');
+    assert.ok(layer.contains(panel) && !target.contains(panel), 'outside the target');
+    assert.ok(document.activeElement === fieldIn(), 'focus moves into the query field');
+    press(fieldIn(), 'ArrowDown');
+    press(fieldIn(), 'Enter');
+    await settle();
+    assert.deepEqual(calls, [['fas fa-flask']], 'a choice on the layer reaches onChange');
+    assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
+    await open(trigger());
+    handle.destroy();
+    await settle();
+    assert.equal(target.childNodes.length, 0, 'the shell is empty');
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
   });
 });
 
