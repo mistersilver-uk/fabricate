@@ -56,8 +56,8 @@ game.fabricate.getGatheringEnvironmentStore() // Gathering environment persisten
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
 game.fabricate.getGatheringRichStateService() // Gathering rich-state internals
-game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
-game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
+game.fabricate.listGatheringForActor({ actor, presentTools }) // Player-visible gathering listing
+game.fabricate.startGatheringAttempt({ actor, environmentId, taskId, presentTools }) // Start gathering
 game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
 game.fabricate.listAlchemyForActor({ actorId, craftingSystemId }) // Leak-safe player alchemy listing
 game.fabricate.submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, presentTools }) // Brew an alchemy attempt
@@ -221,6 +221,9 @@ For non-GM blind or missing-environment rows, the runtime redacts task IDs, resu
 When `rememberedActorId` is omitted from `listGatheringForActor` options, it defaults to the persisted last-gathering selection (`getSelectedGatheringActorId()`), so a fresh listing honors the remembered actor.
 Passing an explicit `rememberedActorId` always overrides that default.
 This includes an explicit `null`, which forces no remembered actor.
+
+`listGatheringForActor` and `startGatheringAttempt` also accept `presentTools`, the optional station payload described for `hydrateCraftingRecipe`.
+A Tool the station supplies counts as present for the attempt's start and, when the attempt is ready, for the execute the same call sends; a timed attempt needs the station again when it is resolved from the Journal.
 
 ### Alchemy Runtime Facade
 

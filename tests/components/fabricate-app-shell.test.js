@@ -403,7 +403,7 @@ describe('SvelteFabricateApp shell window', () => {
 
     // componentId is a per-system id, so the system rides with it; an item-sourced Tool has no
     // componentId and is carried by its library Tool id (issue 1119). Every seam reads the same
-    // payload per call, and only a crafting Journal command carries it (issue 2265).
+    // payload per call, and only a crafting or gathering Journal command carries it (issues 2265, 2275).
     it('derives one system-scoped presentTools payload for every station seam, per call', async () => {
       await withFabricateLifecycleReplay(async ({ loadModule }) => {
         const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
@@ -439,12 +439,13 @@ describe('SvelteFabricateApp shell window', () => {
             assert.deepEqual(received[seam].presentTools, expected, `${seam} ${JSON.stringify(station)}`);
             assert.equal(received[seam].actorId, 'actor-1', 'the caller options survive');
           }
-          for (const runType of ['crafting', 'gathering']) {
+          for (const runType of ['crafting', 'gathering', 'salvage']) {
             services.executeJournalRunCommand({ runType, action: 'execute', payload: { trigger: 'manual' } });
             const sent = received.executeJournalRunCommand.payload;
+            const carries = runType !== 'salvage' && Boolean(expected);
             assert.equal(sent.trigger, 'manual');
-            assert.deepEqual(sent.presentTools, runType === 'crafting' ? (expected ?? undefined) : undefined);
-            assert.equal(Object.hasOwn(sent, 'presentTools'), runType === 'crafting' && Boolean(expected));
+            assert.deepEqual(sent.presentTools, carries ? expected : undefined, runType);
+            assert.equal(Object.hasOwn(sent, 'presentTools'), carries, runType);
           }
         }
       });

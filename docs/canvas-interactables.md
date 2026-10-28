@@ -215,8 +215,9 @@ This only works within the station's own crafting system.
 A station tool from one system never satisfies the same tool required by a different system.
 
 Activating a tool station opens the Crafting tab.
-The borrowed tool applies to recipe details, ingredient-choice recalculations, the shopping list, the craft action, an alchemy brew, and the Journal's stage actions, **Begin step** and **Complete stage**.
+The borrowed tool applies to recipe details, ingredient-choice recalculations, the shopping list, the craft action, an alchemy brew, a gathering attempt, and the Journal's stage actions, **Begin step** and **Complete stage**.
 Each of those actions checks for the station when you take it, so a stage begun at a station completes only while a station supplying that tool is active again.
+A timed gathering begun at a station also needs the station again to resolve from the Journal; its Journal entry does not show **Needs tools**, so resolving it without the station is refused.
 In the Journal, a stage that needs the tool shows **Needs tools** and its actions stay unavailable while you hold no copy of the tool and no station supplies it.
 With the station active, the same stage is ready to begin or complete.
 Switching stations refreshes an already-open recipe and the Journal.

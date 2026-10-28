@@ -97,10 +97,10 @@ function presentToolsFor(activeCanvasTool) {
   };
 }
 
-// The station rides every crafting Journal command as that command's own payload; nothing else
-// carries it to the active GM (issue 2265).
+// The station rides every crafting and gathering Journal command as that command's own payload;
+// nothing else carries it to the active GM (issues 2265, 2275).
 function withStationCommand(command, presentTools) {
-  if (!presentTools || command?.runType !== 'crafting') return command;
+  if (!presentTools || !['crafting', 'gathering'].includes(command?.runType)) return command;
   return { ...command, payload: { ...command.payload, presentTools } };
 }
 
