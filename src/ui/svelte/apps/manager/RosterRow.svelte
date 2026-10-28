@@ -6,7 +6,7 @@
   optional subtitle, and an On/Off grant toggle (reusing `.fabricate-toggle`).
 
   Props:
-   - name: the entry's display name (serif via the inherited `--font-primary`).
+   - name: the entry's display name, in the window's inherited face.
    - subtitle?: optional secondary line (e.g. a role or hint).
    - icon: leading Font Awesome icon class (default 'fas fa-user').
    - granted: whether access is currently granted (drives the toggle state).

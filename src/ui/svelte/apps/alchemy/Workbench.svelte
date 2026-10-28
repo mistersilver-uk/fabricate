@@ -432,7 +432,7 @@
 
   .alchemy-workbench-title h2 {
     margin: 0;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 18px;
     font-weight: 600;
     color: var(--fab-text);
@@ -575,7 +575,7 @@
   }
 
   .alchemy-chip-qty {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11px;
     font-weight: 700;
     color: var(--fab-accent);
@@ -599,7 +599,7 @@
   }
 
   .alchemy-signature-text {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11px;
     color: var(--fab-text-secondary);
   }
@@ -676,14 +676,14 @@
   }
 
   .alchemy-result-name {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 15px;
     font-weight: 600;
     color: var(--fab-text);
   }
 
   .alchemy-result-qty {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 18px;
     font-weight: 700;
     color: var(--fab-accent);
@@ -714,7 +714,7 @@
   }
 
   .alchemy-unknown-title {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 15px;
     font-weight: 600;
     color: var(--fab-warning-text);

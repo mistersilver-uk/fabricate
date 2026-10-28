@@ -293,7 +293,7 @@ describe('a widened entry and the standalone style root', () => {
     const { fontFamily, fontSize } = layer.firstElementChild.style;
     assert.deepEqual(
       [fontFamily, fontSize],
-      ['var(--font-primary)', 'var(--font-size-14)'],
+      ['var(--font-body, var(--font-primary, sans-serif))', 'var(--font-size-14)'],
       "its container states a Fabricate window's typeface and size, not the page body's"
     );
     select.destroy();

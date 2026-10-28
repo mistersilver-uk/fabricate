@@ -1,7 +1,7 @@
 /* ========================================== Crafting System Manager ========================================== */
 
 .fabricate.crafting-system-manager {
-  font-family: var(--font-primary);
+  font-family: var(--font-body, var(--font-primary, sans-serif));
 }
 
 /* The manager renders its own edge-to-edge chrome — a titlebar, a header and a three-column body — so the Foundry window frame is the only frame it needs (issue 643). */

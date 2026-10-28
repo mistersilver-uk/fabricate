@@ -1346,7 +1346,7 @@ function document_(css) {
     '<!doctype html><html><head><meta charset="utf-8">' +
     // THE HARNESS DECLARES THE TYPOGRAPHIC CONTEXT EXACTLY ONCE.
     '<style>html, body { margin: 0; padding: 0; }' +
-    'body { font-family: "Signika", sans-serif; font-size: 16px; }</style>' +
+    'body { --font-body: "Signika", sans-serif; font-family: var(--font-body); font-size: 16px; }</style>' +
     `<style id="module-sheet">${css}</style>` +
     `</head><body>${hosts}</body></html>`
   );
@@ -1671,7 +1671,7 @@ async function measureCallerSized(css) {
     await tab.setContent(
       '<!doctype html><html><head><meta charset="utf-8">' +
         '<style>html, body { margin: 0; padding: 0; }' +
-        'body { font-family: "Signika", sans-serif; font-size: 14px; }</style>' +
+        'body { --font-body: "Signika", sans-serif; font-family: var(--font-body); font-size: 14px; }</style>' +
         `<style id="module-sheet">${css}</style></head><body>` +
         `<div class="fabricate fabricate-manager"><div>${CALLER_SIZED.map((one) => one.markup).join('')}</div></div>` +
         '<div><div><button type="button" class="fabricate-icon-button" data-probe="caller-bare-icon" aria-label="Delete"><i class="fas fa-trash"></i></button></div></div>' +
@@ -2382,7 +2382,7 @@ async function measureNegativeControls(css) {
     await tab.setContent(
       '<!doctype html><html><head><meta charset="utf-8">' +
         '<style>html, body { margin: 0; padding: 0; }' +
-        'body { font-family: "Signika", sans-serif; font-size: 16px; }</style>' +
+        'body { --font-body: "Signika", sans-serif; font-family: var(--font-body); font-size: 16px; }</style>' +
         `<style id="module-sheet">${css}</style></head><body>` +
         `<div class="fabricate fabricate-manager"><div>${NEGATIVE_CONTROLS}</div></div>` +
         '</body></html>'

@@ -420,7 +420,7 @@
   .manager-party-meta {
     overflow: hidden;
     color: var(--fab-text-muted);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 400;
     text-overflow: ellipsis;
@@ -438,7 +438,7 @@
     border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-soft);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10.5px;
     font-weight: 600;
   }
@@ -502,7 +502,7 @@
     border-radius: 9px;
     color: var(--fab-text-secondary);
     background: none;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10.5px;
     font-weight: 600;
   }
@@ -514,7 +514,7 @@
   .manager-party-field-error {
     margin: 0;
     color: var(--fab-danger-text);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 500;
     line-height: 1.4;
@@ -536,7 +536,7 @@
 
   .manager-party-override-eyebrow {
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -549,7 +549,7 @@
     gap: var(--fab-space-1);
     margin: 0;
     color: var(--fab-text-muted);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 400;
     line-height: 1.4;
