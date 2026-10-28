@@ -17,9 +17,9 @@ const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
 /** The shipped gathering dormancy sentence, reused rather than re-worded. */
 const GATHERING_DORMANT_BODY = [
   'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-  'Progressive and routed gathering are not available yet, so no gathering ' +
-    'configuration you can choose today rolls a formula. Anything you set here is saved and ' +
-    'starts applying as soon as those modes ship.',
+  'Check gathering rolls a formula, so these modifiers add to its roll. A d100 task rolls ' +
+    'no formula and takes none, and Progressive is a legacy mode that is not offered for ' +
+    'new tasks.',
 ];
 
 /** The shipped gathering dormancy heading, used as this callout's `Check` fact value. */

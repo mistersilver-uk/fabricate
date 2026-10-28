@@ -276,14 +276,13 @@ Crafting, Salvage and Gathering all select over the same library.
 Each **Named modifiers** card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to World › Rules & Resources › Modifiers to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
-**Gathering is not switched on yet.**
-Progressive and routed gathering are not available yet, and while d100 resolution does roll a check — the d100 against each drop's chance — that roll cannot take check modifiers yet.
-So nothing you set on the Gathering check's modifiers applies to a roll today.
-The card says so.
-Anything you set is saved and starts applying when those gathering modes ship.
+**Gathering check modifiers apply to Check gathering.**
+A task resolved by **Check** rolls the system's gathering check, and the modifiers you select on the Gathering check add to that roll.
+A d100 task rolls the d100 against each drop's chance, and that roll cannot take check modifiers.
+Progressive is a legacy mode that is not offered for new tasks, and a legacy Progressive task rolls the gathering check, so the same modifiers add to its roll.
 
 A gathering **check** modifier and a gathering **character** modifier now come from the same library, but they are applied differently and one does not stand in for the other.
-A character modifier is attached to a drop row or an event and shifts that drop's percentage chance in d100 gathering; a check modifier is selected here and adds to a rolled formula in progressive and routed gathering.
+A character modifier is attached to a drop row or an event and shifts that drop's percentage chance in d100 gathering; a check modifier is selected here and adds to a rolled formula in Check gathering and in legacy Progressive gathering.
 Neither applies where the other does.
 
 ### Maximum picks

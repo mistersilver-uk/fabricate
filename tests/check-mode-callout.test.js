@@ -131,10 +131,11 @@ test("gathering's routed mode is dormant and reuses the shipped dormancy sentenc
       'the dormancy sentence must be the one the Modifiers section already ships, not a ' +
         'second vocabulary for the same fact'
     );
-    // The sentence must still SAY the modes are dormant, and must not do it by naming an
-    // internal issue: this is a GM-facing guide, and a tracker reference is a maintainer
-    // note that belongs in the module comment (where it still is), not on the screen.
-    assert.match(described.body.fallback, /not available yet/i);
+    // The sentence states the shipped behaviour (Check gathering rolls; Progressive is legacy)
+    // and must not name an internal issue: a tracker reference does not belong on the screen.
+    assert.match(described.body.fallback, /Check gathering rolls a formula/);
+    assert.match(described.body.fallback, /Progressive is a legacy mode/);
+    assert.doesNotMatch(described.body.fallback, /not available yet|ship/i);
     assert.doesNotMatch(
       described.body.fallback,
       /\bissues?\s+\d+/i,

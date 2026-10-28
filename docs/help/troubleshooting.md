@@ -225,7 +225,7 @@ never used to.
   Steps of a multi-step recipe do not offer that toggle yet.
 - The resolution mode has no failure outcome to produce.
   **Routed by ingredients** and **Progressive** have no failure tier or reserved failure result set,
-  and gathering's routed and progressive modes are still being built, so the setting is inert there
+  and a gathering d100 task has no failure outcome to produce, so the setting is inert there
   and the section says so.
 - On a **Routed by check** system, the failure-marked outcome tier is not assigned to any result set.
   A failing tier routes exactly like a succeeding one: it has to be bound to a result set.
