@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
-import { dropThreshold } from '../../src/systems/gatheringRichStateInternals.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
@@ -1220,7 +1219,7 @@ test('2331: an active d100 preview row carries the engine threshold for its chan
 
   assert.deepEqual(
     listing.activeRuns[0].gatheringYield.entries.map((entry) => [entry.chance, entry.threshold]),
-    [[65, dropThreshold(65)], [100, dropThreshold(100)], [0, dropThreshold(0)]],
+    [[65, 36], [100, 1], [0, 101]],
     'the clamped chance, then the roll it drops on'
   );
 });

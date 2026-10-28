@@ -93,7 +93,7 @@ The opaque blind action never shows per-task success chances.
 
 New gathering runs wait for manual collection by default.
 After starting a task, open the [Journal]({% link player-app/journal.md %}) and use its ready action.
-Depending on the task, this is **Collect**, **Roll a d100**, or **Roll check**.
+Depending on the task, this is **Collect**, **Roll a d100** (untimed runs), or **Roll check**.
 A timed run must first finish its world-time countdown.
 Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
 Starting still applies the task's established stamina, node, and reservation rules.
