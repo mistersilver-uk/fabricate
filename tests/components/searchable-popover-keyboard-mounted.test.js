@@ -1258,7 +1258,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
-  describe('Tab and focus leaving the picker (issues 2598, 2676)', () => {
+  describe('Tab and focus leaving the picker (issues 2598, 2676, 2702)', () => {
     const footer = createRawSnippet(() => ({
       render: () => '<div><button type="button" data-test-footer-stop>Done</button></div>',
     }));
@@ -1357,6 +1357,33 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         assert.equal(trigger().getAttribute('data-keyboard-focus'), 'true', JSON.stringify(props));
         harness.remount();
       }
+    });
+
+    it('enters a search-free panel`s footer on Tab from the open trigger, and leaves it from there', async () => {
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox', footer });
+      const button = trigger();
+      button.focus();
+      await openPanel();
+      const stop = () => harness.target.querySelector('[data-test-footer-stop]');
+      let event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, true, 'the trigger moves focus itself');
+      assert.ok(document.activeElement === stop(), 'focus is on the footer stop');
+      assert.ok(panelOpen(), 'and the panel stays open');
+
+      event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, true);
+      await settle();
+      assert.ok(
+        !panelOpen() && document.activeElement === button,
+        'Shift+Tab closes onto the trigger'
+      );
+
+      await openPanel();
+      pressKey('Tab');
+      event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, false, 'Tab from the last stop moves on');
+      assert.ok(!panelOpen() && document.activeElement === button, 'from the trigger');
+      harness.remount();
     });
   });
 });

@@ -74,7 +74,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, holderKeyIntent, plainTab } from '../util/listboxNavigation.js';
+  import { activeOptionId, holderKeyIntent, triggerTab } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
   import {
     PENDING_SOURCE,
@@ -339,11 +339,15 @@
     if (!staysOpenOnChoose) close();
   }
 
-  // Tab and Shift+Tab bubble, closing an open panel; every other key stops here (issue 2598).
+  // A forward Tab enters a search-free panel's footer; any other Tab closes it (issues 2598, 2702).
   function onTriggerKeydown(event) {
     if (!showSearch) onHolderKeydown(event);
-    if (!plainTab(event)) event.stopPropagation();
-    else if (open) close({ restoreFocus: false });
+    const tab = triggerTab(event, open && footer && !showSearch ? popoverRoot : null);
+    if (!tab) event.stopPropagation();
+    else if (tab.entry) {
+      event.preventDefault();
+      tab.entry.focus();
+    } else if (open) close({ restoreFocus: false });
     triggerOnKeydown?.(event);
   }
 

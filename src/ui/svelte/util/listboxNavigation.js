@@ -248,6 +248,12 @@ export function plainTab(event) {
   );
 }
 
+/** `null` for a key but a plain Tab; else `{ entry }`, the stop of `panel` a forward Tab enters. */
+export function triggerTab(event, panel) {
+  if (!plainTab(event)) return null;
+  return { entry: (!event.shiftKey && panelTabStops(panel)[0]) || null };
+}
+
 /** A Tab leaving the panel: `'forward'` from its last stop, `'back'` from its first, or `null`. */
 export function panelTabExit(event, panel) {
   if (!plainTab(event)) return null;
