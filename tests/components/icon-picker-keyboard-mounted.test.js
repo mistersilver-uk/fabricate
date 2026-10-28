@@ -284,6 +284,17 @@ describe('1503 IconPicker — the listbox focus model', () => {
     );
   });
 
+  it('closes on Tab in the query field with focus on the trigger, for the browser to move on (issue 2676)', async () => {
+    chosen.length = 0;
+    const { root } = await openPanel();
+    const event = pressKey('Tab');
+    assert.equal(event.defaultPrevented, false, 'the browser moves Tab on from the trigger');
+    assert.ok(globalThis.document.activeElement === trigger(root), 'focus is on the trigger');
+    assert.ok(!root.querySelector('.fabricate-icon-picker-popover'), 'the panel is closed');
+    assert.equal(trigger(root).getAttribute('data-keyboard-focus'), 'true');
+    assert.deepEqual(chosen, [], 'nothing was chosen');
+  });
+
   it('names no row when the query matches nothing, and leaves the arrows to the field', async () => {
     const { panel } = await openPanel();
     const holder = holderOf(panel);

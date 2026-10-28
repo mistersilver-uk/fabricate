@@ -222,6 +222,48 @@ describe('SetPicker (mounted)', () => {
       assert.ok(picker.selected().includes('Blacksmith'), 'and keeps the staged choice');
       assert.ok(document.activeElement === picker.field(), 'and focus stays in the query field');
     });
+
+    /** Tab or Shift+Tab on the focused element, settled; the event, to read its default. */
+    async function pressTab(shiftKey = false) {
+      const event = new globalThis.KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.activeElement.dispatchEvent(event);
+      await settle();
+      return event;
+    }
+
+    it('closes on Tab from Apply, the last stop, discarding the buffer and moving on from the Add (issue 2676)', async () => {
+      const picker = await mountPicker(overflowing);
+      picker.more().click();
+      await settle();
+      await picker.choose('Blacksmith');
+      picker.apply().focus();
+      const event = await pressTab();
+      assert.equal(event.defaultPrevented, false, 'the browser moves Tab on');
+      assert.ok(!picker.panel(), 'the panel is closed');
+      assert.ok(document.activeElement === picker.trigger(), 'focus is on the Add, not "+N more"');
+      assert.deepEqual(picker.calls, [], 'nothing was applied');
+      await picker.open();
+      assert.ok(!picker.selected().includes('Blacksmith'), 'the staged choice was discarded');
+    });
+
+    it('closes on Shift+Tab from the query field, discarding the buffer and focusing "+N more"', async () => {
+      const picker = await mountPicker(overflowing);
+      picker.more().click();
+      await settle();
+      await picker.choose('Blacksmith');
+      const event = await pressTab(true);
+      assert.equal(event.defaultPrevented, true);
+      assert.ok(!picker.panel(), 'the panel is closed');
+      assert.ok(document.activeElement === picker.more(), 'focus returns to "+N more"');
+      assert.deepEqual(picker.calls, []);
+      await picker.open();
+      assert.ok(!picker.selected().includes('Blacksmith'), 'the staged choice was discarded');
+    });
   });
 
   describe('staged commit', () => {

@@ -2,8 +2,9 @@
   The Journal's run-type filter: `SearchablePopover`'s multi-select over the four kinds, with no
   query field, so the trigger holds the listbox contract. Each choice commits as it is made; a row
   draws the shared box, the kind's glyph, its name and its run count, and the footer switches every
-  hidden kind back on. Props: `shownKinds` (the store's set), `runs` (every listed run, counted per
-  kind before any filter) and `onToggle(kind)`, the one write the store offers.
+  hidden kind back on and closes the panel onto the trigger, since its own press disables it.
+  Props: `shownKinds` (the store's set), `runs` (every listed run, counted per kind before any
+  filter) and `onToggle(kind)`, the one write the store offers.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -58,14 +59,17 @@
   <span class="journal-kind-count" data-journal-kind-count={option.id}>{counts[option.id]}</span>
 {/snippet}
 
-{#snippet showAllFooter()}
+{#snippet showAllFooter({ close })}
   <div class="journal-kind-footer">
     <Button
       role="ghost"
       fullWidth
       data-journal-kind-show-all=""
       disabled={shown.length === RUN_KINDS.length}
-      onclick={showAll}
+      onclick={() => {
+        showAll();
+        close();
+      }}
     >
       <i class="fas fa-xmark" aria-hidden="true"></i>
       {localize('FABRICATE.App.Journal.Filters.Kind.ShowAll')}

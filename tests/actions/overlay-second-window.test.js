@@ -347,6 +347,61 @@ describe('dismissOnOutsideClick in a second window', () => {
     assert.equal(dismissed.length, 2, 'a destroyed action leaves no listener');
   });
 
+  it('calls onFocusLeave for a relatedTarget of another realm, told by nodeType', () => {
+    const node = doc.createElement('div');
+    const field = doc.createElement('input');
+    node.append(field);
+    doc.body.append(node);
+    const left = [];
+    const handle = dismissOnOutsideClick(node, {
+      onFocusLeave: (event) => {
+        left.push(event.relatedTarget);
+      },
+    });
+    const outside = foreignNode(1);
+    field.dispatchEvent(
+      Object.defineProperty(new second.FocusEvent('focusout', { bubbles: true }), 'relatedTarget', {
+        value: outside,
+      })
+    );
+    field.dispatchEvent(
+      Object.defineProperty(new second.FocusEvent('focusout', { bubbles: true }), 'relatedTarget', {
+        value: { nodeName: 'BUTTON' },
+      })
+    );
+    assert.ok(
+      left.length === 1 && left[0] === outside,
+      'a foreign node leaves; a non-node does not'
+    );
+    handle.destroy();
+  });
+
+  it('hears the new document’s focusout once re-enabled after adoptNode', () => {
+    const node = document.createElement('div');
+    const field = document.createElement('input');
+    node.append(field);
+    document.body.append(node);
+    const left = [];
+    const onFocusLeave = () => {
+      left.push('left');
+    };
+    const handle = dismissOnOutsideClick(node, { onFocusLeave });
+    doc.body.append(doc.adoptNode(node));
+    const outside = doc.createElement('button');
+    doc.body.append(outside);
+    const leave = () =>
+      field.dispatchEvent(
+        new second.FocusEvent('focusout', { bubbles: true, relatedTarget: outside })
+      );
+    leave();
+    assert.deepEqual(left, [], 'still bound to the document it was enabled in');
+    handle.update({ enabled: false, onFocusLeave });
+    handle.update({ enabled: true, onFocusLeave });
+    leave();
+    assert.deepEqual(left, ['left']);
+    handle.destroy();
+  });
+
   // happy-dom delivers mutation records from a microtask, and a later task sees them all.
   const settle = () => new Promise((done) => setTimeout(done, 0));
 
