@@ -2830,7 +2830,7 @@
         "Titlebar": {
           "Premium": "PREMIUM",
           "PremiumStatus": "Fabricate Premium is installed and connected",
-          "Status": "Selected system resolution",
+          "Status": "Selected system resolution:",
           "OutcomeTier": "outcome tier",
           "OutcomeTiers": "outcome tiers"
         },
