@@ -17,8 +17,11 @@ import {
   foundryReads,
   importClosure,
   isComponent,
+  isNameRead,
   propLocals,
   publishedLocals,
+  referencedNames,
+  relativeImports,
   syntheticReader,
 } from './publishedComponentGate.js';
 
@@ -223,6 +226,74 @@ const unchained = (expression) =>
 /** A value that is, or may hold, an item of a collection the entry does not publish (or a whole one). */
 const UNNAMEABLE = Object.freeze({ key: null });
 
+/** A script local derived from published data: unnameable like `UNNAMEABLE`, and told apart from an unknown name. */
+const TAINTED = Object.freeze({ key: null });
+
+/** Whether an origin is a published key, or a local derived from one. */
+const holdsData = (origin) => origin.key !== null || origin === TAINTED;
+
+/** The identifiers under `ast` that read `name`, each with its ancestors, less imports and declared patterns. */
+function readsOf(ast, name) {
+  const reads = [];
+  for (const root of [ast.fragment, ast.module, ast.instance]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== name) return;
+      if (!isNameRead(node, ancestors.at(-1))) return;
+      const declared = (at) =>
+        at.type === 'ImportDeclaration' ||
+        (at.type === 'VariableDeclarator' && [...walkNodes(at.id)].includes(node));
+      if (ancestors.every((at) => !declared(at))) reads.push({ node, ancestors });
+    });
+  }
+  return reads;
+}
+
+const COMPARISONS = new Set(['==', '!=', '===', '!==']);
+
+/** Whether a read of a snippet only tests it: its result is a boolean, so the snippet goes nowhere. */
+function isTest({ node, ancestors }) {
+  const parent = ancestors.at(-1);
+  if (parent?.type === 'UnaryExpression')
+    return parent.operator === '!' || parent.operator === 'typeof';
+  if (parent?.type === 'BinaryExpression') return COMPARISONS.has(parent.operator);
+  return ['IfBlock', 'ConditionalExpression'].includes(parent?.type) && parent.test === node;
+}
+
+/** Whether a read of a snippet is the callee of a `{@render}`, the name its `{#snippet}` declares, or a test. */
+function staysPut(read) {
+  const { node, ancestors } = read;
+  const tag = ancestors.findLast((at) => at.type === 'RenderTag');
+  return (
+    (tag && renderCall(tag).callee === node) ||
+    (ancestors.at(-1)?.type === 'SnippetBlock' && ancestors.at(-1).expression === node) ||
+    isTest(read)
+  );
+}
+
+/** Whether `node` writes an object literal in each branch, or maps an array to one (what a literal local traces by its keys). */
+function isLiteralTree(node) {
+  const at = unchained(node);
+  if (at.type === 'ObjectExpression') return true;
+  if (at.type === 'ConditionalExpression') {
+    return isLiteralTree(at.consequent) && isLiteralTree(at.alternate);
+  }
+  return mappedLiteral(at) !== undefined;
+}
+
+/** The literal an `array.map((x) => <literal>)` call returns for each element, else `undefined`. */
+function mappedLiteral(node) {
+  const [callback] = node.arguments ?? [];
+  const mapping =
+    node.type === 'CallExpression' &&
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.name === 'map' &&
+    node.arguments.length === 1 &&
+    callback.type === 'ArrowFunctionExpression' &&
+    callback.expression;
+  return mapping && isLiteralTree(callback.body) ? callback.body : undefined;
+}
+
 /** The names a binding pattern introduces. */
 function boundNames(pattern) {
   if (pattern.type === 'Identifier') return [pattern.name];
@@ -261,18 +332,26 @@ const through = (origin, path) =>
     ? UNNAMEABLE
     : { key: origin.key, members: [...origin.members, ...path] };
 
+/** The expression an attribute value is exactly, bare or alone inside quotes; else `undefined`. */
+function singleExpression(value) {
+  const parts = [value].flat();
+  return parts.length === 1 ? parts[0]?.expression : undefined;
+}
+
 /**
  * The places a published entry's closure spreads attributes from a value that is, or may be, data
  * the caller published, as `{ key, members }`: the published `data` key and the members read below
  * it, an `{#each}` item counting as the value it iterates, a `{@const}` as its initialiser and a
  * snippet parameter of the entry's own file as the arguments that file, or a child it hands the
  * snippet to, renders it with, an object literal's plain key read by name (a snippet nothing
- * renders is unnameable; issue 2647). `{ key: null }` is a value that may be an item of a
- * collection the entry does not publish. A spread of the file's `$props()` rest is no item, and so
- * is one of a script-level `const` or `$derived` unless it is an object literal, whose spreads and
- * computed keys are traced, a branch or call inside it counting as its values (what a script
- * function closes over is not traced). A child's `$props()` key is what its parents pass it. An
- * object literal writes its own keys: each computed key and each spread inside it is traced as a
+ * renders, or one read anywhere but a render, a test or the tag that hands it, is unnameable;
+ * issues 2647, 2607). `{ key: null }` is a value that may be an item of a collection the entry
+ * does not publish. A spread of the file's `$props()` rest is no item. A script-level `const` or
+ * `$derived` is no item unless it reads published data, in which case it is unnameable, or it is an
+ * object literal (under a condition, or mapped from an array), whose spreads and computed keys are
+ * traced, a branch or call inside it counting as its values. A child's `$props()` key is what its
+ * parents pass it, and unnameable where a parent draws the child other than by a component tag.
+ * An object literal writes its own keys: each computed key and each spread inside it is traced as a
  * spread is (issue 2601). Every other spread fails closed.
  */
 function spreadTracer(entry, reader) {
@@ -298,11 +377,12 @@ function spreadTracer(entry, reader) {
           const derived = callee?.name === '$derived' || callee?.object?.name === '$derived';
           if (callee?.name === '$props') {
             const rest = id.properties?.find((property) => property.type === 'RestElement');
-            if (rest) names.set(rest.argument.name, null);
+            if (rest) names.set(rest.argument.name, { kind: 'rest' });
           } else if (statement.kind === 'const' || derived) {
             const value = callee?.name === '$derived' ? init.arguments[0] : init;
-            const literal = id.type === 'Identifier' && value?.type === 'ObjectExpression';
-            for (const name of boundNames(id)) names.set(name, literal ? value : null);
+            const literal = id.type === 'Identifier' && isLiteralTree(value);
+            const held = { kind: literal ? 'literal' : 'derived', value };
+            for (const name of boundNames(id)) names.set(name, held);
           }
         }
       }
@@ -341,50 +421,70 @@ function spreadTracer(entry, reader) {
       });
 
   /** The keys a tag hands `snippet` as: its own name when it is the tag's content, else each attribute naming it. */
-  const handedAs = (tag, snippet) => [
+  const handedAs = (tag, snippet, handed) => [
     ...(tag.fragment?.nodes.some((n) => n.type === 'SnippetBlock' && n.expression.name === snippet)
       ? [snippet]
       : []),
     ...tag.attributes
       .filter(
-        ({ type, value }) => type === 'Attribute' && [value].flat()[0]?.expression?.name === snippet
+        ({ type, value }) => type === 'Attribute' && singleExpression(value)?.name === snippet
       )
-      .map(({ name }) => name),
+      .map(({ name, value }) => {
+        handed.add(singleExpression(value));
+        return name;
+      }),
   ];
+
+  /** Whether `file` reads `name` anywhere but as a `{@render}` callee, a declaration, a test or a `handed` node. */
+  const strays = (file, name, handed = new Set()) =>
+    readsOf(asts.get(file), name).some((read) => !staysPut(read) && !handed.has(read.node));
 
   const renderedWith = (file, snippet, index, path) => {
     const own = rendersOf(file, snippet.name, index, path);
+    const handed = new Set();
     const byChildren = componentTags(file, asts.get(file)).flatMap(([child, tag]) => {
-      const keys = handedAs(tag, snippet.name);
+      const accounted = new Set();
+      const keys = handedAs(tag, snippet.name, accounted);
       if (keys.length === 0 || !asts.has(child)) return [];
+      for (const node of accounted) handed.add(node);
       const locals = propLocals(asts.get(child)).filter(({ key }) => keys.includes(key));
       return locals.flatMap(({ local }) =>
-        guarded(`${child}#${local}`, () => rendersOf(child, local, index, path))
+        guarded(`${child}#${local}`, () => [
+          ...rendersOf(child, local, index, path),
+          ...(strays(child, local) ? [UNNAMEABLE] : []),
+        ])
       );
     });
-    return [...own, ...byChildren];
+    return [...own, ...byChildren, ...(strays(file, snippet.name, handed) ? [UNNAMEABLE] : [])];
   };
 
+  /** Whether `parent` reads the binding of its import of `file` anywhere but as a component tag. */
+  const drawnApart = (parent, file) =>
+    [...relativeImports(parent, asts.get(parent))]
+      .filter(([, path]) => path === file)
+      .some(([binding]) => readsOf(asts.get(parent), binding).length > 0);
+
   const passedTo = (file, key) =>
-    guarded(`${file}:${key}`, () =>
-      files.flatMap((parent) =>
+    guarded(`${file}:${key}`, () => {
+      const tags = files.flatMap((parent) =>
         componentTags(parent, asts.get(parent))
           .filter(([child]) => child === file)
-          .flatMap(([, tag]) =>
-            tag.attributes
-              .filter((attribute) => attribute.name === key)
-              .map((attribute) =>
-                attribute.type === 'BindDirective'
-                  ? attribute.expression
-                  : attribute.value?.expression
-              )
-              .filter(Boolean)
-              .flatMap((expression) =>
-                originsOf(expression, parent, ancestorsOf.get(parent).get(tag))
-              )
+          .map(([, tag]) => [parent, tag])
+      );
+      const passes = tags.flatMap(([parent, tag]) =>
+        tag.attributes
+          .filter((attribute) => attribute.name === key)
+          .map((attribute) =>
+            attribute.type === 'BindDirective'
+              ? attribute.expression
+              : singleExpression(attribute.value)
           )
-      )
-    );
+          .filter(Boolean)
+          .flatMap((expression) => originsOf(expression, parent, ancestorsOf.get(parent).get(tag)))
+      );
+      const untraced = tags.length === 0 || files.some((parent) => drawnApart(parent, file));
+      return untraced ? [...passes, UNNAMEABLE] : passes;
+    });
 
   function fromScope(name, file) {
     const ast = asts.get(file);
@@ -394,12 +494,17 @@ function spreadTracer(entry, reader) {
       if (key !== undefined) return entry.props[key].kind === 'data' ? [{ key, members: [] }] : [];
       if (prop) return [];
     }
-    const locals = scriptLocals.get(file);
-    if (locals.has(name)) {
-      const literal = locals.get(name);
-      return literal ? guarded(literal, () => literalOrigins(literal, file)) : [];
-    }
+    const held = scriptLocals.get(file).get(name);
+    if (held) return guarded(held, () => localOrigins(held, file));
     return prop ? passedTo(file, prop.key) : [UNNAMEABLE];
+  }
+
+  /** A script local's origins: a rest and a plain constant hold none, a literal its keys, a derived value any data it reads. */
+  function localOrigins({ kind, value }, file) {
+    if (kind === 'literal') return literalOrigins(value, file);
+    if (kind === 'rest') return [];
+    const reads = [...referencedNames(value)];
+    return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [TAINTED] : [];
   }
 
   /** A script-level literal's origins: its plain keys are no item, a branch or call is its values. */
@@ -409,7 +514,11 @@ function spreadTracer(entry, reader) {
       return [node.consequent, node.alternate].flatMap((branch) => literalOrigins(branch, file));
     }
     if (node.type === 'CallExpression') {
-      return node.arguments.flatMap((argument) => literalOrigins(argument, file));
+      const mapped = mappedLiteral(node);
+      if (mapped) return literalOrigins(mapped, file);
+      const base =
+        node.callee.type === 'MemberExpression' ? originsOf(node.callee.object, file, []) : [];
+      return [...base, ...node.arguments.flatMap((argument) => literalOrigins(argument, file))];
     }
     if (node.type !== 'ObjectExpression') return originsOf(node, file, []);
     return node.properties.flatMap((property) => {

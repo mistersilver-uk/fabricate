@@ -1614,8 +1614,9 @@ The list commits human decisions only, so no total or baseline is committed and 
 A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
 - **A per-item spread is stripped or the check fails, and the check fails closed.**
 Every spread attribute in a published closure is traced to the published `data` it comes from.
-A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that is not an object literal, a published key that is not `data`, and a literal.
-A script-level `const` or `$derived` object literal is traced by its spreads and computed keys, a branch or call inside it counting as its values, and a value a script function closes over is not traced.
+A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that reads no published `data` and is not an object literal, a published key that is not `data`, and a literal.
+A script-level `const` or `$derived` local that reads published `data` and is not an object literal is unnameable, so a spread of an alias of an item fails closed like one of the item.
+A script-level `const` or `$derived` object literal, under a condition or mapped from an array, is traced by its spreads and computed keys, a branch or call inside it counting as its values, and a value a script function closes over is not traced.
 A spread of a member of published `data` passes only when it is a stripped member.
 Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
 A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
@@ -1624,8 +1625,10 @@ A failing spread of a whole item, of an expression no rule traces or of an unpub
 The one stripped member is `InfoStrip.facts.props`.
 A row fails when no published closure spreads that member, whether its key is not `data`, its entry is not published or the component stopped spreading it.
 A spread inside a snippet declared in a child component's file is not traced.
-A snippet the entry declares is traced only through the `{@render}` tags of the entry's own file, so one nothing there renders by name fails closed, whether the render is aliased, made with `.call`, or done by a child component the snippet is passed to.
-These shapes are not traced, and are tracked in issue 2607: a `const` or `$derived` alias of published data, a snippet passed to a child component as a prop (the child's own render of it is not followed), a child drawn through `svelte:component` or a `{@const}` component alias, and a quoted attribute such as `item="{item}"`.
+A snippet the entry declares is traced through the `{@render}` tags of the entry's own file, and through those of a child component it is passed to by name or inside the tag.
+A snippet read anywhere but as a `{@render}` callee, a test or the tag that passes it, in the entry or in the child, is unnameable, whether the read is an alias, a `.call`, or a pass to a further component, and so is one nothing renders.
+A child component's `$props()` key is what the tags that draw it pass, an expression that is the whole of a quoted value included.
+It is unnameable when no component tag draws the child, or a parent also draws it other than by a tag, through `svelte:component`, an `{@const}` alias or a script alias.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
