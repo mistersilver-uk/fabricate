@@ -241,8 +241,18 @@ const unchained = (expression) =>
 /** A value that is, or may hold, an item of a collection the entry does not publish (or a whole one). */
 const UNNAMEABLE = Object.freeze({ key: null });
 
-/** A name no rule resolves, an import or a global: it holds no data, and a spread of it still fails closed. */
+/** A name that is an import or a listed global: it holds no data, and a spread of it still fails closed. */
 const UNRESOLVED = Object.freeze({ key: null });
+
+/**
+ * The globals and runes a script may read without reading data; every other name no rule resolves
+ * is unnameable, so a name missing here makes an alias of it fail closed rather than pass.
+ */
+const KNOWN_GLOBALS = new Set(
+  'Array Boolean Date JSON Map Math Number Object Set String Symbol Infinity NaN undefined globalThis window document console $derived $state $effect $inspect $host'.split(
+    ' '
+  )
+);
 
 /** Whether an origin is, or may hold, published data: every origin but a name no rule resolves. */
 const holdsData = (origin) => origin !== UNRESOLVED;
@@ -295,7 +305,7 @@ function isLiteralTree(node) {
   return mappedLiteral(at) !== undefined;
 }
 
-/** The `{#each}` a mapped call stands for: its first parameter is an element of the array it maps. */
+/** The `{#each}` a mapped call stands for: its parameters are an element of the array and its index. */
 function elementOf(call) {
   const [element, index] = call.arguments[0].params;
   return {
@@ -304,6 +314,22 @@ function elementOf(call) {
     index: index?.name,
     expression: call.callee.object,
   };
+}
+
+/** The names a script expression declares inside itself: callback parameters and local declarations. */
+function declaredWithin(expression) {
+  const names = new Set();
+  for (const node of walkNodes(expression)) {
+    const patterns = [
+      ...(node.type.endsWith('FunctionExpression') || node.type === 'ArrowFunctionExpression'
+        ? node.params
+        : []),
+      ...(node.type === 'VariableDeclarator' ? [node.id] : []),
+      ...(node.type === 'CatchClause' && node.param ? [node.param] : []),
+    ];
+    for (const pattern of patterns) for (const name of boundNames(pattern)) names.add(name);
+  }
+  return names;
 }
 
 /** The literal an `array.map((x) => <literal>)` call returns for each element, else `undefined`. */
@@ -373,9 +399,10 @@ function singleExpression(value) {
  * renders, or one read anywhere but a render, a test or the tag that hands it, is unnameable;
  * issues 2647, 2607). `{ key: null }` is a value that may be an item of a collection the entry
  * does not publish. A spread of the file's `$props()` rest is no item. A script-level `const` or
- * `$derived` is no item unless it reads published data, in which case it is unnameable, or it is an
- * object literal (under a condition, or mapped from an array), whose spreads and computed keys are
- * traced, a branch or call inside it counting as its values. A child's `$props()` key is what its
+ * `$derived` holds no data when every name it reads is an import, a function declared in the file
+ * or a `KNOWN_GLOBALS` member, and is otherwise unnameable, as is every other name no rule
+ * resolves. An object literal (under a condition, or mapped from an array) has its spreads and
+ * computed keys traced, a branch or call inside it counting as its values. A child's `$props()` key is what its
  * parents pass it, and unnameable where a parent draws the child other than by a component tag.
  * An object literal writes its own keys: each computed key and each spread inside it is traced as a
  * spread is (issue 2601). Every other spread fails closed.
@@ -392,14 +419,20 @@ function spreadTracer(entry, reader) {
   );
   const topLevel = (ast) =>
     [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
-  const opaqueNames = new Map();
+  const scopeNames = new Map();
   const scriptLocals = new Map(
     files.map((file) => {
       const ast = asts.get(file);
       const names = new Map();
-      const opaque = new Set();
-      opaqueNames.set(file, opaque);
-      for (const statement of topLevel(ast)) {
+      const imports = new Set();
+      const functions = new Set();
+      scopeNames.set(file, { imports, functions });
+      for (const exported of topLevel(ast)) {
+        const statement = exported.declaration ?? exported;
+        if (exported.type === 'ImportDeclaration') {
+          for (const specifier of exported.specifiers) imports.add(specifier.local.name);
+        }
+        if (statement.type === 'FunctionDeclaration') functions.add(statement.id.name);
         if (statement.type !== 'VariableDeclaration') continue;
         for (const { id, init } of statement.declarations) {
           const callee = init?.callee;
@@ -412,8 +445,6 @@ function spreadTracer(entry, reader) {
             const literal = id.type === 'Identifier' && isLiteralTree(value);
             const held = { kind: literal ? 'literal' : 'derived', value };
             for (const name of boundNames(id)) names.set(name, held);
-          } else {
-            for (const name of boundNames(id)) opaque.add(name);
           }
         }
       }
@@ -528,14 +559,19 @@ function spreadTracer(entry, reader) {
     const held = scriptLocals.get(file).get(name);
     if (held) return guarded(held, () => localOrigins(held, file));
     if (prop) return passedTo(file, prop.key);
-    return opaqueNames.get(file).has(name) ? [UNNAMEABLE] : [UNRESOLVED];
+    // A function declaration is read as holding no data (a stated limit); a class, a let, an
+    // export and anything unknown is unnameable.
+    const { imports, functions } = scopeNames.get(file);
+    const clean = imports.has(name) || functions.has(name) || KNOWN_GLOBALS.has(name);
+    return clean ? [UNRESOLVED] : [UNNAMEABLE];
   }
 
   /** A script local's origins: a rest and a plain constant hold none, a literal its keys, a derived value any data it reads. */
   function localOrigins({ kind, value }, file) {
     if (kind === 'literal') return literalOrigins(value, file);
     if (kind === 'rest') return [];
-    const reads = [...referencedNames(value)];
+    const inside = declaredWithin(value);
+    const reads = [...referencedNames(value)].filter((read) => !inside.has(read));
     return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [UNNAMEABLE] : [];
   }
 

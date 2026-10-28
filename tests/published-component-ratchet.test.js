@@ -852,6 +852,26 @@ describe('the per-item spreads of a published closure', () => {
       assert.deepEqual(idsOf(code, '<i {...again}></i>'), [UNNAMED]);
     });
 
+    it('an alias of an exported const, a class field or a mapped callback’s array', () => {
+      const shapes = {
+        'an exported const': [
+          'export const first = items[0]; const a = $derived(first);',
+          '<i {...a}></i>',
+        ],
+        'a class field': [
+          'class S { f = $derived(items[0]); } const s = new S(); const a = $derived(s.f);',
+          '<i {...a}></i>',
+        ],
+        'the array a mapped callback receives': [
+          'const copies = $derived(items.map((x, i, arr) => ({ ...arr }))); const again = copies;',
+          '<i {...again[0]}></i>',
+        ],
+      };
+      for (const [shape, [alias, body]] of Object.entries(shapes)) {
+        assert.deepEqual(idsOf(`${PROPS} ${alias}`, body), [UNNAMED], shape);
+      }
+    });
+
     it('but not an alias of an imported call, a constant or a text prop', () => {
       const make = { 'src/make.js': 'export const make = (value) => ({ value });' };
       const code = `import { make } from './make.js'; ${PROPS} const k = 5;`;
@@ -859,6 +879,8 @@ describe('the per-item spreads of a published closure', () => {
         'const a = $derived(make(tone)); const b = a;',
         'const b = $derived(make(k));',
         'const a = $derived(tone); const b = $derived(a + k);',
+        'const a = $derived(Math.max(k, 2)); const b = a;',
+        'const a = $derived(JSON.stringify(tone)); const b = a;',
       ]) {
         assert.deepEqual(idsOf(`${code} ${alias}`, '<i {...b}></i>', make), [], alias);
       }
@@ -876,6 +898,11 @@ describe('the per-item spreads of a published closure', () => {
 
   describe('records the shapes the item-spread gate does not trace (issue 2607)', () => {
     const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
+
+    it('passes a plain-key value of an object literal, which is not traced', () => {
+      const code = `${PROPS} const w = $derived({ items }); const a = w;`;
+      assert.deepEqual(idsOf(code, '<i {...a.items[0]}></i>'), []);
+    });
 
     it('passes a derived value that reads the items only through a script function', () => {
       const code = `${PROPS} function pick() { return items[0]; } const first = $derived(pick());`;

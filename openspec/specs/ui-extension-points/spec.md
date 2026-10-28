@@ -1615,9 +1615,11 @@ A change that makes a listed component fail a static rule, or stops it being a c
 - **A per-item spread is stripped or the check fails, and the check fails closed.**
 Every spread attribute in a published closure is traced to the published `data` it comes from.
 A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that reads no published `data` and is not an object literal, a published key that is not `data`, and a literal.
-A script-level `const` or `$derived` local that is not an object literal, and reads published `data`, a value that is unnameable here, or a top-level `let`, is itself unnameable, so a spread of an alias of an item fails closed like one of the item.
-A name that is an import or a global holds no data, so a local derived from one and from constants passes.
-A script-level `const` or `$derived` object literal, under a condition or mapped from an array, is traced by its spreads and computed keys, a branch or call inside it counting as its values, and the parameter of a mapped array's callback standing for an element of that array as an `{#each}` context does.
+A script-level `const` or `$derived` local that is not an object literal is traced by the names it reads, less the parameters and declarations inside its own expression.
+It holds no data when every name it reads is clean, and it is unnameable, so a spread of an alias of an item fails closed like one of the item, when it reads any other.
+A name is clean when it is an import of the file, a function declared in the file (a limit below), a rune, or one of `Array`, `Boolean`, `Date`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Set`, `String`, `Symbol`, `Infinity`, `NaN`, `undefined`, `globalThis`, `window`, `document` and `console`.
+Every other name no rule resolves is unnameable: a top-level `let`, a class, the whole `$props()` object and any name not listed.
+A script-level `const` or `$derived` object literal, under a condition or mapped from an array, is traced by its spreads and computed keys, a branch or call inside it counting as its values, and the first two parameters of a mapped array's callback standing for an element of that array and its index as an `{#each}` context does, and any further parameter being unnameable.
 A spread of a member of published `data` passes only when it is a stripped member.
 Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
 A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
@@ -1632,6 +1634,7 @@ A child component's `$props()` key is what the tags that draw it pass, an expres
 It is unnameable when no component tag draws the child, or a parent also draws it other than by a tag, through `svelte:component`, an `{@const}` alias or a script alias.
 - **Limit: these shapes are not traced, and a spread through them passes.**
 A script-level `const` or `$derived` that reads published `data` only through a function declared in the script, whose body the check does not read.
+A plain-key value of a script-level object literal, such as `{ items }` or `{ a: items[0] }`, because the check traces only a literal's spreads and computed keys.
 A snippet passed to a child component that forwards it through its rest props.
 A child component that a script module in the closure also draws, which no component tag reads.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
