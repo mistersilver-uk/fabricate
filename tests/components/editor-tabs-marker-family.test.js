@@ -537,7 +537,9 @@ describe('EditorTabs names what a record count counts (issue 2491)', () => {
       'a suppressed zero draws nothing, so it names nothing'
     );
     assert.equal(
-      await nameOf({ outcomes: { vehicle: 'count', label: 0, name: '0 outcomes', suppressZero: false } }),
+      await nameOf({
+        outcomes: { vehicle: 'count', label: 0, name: '0 outcomes', suppressZero: false },
+      }),
       'Outcomes, 0 outcomes'
     );
     const root = await harness.mount({

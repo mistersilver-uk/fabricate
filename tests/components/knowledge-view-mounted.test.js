@@ -258,7 +258,8 @@ describe('KnowledgeView mounted behaviour', () => {
 
   it('names what each tab`s record count counts', async () => {
     const target = await harness.mount(makeProps());
-    const name = (id) => target.querySelector(`[data-knowledge-tab="${id}"]`).getAttribute('aria-label');
+    const name = (id) =>
+      target.querySelector(`[data-knowledge-tab="${id}"]`).getAttribute('aria-label');
     assert.equal(name(KNOWLEDGE_TAB_RECIPE_ITEMS), 'Recipe items, 1 recipe item');
     assert.equal(name(KNOWLEDGE_TAB_LEARNED_RECIPES), 'Learned recipes, 1 learned recipe');
     const ownedCopies = [rawCopy(), rawCopy({ itemId: 'i2', itemUuid: 'Actor.a1.Item.i2' })];
