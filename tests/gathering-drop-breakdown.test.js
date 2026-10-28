@@ -315,8 +315,9 @@ test('issue 2331: the Journal states the threshold the roll evaluates against, w
   const unmodified = new Map(authored.map((entry) => [entry.id, entry.threshold]));
   const environment = thresholdEnvironment();
   const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
-  for (const row of resolved.itemRows.filter((entry) => ['plain', 'never'].includes(entry.id))) {
-    assert.equal(unmodified.get(row.id), row.threshold, `${row.id}: the authored preview row`);
+  const rolledUnmodified = new Map(resolved.itemRows.map((row) => [row.id, row.threshold]));
+  for (const id of ['plain', 'never']) {
+    assert.equal(unmodified.get(id), rolledUnmodified.get(id), `${id}: the authored preview row`);
   }
 });
 
