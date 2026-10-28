@@ -260,18 +260,29 @@ describe('anchoredPopover in a second window', () => {
   });
 
   it('re-measures when the panel’s own document finishes loading its fonts', async () => {
-    const { promise: ready, resolve } = Promise.withResolvers();
-    Object.defineProperty(doc, 'fonts', { value: { ready }, configurable: true });
+    const own = Promise.withResolvers();
+    const other = Promise.withResolvers();
+    Object.defineProperty(doc, 'fonts', { value: { ready: own.promise }, configurable: true });
+    Object.defineProperty(document, 'fonts', {
+      value: { ready: other.promise },
+      configurable: true,
+    });
     const { trigger, panel } = detachedScene();
     const counter = { measures: 0 };
     const handle = countedPopover(panel, trigger, counter);
-    await new Promise((done) => setTimeout(done, 0));
-    assert.equal(counter.measures, 1, 'no other document’s fonts re-measure it');
-    resolve();
-    await ready;
-    await new Promise((done) => setTimeout(done, 0));
-    assert.equal(counter.measures, 2, 'measured again once its own fonts are ready');
-    handle.destroy();
+    try {
+      other.resolve();
+      await other.promise;
+      await new Promise((done) => setTimeout(done, 0));
+      assert.equal(counter.measures, 1, 'no other document’s fonts re-measure it');
+      own.resolve();
+      await own.promise;
+      await new Promise((done) => setTimeout(done, 0));
+      assert.equal(counter.measures, 2, 'measured again once its own fonts are ready');
+    } finally {
+      handle.destroy();
+      delete document.fonts;
+    }
   });
 
   it('binds nothing and stays closed in a document without a window', () => {

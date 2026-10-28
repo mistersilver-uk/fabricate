@@ -85,7 +85,7 @@ export function propLocals(ast) {
 }
 
 /** Whether an identifier under `parent` is read as a name: no member name after a dot, and no object key. */
-function isNameRead(node, parent) {
+export function isNameRead(node, parent) {
   const isMemberName =
     parent?.type === 'MemberExpression' && parent.property === node && !parent.computed;
   const isObjectKey = parent?.type === 'Property' && parent.key === node && !parent.computed;

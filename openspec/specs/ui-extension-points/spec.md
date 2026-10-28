@@ -615,6 +615,7 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
   1. `overlayHost`, while it is connected and in `target`'s document;
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
   3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
+- An overlay that is open keeps its panel in the host it opened in while that host stays connected, so an `overlayHost` moved to another document while it is open leaves the panel in it, and the next overlay to open picks its host again.
 - The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input (issue 2680).
 - Unless the panel's own group says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's group says so, as for an `IconPicker` list or an `ActionMenu` menu.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
@@ -635,7 +636,7 @@ A `Modal` mounted in another `Modal`'s content slot is not closed by this: its d
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 - An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
-The gate also holds that the closure of an `overlays: true` entry imports no `resolveOverlayHost` except through `actions/anchoredPopover.js`, which acquires its host through the chain, as `Modal` does directly.
+The gate also holds that the closure of an `overlays: true` entry names no `resolveOverlayHost` as an import, a re-export, a namespace or dynamic-import member or a destructured key, because `actions/anchoredPopover.js` and `Modal` acquire their host through the chain.
 - `Select` (issue 2454) is the first entry whose `overlays` is `true`: its list is the overlay, and its group states what the list draws.
 - `IconPicker` (issue 2647) is the second: its list and its query field are the overlay, and its group states what they draw.
 - `ActionMenu` (issue 2652) is the third: its menu is the overlay, and its group states what it draws.
@@ -1594,7 +1595,7 @@ A _stripped member_ is a per-item member of a published `data` key that `STRIPPE
   - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
   - Every element admission rule 9 judges is marked as that rule asks, and every `svelte:element` in its closure is pinned to the tags it can draw.
   - Every required prop, a `$props()` key with no default, is carried by a shipped kind; a snippet a component calls with arguments is never a slot, and a prop that is drawn as a component is not data.
-  - Its closure reaches `resolveOverlayHost` only through `anchoredPopover.js`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
+  - Its closure names no `resolveOverlayHost` as an import, a re-export, a namespace or dynamic-import member or a destructured key, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
   - The ancestor a component needs is not a static rule: it sets the entry's `root` and never excludes the component.
 - **Every publishable candidate is published or listed.**
 A component that becomes publishable is published, or listed, in the same change.
@@ -1613,8 +1614,12 @@ The list commits human decisions only, so no total or baseline is committed and 
 A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
 - **A per-item spread is stripped or the check fails, and the check fails closed.**
 Every spread attribute in a published closure is traced to the published `data` it comes from.
-A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that is not an object literal, a published key that is not `data`, and a literal.
-A script-level `const` or `$derived` object literal is traced by its spreads and computed keys, a branch or call inside it counting as its values, and a value a script function closes over is not traced.
+A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that reads no published `data` and is not an object literal, a published key that is not `data`, and a literal.
+A script-level `const` or `$derived` local that is not an object literal is traced by the names it reads, less the parameters and declarations inside its own expression.
+It holds no data when every name it reads is clean, and it is unnameable, so a spread of an alias of an item fails closed like one of the item, when it reads any other.
+A name is clean when it is an import of the file, a function declared in the file (a limit below), one of the runes `$derived`, `$state`, `$effect`, `$inspect` and `$host`, or one of `Array`, `Boolean`, `Date`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Set`, `String`, `Symbol`, `Infinity`, `NaN`, `undefined`, `globalThis`, `window`, `document` and `console`.
+Every other name no rule resolves is unnameable: a top-level `let`, a class, the whole `$props()` object and any name not listed.
+A script-level `const` or `$derived` object literal, under a condition or mapped from an array, is traced by its spreads and computed keys, a branch or call inside it counting as its values, and the first two parameters of a mapped array's callback standing for an element of that array and its index as an `{#each}` context does, and any further parameter being unnameable.
 A spread of a member of published `data` passes only when it is a stripped member.
 Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
 A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
@@ -1623,8 +1628,17 @@ A failing spread of a whole item, of an expression no rule traces or of an unpub
 The one stripped member is `InfoStrip.facts.props`.
 A row fails when no published closure spreads that member, whether its key is not `data`, its entry is not published or the component stopped spreading it.
 A spread inside a snippet declared in a child component's file is not traced.
-A snippet the entry declares is traced only through the `{@render}` tags of the entry's own file, so one nothing there renders by name fails closed, whether the render is aliased, made with `.call`, or done by a child component the snippet is passed to.
-These shapes are not traced, and are tracked in issue 2607: a `const` or `$derived` alias of published data, a snippet passed to a child component as a prop (the child's own render of it is not followed), a child drawn through `svelte:component` or a `{@const}` component alias, and a quoted attribute such as `item="{item}"`.
+A snippet the entry declares is traced through the `{@render}` tags of the entry's own file, and through those of a child component it is passed to by name or inside the tag.
+A snippet read anywhere but as a `{@render}` callee, a test or the tag that passes it, in the entry or in the child, is unnameable, whether the read is an alias, a `.call`, or a pass to a further component, and so is one nothing renders.
+A child component's `$props()` key is what the tags that draw it pass, an expression that is the whole of a quoted value included.
+It is unnameable when no component tag draws the child, or a parent also draws it other than by a tag, through `svelte:component`, an `{@const}` alias or a script alias.
+- **Limit: these shapes are not traced, and a spread through them passes.**
+A script-level `const` or `$derived` that reads published `data` only through a function declared in the script, whose body the check does not read.
+A plain-key value of a script-level object literal, such as `{ items }` or `{ a: items[0] }`, because the check traces only a literal's spreads and computed keys.
+A snippet passed to a child component that forwards it through its rest props.
+A child component that a script module in the closure also draws, which no component tag reads.
+A read of a published name that a parameter or declaration inside the same expression also names, such as `sections.map(({ sections }) => sections)`, because the exclusion of inner names is by name and not by scope.
+A value built up by a mutation after its declaration, such as `const box = {}; Object.assign(box, items[0])` or an array pushed to in an `$effect`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
 A function anywhere in the value is still M10, and a value that is not data is still M11.

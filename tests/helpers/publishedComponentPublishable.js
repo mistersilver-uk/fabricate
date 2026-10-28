@@ -17,8 +17,11 @@ import {
   foundryReads,
   importClosure,
   isComponent,
+  isNameRead,
   propLocals,
   publishedLocals,
+  referencedNames,
+  relativeImports,
   syntheticReader,
 } from './publishedComponentGate.js';
 
@@ -31,12 +34,6 @@ export const OVERLAY_ACTIONS = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/actions/typeaheadPanel.js',
-]);
-
-/** The files that may name `resolveOverlayHost`: its own, and the action that acquires through the chain. */
-const HOST_RESOLVER_HOMES = Object.freeze([
-  'src/ui/svelte/actions/anchoredPopover.js',
-  'src/ui/svelte/util/overlayHost.js',
 ]);
 
 /**
@@ -123,15 +120,31 @@ function candidatePaths(rows) {
 const astOf = (file, reader) =>
   isComponent(file) ? reader.component(file) : reader.module(file).ast;
 
-/** The files of a closure that import `resolveOverlayHost`, which ignores the overlay chain. */
+const HOST_RESOLVER = 'resolveOverlayHost';
+const keyName = (key) => key?.name ?? key?.value;
+
+/** Whether a node names `resolveOverlayHost` as an import, a re-export, a member or a destructured key. */
+function namesHostResolver(node) {
+  if (node.type === 'ImportSpecifier') return node.imported?.name === HOST_RESOLVER;
+  if (node.type === 'ExportNamedDeclaration') {
+    return (
+      Boolean(node.source) &&
+      node.specifiers.some((specifier) => specifier.local?.name === HOST_RESOLVER)
+    );
+  }
+  if (node.type === 'ExportAllDeclaration') {
+    return String(node.source?.value).endsWith('/overlayHost.js');
+  }
+  if (node.type === 'MemberExpression') {
+    return (node.computed ? node.property.value : node.property.name) === HOST_RESOLVER;
+  }
+  return node.type === 'Property' && !node.computed && keyName(node.key) === HOST_RESOLVER;
+}
+
+/** The files of a closure that import, re-export or reach `resolveOverlayHost`, which ignores the overlay chain. */
 export function hostResolverImports(path, reader) {
   return [...importClosure(path, reader)]
-    .filter((file) => !HOST_RESOLVER_HOMES.includes(file))
-    .filter((file) =>
-      [...walkNodes(astOf(file, reader))].some(
-        (node) => node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost'
-      )
-    )
+    .filter((file) => [...walkNodes(astOf(file, reader))].some(namesHostResolver))
     .sort(byCodePoint);
 }
 
@@ -228,6 +241,111 @@ const unchained = (expression) =>
 /** A value that is, or may hold, an item of a collection the entry does not publish (or a whole one). */
 const UNNAMEABLE = Object.freeze({ key: null });
 
+/** A name that is an import or a listed global: it holds no data, and a spread of it still fails closed. */
+const UNRESOLVED = Object.freeze({ key: null });
+
+/**
+ * The globals and runes a script may read without reading data; every other name no rule resolves
+ * is unnameable, so a name missing here makes an alias of it fail closed rather than pass.
+ */
+const KNOWN_GLOBALS = new Set(
+  'Array Boolean Date JSON Map Math Number Object Set String Symbol Infinity NaN undefined globalThis window document console $derived $state $effect $inspect $host'.split(
+    ' '
+  )
+);
+
+/** Whether an origin is, or may hold, published data: every origin but a name no rule resolves. */
+const holdsData = (origin) => origin !== UNRESOLVED;
+
+/** The identifiers under `ast` that read `name`, each with its ancestors, less imports and declared patterns. */
+function readsOf(ast, name) {
+  const reads = [];
+  for (const root of [ast.fragment, ast.module, ast.instance]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== name) return;
+      if (!isNameRead(node, ancestors.at(-1))) return;
+      const declared = (at) =>
+        at.type === 'ImportDeclaration' ||
+        (at.type === 'VariableDeclarator' && [...walkNodes(at.id)].includes(node));
+      if (ancestors.every((at) => !declared(at))) reads.push({ node, ancestors });
+    });
+  }
+  return reads;
+}
+
+const COMPARISONS = new Set(['==', '!=', '===', '!==']);
+
+/** Whether a read of a snippet only tests it: its result is a boolean, so the snippet goes nowhere. */
+function isTest({ node, ancestors }) {
+  const parent = ancestors.at(-1);
+  if (parent?.type === 'UnaryExpression')
+    return parent.operator === '!' || parent.operator === 'typeof';
+  if (parent?.type === 'BinaryExpression') return COMPARISONS.has(parent.operator);
+  return ['IfBlock', 'ConditionalExpression'].includes(parent?.type) && parent.test === node;
+}
+
+/** Whether a read of a snippet is the callee of a `{@render}`, the name its `{#snippet}` declares, or a test. */
+function staysPut(read) {
+  const { node, ancestors } = read;
+  const tag = ancestors.findLast((at) => at.type === 'RenderTag');
+  return (
+    (tag && renderCall(tag).callee === node) ||
+    (ancestors.at(-1)?.type === 'SnippetBlock' && ancestors.at(-1).expression === node) ||
+    isTest(read)
+  );
+}
+
+/** Whether `node` writes an object literal in each branch, or maps an array to one (what a literal local traces by its keys). */
+function isLiteralTree(node) {
+  const at = unchained(node);
+  if (at.type === 'ObjectExpression') return true;
+  if (at.type === 'ConditionalExpression') {
+    return isLiteralTree(at.consequent) && isLiteralTree(at.alternate);
+  }
+  return mappedLiteral(at) !== undefined;
+}
+
+/** The `{#each}` a mapped call stands for: its parameters are an element of the array and its index. */
+function elementOf(call) {
+  const [element, index] = call.arguments[0].params;
+  return {
+    type: 'EachBlock',
+    context: element ?? { type: 'Identifier', name: '' },
+    index: index?.name,
+    expression: call.callee.object,
+  };
+}
+
+/** The names a script expression declares inside itself: callback parameters and local declarations. */
+function declaredWithin(expression) {
+  const names = new Set();
+  for (const node of walkNodes(expression)) {
+    const patterns = [
+      ...(node.type.endsWith('FunctionExpression') || node.type === 'ArrowFunctionExpression'
+        ? node.params
+        : []),
+      ...(node.type === 'VariableDeclarator' ? [node.id] : []),
+      ...(node.type === 'CatchClause' && node.param ? [node.param] : []),
+    ];
+    for (const pattern of patterns) for (const name of boundNames(pattern)) names.add(name);
+  }
+  return names;
+}
+
+/** The literal an `array.map((x) => <literal>)` call returns for each element, else `undefined`. */
+function mappedLiteral(node) {
+  const [callback] = node.arguments ?? [];
+  const mapping =
+    node.type === 'CallExpression' &&
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.name === 'map' &&
+    node.arguments.length === 1 &&
+    callback.type === 'ArrowFunctionExpression' &&
+    callback.expression;
+  return mapping && isLiteralTree(callback.body) ? callback.body : undefined;
+}
+
 /** The names a binding pattern introduces. */
 function boundNames(pattern) {
   if (pattern.type === 'Identifier') return [pattern.name];
@@ -266,18 +384,27 @@ const through = (origin, path) =>
     ? UNNAMEABLE
     : { key: origin.key, members: [...origin.members, ...path] };
 
+/** The expression an attribute value is exactly, bare or alone inside quotes; else `undefined`. */
+function singleExpression(value) {
+  const parts = [value].flat();
+  return parts.length === 1 ? parts[0]?.expression : undefined;
+}
+
 /**
  * The places a published entry's closure spreads attributes from a value that is, or may be, data
  * the caller published, as `{ key, members }`: the published `data` key and the members read below
  * it, an `{#each}` item counting as the value it iterates, a `{@const}` as its initialiser and a
  * snippet parameter of the entry's own file as the arguments that file, or a child it hands the
  * snippet to, renders it with, an object literal's plain key read by name (a snippet nothing
- * renders is unnameable; issue 2647). `{ key: null }` is a value that may be an item of a
- * collection the entry does not publish. A spread of the file's `$props()` rest is no item, and so
- * is one of a script-level `const` or `$derived` unless it is an object literal, whose spreads and
- * computed keys are traced, a branch or call inside it counting as its values (what a script
- * function closes over is not traced). A child's `$props()` key is what its parents pass it. An
- * object literal writes its own keys: each computed key and each spread inside it is traced as a
+ * renders, or one read anywhere but a render, a test or the tag that hands it, is unnameable;
+ * issues 2647, 2607). `{ key: null }` is a value that may be an item of a collection the entry
+ * does not publish. A spread of the file's `$props()` rest is no item. A script-level `const` or
+ * `$derived` holds no data when every name it reads is an import, a function declared in the file
+ * or a `KNOWN_GLOBALS` member, and is otherwise unnameable, as is every other name no rule
+ * resolves. An object literal (under a condition, or mapped from an array) has its spreads and
+ * computed keys traced, a branch or call inside it counting as its values. A child's `$props()` key is what its
+ * parents pass it, and unnameable where a parent draws the child other than by a component tag.
+ * An object literal writes its own keys: each computed key and each spread inside it is traced as a
  * spread is (issue 2601). Every other spread fails closed.
  */
 function spreadTracer(entry, reader) {
@@ -292,22 +419,32 @@ function spreadTracer(entry, reader) {
   );
   const topLevel = (ast) =>
     [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
+  const scopeNames = new Map();
   const scriptLocals = new Map(
     files.map((file) => {
       const ast = asts.get(file);
       const names = new Map();
-      for (const statement of topLevel(ast)) {
+      const imports = new Set();
+      const functions = new Set();
+      scopeNames.set(file, { imports, functions });
+      for (const exported of topLevel(ast)) {
+        const statement = exported.declaration ?? exported;
+        if (exported.type === 'ImportDeclaration') {
+          for (const specifier of exported.specifiers) imports.add(specifier.local.name);
+        }
+        if (statement.type === 'FunctionDeclaration') functions.add(statement.id.name);
         if (statement.type !== 'VariableDeclaration') continue;
         for (const { id, init } of statement.declarations) {
           const callee = init?.callee;
           const derived = callee?.name === '$derived' || callee?.object?.name === '$derived';
           if (callee?.name === '$props') {
             const rest = id.properties?.find((property) => property.type === 'RestElement');
-            if (rest) names.set(rest.argument.name, null);
+            if (rest) names.set(rest.argument.name, { kind: 'rest' });
           } else if (statement.kind === 'const' || derived) {
             const value = callee?.name === '$derived' ? init.arguments[0] : init;
-            const literal = id.type === 'Identifier' && value?.type === 'ObjectExpression';
-            for (const name of boundNames(id)) names.set(name, literal ? value : null);
+            const literal = id.type === 'Identifier' && isLiteralTree(value);
+            const held = { kind: literal ? 'literal' : 'derived', value };
+            for (const name of boundNames(id)) names.set(name, held);
           }
         }
       }
@@ -346,50 +483,70 @@ function spreadTracer(entry, reader) {
       });
 
   /** The keys a tag hands `snippet` as: its own name when it is the tag's content, else each attribute naming it. */
-  const handedAs = (tag, snippet) => [
+  const handedAs = (tag, snippet, handed) => [
     ...(tag.fragment?.nodes.some((n) => n.type === 'SnippetBlock' && n.expression.name === snippet)
       ? [snippet]
       : []),
     ...tag.attributes
       .filter(
-        ({ type, value }) => type === 'Attribute' && [value].flat()[0]?.expression?.name === snippet
+        ({ type, value }) => type === 'Attribute' && singleExpression(value)?.name === snippet
       )
-      .map(({ name }) => name),
+      .map(({ name, value }) => {
+        handed.add(singleExpression(value));
+        return name;
+      }),
   ];
+
+  /** Whether `file` reads `name` anywhere but as a `{@render}` callee, a declaration, a test or a `handed` node. */
+  const strays = (file, name, handed = new Set()) =>
+    readsOf(asts.get(file), name).some((read) => !staysPut(read) && !handed.has(read.node));
 
   const renderedWith = (file, snippet, index, path) => {
     const own = rendersOf(file, snippet.name, index, path);
+    const handed = new Set();
     const byChildren = componentTags(file, asts.get(file)).flatMap(([child, tag]) => {
-      const keys = handedAs(tag, snippet.name);
+      const accounted = new Set();
+      const keys = handedAs(tag, snippet.name, accounted);
       if (keys.length === 0 || !asts.has(child)) return [];
+      for (const node of accounted) handed.add(node);
       const locals = propLocals(asts.get(child)).filter(({ key }) => keys.includes(key));
       return locals.flatMap(({ local }) =>
-        guarded(`${child}#${local}`, () => rendersOf(child, local, index, path))
+        guarded(`${child}#${local}`, () => [
+          ...rendersOf(child, local, index, path),
+          ...(strays(child, local) ? [UNNAMEABLE] : []),
+        ])
       );
     });
-    return [...own, ...byChildren];
+    return [...own, ...byChildren, ...(strays(file, snippet.name, handed) ? [UNNAMEABLE] : [])];
   };
 
+  /** Whether `parent` reads the binding of its import of `file` anywhere but as a component tag. */
+  const drawnApart = (parent, file) =>
+    [...relativeImports(parent, asts.get(parent))]
+      .filter(([, path]) => path === file)
+      .some(([binding]) => readsOf(asts.get(parent), binding).length > 0);
+
   const passedTo = (file, key) =>
-    guarded(`${file}:${key}`, () =>
-      files.flatMap((parent) =>
+    guarded(`${file}:${key}`, () => {
+      const tags = files.flatMap((parent) =>
         componentTags(parent, asts.get(parent))
           .filter(([child]) => child === file)
-          .flatMap(([, tag]) =>
-            tag.attributes
-              .filter((attribute) => attribute.name === key)
-              .map((attribute) =>
-                attribute.type === 'BindDirective'
-                  ? attribute.expression
-                  : attribute.value?.expression
-              )
-              .filter(Boolean)
-              .flatMap((expression) =>
-                originsOf(expression, parent, ancestorsOf.get(parent).get(tag))
-              )
+          .map(([, tag]) => [parent, tag])
+      );
+      const passes = tags.flatMap(([parent, tag]) =>
+        tag.attributes
+          .filter((attribute) => attribute.name === key)
+          .map((attribute) =>
+            attribute.type === 'BindDirective'
+              ? attribute.expression
+              : singleExpression(attribute.value)
           )
-      )
-    );
+          .filter(Boolean)
+          .flatMap((expression) => originsOf(expression, parent, ancestorsOf.get(parent).get(tag)))
+      );
+      const untraced = tags.length === 0 || files.some((parent) => drawnApart(parent, file));
+      return untraced ? [...passes, UNNAMEABLE] : passes;
+    });
 
   function fromScope(name, file) {
     const ast = asts.get(file);
@@ -399,27 +556,45 @@ function spreadTracer(entry, reader) {
       if (key !== undefined) return entry.props[key].kind === 'data' ? [{ key, members: [] }] : [];
       if (prop) return [];
     }
-    const locals = scriptLocals.get(file);
-    if (locals.has(name)) {
-      const literal = locals.get(name);
-      return literal ? guarded(literal, () => literalOrigins(literal, file)) : [];
-    }
-    return prop ? passedTo(file, prop.key) : [UNNAMEABLE];
+    const held = scriptLocals.get(file).get(name);
+    if (held) return guarded(held, () => localOrigins(held, file));
+    if (prop) return passedTo(file, prop.key);
+    // A function declaration is read as holding no data (a stated limit); a class, a let, an
+    // export and anything unknown is unnameable.
+    const { imports, functions } = scopeNames.get(file);
+    const clean = imports.has(name) || functions.has(name) || KNOWN_GLOBALS.has(name);
+    return clean ? [UNRESOLVED] : [UNNAMEABLE];
+  }
+
+  /** A script local's origins: a rest and a plain constant hold none, a literal its keys, a derived value any data it reads. */
+  function localOrigins({ kind, value }, file) {
+    if (kind === 'literal') return literalOrigins(value, file);
+    if (kind === 'rest') return [];
+    const inside = declaredWithin(value);
+    const reads = [...referencedNames(value)].filter((read) => !inside.has(read));
+    return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [UNNAMEABLE] : [];
   }
 
   /** A script-level literal's origins: its plain keys are no item, a branch or call is its values. */
-  function literalOrigins(expression, file) {
+  function literalOrigins(expression, file, ancestors = []) {
     const node = unchained(expression);
+    const trace = (inner) => literalOrigins(inner, file, ancestors);
     if (node.type === 'ConditionalExpression') {
-      return [node.consequent, node.alternate].flatMap((branch) => literalOrigins(branch, file));
+      return [node.consequent, node.alternate].flatMap((branch) => trace(branch));
     }
     if (node.type === 'CallExpression') {
-      return node.arguments.flatMap((argument) => literalOrigins(argument, file));
+      const mapped = mappedLiteral(node);
+      if (mapped) return literalOrigins(mapped, file, [...ancestors, elementOf(node)]);
+      const base =
+        node.callee.type === 'MemberExpression'
+          ? originsOf(node.callee.object, file, ancestors)
+          : [];
+      return [...base, ...node.arguments.flatMap((argument) => trace(argument))];
     }
-    if (node.type !== 'ObjectExpression') return originsOf(node, file, []);
+    if (node.type !== 'ObjectExpression') return originsOf(node, file, ancestors);
     return node.properties.flatMap((property) => {
-      if (property.type === 'SpreadElement') return literalOrigins(property.argument, file);
-      return property.computed ? originsOf(property.key, file, []) : [];
+      if (property.type === 'SpreadElement') return trace(property.argument);
+      return property.computed ? originsOf(property.key, file, ancestors) : [];
     });
   }
 
