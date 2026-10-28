@@ -205,19 +205,21 @@
 
   // A trapped modal owns the keyboard: Foundry's window-level keybindings read only
   // `document.activeElement`. Stopped at the document, so Svelte's delegated handlers still run.
+  // A Tab from outside that a handler moved focus inside for, as a picker panel does, is wrapped.
   function ownKeyboard(node, enabled) {
     if (!enabled) return {};
     const doc = node.ownerDocument;
     const stop = (event) => {
       if (node.contains(event.target)) event.stopPropagation();
+      else if (event.key === 'Tab' && !event.defaultPrevented && node.contains(doc.activeElement))
+        handleTab(event, node);
     };
     doc.addEventListener('keydown', stop);
     return { destroy: () => doc.removeEventListener('keydown', stop) };
   }
 
   // From the dialog element Tab enters it in every mode; from inside it only `trapFocus` wraps.
-  function handleTab(event) {
-    const node = event.currentTarget;
+  function handleTab(event, node = event.currentTarget) {
     const inside = focusables(node);
     if (inside.length === 0) return;
     const active = node.ownerDocument.activeElement;
