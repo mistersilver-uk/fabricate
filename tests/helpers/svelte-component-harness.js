@@ -719,14 +719,15 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       teardownDOM();
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
     },
-    // `context` is the Svelte context map a Fabricate root mounts its tree with (issue 2454).
-    async mount(props = {}, { context } = {}) {
+    // `context` is the Svelte context map a Fabricate root mounts its tree with (issue 2454);
+    // `ownerDocument` is the document the target is made in, a second window's for a detached one.
+    async mount(props = {}, { context, ownerDocument = document } = {}) {
       // Cross a macrotask boundary BEFORE building the next tree.
       await new Promise((resolve) => setImmediate(resolve));
-      target = document.createElement('div');
+      target = ownerDocument.createElement('div');
       // THE MOUNT TARGET IS AN APPLICATION ROOT (issue 1466).
       target.className = rootClass;
-      document.body.appendChild(target);
+      ownerDocument.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props, context });
       flushSync();
       await tick();

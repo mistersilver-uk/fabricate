@@ -972,8 +972,11 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
 
   const ONE_TOKEN = Object.freeze({ tokens: ['1'], tokensLabel: 'Add a term' });
 
-  async function mountSpeaking(echo, props = {}) {
-    const target = await harness.mount({ value: '', ...READING, ...props, onChange: echo });
+  async function mountSpeaking(echo, props = {}, options = {}) {
+    const target = await harness.mount(
+      { value: '', ...READING, ...props, onChange: echo },
+      options
+    );
     const input = target.querySelector('input');
     return {
       target,
@@ -1226,6 +1229,33 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
       });
     });
   }
+
+  it('waits out the focus move in a second window, reading focus from the field’s own document', async () => {
+    const second = new Window({ url: 'http://localhost/detached' });
+    try {
+      const [, echo] = ECHOES[0];
+      const field = await mountSpeaking(
+        echo,
+        { value: '5', ...ONE_TOKEN },
+        {
+          ownerDocument: second.document,
+        }
+      );
+      const [button] = tokenButtons(field.target);
+      button.focus();
+      button.click();
+      await settle();
+      assert.ok(second.document.activeElement === field.input, 'focus is on the field there');
+      assert.equal(field.drawn(), '= 6');
+      await advance(ANNOUNCE_AFTER_FOCUS_MS - 1);
+      assert.equal(field.said(), '', 'nothing is said before the focus move has been heard');
+      await advance(1);
+      assert.equal(field.said(), '= 6', `at ${ANNOUNCE_AFTER_FOCUS_MS}ms`);
+    } finally {
+      harness.remount();
+      await second.happyDOM.close();
+    }
+  });
 
   it('speaks an edit whose caller hands it a new resolver of the same readings, with the echo and after it', async () => {
     // The Studio's field re-derives its resolver on every write, and again when its route re-emits.

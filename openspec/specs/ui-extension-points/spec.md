@@ -615,6 +615,7 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
   1. `overlayHost`, while it is connected and in `target`'s document;
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
   3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
+- An overlay that is open keeps its panel in the host it opened in while that host stays connected, so an `overlayHost` moved to another document while it is open leaves the panel in it, and the next overlay to open picks its host again.
 - The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input (issue 2680).
 - Unless the panel's own group says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's group says so, as for an `IconPicker` list or an `ActionMenu` menu.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
@@ -635,7 +636,7 @@ A `Modal` mounted in another `Modal`'s content slot is not closed by this: its d
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 - An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
-The gate also holds that the closure of an `overlays: true` entry imports no `resolveOverlayHost` except through `actions/anchoredPopover.js`, which acquires its host through the chain, as `Modal` does directly.
+The gate also holds that the closure of an `overlays: true` entry imports or re-exports no `resolveOverlayHost`, because `actions/anchoredPopover.js` and `Modal` acquire their host through the chain.
 - `Select` (issue 2454) is the first entry whose `overlays` is `true`: its list is the overlay, and its group states what the list draws.
 - `IconPicker` (issue 2647) is the second: its list and its query field are the overlay, and its group states what they draw.
 - `ActionMenu` (issue 2652) is the third: its menu is the overlay, and its group states what it draws.
@@ -1594,7 +1595,7 @@ A _stripped member_ is a per-item member of a published `data` key that `STRIPPE
   - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
   - Every element admission rule 9 judges is marked as that rule asks, and every `svelte:element` in its closure is pinned to the tags it can draw.
   - Every required prop, a `$props()` key with no default, is carried by a shipped kind; a snippet a component calls with arguments is never a slot, and a prop that is drawn as a component is not data.
-  - Its closure reaches `resolveOverlayHost` only through `anchoredPopover.js`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
+  - Its closure imports or re-exports no `resolveOverlayHost`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
   - The ancestor a component needs is not a static rule: it sets the entry's `root` and never excludes the component.
 - **Every publishable candidate is published or listed.**
 A component that becomes publishable is published, or listed, in the same change.

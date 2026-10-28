@@ -33,12 +33,6 @@ export const OVERLAY_ACTIONS = Object.freeze([
   'src/ui/svelte/actions/typeaheadPanel.js',
 ]);
 
-/** The files that may name `resolveOverlayHost`: its own, and the action that acquires through the chain. */
-const HOST_RESOLVER_HOMES = Object.freeze([
-  'src/ui/svelte/actions/anchoredPopover.js',
-  'src/ui/svelte/util/overlayHost.js',
-]);
-
 /**
  * A reader over `readFile`, which answers a path's text or `undefined`; `has` says which. Each parse
  * of a path is made once, so a closure scan of many entries reads each file once.
@@ -123,15 +117,16 @@ function candidatePaths(rows) {
 const astOf = (file, reader) =>
   isComponent(file) ? reader.component(file) : reader.module(file).ast;
 
-/** The files of a closure that import `resolveOverlayHost`, which ignores the overlay chain. */
+const namesHostResolver = (node) =>
+  (node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost') ||
+  (node.type === 'ExportNamedDeclaration' &&
+    Boolean(node.source) &&
+    node.specifiers.some((specifier) => specifier.local?.name === 'resolveOverlayHost'));
+
+/** The files of a closure that import or re-export `resolveOverlayHost`, which ignores the overlay chain. */
 export function hostResolverImports(path, reader) {
   return [...importClosure(path, reader)]
-    .filter((file) => !HOST_RESOLVER_HOMES.includes(file))
-    .filter((file) =>
-      [...walkNodes(astOf(file, reader))].some(
-        (node) => node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost'
-      )
-    )
+    .filter((file) => [...walkNodes(astOf(file, reader))].some(namesHostResolver))
     .sort(byCodePoint);
 }
 

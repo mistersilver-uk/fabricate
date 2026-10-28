@@ -906,7 +906,7 @@ describe('the per-item members the seam strips (issue 2455)', () => {
 
 /**
  * Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action, and
- * an `overlays: true` closure reaches no `resolveOverlayHost` except through `anchoredPopover.js`.
+ * an `overlays: true` closure imports or re-exports no `resolveOverlayHost`.
  */
 function overlayFaults(entry, reader = SHIPPED) {
   const reached = [...importClosure(entry.path, reader)]
@@ -978,7 +978,31 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
         'export const anchoredPopover = (node) => resolveOverlayHost(node);',
       'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
     });
-    assert.deepEqual(overlayFaults(entry, through), [], 'through anchoredPopover.js is allowed');
+    assert.deepEqual(overlayFaults(entry, through), [
+      'is overlays: true and src/ui/svelte/actions/anchoredPopover.js imports resolveOverlayHost, which ignores the chain',
+    ]);
+  });
+
+  it('refuses an overlays: true closure that re-exports resolveOverlayHost, and leaves the declaration alone', () => {
+    const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte', overlays: true };
+    const closure = (reexport) =>
+      syntheticReader({
+        'src/ui/svelte/components/E.svelte':
+          "<script>import { portal } from '../actions/portal.js';" +
+          "import { reach } from '../util/reach.js';</script>",
+        'src/ui/svelte/actions/portal.js': 'export function portal() {}',
+        'src/ui/svelte/util/reach.js': reexport,
+        'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
+      });
+    for (const reexport of [
+      "export { resolveOverlayHost } from './overlayHost.js';",
+      "export { resolveOverlayHost as reach } from './overlayHost.js';",
+    ]) {
+      assert.deepEqual(overlayFaults(entry, closure(reexport)), [
+        'is overlays: true and src/ui/svelte/util/reach.js imports resolveOverlayHost, which ignores the chain',
+      ]);
+    }
+    assert.deepEqual(overlayFaults(entry, closure('export const reach = () => null;')), []);
   });
 
   it("acquires Modal's host through the chain", () => {

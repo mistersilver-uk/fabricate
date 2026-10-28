@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { Window } from 'happy-dom';
 import { flushSync, tick } from 'svelte';
 
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -44,16 +45,19 @@ async function settle() {
 }
 
 /** A mounted picker with every `onChange` call recorded. */
-async function mountPicker(props = {}) {
+async function mountPicker(props = {}, { ownerDocument } = {}) {
   const calls = [];
-  const root = await harness.mount({
-    options: TAGS,
-    ariaLabel: 'Tags',
-    onChange: (next, change) => {
-      calls.push({ next, change });
+  const root = await harness.mount(
+    {
+      options: TAGS,
+      ariaLabel: 'Tags',
+      onChange: (next, change) => {
+        calls.push({ next, change });
+      },
+      ...props,
     },
-    ...props,
-  });
+    { ownerDocument }
+  );
   const q = (selector) => root.querySelector(selector);
   const panel = () => q('.fabricate-set-picker-popover');
   return {
@@ -211,6 +215,28 @@ describe('SetPicker (mounted)', () => {
       await picker.open();
       await press('Escape');
       assert.ok(document.activeElement === picker.trigger(), 'focus returns to the Add');
+    });
+
+    it('takes focus back in a second window, read from its own document', async () => {
+      const second = new Window({ url: 'http://localhost/detached' });
+      try {
+        const picker = await mountPicker(overflowing, { ownerDocument: second.document });
+        picker.more().click();
+        await settle();
+        assert.ok(second.document.activeElement === picker.field(), 'the field holds focus there');
+        second.document.activeElement.dispatchEvent(
+          new second.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        );
+        await settle();
+        assert.ok(!picker.panel());
+        assert.ok(
+          second.document.activeElement === picker.more(),
+          'focus returns to "+N more" in that document'
+        );
+      } finally {
+        harness.remount();
+        await second.happyDOM.close();
+      }
     });
 
     it('is a no-op while the panel is open, so the staged choices survive the press', async () => {

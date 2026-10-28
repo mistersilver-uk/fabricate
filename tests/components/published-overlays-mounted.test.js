@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Window } from 'happy-dom';
 
@@ -33,6 +33,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const PROBE = PROBE_OVERLAY_ENTRY.path;
 const OVERLAY_HOST = 'src/ui/svelte/util/overlayHost.js';
+const OVERLAYS = 'src/ui/publishedComponentOverlays.js';
 const LAYER = '.fabricate.fabricate-standalone-overlay';
 const THEME = 'data-fabricate-theme';
 
@@ -48,6 +49,7 @@ const harness = createMountedComponentHarness({
 let runtime;
 let components;
 let overlaysOpenedFrom;
+let openOverlayChain;
 let createPublishedComponents;
 let probe;
 let reports;
@@ -61,6 +63,7 @@ before(async () => {
   ({ publishedComponentRuntime: runtime, COMPONENTS: components } =
     await harness.loadRuneModule(ADAPTER));
   ({ overlaysOpenedFrom } = await harness.loadRawModule(OVERLAY_HOST));
+  ({ openOverlayChain } = await harness.loadRawModule(OVERLAYS));
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
   stopRecording = recordEscapes((error) => {
@@ -134,13 +137,13 @@ function companionHost() {
 }
 
 /**
- * Records every listener added from now on to any node, and to this window, which holds its own
- * pair, and answers those still bound as `<type>` strings; `stop()` restores both.
+ * Records every listener added from now on to any node, and to this window and each of `windows`,
+ * which hold their own pair, and answers those still bound as `<type>` strings; `stop()` restores both.
  */
-function trackListeners() {
+function trackListeners(windows = []) {
   let nodes = document.createElement('div');
   while (!Object.hasOwn(nodes, 'addEventListener')) nodes = Object.getPrototypeOf(nodes);
-  const owners = [nodes, document.defaultView];
+  const owners = [nodes, document.defaultView, ...windows];
   const originals = owners.map((owner) => [owner.addEventListener, owner.removeEventListener]);
   const bound = [];
   const captureOf = (options) =>
@@ -322,6 +325,70 @@ describe('the host chain an overlay resolves when it opens', () => {
     assert.ok(containerOf(panel).parentElement === layer, 'by one in the standalone layer');
     assert.equal(layer.children.length, 1);
     handle.destroy();
+  });
+});
+
+describe('an acquire that throws holds nothing', () => {
+  const opened = [];
+  afterEach(() => {
+    for (const chain of opened) chain.close();
+    opened.length = 0;
+  });
+
+  /** A chain over `target` on the real runtime less `withRuntime`; it is closed after each clause. */
+  function chainOver(target, { option, withRuntime = {} } = {}) {
+    const chain = openOverlayChain({
+      target,
+      option,
+      runtime: () => ({ ...runtime, ...withRuntime }),
+      report: (...args) => {
+        reports.push(args);
+      },
+    });
+    opened.push(chain);
+    return chain;
+  }
+
+  it('releases the standalone layer when the container cannot be made, and takes the next acquire', () => {
+    const chain = chainOver(companionTarget(shells));
+    const make = document.createElement.bind(document);
+    let divs = 0;
+    const stub = mock.method(document, 'createElement', (name, ...rest) => {
+      // The layer is the first div, the container the second.
+      if (name === 'div' && (divs += 1) === 2) throw new Error('container refused');
+      return make(name, ...rest);
+    });
+    try {
+      assert.throws(() => chain.acquire({}), { message: 'container refused' });
+    } finally {
+      stub.mock.restore();
+    }
+    assert.equal(divs, 2, 'the layer was made and the container was refused');
+    assert.ok(!document.querySelector(LAYER), 'no layer is left');
+    const overlay = {};
+    const container = chain.acquire(overlay);
+    assert.ok(document.querySelector(LAYER)?.contains(container), 'the next acquire is hosted');
+    chain.release(overlay);
+    assert.ok(!document.querySelector(LAYER), 'and releases its layer');
+  });
+
+  it('removes the container from an overlayHost when the mount throws, and takes the next acquire', () => {
+    const option = companionHost();
+    const failing = chainOver(companionTarget(shells), {
+      option,
+      withRuntime: {
+        mount: () => {
+          throw new Error('mount refused');
+        },
+      },
+    });
+    assert.throws(() => failing.acquire({}), { message: 'mount refused' });
+    assert.equal(option.children.length, 0, 'no container is left in the option');
+    const chain = chainOver(companionTarget(shells), { option });
+    const overlay = {};
+    assert.ok(chain.acquire(overlay).parentElement === option, 'the next acquire is hosted');
+    chain.release(overlay);
+    assert.equal(option.children.length, 0);
   });
 });
 
@@ -509,6 +576,24 @@ describe('in a second window', () => {
     assert.ok(!layer.isConnected, 'its layer goes with its last overlay');
   });
 
+  it('binds its listeners to that window and leaves none in it once destroyed', async () => {
+    const listeners = trackListeners([second]);
+    try {
+      const { handle, panel } = openProbe(detachedTarget());
+      const container = containerOf(panel);
+      assert.ok(
+        ['resize', 'scroll'].every((type) => listeners.still().includes(type)),
+        'the popover is bound while open'
+      );
+      handle.destroy();
+      await settle();
+      assert.ok(!panel.isConnected && !container.isConnected, 'no panel and no container');
+      assert.deepEqual(listeners.still(), [], 'no listener in either window');
+    } finally {
+      listeners.stop();
+    }
+  });
+
   it('hosts a same-document overlayHost moved into another document in the target’s own layer', () => {
     const target = companionTarget(shells);
     const overlayHost = companionHost();
@@ -525,6 +610,23 @@ describe('in a second window', () => {
     assert.ok(layer.querySelector('[data-overlay-probe-panel]'), 'the panel is in it');
     assert.equal(overlayHost.children.length, 0, 'the moved host holds none');
     handle.destroy();
+  });
+
+  it('keeps an open overlay in its overlayHost when that host is moved to another document', () => {
+    const overlayHost = companionHost();
+    const { handle, panel, props } = openProbe(companionTarget(shells), { overlayHost });
+    const container = containerOf(panel);
+    second.document.body.append(overlayHost);
+    handle.update({ ...props, open: true, cap: 10 });
+    flushSync();
+    assert.ok(containerOf(panel) === container, 'the same container');
+    assert.ok(
+      container.parentElement === overlayHost && container.isConnected,
+      'in the moved host'
+    );
+    assert.ok(!document.querySelector(LAYER), 'no layer is made for it');
+    handle.destroy();
+    assert.equal(overlayHost.children.length, 0, 'destroy leaves none');
   });
 
   it('reaches no handler when the container is not a mount target', () => {
