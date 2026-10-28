@@ -1061,7 +1061,8 @@
     [
       "fabricate.submitAlchemyAttempt",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [

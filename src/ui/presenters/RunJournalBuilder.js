@@ -66,6 +66,7 @@ import {
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
 import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
+import { d100PreviewEntries } from './runJournalD100Preview.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 import {
   ingredientNeed,
@@ -2225,7 +2226,12 @@ export class RunJournalBuilder {
         mode === 'straight'
           ? this._straightYieldEntries(context.task, stringOrNull(run.craftingSystemId))
           : mode === 'd100'
-            ? this._d100YieldEntries(context.task, run, stringOrNull(run.craftingSystemId))
+            ? d100PreviewEntries({
+                task: context.task,
+                run,
+                entryFor: (row, index, chance) =>
+                  this._yieldEntry(row, stringOrNull(run.craftingSystemId), index, chance),
+              })
             : [],
       roll: this._gatheringActualRoll(run),
       tiers:
@@ -2300,24 +2306,6 @@ export class RunJournalBuilder {
         this._yieldEntry(result, systemId, index, 100)
       )
     );
-  }
-
-  _d100YieldEntries(task, run, systemId) {
-    const evaluatedRows = Array.isArray(run?.checkResult?.itemRows)
-      ? run.checkResult.itemRows
-      : normalizeList(run?.checkResult?.items);
-    const actualById = new Map(
-      evaluatedRows
-        .filter((item) => stringOrNull(item?.id))
-        .map((item) => [stringOrNull(item.id), item])
-    );
-    return normalizeList(task?.dropRows ?? task?.itemDrops)
-      .filter((row) => row?.enabled !== false)
-      .map((row, index) => {
-        const actual = actualById.get(stringOrNull(row?.id));
-        const chance = numberOrNull(actual?.finalDropRate) ?? numberOrNull(row?.dropRate) ?? 0;
-        return this._yieldEntry(row, systemId, index, Math.min(100, Math.max(0, chance)));
-      });
   }
 
   _yieldEntry(result, systemId, index, chance) {

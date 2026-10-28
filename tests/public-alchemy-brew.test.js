@@ -30,13 +30,20 @@ function executeReply(outcome) {
   return serializedOperationResult(versionedTransitionResult(run, outcome));
 }
 
-function brew({ started, settled = null, interactive = false, executeCommand } = {}) {
+function brew({
+  started,
+  settled = null,
+  interactive = false,
+  executeCommand,
+  presentTools = null,
+} = {}) {
   const commands = [];
   const reply = executePublicBrew({
     requestStart: async () => started,
     actor,
     sourceActors,
     interactive,
+    presentTools,
     executeCommand:
       executeCommand === undefined
         ? async (command, options) => {
@@ -82,6 +89,21 @@ test('the public API default keeps the execute non-interactive', async () => {
   });
   await reply;
   assert.deepEqual(commands[0].options, { interactive: false });
+});
+
+test("a station's presentTools rides the execute payload, outside its selection", async () => {
+  const station = { systemId: 'alchemy', componentIds: [], toolIds: ['athanor'] };
+  const settled = executeReply({ success: true });
+  const { reply, commands } = brew({ started: startReply(), settled, presentTools: station });
+  await reply;
+  assert.deepEqual(commands[0].command.payload, {
+    trigger: 'manual',
+    sourceActorUuids: ['Actor.alchemist', 'Actor.satchel'],
+    presentTools: station,
+  });
+  const without = brew({ started: startReply(), settled });
+  await without.reply;
+  assert.equal(Object.hasOwn(without.commands[0].command.payload, 'presentTools'), false);
 });
 
 test('waiting, unready, fizzled and refused starts are returned unchanged', async () => {

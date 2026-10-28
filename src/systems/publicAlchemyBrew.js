@@ -10,7 +10,8 @@ import { validText } from './journalRunReply.js';
 /**
  * The start reply, executed when it is ready. A fizzle, a waiting or unready start and a refusal
  * return unchanged; otherwise the execute reply lies over the start, so a cancelled or refused
- * execute still names the run the start left live. `interactive` is the caller's flag.
+ * execute still names the run the start left live. `interactive` is the caller's flag, and a
+ * station's `presentTools` is an execute payload key only when the caller supplied one.
  */
 export async function executePublicBrew({
   requestStart,
@@ -18,6 +19,7 @@ export async function executePublicBrew({
   sourceActors,
   executeCommand = null,
   interactive = false,
+  presentTools = null,
 } = {}) {
   const started = await requestStart();
   if (
@@ -36,7 +38,11 @@ export async function executePublicBrew({
     expectedRevision: started.runRevision,
     action: 'execute',
     // No client selection plan: the start already locked the plan the authority derived.
-    payload: { trigger: 'manual', sourceActorUuids: actorUuidList(sourceActors) },
+    payload: {
+      trigger: 'manual',
+      sourceActorUuids: actorUuidList(sourceActors),
+      ...(presentTools && { presentTools }),
+    },
   };
   let settled;
   try {

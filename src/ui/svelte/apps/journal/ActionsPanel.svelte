@@ -47,6 +47,9 @@
     )
   );
 
+  // Only an untimed d100 run opens the roll prompt; a timed one resolves silently when collected.
+  const promptsD100 = $derived(run?.gatheringYield?.mode === 'd100' && !run?.timeGate);
+
   // The code vocabulary itself lives in `journalRunReasons.js` so the stores that
   // report an authority refusal share it; only the panel's two positional
   // fallbacks (waiting on the time gate, then the generic) stay here.
@@ -66,8 +69,7 @@
       return localize('FABRICATE.App.Journal.Actions.Wait', {
         time: formatDurationHMS(availableAt - now),
       });
-    if (run?.gatheringYield?.mode === 'd100')
-      return localize('FABRICATE.App.Journal.Actions.RollD100');
+    if (promptsD100) return localize('FABRICATE.App.Journal.Actions.RollD100');
     if (hasCheck) return localize('FABRICATE.App.Journal.Actions.RollCheck');
     if (run?.activityKind === 'gathering') return localize('FABRICATE.App.Journal.Actions.Collect');
     if (run?.activityKind === 'alchemy') return localize('FABRICATE.App.Journal.Actions.Brew');
@@ -80,7 +82,7 @@
 
   function primaryIcon() {
     if (!gateReady) return 'fas fa-hourglass-half';
-    if (run?.gatheringYield?.mode === 'd100') return 'fas fa-dice';
+    if (promptsD100) return 'fas fa-dice';
     if (hasCheck) return 'fas fa-dice-d20';
     return 'fas fa-check-double';
   }

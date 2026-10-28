@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { d100PreviewEntries } from '../src/ui/presenters/runJournalD100Preview.js';
+import { applyPersonalizedDrops } from '../src/ui/svelte/apps/journal/runDetailPresentation.js';
 import {
   GatheringDocumentActor,
   compendiumSourceItem,
@@ -281,6 +283,42 @@ test('issue 2257: the preview threshold cannot drift from the one the roll evalu
     byMode[dropModifierMode] = preview.drops.map((drop) => drop.threshold);
   }
   assert.notDeepEqual(byMode.additive, byMode.multiplicative, 'the two modes mix the modifiers differently');
+});
+
+test('issue 2331: the Journal states the threshold the roll evaluates against, with a modifier', async () => {
+  const service = thresholdService({ roll: 40 });
+  const task = {
+    id: 't',
+    resolutionMode: 'd100',
+    gatheringModifier: 7,
+    dropRows: [
+      thresholdRow('plain', 64),
+      thresholdRow('weather', 40, { conditionModifiers: { weather: [{ conditionId: 'rain', value: 10 }] } }),
+      thresholdRow('character', 25, { characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-' }] }),
+      thresholdRow('never', 0)
+    ]
+  };
+  const authored = d100PreviewEntries({
+    task,
+    run: {},
+    entryFor: (row, _index, chance) => ({ id: row.id, chance })
+  });
+  for (const dropModifierMode of ['additive', 'multiplicative']) {
+    const environment = thresholdEnvironment({ dropModifierMode });
+    const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
+    const rolled = new Map(resolved.itemRows.map((row) => [row.id, row]));
+    const preview = await service.previewDropBreakdown({ environment, task, actor: {} });
+    for (const entry of applyPersonalizedDrops(authored, preview)) {
+      assert.equal(entry.threshold, rolled.get(entry.id).threshold, `${dropModifierMode}: ${entry.id}`);
+    }
+  }
+  const unmodified = new Map(authored.map((entry) => [entry.id, entry.threshold]));
+  const environment = thresholdEnvironment();
+  const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
+  const rolledUnmodified = new Map(resolved.itemRows.map((row) => [row.id, row.threshold]));
+  for (const id of ['plain', 'never']) {
+    assert.equal(unmodified.get(id), rolledUnmodified.get(id), `${id}: the authored preview row`);
+  }
 });
 
 /**

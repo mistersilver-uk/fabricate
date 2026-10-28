@@ -825,6 +825,35 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(!target.querySelector('[data-journal-record]'));
   });
 
+  it("names a ready d100 run's action by whether it prompts, and keeps the wait label while it counts down", async () => {
+    const d100 = (extra = {}) =>
+      makeGatheringRun({
+        lifecycleContract: 'current',
+        gatheringYield: { mode: 'd100', entries: [], roll: null, tiers: [] },
+        actions: { ...makeGatheringRun().actions, execute: true },
+        ...extra,
+      });
+    const primary = async (run, now) => {
+      const target = await harness.mount({ run, now, services: services() });
+      const button = target.querySelector('[data-run-action="primary"]');
+      const reading = { text: button.textContent.trim(), icon: button.innerHTML };
+      harness.remount();
+      return reading;
+    };
+
+    const untimed = await primary(d100({ timeGate: null }), 6000);
+    assert.match(untimed.text, /Actions\.RollD100/u, 'an untimed run prompts for its roll');
+    assert.match(untimed.icon, /fa-dice/u);
+
+    const timedReady = await primary(d100(), 6000);
+    assert.match(timedReady.text, /Actions\.Collect/u, 'a ready timed run resolves silently');
+    assert.doesNotMatch(timedReady.text, /RollD100/u);
+    assert.doesNotMatch(timedReady.icon, /fa-dice/u);
+
+    const timedWaiting = await primary(d100(), 100);
+    assert.match(timedWaiting.text, /Actions\.Wait/u, 'the countdown label is unchanged');
+  });
+
   it('uses localized unknown identity without fabricating a missing amount', async () => {
     const run = makeSucceededRun({
       steps: [
