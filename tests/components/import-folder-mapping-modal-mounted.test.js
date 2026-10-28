@@ -18,6 +18,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -106,13 +107,6 @@ function categoryTrigger(index) {
  */
 function categoryTriggerText(root, index) {
   return selectTriggerText(root, categoryTrigger(index));
-}
-
-/** Flushes Svelte, lets a task pass for queued focus moves, and flushes again. */
-async function settle() {
-  flushSync();
-  await new Promise((done) => setTimeout(done, 0));
-  flushSync();
 }
 
 before(() => harness.setup());
