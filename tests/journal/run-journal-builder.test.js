@@ -1167,6 +1167,38 @@ test('gathering yield projects straight and d100 authored previews without repla
   ]);
 });
 
+test('2324: an active d100 gathering run projects no roll, so its preview draws no cut', () => {
+  const task = {
+    id: 'd100-task',
+    resolutionMode: 'd100',
+    dropRows: [
+      { id: 'moss-row', componentId: 'moss', quantity: 2, dropRate: 65, enabled: true },
+      { id: 'reed-row', componentId: 'reed', quantity: 1, dropRate: 40, enabled: true },
+    ],
+  };
+  const listing = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'd100-active',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'd100-task',
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => task,
+    getComponent: (_systemId, componentId) => ({ id: componentId, name: componentId }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  const preview = listing.activeRuns[0].gatheringYield;
+  assert.equal(preview.mode, 'd100');
+  assert.equal(preview.roll, null, 'a run that has not settled has rolled nothing');
+  assert.ok(
+    preview.entries.every((entry) => !Object.hasOwn(entry, 'cleared')),
+    'and carries no per-row verdict for the scale to read in either direction'
+  );
+});
+
 test('1645: a rolled amount is stated beside the number every yield projection carries', () => {
   const rolled = { id: 'ore-result', componentId: 'ore', quantity: 3, quantityFormula: '1d4+1' };
   const fixed = { id: 'clay-result', componentId: 'clay', quantity: 2 };
