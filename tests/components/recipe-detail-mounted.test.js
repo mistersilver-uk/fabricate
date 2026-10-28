@@ -189,19 +189,35 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('keeps the one primary, disabled and renamed, while a craft is in flight', async () => {
-    const target = await harness.mount({
+  it('keeps the one primary, busy and renamed, while a craft is in flight', async () => {
+    const crafted = [];
+    const props = {
       recipe: recipe(),
       selectedSetId: recipe().defaultSetId,
-      craftability: craftability({ canCraft: false }),
-      busy: true,
-    });
+      craftability: craftability(),
+      onCraft: () => {
+        crafted.push('craft');
+      },
+      busy: false,
+    };
+    const target = await harness.mount(props);
+    const [idle] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    idle.focus();
+    idle.click();
+    assert.deepEqual(crafted, ['craft']);
 
+    await harness.setProps({ busy: true });
     const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
-    assert.equal(primary.disabled, true);
+    assert.ok(primary === idle, 'the same button node survives the press');
+    assert.ok(target.ownerDocument.activeElement === primary, 'the pressed button keeps focus');
+    assert.equal(primary.getAttribute('aria-busy'), 'true', 'and announces the busy state');
+    assert.equal(primary.getAttribute('aria-disabled'), 'true');
+    assert.equal(primary.disabled, false, 'busy is not disabled, so the tab stop stays');
     assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'true');
     assert.match(primary.textContent, /Button\.Crafting/u);
     assert.ok(Boolean(primary.querySelector('i.fa-spinner')));
+    primary.click();
+    assert.deepEqual(crafted, ['craft'], 'a second press is swallowed while busy');
     // The inputs a craft in flight has spent are not a shortfall.
     assert.ok(!target.querySelector('.crafting-detail-pip'), 'no missing-materials pip');
     assert.ok(!target.querySelector('[data-recipe-blocking]'), 'and no missing-materials notice');

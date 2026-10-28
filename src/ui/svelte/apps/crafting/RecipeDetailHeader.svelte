@@ -102,7 +102,7 @@
     artDimmed={uncraftable}
     {primaryLabel}
     primaryIcon={busy ? 'fas fa-spinner fa-spin' : 'fas fa-hammer'}
-    primaryDisabled={busy}
+    primaryBusy={busy}
     primaryProps={{ 'data-crafting-craft': '', 'data-crafting-craft-disabled': String(busy) }}
     onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}
   >
