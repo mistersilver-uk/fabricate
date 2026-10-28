@@ -2,7 +2,7 @@
  * Issue 2257 D16 and task 10b: each slot pip's ink on its solid fill, and a short candidate's
  * danger reading on its own ground and on the chosen face, clear 4.5:1 in all seven themes.
  * Issue 2366: an open tile's empty ring clears the 3:1 non-text floor on the tile in all seven.
- * Issue 2345: the second ring a keyed pressed tile draws is the accent and clears 3:1 on the grounds a tile sits on.
+ * Issue 2345: the 4px band a keyed pressed tile draws is the accent and clears 3:1 on the grounds a tile sits on.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -57,12 +57,19 @@ test("an open tile's empty ring is inked --fab-accent-text and clears 3:1 on the
   assert.notDeepEqual(inkShortfalls(themes, '--fab-accent', ground, 3), []);
 });
 
-test('a keyed pressed tile draws a second 2px accent ring that clears 3:1 on the pane grounds', () => {
-  const ring = rulesIn(corpus[TILE]).filter(
-    (rule) => rule.selector === '.fab-slot-tile.is-selected:focus-visible::after'
-  );
-  assert.equal(ring.length, 1, 'one rule draws the second ring');
-  assert.equal(propertiesOf(ring[0]).get('border'), '2px solid var(--fab-accent)');
+test('a keyed pressed tile thickens its accent outline to a 4px band that clears 3:1 on the pane grounds', () => {
+  const rules = rulesIn(corpus[TILE]);
+  const drawn = (selector) => {
+    const found = rules.filter((rule) => rule.selector === selector);
+    assert.equal(found.length, 1, `one rule draws ${selector}`);
+    return propertiesOf(found[0]);
+  };
+  const pressed = drawn('.fab-slot-tile.is-selected');
+  assert.equal(pressed.get('outline'), '2px solid var(--fab-accent)');
+  assert.equal(pressed.get('outline-offset'), '2px');
+  const keyed = drawn('.fab-slot-tile.is-selected:focus-visible');
+  assert.equal(keyed.get('outline-width'), '4px');
+  assert.equal(keyed.get('outline-offset'), '0');
   for (const ground of ['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']) {
     assert.deepEqual(inkShortfalls(themes, '--fab-accent', [ground], 3), [], ground);
   }

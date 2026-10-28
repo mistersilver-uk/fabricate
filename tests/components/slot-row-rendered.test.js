@@ -187,7 +187,7 @@ describe('SlotTile faces, rendered (issue 2257 D16)', () => {
   it('keeps the ring, and the pressed outline, on a focused tile', async () => {
     for (const [id, properties] of [
       ['flux', ['box-shadow']],
-      ['binder', ['box-shadow', 'outline-style', 'outline-width', 'outline-color']],
+      ['binder', ['box-shadow', 'outline-style', 'outline-color']],
     ]) {
       const before = await computed(tile(id), properties);
       const focused = await tab.evaluate((at) => {
@@ -201,17 +201,9 @@ describe('SlotTile faces, rendered (issue 2257 D16)', () => {
     }
   });
 
-  // Issue 2345: the module ring repeats the pressed outline, so a keyed pressed tile adds a second one.
+  // Issue 2345: the module ring repeats the pressed outline, so keyboard focus thickens it.
   describe('a pressed tile under keyboard focus', () => {
-    const PROPERTIES = ['content', 'top', 'left', 'border-top-width', 'border-top-style'];
-    const ring = (id) =>
-      tab.evaluate(
-        ([at, names]) => {
-          const style = getComputedStyle(document.querySelector(at), '::after');
-          return names.map((name) => style.getPropertyValue(name));
-        },
-        [tile(id), PROPERTIES]
-      );
+    const OUTLINE = ['outline-style', 'outline-width', 'outline-offset', 'outline-color'];
     const keyFocus = async (id) => {
       await tab.keyboard.press('Tab');
       const focused = await tab.evaluate((at) => {
@@ -222,24 +214,44 @@ describe('SlotTile faces, rendered (issue 2257 D16)', () => {
       assert.ok(focused, `${id}'s tile holds keyboard focus`);
     };
     const release = () => tab.evaluate(() => document.activeElement?.blur());
+    const accent = (id) => expected(tile(id), 'outline-color', 'var(--fab-accent)');
 
-    it('draws a second accent ring beyond the pressed outline, unlike the unfocused tile', async () => {
+    it('draws a 4px accent band flush with the tile, heavier than the 2px pressed outline', async () => {
       await release();
-      const resting = await ring('binder');
+      const resting = await computed(tile('binder'), OUTLINE);
+      assert.deepEqual(resting, {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-offset': '2px',
+        'outline-color': await accent('binder'),
+      });
       await keyFocus('binder');
-      const focused = await ring('binder');
-      assert.notDeepEqual(focused, resting, 'a focused pressed tile differs from an unfocused one');
-      assert.deepEqual(focused, ['""', '-8px', '-8px', '2px', 'solid']);
+      assert.deepEqual(await computed(tile('binder'), OUTLINE), {
+        'outline-style': 'solid',
+        'outline-width': '4px',
+        'outline-offset': '0px',
+        'outline-color': await accent('binder'),
+      });
       await release();
     });
 
-    it('insets the ring one more pixel on the open face, whose dashed border is 1px', async () => {
+    it('keeps the 4px band inside the 4px gap above the caption on the open face too', async () => {
       await tab.evaluate(
         (at) => document.querySelector(at).classList.add('is-selected'),
         tile('solvent')
       );
       await keyFocus('solvent');
-      assert.deepEqual((await ring('solvent')).slice(1, 3), ['-9px', '-9px']);
+      const { band, gap } = await tab.evaluate((at) => {
+        const button = document.querySelector(at);
+        const style = getComputedStyle(button);
+        const shell = button.closest('.fab-slot-tile-shell');
+        return {
+          band: Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset),
+          gap: Number.parseFloat(getComputedStyle(shell).rowGap),
+        };
+      }, tile('solvent'));
+      assert.equal(band, 4, 'the band is 4px wide and flush with the open face');
+      assert.ok(band <= gap, `the band (${band}px) clears the caption gap (${gap}px)`);
       await tab.evaluate(
         (at) => document.querySelector(at).classList.remove('is-selected'),
         tile('solvent')
@@ -247,9 +259,14 @@ describe('SlotTile faces, rendered (issue 2257 D16)', () => {
       await release();
     });
 
-    it('leaves an unpressed tile on the module ring alone', async () => {
+    it('leaves an unpressed focused tile on the module ring', async () => {
       await keyFocus('flux');
-      assert.equal((await ring('flux'))[0], 'none');
+      assert.deepEqual(await computed(tile('flux'), OUTLINE), {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-offset': '2px',
+        'outline-color': await accent('flux'),
+      });
       await release();
     });
   });

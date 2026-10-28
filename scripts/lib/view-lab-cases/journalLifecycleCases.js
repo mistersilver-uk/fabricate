@@ -340,7 +340,7 @@ export function journalLifecycleCases() {
         `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt} + [data-run-status="waiting"]`,
         `${detail} [data-run-completion-switch] input[value="worldTime"]:checked`
       ),
-    // The pressed tile, once a key has put focus on it: only keyboard focus draws the second ring.
+    // The pressed tile, once a key has put focus on it: only keyboard focus thickens its outline to 4px.
     'open-choice-focused':
       detail +
       has(
