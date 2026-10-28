@@ -593,8 +593,8 @@ Critical/Warning count pills + a green-check / red-x checklist.
 ## 8. Working rules (checklist before shipping)
 
 1. **Serif names, sans explains.**
-   Serif for the names of things, sans for UI and prose, mono only for dice and IDs — subject to
-   the typography adoption in §3; until then everything uses the inherited `var(--font-body, var(--font-primary, sans-serif))`.
+   Serif for the names of things, sans for UI and prose, mono only for dice and IDs, as the §3 role
+   table maps them.
 2. **Colour carries meaning, not decoration.**
    Reserve semantic hues for status; keep surfaces neutral.
 3. **Tint, don't fill.**
