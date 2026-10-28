@@ -948,7 +948,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 #### Recipe Detail
 
 - The detail leads with its identity header: the recipe's 38px tile, its name in the serif face, and Craft as the pane's one primary.
-  Craft is absent, not disabled, while the live craftability says the craft cannot run, and the header then states what is missing; a craft in flight keeps it, disabled.
+  Craft is absent, not disabled, while the live craftability says the craft cannot run, and the header then states what is missing; a craft in flight keeps it, busy: it keeps focus, announces `aria-busy`, reads "Crafting…" and ignores a second press, and is never `disabled`.
 - The detail body is keyed on the recipe's `modeToken` (simple,
   routedByIngredients, routedByCheck, progressive), so each resolution mode renders
   its own body (ingredient sets, routed-by-check outcome-tier table, progressive

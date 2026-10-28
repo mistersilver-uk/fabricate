@@ -17,6 +17,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -150,6 +151,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/systems/invalidationDomains.js');
     // Issue 2008: an attempt's additional-dice notice is worded by the prompt presenter.
     for (const modulePath of [
+      ...STATUS_TONE_RAW_MODULES,
       ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',

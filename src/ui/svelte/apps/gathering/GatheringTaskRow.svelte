@@ -2,7 +2,7 @@
 <!--
   GatheringTaskRow draws one task of the center column as a selectable ListRow (issue 1778);
   selecting it drives the right-column inspector, which holds the detail and the Attempt. The 56px
-  thumb leads, each blocking issue is a callout badge, the economy is meta, the description is the
+  thumb leads, each blocking issue is a list-density `Chip`, the economy is meta, the description is the
   row's content and the success ChanceBar sits in the aside. A blocked row stays enabled, because
   it opens the inspector that explains it, and its name says it is blocked.
 -->
@@ -11,7 +11,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import { descriptionOrDefault, toPercent } from '../../util/gatheringFormat.js';
   import { calloutFor } from './gatheringBlockedReasons.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
   import ChanceBar from './ChanceBar.svelte';
+  import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import ListRow from '../../components/ListRow.svelte';
 
@@ -97,13 +99,18 @@
   </span>
 {/snippet}
 
+<!-- A neutral callout takes the opaque ground, so it clears 4.5:1 on a selected or hovered row; each chip truncates, with its full label as the title. -->
 {#snippet badges()}
   <span class="gathering-task-callouts" data-gathering-callouts>
     {#each callouts as callout (callout.code)}
-      <span class={`gathering-task-callout tone-${callout.tone}`}>
-        <i class={`fas ${callout.icon}`} aria-hidden="true"></i>
-        <span>{callout.label}</span>
-      </span>
+      <Chip
+        density="list"
+        tone={statusChipTone(callout.tone)}
+        emphasis={callout.tone === 'neutral' ? 'solid' : ''}
+        icon={`fas ${callout.icon}`}
+        title={callout.label}
+        truncate>{callout.label}</Chip
+      >
     {/each}
   </span>
 {/snippet}
@@ -178,35 +185,6 @@
     align-items: center;
     gap: var(--fab-space-chip);
     min-width: 0;
-  }
-
-  .gathering-task-callout {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fab-space-1);
-    padding: 1px var(--fab-space-2);
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    background: var(--fab-surface-raised);
-    border: 1px solid var(--fab-border);
-    color: var(--fab-text);
-  }
-
-  .gathering-task-callout.tone-warning {
-    color: var(--fab-warning-text);
-    border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
-  }
-
-  .gathering-task-callout.tone-info {
-    color: var(--fab-info-text);
-    border-color: var(--fab-info-border);
-    background: var(--fab-info-soft);
-  }
-
-  .gathering-task-callout i {
-    font-size: 10px;
   }
 
   .gathering-task-thumb-wrap {
