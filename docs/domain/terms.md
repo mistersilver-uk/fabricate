@@ -1688,6 +1688,16 @@ Canonical mapping: Derived from actor inventories + system components
 
 Spec reference: openspec/specs/resolution-modes/spec.md
 
+## Entity Tint
+
+Other wording for the same concept, such as tint, preset, palette key, colour token or tag token, names the `colorToken` value and is not a second term.
+A tint colours a glyph, a badge ink and a bar fill, and it is never a chip background.
+The offered set follows a stated rule: a tint is pickable unless it is a neutral that would read as body text or a disabled state, or it is bound to a fixed brand site.
+
+Canonical mapping: `MANAGER_COLOR_TOKENS` (the ten offered tokens in render order), `ESSENCE_COLOR_TOKENS` (the essence vocabulary), `BIOME_COLOR_TOKENS` and `GATHERING_BIOME_COLOR_TOKENS` (the biome vocabulary, with `customColor` as the biome-only sibling)
+
+Spec reference: openspec/specs/design-system/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
 ## Auto-Fill
 
 Scoped to recipes reducible to a concrete plain-component multiset; rich signatures are shown but not auto-filled (client fails safe to `untried`).
