@@ -204,7 +204,7 @@ The **GM-authored** policy deciding whether a player may reorder a progressive r
 #### Player Result Order
 
 The **per-user runtime preference** naming the order a player wants a progressive recipe's stages spent in.
-Stored as **result ids** (not indices, so it survives GM edits) under namespaced keys (`recipe:<recipeId>` / `salvage:<systemId>:<componentId>` — namespaced because recipe and component ids are drawn from different id spaces and can collide; both `recipe:` and `salvage:` keys are written as of issue 675, whose salvage panel is the first writer of the latter) in the `PROGRESSIVE_RESULT_ORDER` setting, which is **`scope: 'user'`** — per user **within a world**, not per account globally, and a replicated document write rather than localStorage.
+Stored as **result ids** (not indices, so it survives GM edits) under namespaced keys (`recipe:<recipeId>` / `salvage:<systemId>:<componentId>` — namespaced because recipe and component ids are drawn from different id spaces and can collide; the salvage key is also system-qualified because component ids are not globally unique; both `recipe:` and `salvage:` keys are written as of issue 675, whose salvage panel is the first writer of the latter) in the `PROGRESSIVE_RESULT_ORDER` setting, which is **`scope: 'user'`** — per user **within a world**, not per account globally, and a replicated document write rather than localStorage.
 
 [Notes](docs/domain/records.md#player-result-order)
 
@@ -1469,7 +1469,7 @@ It is descriptive: it places a period on the clock and never gates, matches or c
 
 #### Valid Id Basis
 
-The id sets a destructive pass derives from the live corpus before pruning anything naming an id outside them — `validRecipes`, `validSystems`, `validSalvageComponentsBySystem` and `validComponentIds`, which had no name until issue 1080, joined at issue 1308 by the two character-library sets and at issue 1359 by the three WORLD-SCOPE entity sets (component, essence and tool ids) and the two CATEGORY VOCABULARIES an icon map is pruned against.
+The id sets a destructive pass derives from the live corpus before pruning anything naming an id outside them — `validRecipes`, `validSystems` and `validSalvageComponentsBySystem`, which had no name until issue 1080, joined at issue 1308 by the two character-library sets and at issue 1359 by the three WORLD-SCOPE entity sets (component, essence and tool ids) and the two CATEGORY VOCABULARIES an icon map is pruned against.
 
 [Notes](docs/domain/terms.md#valid-id-basis)
 

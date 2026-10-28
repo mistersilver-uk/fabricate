@@ -12,6 +12,7 @@
 -->
 <script>
   import Button from '../../../components/Button.svelte';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   // The ordered stage list, shared with the Recipe Studio's progressive stages (issue 2511).
   import ProgressiveStageList from '../ProgressiveStageList.svelte';
   import {
@@ -42,7 +43,8 @@
   // The macro and trigger vocabularies are SYSTEM-scoped, so this view's own lists resolve the
   // referenced component's names too; without them the sentence names nothing a GM recognises.
   const macroNames = $derived(complicationMacroNames(macroOptions));
-  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
+  const stageKeys = $derived(uniqueRowKeys(stages));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions, 'salvage'));
 </script>
 
 <!-- `data-add-salvage-group` rides this button only while there is no backing group,
@@ -78,6 +80,7 @@
 {#if stages.length > 0}
   <ProgressiveStageList
     items={stages}
+    itemKey={(_stage, index) => stageKeys[index]}
     {componentOptions}
     activity="salvage"
     kinds={resultKinds}

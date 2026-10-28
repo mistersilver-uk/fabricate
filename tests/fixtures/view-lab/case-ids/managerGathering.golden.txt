@@ -13,6 +13,7 @@ manager-gathering-task-editor-routed-no-tiers
 manager-gathering-task-editor-reward-rule
 manager-gathering-task-editor-validation
 manager-gathering-task-editor-validation-warnings
+manager-gathering-task-editor-validation-duplicate-result
 manager-gathering-task-editor-validation-blocking
 manager-gathering-task-editor-validation-narrow
 manager-gathering-task-node-interval-normal

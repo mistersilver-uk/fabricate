@@ -337,6 +337,7 @@ For [rewards the player chooses](#rewards-the-player-chooses), it reports a grou
 It also reports a rolled group with no selection roll, or one that cannot be rolled, and a rolled group whose ranges are missing, backwards, fractional or overlapping.
 It reports an **Up to N of** group whose count is not a positive whole number or a rollable roll, and a group with a chooser or award rule Fabricate does not recognise.
 A group inside a progressive system is reported too.
+It also reports a result entered twice in the same recipe or step.
 
 {% include screenshot.html case="manager-recipe-edit-validation" %}
 

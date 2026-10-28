@@ -107,6 +107,10 @@
       'IssueChoiceGroupCount',
       'An up-to choice of rewards does not say how many it awards.',
     ],
+    resultDuplicate: [
+      'IssueResultDuplicate',
+      'A recipe or step lists the same result entry twice, so it cannot be saved.',
+    ],
     alchemyResultSelection: [
       'IssueAlchemyResultSelection',
       'An alchemy recipe does not resolve to exactly one result set.',

@@ -44,7 +44,7 @@
     withRange,
     withoutAlternative,
   } from './resultGroupEdits.js';
-  import { resultAmountInvalid } from './resultRows.js';
+  import { resultAmountInvalid, uniqueRowKeys } from './resultRows.js';
 
   let {
     group = {},
@@ -176,6 +176,7 @@
   }
 
   const members = $derived(isChoiceGroup(group) ? group.alternatives : []);
+  const memberKeys = $derived(uniqueRowKeys(members));
 
   // Runs once per group the caller hands back.
   $effect(() => {
@@ -323,7 +324,7 @@
   >
     <ChoiceGroupAwardHeader {group} {onChange} />
     <div class="manager-recipe-ingredient-requirement-options manager-recipe-result-group-members">
-      {#each members as entry, index (entry?.id || index)}
+      {#each members as entry, index (memberKeys[index])}
         {@render resultRow(entry, index)}
       {/each}
     </div>

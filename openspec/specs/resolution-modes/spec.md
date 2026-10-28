@@ -901,6 +901,8 @@ It was previously modelled, normalized, GM-authorable, captured onto every salva
 - The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
 - Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<systemId>:<componentId>`.
 - The salvage key is system-qualified because component ids are not globally unique (copy-mode import preserves them), so a component-id-only key would let two systems' components share one order.
+- The stale-preference sweep removes a `salvage:<systemId>:<componentId>` key only when that system no longer holds that component.
+- It also keeps the component-id-only `salvage:<componentId>` key that predates issue 766 while any system holds that component, and nothing reads or writes that form now.
 - One key per recipe, not per step.
 - The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
 - It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
@@ -913,13 +915,14 @@ Reconciling a stored order against the authored list MUST satisfy all of the fol
 - Ids in the stored order that match no authored result are skipped.
 - Authored results the stored order does not name are **tail-appended in authored order**, so an unranked stage can never displace a ranked one: a GM adding a stage cannot silently demote a player's ranked stage, and the new stage is awarded only if budget remains.
 - A result with **no id** is never reorderable and always retains its authored position (it matches nothing and tail-appends).
-- **Duplicate ids: first match wins.** The second copy tail-appends rather than vanishing or doubling.
+- **Duplicate ids: first match wins.** The editor and `Recipe.validateStructure()` refuse a result id repeated within one recipe or step, so this applies only to stored data that predates the refusal.
+  The second copy tail-appends rather than vanishing or doubling.
 - An absent or empty stored order yields the authored list unchanged.
 
 #### Cross-step id uniqueness (assumption)
 
 - One flat id list reconciles every step of a multi-step progressive recipe.
-- This is correct only while result ids are **unique across a recipe's steps**, which nothing enforces — copy-mode import preserves result ids by design.
+- This is correct only while result ids are **unique across a recipe's steps**, which nothing enforces: uniqueness is required within one recipe or step (`data-models/spec.md`, `Recipe._validateResultGroups`), not across steps, and copy-mode import preserves result ids by design.
 - A result id colliding across two steps therefore ranks independently in each.
 - This is a recorded assumption, not a guarantee.
 

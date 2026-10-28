@@ -17,7 +17,7 @@ It runs while Fabricate starts up, before the module is ready for use.
 |:-------------------------------------|:------------------------------------------------------------------------------------------------------------|
 | Last viewed system in GM admin       | Cleared if the remembered system is no longer one of the current crafting systems                           |
 | Last selected gathering actor        | Cleared when the remembered actor no longer exists or is no longer selectable by the current user           |
-| Progressive result order preferences | Any entry for a recipe or a salvageable component that no longer exists is removed                           |
+| Progressive result order preferences | Any entry for a recipe, or for a salvageable component its crafting system no longer holds, is removed       |
 
 ## Why this matters
 

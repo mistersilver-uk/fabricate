@@ -18,6 +18,7 @@
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
   import { buildRoutingModel } from './recipeRoutingModel.js';
   import { assignCandidates, inboundChips } from './resultSetSources.js';
@@ -71,6 +72,7 @@
   } = $props();
 
   const groups = $derived(Array.isArray(resultGroups) ? resultGroups : []);
+  const groupKeys = $derived(uniqueRowKeys(groups));
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
 
@@ -329,7 +331,7 @@
     <!-- Results has NO OR relationship between groups: the producing one is chosen at craft
          time by routing, so no OR divider sits between them. -->
     <ul class="manager-recipe-result-groups">
-      {#each groups as group, index (group?.id || index)}
+      {#each groups as group, index (groupKeys[index])}
         <li class="manager-recipe-result-group-item">
           <RecipeResultGroupCard
             {group}

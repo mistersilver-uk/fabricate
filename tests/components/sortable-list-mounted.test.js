@@ -371,6 +371,74 @@ describe('SortableList — reorder answers both inputs', () => {
     assert.match(region.textContent, /(position 2 of 3|"position":"2")/u, 'with its new position');
   });
 
+  it('follows the row that moved when two rows share an id, from the grip and from the rocker', async () => {
+    const twins = [
+      { id: 'dup', key: 'k1', name: 'First twin' },
+      { id: 'dup', key: 'k2', name: 'Second twin' },
+      { id: 'solo', key: 'k3', name: 'Solo' },
+    ];
+    let items = [...twins];
+    const roundTrip = (from, to) => {
+      const next = [...items];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      items = next;
+      harness.component.$set({ items });
+    };
+    const target = await harness.mount({
+      items,
+      itemLabel,
+      row: rowSnippet,
+      itemKey: (item) => item.key,
+      onReorder: roundTrip,
+    });
+    const focusedRow = () =>
+      globalThis.document.activeElement.closest('.fabricate-sortable-list-row');
+
+    press(gripOf(rowsOf(target)[1]), 'ArrowDown');
+    flushSync();
+    assert.ok(
+      focusedRow() === rowsOf(target)[2],
+      'the second twin moved to the end and its own grip has focus, not the first twin`s'
+    );
+
+    rowsOf(target)[0].querySelector('[data-sortable-move="down"]').click();
+    flushSync();
+    assert.ok(
+      focusedRow() === rowsOf(target)[1] &&
+        globalThis.document.activeElement.getAttribute('data-sortable-move') === 'down',
+      'the first twin moved down past an identical id and its pressed chevron has focus'
+    );
+  });
+
+  it('follows the row to the position it was moved to when the caller rebuilds the record', async () => {
+    let items = [
+      { id: 'dup', key: 'k1', name: 'First twin' },
+      { id: 'dup', key: 'k2', name: 'Second twin' },
+    ];
+    const target = await harness.mount({
+      items,
+      itemLabel,
+      row: rowSnippet,
+      itemKey: (item) => item.key,
+      onReorder: (from, to) => {
+        const next = [...items];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, { ...moved });
+        items = next;
+        harness.component.$set({ items });
+      },
+    });
+
+    press(gripOf(rowsOf(target)[0]), 'ArrowDown');
+    flushSync();
+    assert.ok(
+      globalThis.document.activeElement.closest('.fabricate-sortable-list-row') ===
+        rowsOf(target)[1],
+      'a rebuilt record is found by the position the move asked for, not by the first id match'
+    );
+  });
+
   it('has focus already on the moved grip at the moment the region`s text changes', async () => {
     // A runtime witness: a `MutationObserver` records `document.activeElement` at the instant the
     // region's text lands. Measured limitation, recorded rather than hidden — both orders flush the

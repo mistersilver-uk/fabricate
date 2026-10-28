@@ -13,6 +13,7 @@
   import Notice from '../../../components/Notice.svelte';
   import RecipeResultGroupCard from '../recipe/RecipeResultGroupCard.svelte';
   import RecipeResultsSection from '../recipe/RecipeResultsSection.svelte';
+  import { uniqueRowKeys } from '../../../components/resultRows.js';
   import { newDraftId } from '../../../util/draftId.js';
   import GatheringTaskCard from './GatheringTaskCard.svelte';
   import GatheringTaskComponentBrowserCard from './GatheringTaskComponentBrowserCard.svelte';
@@ -49,6 +50,7 @@
   } = $props();
 
   const resultGroups = $derived(Array.isArray(task?.resultGroups) ? task.resultGroups : []);
+  const groupKeys = $derived(uniqueRowKeys(resultGroups));
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   function normalizeRoutedName(value) {
     return String(value || '')
@@ -189,7 +191,7 @@
       </EmptyState>
     {:else}
       <ul class="manager-recipe-result-groups">
-        {#each resultGroups as group, index (group?.id || index)}
+        {#each resultGroups as group, index (groupKeys[index])}
           <li class="manager-recipe-result-group-item">
             <RecipeResultGroupCard
               {group}
