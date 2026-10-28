@@ -2759,6 +2759,7 @@ describe('each entry matches its component declaration', () => {
     'var(--font-primary)',
     'var(--font-primary, )',
     'var(--font-primary, var(--x))',
+    'var(--font-primary, sans-serif)',
     'var(--font-body, var(--font-primary))',
   ]) {
     it(`refuses ${value}, which can go invalid with no Foundry variable`, () => {

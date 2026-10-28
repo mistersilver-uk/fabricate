@@ -1,7 +1,9 @@
 /**
- * With `--font-primary` undefined, as in every Fabricate window (issue 2312), the module roots and a
- * component that restates the UI face still compute `--font-body`'s face, and with neither variable
- * defined they compute the literal fallback.
+ * With `--font-primary` undefined, as in every Fabricate window (issue 2312), the module roots, the
+ * headings under them and a component that restates the UI face compute `--font-body`'s face
+ * whatever face an ancestor sets, and with neither variable defined they compute the literal
+ * fallback. Each root sits in a monospace ancestor and each heading and component in a monospace
+ * parent, so a read that falls back to inheritance computes monospace.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,14 +27,15 @@ const pageFor = (bodyStyle) => `<!doctype html><html><head><meta charset="utf-8"
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${memberRow.css}</style>
 <style>body { ${bodyStyle} }</style></head>
-<body class="game"><div class="application"><section class="window-content">
-  <div class="fabricate fabricate-app" data-case="app"><h2 data-case="app-heading">Title</h2></div>
-  <div class="fabricate crafting-system-manager" data-case="manager"><h3 data-case="manager-heading">Title</h3>
-    <div style="font-family: monospace">
+<body class="game"><div style="font-family: monospace">
+  <div class="application fabricate fabricate-app" data-case="app"><section class="window-content">
+    <div style="font-family: monospace"><h2 data-case="app-heading">Title</h2></div>
+  </section></div>
+  <div class="application fabricate crafting-system-manager" data-case="manager"><section class="window-content">
+    <div style="font-family: monospace"><h3 data-case="manager-heading">Title</h3>
       <span class="manager-party-member-name ${memberRow.hashClass}" data-case="member">Ada</span>
     </div>
-  </div>
-</section></div></body></html>`;
+  </section></div></div></body></html>`;
 
 let browser;
 
@@ -56,7 +59,7 @@ async function facesOf(bodyStyle) {
 }
 
 describe('the UI face with --font-primary undefined', () => {
-  it('is the body face on both module roots, their headings and a restating component', async () => {
+  it('is the body face on both module roots, their headings and a restating component, under monospace ancestors', async () => {
     const faces = await facesOf(`--font-body: ${BODY_FACE}; font-family: var(--font-body);`);
     for (const [name, face] of Object.entries(faces)) assert.equal(face, BODY_FACE, name);
   });

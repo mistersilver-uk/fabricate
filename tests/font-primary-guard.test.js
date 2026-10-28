@@ -1,61 +1,111 @@
 /**
- * Foundry declares `--font-primary` only under the ApplicationV1 `.app` root (issue 2312), so a
- * read with no literal-ended fallback is invalid at computed-value time in every Fabricate window.
- * A face is stated as `var(--font-body, var(--font-primary, sans-serif))`.
+ * Foundry declares `--font-primary` only under the ApplicationV1 `.app` root (issue 2312), so no
+ * Fabricate window defines it. A `--font-primary` read is admitted only as the literal-ended
+ * fallback of a `--font-body` read, `var(--font-body, var(--font-primary, sans-serif))`.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { fontPrimaryReads, unguardedFontPrimaryReads } from './helpers/fontPrimaryReads.js';
-import { literalStrings } from './helpers/moduleAst.js';
+import { literalStrings, walkNodes } from './helpers/moduleAst.js';
 import { sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { collectStyleCorpus } from './helpers/styleBlockScan.js';
+import { parseComponent } from './helpers/svelteStructureContract.js';
 
 const GUARDED = 'var(--font-body, var(--font-primary, sans-serif))';
 
-/** `{ file, reads }` for each stylesheet, Svelte style block and JS string literal with a read. */
+/** Every string a component or module spells: literals, markup text and style declarations. */
+function textsOf(ast) {
+  const texts = literalStrings(ast);
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'Text') texts.push(node.data);
+    if (node.type === 'Declaration') texts.push(node.value);
+  }
+  return texts.join('\n');
+}
+
+/** `{ file, reads, unguarded }` for each stylesheet, style block, markup attribute and script. */
 function shippedReads() {
   const styled = Object.entries(collectStyleCorpus());
-  const inline = sourceAstEntriesUnder('src')
-    .filter(([file]) => !file.endsWith('.svelte'))
-    .map(([file, ast]) => [file, literalStrings(ast).join('\n')]);
-  return [...styled, ...inline]
-    .map(([file, text]) => ({ file, reads: fontPrimaryReads(text) }))
+  const sources = sourceAstEntriesUnder('src').map(([file, ast]) => [file, textsOf(ast)]);
+  return [...styled, ...sources]
+    .map(([file, text]) => ({
+      file,
+      reads: fontPrimaryReads(text),
+      unguarded: unguardedFontPrimaryReads(text),
+    }))
     .filter(({ reads }) => reads.length > 0);
 }
 
+const REFUSED = [
+  ['bare', 'var(--font-primary)'],
+  ['an empty fallback', 'var(--font-primary, )'],
+  ['a variable fallback', 'var(--font-primary, var(--x))'],
+  ['a variable ending in a literal', 'var(--font-primary, var(--x, serif))'],
+  ['a literal fallback with no --font-body read', 'var(--font-primary, sans-serif)'],
+  ['a tight literal fallback with no --font-body read', 'var(--font-primary,Arial)'],
+  ['a --font-body fallback that is not a literal', 'var(--font-body, var(--font-primary))'],
+  ['a quoted literal with no --font-body read', 'var(--font-primary, "A (b)")'],
+  ['a CSS-wide keyword', 'var(--font-body, var(--font-primary, inherit))'],
+  ['a CSS-wide keyword last', 'var(--font-body, var(--font-primary, serif, UNSET))'],
+  ['a template hole', 'var(--font-body, var(--font-primary, ${face}))'],
+  ['inner spaces', 'var( --font-primary )'],
+  ['a newline after the opener', 'var(\n  --font-primary\n)'],
+  ['an upper-case function name', 'VAR(--font-primary)'],
+  ['spaces round the comma', 'var( --font-primary , sans-serif )'],
+  ['a font shorthand', 'font: 12px/1 var(--font-primary)'],
+  ['a family list', 'var(--font-primary), "Signika", sans-serif'],
+  ['calc()', 'calc(var(--font-primary))'],
+  ['an alias', '--face: var(--font-primary)'],
+  ['a multi-line declaration', 'font-family:\n    var(--font-primary);'],
+  [
+    'a --font-body read with another fallback',
+    'var(--font-body, serif, var(--font-primary, serif))',
+  ],
+];
+
+const ADMITTED = [
+  ['the guarded form', GUARDED],
+  ['the guarded form, spaced', 'var( --font-body , var( --font-primary , sans-serif ) )'],
+  ['the guarded form with a quoted literal', 'var(--font-body, var(--font-primary, "A (b)"))'],
+  ['a longer property name', 'var(--font-primary-alt, serif)'],
+  ['a definition, which declares the variable', ':root { --font-primary: Arial; }'],
+  ['a name that merely ends in var(', 'devar(--font-primary)'],
+];
+
 describe('the --font-primary read', () => {
-  it('is guarded by a literal-ended fallback in every shipped stylesheet, style block and inline face', () => {
-    const offenders = shippedReads().flatMap(({ file, reads }) =>
-      reads
-        .filter((read) => unguardedFontPrimaryReads(read).length > 0)
-        .map((read) => `${file}: ${read}`)
+  it('is admitted only as the literal-ended fallback of a --font-body read, in every shipped source', () => {
+    const offenders = shippedReads().flatMap(({ file, unguarded }) =>
+      unguarded.map((read) => `${file}: ${read}`)
     );
-    assert.deepEqual(offenders, []);
+    assert.deepEqual([...new Set(offenders)], []);
   });
 
-  it('is found where it is bare, or where its fallback ends in another variable', () => {
-    for (const value of [
-      'var(--font-primary)',
-      'var(--font-primary, )',
-      'var(--font-primary, var(--x))',
-      'var(--font-body, var(--font-primary))',
-    ]) {
+  for (const [shape, value] of REFUSED) {
+    it(`is refused as ${shape}`, () => {
       assert.equal(unguardedFontPrimaryReads(value).length, 1, value);
-    }
-  });
+    });
+  }
 
-  it('is admitted where its fallback ends in a literal', () => {
-    for (const value of [GUARDED, 'var(--font-primary, sans-serif)', 'var(--font-primary,Arial)']) {
+  for (const [shape, value] of ADMITTED) {
+    it(`is admitted as ${shape}`, () => {
       assert.deepEqual(unguardedFontPrimaryReads(value), [], value);
-    }
+    });
+  }
+
+  it('is refused in a Svelte file’s markup attribute, directive and script', () => {
+    const offenders = (source) => unguardedFontPrimaryReads(textsOf(parseComponent(source)));
+    assert.equal(offenders('<div style="font-family: var(--font-primary)"></div>').length, 1);
+    assert.equal(offenders('<div style:font-family="var(--font-primary)"></div>').length, 1);
+    assert.equal(
+      offenders('<script>const face = `var(--font-primary)`;</script><div></div>').length,
+      1
+    );
+    assert.equal(offenders('<style>.a { font-family: var(--font-primary); }</style>').length, 1);
+    assert.deepEqual(offenders(`<div style="font-family: ${GUARDED}"></div>`), []);
   });
 
-  it('is not read from a definition, which declares the variable', () => {
-    assert.deepEqual(unguardedFontPrimaryReads(':root { --font-primary: Arial; }'), []);
-  });
-
-  it('is scanned in a stylesheet, a Svelte style block and a JS string', () => {
+  it('is scanned in a stylesheet, a Svelte file and a JS string', () => {
     const files = shippedReads().map(({ file }) => file);
     assert.deepEqual(
       [
