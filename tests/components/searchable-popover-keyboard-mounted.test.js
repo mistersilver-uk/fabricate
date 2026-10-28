@@ -1341,7 +1341,9 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
           assert.ok(document.activeElement === button, 'focus stays for the browser to move');
         }
         pressKey('Tab');
-        for (const modifiers of [{ ctrlKey: true }, { altKey: true }]) pressKey('Tab', modifiers);
+        for (const modifiers of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+          pressKey('Tab', modifiers);
+        }
         pressKey('ArrowUp');
         pressKey('Escape');
         assert.deepEqual(above.heard, ['Tab', 'Tab', 'Tab'], 'only plain Tab reaches the window');
@@ -1351,7 +1353,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       harness.remount();
     });
 
-    it('marks every trigger form for Foundry`s keyboard focus', async () => {
+    it('marks every trigger form for Foundry’s keyboard focus', async () => {
       for (const props of [{}, { triggerChip: true }, { triggerButton: { role: 'neutral' } }]) {
         await mountPicker(props);
         assert.equal(trigger().getAttribute('data-keyboard-focus'), 'true', JSON.stringify(props));
@@ -1359,7 +1361,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       }
     });
 
-    it('enters a search-free panel`s footer on Tab from the open trigger, and leaves it from there', async () => {
+    it('enters a search-free panel’s footer on Tab from the open trigger, and leaves it from there', async () => {
       await mountPicker({ showSearch: false, triggerHasPopup: 'listbox', footer });
       const button = trigger();
       button.focus();
@@ -1377,6 +1379,11 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         !panelOpen() && document.activeElement === button,
         'Shift+Tab closes onto the trigger'
       );
+
+      await openPanel();
+      event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, false, 'Shift+Tab from the open trigger moves back');
+      assert.ok(!panelOpen() && document.activeElement === button, 'closing the panel');
 
       await openPanel();
       pressKey('Tab');

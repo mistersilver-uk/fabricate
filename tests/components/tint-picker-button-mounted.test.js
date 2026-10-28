@@ -74,7 +74,7 @@ describe('TintPickerButton swatch', () => {
     assert.equal(
       button.getAttribute('data-keyboard-focus'),
       'true',
-      'so Foundry`s Tab binding never takes the Tab it lets through (issue 2598)'
+      'so Foundry’s Tab binding never takes the Tab it lets through (issue 2598)'
     );
     assert.ok(
       Boolean(button.closest('.fabricate-color-picker.manager-color-picker')),

@@ -635,18 +635,18 @@ describe('panelTabExit (issue 2676)', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
-  /** A panel of a query field, a gated row list, a disabled and a hidden stop, and two footer buttons. */
+  /** A query field, a gated row list and two footer buttons, then a disabled, hidden and inert stop. */
   function panel() {
     const root = document.createElement('div');
     root.tabIndex = -1;
     root.innerHTML = `
       <input data-field />
       <div role="listbox" tabindex="-1"><button tabindex="-1" data-row>Row</button></div>
-      <input type="hidden" />
-      <div inert><button data-inert>Inert</button></div>
       <button data-clear>Clear</button>
       <button data-apply>Apply</button>
-      <button disabled>Gone</button>`;
+      <button disabled>Gone</button>
+      <input type="hidden" />
+      <div inert><button data-inert>Inert</button></div>`;
     document.body.append(root);
     const at = (selector) => root.querySelector(selector);
     return { root, at };
