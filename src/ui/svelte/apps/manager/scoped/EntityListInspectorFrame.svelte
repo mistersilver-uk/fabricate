@@ -3,7 +3,7 @@
   The ONE list-plus-inspector composition behind every scoped-entity list (issue 1380, epic 1357).
   Issue 1050 shipped the SonarCloud duplication gate red at 5.3% with 93 of 98 duplicated lines
   inside one component, and `.svelte` IS duplication-analysed. So the composition is built once
-  here and configured per scope; `EntityCatalogueShell` is its caller and may not inline it.
+  here and configured by its caller; `EntityCatalogueShell` is its caller and may not inline it.
 -->
 <script>
   import { paginateRows } from '../../../../model/browserPagination.js';
@@ -962,7 +962,7 @@
   }
 
   /* 340px AND NO COLUMN GAP, matching the shared aside this column stands in for, so a GM sees ONE
-     inspector across both scopes rather than learning a second one per screen. */
+     inspector across every catalogue rather than learning a second one per screen. */
   .manager-scoped-list-layout.has-inspector {
     grid-template-columns: minmax(0, 1fr) 340px;
     column-gap: 0;
