@@ -1020,6 +1020,7 @@ The correction must actually reach every surface reading that entity, and rows k
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
+Dismissing it by keyboard moves focus to the library's search field before the flash leaves the page, because a focus that falls to the document body lets Foundry's Escape close every open window, the Manager included.
 The flash **floats** over the list rather than sitting in flow above it: an in-flow banner shoves every row down the page as it appears, moving the row the GM just clicked out from under the cursor.
 
 The **lock toggle** gives `recipe.locked` a real write path from the row.

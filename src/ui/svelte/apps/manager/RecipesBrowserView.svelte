@@ -91,18 +91,21 @@
     list.syncSystem(selectedSystemId);
   });
 
-  // The blocked-enable flash. This view CLAIMS the refusal message through the store's `onBlocked`
-  // sink, so the store SUPPRESSES its own Foundry notification and the GM is not told twice; the
-  // error is never surfaced from inside this component, which is what keeps that seam stubbable.
-  // TWO PARTS since issue 1515, because `Notice` draws a `title` over a quieter `detail`, and each
-  // half is built from its own material rather than cut at a colon a translation may move.
+  // The blocked-enable flash: this view claims the refusal through the store's `onBlocked` sink, so
+  // the store suppresses its own Foundry notification and never surfaces the error from here.
+  // Two parts (issue 1515): `Notice` draws a `title` over a quieter `detail`.
   let flashTitle = $state('');
   let flashDetail = $state('');
 
-  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515): clearing the term and
-  // setting it again is ONE batched update, so the `{#if}` never goes false and a dismissed
-  // instance survives, making the second refusal silent. Keying on a rising counter fixes that.
+  // A rising counter keys the notice: clearing the term and setting it again is ONE batched
+  // update, so a dismissed instance would survive and make the second refusal silent (issue 1515).
   let flashToken = $state(0);
+
+  // Dismissing removes the focused control, which drops focus to <body> where Foundry's Escape
+  // closes every open window, so focus goes to the search field first.
+  let noticeSlot = $state(null);
+  const focusSearchField = () =>
+    noticeSlot?.parentElement?.querySelector('[data-recipe-toolbar] input[type="search"]')?.focus();
 
   function handleToggleEnabled(recipe) {
     flashTitle = '';
@@ -355,17 +358,13 @@
     place a GM is told why the switch did not move, and it does not auto-hide.
     `openspec/specs/design-system/spec.md` routes a `role="alert"` strip to a BLOCKING notice and
     fixes its position; this route has no page header, so that is the content region's first child.
-    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT: a CONDITIONAL direct child of
-    `.manager-main` would move the collapsing `minmax(0, 1fr)` between children, which is what
-    `assertOneTrackPerGridChild` names. An empty slot is a zero-height `auto` row.
+    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT: a conditional direct child of
+    `.manager-main` would move the collapsing `minmax(0, 1fr)` (`assertOneTrackPerGridChild`).
   -->
-  <div class="manager-recipe-notice">
+  <div class="manager-recipe-notice" bind:this={noticeSlot}>
     {#key flashToken}
       {#if flashTitle}
-        <!-- NO `icon`, DELIBERATELY (issue 1515): `Notice` ships a per-tone default glyph and the
-             danger tone's default IS the specimen's danger mark, so passing one here re-stated the
-             primitive's own choice from a call site. The prop stays for the two accent callers
-             whose glyph the specimen does not declare. -->
+        <!-- No `icon` (issue 1515): the danger tone's default glyph is the specimen's danger mark. -->
         <Notice
           blocking
           tone="danger"
@@ -373,6 +372,7 @@
           detail={flashDetail}
           dismissable
           dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
+          onDismiss={focusSearchField}
           data-recipe-flash=""
         />
       {/if}

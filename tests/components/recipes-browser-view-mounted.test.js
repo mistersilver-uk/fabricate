@@ -1034,6 +1034,31 @@ describe('RecipesBrowserView lifted browser state', () => {
     );
   });
 
+  it('keeps the keyboard inside the browser when the focused flash is dismissed', async () => {
+    // Removing the focused dismiss control drops focus to <body>, where Foundry's Escape closes
+    // every open window, so the dismissal must hand focus to the search field first.
+    const calls = [];
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true })],
+      onToggleEnabled: (id, enabled, options) => calls.push(options),
+    });
+    root.querySelector('[data-recipe-id="r1"] .fabricate-toggle').click();
+    calls[0].onBlocked('This recipe has no result groups.');
+    flushSync();
+
+    const dismiss = root.querySelector('[data-recipe-flash] [data-notice-dismiss]');
+    dismiss.focus();
+    assert.ok(document.activeElement === dismiss, 'pre-condition: the dismiss control holds focus');
+
+    dismiss.click();
+    flushSync();
+
+    const search = root.querySelector('[data-recipe-toolbar] input[type="search"]');
+    assert.ok(Boolean(search), 'the search field is rendered');
+    assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is gone');
+    assert.ok(document.activeElement === search, 'and the keyboard is on the search field');
+  });
+
   it('never reaches for a Foundry notification itself', async () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'),
