@@ -2740,6 +2740,8 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 The manager's title band MUST render through `AppTitleBar` (`src/ui/svelte/components/AppTitleBar.svelte`), above the page header and the rail on every manager route, the Tool routes included, and only `apps/manager/ManagerTitleBar.svelte` renders it (issue 2420).
 `ManagerTitleBar` formats the summary the shell derives — the selected system's resolution mode, followed by its outcome-tier count when that count is positive — and hands `AppTitleBar` that caption and whether a companion is installed; with no mode label, which is to say with no system selected, it hands no caption, so the band draws no status line.
 `AppTitleBar` draws the band's own words, the `PREMIUM` mark, its read name and the status prefix, from the `FABRICATE.Admin.Manager.Titlebar` keys, and draws a caller's caption verbatim.
+The status prefix ends in a separator, so a screen reader pauses between it and the caption instead of reading them as one run.
+The band's content row is pinned to 16px under its padding and rule, so the band is the same height with and without the mark, the status line, or both (issue 2422).
 The player window renders no `AppTitleBar`, because it carries no premium signal; its top bar is `ActorSelectTopBar`, a region beside its rail.
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.

@@ -191,7 +191,7 @@ const PREMIUM_MARK =
   '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>';
 const statusLine = (caption) =>
   `<span class="manager-titlebar-status" data-manager-titlebar-status="" title="${caption}">` +
-  '<span class="visually-hidden">Selected system resolution</span> ' +
+  '<span class="visually-hidden">Selected system resolution:</span> ' +
   '<i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i> ' +
   `<span class="manager-titlebar-status-text">${caption}</span></span>`;
 
