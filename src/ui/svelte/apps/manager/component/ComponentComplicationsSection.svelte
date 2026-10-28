@@ -1089,14 +1089,14 @@
     max-width: 460px;
   }
 
-  /* NO vertical margin on either. The section root is a grid, and a grid gap and an item margin
-     ADD: the 9px these carried rendered as 30px between the list and the Add control while the
-     EMPTY state measured 21px — one section disagreeing with itself. The panel's gap is the only
-     rhythm here. (The parity harness records no `margin`, so nothing else would have caught it.) */
+  /* NO vertical margin: the panel is a grid, and a grid gap and an item margin ADD (9px rendered
+     as 30px above the Add control). `min-width: 0` stops the grid's auto track at the column, so a
+     long nowrap summary ellipsises instead of widening the card. */
   .fab-complications-list {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   .fab-complication-fields {

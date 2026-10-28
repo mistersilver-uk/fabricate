@@ -13,7 +13,7 @@ import {
   getDiscoveredRealmIds,
 } from '../systems/gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from '../systems/gatheringRealms.js';
-import { executePublicGather } from '../systems/journalRunCommands.js';
+import { executePublicGather } from '../systems/publicGatheringAttempt.js';
 
 import {
   deprecate,
@@ -216,6 +216,7 @@ export const gatheringFacade = {
       // A required check still opens its dialog; an omitted flag stays silent (issue 1780).
       interactive: withRememberedActor.interactive === true,
       additionalDice: withRememberedActor.additionalDice ?? 0,
+      presentTools: withRememberedActor.presentTools ?? null,
     });
   },
 

@@ -93,7 +93,7 @@ The opaque blind action never shows per-task success chances.
 
 New gathering runs wait for manual collection by default.
 After starting a task, open the [Journal]({% link player-app/journal.md %}) and use its ready action.
-Depending on the task, this is **Collect**, **Roll a d100**, or **Roll check**.
+Depending on the task, this is **Collect**, **Roll a d100** (untimed runs), or **Roll check**.
 A timed run must first finish its world-time countdown.
 Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
 Starting still applies the task's established stamina, node, and reservation rules.
@@ -128,7 +128,7 @@ The bonus also applies to every event roll, so a positive bonus makes hazards li
 The result applies only after you answer the prompt.
 A timed d100 gather does not prompt.
 Dismissing the prompt leaves the run ready in the Journal under **Roll a d100**, with its start-time costs spent, and the Gathering tab refreshes.
-Today a timed d100 run shows the same **Roll a d100** label once it is ready, but it completes without a prompt.
+A timed d100 run shows **Collect** once it is ready, and completes without a prompt.
 
 A required player check opens an interactive dialog when you execute the ready run.
 Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.

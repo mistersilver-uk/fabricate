@@ -578,10 +578,10 @@
         labels={{
           threshold: (entry) =>
             localize(
-              gatheringYield.mode === 'd100'
+              gatheringYield.mode === 'd100' && Number.isFinite(entry.threshold)
                 ? 'FABRICATE.App.Journal.Yields.HighRollThreshold'
                 : 'FABRICATE.App.Journal.Yields.Chance',
-              { chance: entry.chance, threshold: 101 - entry.chance }
+              { chance: entry.chance, threshold: entry.threshold }
             ),
           cleared: (entry) =>
             localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),

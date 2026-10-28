@@ -77,6 +77,11 @@
   const blindAttemptable = $derived(env?.attemptable === true);
   // A blind gather that cannot run names a generic reason only: its blockers may be task-derived.
   const blindBlocked = $derived(isBlind && !blindAttemptable);
+  const blindAttemptKey = $derived(
+    busy
+      ? 'FABRICATE.App.Gathering.Detail.BlindAttemptBusy'
+      : 'FABRICATE.App.Gathering.Detail.BlindAttempt'
+  );
   const uid = $props.id();
   const blindReasonId = `${uid}-blind-reason`;
 
@@ -187,9 +192,10 @@
         {name}
         art={sceneThumb || img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
         chips={hasPips ? pips : null}
-        primaryLabel={isBlind ? localize('FABRICATE.App.Gathering.Detail.BlindAttempt') : ''}
-        primaryIcon="fas fa-dice"
-        primaryDisabled={!blindAttemptable || busy}
+        primaryLabel={isBlind ? localize(blindAttemptKey) : ''}
+        primaryIcon={busy ? 'fas fa-spinner fa-spin' : 'fas fa-dice'}
+        primaryDisabled={!blindAttemptable}
+        primaryBusy={busy}
         primaryProps={{
           class: 'gathering-detail-blind-attempt',
           'data-gathering-blind-attempt': '',

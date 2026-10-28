@@ -17,6 +17,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -281,6 +282,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     for (const modulePath of [
       ...FOUNDRY_BRIDGE_RAW_MODULES,
       ...LOCALIZE_OR_RAW_MODULES,
+      ...STATUS_TONE_RAW_MODULES,
       ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',
@@ -1654,45 +1656,83 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(calls.list, 2, 'listing re-fetched after the attempt');
   });
 
-  it('guards against double-submit while an attempt is in flight', async () => {
-    // A deferred attempt promise lets us click again before the first settles.
-    let releaseAttempt;
-    const calls = { list: 0, attempts: [] };
-    const services = {
-      listGatheringForActor: () => {
-        calls.list += 1;
-        return Promise.resolve(listing([environment()]));
-      },
-      startGatheringAttempt: (opts) => {
-        calls.attempts.push(opts);
-        return new Promise((resolve) => {
-          releaseAttempt = resolve;
-        });
-      },
-    };
-    await mountView(services);
+  // Each header's one Attempt: the task inspector's and the blind centre's.
+  const IN_FLIGHT_CASES = [
+    {
+      name: 'the task inspector Attempt',
+      fixture: () => environment(),
+      selector: '[data-gathering-task-detail] [data-gathering-attempt]',
+      idle: 'Detail.Attempt',
+      busy: 'Detail.AttemptBusy',
+    },
+    {
+      name: 'the blind Attempt',
+      fixture: () =>
+        environment({
+          id: 'env-blind',
+          selectionMode: 'blind',
+          revealPolicy: 'never',
+          tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true }],
+          discoveredTasks: [],
+        }),
+      selector: '[data-gathering-blind-attempt]',
+      idle: 'Detail.BlindAttempt',
+      busy: 'Detail.BlindAttemptBusy',
+    },
+  ];
 
-    const attemptBtn = target.querySelector(
-      '[data-gathering-task-detail] [data-gathering-attempt]'
-    );
-    attemptBtn.click();
-    await tick();
-    flushSync();
-    // While in flight the button is disabled and a second click is ignored.
-    assert.ok(
-      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled,
-      'button disabled during the round-trip'
-    );
-    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
-    await tick();
-    flushSync();
-    assert.equal(calls.attempts.length, 1, 'second click is a no-op while busy');
+  // The localize stub returns the key, so the whole trimmed text tells an idle label from a busy one.
+  const label = (button) => button.textContent.trim().replace('FABRICATE.App.Gathering.', '');
 
-    releaseAttempt({ accepted: true });
-    await settle();
-    assert.equal(calls.attempts.length, 1, 'still exactly one attempt after settle');
-    assert.equal(calls.list, 2, 'listing re-fetched once after the attempt resolves');
-  });
+  for (const inFlight of IN_FLIGHT_CASES) {
+    it(`keeps focus on ${inFlight.name} and ignores a second press while an attempt is in flight`, async () => {
+      // A deferred attempt promise lets us press again before the first settles.
+      let releaseAttempt;
+      const calls = { list: 0, attempts: [] };
+      const services = {
+        listGatheringForActor: () => {
+          calls.list += 1;
+          return Promise.resolve(listing([inFlight.fixture()]));
+        },
+        startGatheringAttempt: (opts) => {
+          calls.attempts.push(opts);
+          return new Promise((resolve) => {
+            releaseAttempt = resolve;
+          });
+        },
+      };
+      await mountView(services);
+
+      const attemptBtn = target.querySelector(inFlight.selector);
+      assert.equal(label(attemptBtn), inFlight.idle, 'idle label before the press');
+      attemptBtn.focus();
+      attemptBtn.click();
+      await tick();
+      flushSync();
+
+      const busyBtn = target.querySelector(inFlight.selector);
+      assert.ok(busyBtn === attemptBtn, 'the same button node survives the press');
+      assert.ok(document.activeElement === busyBtn, 'the pressed button keeps DOM focus');
+      assert.equal(busyBtn.getAttribute('aria-busy'), 'true', 'and announces the busy state');
+      assert.equal(busyBtn.getAttribute('aria-disabled'), 'true');
+      assert.equal(busyBtn.disabled, false, 'busy is not disabled, so the tab stop stays');
+      assert.equal(label(busyBtn), inFlight.busy, 'and the label names the work');
+      assert.ok(Boolean(busyBtn.querySelector('i.fa-spinner')), 'with the spinner glyph');
+
+      busyBtn.click();
+      await tick();
+      flushSync();
+      assert.equal(calls.attempts.length, 1, 'second press is a no-op while busy');
+
+      releaseAttempt({ accepted: true });
+      await settle();
+      assert.equal(calls.attempts.length, 1, 'still exactly one attempt after settle');
+      assert.equal(calls.list, 2, 'listing re-fetched once after the attempt resolves');
+      const idleBtn = target.querySelector(inFlight.selector);
+      assert.ok(!idleBtn.hasAttribute('aria-busy'), 'the busy face clears when the attempt ends');
+      assert.equal(label(idleBtn), inFlight.idle, 'and the idle label returns');
+    });
+  }
 
   it('auto-selects the first attemptable task and shows it in the right-column inspector', async () => {
     const { services } = makeServices(listing([environment()]));
@@ -2266,6 +2306,55 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(
       callouts.textContent.includes('Callout.NodeExhausted'),
       'the exhausted callout label is shown'
+    );
+  });
+
+  it('row draws each callout as a list-density chip in the tone the specimen uses', async () => {
+    await renderRow({
+      task: {
+        id: 't1',
+        name: 'Vein',
+        attemptable: false,
+        blockedReasons: [
+          { code: 'TOOL_BLOCKED' },
+          { code: 'GAME_PAUSED' },
+          { code: 'SOMETHING_NEW', message: 'Unmapped reason' },
+        ],
+      },
+    });
+    const chips = [...target.querySelectorAll('[data-gathering-callouts] > *')];
+    assert.deepEqual(
+      chips.map((chip) => [chip.textContent.trim(), chip.classList.contains('manager-chip')]),
+      [
+        ['FABRICATE.App.Gathering.Detail.Callout.MissingTools', true],
+        ['FABRICATE.App.Gathering.Detail.Callout.Paused', true],
+        ['Unmapped reason', true],
+      ],
+      'one shared Chip per distinct blocked reason, with its label unchanged'
+    );
+    assert.ok(
+      chips.every((chip) => chip.classList.contains('is-list')),
+      'at the list density the specimen draws its badges at'
+    );
+    assert.deepEqual(
+      chips.map((chip) => [
+        chip.classList.contains('is-warning'),
+        chip.classList.contains('is-neutral'),
+      ]),
+      [
+        [true, false],
+        [false, true],
+        [true, false],
+      ],
+      'warning stays warning and neutral stays neutral'
+    );
+    assert.ok(
+      chips.every((chip) => chip.querySelector('i.fas') !== null),
+      'each keeps its leading glyph'
+    );
+    assert.ok(
+      !target.querySelector('.gathering-task-callout'),
+      'and no hand-rolled scoped pill remains'
     );
   });
 

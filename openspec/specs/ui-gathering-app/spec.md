@@ -191,6 +191,7 @@ When the game is paused, the app must keep environment browsing readable, show a
 
 Start actions must surface blocking reasons for missing stamina, depleted nodes, scene/token access, duplicate active runs, hidden tasks, missing catalysts/tools, attempt limits, provider diagnostics, and paused game.
 A blocked Attempt stays a disabled primary with its visible label, in the pane's identity header.
+An Attempt in flight, the task inspector's and a blind environment's alike, is busy rather than disabled: the pressed button keeps focus, announces `aria-busy`, reads "Attempting…" and ignores a second press.
 Its reason is a visible warning notice directly under the header, "Can't attempt — {reason}", which the Attempt references by `aria-describedby`.
 A blind environment's header Attempt states only the generic reason, because its blockers may be derived from tasks the player cannot see.
 

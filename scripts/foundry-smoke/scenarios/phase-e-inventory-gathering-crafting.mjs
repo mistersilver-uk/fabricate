@@ -397,15 +397,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       .first()
       .click();
     if (prompts) await answerRollPrompt(ctx, 'player-gathering-roll-prompt');
-    // The attempt keeps a ready button disabled until its listing reload lands, and that reload
-    // re-keys the task rows; selecting a row before it settles races a detached element.
+    // The attempt keeps a ready button busy (`aria-busy`, never `disabled`) until its listing
+    // reload lands, and that reload re-keys the task rows; selecting a row before it settles races
+    // a detached element.
     await page.waitForFunction(
       () => {
         const app = document.querySelector('#fabricate-app');
         return (
           Boolean(app?.querySelector('[data-gathering-state="populated"]')) &&
           !app.querySelector(
-            '[data-gathering-attempt][data-gathering-attempt-blocked="false"]:disabled'
+            '[data-gathering-attempt][data-gathering-attempt-blocked="false"]:is(:disabled, [aria-busy="true"])'
           )
         );
       },

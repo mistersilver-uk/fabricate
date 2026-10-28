@@ -194,9 +194,14 @@
     <PlayerDetailHeader
       {name}
       art={img || DEFAULT_GATHERING_TASK_IMG}
-      primaryLabel={localize('FABRICATE.App.Gathering.Detail.Attempt')}
-      primaryIcon={blocked ? 'fa-solid fa-ban' : ''}
-      primaryDisabled={!attemptable || busy}
+      primaryLabel={localize(
+        busy
+          ? 'FABRICATE.App.Gathering.Detail.AttemptBusy'
+          : 'FABRICATE.App.Gathering.Detail.Attempt'
+      )}
+      primaryIcon={busy ? 'fas fa-spinner fa-spin' : blocked ? 'fa-solid fa-ban' : ''}
+      primaryDisabled={!attemptable}
+      primaryBusy={busy}
       primaryProps={attemptProps}
       onclick={handleAttempt}
     />
