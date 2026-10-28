@@ -196,7 +196,7 @@ promise across themes; do not restate the measurements here.
 > (JetBrains Mono) in its `:root` block, with real `@font-face` rules for both, so use the
 > tokens rather than a font stack.
 > There is no `--fab-font-sans` and there is not meant to be: sans is Foundry core's Signika
-> through `--font-primary`, which every surface already inherits.
+> through `var(--font-body, var(--font-primary, sans-serif))`, which every surface already inherits.
 > A serif heading must name the element it renders on — bare headings take core's colour and
 > margins — and the `design-system` capability states that rule and the shipped ramp's sizes.
 > The table below is the ROLE map, not a second copy of those sizes.
@@ -206,7 +206,7 @@ promise across themes; do not restate the measurements here.
 | Role | Face |
 |---|---|
 | Page title, section heading, panel or entity title, card and row names, stat values | `--fab-font-serif` |
-| Body copy, control and button labels, section kickers | `--font-primary`, Foundry's Signika |
+| Body copy, control and button labels, section kickers | `var(--font-body, var(--font-primary, sans-serif))`, Foundry's Signika |
 | Dice formulas, run ids, token names, counts | `--fab-font-mono` |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -594,7 +594,7 @@ Critical/Warning count pills + a green-check / red-x checklist.
 
 1. **Serif names, sans explains.**
    Serif for the names of things, sans for UI and prose, mono only for dice and IDs — subject to
-   the typography adoption in §3; until then everything uses the inherited `--font-primary`.
+   the typography adoption in §3; until then everything uses the inherited `var(--font-body, var(--font-primary, sans-serif))`.
 2. **Colour carries meaning, not decoration.**
    Reserve semantic hues for status; keep surfaces neutral.
 3. **Tint, don't fill.**
