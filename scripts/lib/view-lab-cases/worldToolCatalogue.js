@@ -22,6 +22,7 @@ const CATALOGUE_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
   // `MembershipActions` is no longer claimed here, and no case replaces it (issue 1373).
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
   /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,

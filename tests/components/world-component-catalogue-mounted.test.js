@@ -8,6 +8,11 @@ import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 // THE REAL VOCABULARY STORE (issue 1371 r16-cat, maintainer ruling M20).
 import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
 import {
+  expectEmptiedSelectionReport,
+  expectNoEmptiedSelectionReport,
+  focusControl,
+} from '../helpers/emptiedSelectionReport.js';
+import {
   COMPONENT_SYSTEMS,
   componentCorpus,
   componentScopeFor,
@@ -1279,6 +1284,36 @@ describe('world Component Catalogue (issue 1371)', () => {
         release(true);
         await drain();
       }
+    });
+
+    it('reports an emptied selection and re-homes the keyboard, from either Clear and after a delete', async () => {
+      const toolbarClear = '[data-scoped-list-clear-selection]';
+      const headerClear = '[data-world-component-bulk-clear]';
+      for (const selector of [toolbarClear, headerClear]) {
+        const { target } = await mixedSelection();
+        await expectEmptiedSelectionReport(target, async () => {
+          focusControl(target, selector).click();
+          await drain();
+        });
+      }
+
+      const { target } = await mixedSelection();
+      await expectEmptiedSelectionReport(target, async () => {
+        focusControl(target, '[data-world-component-bulk-danger] .fabricate-button').click();
+        await drain();
+        dangerControl(target).click();
+        await drain();
+      });
+    });
+
+    it('reports nothing when unticking the last row empties the selection', async () => {
+      const { target } = await mixedSelection();
+      await expectNoEmptiedSelectionReport(target, async () => {
+        for (const id of ['resin', 'ingot']) {
+          target.querySelector(`[data-scoped-list-select="${id}"]`).click();
+          await drain();
+        }
+      });
     });
 
     it('goes inert on its axes while the armed delete is still writing (issue 1844)', async () => {
@@ -2739,6 +2774,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       compiledExtras: [
         'src/ui/svelte/apps/manager/IconFactRow.svelte',
         'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+        'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
         'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
         'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
         'src/ui/svelte/components/ArmedDangerButton.svelte',

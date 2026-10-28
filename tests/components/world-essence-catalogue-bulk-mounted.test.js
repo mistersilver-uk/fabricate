@@ -5,6 +5,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync, tick as settleSvelte } from '../../node_modules/svelte/src/index-client.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { expectEmptiedSelectionReport, focusControl } from '../helpers/emptiedSelectionReport.js';
 import {
   ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
   ESSENCE_CATALOGUE_BULK_RAW_MODULES,
@@ -340,6 +341,25 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
     await rerender();
     assert.ok(!panelOf(target), 'the panel Clear did not reach the frame selection');
     assert.deepEqual(calls, []);
+  });
+
+  it('reports an emptied selection and re-homes the keyboard, from either Clear and after an apply', async () => {
+    for (const selector of ['[data-scoped-list-clear-selection]', '[data-world-essence-bulk-clear]']) {
+      const { target } = await mountPage();
+      await tickRows(target, ['ash']);
+      await expectEmptiedSelectionReport(target, async () => {
+        focusControl(target, selector).click();
+        await rerender();
+      });
+    }
+
+    const { target } = await mountPage();
+    await tickRows(target, ['ash']);
+    await stageNoColour(target);
+    await expectEmptiedSelectionReport(target, async () => {
+      focusControl(target, '[data-world-essence-bulk-apply]');
+      await apply(target);
+    });
   });
 
   it('offers no delete, status or membership control, and names what stays per-essence', async () => {

@@ -267,6 +267,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       // Issue 1371 r8-cat: the frame is this screen too.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
       WORLD_SCOPE_MODEL_PATTERN,
       PREMIUM_ICONS_AD_PATTERN,

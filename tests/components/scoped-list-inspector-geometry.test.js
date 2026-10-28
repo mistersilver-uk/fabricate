@@ -134,6 +134,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceReferenceUnion.js',
     'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/model/scopedEntityListModel.js',
     // The frame's lifted view-state (issue 1438).
     'src/ui/model/managerBrowserViewState.js',
@@ -152,6 +153,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     FRAME,
+    'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',

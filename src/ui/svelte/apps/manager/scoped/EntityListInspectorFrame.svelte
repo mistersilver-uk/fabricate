@@ -32,6 +32,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
+  import EmptiedSelectionAnnouncer from './EmptiedSelectionAnnouncer.svelte';
   import Callout from '../../../components/Callout.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -98,10 +99,8 @@
     // `Medallion` descriptor — `{variant, glyph}`, the primitive's OWN prop names — for the tile
     // at the head of every list row, which is the art ladder's 38 whatever the caller.
     rowMedallion = null,
-    // ── THE SELECTION BAND'S SELECT-ALL, AND WHAT IT REACHES (issue 1371 r9-cat, gap-list 37) ──
-    // `'results'` (the shipped band: a tri-state master box for the page, and `Select all {n}
-    // results` for the whole filtered corpus) or `'shown'` — the reference's band, which draws no
-    // master box at all and offers one text action, `Select all {n} shown` (`proto:592`).
+    // The select-all band: `'results'` (a page master box plus `Select all {n} results`) or
+    // `'shown'` (no master box, one `Select all {n} shown` action).
     selectAllScope = 'results',
     // The VISIBLE caption on the select-all box. The prototype's reads `All` where the shipped
     // primitive says `Select all`.
@@ -113,17 +112,11 @@
     restingHint = '',
     selectedId = $bindable(''),
     onSelect = () => {},
-    // ── THE FIRST ROW IS INSPECTED ON OPEN, WHEN A LANE ASKS (issue 1371 r13-cat, M14) ───── "the
-    // component library should auto-select the first component when it is opened." OPT-IN and OFF
-    // by default, so a frame that says nothing opens on the resting inspector it always did and
-    // the essence and tool catalogues are byte-identical.
+    // The first row is inspected on open when a lane asks (M14). Off by default, so the essence and
+    // tool catalogues open on the resting inspector.
     autoSelectFirst = false,
-    // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
-    // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
-    // from being full-width." The inspector column below pads `--fab-space-4` and the bulk panel
-    // renders inside a `-scroll` child that owns the `overflow-y`, so the pinned foot was CLIPPED
-    // at the scroller's edge and stopped 16px short of the column's on every side; the flush
-    // scroller now carries the column's inset as `--fab-manager-inspector-pad` (issue 2500).
+    // The bulk dock reaches the inspector's edges (M24): the flush scroller carries the column's
+    // inset as `--fab-manager-inspector-pad`, so the pinned foot is not clipped short (issue 2500).
     flushBulkDock = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
@@ -182,6 +175,7 @@
   let selectedIds = $state(new Set());
   /** @type {HTMLElement|null} */
   let inspectorElement = $state(null);
+  let emptiedReport = $state(null);
 
   const available = $derived(scope?.available === true);
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
@@ -376,8 +370,10 @@
   }
 
   function clearSelection() {
+    const emptied = selectedIds.size > 0;
     selectedIds = new Set();
     disarm();
+    if (emptied) emptiedReport?.report();
   }
 
   /**
@@ -537,6 +533,8 @@
         <FilterBar
           class="manager-scoped-list-toolbar"
           data-scoped-list-toolbar=""
+          tabindex="-1"
+          data-keyboard-focus="true"
           ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
         >
           <!--
@@ -839,6 +837,7 @@
           onPageSizeChange={changePageSize}
         />
       {/if}
+      <EmptiedSelectionAnnouncer bind:this={emptiedReport} />
     </div>
 
     <!-- `&& available` for the reason the layout's own note gives: the unavailable state draws
