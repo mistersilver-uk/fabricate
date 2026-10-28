@@ -6,7 +6,7 @@
 import { resolveTimeOfDayStartHour } from '../../../../../systems/normalize/gatheringConditionOptions.js';
 import { clock } from '../../../util/worldTimeLabel.js';
 
-/** The tag palette in the library drawing's order; a band takes the one at its authored index. */
+/** A drawing order for bands, not an entity-tint offering; a band takes the tag at its authored index. */
 export const TIME_OF_DAY_TAGS = Object.freeze([
   'mist',
   'butter',

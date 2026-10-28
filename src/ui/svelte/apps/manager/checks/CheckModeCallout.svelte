@@ -8,7 +8,6 @@
   `InfoStrip`, whose facts are mono figures under a kicker where these are words under a title,
   and a paragraph plus a fact list under one title is two shapes wearing one name.
 
-  DORMANT modes render the same shape with the shipped dormancy sentence and a clock glyph.
   Props: activity / mode / alchemyCheckMode; outcomeCount, for the `{count} tiers` fact.
 -->
 <script>
@@ -27,10 +26,7 @@
 </script>
 
 {#if described}
-  <section
-    class={`manager-checks-mode-callout ${described.dormant ? 'is-dormant' : ''}`}
-    data-checks-mode-callout={described.key}
-  >
+  <section class="manager-checks-mode-callout" data-checks-mode-callout={described.key}>
     <span class="manager-checks-mode-callout-icon">
       <i class={described.icon} aria-hidden="true"></i>
     </span>

@@ -6860,10 +6860,10 @@
             "D100Title": "Fixed d100 roll",
             "D100Lead": "In d100 mode the gathering check is a fixed d100 roll against each drop's chance. There is nothing to configure here.",
             "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
-            "ModifierDisambiguation": "These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.",
-            "ModifierDormantHeading": "Not in use yet",
-            "ModifierDormantBody": "Progressive and routed gathering are not available yet, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying as soon as those modes ship.",
-            "ModifierInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so nothing selected here changes it."
+            "ModifierDisambiguation": "These are check modifiers: they add to a rolled gathering formula in Check resolution (and legacy Progressive). They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.",
+            "ModifierDormantHeading": "Applies to Check gathering",
+            "ModifierDormantBody": "Check gathering rolls a formula, so these modifiers add to its roll. A d100 task rolls no formula and takes none, and Progressive is a legacy mode that is not offered for new tasks.",
+            "ModifierInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so nothing selected here changes it."
           },
           "Validation": {
             "EmptyTitle": "Nothing to validate yet",
@@ -6910,7 +6910,7 @@
             "IssueModifierExpressionInvalid": "A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.",
             "IssueModifierAverageUnavailable": "A check modifier this check ranks ({names}) changes what its dice total means — by counting successes, for example — so it has no average to compare with the others. Modifiers with an ordinary average are chosen ahead of it; it is still rolled exactly as written whenever a pick is left over.",
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
-            "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.",
+            "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so the ones selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",
             "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
             "IssueMultipleTierStepTargets": "If more than one matches on the same roll, the lowest-ranked tier wins.",
@@ -7619,6 +7619,8 @@
             "SalvageSimpleBody": "One roll is measured against the difficulty. A cleared roll returns the item’s salvage results, and a missed one returns nothing.",
             "SalvageProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the item’s ordered salvage results until it runs out.",
             "GatheringD100": "d100 roll",
+            "GatheringRoutedBody": "The roll is mapped onto a named tier, and the task’s result set named after that tier is produced.",
+            "GatheringProgressiveBody": "Progressive is a legacy mode that is not offered for new tasks. The roll yields a value, not a verdict, which is spent down the task’s ordered results until it runs out.",
             "GatheringD100Body": "Each drop is rolled against its own percentage chance. There is no formula and no difficulty to author here — per-task tuning adjusts the chance, not the roll."
           },
           "RecordNoun": {
@@ -7640,8 +7642,8 @@
             "AlwaysDesc": "Every failed check produces its failure result. {records} without one produce nothing.",
             "InertRoutedByIngredients": "In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.",
             "InertProgressive": "A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.",
-            "InertGatheringD100": "The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.",
-            "GatheringDormant": "Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.",
+            "InertGatheringD100": "The d100 gathering roll has no failure outcome to produce, so this setting does not apply to d100 tasks. It is kept and applies to tasks resolved by Check.",
+            "GatheringDormant": "The failure result policy applies to gathering tasks resolved by Check. A d100 task has no failure outcome to produce, so nothing on this screen changes it.",
             "FailureOutcomeTitle": "Failure feedback",
             "FailureOutcomeLead": "A gathering task can say what happens when an attempt turns up nothing — a line of text, or a macro. It is authored on the task itself.",
             "FailureOutcomeNoRecord": "Choose a gathering task under Preview as to open its failure feedback.",

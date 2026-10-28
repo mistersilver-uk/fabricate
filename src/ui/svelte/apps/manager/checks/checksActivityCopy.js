@@ -53,7 +53,7 @@ export function failurePolicyInertNote(
     return gatheringD100
       ? text(
           'FABRICATE.Admin.Manager.Checks.FailureResults.InertGatheringD100',
-          'The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.'
+          'The d100 gathering roll has no failure outcome to produce, so this setting does not apply to d100 tasks. It is kept and applies to tasks resolved by Check.'
         )
       : '';
   }

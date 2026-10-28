@@ -199,12 +199,6 @@
   background: var(--fab-info-soft);
 }
 
-/* A DORMANT mode (gathering's routed and progressive, disabled pending issue 683) is not an explanation of a live configuration, so it takes the warning edge the rest of the studio uses for "this reaches nothing". */
-.fabricate-manager .manager-checks-mode-callout.is-dormant {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-warning-soft);
-}
-
 .fabricate-manager .manager-checks-mode-callout-icon {
   display: flex;
   flex: 0 0 auto;
@@ -216,10 +210,6 @@
   color: var(--fab-info);
   background: var(--fab-bg-1);
   font-size: 14px;
-}
-
-.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-icon {
-  color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-checks-mode-callout-body {
@@ -265,10 +255,6 @@
 .fabricate-manager .manager-checks-mode-callout-fact > i {
   color: var(--fab-info);
   font-size: 10px;
-}
-
-.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-fact > i {
-  color: var(--fab-warning);
 }
 
 /* The prototype separates a fact's LABEL from its VALUE with a middle dot. */

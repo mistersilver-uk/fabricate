@@ -827,7 +827,7 @@ Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-mod
 A newly-created system defaults to `perRecord`; an absent or unrecognized value normalizes to `perRecord` on read (the **Tool-Breakage Authority** precedent); and the `1.25.0` migration seeds `never` onto every check that already exists, so no upgraded world changes behaviour.
 It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as GM-facing declarations of intent rather than as a second branch.
 It is orthogonal to the failure CONSUMPTION axis (`recipes-and-steps` §Failure Consumption and Failure-Result Policy), which answers whether a failed attempt consumes; gathering carries the produce axis and no consume axis, and **Failure Outcome** continues to own its text/macro feedback through `_applyFailureFeedback`.
-Its reach is bounded by what each mode's model can express: real on crafting `simple` and `alchemy simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index — the retain-one clamp guarantees index 0 is the SUCCESS group); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI and route with a `disposition: 'failure'`; inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering the whole path ships DORMANT pending issue 683.
+Its reach is bounded by what each mode's model can express: real on crafting `simple` and `alchemy simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index — the retain-one clamp guarantees index 0 is the SUCCESS group); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI and route with a `disposition: 'failure'`; inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering it applies to a task resolved by Check and is inert for a d100 task, which has no failure outcome to produce.
 On a single-step crafting `simple` or `alchemy simple` recipe the opt-in is the PRESENCE of its `role: 'failure'` group: the editor adds it empty and removes it, with its results, through the "Award results on a failed check" toggle, and never synthesizes it, so an edit to the success set cannot create it (a step of a multi-step recipe has no toggle, issue 2523).
 Under `never` that toggle is disabled while the group is absent and still removes a group already present, which stays drawn with a note that it awards nothing; an empty failure group draws an "Optional" note rather than a "Nothing produced" warning.
 **The policy therefore gates AUTHORING as well as resolution** — the tier picker, the readiness validator and the routing all read the same policy-conditional set.
@@ -1687,6 +1687,18 @@ Each entry shows image, name, and available quantity (inventory minus workbench)
 Canonical mapping: Derived from actor inventories + system components
 
 Spec reference: openspec/specs/resolution-modes/spec.md
+
+## Entity Tint
+
+Other wording for the same concept, such as tint, preset, colour token or tag token, names the `colorToken` value and is not a second term.
+The wording "palette key" is not canonical: say tint or tag token.
+Do not call it a palette: `Component Palette` is the unrelated grid of components, so say tint or tag token.
+A tint colours a glyph, a badge ink and a bar fill, and it is never a chip background.
+The offered set follows a stated rule: a tint is pickable unless it is a neutral that would read as body text or a disabled state, or it is bound to a fixed brand site.
+
+Canonical mapping: `MANAGER_COLOR_TOKENS` (the ten offered tokens in render order), `ESSENCE_COLOR_TOKENS` (the essence vocabulary), `BIOME_COLOR_TOKENS` and `GATHERING_BIOME_COLOR_TOKENS` (the biome vocabulary, with `customColor` as the biome-only sibling)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/design-system/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
 ## Auto-Fill
 

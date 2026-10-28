@@ -5,8 +5,8 @@
   a result at all. What a failed attempt COSTS is the consumption axis, beside this card.
 
   The `perRecord` label is PER-ACTIVITY, the nouns arriving as props. THE INERT NOTE states WHY
-  the policy has no reach in `routedByIngredients`, `progressive` or gathering's dormant routed
-  path, rather than rendering a control that quietly does nothing — and the control stays ENABLED
+  the policy has no reach in `routedByIngredients`, `progressive` or a gathering d100 task,
+  rather than rendering a control that quietly does nothing — and the control stays ENABLED
   there, disabling it destroying the distinction between "this system forbids failure results"
   and "this mode cannot express them" for a value persisted per ACTIVITY.
 -->
