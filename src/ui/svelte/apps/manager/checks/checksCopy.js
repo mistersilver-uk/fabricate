@@ -156,7 +156,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   modifiersInertNoModifierSupport: [
     'IssueModifiersInertNoModifierSupport',
-    'The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.',
+    'The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so the ones selected here are never applied.',
   ],
   modifiersInertNoFormula: [
     'IssueModifiersInertNoFormula',

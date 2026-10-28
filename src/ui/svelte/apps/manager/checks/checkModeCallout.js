@@ -166,7 +166,7 @@ const MODES = Object.freeze({
     body: [
       'GatheringProgressiveBody',
       'The roll produces a value rather than a verdict, and that value is spent down the ' +
-        'system’s gathering results. Progressive is a legacy mode that is not offered for new tasks.',
+        'task’s ordered results until it runs out. Progressive is a legacy mode that is not offered for new tasks.',
     ],
     facts: ['check:required', 'outcomes:ordered', 'results:spent'],
   },

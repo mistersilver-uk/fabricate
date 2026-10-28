@@ -209,14 +209,14 @@ When it cannot, and the library holds at least one entry, the **Modifiers** sect
 
 - The current resolution mode rolls no check at all, so there is nothing for a modifier to add to.
 - The active check would roll a formula, but none is authored yet.
-- The mode does roll a check, but that roll cannot take check modifiers yet.
+- The mode does roll a check, but that roll cannot take check modifiers.
 
 The first two are fixed on the check itself.
 Change the resolution mode to one that rolls a check, or author a roll formula for the mode you are on.
 
 The third is gathering's d100 mode, and only gathering's d100 mode.
 The d100 rolled against each drop's chance is that mode's check, so the mode does roll.
-What it has no room for yet is a modifier added to that roll, so the notice states the reason rather than pointing you at a setting that would not help.
+What it has no room for is a modifier added to that roll, so the notice states the reason rather than pointing you at a setting that would not help.
 
 ### Combination rule
 

@@ -6910,7 +6910,7 @@
             "IssueModifierExpressionInvalid": "A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.",
             "IssueModifierAverageUnavailable": "A check modifier this check ranks ({names}) changes what its dice total means — by counting successes, for example — so it has no average to compare with the others. Modifiers with an ordinary average are chosen ahead of it; it is still rolled exactly as written whenever a pick is left over.",
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
-            "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.",
+            "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so the ones selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",
             "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
             "IssueMultipleTierStepTargets": "If more than one matches on the same roll, the lowest-ranked tier wins.",
@@ -7620,7 +7620,7 @@
             "SalvageProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the item’s ordered salvage results until it runs out.",
             "GatheringD100": "d100 roll",
             "GatheringRoutedBody": "One roll is rolled once and mapped onto a band. Each band is a named tier, and a task’s result set named after a tier is produced for it.",
-            "GatheringProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the system’s gathering results. Progressive is a legacy mode that is not offered for new tasks.",
+            "GatheringProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the task’s ordered results until it runs out. Progressive is a legacy mode that is not offered for new tasks.",
             "GatheringD100Body": "Each drop is rolled against its own percentage chance. There is no formula and no difficulty to author here — per-task tuning adjusts the chance, not the roll."
           },
           "RecordNoun": {

@@ -52,8 +52,7 @@
     // Why the catalogue reaches no roll, or '' when it does; each cause needs a different remedy,
     // so it is passed rather than derived from one boolean.
     inertCause = '',
-    // Whether to state which gathering modes take check modifiers: its own notice, alongside
-    // `inertCause`, the two being different facts with different fixes.
+    // Whether to state which gathering modes take check modifiers, beside `inertCause`'s notice.
     dormant = false,
     // Navigate to the surface that authors the library; a null default keeps this mountable.
     onEditLibrary = null,
@@ -364,7 +363,7 @@
     {/if}
 
     {#if dormant}
-      <p class="manager-modifier-inert" role="note" data-check-modifier-dormant>
+      <p class="manager-modifier-inert is-info" role="note" data-check-modifier-dormant>
         <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
         <span>
           <strong
@@ -599,14 +598,10 @@
     line-height: 1.4;
   }
 
-  /* The inert and dormant notices sit at the TOP of the rows list, above the catalogue they
-     invalidate, and are warning-toned rather than muted: everything below is authoring that
-     reaches no roll, which is not a footnote. Mirrors `.manager-resolution-mode-note`'s
-     icon-beside-text shape so the two read as the same kind of statement. */
+  /* Top-of-list notices: warning for a selection that reaches no roll, `is-info` for a live fact. */
   .manager-modifier-inert {
     display: flex;
-    /* Without this the flex default `stretch` gives the icon a callout-tall box and centres the
-           glyph in it, floating it halfway down a three-line note. */
+    /* Not `stretch`, which floats the icon halfway down a three-line note. */
     align-items: flex-start;
     gap: var(--fab-space-2);
     margin-block: 0;
@@ -619,14 +614,19 @@
     line-height: 1.45;
   }
 
+  .manager-modifier-inert.is-info {
+    border-color: var(--fab-info-border);
+    color: var(--fab-info-text);
+    background: var(--fab-info-soft);
+  }
+
   .manager-modifier-inert > i {
-    /* Share the paragraph's line box, Font Awesome's own line-height sitting the glyph high. */
+    /* Share the paragraph's line box. */
     flex: 0 0 auto;
     line-height: inherit;
   }
 
   .manager-modifier-inert strong {
-    /* The heading and its sentence share one line box, so the note stays a paragraph. */
     margin-right: var(--fab-space-1);
   }
 
