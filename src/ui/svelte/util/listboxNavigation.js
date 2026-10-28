@@ -47,6 +47,20 @@ function firstEnabled({ from, direction, rows, isDisabled, fallback }) {
   return fallback;
 }
 
+// A vertical press in a grid keeps its column (the APG grid pattern): the column is its own ring,
+// so a ragged last row that lacks the column is wrapped past rather than landed on, and a gated
+// cell is skipped along the column. A column with no other enabled cell leaves the cursor in place.
+function columnMove({ current, rows, columns, direction, isDisabled }) {
+  const column = current % columns;
+  const cells = Math.floor((rows - 1 - column) / columns) + 1;
+  const position = Math.floor(current / columns);
+  for (let scanned = 1; scanned < cells; scanned += 1) {
+    const index = column + ring(position + direction * scanned, cells) * columns;
+    if (!skips(isDisabled, index)) return index;
+  }
+  return current;
+}
+
 // `null` is load-bearing: focus usually sits on the panel's QUERY FIELD, so a key this module does
 // not own must fall through untouched — returning `current` reads as "the cursor did not move" and
 // would `preventDefault()` every typed letter. `isDisabled` is an INDEX predicate, not the option
@@ -67,6 +81,9 @@ export function nextActiveIndex(current, count, key, options = {}) {
     return firstEnabled({ from: rows - 1, direction: -1, rows, isDisabled, fallback });
 
   const columns = Number.isInteger(options?.columns) && options.columns > 1 ? options.columns : 1;
+  if (columns > 1 && VERTICAL.has(key) && isUsableIndex(current, rows)) {
+    return columnMove({ current, rows, columns, direction: VERTICAL.get(key), isDisabled });
+  }
   const step = VERTICAL.has(key)
     ? VERTICAL.get(key) * columns
     : columns > 1 && HORIZONTAL.has(key)
@@ -75,16 +92,15 @@ export function nextActiveIndex(current, count, key, options = {}) {
   if (step === null) return null;
 
   // Entering the list from the sentinel lands on an END rather than at `sentinel + step`: there is
-  // no position to step from. The ring closes over the FLAT order, not a rectangle, which is what
-  // keeps a ragged last row reachable — a rectangular wrap would strand the cells under it.
+  // no position to step from. A sideways press closes its ring over the FLAT order, not a
+  // rectangle, which is what keeps a ragged last row reachable.
   const landing = isUsableIndex(current, rows)
     ? ring(current + step, rows)
     : step > 0
       ? 0
       : rows - 1;
 
-  // The skip scan walks ONE row at a time even where the press was `columns` wide: stepping by
-  // `columns` would visit one COLUMN of the ring, stranding every enabled tile beside a gated one.
+  // The skip scan walks the FLAT order one cell at a time, so a gated cell strands nothing beside it.
   return firstEnabled({
     from: landing,
     direction: Math.sign(step),

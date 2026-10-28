@@ -34,18 +34,10 @@ const MARK_MIN_RATIO = 3;
 
 /**
  * The pairs measured below a floor, each pinned at its measured ratio rounded down so none may
- * get worse. The `verdant` and `azure` pairs are owned by issue 2604, which lifts them.
+ * get worse.
  */
-const KNOWN_BELOW_LABEL_FLOOR = new Map([
-  ['foundry-native/mauve', 3.36],
-  ['foundry-native/azure', 4.15],
-]);
-const KNOWN_BELOW_MARK_FLOOR = new Map([
-  ['foundry-native/mauve', 2.72],
-  ['ironblood-forge/verdant', 2.85],
-  ['hearth-herb/verdant', 2.66],
-  ['hearth-herb/azure', 2.44],
-]);
+const KNOWN_BELOW_LABEL_FLOOR = new Map([['foundry-native/mauve', 3.36]]);
+const KNOWN_BELOW_MARK_FLOOR = new Map([['foundry-native/mauve', 2.72]]);
 
 /** THE SELECTED ROW'S OWN RATCHET (issue 1371 r19-gates2, UX review round 5 F-P5). */
 const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
@@ -58,16 +50,6 @@ const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
   ['ironblood-forge/rose', 4.19],
   ['hearth-herb/aqua', 4.35],
   ['starglass-arcana/aqua', 4.44],
-  ['fabricate/azure', 3.98],
-  ['ironblood-forge/verdant', 3.28],
-  ['ironblood-forge/azure', 3.5],
-  ['hearth-herb/verdant', 3.49],
-  ['hearth-herb/azure', 3.2],
-  ['starglass-arcana/verdant', 4.04],
-  ['starglass-arcana/azure', 4.14],
-  ['foundry-native/verdant', 2.68],
-  ['foundry-native/azure', 2.27],
-  ['sovereign/azure', 3.66],
 ]);
 
 /**
@@ -142,8 +124,18 @@ function page(theme, tint, chipMarkup, tileMarkup, scoped) {
 /** Runs IN THE PAGE: the chip's ink and fill, and the surface behind it, as raw rgba tuples. */
 function readColours() {
   const parse = (value) => {
+    // A `color-mix()` computes to `color(srgb r g b / a)` with channels in 0..1; a plain colour to `rgb()`.
+    const mixed = value.match(/^color\(srgb ([^)]+)\)$/);
+    if (mixed) {
+      const [colour, alpha] = mixed[1].split('/');
+      const [r, g, b] = colour
+        .trim()
+        .split(/\s+/)
+        .map((part) => parseFloat(part) * 255);
+      return [r, g, b, alpha === undefined ? 1 : parseFloat(alpha)];
+    }
     const match = value.match(/rgba?\(([^)]+)\)/);
-    if (!match) return [0, 0, 0, 0];
+    if (!match) throw new Error(`unreadable colour ${JSON.stringify(value)}`);
     const parts = match[1].split(',').map((part) => parseFloat(part.trim()));
     return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
   };

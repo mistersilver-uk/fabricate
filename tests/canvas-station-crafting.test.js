@@ -578,6 +578,34 @@ test('canvas stations reach the player crafting path', async (t) => {
     });
 
     await t.test(
+      'the shopping list asks for a station Tool only while no station supplies it',
+      async () => {
+        const { app, services, recipe, activeCanvasTool } = fixture();
+        const toolsToAcquire = () =>
+          services.crafting.shoppingAggregate.tools.filter((tool) => tool.available !== true);
+        app.rendered = true;
+        app.bringToFront = () => {};
+        App._instance = app;
+        try {
+          await services.crafting.load();
+          services.crafting.addToShoppingList(recipe.id, 2);
+          assert.equal(services.crafting.shoppingAggregate.tools.length, 1);
+          assert.deepEqual(toolsToAcquire(), [], 'the active station supplies the Tool');
+          await App.show('crafting', { actorId: actor.id });
+          assert.deepEqual(
+            toolsToAcquire().map((tool) => tool.name),
+            ['Station anvil'],
+            'a cleared station lists the Tool again'
+          );
+          await App.show('crafting', { activeCanvasTool, actorId: actor.id });
+          assert.deepEqual(toolsToAcquire(), [], 'a re-activated station supplies it again');
+        } finally {
+          App._instance = null;
+        }
+      }
+    );
+
+    await t.test(
       'closing the session removes the virtual Tool from retained services',
       async () => {
         const { app, services, options } = fixture();

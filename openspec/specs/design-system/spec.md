@@ -750,6 +750,8 @@ Its description inks `--fab-text-muted` and clears 4.5:1 at rest and chosen in e
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
 The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip that carries no tint of its own, and the tag row's `+ Tag`, ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1; a tinted chip keeps its tint's ink.
+The `verdant` and `azure` tints are the exception: their chip label and tile glyph ink with the tint mixed halfway to `--fab-text`, because the raw tag measures as low as 2.27:1 on a selected row and 2.45:1 on the tile in the palettes where those two tags are darkest.
+That mix MUST clear 4.5:1 for the label on an ordinary and a selected row and 3:1 for the glyph on the tile, in every palette (issue 2604).
 A contrast claim about a translucent fill MUST name the ground it composites over, because `-soft` is an alpha and there are two.
 An unchecked selection control — a radio ring or a checkbox box — and a switch's off track draw their outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
 That outline MUST meet WCAG 1.4.11's 3:1 against the control's surface in every palette: the fill it encloses where the control draws one — `--fab-bg-0` in a medium or large checkbox, `--fab-bg-1` in a radio card's dot — and otherwise the surface beneath it.
@@ -1791,6 +1793,10 @@ Its vocabulary follows the Foundry release Fabricate registers when its entry sc
 
 The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:
 The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
+A vertical key keeps the cursor's column, as the grid pattern's vertical arrows do, and wraps at an edge as this picker's linear ring does: ArrowDown on the last cell of a column wraps to the first cell of the same column, and ArrowUp on the first cell wraps to the last cell of that column.
+A column is the cells at one offset in each row, so in a ragged last row a column the row lacks is wrapped past, and the wrap lands on the nearest cell above the gap rather than on a cell of another column.
+A disabled cell is skipped along its column, and a column with no other enabled cell leaves the cursor where it is: the active option is unchanged, so nothing is announced, and the key is still consumed.
+ArrowLeft, ArrowRight, Home and End keep their flat-order meaning, and a list of one column keeps its single flat ring.
 With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
 The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
@@ -1820,7 +1826,15 @@ It positions the panel against the anchor, counts the anchor inside for outside-
 
 - **WHEN** a caller opens the picker with `as="grid"` and `squareTiles`
 - **THEN** each option renders no text node and carries its label as both `aria-label` and `title`
-- **AND** ArrowDown moves the cursor by `columns` options
+- **AND** ArrowDown, from a row that has a cell below, moves the cursor by `columns` options
+
+#### Scenario: A vertical key wraps within its column
+
+- **WHEN** a grid of ten tiles draws four columns, so the last row holds two tiles
+- **AND** the cursor is on the first tile and the GM presses ArrowUp
+- **THEN** the cursor lands on the ninth tile, the last of the first column
+- **AND** ArrowUp from the fourth tile lands on the eighth, because the last row has no fourth column
+- **AND** ArrowDown from the ninth tile returns to the first
 
 #### Scenario: A panel opens from a caller's anchor
 
@@ -2740,6 +2754,8 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 The manager's title band MUST render through `AppTitleBar` (`src/ui/svelte/components/AppTitleBar.svelte`), above the page header and the rail on every manager route, the Tool routes included, and only `apps/manager/ManagerTitleBar.svelte` renders it (issue 2420).
 `ManagerTitleBar` formats the summary the shell derives — the selected system's resolution mode, followed by its outcome-tier count when that count is positive — and hands `AppTitleBar` that caption and whether a companion is installed; with no mode label, which is to say with no system selected, it hands no caption, so the band draws no status line.
 `AppTitleBar` draws the band's own words, the `PREMIUM` mark, its read name and the status prefix, from the `FABRICATE.Admin.Manager.Titlebar` keys, and draws a caller's caption verbatim.
+The status prefix ends in a separator, so a screen reader pauses between it and the caption instead of reading them as one run.
+The band's content row is pinned to 16px under its padding and rule, so the band is the same height with and without the mark, the status line, or both (issue 2422).
 The player window renders no `AppTitleBar`, because it carries no premium signal; its top bar is `ActorSelectTopBar`, a region beside its rail.
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.

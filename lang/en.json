@@ -1545,7 +1545,6 @@
           "Next": "Next stage",
           "Position": "Viewing stage {index} of {count}",
           "Return": "Return to current stage {index}",
-          "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
           "RouteUnchosen": "This stage has not been given a route yet. Choose one to carry on.",
           "Consumed": "Consumed when this stage started",
@@ -2832,7 +2831,7 @@
         "Titlebar": {
           "Premium": "PREMIUM",
           "PremiumStatus": "Fabricate Premium is installed and connected",
-          "Status": "Selected system resolution",
+          "Status": "Selected system resolution:",
           "OutcomeTier": "outcome tier",
           "OutcomeTiers": "outcome tiers"
         },
@@ -8267,11 +8266,9 @@
             "MembershipOut": "Not here",
             "MembershipUnused": "Unused",
             "NoDescription": "No description",
-            "OpenEditor": "Edit in {system}",
             "OpenEntry": "Open",
             "OpenSystemRules": "Rules",
             "OpenSystemRulesNamed": "Open {system} rules for {entity}",
-            "OpenWorldEntry": "Open the world entry",
             "ResultCount": "{shown} of {total} {unit}",
             "RestingTitle": "Nothing selected",
             "SearchLabel": "Search",

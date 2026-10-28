@@ -1,4 +1,4 @@
-/** The two scoped-entity list shells, MOUNTED (issue 1380, epic 1357). */
+/** The scoped-entity list frame and catalogue shell, MOUNTED (issue 1380, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
@@ -92,19 +92,6 @@ const catalogueHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
-});
-
-const rulesHarness = createMountedComponentHarness({
-  repoRoot,
-  tmpPrefix: 'fabricate-scoped-rules-',
-  rawModules: SCOPED_RAW_MODULES,
-  compiledModules: [
-    ...FRAME_MODULES,
-    ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
-    'src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte',
-  ],
-  componentPath: 'src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte',
 });
 
 // ── FIXTURES ────────────────────────────────────────────────────────────────────────────────
@@ -222,44 +209,17 @@ function catalogueProps(entityType, overrides = {}) {
   };
 }
 
-function rulesProps(entityType, overrides = {}) {
-  return {
-    scope: scopeOf(entityType),
-    actions: {},
-    systems: ROSTER,
-    systemId: 'sys-a',
-    systemName: 'Mythwright Forge',
-    hookValue: `${entityType}s`,
-    title: 'Rules',
-    subtitle: 'This system only.',
-    icon: 'fas fa-cubes-stacked',
-    emptyTitle: 'Nothing here yet',
-    emptyHint: 'Add one from the world catalogue.',
-    sectionNotes: {
-      category: 'Falls back to General.',
-      effectSource: 'Falls back to no effect source.',
-      macro: 'Falls back to no macro.',
-      breakage: 'Falls back to never breaks.',
-      onBreak: 'Falls back to nothing happens.',
-      prerequisites: 'Falls back to anyone may use it.',
-      bonus: 'Falls back to no check bonus.',
-      essences: 'Falls back to no essence values.', // issue 1371 r18 (M31)
-    },
-    ...overrides,
-  };
-}
-
 const rows = (root) => [...root.querySelectorAll('[data-scoped-list-row]')];
 
 // ── AC-2 · ENTITY-TYPE DIFFERENTIATION ──────────────────────────────────────────────────────
 
-describe('the rules-list shell differentiates by entity type from ONE props factory', () => {
-  before(() => rulesHarness.setup());
-  after(() => rulesHarness.teardown());
-  afterEach(() => rulesHarness.remount());
+describe('the catalogue shell differentiates by entity type from ONE props factory', () => {
+  before(() => catalogueHarness.setup());
+  after(() => catalogueHarness.teardown());
+  afterEach(() => catalogueHarness.remount());
 
   it('an ESSENCE renders rows, NO source badge, its own glyph and its colour tint', async () => {
-    const root = await rulesHarness.mount(rulesProps('essence'));
+    const root = await catalogueHarness.mount(catalogueProps('essence'));
     // THE POSITIVE CONTROL FOR THE NEGATIVE BELOW. A shell rendering nothing at all satisfies
     // "zero source badges" perfectly.
     assert.ok(rows(root).length >= 1, 'the essence mount rendered no rows at all');
@@ -284,7 +244,7 @@ describe('the rules-list shell differentiates by entity type from ONE props fact
 
   for (const entityType of ['component', 'tool']) {
     it(`a ${entityType.toUpperCase()} renders one source badge per row and resolves img`, async () => {
-      const root = await rulesHarness.mount(rulesProps(entityType));
+      const root = await catalogueHarness.mount(catalogueProps(entityType));
       const listRows = rows(root);
       // `>= 3`, NOT `>= 1`. The badge assertion below depends on the fixture rotating all three
       // source-link fields, which needs three rows — it gets them only from `scopeOf`'s default
@@ -631,62 +591,6 @@ describe('every snippet is invoked with the documented parameters', () => {
       catalogueProps('tool', { scope, rowMeta: recordingSnippet(seen, 'data-lane-row-meta') })
     );
     assert.equal(seen.at(-1)[1].scope.toolBreakage.mode, 'toolSpecific');
-  });
-});
-
-// ── AC-4 · THE INHERIT ROW SET AND ITS NOTES ────────────────────────────────────────────────
-
-describe('the rules list draws one inherit row per inheritable section, with its note', () => {
-  before(() => rulesHarness.setup());
-  after(() => rulesHarness.teardown());
-  afterEach(() => rulesHarness.remount());
-
-  const EXPECTED = {
-    component: ['category', 'essences'], // issue 1371 r18 (M31): the world record's second section
-    essence: ['effectSource', 'macro'],
-    // FOUR since `1.31.0` (issue 1373). The row set is derived from the descriptor rather than
-    // listed, so this moves with `TOOL_SECTIONS` and nothing else had to change.
-    tool: ['breakage', 'onBreak', 'prerequisites', 'bonus'],
-  };
-
-  for (const [entityType, sections] of Object.entries(EXPECTED)) {
-    it(`draws ${sections.length} row(s) for a ${entityType}, from the same props`, async () => {
-      const root = await rulesHarness.mount(rulesProps(entityType));
-      const firstRow = rows(root)[0];
-      assert.deepEqual(
-        [...firstRow.querySelectorAll('[data-scoped-inherit-row]')].map((node) =>
-          node.getAttribute('data-scoped-inherit-row')
-        ),
-        sections
-      );
-      assert.equal(
-        firstRow.querySelectorAll('[data-scoped-inherit-row="repairRequirements"]').length,
-        0,
-        'a SEEDED section has no live parent to fall back to, so it draws no switch'
-      );
-    });
-  }
-
-  it('renders a NON-EMPTY note on every row the shell supplied one for', async () => {
-    // A bare row-count criterion passes over every note empty.
-    // list says "Effect source · Inherited" and never says what is being inherited.
-    const root = await rulesHarness.mount(rulesProps('tool'));
-    const notes = [...rows(root)[0].querySelectorAll('[data-scoped-inherit-note]')];
-    assert.equal(notes.length, 4, 'all four tool sections were given a note');
-    for (const note of notes) {
-      assert.ok(note.textContent.trim().length > 0);
-    }
-  });
-
-  it('writes the NEXT inherit value through the action family', async () => {
-    const calls = [];
-    const root = await rulesHarness.mount(
-      rulesProps('tool', {
-        actions: { setSectionInherited: (...args) => calls.push(args) },
-      })
-    );
-    rows(root)[0].querySelector('[data-scoped-inherit-toggle="breakage"]').click();
-    assert.deepEqual(calls, [['tool-0', 'sys-a', 'breakage', false]]);
   });
 });
 
@@ -1202,11 +1106,9 @@ describe('the owner can drive the inspected row at any time', () => {
 
 // ── THE OUTWARD CALLBACKS, WHICH ARE THE HALF THE CONSUMING LANES WIRE ──────────────────────
 
-describe('every callback the shells expose is actually invoked', () => {
-  // THIS PR SHIPS NO SCREEN, so its outward API is four callbacks and nothing else exercises
-  // them. Pinning the prop NAMES and the snippet invocations leaves the callbacks unmeasured,
-  // and one edit to the row action handler silently turns every pen and globe on every row of
-  // every scoped list into decoration while both shells stay green.
+describe('every callback the catalogue shell exposes is actually invoked', () => {
+  // Pinning the prop names leaves the callbacks unmeasured: a broken row action handler would
+  // turn every pen on every row into decoration while the shell stayed green.
   describe('catalogue', () => {
     before(() => catalogueHarness.setup());
     after(() => catalogueHarness.teardown());
@@ -1230,28 +1132,6 @@ describe('every callback the shells expose is actually invoked', () => {
       assert.ok(Boolean(pen), 'the row renders no open-entry action at all');
       pen.click();
       assert.deepEqual(opened, ['component-1']);
-    });
-  });
-
-  describe('rules list', () => {
-    before(() => rulesHarness.setup());
-    after(() => rulesHarness.teardown());
-    afterEach(() => rulesHarness.remount());
-
-    it('calls onSelect, onOpenEditor and onOpenWorldEntry with the entity id', async () => {
-      const calls = { select: [], editor: [], world: [] };
-      const root = await rulesHarness.mount(
-        rulesProps('tool', {
-          onSelect: (id) => calls.select.push(id),
-          onOpenEditor: (id) => calls.editor.push(id),
-          onOpenWorldEntry: (id) => calls.world.push(id),
-        })
-      );
-      const row = rows(root)[2];
-      row.querySelector('[data-scoped-list-inspect="tool-2"]').click();
-      row.querySelector('[data-scoped-list-action="open-editor"]').click();
-      row.querySelector('[data-scoped-list-action="open-world-entry"]').click();
-      assert.deepEqual(calls, { select: ['tool-2'], editor: ['tool-2'], world: ['tool-2'] });
     });
   });
 });

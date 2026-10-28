@@ -114,7 +114,6 @@ describe('the lifted manager browser view-state is wired end to end (issue 1438)
       [`${MANAGER_DIR}/TagsCategoriesView.svelte`, 'componentCategoryBrowserState'],
       [`${MANAGER_DIR}/TagsCategoriesView.svelte`, 'componentTagBrowserState'],
       [`${MANAGER_DIR}/scoped/EntityCatalogueShell.svelte`, 'browserState'],
-      [`${MANAGER_DIR}/scoped/EntityRulesListShell.svelte`, 'browserState'],
       [`${MANAGER_DIR}/scoped/WorldEssenceCataloguePage.svelte`, 'browserState'],
     ];
     for (const [path, prop] of PASS_THROUGH) {

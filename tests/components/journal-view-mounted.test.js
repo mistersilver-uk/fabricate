@@ -1000,6 +1000,35 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!redactedTarget.querySelector('[data-journal-yield-loading]'));
   });
 
+  it("labels a d100 preview row with the threshold the engine states, never one derived from its chance", async () => {
+    const run = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30, threshold: 71 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const reading = (target) => target.querySelector('[data-yield-entry="herb"]').textContent;
+    const authored = await harness.mount({ services: makeServices(store) });
+    assert.match(reading(authored), /Yields\.HighRollThreshold:\{"chance":30,"threshold":71\}/u);
+
+    harness.remount();
+    const personalized = await harness.mount({
+      services: {
+        ...makeServices(store),
+        // 61 is not 101 - 72: the label may only be the engine's own number.
+        getGatheringDropBreakdown: async () => ({
+          drops: [{ id: 'herb', finalChance: 0.72, threshold: 61 }],
+        }),
+      },
+    });
+    await settle();
+    assert.match(reading(personalized), /"chance":72,"threshold":61\}/u);
+  });
+
   it('reports a personalized gathering preview failure and keeps the authored scale visible', async () => {
     const run = makeGatheringRun({
       environmentId: 'env-1',

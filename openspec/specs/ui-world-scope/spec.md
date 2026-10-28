@@ -800,13 +800,12 @@ Each is stated here because the shape of each is decided by the `data-models/spe
 
 ## Scoped entity list shells
 
-The world catalogues and the system-scope rules lists share ONE list composition, built once and configured per scope.
+The world catalogues share ONE list composition, built once and configured per scope.
 
-1. **The frame is ONE component, and neither shell may inline it.**
-   Three lanes need the same list-plus-inspector composition, and three independent copies of it is a measured duplication failure rather than an aesthetic one.
-2. **The composition is ASYMMETRIC by scope, because the shipped layout is.**
+1. **The frame is ONE component, and the shell may not inline it.**
+   Every scoped list needs the same list-plus-inspector composition, and independent copies of it are a measured duplication failure rather than an aesthetic one.
+2. **The composition draws its own inspector column, because the shipped layout leaves it none.**
    All seven world scoped routes are released to full width and render no shared aside, so a world catalogue draws its own inspector column inside `main`.
-   The three system-scope routes are not released and their shared 300px aside is live, so a rules list draws NO inspector: a second column beside it would put two inspectors on screen with neither gateway file open to reconcile them.
    The inspector region renders only when an inspector body is supplied.
 3. **The row is not a button and carries two independent selected states.**
    It contains a selection checkbox's input and label, so the click target is a nested identity button, and the checkbox is the row's FIRST child, before the identity button: the reference draws the box leading on every list it draws, the shipped frame renders it first, and a real-browser hit-test measures it there (issue 1371, revision 11).
@@ -859,7 +858,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
     `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
 20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
-    These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
+    These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
     The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a fifteen-row list a GM has put on a twenty-five-row page.
     Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, page-size control offered.
     **AND IT SPANS THE LIST'S FULL WIDTH** (maintainer ruling M19, issue 1371 revision 13): the world Component catalogue's footer sat inside the column's own inset, a step short of both column edges and of the bottom, and a footer that does not share the column's edges reads as a control for something else; it now shares the column's edges by requirement 25 and takes the same `--fab-bg-1` fill (issue 2546, M4) the system rules list's footer draws edge to edge, measured in a real browser against the column's own box.
@@ -884,7 +883,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
     A bulk axis is offered only where its value is CLOSED and means the same thing for every record in the selection; an axis carrying a per-record value is named as staying per-record rather than left to be inferred from a short panel.
 
 24. **A SECOND SITE'S ROW OR TOOLBAR ANATOMY ARRIVES AS AN OPT-IN PROP WITH A BYTE-IDENTICAL DEFAULT, never as an in-place edit of the shared composition** (issue 1371, maintainer ruling M10).
-    The world Component, Essence and Tools catalogues read these shells (the rules shell is mounted only by tests today), so a row change made in place is a change to screens nobody asked to move — which is `design-system/spec.md`'s extend-with-a-defaulted-prop rule applied to a COMPOSITION rather than to a primitive, and it binds for the same reason: the shells own the anatomy, so only they can offer a second answer to it.
+    The world Component, Essence and Tools catalogues read this shell, so a row change made in place is a change to screens nobody asked to move — which is `design-system/spec.md`'s extend-with-a-defaulted-prop rule applied to a COMPOSITION rather than to a primitive, and it binds for the same reason: the shells own the anatomy, so only they can offer a second answer to it.
     The switches this epic added are named rather than left to be counted off a destructure, because each exists to split a question that had shipped fused.
     `openEntryLabelled` separates WHAT the row's exit is called from WHETHER its label is drawn, which was one question — so a lane could not title a 28px icon control `Open catalogue entry` without also getting a labelled control four times its width.
     `rowNameTrailing` puts a lane's INERT pills on the name line, inside the identity button, which is why nothing passed through it may be interactive.
@@ -893,7 +892,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
     **THE DEFAULT CLAIM IS PROVEN BY RENDERING, NEVER BY READING THE DIFF.**
     A default is byte-identical when the OTHER scopes' rendered DOM is identical at default props across every state the shell draws, and the proof carries a NEGATIVE CONTROL: a deliberately flipped default that MOVES the dump.
     Without one, a control mutating a value every caller passes explicitly reddens nothing and reads as a proof that held — which is the silently-ineffective-mutation trap, and it fired once on this change before the control caught it.
-    **THE DECLARED PROP SET OF EACH SHELL IS PINNED AS A LITERAL LIST, and the two lists are pinned as a DIFFERENCE rather than independently**, because the reason they are nearly identical is the point: one composition, configured per scope, and a prop appearing on one shell alone states which question that scope is the only one to ask.
+    **THE DECLARED PROP SET OF THE SHELL IS PINNED AS A LITERAL LIST**, so a prop cannot appear or vanish without the contract naming it.
     A prop that a shell threads onward to a composed primitive is pinned on the primitive too, and both halves default to OFF: a surface gated on the class every caller already passes is not opt-in, it is the in-place edit wearing a prop's name.
     **TWO MORE SWITCHES JOINED UNDER THE MAINTAINER'S LIVE-TEST RULINGS, each named for the question it splits**: `autoSelectFirst` (M14, requirement 12) separates WHETHER a list opens inspected from WHICH row a GM has chosen, and `flushBulkDock` (M24) moves the pane inset from the column onto the bulk scroller so the pinned dock can reach the inspector's edges — each default OFF, with the world Component, Essence and Tools catalogues opting into `autoSelectFirst` and the world Component, Essence and Tools catalogues, the three that draw a bulk face, opting into `flushBulkDock`.
     M21's flush list column is not a switch: requirement 25 makes it the composition's own geometry, because a geometry every mounted caller needs is stated once as the composition's own and is not given a default.

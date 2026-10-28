@@ -97,12 +97,14 @@
   cursor: default;
 }
 
-/* The manager titlebar — a thin identity strip above the header, shared by every manager screen (issues 643, 1185). */
+/* The manager titlebar — a thin identity strip above the header, shared by every manager screen (issues 643, 1185). Its content row is pinned to 16px (33px with the padding and rule), so the mark and the status line can come and go without shifting the screen below (issue 2422). */
 .fabricate-manager .manager-titlebar {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
+  min-height: 33px;
+  line-height: 16px;
   padding: var(--fab-space-2) var(--fab-space-4);
   border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
@@ -115,6 +117,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border-radius: 6px;
   font-size: 0.62rem;
+  line-height: 12px;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   white-space: nowrap;

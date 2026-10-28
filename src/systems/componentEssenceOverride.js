@@ -1,7 +1,6 @@
 /**
- * A system-scope essence write is an override: the one home for that rule (issue 1371), shared by
- * `adminStore`'s `updateComponent` and `componentEditorSave.js`'s `overrideAwareComponentWrite` so
- * the two entry points cannot disagree. The read union answers an inheriting system's `essences`
+ * A system-scope essence write is an override: the one home for that rule (issue 1371), applied by
+ * `adminStore`'s component writes. The read union answers an inheriting system's `essences`
  * from the world map, so a write there would be masked; the pair's flag moves to overriding first,
  * then the values land, as `ComponentEditView`'s `setEssenceInheritance` orders it.
  *

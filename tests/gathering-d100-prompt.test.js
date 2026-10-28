@@ -12,11 +12,11 @@ import { safeRollDecision } from '../src/systems/journalPreparedCheck.js';
 import {
   createGatheringJournalRunOperations,
   createJournalRunCommandService,
-  executePublicGather,
   installGatheringJournalRunAuthority,
   JOURNAL_RUN_SOCKET_KIND,
 } from '../src/systems/journalRunCommands.js';
 import { preparedDecisionPolicy } from '../src/systems/preparedDecisionPolicy.js';
+import { executePublicGather } from '../src/systems/publicGatheringAttempt.js';
 
 import {
   buildEngine,
@@ -1043,6 +1043,35 @@ test('a timed d100 run collected manually opens no prompt', async () => {
   assert.equal(result.success, true, JSON.stringify(result));
   assert.equal(world.seen.prompts.length, 0);
   assert.deepEqual(world.tokenStatuses(), []);
+});
+
+test('an active d100 run records no roll while it waits, prompts or is dismissed (issue 2324)', async () => {
+  stubDice({ faces: [50] });
+  const recorded = (world, run) => world.actor.getFlag('fabricate', 'gatheringRuns').active[run.id];
+  const firstActive = (world) => world.runManager.getActiveRuns(world.actor)[0];
+
+  const timed = commandWorld({ fixture: herbFixture({ timeRequirement: { minutes: 1 } }) });
+  await timed.gather();
+  timed.clock.worldTime += 120;
+  const waiting = firstActive(timed);
+  assert.ok(waiting.timeGate, 'a timed run waits on its time gate');
+  assert.equal(recorded(timed, waiting).checkResult, undefined, 'a ready timed run has no roll');
+
+  let atPrompt;
+  const untimed = commandWorld({
+    answer: async (_descriptor, { world }) => {
+      atPrompt = recorded(world, firstActive(world));
+      return { confirmed: false };
+    },
+  });
+  await untimed.gather();
+  assert.ok(atPrompt, 'the prompt opened against an active run');
+  assert.equal(atPrompt.checkResult, undefined, 'the prompt precedes any roll');
+  assert.equal(
+    recorded(untimed, firstActive(untimed)).checkResult,
+    undefined,
+    'a dismissed prompt leaves a ready run with no roll'
+  );
 });
 
 test('offersD100Prompt keys on the run, not the live task', async () => {

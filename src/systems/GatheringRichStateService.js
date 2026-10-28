@@ -19,6 +19,7 @@ import { GatheringNodeService } from './GatheringNodeService.js';
 import { normalizeGatheringResultGroups } from './gatheringResultGroups.js';
 import {
   cloneJson,
+  dropThreshold,
   nonNegativeInteger,
   nonNegativeNumber,
   normalizeList,
@@ -2093,11 +2094,6 @@ function matchingConditionModifierEntries(
     ...matchingBiomeModifierEntries(modifiers?.biome, biomes, biomeAggregation, dropModifierMode)
   );
   return entries;
-}
-
-/** The least effective d100 roll a row with this final chance drops on; the preview states it too. */
-function dropThreshold(finalDropRate) {
-  return 101 - finalDropRate;
 }
 
 function rollDropRow({

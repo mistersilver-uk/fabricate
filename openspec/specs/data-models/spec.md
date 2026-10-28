@@ -4442,20 +4442,24 @@ Requirements:
    It is system-scoped per the rule above, and with no active tool the payload is null (inert).
    Station presence belongs to the player's app session, not to a run: the payload is never written to a crafting or gathering run record, a stage's `selectionPlan`, or the run authority's ledger (request records, replies or prepare-token bindings).
    What a command did with it is ordinary execution evidence: under check-driven Tool breakage a stage that used the station's Tool records it in `usedTools` with `virtual: true`, and a prepared check retains the Tool-bonus contributions it was described with.
+   A gathering `execute` records it the same way in its execution journal's Tool effect, whose plan and applied receipt are made under that command's station alike; an owned working copy of the Tool is matched before the station.
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
    The chip names the station's Tool by the Tool display-name precedence of `## Tool` requirement 13 — its **Display label** (`label`, resolved for the station's crafting system), then its name snapshot, then its linked managed component's name — and falls back to the generic localized label only when none of those resolves.
    The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
-5. Crafting carries the station per call.
+5. The player app carries the station per call.
    The player app supplies `presentTools` to recipe detail hydration (`hydrateCraftingRecipe`), selected-set evaluation (`evaluateSelectedSet`), craft submission (`craftRecipe`), the step advance (`advanceCraftingRun`), the Journal listing (`listJournalForActor`), and every `runType: 'crafting'` Journal run command as that command's `payload.presentTools`.
    On the active GM, a version-1 crafting `start`, `beginStep`, `describeCheck` and `execute` evaluate Tool presence with that command's own payload and nothing else; no command inherits a station from an earlier command of the same run.
    A started stage re-validates its Tools when it resolves, so a stage begun at a station resolves only while a station supplying that Tool is active again; a check described with the station is redeemed by an `execute` that must carry it too.
    The Journal projection and the stage commands answer Tool readiness from the one shared predicate (`RunJournal` requirement 2) under the same viewer's station, so a control the projection enables with the station is one the command accepts with it.
    Replacing or clearing the active station refreshes the open recipe's hydrated detail and the Journal's stage readiness without a loading indicator, keeping the open recipe selected.
+   Gathering carries the station the same way: its versioned start takes `payload.presentTools`, and every `runType: 'gathering'` Journal run command, including the `execute` a ready `startGatheringAttempt` sends in the same call, carries it as that command's `payload.presentTools`.
+   On the active GM a version-1 gathering `execute` re-validates its Tools with that command's own payload and nothing else, so a gathering begun at a station resolves only while a station supplying that Tool is active again.
+   Alchemy submission (`submitAlchemyAttempt`) carries it as the brew's start `payload.presentTools` and, when the matched stage executes in the same call, as that `execute` command's `payload.presentTools`, never inside a `selectionPlan`; the active GM runs the matched start on the same per-command presence view as a crafting start.
+   The shopping-list aggregate evaluates its Tools through the player app's per-call station view of the recipe manager and is re-evaluated on every listing load, so a Tool the active station supplies is not listed to acquire, and is listed again once the station is cleared.
 6. `presentTools` is a client-asserted claim, as on gathering's versioned start.
    The active-GM authority does not re-verify that the sender's token occupies an activated station, and the re-resolution it performs under its execution claim (§ Authority Ledger and Recovery Boundary) does not include it.
    The claim can satisfy only Tool presence within its own crafting system; it never causes usage, breakage, consumption or an award.
-7. The station does not reach salvage, companion pooled holdings (`presentTools: null`), alchemy submission (`submitAlchemyAttempt`), or the world-time automatic advance, which has no player command to carry one and so blocks or refuses a Tool-bearing stage without spending.
-   The shopping-list aggregate is not a target of this requirement (deferred).
+7. The station does not reach salvage, companion pooled holdings (`presentTools: null`), or the world-time automatic advance, which has no player command to carry one and so blocks or refuses a Tool-bearing stage without spending.
 
 ### Item → Tool Drop Resolution
 
