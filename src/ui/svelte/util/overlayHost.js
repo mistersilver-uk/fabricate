@@ -76,8 +76,8 @@ function chainAbove(node) {
 }
 
 // Each acquired overlay by the element it was opened from, until it is released (issue 2660).
-// An overlay acquired from itself, as a `Modal` dialog is, is not stored, so a `Modal` never
-// counts as opened from another.
+// An overlay acquired from itself is not stored; a `Modal` dialog is acquired from where it was
+// mounted, so one mounted inside another counts as opened from it (issue 2678).
 const openedFrom = new Map();
 
 function recordOpener(overlay, anchor) {

@@ -942,24 +942,86 @@ describe('outside presses on the published Modal', () => {
     assert.deepEqual(calls, [[]]);
   });
 
-  it('calls onClose once for a mousedown in a Modal mounted in the body slot, which counts as outside', async () => {
+  /** An open dialog with a published `Modal` open in its body slot, each recording `onClose`. */
+  async function withInnerModal() {
     const outer = mountModal();
     await settle();
     const inner = recorder();
-    mountIn(outer.api, outer.handle.slot('body'), 'Modal', {
+    const { handle } = mountIn(outer.api, outer.handle.slot('body'), 'Modal', {
+      ...REQUIRED,
+      title: 'Confirm the rename',
+      open: true,
+      body: true,
+      onClose: inner.record,
+    });
+    await settle();
+    const innerDialog = () =>
+      [...document.querySelectorAll(DIALOG_HOOK)].find(
+        (dialog) => dialog.getAttribute('aria-label') === 'Confirm the rename'
+      );
+    return { outer, inner, innerDialog, innerSlot: handle.slot('body') };
+  }
+
+  it('calls neither onClose for a press or an Escape in a Select list opened inside the inner Modal; the Escape closes the list (issue 2678)', async () => {
+    const { outer, inner, innerSlot } = await withInnerModal();
+    const { target } = mountIn(outer.api, innerSlot, 'Select', { ...SELECT, onChange() {} });
+    target.querySelector('button').click();
+    flushSync();
+    await settle();
+    const list = listboxIn();
+    assert.ok(Boolean(list), 'the list is open');
+    pointer(list, 'mousedown');
+    assert.ok(list.isConnected, 'a press there keeps the list');
+    press(list, 'Escape');
+    await settle();
+    assert.ok(!listboxIn(), 'the Escape closes the list');
+    assert.deepEqual([outer.calls, inner.calls], [[], []], 'and neither dialog is dismissed');
+  });
+
+  it('calls only the inner onClose for a mousedown and an Escape in a Modal mounted in the body slot, which counts as inside (issue 2678)', async () => {
+    const { outer, inner, innerDialog } = await withInnerModal();
+    assert.ok(!dialogIn().contains(innerDialog()), 'the inner dialog is drawn outside the outer');
+    pointer(innerDialog(), 'mousedown');
+    press(innerDialog().querySelector('[data-manager-modal-close]'), 'Escape');
+    assert.deepEqual(outer.calls, [], 'the outer dialog is not dismissed');
+    assert.deepEqual(inner.calls, [[]], 'the inner one closes once, on its Escape');
+  });
+
+  it('draws no Modal opened in a slot that is already detached until the slot is attached (issue 2678)', async () => {
+    const outer = mountModal();
+    await settle();
+    const slot = outer.handle.slot('body');
+    outer.update({ open: false });
+    await settle();
+    assert.ok(!slot.isConnected, 'the slot is detached');
+    const inner = recorder();
+    mountIn(outer.api, slot, 'Modal', {
       ...REQUIRED,
       title: 'Confirm the rename',
       open: true,
       onClose: inner.record,
     });
+    const innerDialog = () =>
+      [...document.querySelectorAll(DIALOG_HOOK)].find(
+        (dialog) => dialog.getAttribute('aria-label') === 'Confirm the rename'
+      );
+    assert.ok(!innerDialog(), 'no dialog is drawn for a detached slot, even before a mutation');
+    outer.update({ open: true });
     await settle();
-    const innerDialog = [...document.querySelectorAll(DIALOG_HOOK)].find(
-      (dialog) => dialog.getAttribute('aria-label') === 'Confirm the rename'
-    );
-    assert.ok(!dialogIn().contains(innerDialog), 'the inner dialog is drawn outside the outer');
-    pointer(innerDialog, 'mousedown');
-    assert.deepEqual(outer.calls, [[]], 'the outer dialog is dismissed once');
-    assert.deepEqual(inner.calls, [], 'the inner one hears a press inside it');
+    assert.ok(Boolean(innerDialog()), 'and it is drawn once the slot is attached');
+    assert.deepEqual([outer.calls, inner.calls], [[], []]);
+  });
+
+  it('removes a Modal mounted in the body slot as an update detaches the slot, calling nothing, and draws it again as the slot returns (issue 2678)', async () => {
+    const { outer, inner, innerDialog } = await withInnerModal();
+    outer.update({ open: false });
+    await settle();
+    assert.ok(!innerDialog(), 'the inner dialog closes with its slot');
+    outer.update({ open: true });
+    await settle();
+    assert.ok(Boolean(innerDialog()), 'and is drawn again when the slot is attached');
+    pointer(innerDialog(), 'mousedown');
+    assert.deepEqual([outer.calls, inner.calls], [[], []], 'and still counts as inside');
   });
 });
 

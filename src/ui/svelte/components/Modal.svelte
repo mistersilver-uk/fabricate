@@ -33,7 +33,11 @@
     whatever its registration order.
   - A panel a control inside the dialog opened, or a panel opened from such a panel, counts as
     inside it wherever it is portaled, by `overlaysOpenedFrom` in `util/overlayHost.js`: a press
-    there dismisses nothing, and its Escape is left to the panel, judged from the same record.
+    there dismisses nothing, and its Escape is left to the panel, judged from the same record. A
+    `Modal` mounted inside the dialog counts so too, being acquired from where it was mounted.
+  - The dialog is drawn only while the element it was mounted in is in its document, so one in a
+    slot an `update` detaches closes with it, calling nothing, and is drawn again as the slot
+    returns (issue 2678).
   - The dialog element is a `tabindex="-1"` focus target held off Foundry's keybindings, so a press
     on its surface focuses it; Tab or Shift+Tab from it moves to its first or its last control in
     every mode (issue 2661).
@@ -48,9 +52,8 @@
   window and reads the live attribute there, and whether the key came from a panel opened inside,
   live too; one left open across a Foundry 14 window move keeps hearing the old window. A document
   capture listener registered before the dialog opened that releases such a panel on mousedown
-  runs first, and the press then counts as outside; a `Modal` opened in another's slot counts as
-  outside it. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
-  tooltip hides when the dialog is destroyed or focus leaves.
+  runs first, and the press then counts as outside. Escape on the close IconButton no longer
+  reaches its delegated tooltip hide; the tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
@@ -92,12 +95,33 @@
 
   // The host the dialog was last acquired into, kept for `modalFocus` to restore focus into.
   let host = null;
+  // Whether the element the dialog was mounted in is in its document; see Invariants.
+  let attached = $state(true);
 
   // Inside a published mount, the chain's container for the dialog; otherwise the class walk from
-  // the dialog node upwards, never a document-wide query.
+  // where the dialog was mounted upwards, never a document-wide query. Called before the move.
   function acquireHost(node) {
-    host = acquireOverlayHost(node, node, { component: 'Modal' });
+    host = acquireOverlayHost(node, node.parentNode, { component: 'Modal' });
     return host;
+  }
+
+  // Read when a mutation of its document is delivered, so a detach and re-attach in one run of
+  // script changes nothing.
+  function followSlot(node) {
+    attached = node.isConnected;
+    const doc = node.ownerDocument;
+    const Observer = doc?.defaultView?.MutationObserver;
+    if (typeof Observer !== 'function') return {};
+    const watch = new Observer(() => {
+      attached = node.isConnected;
+    });
+    watch.observe(doc, { childList: true, subtree: true });
+    return {
+      destroy() {
+        watch.disconnect();
+        attached = true;
+      },
+    };
   }
 
   // Gives the host back to the chain when the dialog closes or the component is destroyed.
@@ -268,7 +292,8 @@
 </script>
 
 {#if open}
-  <div class="manager-modal-overlay" data-manager-modal-overlay>
+  <div class="manager-modal-overlay" data-manager-modal-overlay use:followSlot></div>
+  {#if attached}
     <div
       class="fabricate-modal"
       bind:this={dialog}
@@ -324,7 +349,7 @@
         {/if}
       </svelte:element>
     </div>
-  </div>
+  {/if}
 {/if}
 
 <style>
