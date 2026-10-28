@@ -49,11 +49,10 @@
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
     list from state the generation cannot see, and both answer with the same -1 sentinel, which is
     NOT "the first row".
-  - `close()` IS NOT MERELY "HIDE THE PANEL": it clears the query, drops the type-ahead prefix and
-    returns focus to the trigger, and `stayOpen` gates the WHOLE of it. That restoration waits for
-    `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
-    while open. ESCAPE IS HANDLED IN ONE PLACE, `dismissOnOutsideClick`'s DOCUMENT capture keydown,
-    which the inline field's keys reach; `onDetached` and `onFocusLeave` close the panel, moving no focus.
+  - `close()` clears the query and the prefix and refocuses the trigger, after `tick()` because an
+    `inlineSearchTrigger` is unmounted while open, or at once with `moveOn` so the browser moves Tab
+    on from it; `stayOpen` gates all of it. Escape is `dismissOnOutsideClick`'s document capture
+    keydown, and its `onDetached` and `onFocusLeave` close the panel with no focus moved.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -305,18 +304,14 @@
     }
   }
 
-  function restoreTriggerFocus() {
-    tick().then(() => {
-      const origin = anchored ? { anchor: anchorNode() } : { trigger: triggerElement };
-      focusReturnTarget(origin, pickerRoot)?.focus?.();
-    });
-  }
-
-  function close({ restoreFocus = true } = {}) {
+  function close({ restoreFocus = true, moveOn = false } = {}) {
+    const origin = () => (anchored ? { anchor: anchorNode() } : { trigger: triggerElement });
+    const refocus = () => focusReturnTarget(origin(), pickerRoot)?.focus?.();
+    if (moveOn) refocus();
     open = false;
     search = '';
     typeAheadBuffer = null;
-    if (restoreFocus) restoreTriggerFocus();
+    if (restoreFocus && !moveOn) tick().then(refocus);
   }
 
   $effect(() => {

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { createRawSnippet, flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { placeCaret } from '../helpers/listboxKeyboardDriver.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
@@ -1258,7 +1258,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
-  describe('Tab and focus leaving the picker (issue 2598)', () => {
+  describe('Tab and focus leaving the picker (issues 2598, 2676)', () => {
+    const footer = createRawSnippet(() => ({
+      render: () => '<div><button type="button" data-test-footer-stop>Done</button></div>',
+    }));
     const panelOpen = () => Boolean(harness.target.querySelector('.fabricate-picker-popover'));
 
     /** Records every keydown that bubbles to the window, as a companion's listener above does. */
@@ -1270,6 +1273,42 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       document.defaultView.addEventListener('keydown', listen);
       return { heard, stop: () => document.defaultView.removeEventListener('keydown', listen) };
     }
+
+    it('closes on Tab in the query field, focusing the trigger at once and leaving the key to the browser', async () => {
+      chosen.length = 0;
+      await mountPicker({});
+      await openPanel();
+      const event = pressKey('Tab');
+      assert.ok(document.activeElement === trigger(), 'focus is on the trigger before any settle');
+      assert.equal(event.defaultPrevented, false, 'the browser moves Tab on from the trigger');
+      assert.ok(!panelOpen(), 'the panel is closed');
+      await settle();
+      assert.ok(document.activeElement === trigger(), 'and no later focus move undoes it');
+      assert.deepEqual(chosen, []);
+      harness.remount();
+    });
+
+    it('closes on Shift+Tab in the query field, keeping the key and returning focus to the trigger', async () => {
+      await mountPicker({});
+      await openPanel();
+      const event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, true);
+      await settle();
+      assert.ok(!panelOpen(), 'the panel is closed');
+      assert.ok(document.activeElement === trigger(), 'focus is back on the trigger');
+      harness.remount();
+    });
+
+    it('leaves a footer stop one Tab from the query field, with the panel open', async () => {
+      await mountPicker({ footer });
+      const panel = await openPanel();
+      const event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, false);
+      assert.ok(panelOpen(), 'the panel stays open');
+      panel.querySelector('[data-test-footer-stop]').focus();
+      assert.ok(panelOpen(), 'focus moving into the panel closes nothing');
+      harness.remount();
+    });
 
     it('closes without choosing or moving focus when focus moves to a control outside', async () => {
       chosen.length = 0;

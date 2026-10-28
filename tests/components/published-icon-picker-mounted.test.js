@@ -489,17 +489,22 @@ describe('the keys the published IconPicker keeps', () => {
     assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
   });
 
-  it('closes when focus moves from the field to an element elsewhere (issue 2598)', async () => {
+  it('closes on Tab in the field onto its trigger, and when focus moves elsewhere (issues 2598, 2676)', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
     const { calls, trigger } = mountPicker({}, { target });
     const elsewhere = document.createElement('button');
     target.parentElement.append(elsewhere);
     await open(trigger());
+    press(fieldIn(), 'Tab');
+    assert.ok(document.activeElement === trigger(), 'focus is on the trigger for the browser');
+    await settle();
+    assert.ok(!panelIn(), 'Tab closes the list');
+    await open(trigger());
     elsewhere.focus();
     await settle();
     assert.ok(!panelIn(), 'focus moving elsewhere closes the list');
     assert.ok(document.activeElement === elsewhere, 'and moves no focus');
-    assert.deepEqual(calls, [], 'without calling onChange');
+    assert.deepEqual(calls, [], 'neither calls onChange');
   });
 });
 

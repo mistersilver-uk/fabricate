@@ -22,7 +22,7 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
+  import { activeOptionId, panelTabExit, squareTileName } from '../util/listboxNavigation.js';
   import { pickerCopy } from '../util/pickerOptionModel.js';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
@@ -135,7 +135,11 @@
     if (event.key === 'Escape') {
       stop(event);
       close();
+      return;
     }
+    const exit = panelTabExit(event, popover);
+    if (exit === 'back') event.preventDefault();
+    if (exit) close({ moveOn: exit === 'forward' });
   }}
 >
   {#snippet optionRow(option, index)}
@@ -235,6 +239,9 @@
       bind:this={optionsList}
       class={`manager-travel-popover-options ${listClass}`}
       role="listbox"
+      tabindex="-1"
+      data-keyboard-focus="true"
+      data-popover-list=""
       id={listId}
       aria-label={dialogNameAttribute}
       aria-labelledby={dialogNamedBy}

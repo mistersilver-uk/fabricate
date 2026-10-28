@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import {
   activeOptionId,
@@ -7,10 +7,12 @@ import {
   holderKeyIntent,
   nextActiveIndex,
   openingKeyOwns,
+  panelTabExit,
   squareTileName,
   typeAheadCursor,
   typeAheadOwnsKey,
 } from '../../src/ui/svelte/util/listboxNavigation.js';
+import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 // The arithmetic of a keyboard cursor over a listbox, unit-tested WITHOUT MOUNTING (issue 1503).
 
@@ -626,5 +628,65 @@ describe('squareTileName (issue 2459)', () => {
       'Anvil — Spent'
     );
     assert.equal(squareTileName({}), '');
+  });
+});
+
+describe('panelTabExit (issue 2676)', () => {
+  before(() => setupDOM());
+  after(() => teardownDOM());
+
+  /** A panel of a query field, a gated row list, a disabled and a hidden stop, and two footer buttons. */
+  function panel() {
+    const root = document.createElement('div');
+    root.tabIndex = -1;
+    root.innerHTML = `
+      <input data-field />
+      <div role="listbox" tabindex="-1"><button tabindex="-1" data-row>Row</button></div>
+      <input type="hidden" />
+      <div inert><button data-inert>Inert</button></div>
+      <button data-clear>Clear</button>
+      <button data-apply>Apply</button>
+      <button disabled>Gone</button>`;
+    document.body.append(root);
+    const at = (selector) => root.querySelector(selector);
+    return { root, at };
+  }
+
+  const tab = (target, extra = {}) => ({ key: 'Tab', target, ...extra });
+
+  it('answers forward for Tab from the last stop and back for Shift+Tab from the first', () => {
+    const { root, at } = panel();
+    assert.equal(panelTabExit(tab(at('[data-apply]')), root), 'forward');
+    assert.equal(panelTabExit(tab(at('[data-field]'), { shiftKey: true }), root), 'back');
+  });
+
+  it('reaches a footer stop by one Tab from the query field, and stays between stops', () => {
+    const { root, at } = panel();
+    assert.equal(panelTabExit(tab(at('[data-field]')), root), null);
+    assert.equal(panelTabExit(tab(at('[data-clear]')), root), null);
+    assert.equal(panelTabExit(tab(at('[data-apply]'), { shiftKey: true }), root), null);
+  });
+
+  it('counts no row, disabled, hidden or inert element as a stop', () => {
+    const { root, at } = panel();
+    assert.equal(panelTabExit(tab(at('[data-row]')), root), null);
+    assert.equal(panelTabExit(tab(at('[data-inert]')), root), null);
+    at('[data-apply]').disabled = true;
+    assert.equal(panelTabExit(tab(at('[data-clear]')), root), 'forward');
+  });
+
+  it('answers null for another key, a modified Tab or a composing one', () => {
+    const { root, at } = panel();
+    const last = at('[data-apply]');
+    for (const event of [
+      { key: 'Enter', target: last },
+      tab(last, { ctrlKey: true }),
+      tab(last, { altKey: true }),
+      tab(last, { metaKey: true }),
+      tab(last, { isComposing: true }),
+    ]) {
+      assert.equal(panelTabExit(event, root), null, JSON.stringify(Object.keys(event)));
+    }
+    assert.equal(panelTabExit(tab(last), null), null, 'no panel');
   });
 });

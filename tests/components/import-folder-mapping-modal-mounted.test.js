@@ -448,3 +448,84 @@ describe('ImportFolderMappingModal: tags through the set picker (issue 2512)', (
     assert.deepEqual(result.decisions[0].addTags, []);
   });
 });
+
+describe('Tab and Escape on the mapping modal’s pickers (issues 2598, 2677)', () => {
+  const settle = async () => {
+    flushSync();
+    await new Promise((done) => setTimeout(done, 0));
+    flushSync();
+  };
+  const press = (node, key, shiftKey = false) => {
+    const event = new document.defaultView.KeyboardEvent('keydown', {
+      key,
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
+    });
+    node.dispatchEvent(event);
+    return event;
+  };
+  const panel = () => document.querySelector('.fabricate-set-picker-popover');
+
+  async function mountWithTags() {
+    const result = { closes: 0, decisions: null };
+    const root = await harness.mount({
+      open: true,
+      folders: [FOLDERS[1]],
+      ...VOCAB,
+      onClose: () => {
+        result.closes += 1;
+      },
+      onCommit: (decisions) => {
+        result.decisions = decisions;
+      },
+    });
+    const addTag = rows()[0].querySelector('[data-import-mapping-add-tag]');
+    addTag.click();
+    await settle();
+    assert.ok(Boolean(panel()), 'Add tag opens the picker');
+    return { root, result, addTag };
+  }
+
+  it('closes the tag panel on Shift+Tab in its query field, onto Add tag, with the modal open', async () => {
+    const { result, addTag } = await mountWithTags();
+    const event = press(panel().querySelector('input'), 'Tab', true);
+    await settle();
+    assert.equal(event.defaultPrevented, true);
+    assert.ok(!panel(), 'the panel is closed');
+    assert.ok(document.activeElement === addTag, 'focus is on Add tag');
+    assert.equal(result.closes, 0, 'onClose is not called');
+    assert.ok(dialog(), 'the dialog is still drawn');
+  });
+
+  it('closes the tag panel on Tab from Clear all, its last enabled stop, discarding it', async () => {
+    const { result, addTag } = await mountWithTags();
+    panel().querySelector('[role="option"][title="#herb"]').click();
+    await settle();
+    panel().querySelector('[data-set-picker-clear]').click();
+    await settle();
+    assert.equal(panel().querySelector('[data-set-picker-apply]').disabled, true);
+    const clear = panel().querySelector('[data-set-picker-clear]');
+    clear.focus();
+    const event = press(clear, 'Tab');
+    assert.ok(document.activeElement === addTag, 'focus is on Add tag before the browser moves on');
+    await settle();
+    assert.equal(event.defaultPrevented, false);
+    assert.ok(!panel(), 'the panel is closed');
+    assert.equal(result.closes, 0, 'onClose is not called');
+    commitButton().click();
+    assert.deepEqual(result.decisions[0].addTags, [], 'nothing was applied');
+  });
+
+  it('closes the modal once on Escape on a closed category select’s trigger (issue 2677)', async () => {
+    const { root, result } = await mountWithTags();
+    press(panel().querySelector('input'), 'Escape');
+    await settle();
+    const trigger = root.querySelector(categoryTrigger(0));
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'the list is closed');
+    trigger.focus();
+    press(trigger, 'Escape');
+    flushSync();
+    assert.equal(result.closes, 1, 'Fabricate’s own dialog hears the Escape before the trigger');
+  });
+});
