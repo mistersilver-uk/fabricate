@@ -1,6 +1,6 @@
 /**
  * Issue 2422 - the manager's title band holds one height whether or not the PREMIUM mark and the
- * status line are drawn,. Mounted through the real `AppTitleBar` and measured in
+ * status line are drawn. Mounted through the real `AppTitleBar` and measured in
  * Chromium under the manager sheet.
  */
 import assert from 'node:assert/strict';
