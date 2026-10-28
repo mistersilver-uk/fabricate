@@ -8369,6 +8369,11 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       assert.equal(tab.querySelector('.manager-editor-tab-count')?.textContent.trim(), '1', id);
       assert.ok(!tab.querySelector('.manager-chip'), `${id}: a record count is never a chip`);
     }
+    assert.deepEqual(
+      ['ingredients', 'results', 'tools'].map((id) => tabMarks(target, id).getAttribute('aria-label')),
+      ['Ingredients, 1 ingredient', 'Results, 1 result', 'Tools, 1 tool'],
+      'each count tab is spoken with the unit its numeral counts'
+    );
     editHarness.remount();
     const empty = await openValidation(RECIPE);
     for (const id of ['ingredients', 'results', 'tools']) {

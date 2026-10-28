@@ -1426,6 +1426,9 @@ A PASS mark is toned neutral, because the issue vehicle's tone states how much a
 On a tab strip the issue summary MUST be the shared chip primitive at its `inspector` density with `mono`, whatever badge class a caller passes: the mono face at weight 500, because it carries a number a GM compares and the mono face ships no weight above 500 (maintainer ruling 2026-10-14, issue 2464), and the size and box that density's, as the chip's library entry states them.
 The strip has no density of its own and borrows this one for its geometry, because a second pill is a missing density and never a new component.
 No rule in the module sheet names that badge's class, and the strip's record count and dot stay bare `span` elements the tab-strip primitive paints.
+A tab's record count MUST be spoken with what it counts: a `count` mark carries a `name` stating the numeral and its unit, such as "3 linked recipes", and the strip names the tab by joining its label with that phrase, such as "Contents, 3 linked recipes".
+The caller resolves the unit through a plural-aware lang pair and the numeral stays the bare visible mark, so a record count is never left as a bare number in a tab's accessible name.
+A named dot on the same tab joins that name, and a tab's own `ariaLabel` still wins.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
@@ -1503,6 +1506,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a tab strip draws an issue summary under any caller's badge class
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
+- **AND** a named record count names its tab with the unit it counts, such as "Contents, 3 linked recipes"
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
 
 #### Scenario: A field draws its caption and its value

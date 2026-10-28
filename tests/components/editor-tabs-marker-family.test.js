@@ -480,3 +480,72 @@ describe('EditorTabs names the Validation tab`s toned counts (issue 1522)', () =
     assert.equal(buttonFor(root, 'validation').getAttribute('aria-label'), null);
   });
 });
+
+describe('EditorTabs names what a record count counts (issue 2491)', () => {
+  const nameOf = async (badges, tabs = TABS) => {
+    const root = await harness.mount({ tabs, activeTab: 'roll', badges });
+    return buttonFor(root, 'outcomes').getAttribute('aria-label');
+  };
+
+  it('composes the tab name from its label and the count mark`s unit', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: { outcomes: { vehicle: 'count', label: 3, name: '3 outcomes' } },
+    });
+    const button = buttonFor(root, 'outcomes');
+    assert.equal(button.getAttribute('aria-label'), 'Outcomes, 3 outcomes');
+    assert.deepEqual(
+      marksOn(button).map((mark) => [mark.count, mark.text, mark.name]),
+      [[true, '3', null]],
+      'the numeral stays the bare visible mark and takes no label of its own'
+    );
+  });
+
+  it('keeps a named dot beside the named count in the one tab name', async () => {
+    assert.equal(
+      await nameOf({
+        outcomes: [
+          { vehicle: 'count', label: 3, name: '3 outcomes' },
+          { vehicle: 'dot', name: '1 issue' },
+        ],
+      }),
+      'Outcomes, 3 outcomes, 1 issue'
+    );
+  });
+
+  it('joins the label and the unit through a localizable template', async () => {
+    const { APP_LOCALIZER } = await harness.loadRawModule('src/ui/svelte/util/appLocalizer.js');
+    const copy = { 'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts': '{label} : {counts}' };
+    const context = new Map([[APP_LOCALIZER, (key) => copy[key] ?? key]]);
+    const root = await harness.mount(
+      {
+        tabs: TABS,
+        activeTab: 'roll',
+        badges: { outcomes: { vehicle: 'count', label: 3, name: '3 outcomes' } },
+      },
+      { context }
+    );
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes : 3 outcomes');
+  });
+
+  it('leaves an unnamed count, an undrawn zero and a tab`s own name as they were', async () => {
+    assert.equal(await nameOf({ outcomes: { vehicle: 'count', label: 3 } }), null);
+    assert.equal(
+      await nameOf({ outcomes: { vehicle: 'count', label: 0, name: '0 outcomes' } }),
+      null,
+      'a suppressed zero draws nothing, so it names nothing'
+    );
+    assert.equal(
+      await nameOf({ outcomes: { vehicle: 'count', label: 0, name: '0 outcomes', suppressZero: false } }),
+      'Outcomes, 0 outcomes'
+    );
+    const root = await harness.mount({
+      tabs: [{ ...TABS[1], ariaLabel: 'Outcomes tab' }],
+      activeTab: 'outcomes',
+      annotated: true,
+      badges: { outcomes: { vehicle: 'count', label: 3, name: '3 outcomes' } },
+    });
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes tab');
+  });
+});

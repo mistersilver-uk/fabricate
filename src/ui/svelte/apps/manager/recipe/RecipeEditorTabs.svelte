@@ -21,6 +21,7 @@
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
+  import { TAB_COUNT_UNITS, nameTabCounts } from '../../../util/tabCountMark.js';
 
   let {
     activeTab = 'overview',
@@ -30,6 +31,12 @@
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
     onSelect = () => {},
   } = $props();
+
+  const COUNT_UNITS = {
+    ingredients: TAB_COUNT_UNITS.ingredients,
+    results: TAB_COUNT_UNITS.results,
+    tools: TAB_COUNT_UNITS.tools,
+  };
 
   // The label keys are written out as LITERALS rather than interpolated, because
   // `ui-lang-keys-resolve` and `lang-keys-no-orphans` read the SOURCE: an interpolated key is
@@ -92,7 +99,7 @@
 <EditorTabs
   tabs={localizeTabs(TABS)}
   {activeTab}
-  {badges}
+  badges={nameTabCounts(badges, COUNT_UNITS)}
   {onSelect}
   ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}
   idStem="recipe"
