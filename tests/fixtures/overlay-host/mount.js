@@ -11,6 +11,7 @@ import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopov
 import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
 import AnchoredPopoverHost from './AnchoredPopoverHost.svelte';
+import ModalPickerHost from './ModalPickerHost.svelte';
 import TintAnchoredHost from './TintAnchoredHost.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -238,6 +239,9 @@ const COMPONENTS = {
   // The tint palette opened from a caller's anchor, as the biome edit palette opens it (issue 2459).
   'tint-anchored': [TintAnchoredHost, {}],
   modal: [Modal, componentKind === 'modal' ? modalProps() : {}],
+  // A dialog holding an IconPicker, a Select and a SetPicker, trapping focus under `?trap=1`, for
+  // the Tab and Escape proof (issues 2676, 2699).
+  'modal-picker': [ModalPickerHost, { trapFocus: params.get('trap') === '1' }],
   actorbar: [
     ActorSelectTopBar,
     {
@@ -252,5 +256,13 @@ if (params.get('layer')) await loadSheetInLayer(params.get('layer'));
 
 const [Component, props] = COMPONENTS[componentKind] ?? COMPONENTS.popover;
 mount(Component, { target: mountPoint, props });
+
+// The page's next tab stop after the frame, where a Tab a panel leaves unhandled lands.
+if (componentKind === 'modal-picker') {
+  const pageAfter = document.createElement('button');
+  Object.assign(pageAfter, { type: 'button', textContent: 'Page after' });
+  pageAfter.dataset.pageAfter = '';
+  document.body.append(pageAfter);
+}
 
 globalThis.__overlayHostFixtureReady = true;

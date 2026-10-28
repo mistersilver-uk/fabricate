@@ -9,6 +9,7 @@ import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { executePublicGather } from '../src/systems/publicGatheringAttempt.js';
 import { resolveRunRecipe, snapshotRunTerms } from '../src/systems/runTerms.js';
 import { engineWithStationPresence } from '../src/systems/stationPresence.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
@@ -36,7 +37,6 @@ import {
   journalRunDismissalKey,
   createJournalRunCommandService,
   executePublicCraft,
-  executePublicGather,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from '../src/systems/journalRunCommands.js';
@@ -1086,6 +1086,45 @@ describe('journal run command protocol', () => {
     assert.equal(settled.success, false);
     assert.equal(settled.reason, 'execute-command-unavailable');
     assert.equal(settled.authorityUnavailable, true);
+  });
+
+  it("keys a station's presentTools on a ready public gather's execute only when supplied (issue 2275)", async () => {
+    const station = { systemId: 'survival', componentIds: [], toolIds: ['sickle'] };
+    const payloads = [];
+    for (const presentTools of [station, null]) {
+      await executePublicGather({
+        requestStart: async () => ({
+          accepted: true,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+          runId: 'gather-5',
+          runRevision: 1,
+        }),
+        actor: { uuid: 'Actor.a' },
+        presentTools,
+        executeCommand: async (command) => {
+          payloads.push(command.payload);
+          return { success: true };
+        },
+      });
+    }
+    assert.deepEqual(payloads, [{ trigger: 'manual', presentTools: station }, { trigger: 'manual' }]);
+  });
+
+  it("answers a gathering execute's Tool presence from that command's station only (issue 2275)", async () => {
+    const seen = [];
+    const engine = {
+      executeVersionedStage: (args) => {
+        seen.push(args.presentTools ?? null);
+        return { success: true };
+      },
+    };
+    const operations = createGatheringJournalRunOperations({ engine });
+    const station = { systemId: 'survival', componentIds: [], toolIds: ['sickle'] };
+    const command = { actor: { uuid: 'Actor.a' }, run: { id: 'run-1' }, expectedRevision: 1 };
+    await operations.execute({ ...command, payload: { trigger: 'manual', presentTools: station } });
+    await operations.execute({ ...command, payload: { trigger: 'manual' } });
+    assert.deepEqual(seen, [station, null], 'a later station-less command inherits nothing');
   });
 
   it('executes a ready fully-selected public craft under a second authority request', async () => {

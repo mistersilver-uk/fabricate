@@ -109,7 +109,7 @@ function commandAuthorizer(request, operation) {
   return request.action === 'chooseAward' ? authorizeAwardChoice : operation.authorize;
 }
 
-function operationUnavailable() {
+export function operationUnavailable() {
   return failure('unsupported-operation');
 }
 
@@ -251,49 +251,6 @@ export async function executePublicCraft({
     })
   );
   return { ...settled, results: results.filter(Boolean) };
-}
-
-/**
- * Preserve one-call completion for the public gathering API, as `executePublicCraft` does for
- * crafting: since issue 1648 `startGatheringAttempt` selects the versioned lifecycle, so without
- * this a ready public attempt reported `accepted: true` and awarded nothing. Keyed on
- * `canExecuteImmediately`, the field the command layer's normaliser forwards (it drops the
- * engine's `state: 'ready'`); a waiting or timed attempt is left as it was, since it matures at
- * GM-gated world time. The execution outcome is applied OVER the start result, so an accepted
- * attempt that failed to execute still reads `accepted`. `interactive` is the caller's flag, as
- * in `executePublicCraft`.
- */
-export async function executePublicGather({
-  requestStart,
-  actor,
-  executeCommand = null,
-  interactive = false,
-  additionalDice = 0,
-} = {}) {
-  if (typeof requestStart !== 'function') return operationUnavailable();
-  const started = await requestStart();
-  if (started?.accepted !== true) return started;
-  if (started.requiresExecution !== true || started.canExecuteImmediately !== true) return started;
-  const runId = validText(started.runId) ? started.runId : null;
-  if (!runId) return started;
-  if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
-  const settled = await executeCommand(
-    {
-      actorUuid: actor?.uuid,
-      runType: 'gathering',
-      runId,
-      // `runRevision`, not `run.runRevision`: the normalised start lifts the revision to the top
-      // level and drops the run document, and an undefined `expectedRevision` is refused as
-      // `invalid-command`.
-      expectedRevision: started.runRevision,
-      action: 'execute',
-      payload: { trigger: 'manual' },
-    },
-    // The caller's flag, for the reason `executePublicCraft` gives (issue 1780): the gathering
-    // screen passes `interactive: true` and expects its roll dialog.
-    { interactive: interactive === true, ...decisionAdditionalDice({ additionalDice }) }
-  );
-  return { ...started, ...settled };
 }
 
 /**
@@ -552,6 +509,7 @@ export function createGatheringJournalRunOperations({
         executionGrant,
         requestId,
         trigger: payload.trigger === 'worldTime' ? 'worldTime' : 'manual',
+        presentTools: payload.presentTools,
       });
     },
     cancel: ({ actor, run, executionGrant, requestId, expectedRevision }) => {

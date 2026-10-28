@@ -1,12 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The ONE list-plus-inspector composition behind every scoped-entity list (issue 1380, epic 1357).
-  Three lanes need it — the world catalogues (6a-ii), the system-scope rules lists (6b) and the
-  tool rules list (6c) — and three independent compositions is not a tidiness argument. Issue 1050
-  shipped the SonarCloud duplication gate red at 5.3% with 93 of 98 duplicated lines inside one
-  component, and `.svelte` IS duplication-analysed. So the composition is built once here and
-  configured per scope; `EntityCatalogueShell` and `EntityRulesListShell` are its two callers and
-  neither may inline it.
+  Issue 1050 shipped the SonarCloud duplication gate red at 5.3% with 93 of 98 duplicated lines
+  inside one component, and `.svelte` IS duplication-analysed. So the composition is built once
+  here and configured per scope; `EntityCatalogueShell` is its caller and may not inline it.
 -->
 <script>
   import { paginateRows } from '../../../../model/browserPagination.js';
@@ -649,14 +646,6 @@
         </FilterBar>
         <EmptiedSelectionAnnouncer bind:this={emptiedReport} />
 
-        {#if bulk && !inspectorBody && selection.count > 0}
-          <!-- With no inspector column there is nowhere else for a bulk body to go, so it sits
-             directly under the toolbar that states the count it acts on. -->
-          <section class="manager-scoped-list-bulk" data-scoped-list-bulk>
-            {@render bulk([...selectedIds], rowContext(null))}
-          </section>
-        {/if}
-
         <div class="manager-scoped-list-rows">
           <!-- WHAT OPENS THE LIST. -->
           <!-- WRAPPED, AND THE WRAPPER IS WHERE THE GAP LIVES (issue 1373, maintainer feedback round 2). -->
@@ -763,9 +752,9 @@
                     </span>
                   </button>
 
-                  <!-- A `<div>`, not the `<span>` `ComponentRow` uses: a lane's `rowMeta` — and
-                       the rules-list shell's own `InheritRow` — render block elements, and a
-                       `<div>` inside a `<span>` is invalid nesting the browser reparents. -->
+                  <!-- A `<div>`, not the `<span>` `ComponentRow` uses: a lane's `rowMeta` renders
+                       block elements, and a `<div>` inside a `<span>` is invalid nesting the
+                       browser reparents. -->
                   <div class="manager-scoped-list-row-meta">
                     <!-- THE SOURCE PILL FOLLOWS THE FACTS. -->
                     {#if rowSourceBadge && scope?.sourceLinked === true && rowSecondLine === 'description'}
@@ -1005,7 +994,6 @@
      inline, above the first, and below a pagerless scroller. */
   .manager-scoped-list-column-lead,
   .manager-scoped-list-unavailable,
-  .manager-scoped-list-bulk,
   .manager-scoped-list-rows {
     min-width: 0;
     padding-inline: var(--fab-space-3);
@@ -1031,10 +1019,6 @@
      toolbar and the pager take, for the same reason. */
   .manager-scoped-list-column-lead {
     display: grid;
-    flex: 0 0 auto;
-  }
-
-  .manager-scoped-list-bulk {
     flex: 0 0 auto;
   }
 

@@ -106,15 +106,6 @@ export function buildComponentEditorState(system, item) {
   const essenceOptions = showEssences
     ? buildEditableEssenceOptions(essenceDefinitions, currentEssences)
     : [];
-  // The two facts a SAVE needs and the rendered rows cannot carry (issue 1371 r20-store3).
-  // `carriedEssences` is what this system's roster does not define and the write must not drop;
-  // `baselineEssences` is exactly the map an UNTOUCHED save of these rows produces, which is what
-  // the override rule compares against to answer "did the GM author anything" without assuming
-  // which of the two maps this editor was seeded from.
-  const carriedEssences = showEssences
-    ? carriedComponentEssences(currentEssences, essenceOptions)
-    : {};
-
   return {
     itemId: item?.id || '',
     itemName: item?.name || '',
@@ -128,13 +119,7 @@ export function buildComponentEditorState(system, item) {
         checked: selectedTags.has(tag)
       }))
       : [],
-    essenceOptions,
-    carriedEssences,
-    baselineEssences: buildComponentEditorUpdates({
-      showEssences,
-      essenceOptions,
-      carriedEssences
-    }).essences
+    essenceOptions
   };
 }
 

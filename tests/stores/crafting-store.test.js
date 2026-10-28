@@ -569,6 +569,30 @@ describe('craftingStore', () => {
     assert.deepEqual(store.shoppingEntries, []);
   });
 
+  // Issue 2273: the app re-loads when the active canvas station changes, and the Tool consult
+  // behind the list answers differently; an unchanged queue must not keep the old answer.
+  it('re-evaluates the shopping list on every load pass', async () => {
+    let stationActive = false;
+    const recipeManager = {
+      getRecipe: (id) => ({ id, name: `Recipe ${id}` }),
+      evaluateShoppingRequirement: () => ({
+        ingredientStates: [],
+        essenceStates: [],
+        toolStates: [{ componentId: 'anvil', name: 'Anvil', available: stationActive }],
+      }),
+    };
+    const { services } = makeServices({ recipeManager, sourceActors: [{ id: 'a1', items: [] }] });
+    const store = createCraftingStore({ services });
+    store.addToShoppingList('r1', 1);
+    flushSync();
+    assert.equal(store.shoppingAggregate.tools[0].available, false);
+
+    stationActive = true;
+    await store.load(true);
+    flushSync();
+    assert.equal(store.shoppingAggregate.tools[0].available, true);
+  });
+
   it('craft guards against re-entrancy while a craft is in flight', async () => {
     let resolveCraft;
     const craftRecipe = () => new Promise((res) => (resolveCraft = res));

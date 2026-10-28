@@ -1173,7 +1173,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges twenty-nine focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges thirty focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1199,6 +1199,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/SearchablePopover.svelte: button',
       'src/ui/svelte/components/SearchablePopover.svelte: input',
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: button',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte: div',
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: div',
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: input',
       'src/ui/svelte/components/SearchField.svelte: input',

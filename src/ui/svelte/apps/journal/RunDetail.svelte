@@ -107,7 +107,7 @@
 
   const gatheringYield = $derived(run?.gatheringYield ?? null);
   const craftingYield = $derived.by(() => {
-    if (terminal || run?.redacted === true || viewedIndex < currentIndex) return null;
+    if (run?.redacted === true || viewedIndex < currentIndex) return null;
     const preview = viewedIsCurrent ? run?.craftingYield : viewedStage?.yieldPreview;
     return preview?.source === 'preview' && preview.stageIndex === viewedIndex ? preview : null;
   });
@@ -239,8 +239,7 @@
   function stageState(index) {
     const stageStatus = stages[index]?.status;
     if (stageStatus === 'failed') return 'failed';
-    if (terminal && !['succeeded', 'done'].includes(stageStatus)) return 'unexecuted';
-    if (terminal || index < currentIndex) return 'past';
+    if (index < currentIndex) return 'past';
     if (index > currentIndex) return 'future';
     return run?.pauseState ? 'paused' : 'current';
   }
@@ -472,7 +471,7 @@
       <section class="journal-detail-stages" data-journal-stages>
         <RunProgress
           {stages}
-          current={terminal ? -1 : currentIndex}
+          current={currentIndex}
           progress={elapsed}
           blocker={progressBlocker}
           label={localize('FABRICATE.App.Journal.Progress.Label')}
@@ -492,12 +491,7 @@
           positionLabel={(index, count) =>
             localize('FABRICATE.App.Journal.Stage.Position', { index: index + 1, count })}
           returnLabel={(index) =>
-            localize(
-              terminal
-                ? 'FABRICATE.App.Journal.Stage.ReturnFinal'
-                : 'FABRICATE.App.Journal.Stage.Return',
-              { index: index + 1 }
-            )}
+            localize('FABRICATE.App.Journal.Stage.Return', { index: index + 1 })}
         />
         {#if viewedStage}
           <StageCard
@@ -510,7 +504,7 @@
                   : viewedStage.detail?.summary || '',
             }}
             index={viewedIndex}
-            current={!terminal && viewedIndex === currentIndex}
+            current={viewedIndex === currentIndex}
             state={stageState(viewedIndex)}
             tag={stageTag}
             facts={stageFacts(viewedStage)}
@@ -530,9 +524,7 @@
                 step={viewedStage}
                 {run}
                 {journal}
-                editable={!terminal &&
-                  viewedIndex === currentIndex &&
-                  run?.actions?.setSelection === true}
+                editable={viewedIndex === currentIndex && run?.actions?.setSelection === true}
               />
             {/snippet}
           </StageCard>

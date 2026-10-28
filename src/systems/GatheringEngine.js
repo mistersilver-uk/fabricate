@@ -581,6 +581,7 @@ export class GatheringEngine {
     executionGrant,
     requestId,
     trigger = 'manual',
+    presentTools = null,
   } = {}) {
     const trusted = await this._consumeVersionedGrant(executionGrant, {
       operation: 'execute',
@@ -638,21 +639,9 @@ export class GatheringEngine {
         })
       );
     }
-    // ratchet-exempt(world-scope): not-a-system
-    if (resolvedTools.tools.length > 0) {
-      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
-      const availability = await this._checkTools({
-        actor,
-        viewer,
-        system: resolved.system,
-        environment: resolved.environment,
-        task: resolved.task,
-        tools: resolvedTools.tools, // ratchet-exempt(world-scope): not-a-system
-        presentTools: null,
-      });
-      if (availability.available !== true) {
-        return versionedGatheringFailure('The gathering tools are no longer available.');
-      }
+    const toolContext = { actor, run: resolvedRun, resolved, resolvedTools, presentTools };
+    if (await this._executionToolsMissing(toolContext)) {
+      return versionedGatheringFailure('The gathering tools are no longer available.');
     }
     if (trigger === 'worldTime' && gatheringTaskRequiresPlayerCheck(resolved.task)) {
       return versionedGatheringFailure('This gathering run requires a player check.');
@@ -676,9 +665,26 @@ export class GatheringEngine {
         expectedRevision,
         resolvedCheckResult: trusted.resolvedCheckResult ?? null,
         trigger,
+        presentTools,
       },
     });
     return asVersionedGatheringResult(result);
+  }
+
+  /** Whether a resolving run lacks a Tool, held or supplied by its execute command's station. */
+  async _executionToolsMissing({ actor, run, resolved, resolvedTools, presentTools }) {
+    // ratchet-exempt(world-scope): not-a-system
+    if (resolvedTools.tools.length === 0) return false;
+    const availability = await this._checkTools({
+      actor,
+      viewer: await this._viewerForRun({ actor, run }),
+      system: resolved.system,
+      environment: resolved.environment,
+      task: resolved.task,
+      tools: resolvedTools.tools, // ratchet-exempt(world-scope): not-a-system
+      presentTools,
+    });
+    return availability.available !== true;
   }
 
   async cancelVersionedRun({ actor, runId, expectedRevision, executionGrant, requestId } = {}) {
@@ -1243,8 +1249,7 @@ export class GatheringEngine {
     }
 
     if (hasTimeRequirement(task)) {
-      // Waiting runs mature with no session or canvas tool, so terminal tool effects use no
-      // virtual-present set; this attempt's gate already passed.
+      // Its execute consults and records the station that execute command carries, if any.
       return this._startWaitingAttempt({
         viewer,
         actor: selectedActor,
@@ -1321,6 +1326,8 @@ export class GatheringEngine {
       activeRun,
       versionedContext,
       resolvedCheckResult: versionedContext?.resolvedCheckResult ?? null,
+      // The execute command's station: its Tool consult and evidence only, never persisted.
+      presentTools: versionedContext?.presentTools ?? null,
       phase: maturityCommitPhase(waitingRun),
       initiatedBy: 'timed',
     };
@@ -3354,41 +3361,12 @@ export class GatheringEngine {
     });
   }
 
-  async _persistAndApplyVersionedTerminal({
-    viewer,
-    actor,
-    system,
-    environment,
-    task,
-    outcome,
-    checkResult,
-    plan,
-    runData,
-    payload,
-    activeRun,
-    interactableRef,
-    versionedContext,
-    phase,
-    initiatedBy,
-  }) {
+  async _persistAndApplyVersionedTerminal(context) {
+    const { viewer, actor, environment, task, outcome, checkResult, plan } = context;
+    const { runData, payload, activeRun, versionedContext } = context;
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const state = { run: null, richEvidence: null, complications: [], response: null };
-    const definitions = this._versionedGatheringEffects({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      plan,
-      activeRun,
-      interactableRef,
-      phase,
-      initiatedBy,
-      opaqueBlind,
-      state,
-    });
+    const definitions = this._versionedGatheringEffects({ ...context, opaqueBlind, state });
     const executionPlan = {
       operationId: versionedContext.operationId,
       requestId: versionedContext.requestId,
@@ -3439,6 +3417,19 @@ export class GatheringEngine {
     });
   }
 
+  /** The terminal Tool effect, applied under the station its plan was made with. */
+  _versionedToolsEffect(context) {
+    const { viewer, actor, system, environment, task, outcome, plan, opaqueBlind } = context;
+    const { presentTools = null } = context;
+    const safeTools = opaqueBlind ? [] : (plan.usedTools ?? []);
+    return versionedEffect('tools', 'applyGatheringTools', safeTools, async () => {
+      const tools = { viewer, actor, system, environment, task, outcome, presentTools };
+      const applied = await this._applyTerminalTools(tools);
+      const actual = cloneJson(normalizeList(applied));
+      return opaqueBlind ? { count: actual.length } : actual;
+    });
+  }
+
   _versionedGatheringEffects(context) {
     const {
       viewer,
@@ -3457,7 +3448,6 @@ export class GatheringEngine {
       state,
     } = context;
     const safeResults = opaqueBlind ? [] : plan.createdResults;
-    const safeTools = opaqueBlind ? [] : (plan.usedTools ?? []);
     const effects = [
       versionedEffect('economy', 'commitGatheringEconomy', { phase }, async () => {
         state.richEvidence = await this._commitRichAttempt({
@@ -3499,20 +3489,7 @@ export class GatheringEngine {
         })
       );
     }
-    effects.push(
-      versionedEffect('tools', 'applyGatheringTools', safeTools, async () => {
-        const applied = await this._applyTerminalTools({
-          viewer,
-          actor,
-          system,
-          environment,
-          task,
-          outcome,
-        });
-        const actual = cloneJson(normalizeList(applied));
-        return opaqueBlind ? { count: actual.length } : actual;
-      })
-    );
+    effects.push(this._versionedToolsEffect(context));
     if (outcome.status === 'failed') {
       effects.push(
         versionedEffect('failure', 'applyGatheringFailure', null, async () => {
