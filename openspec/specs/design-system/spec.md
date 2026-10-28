@@ -714,7 +714,7 @@ That is the same `reuse, then extend, then add` order this capability already st
 A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
 Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
 `Kicker` MUST state the UI face itself, as `var(--font-body, var(--font-primary, sans-serif))`, rather than inherit its parent's, so a kicker under a mono evidence band still draws the UI face (issue 2257 D21, with #2312).
-That expression names `--font-primary` only inside a fallback that ends in a literal, so it is not the bare read issue 2312 tracks, and the published manifest's ancestor gate admits it.
+That expression names `--font-primary` only inside a fallback that ends in a literal, so the repo-wide guard in `tests/font-primary-guard.test.js` and the published manifest's ancestor gate both admit it, and the module roots and every component that states the UI face use it.
 
 Where the module sheet must supply a BASELINE for a bare element a component may re-declare, it is written at a specificity deliberately BELOW a Svelte scoped compound's (0,2,0), so the sheet is a floor components override rather than a rule that overrides them; `:where()` is how the scoping is bought without paying specificity for it.
 The same arithmetic runs in the other direction for a module-root rule that must NOT be beaten: a flat `.fabricate a:focus` list is (0,2,1), while the `:is()` form of the same list takes its most specific argument — `[tabindex]`, at (0,3,0) — and would newly outrank every per-component ring in the sheet, so the flat spelling is prescribed rather than stylistic.
@@ -1128,12 +1128,16 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+An element with no role of its own, a `div`, `span` or `p`, MUST NOT carry an `aria-label`, because ARIA 1.2 prohibits naming a generic or paragraph and most screen readers drop the name.
+It takes a role that supports one, `group` for a set of controls or chips and `img` for a chip whose label replaces its text, or its name moves into visually hidden text; `tests/aria-label-generic-elements.test.js` fails a new offender.
+Some sites in oversized files stay listed in that test until the file-size ratchet admits a role line, and the list can only shrink.
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
 A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
 An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
 A bar's reading is its stage's `valueText` where the caller passes a non-empty one and its percentage otherwise: `RunProgress` passes "p%, stage n of m" through the `FABRICATE.Common.StageBars.Position` key for each named stage of several, whose name states no position, and none for an unnamed one, whose label does; `p` is the stage's whole percent, truncated, so a stage short of done never reads 100%.
+A bar's `aria-valuenow` is that same truncated whole percent, whatever the caller passes, so the bars of one group read their percentage alike.
 A named stage's caption is ellipsized on overflow with its stage's name as its `title`, as an entry's time is; the caption stays `aria-hidden`, so the title is a pointer affordance and the bar's own name is what is announced.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
@@ -1437,6 +1441,9 @@ A PASS mark is toned neutral, because the issue vehicle's tone states how much a
 On a tab strip the issue summary MUST be the shared chip primitive at its `inspector` density with `mono`, whatever badge class a caller passes: the mono face at weight 500, because it carries a number a GM compares and the mono face ships no weight above 500 (maintainer ruling 2026-10-14, issue 2464), and the size and box that density's, as the chip's library entry states them.
 The strip has no density of its own and borrows this one for its geometry, because a second pill is a missing density and never a new component.
 No rule in the module sheet names that badge's class, and the strip's record count and dot stay bare `span` elements the tab-strip primitive paints.
+A tab's record count MUST be spoken with what it counts: a `count` mark carries a `name` stating the numeral and its unit, such as "3 linked recipes", and the strip names the tab by joining its label with that phrase, such as "Contents, 3 linked recipes".
+The caller resolves the unit through a plural-aware lang pair and the numeral stays the bare visible mark, so a record count is never left as a bare number in a tab's accessible name.
+Any other named mark on the same tab joins that name, and a tab's own `ariaLabel` still wins.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
@@ -1514,6 +1521,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a tab strip draws an issue summary under any caller's badge class
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
+- **AND** a named record count names its tab with the unit it counts, such as "Contents, 3 linked recipes"
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
 
 #### Scenario: A field draws its caption and its value

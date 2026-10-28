@@ -141,7 +141,7 @@ export function overlaysOpenedFrom(root) {
  */
 const ON_STANDALONE_LAYER = Object.freeze({
   pointerEvents: 'auto',
-  fontFamily: 'var(--font-primary)',
+  fontFamily: 'var(--font-body, var(--font-primary, sans-serif))',
   fontSize: 'var(--font-size-14)',
 });
 

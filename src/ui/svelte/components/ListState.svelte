@@ -152,7 +152,7 @@
 
   .fabricate-list-state-bar.is-name {
     width: 40%;
-    font-family: var(--font-primary, sans-serif);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 12px;
   }
 

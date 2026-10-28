@@ -228,7 +228,7 @@
     border: none;
     color: var(--fab-text);
     background: transparent;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11.5px;
     font-weight: 500;
   }
@@ -239,7 +239,7 @@
     border: 0;
     color: var(--fab-text-subtle);
     background: none;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 600;
   }
@@ -301,7 +301,7 @@
   .manager-party-add-name {
     overflow: hidden;
     color: var(--fab-text);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11.5px;
     font-weight: 500;
     text-overflow: ellipsis;
@@ -311,7 +311,7 @@
   .manager-party-add-meta {
     overflow: hidden;
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 9.5px;
     font-weight: 400;
     text-overflow: ellipsis;

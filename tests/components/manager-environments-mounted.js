@@ -3312,6 +3312,13 @@ export function registerEnvironmentsCases() {
       'force-included and not-matching included events should count, library-disabled event should not'
     );
     assert.deepEqual(
+      ['tasks', 'events'].map((id) =>
+        target.querySelector(`[data-environment-tab-button="${id}"]`).getAttribute('aria-label')
+      ),
+      ['Tasks, 1 task', 'Events, 2 events'],
+      'each count tab is spoken with the unit its numeral counts'
+    );
+    assert.deepEqual(
       validationBadges.map((node) => node.textContent.trim()),
       ['2', '4'],
       // TWO blocking, not three (issue #1315).

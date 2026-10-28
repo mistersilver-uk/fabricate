@@ -27,7 +27,8 @@
 
       /* Arial, so every text-derived box reproduces on a runner without Foundry's licensed face. */
       body {
-        font-family: Arial, sans-serif;
+        --font-body: Arial, sans-serif;
+        font-family: var(--font-body);
       }
 
       .fabricate-manager {

@@ -2760,14 +2760,15 @@ describe('each entry matches its component declaration', () => {
     'var(--font-primary)',
     'var(--font-primary, )',
     'var(--font-primary, var(--x))',
+    'var(--font-primary, sans-serif)',
     'var(--font-body, var(--font-primary))',
   ]) {
-    it(`refuses ${value}, which can go invalid with no Foundry variable`, () => {
+    it(`refuses ${value}, which is not the literal-ended fallback of a --font-body read`, () => {
       assert.deepEqual(faceRule(value), ['unguarded var(--font-primary)']);
     });
   }
 
-  it('admits a --font-primary read whose fallback ends in a literal', () => {
+  it('admits a --font-primary read only as the literal-ended fallback of a --font-body read', () => {
     assert.deepEqual(faceRule('var(--font-body, var(--font-primary, sans-serif))'), []);
   });
 

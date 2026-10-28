@@ -124,7 +124,7 @@
 
   .alchemy-chooser-heading {
     margin: 0;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 21px;
     font-weight: 600;
     line-height: 1.2;

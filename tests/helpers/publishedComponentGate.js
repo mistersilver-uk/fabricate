@@ -13,6 +13,7 @@ import { posix, resolve } from 'node:path';
 import { stylesheetSources } from '../../scripts/lib/stylesheetSource.js';
 
 import { templateOf } from './apiConvention.js';
+import { unguardedFontPrimaryReads } from './fontPrimaryReads.js';
 import {
   identifierNames,
   importedModules,
@@ -1206,8 +1207,6 @@ const APP_TOKENS = ['var(--fab-manager-'];
 /** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
 const MANAGER_ROOTS = new Set(['fabricate-manager']);
 const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
-// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
-const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
 export const FOUNDRY_GLOBALS = [
   'game',
   'foundry',
@@ -1242,7 +1241,7 @@ export function ancestorDependencies(ast, root = 'any') {
     if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
     if (node.type !== 'Declaration') continue;
     for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
-    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
+    if (unguardedFontPrimaryReads(node.value).length > 0) {
       found.add('unguarded var(--font-primary)');
     }
   }

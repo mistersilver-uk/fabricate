@@ -135,7 +135,7 @@ const DENSE_CSS = [
   '  min-width: 0;',
   '  flex: 1 1 auto;',
   '  color: var(--fab-text);',
-  '  font-family: var(--font-primary, sans-serif);',
+  '  font-family: var(--font-body, var(--font-primary, sans-serif));',
   '  font-size: 12px;',
   '  font-weight: 600;',
   '  overflow-wrap: anywhere;',

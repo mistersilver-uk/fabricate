@@ -314,7 +314,7 @@
   .manager-travel-popover-title {
     min-width: 0;
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -464,7 +464,7 @@
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option {
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11.5px;
     font-weight: 500;
   }

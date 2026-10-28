@@ -378,7 +378,7 @@
 
   .crafting-settings-section-title {
     margin: 0;
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 1rem;
     font-weight: 600;
     color: var(--fab-text);

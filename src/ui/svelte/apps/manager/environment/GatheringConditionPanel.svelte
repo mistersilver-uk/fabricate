@@ -285,6 +285,7 @@
 
   <div
     class={['manager-condition-pill-list', isTimeOfDay && 'is-time-of-day']}
+    role="group"
     aria-label={text('FABRICATE.Admin.Manager.Environment.Conditions.Values', 'Condition values')}
   >
     {#each conditionValues(setting) as option (conditionId(option))}
