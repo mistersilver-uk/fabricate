@@ -115,6 +115,13 @@
     outline-offset: 2px;
   }
 
+  /* The module focus ring repeats the pressed outline, so keyboard focus on a pressed tile thickens it
+     to a 4px band hugging the tile; it stays inside the 4px caption gap. */
+  .fab-slot-tile.is-selected:focus-visible {
+    outline-width: 4px;
+    outline-offset: 0;
+  }
+
   .fab-slot-tick {
     position: absolute;
     right: -5px;

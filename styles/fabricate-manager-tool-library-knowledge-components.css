@@ -2290,11 +2290,12 @@
   list-style: none;
 }
 
-/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. */
+/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. `margin: 0` resets Foundry's `ul li` margin, so the list's `gap` is the only row spacing. */
 .fabricate-sortable-list-row {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  margin: 0;
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-1);

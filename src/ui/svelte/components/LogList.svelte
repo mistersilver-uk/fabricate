@@ -130,6 +130,12 @@
     border-color: var(--fab-danger-border);
   }
 
+  /* A hovered failed entry deepens its danger ground toward the opaque danger, so it rises a visible
+     step and keeps its hue; mixing toward a translucent ground would lower the alpha instead. */
+  .fab-log-list-entry.is-danger.is-open:not(.is-selected):hover {
+    background: color-mix(in srgb, var(--fab-danger-soft) 90%, var(--fab-danger));
+  }
+
   .fab-log-list-entry.is-selected {
     border-color: var(--fab-accent-border);
   }

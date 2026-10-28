@@ -1416,6 +1416,12 @@ const STATE_TINTS = Object.freeze([
     '`is-open` marks an entry that opens, not an open one, so this is its hover raise',
   ],
   [
+    `${COMPONENTS}/LogList.svelte`,
+    '.fab-log-list-entry.is-danger.is-open:not(.is-selected):hover',
+    'color-mix(in srgb, var(--fab-danger-soft) 90%, var(--fab-danger))',
+    'a failed entry’s own danger face, raised on hover: the neutral raise would drop its hue',
+  ],
+  [
     MODULE_SHEET,
     '.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on',
     'var(--fab-accent-soft)',

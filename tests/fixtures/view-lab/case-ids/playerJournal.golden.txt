@@ -31,6 +31,7 @@ fabricate-journal-lifecycle-legacy-armed
 fabricate-journal-lifecycle-waiting-auto-eligible
 fabricate-journal-lifecycle-waiting-auto-completes
 fabricate-journal-lifecycle-waiting-open-choice
+fabricate-journal-lifecycle-open-choice-focused
 fabricate-journal-lifecycle-stage-not-started
 fabricate-journal-lifecycle-awaiting-choice
 fabricate-journal-lifecycle-stage-consumed
