@@ -482,7 +482,6 @@ Core's document-level click listeners read `event.target.closest(...)` and are n
 - **`--font-primary` is declared only under `body.game .app`, the ApplicationV1 root, in Foundry 13.351 and 14.365; the face an ApplicationV2 window inherits is `--font-body` on `body`.**
 No Fabricate window carries `.app`, so `var(--font-primary)` with no fallback is invalid at computed-value time there and the element inherits `body`'s `font-family: var(--font-body)`.
 `var(--font-primary, sans-serif)` is worse: the fallback applies and the text computes the generic `sans-serif`, not Signika.
-So the module states its face as `var(--font-body, var(--font-primary, sans-serif))` everywhere, and `tests/font-primary-guard.test.js` fails any other `--font-primary` read (issue 2312).
 A published component may render under no Fabricate ancestor, so it reads the face as `var(--font-body, var(--font-primary, sans-serif))` or inherits (`public/css/foundry2.css` lines 61 and 132, both versions; `--font-body` on `body` at 13.351:245–248 and 14.365:262–265; issue 2451).
 - **Foundry core ships no live region and no `.visually-hidden` class.**
 A grep of the core `client/` files and templates finds no `aria-live`, `aria-atomic`, or `status`, `alert` or `log` role, and `ui.notifications` is a bare `<ol>` (`client/applications/ui/notifications.mjs`, V13.351 and V14.365).
