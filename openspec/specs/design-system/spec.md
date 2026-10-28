@@ -1128,6 +1128,9 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+An element with no role of its own, a `div`, `span` or `p`, MUST NOT carry an `aria-label`, because ARIA 1.2 prohibits naming a generic or paragraph and most screen readers drop the name.
+It takes a role that supports one, `group` for a set of controls or chips and `img` for a chip whose label replaces its text, or its name moves into visually hidden text; `tests/aria-label-generic-elements.test.js` fails a new offender.
+Six sites in five oversized files stay listed in that test until the file-size ratchet admits a role line, and the list can only shrink.
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.

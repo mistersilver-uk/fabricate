@@ -367,6 +367,7 @@
     </ol>
     <div
       class="manager-setup-links"
+      role="group"
       aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
     >
       <Button

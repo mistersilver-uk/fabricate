@@ -94,6 +94,7 @@
             <span
               class="crafting-step-duration"
               data-recipe-step-duration
+              role="img"
               title={durationTitle}
               aria-label={`${durationTitle}: ${formatTimeRequirementCompact(step.duration)}`}
             >
