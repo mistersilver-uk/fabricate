@@ -234,7 +234,7 @@ export function holderKeyIntent(event, context = {}) {
 const TAB_STOP = 'input, button, textarea, select, [href], [tabindex]';
 
 /** The panel's tab stops in document order: enabled, not hidden, not inert, not `tabindex="-1"`. */
-export function panelTabStops(panel) {
+function panelTabStops(panel) {
   return [...(panel?.querySelectorAll?.(TAB_STOP) ?? [])].filter(
     (stop) =>
       stop.tabIndex >= 0 && !stop.disabled && stop.type !== 'hidden' && !stop.closest('[inert]')
@@ -242,7 +242,7 @@ export function panelTabStops(panel) {
 }
 
 /** Whether the key is Tab or Shift+Tab with no other modifier, outside a composition. */
-export function plainTab(event) {
+function plainTab(event) {
   return (
     event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing
   );
