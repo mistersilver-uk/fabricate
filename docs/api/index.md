@@ -60,7 +60,7 @@ game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering list
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
 game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
 game.fabricate.listAlchemyForActor({ actorId, craftingSystemId }) // Leak-safe player alchemy listing
-game.fabricate.submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds }) // Brew an alchemy attempt
+game.fabricate.submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, presentTools }) // Brew an alchemy attempt
 game.fabricate.getSelectedAlchemySystemId() // Persisted last-selected alchemy system id
 game.fabricate.setSelectedAlchemySystemId(id) // Persist the last-selected alchemy system id
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
@@ -256,7 +256,7 @@ Hooks.once('fabricate.ready', async () => {
   It is owner-scoped through the same gate as crafting, so a non-owner viewer receives a denied, empty listing rather than another user's inventory or fizzle memory.
   A GM sees every enabled recipe as known.
   `actorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
-- `submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, componentSourceActorIds, interactive })` brews the submitted components as an attempt for the resolved actor.
+- `submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, componentSourceActorIds, interactive, presentTools })` brews the submitted components as an attempt for the resolved actor.
   It is owner-scoped like `listAlchemyForActor` and delegates to the authoritative engine, which matches the submission against all enabled recipes in the system, known and undiscovered alike.
   On a match the recipe is discovered when Learn on Craft is on, and every submitted unit is spent when the brew starts, drawn only from the submitted items.
   A matched brew that can resolve now resolves in this call through `executePublicBrew`, as `craftRecipe` does through `executePublicCraft`; a time-gated brew starts and returns the run for later completion in the Journal.
@@ -268,6 +268,7 @@ Hooks.once('fabricate.ready', async () => {
   The reply carries `disposition: 'failed'`, with `createdResultUuids` listing any awarded items.
   Otherwise the attempt fizzles with no check and no roll, consuming the components only when the system's Consume on Fail setting is on.
   `interactive` prompts a roll on a matched brew in `simple` or `tiered` check mode, and defaults to `false` for macros and automation, so it never triggers a roll on the fizzle path.
+  `presentTools` is the optional station payload described for `hydrateCraftingRecipe`, so a matched recipe's Tool supplied by the station counts as present for the brew's start and its same-call execute, as for `craftRecipe`; a time-gated brew needs the station again when it is resolved from the Journal, because a crafting Journal command carries the station.
 - `getSelectedAlchemySystemId()` reads the persisted last-selected alchemy system from the `fabricate.lastAlchemySystem` client setting, returning `''` when unset.
 - `setSelectedAlchemySystemId(id)` persists the selection to that same client setting.
 

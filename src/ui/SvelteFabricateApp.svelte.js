@@ -279,7 +279,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       evaluateSelectedSet: (opts = {}) =>
         game?.fabricate?.evaluateSelectedSet?.(withStation(opts)) ?? null,
       listAlchemyForActor: (opts = {}) => game?.fabricate?.listAlchemyForActor?.(opts) ?? null,
-      submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(opts) ?? null,
+      submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(withStation(opts)) ?? null,
       getSelectedAlchemySystemId: () => game?.fabricate?.getSelectedAlchemySystemId?.() ?? '',
       setSelectedAlchemySystemId: (id) => game?.fabricate?.setSelectedAlchemySystemId?.(id),
       listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],

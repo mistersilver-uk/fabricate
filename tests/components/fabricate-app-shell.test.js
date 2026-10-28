@@ -416,6 +416,7 @@ describe('SvelteFabricateApp shell window', () => {
           'craftRecipe',
           'advanceCraftingRun',
           'listJournalForActor',
+          'submitAlchemyAttempt',
         ];
         const received = {};
         for (const seam of [...seams, 'executeJournalRunCommand']) {

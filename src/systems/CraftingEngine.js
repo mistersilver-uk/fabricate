@@ -3892,6 +3892,7 @@ export class CraftingEngine {
           componentId: entry?.componentId ?? null,
         })),
         completionMode: options?.completionMode || 'manual',
+        presentTools: options?.presentTools,
       });
     }
     if (!craftingActor) {
@@ -4011,8 +4012,7 @@ export class CraftingEngine {
       };
     }
 
-    const recipe = matchResult.recipe;
-    const ingredientSetId = matchResult.ingredientSetId;
+    const { recipe, ingredientSetId } = matchResult;
     return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
       ...options,
       isAlchemyAttempt: true,
