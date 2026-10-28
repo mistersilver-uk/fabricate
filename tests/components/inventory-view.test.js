@@ -2306,8 +2306,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     target.querySelectorAll(MOVE_DOWN)[0].click();
     await settle();
     assert.deepEqual(
-      calls.reorder.map(([index, target, sentence]) => [index, target, sentence ?? '']),
-      [[0, 1, '']],
+      calls.reorder,
+      [[0, 1]],
       'from index 0 to index 1, and no sentence: the list speaks its own move'
     );
 
