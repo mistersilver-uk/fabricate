@@ -120,47 +120,34 @@ test('the outcome-tier fact carries the authored count, not a literal placeholde
   assert.equal(outcomes.data.count, '5');
 });
 
-test("gathering's routed mode is dormant and reuses the shipped dormancy sentence", () => {
-  const routed = describeCheckMode({ activity: 'gathering', mode: 'routed' });
-  const progressive = describeCheckMode({ activity: 'gathering', mode: 'progressive' });
-  for (const described of [routed, progressive]) {
-    assert.equal(described.dormant, true, `${described.key} is presented as a live mode`);
-    assert.equal(
-      described.body.key,
-      'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-      'the dormancy sentence must be the one the Modifiers section already ships, not a ' +
-        'second vocabulary for the same fact'
-    );
-    // The sentence states the shipped behaviour (Check gathering rolls; Progressive is legacy)
-    // and must not name an internal issue: a tracker reference does not belong on the screen.
-    assert.match(described.body.fallback, /Check gathering rolls a formula/);
-    assert.match(described.body.fallback, /Progressive is a legacy mode/);
-    assert.doesNotMatch(described.body.fallback, /not available yet|ship/i);
+test("gathering's routed and progressive modes are live and state their own behaviour", () => {
+  for (const mode of ['routed', 'progressive']) {
+    const described = describeCheckMode({ activity: 'gathering', mode });
+    assert.match(described.body.key, /\.Checks\.Mode\.Gathering(Routed|Progressive)Body$/);
     assert.doesNotMatch(
       described.body.fallback,
-      /\bissues?\s+\d+/i,
-      'user-facing copy must not name an internal issue number'
+      /not available yet|ship|these modifiers|\bissues?\s+\d+/i,
+      'the body stands alone and names no internal issue'
     );
+    assert.notEqual(described.icon, 'fas fa-clock', `${described.key} is not presented as pending`);
     const check = described.facts.find((entry) => entry.id === 'check');
-    assert.equal(
-      check.value.key,
-      'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantHeading'
-    );
-    assert.equal(check.value.fallback, 'Not in use yet');
+    assert.equal(check.value.fallback, 'Required');
   }
+  assert.match(
+    describeCheckMode({ activity: 'gathering', mode: 'progressive' }).body.fallback,
+    /Progressive is a legacy mode/
+  );
 });
 
-test('no crafting or salvage mode is marked dormant', () => {
+test('no mode reports a dormant state', () => {
   for (const [activity, mode, alchemyCheckMode] of REACHABLE) {
-    if (activity === 'gathering') continue;
     const described = describeCheckMode({ activity, mode, alchemyCheckMode });
-    assert.equal(described.dormant, false, `${described.key} must be a live configuration`);
+    assert.ok(!Object.hasOwn(described, 'dormant'), `${described.key} carries a dormant flag`);
   }
 });
 
 test('gathering d100 is live, and says the roll is not authored here', () => {
   const described = describeCheckMode({ activity: 'gathering', mode: 'd100' });
-  assert.equal(described.dormant, false);
   const check = described.facts.find((entry) => entry.id === 'check');
   assert.equal(check.value.fallback, 'Fixed d100');
 });

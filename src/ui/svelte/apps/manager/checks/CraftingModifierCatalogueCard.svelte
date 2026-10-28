@@ -52,8 +52,8 @@
     // Why the catalogue reaches no roll, or '' when it does; each cause needs a different remedy,
     // so it is passed rather than derived from one boolean.
     inertCause = '',
-    // Whether the check-modifier seam is DORMANT: its own notice, ALONGSIDE `inertCause`, the
-    // two being different facts with different fixes.
+    // Whether to state which gathering modes take check modifiers: its own notice, alongside
+    // `inertCause`, the two being different facts with different fixes.
     dormant = false,
     // Navigate to the surface that authors the library; a null default keeps this mountable.
     onEditLibrary = null,
@@ -213,7 +213,7 @@
     noModifierSupport: {
       key: 'FABRICATE.Admin.Manager.Checks.Gathering.ModifierInertNoModifierSupport',
       fallback:
-        'The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so nothing selected here changes it.',
+        'The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so nothing selected here changes it.',
     },
   };
 
@@ -358,19 +358,19 @@
       <p class="manager-muted" data-gathering-modifier-disambiguation>
         {text(
           'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDisambiguation',
-          'These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.'
+          'These are check modifiers: they add to a rolled gathering formula in Check resolution (and legacy Progressive). They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.'
         )}
       </p>
     {/if}
 
     {#if dormant}
       <p class="manager-modifier-inert" role="note" data-check-modifier-dormant>
-        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
         <span>
           <strong
             >{text(
               'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantHeading',
-              'Not in use yet'
+              'Applies to Check gathering'
             )}</strong
           >
           {text(

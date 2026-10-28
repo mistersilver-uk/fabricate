@@ -1,32 +1,17 @@
 /**
- * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data — a callout naming the
- * mode, one paragraph on what it does with a roll, and three facts. PURE and covering EVERY
- * mode, so `tests/check-mode-callout.test.js` proves exhaustiveness BOTH ways.
+ * The Checks Studio's per-mode explanation, as data: a callout naming the mode, one paragraph on
+ * what it does with a roll, and three facts. Pure, and covering every mode, so
+ * `tests/check-mode-callout.test.js` proves exhaustiveness both ways.
  *
- * ALCHEMY HAS TWO ENTRIES, NOT THREE: there is no `crafting:none`, alchemy at
- * `checkMode: 'none'` being the OFF state of an optional check, so `checkModeKey` returns `''`.
- * Its SIMPLE check states `check:optional` unlike its tiered sibling.
+ * Alchemy has two entries, not three: there is no `crafting:none`, alchemy at `checkMode: 'none'`
+ * being the off state of an optional check, so `checkModeKey` returns `''`.
+ * Its simple check states `check:optional` unlike its tiered sibling.
  *
- * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL: SonarCloud's CPD
- * measures new-code density over the lines a PR touches, so ANY edit there lands at 100%
- * duplicated — which is why this rationale is in the header. GATHERING'S ROUTED AND PROGRESSIVE
- * MODES ARE DORMANT but REACHABLE, so the framing is the Modifiers section's own, VERBATIM. */
+ * The `MODES` table is one copy-paste block, so keep edits inside it small: SonarCloud's CPD
+ * measures new-code density over the lines a PR touches.
+ */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
-
-/** The shipped gathering dormancy sentence, reused rather than re-worded. */
-const GATHERING_DORMANT_BODY = [
-  'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-  'Check gathering rolls a formula, so these modifiers add to its roll. A d100 task rolls ' +
-    'no formula and takes none, and Progressive is a legacy mode that is not offered for ' +
-    'new tasks.',
-];
-
-/** The shipped gathering dormancy heading, used as this callout's `Check` fact value. */
-const GATHERING_DORMANT_STATE = [
-  'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantHeading',
-  'Not in use yet',
-];
 
 const FACT_ICONS = Object.freeze({
   check: 'fas fa-dice-d20',
@@ -40,12 +25,9 @@ const FACT_LABELS = Object.freeze({
   results: ['Results', 'Results'],
 });
 
-/**
- * Resolve a `[key, fallback]` pair to a localization key; one already containing a `.` is
- * ABSOLUTE and used verbatim, which is how a sentence shipped under another namespace is reused
- * rather than re-authored under a second key that would drift from it. */
+/** Resolve a `[key, fallback]` pair to its localization key under the mode namespace. */
 function copy(pair) {
-  return { key: pair[0].includes('.') ? pair[0] : `${NAMESPACE}${pair[0]}`, fallback: pair[1] };
+  return { key: `${NAMESPACE}${pair[0]}`, fallback: pair[1] };
 }
 
 function fact(id, value) {
@@ -168,20 +150,25 @@ const MODES = Object.freeze({
     ],
     facts: ['check:fixedD100', 'outcomes:perDrop', 'results:perDrop'],
   },
-  // DORMANT. See the module note: the framing is the Modifiers section's, verbatim.
   'gathering:routed': {
-    icon: 'fas fa-clock',
-    dormant: true,
+    icon: 'fas fa-dice-d20',
     title: ['RoutedByCheck', 'Routed by check'],
-    body: GATHERING_DORMANT_BODY,
-    facts: ['check:dormant', 'outcomes:tiers', 'results:tiers'],
+    body: [
+      'GatheringRoutedBody',
+      'One roll is rolled once and mapped onto a band. Each band is a named tier, and a ' +
+        'task’s result set named after a tier is produced for it.',
+    ],
+    facts: ['check:required', 'outcomes:tiers', 'results:tiers'],
   },
   'gathering:progressive': {
-    icon: 'fas fa-clock',
-    dormant: true,
+    icon: 'fas fa-stairs',
     title: ['Progressive', 'Progressive'],
-    body: GATHERING_DORMANT_BODY,
-    facts: ['check:dormant', 'outcomes:ordered', 'results:spent'],
+    body: [
+      'GatheringProgressiveBody',
+      'The roll produces a value rather than a verdict, and that value is spent down the ' +
+        'system’s gathering results. Progressive is a legacy mode that is not offered for new tasks.',
+    ],
+    facts: ['check:required', 'outcomes:ordered', 'results:spent'],
   },
 });
 
@@ -189,7 +176,6 @@ const FACT_VALUES = Object.freeze({
   'check:required': REQUIRED,
   'check:optional': OPTIONAL,
   'check:fixedD100': FIXED_D100,
-  'check:dormant': GATHERING_DORMANT_STATE,
   'outcomes:tiers': ['OutcomesTiers', '{count} tiers'],
   'outcomes:passFail': ['OutcomesPassFail', 'Pass or fail'],
   'outcomes:ordered': ['OutcomesOrdered', 'An ordered list'],
@@ -235,7 +221,7 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
  * @param {string} args.mode The authored resolution mode.
  * @param {string} [args.alchemyCheckMode] The alchemy check mode, when `mode` is `alchemy`.
  * @param {number} [args.outcomeCount] Authored outcome tiers, for the `{count} tiers` fact.
- * @returns {{key: string, icon: string, dormant: boolean, title: object, body: object,
+ * @returns {{key: string, icon: string, title: object, body: object,
  *   facts: object[]}|null}
  */
 export function describeCheckMode({
@@ -250,7 +236,6 @@ export function describeCheckMode({
   return {
     key,
     icon: entry.icon,
-    dormant: entry.dormant === true,
     title: copy(entry.title),
     body: copy(entry.body),
     facts: entry.facts.map((token) => ({

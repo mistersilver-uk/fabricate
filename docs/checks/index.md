@@ -343,8 +343,8 @@ When any of those is not true, for example a system with only one eligible modif
 A bulk salvage is one of those cases.
 Its single batch prompt never asks for modifiers, so every roll in the batch applies that same best selection.
 
-**Crafting and salvage prompt, and gathering does not yet.**
-A gathering check under **Player picks** still applies the best selection the player could legally have made, and gains its prompt when progressive and routed gathering ship.
+**Crafting and salvage prompt, and gathering does not.**
+A gathering check under **Player picks** applies the best selection the player could legally have made and does not prompt for one.
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon and label.
 A modifier that works out to a plain number shows that number.

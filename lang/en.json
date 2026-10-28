@@ -6860,10 +6860,10 @@
             "D100Title": "Fixed d100 roll",
             "D100Lead": "In d100 mode the gathering check is a fixed d100 roll against each drop's chance. There is nothing to configure here.",
             "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
-            "ModifierDisambiguation": "These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.",
-            "ModifierDormantHeading": "Not in use yet",
+            "ModifierDisambiguation": "These are check modifiers: they add to a rolled gathering formula in Check resolution (and legacy Progressive). They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.",
+            "ModifierDormantHeading": "Applies to Check gathering",
             "ModifierDormantBody": "Check gathering rolls a formula, so these modifiers add to its roll. A d100 task rolls no formula and takes none, and Progressive is a legacy mode that is not offered for new tasks.",
-            "ModifierInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so nothing selected here changes it."
+            "ModifierInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers, so nothing selected here changes it."
           },
           "Validation": {
             "EmptyTitle": "Nothing to validate yet",
@@ -7619,6 +7619,8 @@
             "SalvageSimpleBody": "One roll is measured against the difficulty. A cleared roll returns the item’s salvage results, and a missed one returns nothing.",
             "SalvageProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the item’s ordered salvage results until it runs out.",
             "GatheringD100": "d100 roll",
+            "GatheringRoutedBody": "One roll is rolled once and mapped onto a band. Each band is a named tier, and a task’s result set named after a tier is produced for it.",
+            "GatheringProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the system’s gathering results. Progressive is a legacy mode that is not offered for new tasks.",
             "GatheringD100Body": "Each drop is rolled against its own percentage chance. There is no formula and no difficulty to author here — per-task tuning adjusts the chance, not the roll."
           },
           "RecordNoun": {
