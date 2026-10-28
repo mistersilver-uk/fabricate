@@ -1,6 +1,6 @@
 /**
- * Internals shared by `GatheringRichStateService`, `GatheringStaminaService` and
- * `GatheringNodeService`, defined once so the three cannot drift.
+ * Internals shared by `GatheringRichStateService`, `GatheringStaminaService`,
+ * `GatheringNodeService` and the Journal's d100 preview, defined once so they cannot drift.
  */
 
 import { cloneJson } from '../utils/scalars.js';
@@ -25,6 +25,11 @@ export function nonNegativeNumber(value, fallback = 0) {
 export function nonNegativeInteger(value, fallback = 0) {
   const number = Number(value);
   return Number.isInteger(number) && number >= 0 ? number : Number(fallback || 0);
+}
+
+/** The least effective d100 roll a row with this final chance drops on; the preview states it too. */
+export function dropThreshold(finalDropRate) {
+  return 101 - finalDropRate;
 }
 
 /** A deep clone of the actor's gathering state, or `{}`; never throws. */

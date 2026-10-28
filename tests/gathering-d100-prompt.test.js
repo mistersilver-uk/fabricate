@@ -1045,6 +1045,35 @@ test('a timed d100 run collected manually opens no prompt', async () => {
   assert.deepEqual(world.tokenStatuses(), []);
 });
 
+test('an active d100 run records no roll while it waits, prompts or is dismissed (issue 2324)', async () => {
+  stubDice({ faces: [50] });
+  const recorded = (world, run) => world.actor.getFlag('fabricate', 'gatheringRuns').active[run.id];
+  const firstActive = (world) => world.runManager.getActiveRuns(world.actor)[0];
+
+  const timed = commandWorld({ fixture: herbFixture({ timeRequirement: { minutes: 1 } }) });
+  await timed.gather();
+  timed.clock.worldTime += 120;
+  const waiting = firstActive(timed);
+  assert.ok(waiting.timeGate, 'a timed run waits on its time gate');
+  assert.equal(recorded(timed, waiting).checkResult, undefined, 'a ready timed run has no roll');
+
+  let atPrompt;
+  const untimed = commandWorld({
+    answer: async (_descriptor, { world }) => {
+      atPrompt = recorded(world, firstActive(world));
+      return { confirmed: false };
+    },
+  });
+  await untimed.gather();
+  assert.ok(atPrompt, 'the prompt opened against an active run');
+  assert.equal(atPrompt.checkResult, undefined, 'the prompt precedes any roll');
+  assert.equal(
+    recorded(untimed, firstActive(untimed)).checkResult,
+    undefined,
+    'a dismissed prompt leaves a ready run with no roll'
+  );
+});
+
 test('offersD100Prompt keys on the run, not the live task', async () => {
   const { offersD100Prompt } = await loadD100Check();
   const task = { resolutionMode: 'd100', timeRequirement: null };
