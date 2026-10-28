@@ -140,7 +140,7 @@ test('enabled survives normalization when at least one result group exists', () 
 // updateItem's shallow spread — the Scope-out assertion the delta requires
 
 test('a save payload that omits category preserves it (the REAL updateItem)', async () => {
-  // A component-editor draft (`saveComponentEditorDraft`) does not author `category`; it stays
+  // `ComponentEditView`'s save payload (`buildUpdates`) does not author `category`; it stays
   // safe only because `updateItem` spreads `{...existing, ...updates}`, so an omitted key survives.
   const manager = makeLoadedManager([
     {
