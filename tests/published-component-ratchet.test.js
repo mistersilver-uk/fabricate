@@ -811,6 +811,104 @@ describe('the per-item spreads of a published closure', () => {
     }
   });
 
+  describe('fails closed on an alias of a value the tracer cannot name (issue 2607)', () => {
+    const UNNAMED = 'src/Fx.svelte: a spread of an item the entry does not publish';
+    const IN_ROW = 'src/Row.svelte: a spread of an item the entry does not publish';
+    const row = {
+      'src/Row.svelte': COMPONENT(
+        'let { item } = $props(); const attrs = $derived(item.props);',
+        '<i {...attrs}></i>'
+      ),
+    };
+    const script = `import Row from './Row.svelte'; ${PROPS}`;
+    const each = (tag) => `{#each items as item}${tag}{/each}`;
+
+    const drawn = {
+      'a child drawn through svelte:component': [
+        script,
+        each('<svelte:component this={Row} {item} />'),
+      ],
+      'a child drawn through an {@const} alias': [script, each('{@const C = Row}<C {item} />')],
+      'an item of a derived collection': [
+        `${script} const sorted = $derived(items.toSorted((a, b) => a.n - b.n));`,
+        '{#each sorted as s}<Row item={s} />{/each}',
+      ],
+      'an item picked by index': [script, '<Row item={items[0]} />'],
+    };
+    for (const [shape, [code, body]] of Object.entries(drawn)) {
+      it(`an alias of a prop passed ${shape}`, () => {
+        assert.deepEqual(idsOf(code, body, row), [IN_ROW]);
+      });
+    }
+
+    it('an alias of a let that holds an item', () => {
+      const code = `${PROPS} let sel = $state(items[0]); const shown = $derived(sel);`;
+      assert.deepEqual(idsOf(code, '<i {...shown.props}></i>'), [UNNAMED]);
+      assert.deepEqual(idsOf(code, '<i {...sel.props}></i>'), [UNNAMED], 'as the let itself does');
+    });
+
+    it('an alias of an object literal that spreads an item', () => {
+      const code = `${PROPS} const merged = { ...items[0] }; const again = merged;`;
+      assert.deepEqual(idsOf(code, '<i {...again}></i>'), [UNNAMED]);
+    });
+
+    it('but not an alias of an imported call, a constant or a text prop', () => {
+      const make = { 'src/make.js': 'export const make = (value) => ({ value });' };
+      const code = `import { make } from './make.js'; ${PROPS} const k = 5;`;
+      for (const alias of [
+        'const a = $derived(make(tone)); const b = a;',
+        'const b = $derived(make(k));',
+        'const a = $derived(tone); const b = $derived(a + k);',
+      ]) {
+        assert.deepEqual(idsOf(`${code} ${alias}`, '<i {...b}></i>', make), [], alias);
+      }
+    });
+
+    it('a mapped literal binds its parameter like an {#each} context, whatever the name shadows', () => {
+      const code = (name) =>
+        `let { items = [], tone = '', hook = '', ...rest } = $props(); const k = 1; ` +
+        `const copies = $derived(items.map((${name}) => ({ ...${name} })));`;
+      for (const name of ['tone', 'hook', 'k', 'rest', 'copies']) {
+        assert.deepEqual(idsOf(code(name), '<i {...copies[0]}></i>'), [UNNAMED], name);
+      }
+    });
+  });
+
+  describe('records the shapes the item-spread gate does not trace (issue 2607)', () => {
+    const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
+
+    it('passes a derived value that reads the items only through a script function', () => {
+      const code = `${PROPS} function pick() { return items[0]; } const first = $derived(pick());`;
+      assert.deepEqual(idsOf(code, '<i {...first.props}></i>'), []);
+    });
+
+    it('passes a snippet a child forwards through its rest props', () => {
+      const files = {
+        'src/List.svelte': COMPONENT(
+          "import Inner from './Inner.svelte'; let { items, ...rest } = $props();",
+          '<Inner {items} {...rest} />'
+        ),
+        'src/Inner.svelte': COMPONENT(
+          'let { items, row } = $props();',
+          '{#each items as it}{@render row(it)}{/each}'
+        ),
+      };
+      const body = SNIPPET + '{@render row(1)}<List {items} {row} />';
+      assert.deepEqual(idsOf(`import List from './List.svelte'; ${PROPS}`, body, files), []);
+    });
+
+    it('passes a child a script module also draws, which no component tag reads', () => {
+      const files = {
+        'src/Row.svelte': COMPONENT('let { item } = $props();', '<i {...item.props}></i>'),
+        'src/registry.js': "import Row from './Row.svelte'; export const registry = { Row };",
+      };
+      const code = `import Row from './Row.svelte'; import { registry } from './registry.js'; ${PROPS}`;
+      const body =
+        '<Row item={tone} />{#each items as item}<svelte:component this={registry.Row} {item} />{/each}';
+      assert.deepEqual(idsOf(code, body, files), []);
+    });
+  });
+
   describe('fails closed on a snippet that goes anywhere but a render (issue 2607)', () => {
     const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
     const UNNAMED = 'src/Fx.svelte: a spread of an item the entry does not publish';

@@ -120,13 +120,28 @@ function candidatePaths(rows) {
 const astOf = (file, reader) =>
   isComponent(file) ? reader.component(file) : reader.module(file).ast;
 
-const namesHostResolver = (node) =>
-  (node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost') ||
-  (node.type === 'ExportNamedDeclaration' &&
-    Boolean(node.source) &&
-    node.specifiers.some((specifier) => specifier.local?.name === 'resolveOverlayHost'));
+const HOST_RESOLVER = 'resolveOverlayHost';
+const keyName = (key) => key?.name ?? key?.value;
 
-/** The files of a closure that import or re-export `resolveOverlayHost`, which ignores the overlay chain. */
+/** Whether a node names `resolveOverlayHost` as an import, a re-export, a member or a destructured key. */
+function namesHostResolver(node) {
+  if (node.type === 'ImportSpecifier') return node.imported?.name === HOST_RESOLVER;
+  if (node.type === 'ExportNamedDeclaration') {
+    return (
+      Boolean(node.source) &&
+      node.specifiers.some((specifier) => specifier.local?.name === HOST_RESOLVER)
+    );
+  }
+  if (node.type === 'ExportAllDeclaration') {
+    return String(node.source?.value).endsWith('/overlayHost.js');
+  }
+  if (node.type === 'MemberExpression') {
+    return (node.computed ? node.property.value : node.property.name) === HOST_RESOLVER;
+  }
+  return node.type === 'Property' && !node.computed && keyName(node.key) === HOST_RESOLVER;
+}
+
+/** The files of a closure that import, re-export or reach `resolveOverlayHost`, which ignores the overlay chain. */
 export function hostResolverImports(path, reader) {
   return [...importClosure(path, reader)]
     .filter((file) => [...walkNodes(astOf(file, reader))].some(namesHostResolver))
@@ -226,11 +241,11 @@ const unchained = (expression) =>
 /** A value that is, or may hold, an item of a collection the entry does not publish (or a whole one). */
 const UNNAMEABLE = Object.freeze({ key: null });
 
-/** A script local derived from published data: unnameable like `UNNAMEABLE`, and told apart from an unknown name. */
-const TAINTED = Object.freeze({ key: null });
+/** A name no rule resolves, an import or a global: it holds no data, and a spread of it still fails closed. */
+const UNRESOLVED = Object.freeze({ key: null });
 
-/** Whether an origin is a published key, or a local derived from one. */
-const holdsData = (origin) => origin.key !== null || origin === TAINTED;
+/** Whether an origin is, or may hold, published data: every origin but a name no rule resolves. */
+const holdsData = (origin) => origin !== UNRESOLVED;
 
 /** The identifiers under `ast` that read `name`, each with its ancestors, less imports and declared patterns. */
 function readsOf(ast, name) {
@@ -278,6 +293,17 @@ function isLiteralTree(node) {
     return isLiteralTree(at.consequent) && isLiteralTree(at.alternate);
   }
   return mappedLiteral(at) !== undefined;
+}
+
+/** The `{#each}` a mapped call stands for: its first parameter is an element of the array it maps. */
+function elementOf(call) {
+  const [element, index] = call.arguments[0].params;
+  return {
+    type: 'EachBlock',
+    context: element ?? { type: 'Identifier', name: '' },
+    index: index?.name,
+    expression: call.callee.object,
+  };
 }
 
 /** The literal an `array.map((x) => <literal>)` call returns for each element, else `undefined`. */
@@ -366,10 +392,13 @@ function spreadTracer(entry, reader) {
   );
   const topLevel = (ast) =>
     [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
+  const opaqueNames = new Map();
   const scriptLocals = new Map(
     files.map((file) => {
       const ast = asts.get(file);
       const names = new Map();
+      const opaque = new Set();
+      opaqueNames.set(file, opaque);
       for (const statement of topLevel(ast)) {
         if (statement.type !== 'VariableDeclaration') continue;
         for (const { id, init } of statement.declarations) {
@@ -383,6 +412,8 @@ function spreadTracer(entry, reader) {
             const literal = id.type === 'Identifier' && isLiteralTree(value);
             const held = { kind: literal ? 'literal' : 'derived', value };
             for (const name of boundNames(id)) names.set(name, held);
+          } else {
+            for (const name of boundNames(id)) opaque.add(name);
           }
         }
       }
@@ -496,7 +527,8 @@ function spreadTracer(entry, reader) {
     }
     const held = scriptLocals.get(file).get(name);
     if (held) return guarded(held, () => localOrigins(held, file));
-    return prop ? passedTo(file, prop.key) : [UNNAMEABLE];
+    if (prop) return passedTo(file, prop.key);
+    return opaqueNames.get(file).has(name) ? [UNNAMEABLE] : [UNRESOLVED];
   }
 
   /** A script local's origins: a rest and a plain constant hold none, a literal its keys, a derived value any data it reads. */
@@ -504,26 +536,29 @@ function spreadTracer(entry, reader) {
     if (kind === 'literal') return literalOrigins(value, file);
     if (kind === 'rest') return [];
     const reads = [...referencedNames(value)];
-    return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [TAINTED] : [];
+    return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [UNNAMEABLE] : [];
   }
 
   /** A script-level literal's origins: its plain keys are no item, a branch or call is its values. */
-  function literalOrigins(expression, file) {
+  function literalOrigins(expression, file, ancestors = []) {
     const node = unchained(expression);
+    const trace = (inner) => literalOrigins(inner, file, ancestors);
     if (node.type === 'ConditionalExpression') {
-      return [node.consequent, node.alternate].flatMap((branch) => literalOrigins(branch, file));
+      return [node.consequent, node.alternate].flatMap((branch) => trace(branch));
     }
     if (node.type === 'CallExpression') {
       const mapped = mappedLiteral(node);
-      if (mapped) return literalOrigins(mapped, file);
+      if (mapped) return literalOrigins(mapped, file, [...ancestors, elementOf(node)]);
       const base =
-        node.callee.type === 'MemberExpression' ? originsOf(node.callee.object, file, []) : [];
-      return [...base, ...node.arguments.flatMap((argument) => literalOrigins(argument, file))];
+        node.callee.type === 'MemberExpression'
+          ? originsOf(node.callee.object, file, ancestors)
+          : [];
+      return [...base, ...node.arguments.flatMap((argument) => trace(argument))];
     }
-    if (node.type !== 'ObjectExpression') return originsOf(node, file, []);
+    if (node.type !== 'ObjectExpression') return originsOf(node, file, ancestors);
     return node.properties.flatMap((property) => {
-      if (property.type === 'SpreadElement') return literalOrigins(property.argument, file);
-      return property.computed ? originsOf(property.key, file, []) : [];
+      if (property.type === 'SpreadElement') return trace(property.argument);
+      return property.computed ? originsOf(property.key, file, ancestors) : [];
     });
   }
 

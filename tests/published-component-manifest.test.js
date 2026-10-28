@@ -983,7 +983,7 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
     ]);
   });
 
-  it('refuses an overlays: true closure that re-exports resolveOverlayHost, and leaves the declaration alone', () => {
+  it('refuses an overlays: true closure that re-exports or reaches resolveOverlayHost, and leaves the declaration alone', () => {
     const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte', overlays: true };
     const closure = (reexport) =>
       syntheticReader({
@@ -997,10 +997,19 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
     for (const reexport of [
       "export { resolveOverlayHost } from './overlayHost.js';",
       "export { resolveOverlayHost as reach } from './overlayHost.js';",
+      "export * from './overlayHost.js';",
+      "import * as host from './overlayHost.js'; export const reach = (n) => host.resolveOverlayHost(n);",
+      "import * as host from './overlayHost.js'; export const reach = host['resolveOverlayHost'];",
+      "export const reach = async (n) => (await import('./overlayHost.js')).resolveOverlayHost(n);",
+      "export const reach = async () => { const { resolveOverlayHost } = await import('./overlayHost.js'); return resolveOverlayHost; };",
     ]) {
-      assert.deepEqual(overlayFaults(entry, closure(reexport)), [
-        'is overlays: true and src/ui/svelte/util/reach.js imports resolveOverlayHost, which ignores the chain',
-      ]);
+      assert.deepEqual(
+        overlayFaults(entry, closure(reexport)),
+        [
+          'is overlays: true and src/ui/svelte/util/reach.js imports resolveOverlayHost, which ignores the chain',
+        ],
+        reexport
+      );
     }
     assert.deepEqual(overlayFaults(entry, closure('export const reach = () => null;')), []);
   });
