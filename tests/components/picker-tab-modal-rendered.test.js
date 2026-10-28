@@ -6,7 +6,8 @@
  * as each Tab reaches the window, Escape on a closed trigger closes the dialog once, and Tab from a
  * set picker's query field reaches its footer rather than its scrolling list, and in a dialog that
  * traps focus a Tab from that footer, the set picker being the dialog's last control, wraps to its
- * close control (issue 2699).
+ * close control (issue 2699), and a Tab from an open search-free picker that is such a dialog's last
+ * control enters its footer before it wraps (issue 2739).
  * Limit: Chromium only; Foundry's Electron client is not measured here.
  */
 import assert from 'node:assert/strict';
@@ -41,11 +42,11 @@ const frames = (page) =>
  * content-editable node, a button in a form, or an element whose `data-keyboard-focus` is `""` or
  * `"true"`, as `.agents/docs/foundry-and-architecture.md` reads it from Foundry 13.351 and 14.365.
  */
-async function openFixture(host, trap = false) {
+async function openFixture(host, trap = false, last = 'set') {
   const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(
     fixtureServer.url(
-      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal-picker&trap=${trap ? 1 : 0}`
+      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal-picker&trap=${trap ? 1 : 0}&last=${last}`
     ),
     { waitUntil: 'load' }
   );
@@ -231,6 +232,37 @@ for (const host of ['manager', 'app']) {
           closes: Number(document.body.dataset.modalCloses),
         }));
         assert.deepEqual(landed, { close: true, open: false, closes: 0 });
+      } finally {
+        await page.close();
+      }
+    });
+
+    it('R8: Tab from an open search-free picker that is a trapping dialog’s last control enters its footer, then wraps to the close control (issue 2739)', async () => {
+      const page = await openFixture(host, true, 'footer');
+      const where = () =>
+        page.evaluate(() => ({
+          done: document.activeElement?.matches('[data-picker-footer-done]') ?? false,
+          close: document.activeElement?.matches('[data-manager-modal-close]') ?? false,
+          open: Boolean(document.querySelector('[data-picker-footer-done]')),
+          closes: Number(document.body.dataset.modalCloses),
+        }));
+      try {
+        await page.focus(`${DIALOG} .fixture-footer-picker > button`);
+        await page.keyboard.press('ArrowDown');
+        await page.waitForSelector('[data-picker-footer-done]');
+        await frames(page);
+        await pressAndSettle(page, 'Tab');
+        assert.deepEqual(
+          await where(),
+          { done: true, close: false, open: true, closes: 0 },
+          'the footer takes focus and the panel stays open'
+        );
+        await pressAndSettle(page, 'Tab');
+        assert.deepEqual(
+          await where(),
+          { done: false, close: true, open: false, closes: 0 },
+          'Tab from the footer closes the panel and wraps to the close control'
+        );
       } finally {
         await page.close();
       }
