@@ -515,15 +515,7 @@ describe('every snippet is invoked with the documented parameters', () => {
   afterEach(() => catalogueHarness.remount());
 
   // `clearSelection` joined the set at issue 1373's maintainer feedback round.
-  const CTX_KEYS = [
-    'scope',
-    'systems',
-    'systemId',
-    'selected',
-    'member',
-    'systemRow',
-    'clearSelection',
-  ];
+  const CTX_KEYS = ['scope', 'systems', 'selected', 'clearSelection'];
 
   it('rowMeta and inspectorBody receive (entry, ctx) with exactly the documented ctx keys', async () => {
     const seen = [];
@@ -544,9 +536,6 @@ describe('every snippet is invoked with the documented parameters', () => {
         'the ctx key set is part of the contract: a lane reaches a conditionally present field ' +
           'through ctx.scope rather than through a new shell prop'
       );
-      assert.equal(ctx.systemId, '', 'world scope addresses no system');
-      assert.equal(ctx.systemRow, null);
-      assert.equal(ctx.member, false);
     }
   });
 
@@ -562,8 +551,6 @@ describe('every snippet is invoked with the documented parameters', () => {
     assert.deepEqual(ids, ['component-1']);
     assert.deepEqual(Object.keys(ctx).sort(), [...CTX_KEYS].sort());
     assert.equal(ctx.selected, false, 'a bulk body addresses no single row');
-    assert.equal(ctx.member, false);
-    assert.equal(ctx.systemRow, null);
     // AND THE ONE CALLABLE KEY ACTUALLY CLEARS. Asserted as an EFFECT rather than as a typeof:
     assert.equal(typeof ctx.clearSelection, 'function', 'the bulk body can reach the set owner');
     ctx.clearSelection();

@@ -22,7 +22,6 @@ import {
   defaultScopedSearchText,
   scopedEntryName,
   SCOPED_LIST_SORTS,
-  SYSTEM_MEMBERSHIP_FILTERS,
   WORLD_MEMBERSHIP_FILTERS,
 } from '../src/ui/model/scopedEntityListModel.js';
 import * as listModel from '../src/ui/model/scopedEntityListModel.js';
@@ -193,33 +192,6 @@ describe('scopedEntityListModel filters', () => {
     assert.equal(model.project({ entries, membership: 'all' }).rows.length, 3);
   });
 
-  it('offers the SYSTEM membership vocabulary over the resolved row', () => {
-    assert.deepEqual(SYSTEM_MEMBERSHIP_FILTERS, ['all', 'in', 'out']);
-    const scoped = entries.map((entry, position) => ({
-      ...entry,
-      systems: [
-        { systemId: 'sys-a', systemName: 'Forge', member: position !== 1, inherited: {} },
-        { systemId: 'sys-b', systemName: 'Loom', member: false, inherited: {} },
-      ],
-    }));
-    const model = createScopedEntityListModel();
-    assert.deepEqual(
-      model.project({ entries: scoped, systemId: 'sys-a', membership: 'in' }).rows.map((r) => r.id),
-      ['a', 'c']
-    );
-    assert.deepEqual(
-      model
-        .project({ entries: scoped, systemId: 'sys-a', membership: 'out' })
-        .rows.map((r) => r.id),
-      ['b']
-    );
-    // The SAME entries against a different system, so the answer is the row's and not the entry's.
-    assert.equal(
-      model.project({ entries: scoped, systemId: 'sys-b', membership: 'in' }).rows.length,
-      0
-    );
-  });
-
   it('applies a lane filter only when its value is neither blank nor `all`', () => {
     const model = createScopedEntityListModel();
     const filters = [
@@ -362,52 +334,6 @@ describe('the two memos, counted', () => {
     // A NEW entries array rebuilds it, once per entry again.
     model.project({ entries: corpus(), searchOf, query: 'ash' });
     assert.equal(calls, CORPUS_SIZE * 2);
-  });
-
-  it('resolves the system row in O(N) index reads rather than O(N x S)', () => {
-    const SYSTEM_COUNT = 8;
-    const ENTRY_COUNT = 50;
-    let reads = 0;
-    const entries = Array.from({ length: ENTRY_COUNT }, (unused, position) => {
-      const rows = Array.from({ length: SYSTEM_COUNT }, (ignored, index) => ({
-        systemId: `sys-${index}`,
-        systemName: `System ${index}`,
-        member: index === SYSTEM_COUNT - 1,
-        inherited: {},
-      }));
-      return {
-        id: `e-${position}`,
-        entity: { name: `Ash ${position}` },
-        membershipCount: 1,
-        // Counts INDEX reads only; a property read on a resolved row is not an array access.
-        systems: new Proxy(rows, {
-          get(target, key, receiver) {
-            if (typeof key === 'string' && /^\d+$/.test(key)) reads += 1;
-            return Reflect.get(target, key, receiver);
-          },
-        }),
-      };
-    });
-
-    const model = createScopedEntityListModel();
-    // The LAST system, so a naive `.find()` per entry walks the whole row array every time.
-    const { rows, systemRows } = model.project({
-      entries,
-      systemId: `sys-${SYSTEM_COUNT - 1}`,
-      membership: 'in',
-    });
-    assert.equal(rows.length, ENTRY_COUNT, 'every entry is a member, so nothing is filtered out');
-    assert.equal(systemRows.get('e-0').systemId, `sys-${SYSTEM_COUNT - 1}`, 'and the row is right');
-    assert.ok(
-      reads <= ENTRY_COUNT + SYSTEM_COUNT,
-      `resolution took ${reads} index reads for ${ENTRY_COUNT} entries over ${SYSTEM_COUNT} ` +
-        `systems; O(N) is at most ${ENTRY_COUNT + SYSTEM_COUNT} and a find-per-row is ` +
-        `${ENTRY_COUNT * SYSTEM_COUNT}`
-    );
-
-    const before = reads;
-    model.project({ entries, systemId: `sys-${SYSTEM_COUNT - 1}`, membership: 'all' });
-    assert.equal(reads, before, 'a second pass over the same (entries, systemId) re-resolved');
   });
 });
 
