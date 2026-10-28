@@ -554,6 +554,24 @@ describe('StageBars (mounted)', () => {
     );
   });
 
+  it('announces a whole number, truncated, while the fill keeps the fraction', async () => {
+    const root = await stages.mount({
+      stages: [
+        { name: 'A', value: 40.4 },
+        { name: 'B', value: 99.9 },
+        { name: 'C', value: 100 },
+      ],
+      ariaLabel: 'Progress',
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-valuenow')
+      ),
+      ['40', '99', '100'],
+      'an unfinished bar never reads 100, and no bar reads a fraction'
+    );
+  });
+
   it('draws a bar for every stage whatever a stage carries, and marks no current one out of range', async () => {
     const duplicated = await stages.mount({
       stages: [

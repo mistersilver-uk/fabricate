@@ -699,6 +699,7 @@ Where the entry's rest keys land on the control itself, `data-cursor` is refused
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
+  The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1123,6 +1124,7 @@ Each group states the accepted values of every key that entry publishes.
   - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
+    A bar's `aria-valuenow` is the clamped value truncated to a whole number, so a stage short of 100 never announces 100 and none announces a fraction.
     `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so the companion states the percentage in it too; a stage whose `valueText` is absent or `''` announces its percentage.
     The companion passes a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
     Naming `valueText` is additive, and `StageBars`' `version` stays 1: before it a stage's `valueText` was unnamed and so private.
@@ -1413,6 +1415,7 @@ Each group states the accepted values of every key that entry publishes.
   - The list offers the vocabulary `game.fabricate.listCuratedIcons()` answers on the same client, one solid-weight row per glyph, in that vocabulary's order while the query is empty.
     Each row is named by its glyph's `label`, as `game.fabricate.listCuratedIcons()` answers it on the same client, which is English and is not localized.
     On Foundry 14 that `label` is Font Awesome's own display name, and on every other generation it is derived from `iconCode`, except where the stylesheet measurement is empty and the Foundry 14 name is used.
+    Each row also carries that label alone as its native tooltip (`title`).
     The trigger shows that same name beside the glyph.
   - `value` is the chosen glyph's Font Awesome class string, a weight token then `fa-<name>`, as `'fas fa-gear'`, and its `iconCode` or any of its `aliases` selects its row.
     With an empty query, the row for `value` is pinned first and marked selected.
