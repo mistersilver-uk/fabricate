@@ -52,6 +52,7 @@ const SCOPED_RAW_MODULES = [
   'src/utils/sourceReferenceUnion.js',
   'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/model/scopedEntityListModel.js',
   // The frame's lifted view-state (issue 1438). Omitting a declared dependency here
   // THROWS in `before()`, which reports its tests as `# cancelled`, never `# fail`.
@@ -71,6 +72,7 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
   'src/ui/svelte/components/SegmentedControl.svelte',
 ];

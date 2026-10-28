@@ -786,6 +786,7 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     **THE CONTROL NEVER GOES `disabled`, AND ITS LABELS PROMISE ONLY WHAT THE WRITE WILL DO.**
     The armed label branches exactly as the entry's does — `Cannot delete` where nothing can go — and the counts on both labels are the DELETABLE subset rather than the selection, because `Delete 2 components…` over a fully-held selection of two is a false promise about an outcome.
     Where nothing can go the idle verb is UNCOUNTED, since `Delete 0 components…` is a promise of an outcome rather than a description of one; the entry's uncounted `Delete entry` is the singular of the same decision.
+    The control keeps focus while its confirmed write runs and its accessible name becomes `Deleting…`, so the panel says that label through a polite live region that exists, empty, before the write starts.
     **AND THE REFUSAL IS ENFORCED AT THE WRITING CALL AS WELL AS STATED BY THE CONTROL.**
     A control's state is a PRESENTATION of a rule, and the one call that writes is where the rule has to hold: the page re-derives the plan and writes only its free half, so a refusal cannot be lost by a control that was mis-wired, re-enabled, or driven from a test.
     The two are deliberately not one statement made once.
