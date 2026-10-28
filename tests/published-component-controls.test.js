@@ -169,6 +169,8 @@ const FOCUSABLE_REACH = Object.freeze({
   // The panel and its rows, which its own file draws unguarded; the query field, under `showSearch`,
   // which `Select` turns off and `IconPicker` keeps at its default.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: div': 'always',
+  // The list, a `tabindex="-1"` target drawn while rows are listed, under the panel's own props.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: div[data-popover-list]': null,
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: button': 'always',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': {
     byEntry: {

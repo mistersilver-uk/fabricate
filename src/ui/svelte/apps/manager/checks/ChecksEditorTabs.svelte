@@ -15,6 +15,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
+  import { TAB_COUNT_UNITS, tabCountMark } from '../../../util/tabCountMark.js';
 
   let { sections = [], activeSection = 'roll', onSelect = () => {} } = $props();
 
@@ -34,6 +35,20 @@
     );
   }
 
+  const SECTION_UNITS = {
+    outcomes: TAB_COUNT_UNITS.outcomes,
+    triggers: TAB_COUNT_UNITS.triggers,
+    modifiers: TAB_COUNT_UNITS.modifiers,
+  };
+
+  // A section with no unit still draws its numeral, unnamed.
+  function countMark(section) {
+    const countUnit = SECTION_UNITS[section.id];
+    return countUnit
+      ? tabCountMark(section.count, countUnit)
+      : { vehicle: 'count', label: section.count };
+  }
+
   const tabs = $derived(
     sections.map((section) => ({
       id: section.id,
@@ -48,9 +63,7 @@
       sections.map((section) => [
         section.id,
         [
-          typeof section.count === 'number' && section.count > 0
-            ? { vehicle: 'count', label: section.count }
-            : null,
+          typeof section.count === 'number' && section.count > 0 ? countMark(section) : null,
           section.issues > 0 ? { vehicle: 'dot', name: issueName(section.issues) } : null,
         ].filter(Boolean),
       ])

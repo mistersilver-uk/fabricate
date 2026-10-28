@@ -100,6 +100,97 @@ describe('dismissOnOutsideClick action', () => {
   });
 });
 
+describe('dismissOnOutsideClick onFocusLeave (issue 2598)', () => {
+  before(() => setupDOM());
+  after(() => teardownDOM());
+
+  /** A root holding a field, a panel and an anchor counted inside, an outside button, and calls. */
+  function scene(options = {}) {
+    const root = document.createElement('div');
+    const field = document.createElement('input');
+    const panel = document.createElement('div');
+    const panelButton = document.createElement('button');
+    const anchor = document.createElement('button');
+    const outside = document.createElement('button');
+    root.append(field);
+    panel.append(panelButton);
+    document.body.append(root, panel, anchor, outside);
+    const calls = [];
+    const action = dismissOnOutsideClick(root, {
+      additionalNodes: () => [panel, anchor],
+      onFocusLeave: (event) => {
+        calls.push(event.relatedTarget);
+      },
+      ...options,
+    });
+    return { root, field, panel, panelButton, anchor, outside, calls, action };
+  }
+
+  const focusOut = (from, relatedTarget) =>
+    from.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget }));
+
+  it('calls onFocusLeave when focus moves from inside to a node outside', () => {
+    const { field, outside, calls, action } = scene();
+    focusOut(field, outside);
+    assert.ok(calls.length === 1 && calls[0] === outside);
+    action.destroy();
+  });
+
+  it('calls nothing when focus moves to the root, the panel or the anchor', () => {
+    const { field, panelButton, anchor, root, calls, action } = scene();
+    focusOut(field, root);
+    focusOut(field, panelButton);
+    focusOut(panelButton, anchor);
+    focusOut(anchor, field);
+    assert.equal(calls.length, 0);
+    action.destroy();
+  });
+
+  it('calls nothing when focus leaves for no node, as when the window loses focus', () => {
+    const { field, calls, action } = scene();
+    focusOut(field, null);
+    assert.equal(calls.length, 0);
+    action.destroy();
+  });
+
+  it('calls nothing for a focusout whose target and relatedTarget are both outside', () => {
+    const { outside, calls, action } = scene();
+    const other = document.createElement('button');
+    document.body.append(other);
+    focusOut(outside, other);
+    assert.equal(calls.length, 0);
+    action.destroy();
+  });
+
+  it('calls the callback an update swaps in, and nothing while disabled', () => {
+    const { field, outside, calls, action } = scene();
+    const later = [];
+    action.update({
+      additionalNodes: () => [],
+      onFocusLeave: () => {
+        later.push('swapped');
+      },
+    });
+    focusOut(field, outside);
+    action.update({
+      enabled: false,
+      onFocusLeave: () => {
+        later.push('disabled');
+      },
+    });
+    focusOut(field, outside);
+    assert.deepEqual([calls.length, later], [0, ['swapped']]);
+    action.destroy();
+  });
+
+  it('removes the focusout listener on destroy', () => {
+    const { field, outside, calls, action } = scene();
+    action.destroy();
+    focusOut(field, outside);
+    assert.equal(calls.length, 0);
+  });
+});
+
 describe('dismissOnOutsideClick onDetached (issue 2671)', () => {
   before(() => setupDOM());
   after(() => teardownDOM());

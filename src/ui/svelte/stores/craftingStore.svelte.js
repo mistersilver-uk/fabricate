@@ -566,7 +566,7 @@ export function createCraftingStore({ services } = {}) {
    * recomputed in the UI; on an infeasible inventory its suggestion is the best partial one.
    *
    * @param {string} [announcement] pre-formatted live-region text (the component
-   *   owns the i18n, exactly as the progressive reorder path does).
+   *   owns the i18n).
    */
   function pickForMe(announcement = '') {
     const current = selectedCraftability;

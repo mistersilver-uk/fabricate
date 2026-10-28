@@ -16,9 +16,8 @@ const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 const { resolveImportReferences, REFERENCE_KINDS } = await import(
   '../src/systems/importReferenceResolver.js'
 );
-const { buildComponentEditorState, buildComponentEditorUpdates } = await import(
-  '../src/ui/svelte/util/componentEditor.js'
-);
+const { buildComponentEditorState, buildComponentEditorUpdates, carriedComponentEssences } =
+  await import('../src/ui/svelte/util/componentEditor.js');
 
 function makeManager() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -193,9 +192,10 @@ test('1371 r20: the editor round-trip CARRIES a quantity whose essence this syst
     ...system.components[0],
     essences: { fire: 3 },
   });
-  const updates = buildComponentEditorUpdates(state);
+  const carriedEssences = carriedComponentEssences({ fire: 3 }, state.essenceOptions);
+  const updates = buildComponentEditorUpdates({ ...state, carriedEssences });
 
-  assert.deepEqual(state.carriedEssences, { fire: 3 }, 'carried, and reported as carried');
+  assert.deepEqual(carriedEssences, { fire: 3 }, 'carried, and reported as carried');
   assert.deepEqual(
     state.essenceOptions.map((option) => option.id),
     ['water'],

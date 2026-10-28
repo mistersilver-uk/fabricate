@@ -271,6 +271,10 @@ describe('RecipeItemEditor (mounted)', () => {
       root.querySelector('[data-recipe-item-tab-count="contents"]').textContent.trim(),
       '2'
     );
+    assert.equal(
+      root.querySelector('[data-recipe-item-tab-button="contents"]').getAttribute('aria-label'),
+      'Contents, 2 linked recipes'
+    );
     const validation = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.equal(validation.textContent.trim(), '✓');
     assert.ok(validation.classList.contains('is-neutral'), 'a pass asks for no attention');

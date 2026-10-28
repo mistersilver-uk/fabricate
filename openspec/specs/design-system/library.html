@@ -2155,7 +2155,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>panel</b> <code>SearchablePopover</code> in its <code>multiple</code> mode &mdash; portalled, measured, flipped</li>
         <li><b>list</b> the panel grows with its matches to at most 380px, less where the window has less room, and the list scrolls inside it beyond that; it never grows the host, because the panel is portalled</li>
         <li><b>count</b> matched-of-total above the search, so the GM knows to refine</li>
-        <li><b>commit</b> <code>staged</code>: Clear and Apply in the panel footer &mdash; nothing writes on click, and Escape or an outside press discards; <code>choose</code>: the session form, one write per choice, no token run and no footer</li>
+        <li><b>commit</b> <code>staged</code>: Clear and Apply in the panel footer &mdash; nothing writes on click, and Escape, an outside press or focus leaving the panel discards; <code>choose</code>: the session form, one write per choice, no token run and no footer</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>
         <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>SetPicker.svelte</code>&rsquo;s <code>$props()</code> at issue 1782.</li>

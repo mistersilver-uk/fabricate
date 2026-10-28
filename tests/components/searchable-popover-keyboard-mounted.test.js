@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { createRawSnippet, flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { placeCaret } from '../helpers/listboxKeyboardDriver.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
@@ -1254,6 +1254,142 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'the cursor walks the rows in the order they are DRAWN — the concatenation of the ' +
           'buckets — and wraps at the end of the last one'
       );
+      harness.remount();
+    });
+  });
+
+  describe('Tab and focus leaving the picker (issues 2598, 2676, 2702)', () => {
+    const footer = createRawSnippet(() => ({
+      render: () => '<div><button type="button" data-test-footer-stop>Done</button></div>',
+    }));
+    const panelOpen = () => Boolean(harness.target.querySelector('.fabricate-picker-popover'));
+
+    /** Records every keydown that bubbles to the window, as a companion's listener above does. */
+    function heardAbove() {
+      const heard = [];
+      const listen = (event) => {
+        heard.push(event.key);
+      };
+      document.defaultView.addEventListener('keydown', listen);
+      return { heard, stop: () => document.defaultView.removeEventListener('keydown', listen) };
+    }
+
+    it('closes on Tab in the query field, focusing the trigger at once and leaving the key to the browser', async () => {
+      chosen.length = 0;
+      await mountPicker({});
+      await openPanel();
+      const event = pressKey('Tab');
+      assert.ok(document.activeElement === trigger(), 'focus is on the trigger before any settle');
+      assert.equal(event.defaultPrevented, false, 'the browser moves Tab on from the trigger');
+      assert.ok(!panelOpen(), 'the panel is closed');
+      await settle();
+      assert.ok(document.activeElement === trigger(), 'and no later focus move undoes it');
+      assert.deepEqual(chosen, []);
+      harness.remount();
+    });
+
+    it('closes on Shift+Tab in the query field, keeping the key and returning focus to the trigger', async () => {
+      await mountPicker({});
+      await openPanel();
+      const event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, true);
+      await settle();
+      assert.ok(!panelOpen(), 'the panel is closed');
+      assert.ok(document.activeElement === trigger(), 'focus is back on the trigger');
+      harness.remount();
+    });
+
+    it('leaves a footer stop one Tab from the query field, with the panel open', async () => {
+      await mountPicker({ footer });
+      const panel = await openPanel();
+      const event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, false);
+      assert.ok(panelOpen(), 'the panel stays open');
+      panel.querySelector('[data-test-footer-stop]').focus();
+      assert.ok(panelOpen(), 'focus moving into the panel closes nothing');
+      harness.remount();
+    });
+
+    it('closes without choosing or moving focus when focus moves to a control outside', async () => {
+      chosen.length = 0;
+      await mountPicker({});
+      await openPanel();
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      await settle();
+      assert.ok(!panelOpen(), 'the panel is closed');
+      assert.equal(trigger().getAttribute('aria-expanded'), 'false');
+      assert.ok(document.activeElement === elsewhere, 'focus stays where it went');
+      assert.deepEqual(chosen, []);
+      elsewhere.remove();
+      harness.remount();
+    });
+
+    it('lets Tab and Shift+Tab bubble from the trigger, closing an open list, and stops every other key', async () => {
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox' });
+      const button = trigger();
+      button.focus();
+      const above = heardAbove();
+      try {
+        for (const shiftKey of [false, true]) {
+          await openPanel();
+          const event = pressKey('Tab', { shiftKey });
+          assert.equal(event.defaultPrevented, false);
+          assert.equal(button.getAttribute('aria-expanded'), 'false', 'the list is closed');
+          await settle();
+          assert.ok(document.activeElement === button, 'focus stays for the browser to move');
+        }
+        pressKey('Tab');
+        for (const modifiers of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+          pressKey('Tab', modifiers);
+        }
+        pressKey('ArrowUp');
+        pressKey('Escape');
+        assert.deepEqual(above.heard, ['Tab', 'Tab', 'Tab'], 'only plain Tab reaches the window');
+      } finally {
+        above.stop();
+      }
+      harness.remount();
+    });
+
+    it('marks every trigger form for Foundry’s keyboard focus', async () => {
+      for (const props of [{}, { triggerChip: true }, { triggerButton: { role: 'neutral' } }]) {
+        await mountPicker(props);
+        assert.equal(trigger().getAttribute('data-keyboard-focus'), 'true', JSON.stringify(props));
+        harness.remount();
+      }
+    });
+
+    it('enters a search-free panel’s footer on Tab from the open trigger, and leaves it from there', async () => {
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox', footer });
+      const button = trigger();
+      button.focus();
+      await openPanel();
+      const stop = () => harness.target.querySelector('[data-test-footer-stop]');
+      let event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, true, 'the trigger moves focus itself');
+      assert.ok(document.activeElement === stop(), 'focus is on the footer stop');
+      assert.ok(panelOpen(), 'and the panel stays open');
+
+      event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, true);
+      await settle();
+      assert.ok(
+        !panelOpen() && document.activeElement === button,
+        'Shift+Tab closes onto the trigger'
+      );
+
+      await openPanel();
+      event = pressKey('Tab', { shiftKey: true });
+      assert.equal(event.defaultPrevented, false, 'Shift+Tab from the open trigger moves back');
+      assert.ok(!panelOpen() && document.activeElement === button, 'closing the panel');
+
+      await openPanel();
+      pressKey('Tab');
+      event = pressKey('Tab');
+      assert.equal(event.defaultPrevented, false, 'Tab from the last stop moves on');
+      assert.ok(!panelOpen() && document.activeElement === button, 'from the trigger');
       harness.remount();
     });
   });
