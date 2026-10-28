@@ -48,7 +48,7 @@ const FIXED_D100 = ['StateFixedD100', 'Fixed d100'];
  * Every mode, keyed `<activity>:<mode>`. `crafting:alchemy` is keyed by the ALCHEMY CHECK MODE,
  * because that is the choice deciding what alchemy rolls.
  */
-const MODES = Object.freeze({
+const BASE_MODES = {
   'crafting:routedByCheck': {
     icon: 'fas fa-dice-d20',
     title: ['RoutedByCheck', 'Routed by check'],
@@ -150,25 +150,25 @@ const MODES = Object.freeze({
     ],
     facts: ['check:fixedD100', 'outcomes:perDrop', 'results:perDrop'],
   },
+};
+
+/** Gathering's Check modes keep a salvage mode's shape and state their own body. */
+const MODES = Object.freeze({
+  ...BASE_MODES,
   'gathering:routed': {
-    icon: 'fas fa-dice-d20',
-    title: ['RoutedByCheck', 'Routed by check'],
+    ...BASE_MODES['salvage:routed'],
     body: [
       'GatheringRoutedBody',
-      'One roll is rolled once and mapped onto a band. Each band is a named tier, and a ' +
-        'task’s result set named after a tier is produced for it.',
+      'The roll is mapped onto a named tier, and the task’s result set named after that tier is produced.',
     ],
-    facts: ['check:required', 'outcomes:tiers', 'results:tiers'],
   },
   'gathering:progressive': {
-    icon: 'fas fa-stairs',
-    title: ['Progressive', 'Progressive'],
+    ...BASE_MODES['salvage:progressive'],
     body: [
       'GatheringProgressiveBody',
-      'The roll produces a value rather than a verdict, and that value is spent down the ' +
-        'task’s ordered results until it runs out. Progressive is a legacy mode that is not offered for new tasks.',
+      'Progressive is a legacy mode that is not offered for new tasks. The roll yields a value, ' +
+        'not a verdict, which is spent down the task’s ordered results until it runs out.',
     ],
-    facts: ['check:required', 'outcomes:ordered', 'results:spent'],
   },
 });
 

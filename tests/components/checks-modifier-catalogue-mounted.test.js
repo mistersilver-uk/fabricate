@@ -133,15 +133,9 @@ describe('the check-modifier catalogue card (mounted)', () => {
 
   it('draws the live gathering note as info and the inert warning note apart from it', async () => {
     const target = await mountChecks({ activity: 'gathering' });
-    const live = target.querySelector('[data-check-modifier-dormant]');
-    const inert = target.querySelector('[data-crafting-modifier-inert]');
-    assert.ok(Boolean(live), 'the gathering card states which gathering modes take modifiers');
-    assert.ok(
-      Boolean(inert),
-      'a d100 gathering system also states that its selection reaches no roll'
-    );
-    assert.ok(live.classList.contains('is-info'), 'the live note takes the info tone');
-    assert.ok(!inert.classList.contains('is-info'), 'the inert note keeps the warning tone');
+    const tone = (hook) => target.querySelector(hook)?.classList.contains('is-info');
+    assert.equal(tone('[data-check-modifier-dormant]'), true, 'the live note takes the info tone');
+    assert.equal(tone('[data-crafting-modifier-inert]'), false, 'the inert note keeps warning');
     harness.remount();
   });
 
