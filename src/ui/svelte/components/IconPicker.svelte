@@ -15,6 +15,9 @@
   | `noMatchesText` | resolved string | `''` | The line the list draws when a query matches no glyph. |
 
   Invariants:
+  - Under an app localizer context the trigger's `aria-describedby` names the chosen glyph, and
+    names nothing while `value` holds no glyph; a published mount carries no localizer, so its
+    trigger keeps the name-only contract the published docs state.
   - Each copy fallback is written at its use site and localized through the `APP_LOCALIZER`
     context; a tree mounted without one draws the English and no placeholder.
   - The snippet trigger states `type="button"` and `data-keyboard-focus="true"` itself, in every
@@ -44,6 +47,7 @@
     DEFAULT_ESSENCE_ICON,
     getEssenceIconOptions,
     filterEssenceIconOptions,
+    getEssenceIconName,
     getEssenceIconOption,
     normalizeEssenceIcon,
   } from '../util/essenceIcons.js';
@@ -79,6 +83,9 @@
         option.aliases?.includes(selectedOption.iconName)
     )?.iconClass ?? selectedOption.iconClass
   );
+  const uid = $props.id();
+  const choiceId = `${uid}-choice`;
+  const describesChoice = $derived(Boolean(localize) && Boolean(getEssenceIconName(value)));
   const triggerName = $derived(
     ariaLabel || copy('FABRICATE.Admin.Features.Essences.ChooseIcon', 'Choose icon')
   );
@@ -185,6 +192,7 @@
       oncontextmenu={handleTriggerContextMenu}
       {disabled}
       aria-label={triggerName}
+      aria-describedby={describesChoice ? choiceId : undefined}
       title={triggerName}
       type="button"
       data-keyboard-focus="true"
@@ -194,7 +202,11 @@
         <i class={selectedOption.iconClass}></i>
       </span>
       {#if !iconOnly}
-        <span class="essence-icon-picker-trigger-label">{selectedOption.label}</span>
+        <span class="essence-icon-picker-trigger-label" id={describesChoice ? choiceId : undefined}
+          >{selectedOption.label}</span
+        >
+      {:else if describesChoice}
+        <span id={choiceId} hidden>{selectedOption.label}</span>
       {/if}
       <span class="essence-icon-picker-trigger-caret" aria-hidden="true">
         <i class={`fas ${open ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>

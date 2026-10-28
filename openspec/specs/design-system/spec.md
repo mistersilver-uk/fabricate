@@ -1790,6 +1790,7 @@ The bar runs the other way too, and moved out of the same directory in the same 
 `IconPicker`'s trigger, list and query-field names, its placeholder and its no-match line are the caller's whenever it passes `ariaLabel`, `listLabel`, `searchLabel`, `searchPlaceholder` and `noMatchesText`; a caller that passes none draws Fabricate's copy, localized by the app root's localizer, and a tree mounted without one draws its English and no placeholder.
 Its vocabulary follows the Foundry release Fabricate registers when its entry script loads, so the picker's closure reads no `game`, and it reads its list's measures from the window that holds the panel.
 `IconPicker` is published through `game.fabricate.api.ui` (issue 2647).
+Under an app localizer context, which a published mount does not carry, `IconPicker`'s trigger `aria-describedby` names the chosen glyph, on an icon-only trigger too, and names nothing while `value` holds no glyph; the trigger's own name stays `ariaLabel`, and a published mount keeps its name-only trigger (issue 2664).
 
 The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:
 The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
