@@ -1791,6 +1791,10 @@ Its vocabulary follows the Foundry release Fabricate registers when its entry sc
 
 The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:
 The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
+A vertical key keeps the cursor's column, as the ARIA authoring practices grid pattern does: ArrowDown on the last cell of a column wraps to the first cell of the same column, and ArrowUp on the first cell wraps to the last cell of that column.
+A column is the cells at one offset in each row, so in a ragged last row a column the row lacks is wrapped past, and the wrap lands on the nearest cell above the gap rather than on a cell of another column.
+A disabled cell is skipped along its column, and a column with no other enabled cell leaves the cursor where it is.
+ArrowLeft, ArrowRight, Home and End keep their flat-order meaning, and a list of one column keeps its single flat ring.
 With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
 The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
@@ -1821,6 +1825,14 @@ It positions the panel against the anchor, counts the anchor inside for outside-
 - **WHEN** a caller opens the picker with `as="grid"` and `squareTiles`
 - **THEN** each option renders no text node and carries its label as both `aria-label` and `title`
 - **AND** ArrowDown moves the cursor by `columns` options
+
+#### Scenario: A vertical key wraps within its column
+
+- **WHEN** a grid of ten tiles draws four columns, so the last row holds two tiles
+- **AND** the cursor is on the first tile and the GM presses ArrowUp
+- **THEN** the cursor lands on the ninth tile, the last of the first column
+- **AND** ArrowUp from the fourth tile lands on the eighth, because the last row has no fourth column
+- **AND** ArrowDown from the ninth tile returns to the first
 
 #### Scenario: A panel opens from a caller's anchor
 

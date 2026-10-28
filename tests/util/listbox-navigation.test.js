@@ -93,13 +93,19 @@ describe('listbox navigation: the cursor arithmetic', () => {
       assert.equal(nextActiveIndex(1, 6, 'ArrowLeft', { columns: 3 }), 0);
     });
 
-    it('wraps a grid over the FLAT order, so a ragged last row is still reachable', () => {
-      // Five options in three columns leaves a two-cell last row. Wrapping over the flat index
-      // rather than over a rectangle is what keeps every option reachable from every other.
-      assert.equal(nextActiveIndex(4, 5, 'ArrowDown', { columns: 3 }), 2);
-      assert.equal(nextActiveIndex(0, 5, 'ArrowUp', { columns: 3 }), 2);
+    it('wraps a sideways press over the FLAT order, so a ragged last row is still reachable', () => {
+      // Five options in three columns leaves a two-cell last row; ArrowLeft and ArrowRight close
+      // their ring over the flat index, which keeps every option reachable from every other.
       assert.equal(nextActiveIndex(4, 5, 'ArrowRight', { columns: 3 }), 0);
       assert.equal(nextActiveIndex(0, 5, 'ArrowLeft', { columns: 3 }), 4);
+    });
+
+    it('keeps the column when a vertical press wraps a ragged grid', () => {
+      // Five options in three columns: columns 0 and 1 hold two cells, column 2 holds one.
+      assert.equal(nextActiveIndex(4, 5, 'ArrowDown', { columns: 3 }), 1);
+      assert.equal(nextActiveIndex(0, 5, 'ArrowUp', { columns: 3 }), 3);
+      assert.equal(nextActiveIndex(2, 5, 'ArrowDown', { columns: 3 }), 2);
+      assert.equal(nextActiveIndex(2, 5, 'ArrowUp', { columns: 3 }), 2);
     });
 
     it('enters a grid at an end rather than at a row offset', () => {
@@ -126,6 +132,87 @@ describe('listbox navigation: the cursor arithmetic', () => {
 
     it('reads no options object at all', () => {
       assert.equal(nextActiveIndex(0, 4, 'ArrowDown', undefined), 1);
+    });
+
+    it('leaves every linear case unchanged by the column rule', () => {
+      for (const options of [undefined, {}, { columns: 1 }, { columns: 0 }]) {
+        for (let count = 1; count <= 5; count += 1) {
+          for (let current = -1; current < count; current += 1) {
+            const down = current < 0 ? 0 : (current + 1) % count;
+            const up = current < 0 ? count - 1 : (current - 1 + count) % count;
+            assert.equal(nextActiveIndex(current, count, 'ArrowDown', options), down);
+            assert.equal(nextActiveIndex(current, count, 'ArrowUp', options), up);
+          }
+        }
+      }
+    });
+  });
+
+  // A vertical press keeps its column: down off the last cell of a column wraps to the column's
+  // first cell, and up off the first wraps to the column's last, which in a ragged grid is the cell
+  // above the gap rather than a cell of another column.
+  describe('nextActiveIndex: a vertical press in a grid keeps its column', () => {
+    const grid = (columns, count) => ({
+      down: (current, options = {}) =>
+        nextActiveIndex(current, count, 'ArrowDown', { columns, ...options }),
+      up: (current, options = {}) =>
+        nextActiveIndex(current, count, 'ArrowUp', { columns, ...options }),
+    });
+
+    it('moves every cell of a 4/4/2 grid down and up its own column', () => {
+      const { down, up } = grid(4, 10);
+      const expectedDown = [4, 5, 6, 7, 8, 9, 2, 3, 0, 1];
+      const expectedUp = [8, 9, 6, 7, 0, 1, 2, 3, 4, 5];
+      for (let current = 0; current < 10; current += 1) {
+        assert.equal(down(current), expectedDown[current], `ArrowDown from ${current}`);
+        assert.equal(up(current), expectedUp[current], `ArrowUp from ${current}`);
+      }
+    });
+
+    it('wraps a 3/3/1 grid by column, and a lone last cell is its own column', () => {
+      const { down, up } = grid(3, 7);
+      assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map(down), [3, 4, 5, 6, 1, 2, 0]);
+      assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map(up), [6, 4, 5, 0, 1, 2, 3]);
+    });
+
+    it('holds still in a single row, where every column has one cell', () => {
+      const { down, up } = grid(4, 3);
+      for (let current = 0; current < 3; current += 1) {
+        assert.equal(down(current), current);
+        assert.equal(up(current), current);
+      }
+    });
+
+    it('treats a grid of one cell per column as a single row however many cells it has', () => {
+      const { down, up } = grid(6, 6);
+      for (let current = 0; current < 6; current += 1) {
+        assert.equal(down(current), current);
+        assert.equal(up(current), current);
+      }
+    });
+
+    it('walks a single column as a plain ring', () => {
+      const { down, up } = grid(2, 2);
+      assert.equal(down(0), 0);
+      assert.equal(up(1), 1);
+      const tall = grid(2, 6);
+      assert.deepEqual([0, 2, 4].map(tall.down), [2, 4, 0]);
+      assert.deepEqual([0, 2, 4].map(tall.up), [4, 0, 2]);
+    });
+
+    it('leaves Home, End and the sideways keys on the flat order', () => {
+      const options = { columns: 4 };
+      assert.equal(nextActiveIndex(5, 10, 'Home', options), 0);
+      assert.equal(nextActiveIndex(5, 10, 'End', options), 9);
+      assert.equal(nextActiveIndex(9, 10, 'ArrowRight', options), 0);
+      assert.equal(nextActiveIndex(0, 10, 'ArrowLeft', options), 9);
+      assert.equal(nextActiveIndex(3, 10, 'ArrowRight', options), 4);
+    });
+
+    it('enters a grid at an end, since no column is active yet', () => {
+      assert.equal(grid(4, 10).down(-1), 0);
+      assert.equal(grid(4, 10).up(-1), 9);
+      assert.equal(grid(4, 10).down(40), 0);
     });
   });
 
@@ -190,10 +277,20 @@ describe('listbox navigation: the cursor arithmetic', () => {
       assert.equal(nextActiveIndex(0, 4, 'ArrowDown', { isDisabled }), 2);
     });
 
-    it('walks the FLAT order when it skips in a grid, so a gated column strands nothing', () => {
-      // The press is `columns` wide; the skip scan is one cell.
-      assert.equal(nextActiveIndex(0, 6, 'ArrowDown', { columns: 3, isDisabled: gated(3) }), 4);
-      assert.equal(nextActiveIndex(4, 6, 'ArrowUp', { columns: 3, isDisabled: gated(1) }), 0);
+    it('skips a gated cell along its column in a grid, and holds still with none to reach', () => {
+      // Column 0 of a 6/3 grid is {0, 3}; column 1 is {1, 4}.
+      assert.equal(nextActiveIndex(0, 6, 'ArrowDown', { columns: 3, isDisabled: gated(3) }), 0);
+      assert.equal(nextActiveIndex(4, 6, 'ArrowUp', { columns: 3, isDisabled: gated(1) }), 4);
+      // Column 1 of a 4/4/2 grid is {1, 5, 9}: the gated middle cell is crossed, not landed on.
+      assert.equal(nextActiveIndex(1, 10, 'ArrowDown', { columns: 4, isDisabled: gated(5) }), 9);
+      assert.equal(nextActiveIndex(9, 10, 'ArrowUp', { columns: 4, isDisabled: gated(5) }), 1);
+      assert.equal(nextActiveIndex(1, 10, 'ArrowUp', { columns: 4, isDisabled: gated(9) }), 5);
+    });
+
+    it('still walks the FLAT order for a sideways press and for entry from the sentinel', () => {
+      assert.equal(nextActiveIndex(2, 6, 'ArrowRight', { columns: 3, isDisabled: gated(3) }), 4);
+      assert.equal(nextActiveIndex(-1, 6, 'ArrowDown', { columns: 3, isDisabled: gated(0) }), 1);
+      assert.equal(nextActiveIndex(-1, 6, 'ArrowUp', { columns: 3, isDisabled: gated(5) }), 4);
     });
 
     it('is TODAY`S ARITHMETIC for every caller that passes no predicate', () => {

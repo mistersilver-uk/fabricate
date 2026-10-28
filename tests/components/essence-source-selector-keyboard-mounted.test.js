@@ -150,13 +150,13 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
     const announced = announceAcross({ holder, key: 'ArrowDown', presses: 6 });
     assert.deepEqual(
       announced,
-      [0, 2, 4, 1, 3, 0].map((index) => rows[index].id),
-      'ArrowDown steps down a COLUMN — two cells in a two-column grid — and wraps over the flat ' +
-        'order, which is what keeps the ragged last row reachable'
+      [0, 2, 4, 0, 2, 4].map((index) => rows[index].id),
+      'ArrowDown steps down a COLUMN — two cells in a two-column grid — and wraps within it, ' +
+        'so the ragged last row is entered from its own column only'
     );
     assert.deepEqual(
       markedRows(panel).map((row) => row.id),
-      [rows[0].id],
+      [rows[4].id],
       'exactly one row is marked, and it is the one the holder names'
     );
   });

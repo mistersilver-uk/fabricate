@@ -1124,7 +1124,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       icon: 'fas fa-tag',
     }));
 
-    it('steps four columns by rows and wraps a ragged last row by the flat ring', async () => {
+    it('steps four columns by rows and keeps the column across a ragged last row', async () => {
       await mountPicker({ as: 'grid', columns: 4, options: TEN });
       const panel = await openPanel();
       const holder = panel.querySelector(':scope .manager-travel-popover-search input');
@@ -1144,8 +1144,41 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       pressKey('ArrowDown');
       assert.equal(
         activeDescendant(holder),
-        rows[2].id,
-        'ArrowDown from tile 9 has no tile under it and wraps by the flat ring to tile 3'
+        rows[0].id,
+        'ArrowDown from tile 9 wraps to the top of its own column, tile 1'
+      );
+      harness.remount();
+    });
+
+    it('wraps ArrowUp from the first tile and ArrowDown from a full row down the column', async () => {
+      await mountPicker({ as: 'grid', columns: 4, options: TEN });
+      const panel = await openPanel();
+      const holder = panel.querySelector(':scope .manager-travel-popover-search input');
+      const rows = optionRows(panel);
+
+      pressKey('Home');
+      assert.equal(activeDescendant(holder), rows[0].id, 'the cursor is on tile 1');
+      pressKey('ArrowUp');
+      assert.equal(
+        activeDescendant(holder),
+        rows[8].id,
+        'ArrowUp from the first tile lands on the tile below it in its column, tile 9'
+      );
+      pressKey('Home');
+      pressKey('ArrowRight');
+      pressKey('ArrowRight');
+      pressKey('ArrowRight');
+      pressKey('ArrowUp');
+      assert.equal(
+        activeDescendant(holder),
+        rows[7].id,
+        'ArrowUp from the fourth tile passes the missing cell and lands on tile 8'
+      );
+      pressKey('ArrowDown');
+      assert.equal(
+        activeDescendant(holder),
+        rows[3].id,
+        'and ArrowDown from the end of that full row returns to the top of the column'
       );
       harness.remount();
     });
