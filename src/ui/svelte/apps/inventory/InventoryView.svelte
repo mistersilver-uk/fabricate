@@ -123,8 +123,8 @@
   function onResetSalvage() {
     store?.resetSalvage?.();
   }
-  function onReorderSalvageStage(index, target, announcement) {
-    store?.reorderSalvageStage?.(index, target, announcement);
+  function onReorderSalvageStage(index, target) {
+    store?.reorderSalvageStage?.(index, target);
   }
   // The announcement is owned here, not by the store: the store holds no i18n, and a
   // keyboard user who presses Reset must hear that the order moved — the rows change

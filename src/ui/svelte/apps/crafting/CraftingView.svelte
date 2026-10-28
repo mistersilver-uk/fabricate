@@ -210,12 +210,11 @@
     store?.setEssenceAllocation(itemKey, units);
   }
   function onPickForMe() {
-    // The component owns the i18n and the store owns the state, mirroring the
-    // progressive reorder path: the localized sentence is passed IN.
+    // The component owns the i18n and the store owns the state: the localized sentence is passed in.
     store?.pickForMe(localize('FABRICATE.App.Crafting.Slots.PickedForYou'));
   }
-  function onReorderStage(index, target, announcement) {
-    store?.reorderProgressiveStage(index, target, announcement);
+  function onReorderStage(index, target) {
+    store?.reorderProgressiveStage(index, target);
   }
   function onReorderStageSettled() {
     void store?.flushProgressiveOrder();
