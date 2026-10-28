@@ -1,4 +1,4 @@
-/** The SOURCE-level contract of the three scoped-entity list shells (issue 1380, epic 1357). */
+/** The SOURCE-level contract of the scoped-entity list frame and catalogue shell (issue 1380). */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
@@ -20,8 +20,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
 const FRAME = `${SCOPED_DIR}/EntityListInspectorFrame.svelte`;
 const CATALOGUE = `${SCOPED_DIR}/EntityCatalogueShell.svelte`;
-const RULES = `${SCOPED_DIR}/EntityRulesListShell.svelte`;
-const SHELLS = Object.freeze([FRAME, CATALOGUE, RULES]);
+const SHELLS = Object.freeze([FRAME, CATALOGUE]);
 // The `SYSTEM RULES n / m` panel.
 const ROSTER = `${SCOPED_DIR}/SystemRulesRoster.svelte`;
 
@@ -122,35 +121,9 @@ const CATALOGUE_PROPS = [
   'title',
 ];
 
-const RULES_PROPS = [
-  'actions',
-  'armedToken',
-  'bulk',
-  'browserState',
-  'emptyHint',
-  'emptyTitle',
-  'filters',
-  'hookValue',
-  'icon',
-  'onOpenEditor',
-  'onOpenWorldEntry',
-  'onSelect',
-  'rowMeta',
-  'scope',
-  'searchOf',
-  'sectionNotes',
-  'selectedId',
-  'sorts',
-  'subtitle',
-  'systemId',
-  'systemName',
-  'systems',
-  'title',
-];
-
-describe('the shells declare the pinned prop sets', () => {
-  it('finds a non-empty destructure in each shell first', () => {
-    // NON-VACUITY. A parse that found nothing would satisfy neither equality below by accident —
+describe('the catalogue shell declares its pinned prop set', () => {
+  it('finds a non-empty destructure in the frame and the shell first', () => {
+    // NON-VACUITY. A parse that found nothing would satisfy the equality below by accident —
     // it would throw — but it would also throw on a rename, so the count is stated separately to
     // say what "found" means.
     for (const path of SHELLS) {
@@ -160,72 +133,6 @@ describe('the shells declare the pinned prop sets', () => {
 
   it('EntityCatalogueShell declares exactly its pinned set', () => {
     assert.deepEqual(declaredProps(sourceOf(CATALOGUE)), [...CATALOGUE_PROPS].sort());
-  });
-
-  it('EntityRulesListShell declares exactly its pinned set', () => {
-    assert.deepEqual(declaredProps(sourceOf(RULES)), [...RULES_PROPS].sort());
-  });
-
-  it('differs from the catalogue by exactly the four system-scope props and the two it drops', () => {
-    // Stated as a DIFFERENCE rather than as two independent lists.
-    const catalogue = new Set(CATALOGUE_PROPS);
-    const rules = new Set(RULES_PROPS);
-    assert.deepEqual([...rules].filter((name) => !catalogue.has(name)).sort(), [
-      'armedToken',
-      'onOpenEditor',
-      'onOpenWorldEntry',
-      'systemId',
-      'systemName',
-    ]);
-    assert.deepEqual([...catalogue].filter((name) => !rules.has(name)).sort(), [
-      // M14's opt-in is catalogue-only for the reason the rest are: the rules-list shell has no
-      // inspector to populate, and its own first-row rule is `ComponentsBrowserView`'s.
-      'autoSelectFirst',
-      // The seven inspector/list copy props issue 1372 added, plus the two the split always had.
-      'columnLead',
-      'countUnit',
-      // The five parity switches (issue 1373) are catalogue-only for the same reason.
-      'describeEntry',
-      'extraCards',
-      // M24's opt-in is catalogue-only as M14's is: the rules-list shell has no inspector.
-      'flushBulkDock',
-      // AND THE TWO PARITY OPT-OUTS (issue 1371).
-      'inspectorBody',
-      'inspectorBodyPlacement',
-      'inspectorCaption',
-      'inspectorFoot',
-      'inspectorKicker',
-      // AND THE TWO LIST SEAMS issue 1373's parity round added.
-      'listLead',
-      'membershipFilter',
-      'nameEntry',
-      'onOpenEntry',
-      'onOpenSystemRules',
-      'openEntryLabel',
-      // AND THE FOUR issue 1371 r8-cat SWITCHES.
-      'openEntryLabelled',
-      'restingHint',
-      'restingTitle',
-      // AND THE ZERO-MEMBER ROSTER SENTENCE (issue 1371).
-      'rosterEmptyNote',
-      // AND THE FOUR issue 1371 r9-cat PRIMITIVE SEAMS.
-      'rosterRecessed',
-      'rowMedallion',
-      'rowNameTrailing',
-      'rowSecondLine',
-      'rowSourceBadge',
-      'rowTrailing',
-      'searchPlaceholder',
-      'sectionIcons',
-      'sectionTitles',
-      'selectAllLabel',
-      // Catalogue-only for the reason `splitToolbar` is: the rules-list shell's selection band is
-      // the shipped one and no reference asks it to move.
-      'selectAllScope',
-      'showWorldDefaults',
-      'splitToolbar',
-      'systemRowAction',
-    ]);
   });
 });
 
@@ -239,9 +146,9 @@ describe('no chrome is inlined into a shell', () => {
   ];
 
   // ONE SANCTIONED EXCEPTION, AND IT IS BOUNDED BY POSITION AND BY PROPS.
-  const INSPECTOR_PAGER = { [CATALOGUE]: 0, [RULES]: 0 };
+  const INSPECTOR_PAGER = { [CATALOGUE]: 0 };
 
-  for (const shell of [CATALOGUE, RULES]) {
+  for (const shell of [CATALOGUE]) {
     it(`${shell.split('/').pop()} renders exactly one frame and none of the composed chrome`, () => {
       const source = sourceOf(shell);
       // POSITIVE FIRST: an empty or renamed file satisfies every `=== 0` below.
@@ -316,7 +223,7 @@ describe('no chrome is inlined into a shell', () => {
   });
 });
 
-describe('the two file-naming gates neither shell may trip', () => {
+describe('the two file-naming gates the shell may not trip', () => {
   it('no new scoped component starts with `World` unless it is a declared entry child', () => {
     // `manager-contract.test.js` filters this directory on that prefix and asserts exactly seven
     // placeholder PAGES; an eighth `World…` file makes that count wrong unless both gates agree
@@ -355,7 +262,6 @@ describe('the two file-naming gates neither shell may trip', () => {
     }
     // …and the hook they DO carry is a bound value, so the regex above cannot match it.
     assert.match(sourceOf(CATALOGUE), /data-scoped-list=\{hookValue\}/);
-    assert.match(sourceOf(RULES), /data-scoped-rules-list=\{hookValue\}/);
   });
 });
 
@@ -393,7 +299,7 @@ describe('the spread detector, proved against fixtures before it is applied', ()
     assert.deepEqual(detectShellSpreads(`${ALIASED}\n<CatalogueRow {...props} />`, SHELLS), []);
   });
 
-  it('resolves a binding only for an import of one of the three shells', () => {
+  it('resolves a binding only for an import of one of the shells', () => {
     assert.deepEqual(shellBindingsIn(`${IMPORT}`, SHELLS), ['EntityCatalogueShell']);
     assert.deepEqual(
       shellBindingsIn(`import Chip from '../Chip.svelte';`, SHELLS),
@@ -414,8 +320,8 @@ describe('the spread detector, proved against fixtures before it is applied', ()
         offenders.push(`src/${relative}: <${hit.binding} … {…spread}`);
       }
     }
-    // The call-site set is what makes the `=== 0` a measurement. Today it is the two shells,
-    // which both compose the frame by name.
+    // The call-site set is what makes the `=== 0` a measurement. Today it is the catalogue shell,
+    // which composes the frame by name, and the pages that mount it.
     assert.ok(
       callSites.length >= 2,
       `only ${callSites.length} file(s) reference a shell, so the ban below is applied to almost ` +
@@ -542,18 +448,16 @@ describe('the armed token crosses the shell boundary as a binding', () => {
   // ── WHY THIS HALF IS STRUCTURAL ─────────────────────────────────────────────────────────
   // The frame's disarm is proved BEHAVIOURALLY in the mounted suite, on the catalogue, where
   // the arming control is on screen: arm a Remove, search, and the control is disarmed. The
-  // rules-list shell renders no arming control at all — the cluster belongs beside the entry,
-  // which for a system-scope route is the shared aside outside this shell — so the thing that
-  // matters there is that the OWNER's token reaches the frame and comes back. That is a
-  // binding, and a binding's write-back is not observable from a mounted target.
+  // token reaches the frame and comes back through a binding, whose write-back is not
+  // observable from a mounted target.
   it('the frame declares it bindable and clears it', () => {
     const frame = sourceOf(FRAME);
     assert.match(frame, /armedToken = \$bindable\(''\)/);
     assert.match(frame, /if \(armedToken\) armedToken = '';/);
   });
 
-  it('both shells BIND it through rather than passing a value', () => {
-    for (const shell of [CATALOGUE, RULES]) {
+  it('the shell BINDS it through rather than passing a value', () => {
+    for (const shell of [CATALOGUE]) {
       const source = sourceOf(shell);
       assert.match(source, /bind:armedToken/, `${shell} passes the token without binding it`);
       assert.equal(
@@ -564,10 +468,8 @@ describe('the armed token crosses the shell boundary as a binding', () => {
     }
   });
 
-  it('the RULES shell exposes it to its owner, and the catalogue keeps it internal', () => {
-    // The asymmetry is deliberate: a rules list shares its owner's single-armed-token invariant
-    // with the shared aside beside it, and a catalogue draws the only inspector on its route.
-    assert.match(sourceOf(RULES), /armedToken = \$bindable\(''\)/);
+  it('the catalogue keeps the token internal', () => {
+    // A catalogue draws the only inspector on its route, so nothing outside it arms anything.
     assert.equal(
       /armedToken = \$bindable\(/.test(sourceOf(CATALOGUE)),
       false,
