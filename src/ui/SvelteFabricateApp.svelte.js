@@ -1,3 +1,5 @@
+import { withStationPresence } from '../systems/stationPresence.js';
+
 import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
@@ -100,6 +102,11 @@ function presentToolsFor(activeCanvasTool) {
 function withStationCommand(command, presentTools) {
   if (!presentTools || command?.runType !== 'crafting') return command;
   return { ...command, payload: { ...command.payload, presentTools } };
+}
+
+// A per-call station view, so the shopping list's Tool consults agree with recipe detail.
+function stationRecipeManager(presentTools) {
+  return withStationPresence(game?.fabricate?.getRecipeManager?.() ?? null, presentTools);
 }
 
 function sameStation(current, next) {
@@ -229,7 +236,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     const withStation = (opts) => ({ ...opts, presentTools: presentTools() });
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
-      getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
+      getRecipeManager: () => stationRecipeManager(presentTools()),
       getActiveCanvasTool: () => this._activeCanvasTool ?? null,
       listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.({
         presentTools: presentTools(),

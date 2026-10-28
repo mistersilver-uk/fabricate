@@ -4451,11 +4451,11 @@ Requirements:
    A started stage re-validates its Tools when it resolves, so a stage begun at a station resolves only while a station supplying that Tool is active again; a check described with the station is redeemed by an `execute` that must carry it too.
    The Journal projection and the stage commands answer Tool readiness from the one shared predicate (`RunJournal` requirement 2) under the same viewer's station, so a control the projection enables with the station is one the command accepts with it.
    Replacing or clearing the active station refreshes the open recipe's hydrated detail and the Journal's stage readiness without a loading indicator, keeping the open recipe selected.
+   The shopping-list aggregate evaluates its Tools through the player app's per-call station view of the recipe manager and is re-evaluated on every listing load, so a Tool the active station supplies is not listed to acquire, and is listed again once the station is cleared.
 6. `presentTools` is a client-asserted claim, as on gathering's versioned start.
    The active-GM authority does not re-verify that the sender's token occupies an activated station, and the re-resolution it performs under its execution claim (§ Authority Ledger and Recovery Boundary) does not include it.
    The claim can satisfy only Tool presence within its own crafting system; it never causes usage, breakage, consumption or an award.
 7. The station does not reach salvage, companion pooled holdings (`presentTools: null`), alchemy submission (`submitAlchemyAttempt`), or the world-time automatic advance, which has no player command to carry one and so blocks or refuses a Tool-bearing stage without spending.
-   The shopping-list aggregate is not a target of this requirement (deferred).
 
 ### Item → Tool Drop Resolution
 

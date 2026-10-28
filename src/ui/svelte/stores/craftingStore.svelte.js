@@ -416,10 +416,9 @@ export function createCraftingStore({ services } = {}) {
   );
 
   const shoppingAggregate = $derived.by(() => {
+    void listing; // a load pass, such as a station change or an inventory mutation, re-evaluates it
     const recipeManager = services?.getRecipeManager?.() ?? null;
-    if (!recipeManager || shoppingEntries.length === 0) {
-      return aggregateShoppingList([], recipeManager, []);
-    }
+    if (!recipeManager || shoppingEntries.length === 0) return aggregateShoppingList([], null, []);
     const sourceActors = services?.getCraftingSourceActors?.() ?? [];
     return aggregateShoppingList(shoppingEntries, recipeManager, sourceActors, {
       craftingActor: resolveCraftingActorFrom(sourceActors),
