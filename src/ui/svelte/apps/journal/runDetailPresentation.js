@@ -54,6 +54,7 @@ function personalizedChance(drop) {
   return Math.min(100, Math.max(0, raw <= 1 ? raw * 100 : raw));
 }
 
+/** Each entry the breakdown prices, with that drop's own chance and the engine's roll threshold. */
 export function applyPersonalizedDrops(entries, breakdown) {
   const byId = new Map(
     (Array.isArray(breakdown?.drops) ? breakdown.drops : []).map((drop) => [
@@ -62,8 +63,10 @@ export function applyPersonalizedDrops(entries, breakdown) {
     ])
   );
   return entries.map((entry) => {
-    const chance = personalizedChance(byId.get(String(entry?.id ?? '')));
-    return chance == null ? entry : { ...entry, chance };
+    const drop = byId.get(String(entry?.id ?? ''));
+    const chance = personalizedChance(drop);
+    if (chance == null) return entry;
+    return { ...entry, chance, threshold: Number.isFinite(drop.threshold) ? drop.threshold : null };
   });
 }
 

@@ -160,6 +160,7 @@ Each field and row MUST retain its known evidence independently: raw roll, effec
 Unknown outcomes MUST remain neutral rather than missed; missing quantities MUST NOT hide known quantities on neighboring rows.
 Actual receipts not uniquely attributed to a selected row MUST appear once below the scale, excluding receipts already represented by row quantities.
 Unknown per-row award attribution MUST NOT erase known check evidence: retain those outcomes with Not recorded amounts and show the unattributed actual award once with an explanation.
+An active d100 gathering preview MUST state each row's effective-roll threshold as the gathering engine states it, and MUST NOT derive one from the row's chance.
 Routed gathering success shows Final check, Brought back and How the check landed; routed failure shows its verdict and actual outcome log without repeating the log's roll in the verdict.
 The full OutcomeLadder remains an active preview; its native selection bands and highest-matching/lowest-relative-fallback rule MUST be stated truthfully rather than adopting prototype low-roll semantics.
 A roll-under ladder MUST rank its tiers through the check's own direction and state its bands with `≤` and `>` (or `<` and `≥` when strict), and its hint MUST state the roll-under selection rule: the tier with the lowest threshold the roll stays at or under (or under), else the tier with the highest threshold.

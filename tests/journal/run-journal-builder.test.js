@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { dropThreshold } from '../../src/systems/gatheringRichStateInternals.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
@@ -1196,6 +1197,31 @@ test('2324: an active d100 gathering run projects no roll, so its preview draws 
   assert.ok(
     preview.entries.every((entry) => !Object.hasOwn(entry, 'cleared')),
     'and carries no per-row verdict for the scale to read in either direction'
+  );
+});
+
+test('2331: an active d100 preview row carries the engine threshold for its chance', () => {
+  const task = {
+    id: 'd100-task',
+    resolutionMode: 'd100',
+    dropRows: [
+      { id: 'moss-row', componentId: 'moss', quantity: 2, dropRate: 65, enabled: true },
+      { id: 'sure-row', componentId: 'reed', quantity: 1, dropRate: 140, enabled: true },
+      { id: 'never-row', componentId: 'fern', quantity: 1, dropRate: 0, enabled: true },
+    ],
+  };
+  const listing = makeBuilder({
+    gatheringActive: [
+      { id: 'd100-active', craftingSystemId: 'sys-1', environmentId: 'env-1', taskId: 'd100-task', status: 'inProgress' },
+    ],
+    getGatheringTask: () => task,
+    getComponent: (_systemId, componentId) => ({ id: componentId, name: componentId }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.deepEqual(
+    listing.activeRuns[0].gatheringYield.entries.map((entry) => [entry.chance, entry.threshold]),
+    [[65, dropThreshold(65)], [100, dropThreshold(100)], [0, dropThreshold(0)]],
+    'the clamped chance, then the roll it drops on'
   );
 });
 
