@@ -17,6 +17,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -281,6 +282,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     for (const modulePath of [
       ...FOUNDRY_BRIDGE_RAW_MODULES,
       ...LOCALIZE_OR_RAW_MODULES,
+      ...STATUS_TONE_RAW_MODULES,
       ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',
@@ -2304,6 +2306,55 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(
       callouts.textContent.includes('Callout.NodeExhausted'),
       'the exhausted callout label is shown'
+    );
+  });
+
+  it('row draws each callout as a list-density chip in the tone the specimen uses', async () => {
+    await renderRow({
+      task: {
+        id: 't1',
+        name: 'Vein',
+        attemptable: false,
+        blockedReasons: [
+          { code: 'TOOL_BLOCKED' },
+          { code: 'GAME_PAUSED' },
+          { code: 'SOMETHING_NEW', message: 'Unmapped reason' },
+        ],
+      },
+    });
+    const chips = [...target.querySelectorAll('[data-gathering-callouts] > *')];
+    assert.deepEqual(
+      chips.map((chip) => [chip.textContent.trim(), chip.classList.contains('manager-chip')]),
+      [
+        ['FABRICATE.App.Gathering.Detail.Callout.MissingTools', true],
+        ['FABRICATE.App.Gathering.Detail.Callout.Paused', true],
+        ['Unmapped reason', true],
+      ],
+      'one shared Chip per distinct blocked reason, with its label unchanged'
+    );
+    assert.ok(
+      chips.every((chip) => chip.classList.contains('is-list')),
+      'at the list density the specimen draws its badges at'
+    );
+    assert.deepEqual(
+      chips.map((chip) => [
+        chip.classList.contains('is-warning'),
+        chip.classList.contains('is-neutral'),
+      ]),
+      [
+        [true, false],
+        [false, true],
+        [true, false],
+      ],
+      'warning stays warning and neutral stays neutral'
+    );
+    assert.ok(
+      chips.every((chip) => chip.querySelector('i.fas') !== null),
+      'each keeps its leading glyph'
+    );
+    assert.ok(
+      !target.querySelector('.gathering-task-callout'),
+      'and no hand-rolled scoped pill remains'
     );
   });
 
