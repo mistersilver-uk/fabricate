@@ -365,7 +365,10 @@ describe('acquireStandaloneOverlayLayer', () => {
     const layer = acquireStandaloneOverlayLayer(document, {});
     const face = ({ style }) => [style.fontFamily, style.fontSize];
     const container = createOverlayContainer(layer.host, standInChain(layer.host));
-    assert.deepEqual(face(container), ['var(--font-primary)', 'var(--font-size-14)']);
+    assert.deepEqual(face(container), [
+      'var(--font-body, var(--font-primary, sans-serif))',
+      'var(--font-size-14)',
+    ]);
     assert.deepEqual(face(layer.host), ['', ''], 'the layer itself states none');
     const framed = createOverlayContainer(element(), standInChain(layer.host));
     assert.deepEqual(face(framed), ['', ''], 'a container elsewhere states none');

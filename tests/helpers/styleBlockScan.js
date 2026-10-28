@@ -237,7 +237,7 @@ function topLevelCommas(text) {
 }
 
 /** The first top-level comma, or -1 — the single cut cutting `var(--a, F)` into name and fallback. */
-function topLevelComma(text) {
+export function topLevelComma(text) {
   const [first] = topLevelCommas(text);
   return first ?? -1;
 }
@@ -320,7 +320,7 @@ export function rulesIn(css) {
 }
 
 /** The index just past the `)` that closes the `(` at or after `from`, or -1 when nothing does. */
-function closingParenthesis(text, from) {
+export function closingParenthesis(text, from) {
   let depth = 0;
   for (let scan = from; scan < text.length; scan += 1) {
     if (text[scan] === '(') depth += 1;
