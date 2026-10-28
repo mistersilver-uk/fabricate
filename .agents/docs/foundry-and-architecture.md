@@ -772,7 +772,7 @@ Per-open state must therefore be re-seeded by an `$effect` keyed on `open` AND t
 A mounted suite that calls `remount()` before every case cannot see this class of defect, because the remount is the one thing the live root never does; drive the reopen through `setProps` in at least one case.
 
 Nor does an outside-click dismissal tie such a dialog to its route.
-`dismissOnOutsideClick` in `src/ui/svelte/actions/dismissOnOutsideClick.js` listens on `mousedown` and Escape, never on `click`, so a keyboard activation of a rail or breadcrumb control navigates without dismissing, and the dialog survives onto the next screen; that is reachable whenever the dialog never moves focus into itself, because the GM's focus is still on the trigger behind an `aria-modal` panel.
+`dismissOnOutsideClick` in `src/ui/svelte/actions/dismissOnOutsideClick.js` listens on `mousedown` and Escape, never on `click`, so a keyboard activation of a rail or breadcrumb control navigates without dismissing, and the dialog survives onto the next screen; that is reachable whenever the dialog never moves focus into itself, because the GM's focus is still on the trigger behind the dialog.
 Any claim that a modal "cannot outlive its route" because navigation dismisses it is false for keyboard activation and only approximately true for pointers.
 Close it from the route instead, with an `$effect` on `currentView` as the catalogue picker now does, and land focus inside the dialog on open as `ImportFolderMappingModal.svelte` does (issue 1371, Foundry review finding 2).
 
