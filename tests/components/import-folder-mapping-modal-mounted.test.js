@@ -19,6 +19,7 @@ import {
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
+import { assertTrapsFocus } from '../helpers/modalTrapContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -258,6 +259,16 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
     assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.equal(root.getAttribute('role'), 'dialog');
+  });
+
+  it('traps focus: in on open at match-by-name, Tab wraps, Escape closes, focus returns (issue 2682)', async () => {
+    await assertTrapsFocus({
+      open: (onClose) => harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose }),
+      close: () => harness.setProps({ open: false }),
+      dialog: '[data-import-mapping]',
+      landing: '[data-import-mapping-match] input',
+      last: '[data-import-mapping-commit]',
+    });
   });
 });
 

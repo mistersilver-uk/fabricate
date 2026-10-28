@@ -5,6 +5,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertTrapsFocus } from '../helpers/modalTrapContract.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -117,7 +118,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.ok(root, 'expected the report to be portaled');
     assert.ok(root.hasAttribute('data-manager-modal'), 'wears the shared modal chrome');
     assert.equal(root.getAttribute('role'), 'dialog');
-    assert.ok(!root.hasAttribute('aria-modal'), 'traps no focus, so it is not announced as modal');
+    assert.equal(root.getAttribute('aria-modal'), 'true', 'it traps focus, so it is modal');
     assert.ok(document.querySelector('[data-manager-modal-close]'), 'has the round close control');
   });
 
@@ -206,7 +207,40 @@ describe('ImportReportModal (mounted)', () => {
     assert.equal(closed, 2);
   });
 
-  it('keeps the chrome the roll prompt\'s additive Modal props leave at their defaults', async () => {
+  it('traps focus: in on open at the close control, Tab wraps, Escape closes, focus returns (issue 2682)', async () => {
+    await assertTrapsFocus({
+      open: (onClose) => harness.mount({ open: true, content: REPORTED_CONTENT, onClose }),
+      close: () => harness.setProps({ open: false }),
+      dialog: '[data-import-report]',
+      landing: '[data-manager-modal-close]',
+      last: '[data-import-report-close]',
+    });
+  });
+
+  it('returns focus to the manager window on close when nothing held focus as it opened (issue 2682)', async () => {
+    await new Promise((settle) => document.defaultView.requestAnimationFrame(settle));
+    document.activeElement?.blur?.();
+    assert.ok(document.activeElement === document.body, 'nothing holds focus');
+    let closed = 0;
+    const root = await harness.mount({
+      open: true,
+      content: REPORTED_CONTENT,
+      onClose: () => (closed += 1),
+    });
+    document.activeElement.dispatchEvent(
+      new document.defaultView.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    assert.equal(closed, 1);
+    await harness.setProps({ open: false });
+    await new Promise((settle) => document.defaultView.requestAnimationFrame(settle));
+    assert.ok(document.activeElement === root, 'focus is on the manager root, not on the page');
+  });
+
+  it('keeps the chrome the roll prompt\'s additive Modal props leave at their defaults, trapFocus aside', async () => {
     let closed = 0;
     const opener = document.createElement('button');
     document.body.append(opener);
@@ -230,7 +264,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
     assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     moduleSheet.remove();
-    assert.ok(document.activeElement === opener, 'focus stays where it was without trapFocus');
+    assert.ok(document.activeElement === close, 'trapFocus moves focus onto the close control');
     const seen = [];
     const onWindowKey = (event) => seen.push([event.key, event.defaultPrevented]);
     document.defaultView.addEventListener('keydown', onWindowKey);

@@ -530,6 +530,25 @@ for (const trapFocus of [false, true]) {
       }
     );
 
+    it(
+      trapFocus
+        ? 'takes a Tab back in once the focused control is removed and focus has fallen to the page (issue 2682)'
+        : 'leaves a Tab with focus fallen to the page to the browser',
+      async () => {
+        await focusedDialog();
+        const plain = q('[data-plain]');
+        plain.focus();
+        plain.remove();
+        assert.ok(document.activeElement === document.body, 'focus fell to the page');
+        const event = key('keydown', { key: 'Tab' });
+        document.body.dispatchEvent(event);
+        assert.equal(event.defaultPrevented, trapFocus);
+        if (trapFocus) {
+          assert.ok(document.activeElement === q('[data-manager-modal-close]'), 'back inside');
+        }
+      }
+    );
+
     it('leaves a Tab a control inside already claimed alone', async () => {
       await focusedDialog();
       const last = q('[data-footer-button]');

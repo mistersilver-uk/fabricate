@@ -13,7 +13,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls `onClose`. |
-  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled; only then is the dialog `aria-modal` (issue 2662). |
+  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled or is the page; only then is the dialog `aria-modal` (issue 2662). |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
@@ -178,8 +178,14 @@
     return [...node.querySelectorAll(FOCUSABLE)].filter((element) => !element.closest('[inert]'));
   }
 
+  // The page itself is no opener, nor a place focus stays inside a trapped dialog.
+  function isPage(element) {
+    const doc = element?.ownerDocument;
+    return !element || element === doc?.body || element === doc?.documentElement;
+  }
+
   function restoreFocus(opener, host) {
-    if (opener?.isConnected && !opener.disabled) {
+    if (!isPage(opener) && opener.isConnected && !opener.disabled) {
       opener.focus?.();
       return;
     }
@@ -205,15 +211,15 @@
 
   // A trapped modal owns the keyboard: Foundry's window-level keybindings read only
   // `document.activeElement`. Stopped at the document, so Svelte's delegated handlers still run.
-  // A Tab from a panel outside whose handler moved focus inside, as a picker's does, is handled as
-  // one from inside.
+  // A Tab from a panel outside whose handler moved focus inside, as a picker's does, or with focus
+  // fallen to the page, as when the focused control is removed, is handled as one from inside.
   function ownKeyboard(node, enabled) {
     if (!enabled) return {};
     const doc = node.ownerDocument;
+    const ours = () => node.contains(doc.activeElement) || isPage(doc.activeElement);
     const stop = (event) => {
       if (node.contains(event.target)) event.stopPropagation();
-      else if (event.key === 'Tab' && !event.defaultPrevented && node.contains(doc.activeElement))
-        handleTab(event, node);
+      else if (event.key === 'Tab' && !event.defaultPrevented && ours()) handleTab(event, node);
     };
     doc.addEventListener('keydown', stop);
     return { destroy: () => doc.removeEventListener('keydown', stop) };

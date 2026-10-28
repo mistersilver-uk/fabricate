@@ -60,6 +60,7 @@
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   width="620px"
   dialogProps={{ 'data-import-report': '' }}
+  trapFocus
   {onClose}
 >
   {#snippet body()}

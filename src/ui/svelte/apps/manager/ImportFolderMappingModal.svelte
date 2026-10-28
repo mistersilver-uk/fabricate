@@ -41,7 +41,6 @@
   let assignments = $state([]);
   let matchByName = $state(true);
   let creatingCategoryFor = $state(-1);
-  let matchToggle = $state(null);
 
   function text(key, fallback) {
     if (!key) return fallback ?? '';
@@ -97,8 +96,6 @@
       matchByName = true;
       creatingCategoryFor = -1;
       seedAssignments();
-      // Land keyboard focus on the match-by-name toggle after the portaled node mounts.
-      queueMicrotask(() => matchToggle?.focus?.());
     }
   });
 
@@ -227,6 +224,8 @@
   )}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   dialogProps={{ 'data-import-mapping': '' }}
+  trapFocus
+  initialFocus="[data-import-mapping-match] input"
   {onClose}
 >
   {#snippet body()}
@@ -236,7 +235,6 @@
       <SelectionCheckbox
         density="compact"
         wrapper="contents"
-        bind:input={matchToggle}
         checked={matchByName}
         ariaLabel={text(
           'FABRICATE.Admin.Items.ImportMapping.MatchByName',

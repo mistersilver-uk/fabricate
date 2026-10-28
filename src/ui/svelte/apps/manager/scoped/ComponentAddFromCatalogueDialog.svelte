@@ -53,23 +53,7 @@
     query = '';
     selectedIds = new Set();
     refusedCount = 0;
-    focusIntoDialog();
   });
-
-  /**
-   * Land keyboard focus on the picker's search field once the portaled panel has mounted. A
-   * QUERY rather than a `bind:this`, because neither `Modal` nor `SearchField`
-   * publishes an element seam and a wrapper would break `.fabricate-search`'s flex sizing; it goes
-   * through this dialog's own two hooks. `queueMicrotask` because the panel is PORTALED.
-   */
-  function focusIntoDialog() {
-    queueMicrotask(() => {
-      const panel = globalThis.document?.querySelector?.(
-        '[data-component-add-from-catalogue-dialog]'
-      );
-      panel?.querySelector?.('[data-component-add-from-catalogue-search]')?.focus?.();
-    });
-  }
 
   function text(key, fallback) {
     if (!key) return fallback ?? '';
@@ -196,6 +180,8 @@
   )}
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
   dialogProps={{ 'data-component-add-from-catalogue-dialog': '' }}
+  trapFocus
+  initialFocus="[data-component-add-from-catalogue-search]"
   width="580px"
   onClose={dismiss}
 >
@@ -314,10 +300,11 @@
     <Button
       role="primary"
       data-component-add-from-catalogue-apply
-      disabled={applying || selectedCount === 0}
+      busy={applying}
+      disabled={selectedCount === 0}
       onclick={apply}
     >
-      <!-- At rest the label stands alone; the spinner is the reference's unreachable state. -->
+      <!-- Busy rather than disabled in a run, so focus stays on it inside the trap (issue 2682). -->
       {#if applying}
         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
       {/if}
