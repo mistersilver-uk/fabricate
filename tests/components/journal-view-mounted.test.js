@@ -1000,6 +1000,35 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!redactedTarget.querySelector('[data-journal-yield-loading]'));
   });
 
+  it("labels a d100 preview row with the threshold the engine states, never one derived from its chance", async () => {
+    const run = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30, threshold: 71 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const reading = (target) => target.querySelector('[data-yield-entry="herb"]').textContent;
+    const authored = await harness.mount({ services: makeServices(store) });
+    assert.match(reading(authored), /Yields\.HighRollThreshold:\{"chance":30,"threshold":71\}/u);
+
+    harness.remount();
+    const personalized = await harness.mount({
+      services: {
+        ...makeServices(store),
+        // 61 is not 101 - 72: the label may only be the engine's own number.
+        getGatheringDropBreakdown: async () => ({
+          drops: [{ id: 'herb', finalChance: 0.72, threshold: 61 }],
+        }),
+      },
+    });
+    await settle();
+    assert.match(reading(personalized), /"chance":72,"threshold":61\}/u);
+  });
+
   it('reports a personalized gathering preview failure and keeps the authored scale visible', async () => {
     const run = makeGatheringRun({
       environmentId: 'env-1',
@@ -1444,6 +1473,51 @@ describe('JournalView mounted behavior', () => {
       assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
       assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'false');
       assert.ok(document.activeElement === kindTrigger(target), 'focus is back on the trigger');
+    });
+
+    it('reaches "Show all run types" by Tab from the open trigger, and moves on from it (issue 2702)', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, ['salvage']);
+      const showAll = openKinds(target).querySelector('[data-journal-kind-show-all]');
+      kindTrigger(target).focus();
+      const tab = () => {
+        const event = new globalThis.KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.activeElement.dispatchEvent(event);
+        flushSync();
+        return event;
+      };
+      assert.equal(tab().defaultPrevented, true, 'the trigger moves focus itself');
+      assert.ok(document.activeElement === showAll, 'focus enters the footer');
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'true', 'the panel stays');
+      assert.equal(tab().defaultPrevented, false, 'Tab from the footer is the browser’s');
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.ok(document.activeElement === kindTrigger(target), 'focus moves on from the trigger');
+    });
+
+    it('closes the panel onto its trigger once "Show all run types" is pressed from the keyboard', async () => {
+      const { store, target } = await mountStore();
+      await showOnly(target, ['salvage']);
+      openKinds(target);
+      kindTrigger(target).focus();
+      kindTrigger(target).dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      );
+      flushSync();
+      const showAll = document.activeElement;
+      assert.ok(showAll.matches('[data-journal-kind-show-all]'), 'focus is on the footer action');
+      showAll.click();
+      flushSync();
+      await settle();
+      assert.deepEqual([...store.kindFilter], RUN_KINDS, 'every kind shows again');
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.ok(
+        document.activeElement === kindTrigger(target),
+        'focus is back on the trigger, not on the disabled action or the page'
+      );
     });
 
     it('draws the empty state for both lists when no kind is shown', async () => {

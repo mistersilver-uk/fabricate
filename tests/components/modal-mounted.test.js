@@ -510,6 +510,65 @@ for (const trapFocus of [false, true]) {
         }
       }
     );
+
+    it(
+      trapFocus
+        ? 'wraps a Tab a panel opened inside moved onto the last control (issue 2699)'
+        : 'leaves a Tab a panel opened inside moved onto the last control to the browser',
+      async () => {
+        await focusedDialog();
+        const last = q('[data-footer-button]');
+        await withPanel(last, (_panel, field) => {
+          field.focus();
+          field.addEventListener('keydown', () => last.focus(), { once: true });
+          const event = key('keydown', { key: 'Tab' });
+          field.dispatchEvent(event);
+          assert.equal(event.defaultPrevented, trapFocus);
+          const landed = trapFocus ? q('[data-manager-modal-close]') : last;
+          assert.ok(document.activeElement === landed, 'focus is where the browser takes it on');
+        });
+      }
+    );
+
+    it('leaves a Tab a control inside already claimed alone', async () => {
+      await focusedDialog();
+      const last = q('[data-footer-button]');
+      const outside = document.createElement('button');
+      document.body.append(outside);
+      try {
+        last.focus();
+        last.addEventListener(
+          'keydown',
+          (event) => {
+            event.preventDefault();
+            outside.focus();
+          },
+          { once: true }
+        );
+        last.dispatchEvent(key('keydown', { key: 'Tab' }));
+        assert.ok(document.activeElement === outside, 'the control’s own focus move stands');
+      } finally {
+        outside.remove();
+      }
+    });
+
+    it('leaves a Shift+Tab a panel opened inside already claimed alone', async () => {
+      await focusedDialog();
+      const close = q('[data-manager-modal-close]');
+      await withPanel(close, (_panel, field) => {
+        field.focus();
+        field.addEventListener(
+          'keydown',
+          (event) => {
+            event.preventDefault();
+            close.focus();
+          },
+          { once: true }
+        );
+        field.dispatchEvent(key('keydown', { key: 'Tab', shiftKey: true }));
+        assert.ok(document.activeElement === close, 'the panel’s own focus move stands');
+      });
+    });
   });
 }
 

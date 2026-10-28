@@ -416,10 +416,9 @@ export function createCraftingStore({ services } = {}) {
   );
 
   const shoppingAggregate = $derived.by(() => {
+    void listing; // a load pass, such as a station change or an inventory mutation, re-evaluates it
     const recipeManager = services?.getRecipeManager?.() ?? null;
-    if (!recipeManager || shoppingEntries.length === 0) {
-      return aggregateShoppingList([], recipeManager, []);
-    }
+    if (!recipeManager || shoppingEntries.length === 0) return aggregateShoppingList([], null, []);
     const sourceActors = services?.getCraftingSourceActors?.() ?? [];
     return aggregateShoppingList(shoppingEntries, recipeManager, sourceActors, {
       craftingActor: resolveCraftingActorFrom(sourceActors),
@@ -566,7 +565,7 @@ export function createCraftingStore({ services } = {}) {
    * recomputed in the UI; on an infeasible inventory its suggestion is the best partial one.
    *
    * @param {string} [announcement] pre-formatted live-region text (the component
-   *   owns the i18n, exactly as the progressive reorder path does).
+   *   owns the i18n).
    */
   function pickForMe(announcement = '') {
     const current = selectedCraftability;

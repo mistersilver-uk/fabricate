@@ -23,11 +23,11 @@
   - `{...rest}` lands on the root, written after `class={…}`.
 
   Invariants:
-  - In `staged` nothing writes before Apply, and Apply writes only a change. The buffer is a
-    change laid over the live `value`, so a member that changes under an open panel is kept, and
-    the footer states what it will add and remove. Escape, an outside press and the trigger close
-    the panel and discard the buffer, returning focus to whichever button opened it; Clear is never
-    disabled — pinned by `tests/components/set-picker-mounted.test.js`.
+  - In `staged` nothing writes before Apply, which writes only a change; the buffer is a change
+    laid over the live `value`, so a member changed under an open panel is kept, and the footer
+    states it. Escape, an outside press, the trigger, focus leaving the panel and Tab or Shift+Tab
+    out of it discard the buffer, Escape and Shift+Tab refocusing whichever button opened it; Clear
+    is never disabled — pinned by `tests/components/set-picker-mounted.test.js`.
 -->
 <script>
   import Avatar from './Avatar.svelte';

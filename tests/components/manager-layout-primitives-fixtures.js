@@ -137,7 +137,7 @@ export async function readTitleBarGeometry() {
         '<span aria-hidden="true">PREMIUM</span>' +
         '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>' +
         '<span class="manager-titlebar-status" data-manager-titlebar-status>' +
-        '<span class="visually-hidden">Selected system resolution</span>' +
+        '<span class="visually-hidden">Selected system resolution:</span>' +
         '<i class="manager-titlebar-status-icon"></i>' +
         '<span class="manager-titlebar-status-text">Simple</span></span></div></div>'
     );
