@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { expectEmptiedSelectionReport, focusControl } from '../helpers/emptiedSelectionReport.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { assertDockAtColumnFoot, measureInspectorDock } from '../helpers/inspectorDockGeometry.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
@@ -40,6 +41,7 @@ const harness = createMountedComponentHarness({
     // The list model this page's rows, pager and bulk bar are derived from.
     'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/model/scopedEntityListModel.js',
   ],
   compiledModules: [
@@ -57,6 +59,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     // THE `SYSTEM RULES n / m` PANEL.
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
@@ -616,6 +619,31 @@ describe('world Tools Catalogue (issue 1373)', () => {
         'the selection survived the write, so twelve rows stay ticked under a panel whose ' +
           'staged axis has reset - which reads as an edit still pending'
       );
+    });
+
+    it('reports an emptied selection and re-homes the keyboard, from either Clear and after an apply', async () => {
+      const mountTicked = async (actions = {}) => {
+        const target = await harness.mount({ scope: scopeFor({}), systems: SYSTEMS, actions });
+        tick(target, 'hammer');
+        await harness.setProps({});
+        return target;
+      };
+      for (const selector of ['[data-scoped-list-clear-selection]', '[data-world-tool-bulk-clear]']) {
+        const target = await mountTicked();
+        await expectEmptiedSelectionReport(target, async () => {
+          focusControl(target, selector).click();
+          await harness.setProps({});
+        });
+      }
+
+      const target = await mountTicked({ setWorldEnabled: () => true });
+      target.querySelector(':scope [data-world-tool-bulk-status-option="off"] input').click();
+      await harness.setProps({});
+      await expectEmptiedSelectionReport(target, async () => {
+        focusControl(target, '[data-world-tool-bulk-apply]').click();
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+        await harness.setProps({});
+      });
     });
 
     it('clears the selection from the panel header without writing anything', async () => {

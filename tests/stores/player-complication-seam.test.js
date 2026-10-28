@@ -573,7 +573,7 @@ describe('the player complication seam', () => {
       assert.equal(store.salvageOrderIsCustom, false);
       assert.equal(store.bulkSalvageable[0].orderIsPlayers, false);
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       assert.equal(store.salvageOrderIsCustom, true);
       assert.equal(
@@ -582,7 +582,7 @@ describe('the player complication seam', () => {
         'one derivation, asked on two screens'
       );
 
-      store.reorderSalvageStage(1, 0, '');
+      store.reorderSalvageStage(1, 0);
       flushSync();
       assert.equal(store.salvageOrderIsCustom, false);
       assert.equal(store.bulkSalvageable[0].orderIsPlayers, false);
@@ -648,11 +648,11 @@ describe('the player complication seam', () => {
       const { store } = await loadedSalvageStore();
       assert.equal(store.bulkSalvageable[0].orderProvenance, 'arrangeable');
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       assert.equal(store.bulkSalvageable[0].orderProvenance, 'players');
 
-      store.reorderSalvageStage(1, 0, '');
+      store.reorderSalvageStage(1, 0);
       flushSync();
       assert.equal(
         store.bulkSalvageable[0].orderProvenance,

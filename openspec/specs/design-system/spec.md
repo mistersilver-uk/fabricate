@@ -1128,12 +1128,16 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+An element with no role of its own, a `div`, `span` or `p`, MUST NOT carry an `aria-label`, because ARIA 1.2 prohibits naming a generic or paragraph and most screen readers drop the name.
+It takes a role that supports one, `group` for a set of controls or chips and `img` for a chip whose label replaces its text, or its name moves into visually hidden text; `tests/aria-label-generic-elements.test.js` fails a new offender.
+Some sites in oversized files stay listed in that test until the file-size ratchet admits a role line, and the list can only shrink.
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
 A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
 An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
 A bar's reading is its stage's `valueText` where the caller passes a non-empty one and its percentage otherwise: `RunProgress` passes "p%, stage n of m" through the `FABRICATE.Common.StageBars.Position` key for each named stage of several, whose name states no position, and none for an unnamed one, whose label does; `p` is the stage's whole percent, truncated, so a stage short of done never reads 100%.
+A bar's `aria-valuenow` is that same truncated whole percent, whatever the caller passes, so the bars of one group read their percentage alike.
 A named stage's caption is ellipsized on overflow with its stage's name as its `title`, as an entry's time is; the caption stays `aria-hidden`, so the title is a pointer affordance and the bar's own name is what is announced.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
@@ -1282,7 +1286,7 @@ Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
 The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at six shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
-The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in the search-suppressed shape only, except `IconPicker`'s snippet trigger, which states it itself in every shape (issue 2647); the inline query's close control carries it too (issue 2454).
+The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in every shape too, through the attributes the primitive spreads onto it, and `IconPicker`'s snippet trigger also states it itself (issues 2598, 2647); the inline query's close control carries it too (issue 2454).
 Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
 An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
 The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
@@ -1290,6 +1294,11 @@ Each option row therefore ALSO carries the keyboard-focus attribute, because a `
 There is a SECOND, independent reason the pointer path suppresses focus, and both are stated because either alone reads as defensive: the module root rings any `:focus-visible` `[tabindex]` descendant, so a row that took focus would draw a competing outline at a POSITIVE offset against the keyboard cursor's inset one.
 The cursor index and the option ids are defined over the FLAT RENDERED order, so a grouped list cannot emit duplicate ids and `aria-activedescendant` cannot be ambiguous.
 The holder CONSUMES `ArrowUp`, `ArrowDown`, `Home`, `End` and `Enter`, plus `ArrowLeft` and `ArrowRight` in the grid form, and leaves every other key — every printable character above all — to the control it is bound to; `Escape` closes the panel from the document's capture phase rather than from the holder.
+Tab is never the holder's: it moves focus among the panel's own focusable elements as the browser does, Tab from the last of them closes the panel without choosing, moves focus to the trigger, or to the anchor, and leaves the browser to move it on from there, and Shift+Tab from the first closes the panel and returns focus to the trigger, or to the anchor, because the panel is portaled and the element after the portal host is not the element after the trigger (issue 2676), where the overflow menu instead returns focus to its trigger, as its requirement states.
+The panel's list is `tabindex="-1"`, so a scrolling list is no tab stop of its own and the panel's tab stops are its query field and the controls its header and footer draw.
+A trigger holder with no query field whose panel draws a footer moves a forward Tab into the panel's first tab stop rather than closing it when the footer has an enabled stop, and otherwise Tab closes it, so a footer action stays reachable from the keyboard (issue 2702).
+The panel also closes without choosing, moving no focus, once focus moves to an element outside the picker's root, its anchor and the panel, and not when the browser window loses focus (issue 2598).
+The picker's trigger stops the propagation of every key but Tab, with or without Shift, so a host's own key handlers never act on a key the picker consumed, and Tab reaches the host once an open panel is closed; the trigger declares `data-keyboard-focus`, so Foundry's Tab binding never takes Tab or Shift+Tab from it.
 Four of those keys are THE CARET'S FIRST wherever the holder is a text field, and the holder takes each of them only from the edge at which the caret would not move: `Home` and `ArrowLeft` only with the caret at offset 0, `End` and `ArrowRight` only with it at the end of the value, never over a selection of any width.
 A MODIFIED keypress is never this widget's, whichever key it is: with `Shift`, `Ctrl`, `Alt` or `Meta` held the holder consumes nothing and the arrows do not move the cursor either.
 `Enter` is the one exception, answered before the modifier test, because on a TRIGGER holder an `Enter` the widget declines reaches the button's own activation and shuts the panel rather than confirming anything.
@@ -1380,6 +1389,12 @@ A single element is exempted by a `<!-- ratchet-exempt(design-system): reason --
 - **AND** the keypress does not also reach Foundry's canvas bindings
 - **AND** a button outside a form is in scope, because `hasFocus` recognises a button only by its `form`
 
+#### Scenario: A GM tabs out of a picker panel inside a modal
+
+- **WHEN** a GM opens the import folder mapping's tag picker and presses Tab from the last control in its panel
+- **THEN** the panel closes and discards what it staged
+- **AND** focus lands on the control after the picker's trigger, inside the dialog, and the modal stays open
+
 ### Requirement: Near-neighbour primitives are routed by a stated rule
 
 Where two primitives are visually similar, the choice between them MUST follow the rule stated here rather than being made by eye.
@@ -1426,6 +1441,9 @@ A PASS mark is toned neutral, because the issue vehicle's tone states how much a
 On a tab strip the issue summary MUST be the shared chip primitive at its `inspector` density with `mono`, whatever badge class a caller passes: the mono face at weight 500, because it carries a number a GM compares and the mono face ships no weight above 500 (maintainer ruling 2026-10-14, issue 2464), and the size and box that density's, as the chip's library entry states them.
 The strip has no density of its own and borrows this one for its geometry, because a second pill is a missing density and never a new component.
 No rule in the module sheet names that badge's class, and the strip's record count and dot stay bare `span` elements the tab-strip primitive paints.
+A tab's record count MUST be spoken with what it counts: a `count` mark carries a `name` stating the numeral and its unit, such as "3 linked recipes", and the strip names the tab by joining its label with that phrase, such as "Contents, 3 linked recipes".
+The caller resolves the unit through a plural-aware lang pair and the numeral stays the bare visible mark, so a record count is never left as a bare number in a tab's accessible name.
+Any other named mark on the same tab joins that name, and a tab's own `ariaLabel` still wins.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
@@ -1503,6 +1521,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a tab strip draws an issue summary under any caller's badge class
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
+- **AND** a named record count names its tab with the unit it counts, such as "Contents, 3 linked recipes"
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
 
 #### Scenario: A field draws its caption and its value
@@ -1670,7 +1689,7 @@ The picker panel scrolls internally at a fixed maximum height and states how man
 
 Every selection MUST be reversible before it is committed.
 The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
-Escape, an outside press and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
+Escape, an outside press, focus leaving the panel and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
 While the panel holds staged choices its footer states what Apply will add and remove rather than the size of the set, so a GM can see that a dismissal would discard something.
 
 Where the control edits several entries at once, the panel STAYS OPEN across choices and announces a multi-selectable list.
@@ -1776,7 +1795,7 @@ With `squareTiles`, each option is a square, text-free tile whose label is both 
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
 The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
 A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
-It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
+It positions the panel against the anchor, counts the anchor inside for outside-click and focus-leave dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
 
 #### Scenario: A converted menu renders no query field
 
@@ -1835,7 +1854,7 @@ A `role="menu"` control was correctly adjudicated as NOT convertible onto the pi
 Neither a frame, a computed-style probe nor a `data-*` selector can distinguish the two, which is why the separation is stated here rather than left to review.
 
 The menu's keyboard contract is the W3C ARIA Authoring Practices Guide's MENU BUTTON pattern: Enter, Space and ArrowDown open onto the first item, ArrowUp opens onto the last, the arrows move focus with wrapping, Home and End reach the ends, and Escape closes and RETURNS FOCUS TO THE TRIGGER.
-Where the shipped primitive departs from that pattern it MUST say so at the source: a natively `disabled` item is not focusable and is therefore skipped rather than landed on, and Tab returns focus to the trigger rather than continuing the tab sequence, because the panel is portaled out of the trigger's subtree and the element after the PORTAL HOST is not the element after the trigger.
+Where the shipped primitive departs from that pattern it MUST say so at the source: a natively `disabled` item is not focusable and is therefore skipped rather than landed on, and Tab returns focus to the trigger rather than continuing the tab sequence, as Tab in a picker's query field does, a published behaviour kept so a companion's Tab handling does not change (issue 2700).
 
 Its items hold focus and are buttons outside a form, so each MUST carry `data-keyboard-focus="true"` — the same obligation the Foundry contract places on any focusable non-form element, and the reason the listbox prohibition above does not reach a menu.
 The panel MUST be portaled through the shared overlay-host resolver rather than positioned inside its trigger's own container: an absolutely positioned menu is clipped by any scrolling ancestor, and a clipped panel reports its full box, so the failure is invisible to every geometric assertion and has to be proved by hit test.
@@ -2371,10 +2390,18 @@ The selected tick is CONFIGURABLE and is a property of the list rather than of a
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
+A select's trigger lets Tab and Shift+Tab through, closing an open list without choosing as focus moves on, and stops every other key, and its list also closes once focus moves outside the trigger and the list, so a keyboard user never leaves an open list behind (issue 2598).
+
 #### Scenario: A select offers three plain options
 
 - **WHEN** a surface needs a one-of-N choice with no descriptions or badges
 - **THEN** it still renders the app’s option list rather than a native popup
+
+#### Scenario: A keyboard user tabs past an open select
+
+- **WHEN** a select's list is open and the user presses Tab
+- **THEN** the list closes without choosing and the trigger reads `aria-expanded="false"`
+- **AND** focus moves to the next control, and a `keydown` listener above the select hears the Tab
 
 ### Requirement: Art that is an identity is picked as a picture
 
@@ -2532,9 +2559,10 @@ It dismisses on an outside click and on Escape.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
+An Escape on a closed `Select` or `IconPicker` trigger inside it dismisses it, as on any other control, because the dialog hears the key before the trigger's own handler; a companion's published dialog differs, as the `Modal` group in `ui-extension-points` states (issue 2677).
 A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
 The dialog element is a focus target, `tabindex="-1"` carrying `data-keyboard-focus="true"`, so a pointer press on its surface outside every control focuses the dialog, Foundry's keybindings stay held off, and Tab or Shift+Tab from it moves to its first or its last control, the close control being the first; it keeps its elevation and draws no focus ring (issue 2661).
-The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
+The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog, though Tab from a picker's panel opened inside it moves on from the picker's trigger, and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
@@ -2543,7 +2571,7 @@ A step that would lose work confirms first.
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
 The shared `Modal` draws ONE frame, the library's banded Modal specimen, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
 It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then, when focus is nowhere, the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
-Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, wrapping from its last control to its first, a Tab that a picker's panel opened inside it moves on from a trigger that is the dialog's last control included (issue 2699), it owns every key while open, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 
@@ -2556,6 +2584,7 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the import folder mapping is open and the user presses Escape on its match-by-name checkbox
 - **THEN** the modal is dismissed once and Foundry's dismiss keybinding closes no window
 - **AND** Escape on an open category list closes that list and leaves the modal open
+- **AND** Escape on a closed category select's trigger dismisses the modal once
 
 #### Scenario: A press on the dialog's surface
 

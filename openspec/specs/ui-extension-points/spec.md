@@ -621,7 +621,7 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
 The `<div>` carries `display: contents` and, where its host is the standalone layer, `pointer-events: auto`, `font-family: var(--font-body, var(--font-primary, sans-serif))` and `font-size: var(--font-size-14)`, and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-- An overlay's outside-press, Escape and scroll listeners, and the watch an open `Select`, `IconPicker` or `ActionMenu` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
+- An overlay's outside-press, focus-leave, Escape and scroll listeners, and the watch an open `Select`, `IconPicker` or `ActionMenu` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
 An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
 An overlay drawn by Fabricate outside every published mount keeps its own host as before.
@@ -649,13 +649,13 @@ That exception reaches a radio and a number input too where the form has a submi
 - A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so the companion resets no form a published control is in, or destroys and mounts the control again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
-- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
 A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, as its group states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
 Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
-Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops every key, as each group states.
+Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, a published behaviour kept so a companion's Tab handling does not change, and in an open `IconPicker` list's query field, where it closes the list and moves focus on from, or back to, the trigger, as each group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops Escape, as each group states.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
 An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states, and the module's base stylesheet draws the same 1px inset ring on every other input and textarea under a Fabricate root except a checkbox, radio, range, color, file, button, submit, reset or image input, so a number, search or date input outside a `Field` takes it too.
@@ -664,7 +664,7 @@ Where the entry's rest keys land on the control itself, `data-validation-focused
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
 A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
 - Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its group states, each never out of `target`.
-An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when the list closes, as its group states.
+An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its group states.
 An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its group names, and back to the trigger when a choice, Escape or Tab closes it, as its group states.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so the companion moves focus to an element of its own before it calls either.
 The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
@@ -699,6 +699,7 @@ Where the entry's rest keys land on the control itself, `data-cursor` is refused
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
+  The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1100,9 +1101,9 @@ Each group states the accepted values of every key that entry publishes.
     While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
     Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
-  - The trigger stops the propagation of every key pressed while it holds focus, so a companion's listener above `target` receives no key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
+  - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, so a companion's listener above `target` hears Tab and no other key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
     In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
-    Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the trigger still closes the list, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
+    Tab and Shift+Tab close an open list without choosing and move focus as the browser does, and the list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
     A press on the trigger does not bubble out of it as a `click`, and a press inside the open list does not bubble out of the list, so a companion's `click` listener above `target` or the `overlayHost` hears neither.
   - The list is the entry's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the list's hidden live region is clipped only under a `.fabricate` ancestor; under the standalone style root the companion passes none, and the list opens on the standalone layer.
@@ -1123,6 +1124,7 @@ Each group states the accepted values of every key that entry publishes.
   - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
+    A bar's `aria-valuenow` is the clamped value truncated to a whole number, so a stage short of 100 never announces 100 and none announces a fraction.
     `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so the companion states the percentage in it too; a stage whose `valueText` is absent or `''` announces its percentage.
     The companion passes a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
     Naming `valueText` is additive, and `StageBars`' `version` stays 1: before it a stage's `valueText` was unnamed and so private.
@@ -1413,6 +1415,7 @@ Each group states the accepted values of every key that entry publishes.
   - The list offers the vocabulary `game.fabricate.listCuratedIcons()` answers on the same client, one solid-weight row per glyph, in that vocabulary's order while the query is empty.
     Each row is named by its glyph's `label`, as `game.fabricate.listCuratedIcons()` answers it on the same client, which is English and is not localized.
     On Foundry 14 that `label` is Font Awesome's own display name, and on every other generation it is derived from `iconCode`, except where the stylesheet measurement is empty and the Foundry 14 name is used.
+    Each row also carries that label alone as its native tooltip (`title`).
     The trigger shows that same name beside the glyph.
   - `value` is the chosen glyph's Font Awesome class string, a weight token then `fa-<name>`, as `'fas fa-gear'`, and its `iconCode` or any of its `aliases` selects its row.
     With an empty query, the row for `value` is pinned first and marked selected.
@@ -1436,8 +1439,9 @@ Each group states the accepted values of every key that entry publishes.
     Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
-    Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
-  - The trigger stops the propagation of every key pressed while it holds focus and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears none of them; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
+    Tab in the query field closes the list without choosing, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger, and Shift+Tab there closes the list and returns focus to the trigger (issue 2676).
+    The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
+  - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears Tab and no other key; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
     In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
     Every key pressed in the query field, Escape included, may reach a companion's listener on the `overlayHost` or above it.
   - The no-match line is a polite live region, so it is announced when a query empties the list; the picker announces nothing else.
@@ -1488,7 +1492,7 @@ Each group states the accepted values of every key that entry publishes.
     In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
     A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger, and a companion that moves focus in response moves it from a later task, as from a `setTimeout`.
     Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
-    Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger.
+    Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger, departing from the APG menu button pattern, in which Tab closes the menu and moves on, as Tab in an `IconPicker`'s query field does; the published behaviour is kept so a companion's Tab handling does not change (issue 2700).
     A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
     A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
@@ -1547,14 +1551,15 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing.
     A companion that closes the dialog while focus is on it or inside it, or in a panel of an overlay entry it mounts in a slot, first moves focus to an element of its own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
   - Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
-    Tab moves focus as the browser does from any element but the dialog itself, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
+    Tab moves focus as the browser does from any element but the dialog itself, so it can leave the dialog, except that Tab in the query field of an `IconPicker` the companion mounts in a slot moves on from that picker's trigger, as its group states, and that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
     Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
     The dialog is a `role="dialog"` named by `title` and is not announced as modal, because Tab can move focus out of it and the window behind it still takes input; the companion moves focus into the dialog when it opens and back to its opener when it closes.
     An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so the companion moves focus into the dialog onto an element that does not act on Enter, or ignores a `keydown` whose `repeat` is `true`.
     A pointer press on the dialog's surface, outside every control, moves focus to the dialog itself, which holds Foundry's keybindings off and draws no focus ring, so Escape then calls `onClose` as Escape in the dialog does, and Tab or Shift+Tab then moves focus to its first or its last control, unless an open ApplicationV1 `Dialog` takes the Tab, as above.
   - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
-    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
+    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed closes nothing (issue 2677).
+    Fabricate's own dialogs differ: there the dialog hears an Escape on a closed `Select` or `IconPicker` trigger before the trigger does, and closes.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
     Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
     Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
@@ -1875,6 +1880,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onChange` once, with the number `25`, the list closes, and focus is on the trigger
 - **AND** the trigger shows the chosen label only once the companion's `update` passes `value: 25`
 - **AND** Escape or a press outside the open list closes it without calling `onChange`
+- **AND** Tab on the trigger with the list open closes it without calling `onChange`, and a `keydown` listener above `target` hears the Tab
 - **AND** a mount whose `options` hold `1` and `'1'` faults when its list opens, calling `onFault` once with the target empty
 - **AND** a mount that omits `options` throws M9, and one that passes a `data-*` key throws M8
 
@@ -1948,6 +1954,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `IconPicker` inside a Fabricate window with `value` `'fas fa-flask'`, its labels and `onChange`, presses the trigger, and presses ArrowDown twice and Enter in the query field
 - **THEN** focus moves into the query field when the list opens, and the flask row is pinned first and selected
 - **AND** Fabricate calls `onChange` once with the second row's class string, closes the list, and returns focus to the trigger
+- **AND** Tab in the query field closes the list without calling `onChange` and moves focus to the trigger, from which the browser moves it on
 - **AND** a mount that omits `searchLabel` throws M9, and one that passes `iconOnly` throws M8
 
 #### Scenario: A published action menu
@@ -1969,6 +1976,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` with `closeOnOutsideClick` `true`, mounts a `Select` in its `body` slot, opens the list and clicks one of its options
 - **THEN** the `Select` calls its `onChange` and Fabricate does not call the `Modal`'s `onClose`
 - **AND** a press on the window outside the dialog and outside the list then calls `onClose` once
+
+#### Scenario: Escape on a closed picker trigger in a published dialog
+
+- **WHEN** a companion mounts `Modal` with `closeOnOutsideClick` `true`, mounts a `Select` and an `IconPicker` in its `body` slot, and presses Escape on each trigger with its list closed
+- **THEN** Fabricate calls no `onClose` and the dialog stays open
+- **AND** Tab in the opened `IconPicker`'s query field closes its list, calls no `onClose`, and moves focus on from its trigger inside the dialog
 
 #### Scenario: A panel left open by an update that detaches its slot
 

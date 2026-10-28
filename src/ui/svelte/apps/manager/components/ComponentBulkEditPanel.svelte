@@ -393,6 +393,7 @@
     }
     return sentences.join(' ');
   });
+  const removeBusyLabel = $derived(text(`${KEY}.RemoveBusy`, 'Removing…'));
   const removeArmedAnnouncement = $derived(
     format(
       `${KEY}.RemoveArmedAnnouncement`,
@@ -401,9 +402,8 @@
     )
   );
 
-  // Arming changes the control's label and accessible name WHILE IT HOLDS FOCUS, and a name change
-  // under focus is not reliably announced, so the state change gets its own polite region. Three
-  // transitions, and the last two are indistinguishable from the props alone, so this is `$state`.
+  // Arming and starting the write rename the focused control, which is not reliably announced,
+  // so a polite region says both. Cancel and idle look alike from props, hence `$state`.
   let announcement = $state('');
   let wasArmed = false;
   let announcedOutcome = '';
@@ -425,7 +425,7 @@
   }
 
   function speakOutcome(outcome) {
-    announcementTicket += 1;
+    say('');
     const ticket = announcementTicket;
     announceAfterFocusMove(restoreFocusToControl, () => {
       if (ticket === announcementTicket) announcement = outcome;
@@ -437,7 +437,7 @@
     if (deleting === true) {
       wasArmed = false;
       announcedOutcome = '';
-      say('');
+      say(removeBusyLabel);
       return;
     }
     if (deleteArmed === true) {
@@ -832,7 +832,7 @@
       idleIcon="fas fa-arrow-right-from-bracket"
       idleLabel={removeLabel}
       armedLabel={removeArmedLabel}
-      busyLabel={text(`${KEY}.RemoveBusy`, 'Removing…')}
+      busyLabel={removeBusyLabel}
       idleAriaLabel={removeLabel}
       armedAriaLabel={`${removeArmedLabel} — ${removeNote}`}
       ariaDescribedBy="component-bulk-remove-note"

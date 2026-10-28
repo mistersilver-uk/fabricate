@@ -175,6 +175,11 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       assert.equal(button.getAttribute('aria-haspopup'), 'dialog');
       assert.equal(button.getAttribute('aria-expanded'), 'false');
       assert.equal(
+        button.getAttribute('data-keyboard-focus'),
+        'true',
+        'the spread marks the caller’s button, so Foundry’s Tab binding never takes Tab from it'
+      );
+      assert.equal(
         button.getAttribute('data-caller-open'),
         'false',
         'the snippet is handed `open` as well as `attributes`'

@@ -500,24 +500,30 @@ describe('the published Select hosts its list', () => {
 });
 
 describe('the keys the published Select keeps', () => {
-  it('stops every keydown on its trigger from bubbling, and Tab leaves the list open', async () => {
+  it('lets Tab bubble from its trigger and close the list, and stops every other key (issue 2598)', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
     const heard = [];
     target.parentElement.addEventListener('keydown', (event) => {
       heard.push(event.key);
     });
-    const { trigger } = mountSelect({}, { target });
+    const { trigger, calls } = mountSelect({}, { target });
     await open(trigger());
     trigger().focus();
-    for (const key of ['ArrowDown', 'a', 'Tab']) press(trigger(), key);
+    for (const key of ['ArrowDown', 'a']) press(trigger(), key);
     await settle();
-    assert.ok(Boolean(listbox()), 'Tab leaves the list open');
+    assert.ok(Boolean(listbox()), 'the list is open');
+    press(trigger(), 'Tab');
+    await settle();
+    assert.ok(!listbox(), 'Tab closes the list');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'false');
+    assert.equal(calls.length, 0, 'without calling onChange');
+    await open(trigger());
     press(trigger(), 'Escape');
     await settle();
     assert.ok(!listbox(), 'Escape closes the list');
     press(trigger(), 'Escape');
     await settle();
-    assert.deepEqual(heard, [], 'no key reached the companion above target, Escape included');
+    assert.deepEqual(heard, ['Tab'], 'the companion above target hears Tab and no other key');
   });
 });
 

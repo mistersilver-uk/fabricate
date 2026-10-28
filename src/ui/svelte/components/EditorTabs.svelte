@@ -7,10 +7,10 @@
   | --- | --- | --- | --- |
   | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
   | `annotated` | boolean | `false` | Reads each tab's `ariaLabel`, `tooltip` and `tierGated` below; off, a tab is drawn from its `id`, `icon` and `label` alone. |
-  | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here (see Invariants). |
+  | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here, and on a tab carrying a named `count` mark (see Invariants). |
   | tab `tooltip` | final text | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
-  | `badges` | per tab id: one mark, or an array of them | `undefined`, no marks | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
+  | `badges` | per tab id: one mark, or an array of them | `undefined`, no marks | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text, and on a `count` it is the phrase stating what the numeral counts ("3 linked recipes"), which the tab's own name then carries as "Contents, 3 linked recipes"; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
   | `ariaLabel` | final text | `''` | The strip's own accessible name. |
   | `idStem` / `buttonIdStem` / `panelIdStem` | strings | `'editor'` / `''` / `''` | `idStem` builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`; the other two override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
   | `tooltipIdStem` / `tooltipDataAttr` | string / `data-*` name | `<idStem>-tooltip` / `''` | The description id `<stem>-<id>` and its per-tab hook. |
@@ -47,6 +47,9 @@
     danger or warning, none of which carries its own `name`, takes the accessible name "Validation, 2 blocking,
     1 warning" on its button; the marks' DOM and the strip's pixels do not change. A tab that sets its own
     `ariaLabel`, or any mark that names itself, keeps that name.
+  - A named record count is spoken with its unit: a tab carrying a `count` mark with a `name`, and no `ariaLabel`
+    of its own, takes the accessible name "Contents, 3 linked recipes" on its button, joined by the names of any
+    named mark on the tab; the numeral stays the bare visible mark. A count with no `name` leaves the name to its content.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
     `activeTab`. The hovered tab's description shows, else the focused tab's when none is hovered;
     a hovered tab that carries none shows none, and Escape hides it until that tab is next hovered
@@ -292,9 +295,25 @@
     );
   }
 
+  // A named record count states what its numeral counts; every other named mark on the tab joins
+  // it, because the tab's own name replaces the content that would otherwise carry theirs.
+  function countName(tab) {
+    const marks = marksByTab[tab.id];
+    if (!marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) return undefined;
+    const names = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
+    return severityText(
+      'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts',
+      '{label}, {counts}',
+      {
+        label: tab.label,
+        counts: names.join(', '),
+      }
+    );
+  }
+
   function tabName(tab) {
     if (annotated && tab.ariaLabel) return tab.ariaLabel;
-    return severityName(tab);
+    return severityName(tab) ?? countName(tab);
   }
 
   function markAttributes(tab, mark) {

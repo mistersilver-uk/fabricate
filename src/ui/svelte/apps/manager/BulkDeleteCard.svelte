@@ -91,7 +91,7 @@
 
   /** Deferred past this flush: the restore runs once the DOM has settled, and focusing a disabled control is a no-op. */
   function speakOutcome(outcome) {
-    announcementTicket += 1;
+    say('');
     const ticket = announcementTicket;
     announceAfterFocusMove(restoreFocusToControl, () => {
       if (ticket === announcementTicket) announcement = outcome;
@@ -103,7 +103,7 @@
     if (busy === true) {
       wasArmed = false;
       announcedOutcome = '';
-      say('');
+      say(busyLabel);
       return;
     }
     if (armed === true) {
@@ -167,8 +167,8 @@
     {onConfirm}
   />
 
-  <!-- Arming changes the accessible name WHILE THE BUTTON HOLDS FOCUS, which is not reliably
-       announced, so a polite region says it — empty on mount, and OUTSIDE the control. -->
+  <!-- Arming and starting the write change the accessible name WHILE THE BUTTON HOLDS FOCUS, which
+       is not reliably announced, so a polite region says both — empty on mount, OUTSIDE the control. -->
   <p id={announceId} class="visually-hidden" aria-live="polite" {...announceHook}>
     {announcement}
   </p>

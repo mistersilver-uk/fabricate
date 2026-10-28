@@ -18,6 +18,7 @@
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { TAB_COUNT_UNITS, tabCountMark } from '../../../util/tabCountMark.js';
 
   let {
     activeTab = 'breakage',
@@ -82,7 +83,7 @@
   // the blocking count, so a GM scanning the strip sees a mark only where there is something to
   // do.
   const badges = $derived({
-    requirements: { vehicle: 'count', label: requirementCount },
+    requirements: tabCountMark(requirementCount, TAB_COUNT_UNITS.requirements),
     validation:
       errorCount > 0
         ? { tone: 'danger', label: errorCount, name: issueCountText(errorCount) }
