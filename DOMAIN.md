@@ -1225,6 +1225,14 @@ Grid view of all components in the selected alchemy crafting system owned by com
 
 [Notes](docs/domain/terms.md#component-palette)
 
+#### Entity Tint
+
+A GM-chosen colour for an essence or a gathering biome, stored in `colorToken` as a bare `--fab-tag-*` token name and never a hex.
+Only a biome may also carry a `customColor`.
+Thirteen tag tokens are declared in every theme and ten are offered as entity tints, withholding the neutrals `bone` and `slate` and the bound `ember`.
+
+[Notes](docs/domain/terms.md#entity-tint)
+
 #### Auto-Fill
 
 A select-to-load selection side effect: selecting a discovered recipe auto-loads its signature onto the workbench (capped by owned quantities).

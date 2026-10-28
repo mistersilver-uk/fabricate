@@ -209,14 +209,14 @@ When it cannot, and the library holds at least one entry, the **Modifiers** sect
 
 - The current resolution mode rolls no check at all, so there is nothing for a modifier to add to.
 - The active check would roll a formula, but none is authored yet.
-- The mode does roll a check, but that roll cannot take check modifiers yet.
+- The mode does roll a check, but that roll cannot take check modifiers.
 
 The first two are fixed on the check itself.
 Change the resolution mode to one that rolls a check, or author a roll formula for the mode you are on.
 
 The third is gathering's d100 mode, and only gathering's d100 mode.
 The d100 rolled against each drop's chance is that mode's check, so the mode does roll.
-What it has no room for yet is a modifier added to that roll, so the notice states the reason rather than pointing you at a setting that would not help.
+What it has no room for is a modifier added to that roll, so the notice states the reason rather than pointing you at a setting that would not help.
 
 ### Combination rule
 
@@ -276,14 +276,13 @@ Crafting, Salvage and Gathering all select over the same library.
 Each **Named modifiers** card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to World › Rules & Resources › Modifiers to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
-**Gathering is not switched on yet.**
-Progressive and routed gathering are not available yet, and while d100 resolution does roll a check — the d100 against each drop's chance — that roll cannot take check modifiers yet.
-So nothing you set on the Gathering check's modifiers applies to a roll today.
-The card says so.
-Anything you set is saved and starts applying when those gathering modes ship.
+**Gathering check modifiers apply to Check gathering.**
+A task resolved by **Check** rolls the system's gathering check, and the modifiers you select on the Gathering check add to that roll.
+A d100 task rolls the d100 against each drop's chance, and that roll cannot take check modifiers.
+Progressive is a legacy mode that is not offered for new tasks, and a legacy Progressive task rolls the gathering check, so the same modifiers add to its roll.
 
 A gathering **check** modifier and a gathering **character** modifier now come from the same library, but they are applied differently and one does not stand in for the other.
-A character modifier is attached to a drop row or an event and shifts that drop's percentage chance in d100 gathering; a check modifier is selected here and adds to a rolled formula in progressive and routed gathering.
+A character modifier is attached to a drop row or an event and shifts that drop's percentage chance in d100 gathering; a check modifier is selected here and adds to a rolled formula in Check gathering and in legacy Progressive gathering.
 Neither applies where the other does.
 
 ### Maximum picks
@@ -344,8 +343,8 @@ When any of those is not true, for example a system with only one eligible modif
 A bulk salvage is one of those cases.
 Its single batch prompt never asks for modifiers, so every roll in the batch applies that same best selection.
 
-**Crafting and salvage prompt, and gathering does not yet.**
-A gathering check under **Player picks** still applies the best selection the player could legally have made, and gains its prompt when progressive and routed gathering ship.
+**Crafting and salvage prompt, and gathering does not.**
+A gathering check under **Player picks** applies the best selection the player could legally have made and does not prompt for one.
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon and label.
 A modifier that works out to a plain number shows that number.

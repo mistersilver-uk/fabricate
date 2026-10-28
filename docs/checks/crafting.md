@@ -252,7 +252,7 @@ Turn the setting back to **Never** and they stop being offered and stop routing 
 
 **Routed by ingredients** and **Progressive** have no failure outcome to mark, so the setting is inert in those modes and the section says so rather than showing a control that does nothing.
 Salvage and gathering each have their own copy of this setting on their own check route.
-Gathering's is inert for now: routed and progressive gathering are still being built.
+Gathering's applies to a task resolved by **Check** and is inert for a d100 task, which has no failure outcome to produce.
 
 ### What a failure costs
 

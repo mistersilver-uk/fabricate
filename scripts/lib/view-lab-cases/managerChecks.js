@@ -806,7 +806,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering-on-failure',
     label: 'Manager — Checks gathering on failure',
-    // The activity with no consumption block, plus the dormancy notice and the read-only `task.failureOutcome` reference.
+    // The activity with no consumption block, plus the neutral failure policy note and the read-only `task.failureOutcome` reference.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -1074,7 +1074,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering-modifiers',
     label: 'Manager — Checks gathering modifiers',
-    // Beyond the smoke, and the only frame of the dormancy notice against a populated catalogue.
+    // Beyond the smoke, and the only frame of the live gathering modifier note against a populated catalogue.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },

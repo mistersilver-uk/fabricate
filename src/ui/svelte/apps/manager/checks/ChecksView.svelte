@@ -1088,7 +1088,7 @@
     tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
-      'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
+      'The failure result policy applies to gathering tasks resolved by Check. A d100 task has no failure outcome to produce, so nothing on this screen changes it.'
     )}
     data-gathering-failure-dormant
   />

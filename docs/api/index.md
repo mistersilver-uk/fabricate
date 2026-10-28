@@ -573,7 +573,7 @@ Hooks.once('fabricate.ready', () => {
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `iconCode` | `string` | The bare name the vocabulary offers and you should persist, such as `mortar-pestle`. No `fa-` prefix and no weight. |
-| `label` | `string` | Font Awesome's own display name, such as `Mortar Pestle`. Not localized. |
+| `label` | `string` | An English display name, not localized. On Foundry 14 it is Font Awesome's own display name, such as `Mortar Pestle`. On every other generation it is derived from `iconCode` by capitalizing each hyphen-separated word, with a word of two letters or fewer in capitals, and it is Font Awesome's display name again where the measurement came back empty. |
 | `aliases` | `string[]` | Every other name the same glyph answers to, such as `['cog']` on `gear`. Often empty. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

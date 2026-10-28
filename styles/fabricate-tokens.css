@@ -126,7 +126,7 @@
   --fab-tag-mauve: #D8BED4;
   --fab-tag-ember: #D98B6A;
 
-  /* The tag family is WIDER than the eight a GM can pick from — `src/ui/svelte/util/managerColorTokens.js` enumerates those, so adding a token here does not add it to a picker. INVARIANT: each name makes a HUE promise, so a theme's values carry its own saturation and lightness character and keep the hue; see `design-system/spec.md`'s `Token foundations are the only source of colour, space and elevation`. */
+  /* The tag family is WIDER than the ten a GM can pick from — `src/ui/svelte/util/managerColorTokens.js` enumerates those, so adding a token here does not add it to a picker. INVARIANT: each name makes a HUE promise, so a theme's values carry its own saturation and lightness character and keep the hue; see `design-system/spec.md`'s `Token foundations are the only source of colour, space and elevation`. */
   --fab-tag-verdant: #9AB89C;
   --fab-tag-azure: #6FA8E8;
   --fab-tag-bone: #E8E0D2;

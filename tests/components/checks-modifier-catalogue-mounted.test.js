@@ -131,6 +131,14 @@ describe('the check-modifier catalogue card (mounted)', () => {
     });
   }
 
+  it('draws the live gathering note as info and the inert warning note apart from it', async () => {
+    const target = await mountChecks({ activity: 'gathering' });
+    const tone = (hook) => target.querySelector(hook)?.classList.contains('is-info');
+    assert.equal(tone('[data-check-modifier-dormant]'), true, 'the live note takes the info tone');
+    assert.equal(tone('[data-crafting-modifier-inert]'), false, 'the inert note keeps warning');
+    harness.remount();
+  });
+
   it('says at the ROW which entries are blocked, and names the right fault for each', async () => {
     const target = await mountChecks();
     const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
