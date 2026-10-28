@@ -1545,7 +1545,6 @@
           "Next": "Next stage",
           "Position": "Viewing stage {index} of {count}",
           "Return": "Return to current stage {index}",
-          "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
           "RouteUnchosen": "This stage has not been given a route yet. Choose one to carry on.",
           "Consumed": "Consumed when this stage started",
