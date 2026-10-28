@@ -47,3 +47,19 @@ export async function expectNoEmptiedSelectionReport(target, untick) {
     'and does not move the keyboard to the toolbar'
   );
 }
+
+/** The sentence node the region currently holds, so a second announcement is observable as a new node. */
+export function reportedSentence(target) {
+  return target.querySelector(`${REGION} span`);
+}
+
+/** Wait past the delay a sentence spends queued behind a focus move, then flush the render. */
+export async function settleReport() {
+  await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+  flushSync();
+}
+
+/** Flush the pending render without waiting, to observe a sentence written with no delay. */
+export function renderNow() {
+  flushSync();
+}

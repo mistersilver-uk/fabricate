@@ -27,6 +27,9 @@ import {
   expectEmptiedSelectionReport,
   expectNoEmptiedSelectionReport,
   focusControl,
+  renderNow,
+  reportedSentence,
+  settleReport,
 } from '../helpers/emptiedSelectionReport.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
@@ -1304,6 +1307,52 @@ describe('world Component Catalogue (issue 1371)', () => {
         dangerControl(target).click();
         await drain();
       });
+    });
+
+    it('announces at once and leaves focus alone when the GM moved it during the write', async () => {
+      const { target } = await mixedSelection();
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      assert.ok(document.activeElement === elsewhere, 'pre-condition: the GM is in the field');
+
+      target.querySelector('[data-scoped-list-clear-selection]').click();
+      await drain();
+      renderNow();
+
+      assert.equal(reportedSentence(target)?.textContent, 'Selection cleared.');
+      assert.ok(document.activeElement === elsewhere, 'the GM keeps the control they chose');
+      elsewhere.remove();
+    });
+
+    it('announces once when a finished write clears a selection that was already cleared', async () => {
+      const { actions } = recordingComponentActions();
+      let release;
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { ...actions, deleteEntity: () => pending },
+      });
+      target.querySelector('[data-scoped-list-select="resin"]').click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+
+      target.querySelector('[data-scoped-list-clear-selection]').click();
+      await drain();
+      await settleReport();
+      const first = reportedSentence(target);
+      assert.equal(first?.textContent, 'Selection cleared.', 'the Clear was reported');
+
+      release(true);
+      await drain();
+      await settleReport();
+      assert.ok(reportedSentence(target) === first, 'the write clearing nothing says nothing more');
     });
 
     it('reports nothing when unticking the last row empties the selection', async () => {

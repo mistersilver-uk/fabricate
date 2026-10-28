@@ -103,7 +103,7 @@
 
   // Dismissing removes the focused control, which drops focus to <body> where Foundry's Escape
   // closes every open window, so focus goes to the search field first.
-  let noticeSlot = $state(null);
+  let noticeSlot = null;
   const focusSearchField = () =>
     noticeSlot?.parentElement?.querySelector('[data-recipe-toolbar] input[type="search"]')?.focus();
 

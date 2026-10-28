@@ -1,7 +1,8 @@
 <!--
   The scoped list's report of an emptied bulk selection: it re-homes the keyboard on the list's
   toolbar and then says the change through one polite region (`ui-visual-style/spec.md`, "Emptying
-  a bulk selection"). It renders as a child of the list column, beside the toolbar it focuses.
+  a bulk selection"). It renders as a child of the list column, directly after the toolbar it
+  focuses, and takes no space in the column's flow.
 
   Exports:
   - `report()` — moves focus to the toolbar only when the re-render dropped it (focus on the
@@ -15,18 +16,13 @@
 -->
 <script>
   import { announceAfterFocusMove } from '../../../util/announceAfterFocus.js';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
 
   const KEY = 'FABRICATE.Admin.Manager.BulkEdit.SelectionCleared';
 
   let region = $state(null);
   let announcement = $state(null);
   let ticket = 0;
-
-  function sentence() {
-    const translated = localize(KEY);
-    return translated && translated !== KEY ? translated : 'Selection cleared.';
-  }
 
   function focusToolbar() {
     const active = document.activeElement;
@@ -40,7 +36,7 @@
     ticket += 1;
     const mine = ticket;
     announceAfterFocusMove(focusToolbar, () => {
-      if (mine === ticket) announcement = { text: sentence() };
+      if (mine === ticket) announcement = { text: localizeOr(KEY, 'Selection cleared.') };
     });
   }
 </script>
