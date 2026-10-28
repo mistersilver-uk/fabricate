@@ -160,6 +160,7 @@
 {:else}
   <div
     class="manager-environment-evidence is-chips"
+    role="group"
     aria-label={text(
       'FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title',
       'Matching evidence'

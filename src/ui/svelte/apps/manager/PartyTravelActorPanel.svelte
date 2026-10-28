@@ -306,7 +306,7 @@
 
   .manager-party-actor-eyebrow {
     color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -392,7 +392,7 @@
   .manager-party-actor-note {
     max-width: min(100%, 34ch);
     color: var(--fab-text-muted);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10.5px;
     font-weight: 400;
     line-height: 1.5;
@@ -423,7 +423,7 @@
   .manager-party-actor-error {
     margin: 0;
     color: var(--fab-danger-text);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 10px;
     font-weight: 500;
     line-height: 1.4;

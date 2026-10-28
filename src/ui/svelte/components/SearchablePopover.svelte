@@ -49,11 +49,10 @@
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
     list from state the generation cannot see, and both answer with the same -1 sentinel, which is
     NOT "the first row".
-  - `close()` IS NOT MERELY "HIDE THE PANEL": it clears the query, drops the type-ahead prefix and
-    returns focus to the trigger, and `stayOpen` gates the WHOLE of it. That restoration waits for
-    `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
-    while open. ESCAPE IS HANDLED IN ONE PLACE, `dismissOnOutsideClick`'s DOCUMENT capture keydown,
-    which the inline field's keys reach; its `onDetached` closes a detached root's panel, no focus moved.
+  - `close()` clears the query and the prefix and refocuses the trigger, after `tick()` because an
+    `inlineSearchTrigger` is unmounted while open, or at once with `moveOn` so the browser moves Tab
+    on from it; `stayOpen` gates all of it. Escape is `dismissOnOutsideClick`'s document capture
+    keydown, and its `onDetached` and `onFocusLeave` close the panel with no focus moved.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -75,7 +74,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
+  import { activeOptionId, holderKeyIntent, triggerTab } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
   import {
     PENDING_SOURCE,
@@ -305,18 +304,14 @@
     }
   }
 
-  function restoreTriggerFocus() {
-    tick().then(() => {
-      const origin = anchored ? { anchor: anchorNode() } : { trigger: triggerElement };
-      focusReturnTarget(origin, pickerRoot)?.focus?.();
-    });
-  }
-
-  function close({ restoreFocus = true } = {}) {
+  function close({ restoreFocus = true, moveOn = false } = {}) {
+    const origin = () => (anchored ? { anchor: anchorNode() } : { trigger: triggerElement });
+    const refocus = () => focusReturnTarget(origin(), pickerRoot)?.focus?.();
+    if (moveOn) refocus();
     open = false;
     search = '';
     typeAheadBuffer = null;
-    if (restoreFocus) restoreTriggerFocus();
+    if (restoreFocus && !moveOn) tick().then(refocus);
   }
 
   $effect(() => {
@@ -334,11 +329,8 @@
   function toggle(event) {
     event.stopPropagation();
     if (disabled || triggerAriaDisabled) return;
-    if (open) {
-      close({ restoreFocus: false });
-      return;
-    }
-    open = true;
+    if (open) close({ restoreFocus: false });
+    else open = true;
   }
 
   function chooseOption(option) {
@@ -347,9 +339,15 @@
     if (!staysOpenOnChoose) close();
   }
 
+  // A forward Tab enters a search-free panel's footer; any other Tab closes it (issues 2598, 2702).
   function onTriggerKeydown(event) {
     if (!showSearch) onHolderKeydown(event);
-    event.stopPropagation();
+    const tab = triggerTab(event, open && footer && !showSearch ? popoverRoot : null);
+    if (!tab) event.stopPropagation();
+    else if (tab.entry) {
+      event.preventDefault();
+      tab.entry.focus();
+    } else if (open) close({ restoreFocus: false });
     triggerOnKeydown?.(event);
   }
 
@@ -365,13 +363,13 @@
     'aria-label': ariaLabel || undefined,
     'aria-labelledby': ariaLabelledBy || undefined,
     'aria-describedby': ariaDescribedBy || undefined,
+    'data-keyboard-focus': 'true',
     ...(showSearch
       ? {}
       : {
           role: 'combobox',
           'aria-controls': controlledListId,
           'aria-activedescendant': activeDescendantId,
-          'data-keyboard-focus': 'true',
         }),
     onclick: toggle,
     onkeydown: onTriggerKeydown,
@@ -416,6 +414,7 @@
     enabled: open,
     onDismiss: () => close(),
     onDetached: anchored ? undefined : () => close({ restoreFocus: false }),
+    onFocusLeave: () => close({ restoreFocus: false }),
     additionalNodes: () => [popoverRoot, anchorNode()],
   }}
 >

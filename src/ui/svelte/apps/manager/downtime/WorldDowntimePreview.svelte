@@ -51,7 +51,7 @@
         {localize('FABRICATE.Admin.Manager.World.Downtime.PreviewNote')}
       </p>
     </div>
-    <div class="downtime-board" aria-label={localize(`${copyBase}.PreviewTitle`)}>
+    <div class="downtime-board" role="group" aria-label={localize(`${copyBase}.PreviewTitle`)}>
       <header>
         <span class="downtime-board-icon" aria-hidden="true"><i class={preview.icon}></i></span>
         <span class="downtime-board-heading">

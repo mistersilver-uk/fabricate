@@ -372,6 +372,7 @@
     </ol>
     <div
       class="manager-setup-links"
+      role="group"
       aria-label={text(
         'FABRICATE.Admin.Manager.Environment.EmptySetup.Resources',
         'Environment resources'

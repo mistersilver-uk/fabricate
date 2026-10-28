@@ -51,7 +51,7 @@ The stacked layout MUST remain usable at the real 1024px minimum application-win
 - One shared search covers all four kinds, and the kind filter is the design system's multi-select picker directly beneath it at the search field's width, not a row of toggles (maintainer ruling 2026-10-05).
 Its trigger leads with a layers glyph, summarises the shown kinds in label order — "All run types" when every kind is shown and "No run types" when none is — and is named by the filter's label plus that summary.
 Its panel lists Crafting, Gathering, Salvage and Alchemy in that order, each option drawing a check box, the kind's glyph, its name and the count of that kind's runs across both lists before any filter, and it renders no query field, because four options need no search.
-Each choice applies as it is made, the panel stays open across choices, and its footer action "Show all run types" switches every hidden kind back on.
+Each choice applies as it is made, the panel stays open across choices, and its footer action "Show all run types" switches every hidden kind back on and closes the panel, returning focus to the trigger.
 The lists show the union of the kinds switched on; every kind starts on, the choice is not persisted, and any combination is valid, so a filter switched down to no kind shows the filtered empty state rather than an error.
 Active status filters are mutually exclusive All, Ready, In progress and Paused, and MUST use the same words as the badges, so that no tab names a badge the player is never shown and no badge names a tab that does not exist.
 The In progress tab selects BOTH merged statuses and counts them together; every active run MUST be reachable from exactly one tab, which a tab vocabulary omitting `inProgress` did not satisfy.

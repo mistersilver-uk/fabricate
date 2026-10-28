@@ -7,7 +7,7 @@
 .fabricate :where(.window-content) h4,
 .fabricate :where(.window-content) h5,
 .fabricate :where(.window-content) h6 {
-  font-family: var(--font-primary);
+  font-family: var(--font-body, var(--font-primary, sans-serif));
   color: inherit;
 }
 
@@ -40,7 +40,7 @@
 /* ========================================== Unified Fabricate shell (4-tab window) ========================================== */
 
 .fabricate.fabricate-app {
-  font-family: var(--font-primary);
+  font-family: var(--font-body, var(--font-primary, sans-serif));
   color: var(--fab-text);
   background: var(--fab-bg-1);
 

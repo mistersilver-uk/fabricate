@@ -23,6 +23,14 @@ import {
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory.
 import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
+import {
+  expectEmptiedSelectionReport,
+  expectNoEmptiedSelectionReport,
+  focusControl,
+  renderNow,
+  reportedSentence,
+  settleReport,
+} from '../helpers/emptiedSelectionReport.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 // Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s.
@@ -1249,6 +1257,112 @@ describe('world Component Catalogue (issue 1371)', () => {
         ['deleteEntity:resin'],
         'and the confirmed press deletes the free record, and only that one'
       );
+    });
+
+    it('announces the busy label through a polite region when the confirmed delete starts', async () => {
+      const { actions } = recordingComponentActions();
+      let release;
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { ...actions, deleteEntity: () => pending },
+      });
+      target.querySelector('[data-scoped-list-select="resin"]').click();
+      await drain();
+      const region = () => target.querySelector('[data-world-component-bulk-delete-announce]');
+      assert.equal(region().getAttribute('aria-live'), 'polite');
+      assert.equal(region().textContent.trim(), '', 'empty on mount, outside the control');
+      assert.ok(!dangerControl(target).contains(region()));
+
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      try {
+        assert.equal(region().textContent.trim(), 'Deleting…', 'the write has started');
+      } finally {
+        release(true);
+        await drain();
+      }
+    });
+
+    it('reports an emptied selection and re-homes the keyboard, from either Clear and after a delete', async () => {
+      const toolbarClear = '[data-scoped-list-clear-selection]';
+      const headerClear = '[data-world-component-bulk-clear]';
+      for (const selector of [toolbarClear, headerClear]) {
+        const { target } = await mixedSelection();
+        await expectEmptiedSelectionReport(target, async () => {
+          focusControl(target, selector).click();
+          await drain();
+        });
+      }
+
+      const { target } = await mixedSelection();
+      await expectEmptiedSelectionReport(target, async () => {
+        focusControl(target, '[data-world-component-bulk-danger] .fabricate-button').click();
+        await drain();
+        dangerControl(target).click();
+        await drain();
+      });
+    });
+
+    it('announces at once and leaves focus alone when the GM moved it during the write', async () => {
+      const { target } = await mixedSelection();
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      assert.ok(document.activeElement === elsewhere, 'pre-condition: the GM is in the field');
+
+      target.querySelector('[data-scoped-list-clear-selection]').click();
+      await drain();
+      renderNow();
+
+      assert.equal(reportedSentence(target)?.textContent, 'Selection cleared.');
+      assert.ok(document.activeElement === elsewhere, 'the GM keeps the control they chose');
+      elsewhere.remove();
+    });
+
+    it('announces once when a finished write clears a selection that was already cleared', async () => {
+      const { actions } = recordingComponentActions();
+      let release;
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { ...actions, deleteEntity: () => pending },
+      });
+      target.querySelector('[data-scoped-list-select="resin"]').click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+
+      target.querySelector('[data-scoped-list-clear-selection]').click();
+      await drain();
+      await settleReport();
+      const first = reportedSentence(target);
+      assert.equal(first?.textContent, 'Selection cleared.', 'the Clear was reported');
+
+      release(true);
+      await drain();
+      await settleReport();
+      assert.ok(reportedSentence(target) === first, 'the write clearing nothing says nothing more');
+    });
+
+    it('reports nothing when unticking the last row empties the selection', async () => {
+      const { target } = await mixedSelection();
+      await expectNoEmptiedSelectionReport(target, async () => {
+        for (const id of ['resin', 'ingot']) {
+          target.querySelector(`[data-scoped-list-select="${id}"]`).click();
+          await drain();
+        }
+      });
     });
 
     it('goes inert on its axes while the armed delete is still writing (issue 1844)', async () => {
@@ -2709,6 +2823,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       compiledExtras: [
         'src/ui/svelte/apps/manager/IconFactRow.svelte',
         'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+        'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
         'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
         'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
         'src/ui/svelte/components/ArmedDangerButton.svelte',

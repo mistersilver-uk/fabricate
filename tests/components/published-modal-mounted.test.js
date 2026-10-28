@@ -787,6 +787,27 @@ for (const closeOnOutsideClick of [true, false]) {
       assert.ok(document.activeElement === trigger, 'focus is on the trigger');
     });
 
+    it('closes a slot-mounted published IconPicker’s list on Tab in its query field, calls nothing, and focus is on its trigger (issue 2676)', async () => {
+      const { api, calls, handle } = await open();
+      const { target } = mountIn(api, handle.slot('body'), 'IconPicker', {
+        ...PICKER,
+        onChange() {},
+      });
+      const trigger = target.querySelector('button');
+      trigger.click();
+      flushSync();
+      await settle();
+      const field = document.querySelector('[role="dialog"]:not([data-manager-modal]) input');
+      assert.ok(field, 'the list is open with its query field');
+      const event = press(field, 'Tab');
+      assert.ok(document.activeElement === trigger, 'focus is on the trigger, for the browser');
+      await settle();
+      assert.equal(event.defaultPrevented, false, 'the browser moves Tab on from the trigger');
+      assert.ok(!document.querySelector('[role="dialog"]:not([data-manager-modal])'), 'closed');
+      assert.deepEqual(calls, []);
+      assert.ok(document.querySelector('[data-manager-modal]'), 'the dialog stays open');
+    });
+
     it('calls nothing for a press on a slot-mounted published ActionMenu’s item, whose click chooses it, nor for an Escape in its menu, which closes it', async () => {
       const { api, calls, handle } = await open();
       const chosen = [];

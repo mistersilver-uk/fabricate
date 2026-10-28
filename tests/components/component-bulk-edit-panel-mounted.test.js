@@ -680,6 +680,20 @@ describe('ComponentBulkEditPanel remove leg (issue 1371 r16-list)', () => {
     assert.equal(removeButton(root).querySelector('span').textContent.trim(), 'Removing…');
   });
 
+  it('announces the busy label through the polite region when the remove starts', async () => {
+    const { root } = await mountPanel({ deleteArmed: true });
+    assert.match(announce(root).textContent, /again/i, 'pre-condition: the arm was announced');
+
+    await panel.setProps({ deleting: true, deleteArmed: false });
+    flushSync();
+    assert.equal(announce(root).textContent.trim(), 'Removing…');
+    assert.ok(!removeButton(root).contains(announce(root)), 'outside the focused control');
+
+    await panel.setProps({ deleting: false });
+    flushSync();
+    assert.equal(announce(root).textContent.trim(), '', 'and silent again once the write ends');
+  });
+
   it('goes inert on its axes while the armed remove is being confirmed (issue 1844)', async () => {
     const { root } = await mountPanel({
       draft: setBulkCategory(createComponentBulkDraft(), 'Metal'),

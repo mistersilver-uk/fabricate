@@ -1020,6 +1020,7 @@ The correction must actually reach every surface reading that entity, and rows k
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
+Dismissing it moves focus to the library's search field before the flash leaves the page, because a focus that falls to the document body lets Foundry's Escape close every open window, the Manager included.
 The flash **floats** over the list rather than sitting in flow above it: an in-flow banner shoves every row down the page as it appears, moving the row the GM just clicked out from under the cursor.
 
 The **lock toggle** gives `recipe.locked` a real write path from the row.
@@ -1155,6 +1156,7 @@ On success it clears the selection and returns the rail to the single-recipe ins
 The keyboard is returned to the studio's toolbar and that same sentence is then announced through the manager's live region, per Emptying a bulk selection above.
 The recipe-item figure it reports is the one the impact statement promised, not the number of definitions the write rewrote, so a legacy-basis delete does not report having done less than it stated.
 A write that deleted nothing reports no success, leaves the selection intact and returns the control to its idle face rather than leaving it in progress, and tells the GM that nothing was deleted — whether the write failed or simply reached nothing, which a concurrent client deleting the same recipes between the statement and the click produces without any failure at all.
+Starting the write is announced through the card's own live region as the control's in-progress label, because the control keeps focus and its accessible name changes under it.
 Focus stays on the control for the duration of the write, because its in-progress face is `aria-disabled` rather than natively disabled, and is returned to the control when anything else left it on the document body; that outcome is then announced through the card's own live region, in that order; disarming without confirming is announced through the same region, since it changes the control's accessible name while it holds focus.
 The single-recipe delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same recipe.
 

@@ -424,7 +424,7 @@
   .manager-travel-parties-intro {
     margin: 0 0 var(--fab-space-3);
     color: var(--fab-text-muted);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11px;
     font-weight: 400;
     line-height: 1.6;
@@ -486,7 +486,7 @@
     border-radius: 9px;
     color: var(--fab-on-accent);
     background: var(--fab-accent);
-    font-family: var(--font-primary);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 11.5px;
     font-weight: 700;
   }
