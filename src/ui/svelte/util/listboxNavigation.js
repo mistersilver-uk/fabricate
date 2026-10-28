@@ -231,6 +231,13 @@ export function holderKeyIntent(event, context = {}) {
   return index === null ? PASS_THROUGH : { kind: 'move-cursor', index };
 }
 
+/** Whether the key is Tab or Shift+Tab with no other modifier, outside a composition. */
+export function plainTab(event) {
+  return (
+    event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing
+  );
+}
+
 // One function for the row id AND the holder's `aria-activedescendant`, so the two cannot drift.
 // `prefix` is per component instance, because two pickers both indexing from 0 would emit the same
 // DOM id; `undefined` is what makes Svelte OMIT the attribute rather than point it at no element.

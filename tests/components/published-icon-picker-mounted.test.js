@@ -433,7 +433,7 @@ describe('the keys the published IconPicker keeps', () => {
     };
   }
 
-  it('stops every keydown on its trigger, and its own click, at the trigger', async () => {
+  it('lets Tab bubble from its trigger, and stops every other key and its own click (issue 2598)', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
     const { trigger } = mountPicker({}, { target });
     const keys = hearing('keydown', [['above', target.parentElement]]);
@@ -451,7 +451,7 @@ describe('the keys the published IconPicker keeps', () => {
       keys.stop();
       clicks.stop();
     }
-    assert.deepEqual(keys.heard, [], 'no key reached the companion above target');
+    assert.deepEqual(keys.heard, ['above:Tab'], 'the companion above target hears Tab alone');
     assert.deepEqual(clicks.heard, [], 'no press of the trigger reached it either');
   });
 
@@ -489,20 +489,17 @@ describe('the keys the published IconPicker keeps', () => {
     assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
   });
 
-  it('leaves the list open when Tab takes focus out of the field, and the next Escape closes it', async () => {
+  it('closes when focus moves from the field to an element elsewhere (issue 2598)', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
-    const { trigger } = mountPicker({}, { target });
+    const { calls, trigger } = mountPicker({}, { target });
     const elsewhere = document.createElement('button');
     target.parentElement.append(elsewhere);
     await open(trigger());
-    press(fieldIn(), 'Tab');
     elsewhere.focus();
     await settle();
-    assert.ok(Boolean(panelIn()), 'Tab leaves the list open');
-    press(elsewhere, 'Escape');
-    await settle();
-    assert.ok(!panelIn(), 'Escape closes the list');
-    assert.ok(document.activeElement === trigger(), 'and returns focus to the trigger');
+    assert.ok(!panelIn(), 'focus moving elsewhere closes the list');
+    assert.ok(document.activeElement === elsewhere, 'and moves no focus');
+    assert.deepEqual(calls, [], 'without calling onChange');
   });
 });
 

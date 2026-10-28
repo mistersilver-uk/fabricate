@@ -227,6 +227,8 @@ function assertClosedOnTrigger(trigger, why) {
 export async function chooseSelectOptionByKeyboard(root, triggerSelector, value) {
   const trigger = root.querySelector(triggerSelector);
   assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
+  // An earlier pointer choice's focus return lands first, so it cannot take focus off this trigger.
+  await tick();
   trigger.focus();
   await pressFocused('ArrowDown');
   assert.equal(trigger.getAttribute('aria-expanded'), 'true', 'ArrowDown opens the list');

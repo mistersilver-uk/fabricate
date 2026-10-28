@@ -1282,7 +1282,7 @@ Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
 The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at six shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
-The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in the search-suppressed shape only, except `IconPicker`'s snippet trigger, which states it itself in every shape (issue 2647); the inline query's close control carries it too (issue 2454).
+The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in every shape too, through the attributes the primitive spreads onto it, and `IconPicker`'s snippet trigger also states it itself (issues 2598, 2647); the inline query's close control carries it too (issue 2454).
 Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
 An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
 The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
@@ -1290,6 +1290,8 @@ Each option row therefore ALSO carries the keyboard-focus attribute, because a `
 There is a SECOND, independent reason the pointer path suppresses focus, and both are stated because either alone reads as defensive: the module root rings any `:focus-visible` `[tabindex]` descendant, so a row that took focus would draw a competing outline at a POSITIVE offset against the keyboard cursor's inset one.
 The cursor index and the option ids are defined over the FLAT RENDERED order, so a grouped list cannot emit duplicate ids and `aria-activedescendant` cannot be ambiguous.
 The holder CONSUMES `ArrowUp`, `ArrowDown`, `Home`, `End` and `Enter`, plus `ArrowLeft` and `ArrowRight` in the grid form, and leaves every other key — every printable character above all — to the control it is bound to; `Escape` closes the panel from the document's capture phase rather than from the holder.
+The panel also closes without choosing, moving no focus, once focus moves to an element outside the picker's root, its anchor and the panel, and not when the browser window loses focus (issue 2598).
+The picker's trigger stops the propagation of every key but Tab, with or without Shift, so a host's own key handlers never act on a key the picker consumed, and Tab reaches the host once an open panel is closed; the trigger declares `data-keyboard-focus`, so Foundry's Tab binding never takes Tab or Shift+Tab from it.
 Four of those keys are THE CARET'S FIRST wherever the holder is a text field, and the holder takes each of them only from the edge at which the caret would not move: `Home` and `ArrowLeft` only with the caret at offset 0, `End` and `ArrowRight` only with it at the end of the value, never over a selection of any width.
 A MODIFIED keypress is never this widget's, whichever key it is: with `Shift`, `Ctrl`, `Alt` or `Meta` held the holder consumes nothing and the arrows do not move the cursor either.
 `Enter` is the one exception, answered before the modifier test, because on a TRIGGER holder an `Enter` the widget declines reaches the button's own activation and shuts the panel rather than confirming anything.
@@ -1670,7 +1672,7 @@ The picker panel scrolls internally at a fixed maximum height and states how man
 
 Every selection MUST be reversible before it is committed.
 The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
-Escape, an outside press and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
+Escape, an outside press, focus leaving the panel and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
 While the panel holds staged choices its footer states what Apply will add and remove rather than the size of the set, so a GM can see that a dismissal would discard something.
 
 Where the control edits several entries at once, the panel STAYS OPEN across choices and announces a multi-selectable list.
@@ -1776,7 +1778,7 @@ With `squareTiles`, each option is a square, text-free tile whose label is both 
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
 The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
 A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
-It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
+It positions the panel against the anchor, counts the anchor inside for outside-click and focus-leave dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
 
 #### Scenario: A converted menu renders no query field
 
@@ -2371,10 +2373,18 @@ The selected tick is CONFIGURABLE and is a property of the list rather than of a
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
+A select's trigger lets Tab and Shift+Tab through, closing an open list without choosing as focus moves on, and stops every other key, and its list also closes once focus moves outside the trigger and the list, so a keyboard user never leaves an open list behind (issue 2598).
+
 #### Scenario: A select offers three plain options
 
 - **WHEN** a surface needs a one-of-N choice with no descriptions or badges
 - **THEN** it still renders the app’s option list rather than a native popup
+
+#### Scenario: A keyboard user tabs past an open select
+
+- **WHEN** a select's list is open and the user presses Tab
+- **THEN** the list closes without choosing and the trigger reads `aria-expanded="false"`
+- **AND** focus moves to the next control, and a `keydown` listener above the select hears the Tab
 
 ### Requirement: Art that is an identity is picked as a picture
 

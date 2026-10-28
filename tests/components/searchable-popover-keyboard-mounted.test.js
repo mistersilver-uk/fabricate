@@ -1257,4 +1257,67 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       harness.remount();
     });
   });
+
+  describe('Tab and focus leaving the picker (issue 2598)', () => {
+    const panelOpen = () => Boolean(harness.target.querySelector('.fabricate-picker-popover'));
+
+    /** Records every keydown that bubbles to the window, as a companion's listener above does. */
+    function heardAbove() {
+      const heard = [];
+      const listen = (event) => {
+        heard.push(event.key);
+      };
+      document.defaultView.addEventListener('keydown', listen);
+      return { heard, stop: () => document.defaultView.removeEventListener('keydown', listen) };
+    }
+
+    it('closes without choosing or moving focus when focus moves to a control outside', async () => {
+      chosen.length = 0;
+      await mountPicker({});
+      await openPanel();
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      await settle();
+      assert.ok(!panelOpen(), 'the panel is closed');
+      assert.equal(trigger().getAttribute('aria-expanded'), 'false');
+      assert.ok(document.activeElement === elsewhere, 'focus stays where it went');
+      assert.deepEqual(chosen, []);
+      elsewhere.remove();
+      harness.remount();
+    });
+
+    it('lets Tab and Shift+Tab bubble from the trigger, closing an open list, and stops every other key', async () => {
+      await mountPicker({ showSearch: false, triggerHasPopup: 'listbox' });
+      const button = trigger();
+      button.focus();
+      const above = heardAbove();
+      try {
+        for (const shiftKey of [false, true]) {
+          await openPanel();
+          const event = pressKey('Tab', { shiftKey });
+          assert.equal(event.defaultPrevented, false);
+          assert.equal(button.getAttribute('aria-expanded'), 'false', 'the list is closed');
+          await settle();
+          assert.ok(document.activeElement === button, 'focus stays for the browser to move');
+        }
+        pressKey('Tab');
+        for (const modifiers of [{ ctrlKey: true }, { altKey: true }]) pressKey('Tab', modifiers);
+        pressKey('ArrowUp');
+        pressKey('Escape');
+        assert.deepEqual(above.heard, ['Tab', 'Tab', 'Tab'], 'only plain Tab reaches the window');
+      } finally {
+        above.stop();
+      }
+      harness.remount();
+    });
+
+    it('marks every trigger form for Foundry`s keyboard focus', async () => {
+      for (const props of [{}, { triggerChip: true }, { triggerButton: { role: 'neutral' } }]) {
+        await mountPicker(props);
+        assert.equal(trigger().getAttribute('data-keyboard-focus'), 'true', JSON.stringify(props));
+        harness.remount();
+      }
+    });
+  });
 });

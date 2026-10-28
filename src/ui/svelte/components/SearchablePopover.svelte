@@ -53,7 +53,7 @@
     returns focus to the trigger, and `stayOpen` gates the WHOLE of it. That restoration waits for
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
     while open. ESCAPE IS HANDLED IN ONE PLACE, `dismissOnOutsideClick`'s DOCUMENT capture keydown,
-    which the inline field's keys reach; its `onDetached` closes a detached root's panel, no focus moved.
+    which the inline field's keys reach; `onDetached` and `onFocusLeave` close the panel, moving no focus.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -75,7 +75,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
+  import { activeOptionId, holderKeyIntent, plainTab } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
   import {
     PENDING_SOURCE,
@@ -334,11 +334,8 @@
   function toggle(event) {
     event.stopPropagation();
     if (disabled || triggerAriaDisabled) return;
-    if (open) {
-      close({ restoreFocus: false });
-      return;
-    }
-    open = true;
+    if (open) close({ restoreFocus: false });
+    else open = true;
   }
 
   function chooseOption(option) {
@@ -347,9 +344,11 @@
     if (!staysOpenOnChoose) close();
   }
 
+  // Tab and Shift+Tab bubble, closing an open panel; every other key stops here (issue 2598).
   function onTriggerKeydown(event) {
     if (!showSearch) onHolderKeydown(event);
-    event.stopPropagation();
+    if (!plainTab(event)) event.stopPropagation();
+    else if (open) close({ restoreFocus: false });
     triggerOnKeydown?.(event);
   }
 
@@ -365,13 +364,13 @@
     'aria-label': ariaLabel || undefined,
     'aria-labelledby': ariaLabelledBy || undefined,
     'aria-describedby': ariaDescribedBy || undefined,
+    'data-keyboard-focus': 'true',
     ...(showSearch
       ? {}
       : {
           role: 'combobox',
           'aria-controls': controlledListId,
           'aria-activedescendant': activeDescendantId,
-          'data-keyboard-focus': 'true',
         }),
     onclick: toggle,
     onkeydown: onTriggerKeydown,
@@ -416,6 +415,7 @@
     enabled: open,
     onDismiss: () => close(),
     onDetached: anchored ? undefined : () => close({ restoreFocus: false }),
+    onFocusLeave: () => close({ restoreFocus: false }),
     additionalNodes: () => [popoverRoot, anchorNode()],
   }}
 >

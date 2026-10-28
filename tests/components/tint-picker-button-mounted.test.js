@@ -71,6 +71,11 @@ describe('TintPickerButton swatch', () => {
     assert.equal(button.getAttribute('aria-haspopup'), 'dialog');
     assert.equal(button.getAttribute('aria-expanded'), 'false');
     assert.equal(button.getAttribute('type'), 'button', 'so it never submits the add form');
+    assert.equal(
+      button.getAttribute('data-keyboard-focus'),
+      'true',
+      'so Foundry`s Tab binding never takes the Tab it lets through (issue 2598)'
+    );
     assert.ok(
       Boolean(button.closest('.fabricate-color-picker.manager-color-picker')),
       'the swatch stays inside the namespace root its sheet rules hang off'
