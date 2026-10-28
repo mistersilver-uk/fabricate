@@ -59,6 +59,10 @@ const REFUSED = [
   ['an alias', '--face: var(--font-primary)'],
   ['a multi-line declaration', 'font-family:\n    var(--font-primary);'],
   [
+    'a bare literal read beside a guarded one',
+    `${GUARDED}; font-family: var(--font-primary, sans-serif)`,
+  ],
+  [
     'a --font-body read with another fallback',
     'var(--font-body, serif, var(--font-primary, serif))',
   ],
@@ -66,6 +70,7 @@ const REFUSED = [
 
 const ADMITTED = [
   ['the guarded form', GUARDED],
+  ['the guarded form twice in one text', `${GUARDED}; font-family: ${GUARDED}`],
   ['the guarded form, spaced', 'var( --font-body , var( --font-primary , sans-serif ) )'],
   ['the guarded form with a quoted literal', 'var(--font-body, var(--font-primary, "A (b)"))'],
   ['a longer property name', 'var(--font-primary-alt, serif)'],
