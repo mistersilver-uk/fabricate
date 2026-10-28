@@ -1555,7 +1555,8 @@ Each group states the accepted values of every key that entry publishes.
     A pointer press on the dialog's surface, outside every control, moves focus to the dialog itself, which holds Foundry's keybindings off and draws no focus ring, so Escape then calls `onClose` as Escape in the dialog does, and Tab or Shift+Tab then moves focus to its first or its last control, unless an open ApplicationV1 `Dialog` takes the Tab, as above.
   - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
-    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
+    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed closes nothing (issue 2677).
+    Fabricate's own dialogs differ: there the dialog hears an Escape on a closed `Select` or `IconPicker` trigger before the trigger does, and closes.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
     Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
     Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
@@ -1972,6 +1973,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` with `closeOnOutsideClick` `true`, mounts a `Select` in its `body` slot, opens the list and clicks one of its options
 - **THEN** the `Select` calls its `onChange` and Fabricate does not call the `Modal`'s `onClose`
 - **AND** a press on the window outside the dialog and outside the list then calls `onClose` once
+
+#### Scenario: Escape on a closed picker trigger in a published dialog
+
+- **WHEN** a companion mounts `Modal` with `closeOnOutsideClick` `true`, mounts a `Select` and an `IconPicker` in its `body` slot, and presses Escape on each trigger with its list closed
+- **THEN** Fabricate calls no `onClose` and the dialog stays open
+- **AND** Tab in the opened `IconPicker`'s query field closes its list, calls no `onClose`, and moves focus on from its trigger inside the dialog
 
 #### Scenario: A panel left open by an update that detaches its slot
 

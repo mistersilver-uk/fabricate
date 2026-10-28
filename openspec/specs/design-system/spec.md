@@ -2551,6 +2551,7 @@ It dismisses on an outside click and on Escape.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
+An Escape on a closed `Select` or `IconPicker` trigger inside it dismisses it, as on any other control, because the dialog hears the key before the trigger's own handler; a companion's published dialog differs, as the `Modal` group in `ui-extension-points` states (issue 2677).
 A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
 The dialog element is a focus target, `tabindex="-1"` carrying `data-keyboard-focus="true"`, so a pointer press on its surface outside every control focuses the dialog, Foundry's keybindings stay held off, and Tab or Shift+Tab from it moves to its first or its last control, the close control being the first; it keeps its elevation and draws no focus ring (issue 2661).
 The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog, though Tab from a picker's panel opened inside it moves on from the picker's trigger, and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
@@ -2575,6 +2576,7 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the import folder mapping is open and the user presses Escape on its match-by-name checkbox
 - **THEN** the modal is dismissed once and Foundry's dismiss keybinding closes no window
 - **AND** Escape on an open category list closes that list and leaves the modal open
+- **AND** Escape on a closed category select's trigger dismisses the modal once
 
 #### Scenario: A press on the dialog's surface
 
