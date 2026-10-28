@@ -128,7 +128,7 @@ The bonus also applies to every event roll, so a positive bonus makes hazards li
 The result applies only after you answer the prompt.
 A timed d100 gather does not prompt.
 Dismissing the prompt leaves the run ready in the Journal under **Roll a d100**, with its start-time costs spent, and the Gathering tab refreshes.
-Today a timed d100 run shows the same **Roll a d100** label once it is ready, but it completes without a prompt.
+A timed d100 run shows **Collect** once it is ready, and completes without a prompt.
 
 A required player check opens an interactive dialog when you execute the ready run.
 Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.
