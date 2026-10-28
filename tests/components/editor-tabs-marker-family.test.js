@@ -529,6 +529,18 @@ describe('EditorTabs names what a record count counts (issue 2491)', () => {
     assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes : 3 outcomes');
   });
 
+  it('keeps a named issue chip beside the named count in the one tab name', async () => {
+    assert.equal(
+      await nameOf({
+        outcomes: [
+          { vehicle: 'count', label: 3, name: '3 outcomes' },
+          { label: '2', tone: 'warning', name: '2 warnings' },
+        ],
+      }),
+      'Outcomes, 3 outcomes, 2 warnings'
+    );
+  });
+
   it('leaves an unnamed count, an undrawn zero and a tab`s own name as they were', async () => {
     assert.equal(await nameOf({ outcomes: { vehicle: 'count', label: 3 } }), null);
     assert.equal(

@@ -47,6 +47,7 @@ describe('ChecksEditorTabs names its section counts', () => {
         section('outcomes', 'Outcomes', { count: 3, issues: 2 }),
         section('triggers', 'Triggers', { count: 1 }),
         section('modifiers', 'Modifiers', { count: 0 }),
+        section('roll', 'Roll', { count: 2 }),
       ],
       activeSection: 'outcomes',
     });
@@ -55,5 +56,7 @@ describe('ChecksEditorTabs names its section counts', () => {
     assert.equal(name('outcomes'), 'Outcomes, 3 outcomes, 2 issues');
     assert.equal(name('triggers'), 'Triggers, 1 trigger');
     assert.equal(name('modifiers'), null, 'a zero count draws nothing and names nothing');
+    assert.equal(name('roll'), null, 'a section with no unit draws its numeral unnamed');
+    assert.equal(root.querySelector('[data-checks-section-count="roll"]')?.textContent.trim(), '2');
   });
 });

@@ -41,6 +41,14 @@
     modifiers: TAB_COUNT_UNITS.modifiers,
   };
 
+  // A section with no unit still draws its numeral, unnamed.
+  function countMark(section) {
+    const countUnit = SECTION_UNITS[section.id];
+    return countUnit
+      ? tabCountMark(section.count, countUnit)
+      : { vehicle: 'count', label: section.count };
+  }
+
   const tabs = $derived(
     sections.map((section) => ({
       id: section.id,
@@ -55,9 +63,7 @@
       sections.map((section) => [
         section.id,
         [
-          typeof section.count === 'number' && section.count > 0
-            ? tabCountMark(section.count, SECTION_UNITS[section.id])
-            : null,
+          typeof section.count === 'number' && section.count > 0 ? countMark(section) : null,
           section.issues > 0 ? { vehicle: 'dot', name: issueName(section.issues) } : null,
         ].filter(Boolean),
       ])

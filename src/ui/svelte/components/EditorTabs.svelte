@@ -49,7 +49,7 @@
     `ariaLabel`, or any mark that names itself, keeps that name.
   - A named record count is spoken with its unit: a tab carrying a `count` mark with a `name`, and no `ariaLabel`
     of its own, takes the accessible name "Contents, 3 linked recipes" on its button, joined by the names of any
-    dot on the tab; the numeral stays the bare visible mark. A count with no `name` leaves the name to its content.
+    named mark on the tab; the numeral stays the bare visible mark. A count with no `name` leaves the name to its content.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
     `activeTab`. The hovered tab's description shows, else the focused tab's when none is hovered;
     a hovered tab that carries none shows none, and Escape hides it until that tab is next hovered
@@ -295,14 +295,12 @@
     );
   }
 
-  // A named record count states what its numeral counts; a named dot on the same tab joins it,
-  // because the tab's own name replaces the content that would otherwise carry the dot's.
+  // A named record count states what its numeral counts; every other named mark on the tab joins
+  // it, because the tab's own name replaces the content that would otherwise carry theirs.
   function countName(tab) {
     const marks = marksByTab[tab.id];
     if (!marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) return undefined;
-    const names = marks
-      .filter((mark) => (mark.vehicle === 'count' || mark.vehicle === 'dot') && mark.name !== '')
-      .map((mark) => mark.name);
+    const names = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
     return severityText(
       'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts',
       '{label}, {counts}',

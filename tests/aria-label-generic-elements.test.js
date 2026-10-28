@@ -15,8 +15,24 @@ import {
   walkElements,
 } from './helpers/svelteTemplateScan.js';
 
-/** Elements whose implicit role is `generic`, `paragraph`, `emphasis`, `strong` or `code`. */
-const GENERIC_TAGS = new Set(['div', 'span', 'p', 'b', 'i', 'em', 'strong', 'small', 'u', 's']);
+/** Elements whose implicit role is `generic`, `paragraph`, `emphasis`, `strong`, `code`, `deletion`, `insertion`, `subscript` or `superscript`. */
+const GENERIC_TAGS = new Set([
+  'div',
+  'span',
+  'p',
+  'b',
+  'i',
+  'em',
+  'strong',
+  'small',
+  'u',
+  's',
+  'code',
+  'sub',
+  'sup',
+  'del',
+  'ins',
+]);
 
 /**
  * Files whose offenders are held back by `tests/file-size-ratchet.test.js`: a `role` line grows an
@@ -75,6 +91,7 @@ test('the scan flags a bare name and passes every shape that is not one', () => 
   assert.deepEqual(lines('<span role="img" aria-label="Realm">x</span>'), [], 'a role');
   assert.deepEqual(lines('<div role={kind} aria-label="x"></div>'), [], 'a dynamic role');
   assert.deepEqual(lines('<span {...combo.list} aria-label="x"></span>'), [], 'a spread');
+  assert.deepEqual(lines('<code aria-label="x"></code>'), [1], 'a code element');
   assert.deepEqual(lines('<section aria-label="x"></section>'), [], 'a landmark');
   assert.deepEqual(lines('<li aria-label="x"></li>'), [], 'a list item');
   assert.deepEqual(lines('<Panel aria-label="x" />'), [], 'a component');

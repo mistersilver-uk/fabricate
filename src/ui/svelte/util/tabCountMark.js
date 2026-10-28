@@ -74,7 +74,9 @@ export function tabCountMark(count, countUnit, extra = {}) {
  */
 export function nameTabCounts(badges, unitsByTab) {
   const nameMark = (mark, countUnit) =>
-    mark?.vehicle === 'count' && !mark.name ? tabCountMark(mark.label, countUnit, mark) : mark;
+    mark?.vehicle === 'count' && !mark.name
+      ? tabCountMark(mark.label ?? mark.value, countUnit, mark)
+      : mark;
   return Object.fromEntries(
     Object.entries(badges ?? {}).map(([id, value]) => {
       const countUnit = unitsByTab[id];

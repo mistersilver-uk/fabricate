@@ -70,5 +70,10 @@ describe('nameTabCounts', () => {
       'a mark that names itself keeps its name'
     );
     assert.deepEqual(nameTabCounts(undefined, units), {});
+    assert.deepEqual(
+      nameTabCounts({ contents: { vehicle: 'count', value: 2 } }, units).contents,
+      { vehicle: 'count', value: 2, label: 2, name: '2 linked recipes' },
+      'a mark that spells its numeral `value` is named from it'
+    );
   });
 });

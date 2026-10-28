@@ -1130,7 +1130,7 @@ A control whose visible text is a glyph or a bare number MUST take its accessibl
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
 An element with no role of its own, a `div`, `span` or `p`, MUST NOT carry an `aria-label`, because ARIA 1.2 prohibits naming a generic or paragraph and most screen readers drop the name.
 It takes a role that supports one, `group` for a set of controls or chips and `img` for a chip whose label replaces its text, or its name moves into visually hidden text; `tests/aria-label-generic-elements.test.js` fails a new offender.
-Six sites in five oversized files stay listed in that test until the file-size ratchet admits a role line, and the list can only shrink.
+Some sites in oversized files stay listed in that test until the file-size ratchet admits a role line, and the list can only shrink.
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
@@ -1432,7 +1432,7 @@ The strip has no density of its own and borrows this one for its geometry, becau
 No rule in the module sheet names that badge's class, and the strip's record count and dot stay bare `span` elements the tab-strip primitive paints.
 A tab's record count MUST be spoken with what it counts: a `count` mark carries a `name` stating the numeral and its unit, such as "3 linked recipes", and the strip names the tab by joining its label with that phrase, such as "Contents, 3 linked recipes".
 The caller resolves the unit through a plural-aware lang pair and the numeral stays the bare visible mark, so a record count is never left as a bare number in a tab's accessible name.
-A named dot on the same tab joins that name, and a tab's own `ariaLabel` still wins.
+Any other named mark on the same tab joins that name, and a tab's own `ariaLabel` still wins.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
