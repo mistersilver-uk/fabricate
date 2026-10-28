@@ -1437,7 +1437,7 @@ Each group states the accepted values of every key that entry publishes.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
     Tab in the query field closes the list without choosing, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger, and Shift+Tab there closes the list and returns focus to the trigger (issue 2676).
-    The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window closes nothing (issue 2598).
+    The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
   - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears Tab and no other key; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
     In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
     Every key pressed in the query field, Escape included, may reach a companion's listener on the `overlayHost` or above it.
