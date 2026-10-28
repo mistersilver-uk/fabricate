@@ -183,11 +183,10 @@ ink for the SOLID accent fill, which `--fab-accent-text` does not replace.
 
 **Entity tints** (`--fab-tag-*`, per-theme tinted dots):
 Thirteen are declared in every theme.
-Eight are offered in the picker — `sage` `mist` `lavender` `rose` `peach` `butter` `aqua`
-`mauve` — and five are declared but not offered: `ember` `verdant` `azure` `bone` `slate`.
+Ten are offered in the picker (`sage` `mist` `lavender` `rose` `peach` `butter` `aqua` `mauve` `verdant` `azure`), and three are declared but withheld: `bone` and `slate` as neutrals, `ember` as bound to the Downtime companion tint.
 The tint colours a glyph, a badge ink or a bar fill, never a chip background, which would
 double-code kind against state.
-The `design-system` capability owns that rule and records which of the eight break the hue
+The `design-system` capability owns that rule and records which of the original eight break the hue
 promise across themes; do not restate the measurements here.
 
 ## 3. Typography
