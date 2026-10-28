@@ -134,6 +134,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceReferenceUnion.js',
     'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/model/scopedEntityListModel.js',
     // The frame's lifted view-state (issue 1438).
     'src/ui/model/managerBrowserViewState.js',
@@ -152,6 +153,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     FRAME,
+    'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
@@ -897,6 +899,9 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         rows: edges(rows),
         rowInset: row.getBoundingClientRect().left - columnBox.left,
         rowsPaddingBottom: parseFloat(getComputedStyle(rows).paddingBottom),
+        announcerInColumn: Boolean(
+          column.querySelector(':scope > [data-scoped-list-selection-announce]')
+        ),
         footClass: String(column.lastElementChild.className),
         footGap: columnBox.bottom - column.lastElementChild.getBoundingClientRect().bottom,
       };
@@ -940,6 +945,10 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       assert.ok(
         Math.abs(box.rowInset - GUTTER_PX) <= EPSILON_PX,
         `a row starts ${box.rowInset}px inside the column, not on the ${GUTTER_PX}px gutter`
+      );
+      assert.ok(
+        box.announcerInColumn,
+        'the report region is a child of the column, beside the toolbar'
       );
       assert.ok(box.footClass.includes(foot), `NON-VACUITY: the foot is \`${box.footClass}\``);
       if (foot === 'fabricate-pagination') {

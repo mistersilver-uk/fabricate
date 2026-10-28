@@ -229,7 +229,11 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     assert.match(live(root).textContent, /Activate again/);
 
     await harness.setProps({ ...cancelled, armed: true, busy: true });
-    assert.equal(live(root).textContent.trim(), '', 'the region is emptied while the write runs');
+    assert.equal(
+      live(root).textContent.trim(),
+      'Deleting…',
+      'the region swaps the armed sentence for the busy label while the write runs'
+    );
 
     await harness.setProps({ ...cancelled, armed: false, busy: false });
     assert.equal(
@@ -424,9 +428,22 @@ describe('1132 BulkDeleteCard — the busy face', () => {
     );
     assert.equal(
       live(root).textContent.trim(),
-      '',
-      'while the armed announcement is cleared — "activate again" stops being true once the write starts'
+      'Deleting…',
+      'while the armed announcement gives way to the busy label — "activate again" stops being true once the write starts'
     );
+    harness.remount();
+  });
+
+  it('announces the busy label on the busy edge, because a name change under focus is not reliably spoken', async () => {
+    const root = await harness.mount(props({ armed: true }));
+    assert.match(live(root).textContent, /Activate again/, 'pre-condition: the arm was announced');
+
+    await harness.setProps(props({ armed: true, busy: true }));
+    assert.equal(live(root).textContent.trim(), 'Deleting…');
+    assert.ok(!button(root).contains(live(root)), 'in the region outside the control');
+
+    await harness.setProps(props({ armed: false, busy: false }));
+    assert.equal(live(root).textContent.trim(), '', 'and falls silent once the write is over');
     harness.remount();
   });
 

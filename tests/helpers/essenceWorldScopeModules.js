@@ -39,6 +39,7 @@ export const ESSENCE_WORLD_SCOPE_RAW_MODULES = Object.freeze([
   'src/utils/sourceReferenceUnion.js',
   'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/model/scopedEntityListModel.js',
   // The frame's lifted view-state (issue 1438).
   'src/ui/model/managerBrowserViewState.js',
@@ -62,6 +63,7 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
   // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',

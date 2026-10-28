@@ -55,6 +55,7 @@ export const SCOPED_LIST_RAW_MODULES = Object.freeze([
   'src/ui/model/scopedEntityListModel.js',
   'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // The frame's lifted view-state factory.
   'src/ui/model/managerBrowserViewState.js',
 ]);
@@ -137,6 +138,7 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/manager/scoped/EmptiedSelectionAnnouncer.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
