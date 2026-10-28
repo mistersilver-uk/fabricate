@@ -53,6 +53,7 @@
         class:is-tinted={Boolean(tintStyle(essence.colorToken))}
         style={tintStyle(essence.colorToken)}
         data-alchemy-essence={essence.id}
+        role="img"
         title={`${essence.name} ×${essence.quantity}`}
         aria-label={`${essence.name} ×${essence.quantity}`}
       >
@@ -64,6 +65,7 @@
       <span
         class="alchemy-essence-chip is-more"
         data-alchemy-essence-more
+        role="img"
         title={more}
         aria-label={more}>+{rows.length - limit}</span
       >

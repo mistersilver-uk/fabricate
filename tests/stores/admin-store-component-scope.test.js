@@ -13,6 +13,7 @@ import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import {
   buildComponentEditorState,
   buildComponentEditorUpdates,
+  carriedComponentEssences,
 } from '../../src/ui/svelte/util/componentEditor.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { recipeReferencesComponent } from '../../src/utils/recipeComponentReferences.js';
@@ -1733,8 +1734,9 @@ test('1371 r22: the manager’s editor saves a tag change without dropping an of
     ['fire'],
     'the editor can only offer a row for an essence this system defines'
   );
+  const carriedEssences = carriedComponentEssences(card.essences, state.essenceOptions);
   assert.deepEqual(
-    state.carriedEssences,
+    carriedEssences,
     { water: 4 },
     'so `water` must be CARRIED, which is exactly what the narrowing made impossible'
   );
@@ -1745,7 +1747,7 @@ test('1371 r22: the manager’s editor saves a tag change without dropping an of
     showEssences: true,
     tagOptions: [{ tag: 'bar', checked: true }],
     essenceOptions: state.essenceOptions,
-    carriedEssences: state.carriedEssences,
+    carriedEssences,
   });
   assert.deepEqual(
     updates.essences,
@@ -1788,14 +1790,13 @@ test('1371 r22: and the render-time baseline the editor now states says the same
     showEssences: true,
     tagOptions: [{ tag: 'bar', checked: true }],
     essenceOptions: state.essenceOptions,
-    carriedEssences: state.carriedEssences,
+    carriedEssences: carriedComponentEssences(card.essences, state.essenceOptions),
   });
+  const baseline = { water: 4, fire: 3 };
 
-  const saved = await store.updateComponent('ingot', updates, {
-    baseline: state.baselineEssences,
-  });
+  const saved = await store.updateComponent('ingot', updates, { baseline });
 
-  assert.deepEqual(state.baselineEssences, { water: 4, fire: 3 }, 'the rows as they were drawn');
+  assert.deepEqual(updates.essences, baseline, 'the rows as they were drawn');
   assert.equal(saved, true);
   assert.deepEqual(calls.map((call) => call.updates), [{ tags: ['bar'] }]);
   assert.equal(membershipRecord(scope).inherit.essences, undefined);

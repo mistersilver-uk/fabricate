@@ -15,6 +15,7 @@
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
+  import { TAB_COUNT_UNITS, tabCountMark } from '../../../util/tabCountMark.js';
   import { KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS } from './knowledgeStudio.js';
 
   let {
@@ -43,12 +44,12 @@
   ];
 
   const marks = $derived({
-    [KNOWLEDGE_TAB_RECIPE_ITEMS]: { vehicle: 'count', label: itemCount, suppressZero: false },
-    [KNOWLEDGE_TAB_LEARNED_RECIPES]: {
-      vehicle: 'count',
-      label: learnedCount,
+    [KNOWLEDGE_TAB_RECIPE_ITEMS]: tabCountMark(itemCount, TAB_COUNT_UNITS.recipeItems, {
       suppressZero: false,
-    },
+    }),
+    [KNOWLEDGE_TAB_LEARNED_RECIPES]: tabCountMark(learnedCount, TAB_COUNT_UNITS.learnedRecipes, {
+      suppressZero: false,
+    }),
   });
 </script>
 

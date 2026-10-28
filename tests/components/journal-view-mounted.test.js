@@ -1446,6 +1446,51 @@ describe('JournalView mounted behavior', () => {
       assert.ok(document.activeElement === kindTrigger(target), 'focus is back on the trigger');
     });
 
+    it('reaches "Show all run types" by Tab from the open trigger, and moves on from it (issue 2702)', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, ['salvage']);
+      const showAll = openKinds(target).querySelector('[data-journal-kind-show-all]');
+      kindTrigger(target).focus();
+      const tab = () => {
+        const event = new globalThis.KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.activeElement.dispatchEvent(event);
+        flushSync();
+        return event;
+      };
+      assert.equal(tab().defaultPrevented, true, 'the trigger moves focus itself');
+      assert.ok(document.activeElement === showAll, 'focus enters the footer');
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'true', 'the panel stays');
+      assert.equal(tab().defaultPrevented, false, 'Tab from the footer is the browser’s');
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.ok(document.activeElement === kindTrigger(target), 'focus moves on from the trigger');
+    });
+
+    it('closes the panel onto its trigger once "Show all run types" is pressed from the keyboard', async () => {
+      const { store, target } = await mountStore();
+      await showOnly(target, ['salvage']);
+      openKinds(target);
+      kindTrigger(target).focus();
+      kindTrigger(target).dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      );
+      flushSync();
+      const showAll = document.activeElement;
+      assert.ok(showAll.matches('[data-journal-kind-show-all]'), 'focus is on the footer action');
+      showAll.click();
+      flushSync();
+      await settle();
+      assert.deepEqual([...store.kindFilter], RUN_KINDS, 'every kind shows again');
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.ok(
+        document.activeElement === kindTrigger(target),
+        'focus is back on the trigger, not on the disabled action or the page'
+      );
+    });
+
     it('draws the empty state for both lists when no kind is shown', async () => {
       const { target } = await mountStore();
       await showOnly(target, []);

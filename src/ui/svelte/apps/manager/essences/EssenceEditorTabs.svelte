@@ -23,6 +23,7 @@
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { TAB_COUNT_UNITS, tabCountMark } from '../../../util/tabCountMark.js';
   import { ESSENCE_EDITOR_TABS } from './essenceStudio.js';
 
   let {
@@ -88,7 +89,7 @@
   }
 
   const badges = $derived({
-    oncraft: { vehicle: 'count', label: onCraftCount },
+    oncraft: tabCountMark(onCraftCount, TAB_COUNT_UNITS.behaviours),
     validation: validationBadgeFor(blockingCount, warningCount),
   });
 </script>
