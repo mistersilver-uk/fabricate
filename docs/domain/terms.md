@@ -1690,13 +1690,15 @@ Spec reference: openspec/specs/resolution-modes/spec.md
 
 ## Entity Tint
 
-Other wording for the same concept, such as tint, preset, palette key, colour token or tag token, names the `colorToken` value and is not a second term.
+Other wording for the same concept, such as tint, preset, colour token or tag token, names the `colorToken` value and is not a second term.
+The wording "palette key" is not canonical: say tint or tag token.
+Do not call it a palette: `Component Palette` is the unrelated grid of components, so say tint or tag token.
 A tint colours a glyph, a badge ink and a bar fill, and it is never a chip background.
 The offered set follows a stated rule: a tint is pickable unless it is a neutral that would read as body text or a disabled state, or it is bound to a fixed brand site.
 
 Canonical mapping: `MANAGER_COLOR_TOKENS` (the ten offered tokens in render order), `ESSENCE_COLOR_TOKENS` (the essence vocabulary), `BIOME_COLOR_TOKENS` and `GATHERING_BIOME_COLOR_TOKENS` (the biome vocabulary, with `customColor` as the biome-only sibling)
 
-Spec reference: openspec/specs/design-system/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/design-system/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
 ## Auto-Fill
 
