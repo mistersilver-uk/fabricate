@@ -1,8 +1,9 @@
 /**
- * The specimens the standalone style root's rendered admission test draws (issues 2456, 2679):
- * each widened entry's props, covering every value of the vocabularies that test reads from the
- * components, with the target width, slot content and nested mount a specimen states, its reach,
- * and the computed properties the test compares element by element and on each pseudo-element.
+ * The specimens the standalone style root's rendered admission test draws (issues 2456, 2679,
+ * 2680): each widened entry's props, covering every value of the vocabularies that test reads from
+ * the components, with the target width, slot content, nested mount and opening steps a specimen
+ * states, its reach, and the computed properties the test compares element by element and on each
+ * pseudo-element. An overlay entry's specimen with `open` steps is read with its open panel.
  */
 
 import {
@@ -26,12 +27,12 @@ const SHELL_BORDER = Object.freeze([
 ]);
 
 /**
- * What a specimen answers to, each selector read inside its target: `focus` is the element Tab
- * from the sentinel reaches, or `null` where nothing is reachable; `mark` the element and
- * properties its keyboard mark changes, the focused element's ring by default; `hover` an enabled,
- * unselected target whose compared properties the pointer changes, or `null`; `inert` marks a
- * disabled hover target, or one the family draws no hover state on, drawn alike under the pointer
- * but not required to change.
+ * What a specimen answers to, each selector read inside its target, or inside its open panel where
+ * it is written `{ panel }`: `focus` is the element Tab from the sentinel before it reaches, or
+ * `null` where nothing is reachable; `mark` the element and properties its keyboard mark changes,
+ * the focused element's ring by default; `hover` an enabled, unselected target whose compared
+ * properties the pointer changes, or `null`; `inert` marks a disabled hover target, or one the
+ * family draws no hover state on, drawn alike under the pointer but not required to change.
  */
 const reach = (focus, hover = focus, mark = {}) => ({
   focus,
@@ -136,6 +137,62 @@ const PREVIOUS = '[data-pagination-prev]';
 
 const CAPTION = '<span id="standalone-field-caption">Batch name</span>';
 
+const SELECT_OPTIONS = Object.freeze([
+  { value: 'forge', label: 'Forge' },
+  { value: 'brew', label: 'Brew' },
+  { value: 'hand', label: 'By hand' },
+]);
+const selectProps = (props) => ({
+  options: SELECT_OPTIONS,
+  ariaLabel: 'Method',
+  onChange: press,
+  ...props,
+});
+/** The select's keyboard mark is its trigger's own border, and the trigger draws no hover state. */
+const TRIGGER_BORDER = Object.freeze({ properties: SHELL_BORDER, inert: true });
+const closedSelect = (props) => ({
+  props: selectProps(props),
+  reach: reach('button', 'button', TRIGGER_BORDER),
+});
+
+const pickerProps = (props) => ({
+  value: 'fas fa-flask',
+  ariaLabel: 'Reagent icon',
+  listLabel: 'Reagent icons',
+  searchLabel: 'Search reagent icons',
+  searchPlaceholder: 'Name a glyph',
+  noMatchesText: 'No glyph matches',
+  onChange: press,
+  ...props,
+});
+
+const MENU_ITEMS = Object.freeze([
+  { id: 'duplicate', label: 'Duplicate reagent', icon: 'fas fa-copy' },
+  { id: 'archive', label: 'Archive reagent', icon: 'fas fa-box-archive', disabled: true },
+  { id: 'rename', label: 'Rename reagent' },
+  { id: 'delete', label: 'Delete reagent', icon: 'fas fa-trash', danger: true },
+]);
+const menuProps = (props) => ({
+  items: MENU_ITEMS,
+  ariaLabel: 'Reagent actions',
+  onSelect: press,
+  ...props,
+});
+
+const CLOSE = { panel: '[data-manager-modal-close]' };
+const modal = (props, slots) => ({
+  props: {
+    open: true,
+    title: 'Rename the reagent',
+    closeLabel: 'Close',
+    onClose: press,
+    ...props,
+    ...Object.fromEntries(Object.keys(slots).map((key) => [key, true])),
+  },
+  slots,
+  reach: reach(CLOSE),
+});
+
 /** Each widened entry's specimens, by id. */
 export const STANDALONE_SPECIMENS = Object.freeze({
   InspectorCard: Object.freeze({
@@ -183,6 +240,22 @@ export const STANDALONE_SPECIMENS = Object.freeze({
         properties: SHELL_BORDER,
         inert: true,
       }),
+    },
+  }),
+  Select: Object.freeze({
+    'select-form-chosen': closedSelect({ value: 'forge' }),
+    'select-inline-chosen': closedSelect({ value: 'brew', size: 'inline' }),
+    'select-toolbar-placeholder': closedSelect({ size: 'toolbar', placeholder: 'Choose a method' }),
+    'select-open': {
+      props: selectProps({ value: 'forge' }),
+      open: [{ key: 'ArrowDown' }],
+      reach: reach(
+        'button',
+        { panel: '[role="option"]:not([aria-selected="true"])' },
+        {
+          properties: SHELL_BORDER,
+        }
+      ),
     },
   }),
   Field: Object.freeze({
@@ -330,6 +403,44 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       width: 336,
       reach: inertHover(NEXT),
     },
+  }),
+  IconPicker: Object.freeze({
+    'icon-picker-chosen': {
+      props: pickerProps({}),
+      reach: reach('button', 'button', { inert: true }),
+    },
+    'icon-picker-open': {
+      props: pickerProps({}),
+      open: [{ click: true }, { query: 'fla' }],
+      reach: reach({ panel: 'input' }, { panel: '[role="option"]' }, { properties: SHELL_BORDER }),
+    },
+    'icon-picker-no-match': {
+      props: pickerProps({}),
+      open: [{ click: true }, { query: 'zzqx' }],
+      reach: reach(
+        { panel: 'input' },
+        { panel: 'input' },
+        { properties: SHELL_BORDER, inert: true }
+      ),
+    },
+  }),
+  ActionMenu: Object.freeze({
+    'action-menu-closed': { props: menuProps({}), reach: reach('button') },
+    'action-menu-open': {
+      props: menuProps({ align: 'start' }),
+      open: [{ click: true }],
+      reach: reach('button', { panel: 'button.is-danger' }),
+    },
+  }),
+  Modal: Object.freeze({
+    'modal-banded': modal(
+      { subtitle: 'Shown to every player' },
+      {
+        body: '<p style="margin:0">Choose a name the whole table will read.</p>',
+        footer: '<button type="button">Done</button>',
+      }
+    ),
+    'modal-header-only': modal({ closeOnOutsideClick: false }, {}),
   }),
 });
 

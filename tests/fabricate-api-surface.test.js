@@ -508,7 +508,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           size: optional,
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: true,
       },
       StageBars: {
@@ -640,7 +640,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           noMatchesText: required,
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: true,
       },
       ActionMenu: {
@@ -652,7 +652,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onSelect: { kind: 'callback', required: true },
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: true,
       },
       Modal: {
@@ -668,7 +668,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           footer: slot,
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: true,
       },
     });

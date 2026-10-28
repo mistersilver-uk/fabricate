@@ -14,6 +14,7 @@ const {
   acquireOverlayHost,
   acquireStandaloneOverlayLayer,
   createOverlayContainer,
+  createStandaloneOverlayLayer,
   heldBy,
   overlayHostRect,
   overlaysOpenedFrom,
@@ -347,6 +348,36 @@ describe('acquireStandaloneOverlayLayer', () => {
     assert.ok(two.host.isConnected, 'a repeated release counts once');
     two.release();
     assert.ok(!document.querySelector(LAYER), 'gone with the last release');
+  });
+
+  it('spans its window’s viewport and takes no pointer, and a container on it takes the pointer', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const { right, bottom, pointerEvents } = layer.host.style;
+    assert.deepEqual([right, bottom, pointerEvents], ['0px', '0px', 'none']);
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.equal(container.style.pointerEvents, 'auto', 'its panel takes the pointer');
+    const framed = createOverlayContainer(element(), standInChain(layer.host));
+    assert.equal(framed.style.pointerEvents, '', 'a container elsewhere states none');
+    layer.release();
+  });
+
+  it('gives a container on it a Fabricate window’s typeface and size, and one elsewhere neither', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const face = ({ style }) => [style.fontFamily, style.fontSize];
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.deepEqual(face(container), ['var(--font-primary)', 'var(--font-size-14)']);
+    assert.deepEqual(face(layer.host), ['', ''], 'the layer itself states none');
+    const framed = createOverlayContainer(element(), standInChain(layer.host));
+    assert.deepEqual(face(framed), ['', ''], 'a container elsewhere states none');
+    layer.release();
+  });
+
+  it('leaves a layer made directly, as the roll prompt makes its own, unspanned', () => {
+    const own = createStandaloneOverlayLayer(document);
+    const { right, bottom, pointerEvents, fontFamily, fontSize } = own.style;
+    assert.deepEqual([right, bottom, pointerEvents], ['', '', ''], 'no inline geometry');
+    assert.deepEqual([fontFamily, fontSize], ['', ''], 'and no face');
+    own.remove();
   });
 
   it('makes a new layer when the shared one was removed by another hand', () => {

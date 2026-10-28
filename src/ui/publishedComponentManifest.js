@@ -294,7 +294,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       size: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     overlays: true,
   }),
   Object.freeze({
@@ -457,7 +458,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       noMatchesText: Object.freeze({ kind: 'data', required: true }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     overlays: true,
   }),
   Object.freeze({
@@ -471,7 +473,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       onSelect: Object.freeze({ kind: 'callback', required: true, args: 1 }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     overlays: true,
   }),
   Object.freeze({
@@ -489,7 +492,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       footer: Object.freeze({ kind: 'slot' }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     overlays: true,
   }),
 ]);

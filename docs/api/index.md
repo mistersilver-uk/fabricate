@@ -1985,7 +1985,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; widening the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, is [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680), the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published component's root is `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2053,7 +2053,7 @@ The published components, in publication order:
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
-| `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
+| `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `any` | `as` (required), `children` (slot) | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot) | yes |
@@ -2063,16 +2063,16 @@ The published components, in publication order:
 | `RadioCardGroup` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `legend` (required), `layout`, `columns`, `disabled`, `disabledOptions` | yes |
 | `SegmentedControl` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `fill`, `density` | yes |
 | `Pagination` | 1 | `any` | `totalCount` (required), `pageSize` (required), `pageIndex`, `pageSizeOptions` (required), `onPageChange` (callback, required), `onPageSizeChange` (callback, required), `persistent`, `ariaLabel` (required), `navLabel` (required), `previousLabel` (required), `nextLabel` (required), `perPageLabel` (required), `rangeTemplate` (required), `pageTemplate` (required), `density` | no |
-| `IconPicker` | 1 | `fabricate` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
-| `ActionMenu` | 1 | `fabricate` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
-| `Modal` | 1 | `fabricate` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
+| `IconPicker` | 1 | `any` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
+| `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
+| `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -2763,18 +2763,18 @@ The select draws no caption, so draw the same words as visible text beside it, a
 - While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
 - Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
 - The trigger stops the propagation of every key pressed while it holds focus, so your listener above `target` receives no key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
+- In a DialogV2, Escape on the trigger does not close the dialog; handle Escape in your own listener on the trigger or move focus first.
 - Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the trigger still closes the list, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
 - A press on the trigger does not bubble out of it as a `click`, and a press inside the open list does not bubble out of the list, so your `click` listener above `target` or on the `overlayHost` hears neither.
 
 The list is the component's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
-Pass an `overlayHost` inside the same Fabricate window, or none, because the list's hidden live region is clipped only under a `.fabricate` ancestor.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the list's hidden live region is clipped only under a `.fabricate` ancestor; in your own window or dialog pass none, and the list opens on the standalone layer.
 The list opens against the trigger, and its placement inside the host is private.
 `Select` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Select`.
-`Select` needs a Fabricate window ancestor, so its root is `fabricate`; its trigger's height, corner, type size, weight and fill are drawn the same in the Manager and the player window, and its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own.
-Your own window or dialog carries no Fabricate root, so the select is refused there with `Select needs a Fabricate window ancestor`.
+Its trigger's height, corner, type size, weight and fill are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, and its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own; its open list is drawn the same on the standalone layer as in the player window.
 The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so leave no room for one.
 An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
-A select is drawn only in a Fabricate window, which gives you no signal when Foundry 14 moves it to or from a detached window, and needs none: each list opened after the move is placed and heard in the window that then holds the trigger, as [Overlays](#overlays) states.
+Foundry 14 gives you no signal when it moves a Fabricate window to or from a detached window, and a select needs none: each list opened after the move is placed and heard in the window that then holds the trigger, as [Overlays](#overlays) states.
 Its sizes beyond each rung's height and corner, its tick, chevron and colours beyond what this section states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, and the list's placement and width are private.
 `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, so a `class` or any of those is refused with `"<key>" is not a prop of Select`.
 
@@ -3412,15 +3412,15 @@ Never pass a name of white space alone, which leaves its element with no name.
   With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
 - Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
 - The trigger stops the propagation of every key pressed while it holds focus and of its own `click`, and the open list stops every `click` inside it, so your listener above `target` or on the `overlayHost` hears none of them; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
+- In a DialogV2, Escape on the trigger does not close the dialog; handle Escape in your own listener on the trigger or move focus first.
 - Every key pressed in the query field, Escape included, may reach your listener on the `overlayHost` or above it.
 - The no-match line is a polite live region, so it is announced when a query empties the list; the picker announces nothing else.
 
 The list is the component's overlay, so `describe('IconPicker').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
-Pass an `overlayHost` inside the same Fabricate window, or none, because the list's rows, ring and hidden live region are drawn only under a `.fabricate` ancestor, and in no `<form>`, because Enter in the query field with no active row can submit a form it sits in.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the list's rows, ring and hidden live region are drawn only under a `.fabricate` ancestor, and in no `<form>`, because Enter in the query field with no active row can submit a form it sits in; in your own window or dialog pass none, and the list opens on the standalone layer.
 The list opens against the trigger, and its placement inside the host is private.
 `IconPicker` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of IconPicker`.
-`IconPicker` needs a Fabricate window ancestor, because its trigger, rows and marks come from Fabricate's module sheet, rooted at `.fabricate-icon-picker` and `.fabricate-icon-picker-popover`, and it is drawn the same in the Manager and the player window.
-Your own window or dialog carries no Fabricate root, so the picker is refused there with `IconPicker needs a Fabricate window ancestor`.
+Its trigger, rows and marks come from Fabricate's module sheet, rooted at `.fabricate-icon-picker` and `.fabricate-icon-picker-popover`, and it is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its open list on the standalone layer there.
 The trigger's keyboard ring is the window's accent ring, 2px wide and 2px clear of the trigger, and the query field shows focus by turning its own 1px border to the accent, drawn inside its box, with no ring.
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so mount the picker on one of those grounds and leave room for the ring inside any edge of your own that clips.
 An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the selection in place; `destroy` removes the trigger and closes the list, so where the trigger or the query field holds focus, move focus to an element of your own first.
@@ -3501,11 +3501,10 @@ Run a command only for an `id` you match by name, with no closing `else`, so no 
   The open menu stops every `click` inside it, so your listener on the `overlayHost` or above it hears none, and every key pressed in the menu, Escape included, may reach that listener.
 
 The menu is the component's overlay, so `describe('ActionMenu').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
-Pass an `overlayHost` inside the same Fabricate window, or none, because the menu's items, their focus mark and the theme are drawn as this section states only under a `.fabricate` ancestor.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the menu's items, their focus mark and the theme are drawn as this section states only under a `.fabricate` ancestor; in your own window or dialog pass none, and the menu opens on the standalone layer.
 The menu opens below the trigger, or above it where the host has room above and none below, and its placement inside the host is otherwise private.
 `ActionMenu` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of ActionMenu`.
-`ActionMenu` needs a Fabricate window ancestor, because its trigger, items and marks come from Fabricate's module sheet, rooted at `.fabricate-action-menu` and `.fabricate-action-menu-panel`, and it is drawn the same in the Manager and the player window.
-Your own window or dialog carries no Fabricate root, so the menu is refused there with `ActionMenu needs a Fabricate window ancestor`.
+Its trigger, items and marks come from Fabricate's module sheet, rooted at `.fabricate-action-menu` and `.fabricate-action-menu-panel`, and it is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its open menu on the standalone layer there.
 The trigger's keyboard ring is the window's accent ring, 2px wide and 2px clear of the trigger, and an item under keyboard focus takes a raised fill and a 1px accent ring drawn inside its edge.
 With no item to choose, the menu itself takes the window's accent ring, 2px wide and 2px clear of its edge.
 The trigger's ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so mount the menu on one of those grounds and leave room for the ring inside any edge of your own that clips.
@@ -3550,7 +3549,7 @@ const menu = fabUi.mount('ActionMenu', {
 It is for one step the user finishes or dismisses before going on.
 It draws nothing focusable inside `target`, so return focus to an element of your own, the control that opened the dialog.
 `open` is `true` to draw the dialog and `false` or absent to draw none, and you open and close it only through `update`.
-While it is closed, `target` holds no element, and while it is open, `target` holds one empty element of Fabricate's, which is private.
+While it is closed, `target` is empty under a Fabricate root and holds only the empty standalone style root elsewhere, and while it is open, `target` holds one empty element of Fabricate's, inside that root where it is written, which is private.
 An `update` replaces every prop, so pass the dialog's other props with `open` on each one, `title`, `closeLabel` and `onClose` among them.
 An `update` that closes the dialog detaches the slot elements with their contents intact, and one that opens it attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and your components, effects and listeners in them keep running.
 A component with an overlay that you mount in a slot closes its open panel when such an `update` detaches the slot, as [Overlays](#overlays) states, so when you open the dialog again its trigger has `aria-expanded` `"false"`.
@@ -3565,6 +3564,7 @@ The dialog's height is capped, so scroll tall content inside one element of your
 Give your dialog at least one control of your own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
 `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
 With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; pass `closeOnOutsideClick: false`, stop Escape in your own listener, or move focus into the dialog first.
 A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so if your opener opens the dialog on every press, pass `false`, or ignore a `click` whose press began while the dialog was open.
 A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as the panel of a component with an overlay that you mount in a slot: a [`Select`](#select)'s list, an [`IconPicker`](#iconpicker)'s list and query field and an [`ActionMenu`](#actionmenu)'s menu.
 A press in such a panel does not call `onClose`, and the panel takes it as its own section states, so a click on an option chooses it as it does outside a dialog.
@@ -3593,13 +3593,13 @@ If you close the dialog while focus is on it or inside it, or in the panel of a 
 - Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
 
 The dialog is the component's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
-Pass an `overlayHost` inside the same Fabricate window, or none, because the close control, its ring and the theme are drawn as this section states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button you draw in a slot would act on them.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the close control, its ring and the theme are drawn as this section states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button you draw in a slot would act on them; in your own window or dialog pass none, and the dialog opens on the standalone layer.
 The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
 Its width, height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
-`Modal` needs a Fabricate window ancestor, because its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager and the player window.
-Your own window or dialog carries no Fabricate root, so the dialog is refused there with `Modal needs a Fabricate window ancestor`.
+Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.
+A `target` in its `body` or `footer` slot sits inside the dialog on that layer, so a component you mount there is under a Fabricate root and is drawn with no standalone style root of its own.
 The close control's keyboard ring is the window's accent ring, 2px wide and 2px clear of the control, and it clears 3:1 against the header band in every palette.
 The title and the subtitle clear 4.5:1 against the header band in every palette, and the close glyph clears 3:1 against it in every palette.
 An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control you drew there; `destroy` removes the dialog, so where the dialog or a control in it holds focus, move focus to an element of your own first.
@@ -3964,8 +3964,11 @@ Each time an overlay opens, Fabricate picks where to draw it, from `target`'s ow
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
-A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s and `Modal`'s do: keep it inside the same Fabricate window as `target`.
+A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s and `Modal`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
+The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
+Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
+Where its host is the standalone layer, that element states `pointer-events: auto` and a Fabricate window's typeface and size, `var(--font-primary)` and `var(--font-size-14)`.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 A standalone style root is a different element, is never an overlay host, and holds no panel.
@@ -4004,8 +4007,9 @@ A component whose root is `any` resolves its tokens from `:root[data-fabricate-t
 The exception is a component Fabricate draws under the [standalone style root](#standalone-style-root), whose tokens resolve from that element's `data-fabricate-theme`.
 A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root, which Fabricate's window frames carry (the player window, the Manager and the interactable windows), so both extension targets have it.
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
+Every component published at version 1 states `any`, so `fabricate` and `manager` are values `describe` may return for a later component, and no mount you make today is refused for a missing Fabricate ancestor.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twelve components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the sixteen components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -4026,7 +4030,7 @@ A published component draws a control only where its section says so, and each c
   Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each section states, and Space on release.
   In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its section names any other.
-  Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its section states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
+  Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its section states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops every key, as each section states.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks you to close that `Modal`, as its section states.
   An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
 - A control draws its own mark for keyboard focus where the component's `root` is `any` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each section states.
@@ -4078,7 +4082,8 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+The panel `Select`, `IconPicker`, `ActionMenu` or `Modal` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.
@@ -4100,8 +4105,8 @@ What it gives you and what it leaves to you:
   The typeface still comes from `target`, so set `font-family`, `font-size` and `line-height` there.
 - It paints no ground, so you supply one.
   Paint `--fab-bg-1` on `target`, or nest the component in an `InspectorCard` or a `Well`, as for [`Callout`](#callout).
-  On Foundry's light theme whatever a component draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the switch's off face, `Field`'s ink and the caption and hint you draw in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows.
-  `RadioCardGroup`'s cards and a default `Pagination` bar paint their own ground.
+  On Foundry's light theme whatever a component draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the `ActionMenu` trigger among them, the switch's off face, `Field`'s ink and the caption and hint you draw in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, the `form` `Select` trigger's and the `IconPicker` trigger's ink on theirs, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows.
+  `RadioCardGroup`'s cards, a default `Pagination` bar, the `inline` and `toolbar` `Select` triggers, and the list, menu or dialog an overlay opens paint their own ground.
   `--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window.
 - Your own content in a content slot of such a mount takes the Fabricate window's ink, dark colour scheme, palette tokens, focus ring and reduced-motion rule, as it does in a Fabricate window.
   Fabricate's heading normalisation does not reach it, so a heading there takes Foundry's own face and ink.
@@ -4118,6 +4123,10 @@ What it gives you and what it leaves to you:
 - A document sheet disables every control in its form when the document is not editable, so mount after `super._onRender`.
 - A component is drawn under the standalone style root only where its admission test holds.
   That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws with the same props in the player window, at rest, under keyboard focus, under the pointer and under reduced motion.
+  For `Select`, `IconPicker`, `ActionMenu` and `Modal` it compares the open list, menu or dialog too, on the standalone layer against the player window's.
+  A panel on the layer draws in a Fabricate window's typeface and at Foundry's application size, as a panel in the player window does, and not in the size Foundry's `<body>` states.
+  Its line height is inherited from the page body, as in a Foundry window, and its ink is Fabricate's.
+  The test page sets one typeface on its body so both arms compare like with like.
   It runs over Fabricate's core-min fixture and, where the harvest exists, Foundry 14.365's core sheet.
   The harvested arm draws under no Foundry theme class.
   Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the component does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the test does not measure them.

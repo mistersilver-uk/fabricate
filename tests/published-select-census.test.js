@@ -32,6 +32,7 @@ import {
   SHIPPED,
   byName,
   everyStylesheet,
+  gatedRoot,
   selectorsWithRules,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
@@ -348,9 +349,9 @@ describe('the module sheet and every component style against the published Selec
   it('publishes no key that would reopen the census', () => {
     const entry = entryNamed('Select');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root, entry.rest],
+      [Object.keys(entry.props), gatedRoot(entry), entry.rest],
       [['options', 'value', 'onChange', 'ariaLabel', 'placeholder', 'size'], 'fabricate', false],
-      'a published label, mono, readonly, disabled, class, rest or wider root reopens the census'
+      'a published label, mono, readonly, disabled, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });
 });
