@@ -1040,22 +1040,24 @@ describe('RecipesBrowserView lifted browser state', () => {
     const calls = [];
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true })],
-      onToggleEnabled: (id, enabled, options) => calls.push(options),
+      onToggleEnabled: (id, enabled, options) => {
+        calls.push(options);
+      },
     });
-    root.querySelector('[data-recipe-id="r1"] .fabricate-toggle').click();
+    root.querySelector(':scope [data-recipe-id="r1"] .fabricate-toggle').click();
     calls[0].onBlocked('This recipe has no result groups.');
     flushSync();
 
-    const dismiss = root.querySelector('[data-recipe-flash] [data-notice-dismiss]');
+    const dismiss = root.querySelector(':scope [data-recipe-flash] [data-notice-dismiss]');
     dismiss.focus();
     assert.ok(document.activeElement === dismiss, 'pre-condition: the dismiss control holds focus');
 
     dismiss.click();
     flushSync();
 
-    const search = root.querySelector('[data-recipe-toolbar] input[type="search"]');
+    const search = root.querySelector(':scope [data-recipe-toolbar] input[type="search"]');
     assert.ok(Boolean(search), 'the search field is rendered');
-    assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is gone');
+    assert.ok(!root.querySelector(':scope [data-recipe-flash]'), 'the flash is gone');
     assert.ok(document.activeElement === search, 'and the keyboard is on the search field');
   });
 

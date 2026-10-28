@@ -344,7 +344,10 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
   });
 
   it('reports an emptied selection and re-homes the keyboard, from either Clear and after an apply', async () => {
-    for (const selector of ['[data-scoped-list-clear-selection]', '[data-world-essence-bulk-clear]']) {
+    for (const selector of [
+      '[data-scoped-list-clear-selection]',
+      '[data-world-essence-bulk-clear]',
+    ]) {
       const { target } = await mountPage();
       await tickRows(target, ['ash']);
       await expectEmptiedSelectionReport(target, async () => {

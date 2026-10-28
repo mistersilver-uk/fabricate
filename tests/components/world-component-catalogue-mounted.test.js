@@ -8,11 +8,6 @@ import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 // THE REAL VOCABULARY STORE (issue 1371 r16-cat, maintainer ruling M20).
 import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
 import {
-  expectEmptiedSelectionReport,
-  expectNoEmptiedSelectionReport,
-  focusControl,
-} from '../helpers/emptiedSelectionReport.js';
-import {
   COMPONENT_SYSTEMS,
   componentCorpus,
   componentScopeFor,
@@ -28,6 +23,11 @@ import {
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory.
 import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
+import {
+  expectEmptiedSelectionReport,
+  expectNoEmptiedSelectionReport,
+  focusControl,
+} from '../helpers/emptiedSelectionReport.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 // Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s.
