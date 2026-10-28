@@ -1,12 +1,19 @@
 /**
  * Issue 2257 D13: a log entry's time clears 4.5:1 on every ground the journal's Finished list draws
  * it on, in all seven themes: muted at rest, secondary on the raised hover ground.
+ * Issue 2342: a hovered failed entry keeps its danger ground, raised, and its time clears 4.5:1 there.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
-import { contrast, flatten, propertiesOf, themePalettes } from '../helpers/themePaletteContrast.js';
+import {
+  contrast,
+  flatten,
+  mix,
+  propertiesOf,
+  themePalettes,
+} from '../helpers/themePaletteContrast.js';
 
 const LOG_LIST = 'src/ui/svelte/components/LogList.svelte';
 const JOURNAL = 'src/ui/svelte/apps/journal/JournalView.svelte';
@@ -62,4 +69,42 @@ test('a hovered entry raises its ground, and its time takes secondary and clears
   const ink = paint(LOG_LIST, `${HOVERED} .fab-log-list-when`, 'color');
   assert.equal(ink, '--fab-text-secondary');
   assert.deepEqual(under(ink, raised), []);
+});
+
+const DANGER_HOVERED = '.fab-log-list-entry.is-danger.is-open:not(.is-selected):hover';
+const RAISED_DANGER =
+  /^color-mix\(in srgb, var\((--fab-[\w-]+)\) (\d+)%, var\((--fab-[\w-]+)\)\)$/u;
+
+/** The tint, its share and the raised ground of the hovered failed entry's `color-mix()`. */
+function raisedDanger() {
+  const [value, ...more] = rulesIn(corpus[LOG_LIST])
+    .filter((rule) => splitSelectorList(rule.selector).includes(DANGER_HOVERED))
+    .map((rule) => propertiesOf(rule).get('background'));
+  assert.ok(value && more.length === 0, 'the hovered failed entry paints its background once');
+  const [, tint, share, raised] = RAISED_DANGER.exec(value) ?? assert.fail(`${value} is not a mix`);
+  return { tint, share: Number(share), raised };
+}
+
+test('a hovered failed entry mixes its danger ground with the raised one, and outranks the neutral hover', () => {
+  const { tint, share, raised } = raisedDanger();
+  assert.equal(tint, paint(LOG_LIST, `${ENTRY}.is-danger`, 'background'));
+  assert.equal(raised, paint(LOG_LIST, HOVERED, 'background'));
+  assert.ok(share > 50, 'the danger tint is the larger share');
+});
+
+test('the time on a hovered failed entry takes secondary and clears 4.5:1 on its raised danger ground', () => {
+  const { tint, share, raised } = raisedDanger();
+  const ink = paint(LOG_LIST, `${HOVERED} .fab-log-list-when`, 'color');
+  assert.equal(ink, '--fab-text-secondary');
+  const shortfalls = [...themes].flatMap(([theme, tokens]) =>
+    HOSTS.map((host) =>
+      contrast(
+        tokens.get(ink),
+        flatten(mix(tokens.get(tint), tokens.get(raised), share / 100), tokens.get(host))
+      )
+    )
+      .filter((ratio) => ratio < 4.5)
+      .map((ratio) => `${theme}: ${ratio.toFixed(2)}:1`)
+  );
+  assert.deepEqual(shortfalls, []);
 });
