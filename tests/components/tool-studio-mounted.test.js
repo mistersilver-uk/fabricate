@@ -856,6 +856,7 @@ describe('Tool Studio editor (mounted)', () => {
     const requirements = root.querySelector('#tool-tab-requirements');
     assert.equal(requirements.querySelector('.manager-editor-tab-count')?.textContent, '2');
     assert.ok(!requirements.querySelector('.manager-chip'), 'a record count is never a chip');
+    assert.equal(requirements.getAttribute('aria-label'), 'Requirements, 2 requirements');
     harness.remount();
     const empty = await harness.mount(
       props({

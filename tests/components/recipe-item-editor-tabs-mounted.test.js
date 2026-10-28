@@ -63,6 +63,7 @@ describe('RecipeItemEditorTabs (mounted)', () => {
     assert.ok(!count.classList.contains('manager-chip'), 'a record count is never a chip');
     const contents = root.querySelector('[data-recipe-item-tab-button="contents"]');
     assert.ok(!contents.querySelector('.manager-chip'));
+    assert.equal(contents.getAttribute('aria-label'), 'Contents, 3 linked recipes');
   });
 
   it('omits the contents count when the count is zero or empty', async () => {

@@ -189,6 +189,21 @@ beforeEach(() => {
   delete globalThis.fromUuid;
 });
 
+describe('2491 EssenceEditView names what the On craft count counts', () => {
+  it('speaks the configured behaviours beside the tab label', async () => {
+    const root = await harness.mount(props());
+    const tab = root.querySelector('[data-essence-tab="oncraft"]');
+    assert.equal(tab.querySelector('.manager-editor-tab-count')?.textContent.trim(), '2');
+    assert.equal(tab.getAttribute('aria-label'), 'On craft, 2 configured behaviours');
+    harness.remount();
+    const bare = await harness.mount(props({ essence: makeEssenceRow({ id: 'aether' }) }));
+    assert.ok(
+      !bare.querySelector('[data-essence-tab="oncraft"]').hasAttribute('aria-label'),
+      'a zero count draws no mark and names nothing'
+    );
+  });
+});
+
 describe('1036/7 EssenceEditView — the dropped macro must be a SCRIPT macro', () => {
   it('links a script macro and names it', async () => {
     globalThis.fromUuid = async (uuid) =>
