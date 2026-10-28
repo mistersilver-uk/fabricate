@@ -1617,7 +1617,7 @@ Every spread attribute in a published closure is traced to the published `data` 
 A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that reads no published `data` and is not an object literal, a published key that is not `data`, and a literal.
 A script-level `const` or `$derived` local that is not an object literal is traced by the names it reads, less the parameters and declarations inside its own expression.
 It holds no data when every name it reads is clean, and it is unnameable, so a spread of an alias of an item fails closed like one of the item, when it reads any other.
-A name is clean when it is an import of the file, a function declared in the file (a limit below), a rune, or one of `Array`, `Boolean`, `Date`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Set`, `String`, `Symbol`, `Infinity`, `NaN`, `undefined`, `globalThis`, `window`, `document` and `console`.
+A name is clean when it is an import of the file, a function declared in the file (a limit below), one of the runes `$derived`, `$state`, `$effect`, `$inspect` and `$host`, or one of `Array`, `Boolean`, `Date`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Set`, `String`, `Symbol`, `Infinity`, `NaN`, `undefined`, `globalThis`, `window`, `document` and `console`.
 Every other name no rule resolves is unnameable: a top-level `let`, a class, the whole `$props()` object and any name not listed.
 A script-level `const` or `$derived` object literal, under a condition or mapped from an array, is traced by its spreads and computed keys, a branch or call inside it counting as its values, and the first two parameters of a mapped array's callback standing for an element of that array and its index as an `{#each}` context does, and any further parameter being unnameable.
 A spread of a member of published `data` passes only when it is a stripped member.
@@ -1637,6 +1637,8 @@ A script-level `const` or `$derived` that reads published `data` only through a 
 A plain-key value of a script-level object literal, such as `{ items }` or `{ a: items[0] }`, because the check traces only a literal's spreads and computed keys.
 A snippet passed to a child component that forwards it through its rest props.
 A child component that a script module in the closure also draws, which no component tag reads.
+A read of a published name that a parameter or declaration inside the same expression also names, such as `sections.map(({ sections }) => sections)`, because the exclusion of inner names is by name and not by scope.
+A value built up by a mutation after its declaration, such as `const box = {}; Object.assign(box, items[0])` or an array pushed to in an `$effect`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
