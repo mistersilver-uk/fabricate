@@ -277,11 +277,7 @@
     )
   );
 
-  /**
-   * THE IDLE VERB, WHICH PROMISES NOTHING IT WILL NOT DO: counted where a count is true and
-   * uncounted where nothing can go, since `Delete 0 components…` promises an outcome and
-   * `Delete 2 components…` over a fully-held selection promises a false one.
-   */
+  /** The idle verb promises only what will happen: uncounted where nothing can go, counted otherwise. */
   const deleteLabel = $derived(
     deleteNote.refused
       ? text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteNone', 'Delete from the world…')
@@ -311,6 +307,10 @@
           'Confirm — delete {count} from the world',
           { count: deletableCount }
         )
+  );
+
+  const deleteBusyLabel = $derived(
+    text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')
   );
 
   // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT: the panel used to spell both labels and both
@@ -773,15 +773,9 @@
   `tests/design-system-keyboard-focus.test.js` is the gate, and all six arrived with this panel.
 -->
 <!--
-  THE DANGER LEG, IN THE DOCK. `proto:686`-`688` pins the destructive verb and its consequence
-  note INSIDE the pinned dock; it shipped as the panel's last CONTENT, so a GM who had scrolled
-  could have the Apply in front of them and the delete somewhere above. The sibling card and the
-  dock foot are alternatives, not a pair.
-
-  IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7): the plan splits the selection, the button
-  counts and writes only the free records, and the note NAMES the held ones and their systems.
-  THE CONTROL STAYS ENABLED EVEN WHEN NOTHING CAN GO, which is requirement 16's own rule, so the
-  ARMED label is what states the outcome.
+  THE DANGER LEG, IN THE DOCK, beside the Apply; it refuses what the entry refuses (epic decision 7)
+  and stays enabled when nothing can go (requirement 16), so the armed label states the outcome.
+  Starting the write renames the focused control, so the polite region below says its busy label.
 -->
 {#snippet componentBulkDanger()}
   <div class="fab-bulk-component-danger" data-world-component-bulk-danger>
@@ -792,7 +786,7 @@
       disabled={applying === true}
       idleLabel={deleteLabel}
       armedLabel={deleteArmedLabel}
-      busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
+      busyLabel={deleteBusyLabel}
       idleAriaLabel={deleteLabel}
       armedAriaLabel={`${deleteArmedLabel} — ${deleteNote.text}`}
       ariaDescribedBy="world-component-bulk-delete-note"
@@ -809,6 +803,9 @@
       data-world-component-bulk-delete-note={deleteNote.refused ? 'refused' : 'proceed'}
     >
       {deleteNote.text}
+    </p>
+    <p class="visually-hidden" aria-live="polite" data-world-component-bulk-delete-announce>
+      {deleting === true ? deleteBusyLabel : ''}
     </p>
   </div>
 {/snippet}

@@ -1251,6 +1251,36 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
+    it('announces the busy label through a polite region when the confirmed delete starts', async () => {
+      const { actions } = recordingComponentActions();
+      let release;
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: COMPONENT_SYSTEMS,
+        actions: { ...actions, deleteEntity: () => pending },
+      });
+      target.querySelector('[data-scoped-list-select="resin"]').click();
+      await drain();
+      const region = () => target.querySelector('[data-world-component-bulk-delete-announce]');
+      assert.equal(region().getAttribute('aria-live'), 'polite');
+      assert.equal(region().textContent.trim(), '', 'empty on mount, outside the control');
+      assert.ok(!dangerControl(target).contains(region()));
+
+      dangerControl(target).click();
+      await drain();
+      dangerControl(target).click();
+      await drain();
+      try {
+        assert.equal(region().textContent.trim(), 'Deleting…', 'the write has started');
+      } finally {
+        release(true);
+        await drain();
+      }
+    });
+
     it('goes inert on its axes while the armed delete is still writing (issue 1844)', async () => {
       const { actions } = recordingComponentActions();
       let release;
