@@ -16,7 +16,7 @@ const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 const { resolveImportReferences, REFERENCE_KINDS } = await import(
   '../src/systems/importReferenceResolver.js'
 );
-const { buildComponentEditorState, buildComponentEditorUpdates, carriedComponentEssences } =
+const { buildComponentEditorState, carriedComponentEssences, essenceMapFromRows } =
   await import('../src/ui/svelte/util/componentEditor.js');
 
 function makeManager() {
@@ -167,12 +167,12 @@ test('1036/1 negative control: an id genuinely ABSENT from essenceDefinitions IS
 test('1036/1: a component editor round-trip preserves a disabled essence quantity', () => {
   const system = systemWithDisabledFire(makeManager());
   const draft = buildComponentEditorState(system, system.components[0]);
-  const updates = buildComponentEditorUpdates(draft);
+  const essences = essenceMapFromRows(draft.essenceOptions);
 
   assert.equal(
-    updates.essences.fire,
+    essences.fire,
     3,
-    'buildComponentEditorUpdates rebuilds solely from draft.essenceOptions, which stays UNFILTERED'
+    'essenceMapFromRows rebuilds solely from draft.essenceOptions, which stays UNFILTERED'
   );
 });
 
@@ -193,7 +193,7 @@ test('1371 r20: the editor round-trip CARRIES a quantity whose essence this syst
     essences: { fire: 3 },
   });
   const carriedEssences = carriedComponentEssences({ fire: 3 }, state.essenceOptions);
-  const updates = buildComponentEditorUpdates({ ...state, carriedEssences });
+  const essences = essenceMapFromRows(state.essenceOptions, carriedEssences);
 
   assert.deepEqual(carriedEssences, { fire: 3 }, 'carried, and reported as carried');
   assert.deepEqual(
@@ -201,7 +201,7 @@ test('1371 r20: the editor round-trip CARRIES a quantity whose essence this syst
     ['water'],
     'negative control: it is NOT offered — the rendered rows are still the system’s own roster'
   );
-  assert.equal(updates.essences.fire, 3, 'and the rebuild re-emits it rather than dropping it');
+  assert.equal(essences.fire, 3, 'and the rebuild re-emits it rather than dropping it');
 });
 
 test('1036/1 negative control: the SYSTEM normalizer is what refuses an undefined essence id', () => {

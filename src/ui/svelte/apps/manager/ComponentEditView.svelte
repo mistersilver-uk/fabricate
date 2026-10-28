@@ -27,6 +27,7 @@
   import {
     carriedComponentEssences,
     clampComponentEssenceQuantity,
+    essenceMapFromRows,
   } from '../../util/componentEditor.js';
   import {
     buildComponentCategoryOptions,
@@ -694,12 +695,7 @@
    * the draft, the baseline the rows as DRAWN — or an untouched save differs from its own baseline.
    */
   function essenceMapFrom(rows) {
-    const essences = carriedComponentEssences(component?.essences, essenceOptions);
-    for (const option of Array.isArray(rows) ? rows : []) {
-      const quantity = clampComponentEssenceQuantity(option.quantity);
-      if (quantity > 0 && option.id) essences[option.id] = quantity;
-    }
-    return essences;
+    return essenceMapFromRows(rows, carriedComponentEssences(component?.essences, essenceOptions));
   }
 
   /**

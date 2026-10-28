@@ -12,8 +12,8 @@ import { resolveScopedEntityRead } from '../../src/systems/scopedEntityReads.js'
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import {
   buildComponentEditorState,
-  buildComponentEditorUpdates,
   carriedComponentEssences,
+  essenceMapFromRows,
 } from '../../src/ui/svelte/util/componentEditor.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
 import { recipeReferencesComponent } from '../../src/utils/recipeComponentReferences.js';
@@ -1722,8 +1722,8 @@ test('1371 r22: the card draws the roster’s chips while still SEEDING the edit
 test('1371 r22: the manager’s editor saves a tag change without dropping an off-roster essence', async () => {
   // The Foundry integrator's round-8 finding 1, end to end over the shipped units: the card the
   // store publishes, `buildComponentEditorState` (which is what `CraftingSystemManagerRoot`'s
-  // `componentEssenceOptionsFor` calls), and `buildComponentEditorUpdates` (which
-  // `ComponentEditView.buildUpdates` is a line-for-line mirror of, through `essenceMapFrom`).
+  // `componentEssenceOptionsFor` calls), and `essenceMapFromRows` (which
+  // `ComponentEditView.buildUpdates` calls through `essenceMapFrom`).
   const { store, scope, harness } = await openOffRosterPair();
   const calls = installSingleComponentWrite(harness);
   const [card] = get(store.viewState).itemCards;
@@ -1742,13 +1742,10 @@ test('1371 r22: the manager’s editor saves a tag change without dropping an of
   );
 
   // The GM ticks a tag and touches nothing else — the rows go back exactly as they were drawn.
-  const updates = buildComponentEditorUpdates({
-    showTags: true,
-    showEssences: true,
-    tagOptions: [{ tag: 'bar', checked: true }],
-    essenceOptions: state.essenceOptions,
-    carriedEssences,
-  });
+  const updates = {
+    tags: ['bar'],
+    essences: essenceMapFromRows(state.essenceOptions, carriedEssences),
+  };
   assert.deepEqual(
     updates.essences,
     { water: 4, fire: 3 },
@@ -1785,13 +1782,13 @@ test('1371 r22: and the render-time baseline the editor now states says the same
   const calls = installSingleComponentWrite(harness);
   const [card] = get(store.viewState).itemCards;
   const state = buildComponentEditorState(harness.system, card);
-  const updates = buildComponentEditorUpdates({
-    showTags: true,
-    showEssences: true,
-    tagOptions: [{ tag: 'bar', checked: true }],
-    essenceOptions: state.essenceOptions,
-    carriedEssences: carriedComponentEssences(card.essences, state.essenceOptions),
-  });
+  const updates = {
+    tags: ['bar'],
+    essences: essenceMapFromRows(
+      state.essenceOptions,
+      carriedComponentEssences(card.essences, state.essenceOptions)
+    ),
+  };
   const baseline = { water: 4, fire: 3 };
 
   const saved = await store.updateComponent('ingot', updates, { baseline });
