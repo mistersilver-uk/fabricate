@@ -4,7 +4,9 @@
  * field moves on from its trigger rather than to the page behind the dialog, Tab and Shift+Tab on an
  * open select close it as focus moves, a copy of Foundry's `KeyboardManager#hasFocus` answers true
  * as each Tab reaches the window, Escape on a closed trigger closes the dialog once, and Tab from a
- * set picker's query field reaches its footer rather than its scrolling list.
+ * set picker's query field reaches its footer rather than its scrolling list, and in a dialog that
+ * traps focus a Tab from that footer, the set picker being the dialog's last control, wraps to its
+ * close control (issue 2699).
  * Limit: Chromium only; Foundry's Electron client is not measured here.
  */
 import assert from 'node:assert/strict';
@@ -39,11 +41,11 @@ const frames = (page) =>
  * content-editable node, a button in a form, or an element whose `data-keyboard-focus` is `""` or
  * `"true"`, as `.agents/docs/foundry-and-architecture.md` reads it from Foundry 13.351 and 14.365.
  */
-async function openFixture(host) {
+async function openFixture(host, trap = false) {
   const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(
     fixtureServer.url(
-      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal-picker`
+      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal-picker&trap=${trap ? 1 : 0}`
     ),
     { waitUntil: 'load' }
   );
@@ -187,7 +189,7 @@ for (const host of ['manager', 'app']) {
       }
     });
 
-    it('R6: Tab in a set picker`s query field reaches its footer, not its scrolling list', async () => {
+    it('R6: Tab in a set picker’s query field reaches its footer, not its scrolling list', async () => {
       const page = await openFixture(host);
       try {
         await page.focus(`${DIALOG} .fabricate-set-picker .fabricate-picker > button`);
@@ -205,6 +207,30 @@ for (const host of ['manager', 'app']) {
           open: Boolean(document.querySelector('.fabricate-set-picker-popover')),
         }));
         assert.deepEqual(landed, { clear: true, open: true });
+      } finally {
+        await page.close();
+      }
+    });
+
+    it('R7: Tab from the last stop of a set picker that is a trapping dialog’s last control wraps to its close control', async () => {
+      const page = await openFixture(host, true);
+      try {
+        await page.focus(`${DIALOG} .fabricate-set-picker .fabricate-picker > button`);
+        await page.keyboard.press('Enter');
+        await page.waitForSelector('.fabricate-set-picker-popover input');
+        await frames(page);
+        await pressAndSettle(page, 'Tab');
+        const onClear = await page.evaluate(
+          () => document.activeElement?.matches('[data-set-picker-clear]') ?? false
+        );
+        assert.equal(onClear, true, 'Clear all is the panel’s last enabled stop');
+        await pressAndSettle(page, 'Tab');
+        const landed = await page.evaluate(() => ({
+          close: document.activeElement?.matches('[data-manager-modal-close]') ?? false,
+          open: Boolean(document.querySelector('.fabricate-set-picker-popover')),
+          closes: Number(document.body.dataset.modalCloses),
+        }));
+        assert.deepEqual(landed, { close: true, open: false, closes: 0 });
       } finally {
         await page.close();
       }

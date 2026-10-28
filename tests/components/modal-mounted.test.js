@@ -530,6 +530,28 @@ for (const trapFocus of [false, true]) {
       }
     );
 
+    it('leaves a Tab a control inside already claimed alone', async () => {
+      await focusedDialog();
+      const last = q('[data-footer-button]');
+      const outside = document.createElement('button');
+      document.body.append(outside);
+      try {
+        last.focus();
+        last.addEventListener(
+          'keydown',
+          (event) => {
+            event.preventDefault();
+            outside.focus();
+          },
+          { once: true }
+        );
+        last.dispatchEvent(key('keydown', { key: 'Tab' }));
+        assert.ok(document.activeElement === outside, 'the control’s own focus move stands');
+      } finally {
+        outside.remove();
+      }
+    });
+
     it('leaves a Shift+Tab a panel opened inside already claimed alone', async () => {
       await focusedDialog();
       const close = q('[data-manager-modal-close]');
