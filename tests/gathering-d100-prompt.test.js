@@ -12,11 +12,11 @@ import { safeRollDecision } from '../src/systems/journalPreparedCheck.js';
 import {
   createGatheringJournalRunOperations,
   createJournalRunCommandService,
-  executePublicGather,
   installGatheringJournalRunAuthority,
   JOURNAL_RUN_SOCKET_KIND,
 } from '../src/systems/journalRunCommands.js';
 import { preparedDecisionPolicy } from '../src/systems/preparedDecisionPolicy.js';
+import { executePublicGather } from '../src/systems/publicGatheringAttempt.js';
 
 import {
   buildEngine,

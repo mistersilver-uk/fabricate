@@ -330,6 +330,7 @@ export const craftingFacade = {
     submittedComponentIds = [],
     componentSourceActorIds = null,
     interactive = false,
+    presentTools = null,
   } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
@@ -367,11 +368,13 @@ export const craftingFacade = {
           craftingSystemId,
           lifecycleVersion: 1,
           interactive,
+          presentTools,
         }),
       actor: craftingActor,
       sourceActors: sources,
       executeCommand: (command, options) => this.executeJournalRunCommand(command, options),
       interactive,
+      presentTools,
     });
   },
 
