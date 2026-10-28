@@ -2775,9 +2775,8 @@ const PROGRESSIVE_CHECK = Object.freeze({
 
 /** Herbalism's GATHERING selection over the shared catalogue (issue 1095). */
 const HERBALISM_GATHERING_CHECK = Object.freeze({
-  // Authored even though gathering's whole failure-result path ships DORMANT pending issue
-  // 683 (decision 8): the gathering On-failure section renders this control beside the
-  // dormancy notice, so the frame has to photograph a persisted value.
+  // Authored so the gathering On-failure section renders this control beside its neutral
+  // failure policy note, and the frame photographs a persisted value.
   failureResultPolicy: 'perRecord',
   defaultModifierPolicy: 'addAll',
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],

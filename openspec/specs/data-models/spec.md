@@ -1144,7 +1144,7 @@ EssenceDefinition = {
   id: string,
   name: string,
   icon: string,
-  colorToken?: string | null, // a `--fab-tag-*` palette key, or null for the accent default
+  colorToken?: string | null, // a `--fab-tag-*` tag token, or null for the accent default
   description?: string,
   enabled: boolean, // default true; gates essence-carried BEHAVIOUR, never essence arithmetic
   propertyMacroUuid?: string | null, // a script Macro run against every result this essence contributes to
@@ -5117,7 +5117,7 @@ The following canonical field names must be used in all new writes:
 | ~~Recipe~~ `recipeItemId` | _(legacy)_                        | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds`                                                                                                                                           |
 | EssenceDefinition         | `sourceComponentId`               | Managed component source reference                                                                                                                                                                                                 |
 | EssenceDefinition         | `sourceItemUuid`                  | Resolved or legacy template item evidence for effect transfer                                                                                                                                                                      |
-| EssenceDefinition         | `colorToken`                      | Nullable `--fab-tag-*` palette key for the essence's authored colour; no `customColor` sibling                                                                                                                                     |
+| EssenceDefinition         | `colorToken`                      | Nullable `--fab-tag-*` tag token for the essence's authored colour; no `customColor` sibling                                                                                                                                     |
 | Component                 | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
 | RecipeItemDefinition      | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
 | RecipeItemDefinition      | `recipeIds`                       | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId`                                                                                                                                         |
