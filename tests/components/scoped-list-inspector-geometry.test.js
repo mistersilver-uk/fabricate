@@ -899,6 +899,9 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         rows: edges(rows),
         rowInset: row.getBoundingClientRect().left - columnBox.left,
         rowsPaddingBottom: parseFloat(getComputedStyle(rows).paddingBottom),
+        announcerInColumn: Boolean(
+          column.querySelector(':scope > [data-scoped-list-selection-announce]')
+        ),
         footClass: String(column.lastElementChild.className),
         footGap: columnBox.bottom - column.lastElementChild.getBoundingClientRect().bottom,
       };
@@ -942,6 +945,10 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       assert.ok(
         Math.abs(box.rowInset - GUTTER_PX) <= EPSILON_PX,
         `a row starts ${box.rowInset}px inside the column, not on the ${GUTTER_PX}px gutter`
+      );
+      assert.ok(
+        box.announcerInColumn,
+        'the report region is a child of the column, beside the toolbar'
       );
       assert.ok(box.footClass.includes(foot), `NON-VACUITY: the foot is \`${box.footClass}\``);
       if (foot === 'fabricate-pagination') {

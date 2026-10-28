@@ -647,6 +647,7 @@
             />
           {/if}
         </FilterBar>
+        <EmptiedSelectionAnnouncer bind:this={emptiedReport} />
 
         {#if bulk && !inspectorBody && selection.count > 0}
           <!-- With no inspector column there is nowhere else for a bulk body to go, so it sits
@@ -837,7 +838,6 @@
           onPageSizeChange={changePageSize}
         />
       {/if}
-      <EmptiedSelectionAnnouncer bind:this={emptiedReport} />
     </div>
 
     <!-- `&& available` for the reason the layout's own note gives: the unavailable state draws

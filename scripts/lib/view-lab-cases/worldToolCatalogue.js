@@ -56,6 +56,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       // The frame that owns the `listLead` slot and the list scroller the zone sits in.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
     ],
   }),
   managerCase({
@@ -170,6 +171,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       // The page window itself, restated on the lifted view-state so a change there cannot publish another screen.
       /^src\/ui\/model\/managerBrowserViewState\.js$/,
       BROWSER_PAGINATION_MATCH,
@@ -218,6 +220,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ToolCatalogueBulkPanel\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
@@ -262,6 +265,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       // `EmptyState.svelte` and `ItemDropZone.svelte` were claimed here and are not anymore.
     ],
   }),
@@ -293,6 +297,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       // The model that answers the query.
       /^src\/ui\/model\/scopedEntityListModel\.js$/,
@@ -334,6 +339,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
     ],
   }),
@@ -364,6 +370,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
     ],
   }),
@@ -397,6 +404,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EmptiedSelectionAnnouncer\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       // The lane descriptor itself: `worldToolSorts` is the only `sorts` array here, and it is what makes the toggle inert.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,

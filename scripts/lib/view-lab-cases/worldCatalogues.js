@@ -729,7 +729,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:Entity(?:CatalogueShell|ListInspectorFrame)|EmptiedSelectionAnnouncer)\.svelte$/,
     ],
   }),
   managerCase({
@@ -781,7 +781,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
       // The two shared list primitives this screen composes (issue 1380).
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:Entity(?:CatalogueShell|ListInspectorFrame)|EmptiedSelectionAnnouncer)\.svelte$/,
       // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
@@ -823,7 +823,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EssenceCatalogueBulkPanel\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:Entity(?:CatalogueShell|ListInspectorFrame)|EmptiedSelectionAnnouncer)\.svelte$/,
       // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/Bulk(?:EditPanelShell|EditSection|SelectionToolbar)\.svelte$/,
       INSPECTOR_PANEL_PATTERN,
