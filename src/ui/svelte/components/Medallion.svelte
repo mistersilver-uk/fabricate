@@ -107,6 +107,11 @@
     border: 0;
   }
 
+  /* The mid-tone tags sit under 3:1 on a lit tile, so their glyph is pulled halfway to the text ink. */
+  .fab-medallion:is([data-medallion-tint='verdant'], [data-medallion-tint='azure']) {
+    color: color-mix(in srgb, var(--fab-medallion-tint) 50%, var(--fab-text));
+  }
+
   .fab-medallion.is-corner-6 {
     border-radius: 6px;
   }

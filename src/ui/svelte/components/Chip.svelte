@@ -501,6 +501,11 @@
     color: var(--fab-purple-text);
   }
 
+  /* The mid-tone tags sit under AA on a lit row, so their ink is pulled halfway to the text ink. */
+  .manager-chip.has-tint:is([data-chip-tint='verdant'], [data-chip-tint='azure']) {
+    color: color-mix(in srgb, var(--fab-chip-color) 50%, var(--fab-text));
+  }
+
   .manager-chip.is-bare {
     border: 0;
   }
