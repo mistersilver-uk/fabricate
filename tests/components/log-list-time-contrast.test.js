@@ -1,13 +1,19 @@
 /**
  * Issue 2257 D13: a log entry's time clears 4.5:1 on every ground the journal's Finished list draws
  * it on, in all seven themes: muted at rest, secondary on the raised hover ground.
- * Issue 2342: a hovered failed entry keeps its danger ground, layered with the raise, and its time clears 4.5:1 there.
+ * Issue 2342: a hovered failed entry keeps its danger ground, deepened toward the solid danger, and its time clears 4.5:1 there.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
-import { contrast, flatten, propertiesOf, themePalettes } from '../helpers/themePaletteContrast.js';
+import {
+  contrast,
+  flatten,
+  mix,
+  propertiesOf,
+  themePalettes,
+} from '../helpers/themePaletteContrast.js';
 
 const LOG_LIST = 'src/ui/svelte/components/LogList.svelte';
 const JOURNAL = 'src/ui/svelte/apps/journal/JournalView.svelte';
@@ -66,31 +72,31 @@ test('a hovered entry raises its ground, and its time takes secondary and clears
 });
 
 const DANGER_HOVERED = '.fab-log-list-entry.is-danger.is-open:not(.is-selected):hover';
-const LAYERED = /^linear-gradient\(var\((--fab-[\w-]+)\), var\(\1\)\), var\((--fab-[\w-]+)\)$/u;
+const DEEPENED = /^color-mix\(in srgb, var\((--fab-[\w-]+)\) (\d+)%, var\((--fab-[\w-]+)\)\)$/u;
 
 /** Classes plus pseudo-classes, the whole of specificity for these selectors (no ids or elements). */
 const specificity = (selector) =>
   (selector.match(/\.[\w-]+/gu) ?? []).length +
   (selector.replaceAll(':not(', '(').match(/:[\w-]+/gu) ?? []).length;
 
-/** The raise and danger tokens of the hovered failed entry's layered `background`. */
-function layeredDanger() {
+/** The tint, its share and the opaque token of the hovered failed entry's `color-mix()` background. */
+function deepenedDanger() {
   const [value, ...more] = rulesIn(corpus[LOG_LIST])
     .filter((rule) => splitSelectorList(rule.selector).includes(DANGER_HOVERED))
     .map((rule) => propertiesOf(rule).get('background'));
   assert.ok(value && more.length === 0, 'the hovered failed entry paints its background once');
-  const [, raised, tint] = LAYERED.exec(value.replaceAll(/\s+/gu, ' ')) ?? assert.fail(value);
-  return { raised, tint };
+  const [, tint, share, solid] = DEEPENED.exec(value) ?? assert.fail(value);
+  return { tint, share: Number(share), solid };
 }
 
-/** The opaque ground of a hovered failed entry over `host`: the raise over the danger tint. */
-const hoveredGround = (tokens, { raised, tint }, host) =>
-  flatten(tokens.get(raised), flatten(tokens.get(tint), tokens.get(host)));
+/** The opaque ground of a hovered failed entry over `host`: the tint mixed toward the solid danger. */
+const hoveredGround = (tokens, { tint, share, solid }, host) =>
+  flatten(mix(tokens.get(tint), tokens.get(solid), share / 100), tokens.get(host));
 
-test('a hovered failed entry layers the neutral hover ground over its danger ground and out-ranks both rules', () => {
-  const { raised, tint } = layeredDanger();
+test('a hovered failed entry deepens its danger ground toward the opaque danger and out-ranks both rules', () => {
+  const { tint, solid } = deepenedDanger();
   assert.equal(tint, paint(LOG_LIST, `${ENTRY}.is-danger`, 'background'));
-  assert.equal(raised, paint(LOG_LIST, HOVERED, 'background'));
+  assert.equal(solid, '--fab-danger');
   assert.ok(specificity(DANGER_HOVERED) > specificity(HOVERED), 'it out-ranks the neutral hover');
   assert.ok(
     specificity(DANGER_HOVERED) > specificity(`${ENTRY}.is-danger`),
@@ -99,7 +105,7 @@ test('a hovered failed entry layers the neutral hover ground over its danger gro
 });
 
 test('a hovered failed entry rises a visible step above its resting danger ground in every theme', () => {
-  const layers = layeredDanger();
+  const layers = deepenedDanger();
   const steps = [...themes].flatMap(([theme, tokens]) =>
     HOSTS.map((host) =>
       contrast(
@@ -113,8 +119,8 @@ test('a hovered failed entry rises a visible step above its resting danger groun
   assert.deepEqual(steps, []);
 });
 
-test('the time on a hovered failed entry takes secondary and clears 4.5:1 on its raised danger ground', () => {
-  const layers = layeredDanger();
+test('the time on a hovered failed entry takes secondary and clears 4.5:1 on its deepened danger ground', () => {
+  const layers = deepenedDanger();
   const ink = paint(LOG_LIST, `${HOVERED} .fab-log-list-when`, 'color');
   assert.equal(ink, '--fab-text-secondary');
   const shortfalls = [...themes].flatMap(([theme, tokens]) =>
