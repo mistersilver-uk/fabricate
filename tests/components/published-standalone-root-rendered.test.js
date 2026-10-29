@@ -306,7 +306,7 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 20, 'each vocabulary key the sixteen publish was read');
+    assert.equal(held, 22, 'each vocabulary key the sixteen publish was read');
   });
 
   it('reads the rungs Select maps for size from its frozen table', () => {
