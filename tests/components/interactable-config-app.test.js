@@ -744,12 +744,14 @@ describe('InteractableConfigRoot body', () => {
   // one of three hosts off its `as` prop, and only the default `button` host writes
   // `aria-pressed`: `as="checkbox"` renders a real checkbox and `as="indicator"` a
   // `<span role="img">`, neither of which announces a pressed state at all.
-  it('and the primitive gives `aria-pressed` the `on` prop itself, not a second flag', () => {
+  it('and the primitive gives `aria-pressed` the `on` prop itself, not a second state flag', () => {
     const announced = templateNodes(componentAstOf(STATUS_TOGGLE))
       .map((node) => attributeExpression(node, 'aria-pressed'))
       .filter(Boolean);
     assert.equal(announced.length, 1, 'exactly one host announces a pressed state');
-    assert.deepEqual([...identifierNames(announced[0])], ['on'], 'and it announces the `on` prop');
+    // `semantics="switch"` moves the state to `aria-checked`, so `isSwitch` only selects the attribute.
+    const stateNames = [...identifierNames(announced[0])].filter((name) => !['isSwitch', 'undefined'].includes(name));
+    assert.deepEqual(stateNames, ['on'], 'and it announces the `on` prop');
   });
 
   it('leaves every one of its switches on the default pressable host', () => {
