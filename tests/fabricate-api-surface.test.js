@@ -433,7 +433,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       EmptyState: {
         version: 1,
-        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
+        props: {
+          icon: optional,
+          title: optional,
+          hint: optional,
+          compact: optional,
+          inline: optional,
+          note: optional,
+          filtered: optional,
+          children: slot,
+        },
         rest: true,
         root: 'any',
         overlays: false,

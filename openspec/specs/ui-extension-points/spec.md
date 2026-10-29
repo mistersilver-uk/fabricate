@@ -449,7 +449,8 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s, `Button`'s and `IconButton`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
-- `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
+- `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `field` and `fill`, are not published at version 1; publishing one later is additive.
+- `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
@@ -863,16 +864,24 @@ Each group states the accepted values of every key that entry publishes.
   - `hint` is optional final display text, the sentence beneath the title.
     The companion passes a title, a hint or both; with neither the panel is an empty box.
   - `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
+  - `compact` is `true` or `false`: `true` draws a smaller glyph tile and tighter padding, for a sidebar or a popover.
+  - `inline` is `true` or `false`: `true` draws the panel as one line, a row whose glyph is released from its tile and sits beside the sentence, for a line directly above a control.
+  - `note` is `true` or `false`: `true` releases the panel itself, with no dashed edge, corner, fill or tile, as one quiet line at a popover's own type scale reading from the left, for the inside of a popover the companion has drawn.
+    Where more than one is `true`, `inline` overrides what `compact` sets and `note` overrides what `inline` sets, and what the later does not set stands: with `inline` and `note` the panel is released and its stack stays a row.
+    Each composes with `filtered`, which adds the muted ink.
+    The content slot's children sit beside the hint under `inline`, and read from the left under `note`, so they are not centred there.
+    Fabricate coerces none of `compact`, `inline` and `note` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
   - `filtered` is `true` or `false`: `true` draws the plain panel, in the muted ink, with no tile or title, for filters that match nothing, which is not an absence of content, and the companion passes `hint` alone with it.
     The hint is plain text, so a search term in it takes no emphasis.
-  - `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
+  - `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, in the column it spaces.
     It is the way out of the dead end, a control or a link; what is drawn there is the companion's own, and a control drawn there is named by the companion.
-    Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so the companion states the ink of any text it draws there.
+    Content there inherits the panel's quiet ink and its alignment, centred or from the left under `inline` and `note`, not `target`'s, so the companion states the ink of any text it draws there.
   - It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is the companion's.
   - It draws no fill, so it sits on `target`'s ground.
     The title inks `--fab-text`, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2`, `--fab-surface-soft` over `--fab-bg-2` and `--fab-bg-3` in every palette.
     The hint inks `--fab-text-muted` on every variant, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2` in every palette.
   - The title states its own serif face, and the hint inherits `target`'s.
+    Under `note` the title drops the serif face and inks `--fab-text-muted` as the hint does, which clears the same floor on the same grounds, since `note` draws no fill.
   - The panel never moves its content slot while it is requested.
 - **`Notice`.**
   - It is the design system's notice: what just happened or is wrong right now, which goes away.
