@@ -14,8 +14,9 @@
   | --- | --- | --- | --- |
   | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls `onClose`. |
   | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled or is the page, a frame after close and only if focus is then on the page; only then is the dialog `aria-modal` (issue 2662). |
-  | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
-  | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
+  | `initialFocus` | string | `''` | `trapFocus` focuses first the first focusable at or in an element whose `data-initial-focus` it equals (issue 2776). |
+  | `initialFocusSelector` | selector | `''` | Else the element it matches; else the first focusable one. |
+  | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer box one equal share of the rail, through `display: contents` wrappers. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 
   Invariants (issue 2658):
@@ -79,6 +80,7 @@
     closeOnOutsideClick = true,
     trapFocus = false,
     initialFocus = '',
+    initialFocusSelector = '',
     footerLayout = 'end',
     onSubmit = undefined,
   } = $props();
@@ -218,12 +220,28 @@
     host.focus?.();
   }
 
+  // The first focusable at or inside an element whose `data-initial-focus` is `initialFocus`, in
+  // document order; compared as text, so a value is never read as a selector.
+  function markedTarget(node, inside) {
+    if (!initialFocus) return null;
+    for (const marked of node.querySelectorAll('[data-initial-focus]')) {
+      if (marked.getAttribute('data-initial-focus') !== initialFocus) continue;
+      const found = inside.find((element) => marked.contains(element));
+      if (found) return found;
+    }
+    return null;
+  }
+
   function modalFocus(node, enabled) {
     if (!enabled) return {};
     const opener = node.ownerDocument.activeElement;
     const held = host;
     const view = node.ownerDocument.defaultView;
-    const first = (initialFocus && node.querySelector(initialFocus)) || focusables(node)[0];
+    const inside = focusables(node);
+    const first =
+      markedTarget(node, inside) ||
+      (initialFocusSelector && node.querySelector(initialFocusSelector)) ||
+      inside[0];
     first?.focus?.();
     return {
       destroy() {
@@ -444,8 +462,10 @@
     background: var(--fab-bg-2);
   }
 
-  .manager-modal-footer.is-equal > :global(*) {
-    flex: 1 1 0;
-    min-width: 0;
+  /* A grid, so a box under a `display: contents` slot wrapper takes its share as a direct child does. */
+  .manager-modal-footer.is-equal {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
   }
 </style>

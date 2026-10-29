@@ -99,7 +99,7 @@
   dialogProps={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
-  initialFocus={INITIAL_FOCUS}
+  initialFocusSelector={INITIAL_FOCUS}
   footerLayout="equal"
   onClose={dismiss}
   onSubmit={(event) => answer(event.target, 'normal')}

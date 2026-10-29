@@ -225,7 +225,7 @@
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   dialogProps={{ 'data-import-mapping': '' }}
   trapFocus
-  initialFocus="[data-import-mapping-match] input"
+  initialFocusSelector="[data-import-mapping-match] input"
   {onClose}
 >
   {#snippet body()}

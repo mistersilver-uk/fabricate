@@ -181,7 +181,7 @@
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
   dialogProps={{ 'data-component-add-from-catalogue-dialog': '' }}
   trapFocus
-  initialFocus="[data-component-add-from-catalogue-search]"
+  initialFocusSelector="[data-component-add-from-catalogue-search]"
   width="580px"
   onClose={dismiss}
 >
