@@ -9,6 +9,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { makeCraftingRun } from '../helpers/journal-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -133,6 +134,33 @@ describe('RunCard mounted behavior', () => {
       assert.ok(chip.textContent.includes(kind === 'choice' ? 'awaitingChoice' : 'needsMaterials'));
       // The status chip is still there.
       assert.ok(target.querySelector('.journal-run-status'));
+    });
+  }
+
+  // Issue 2745. A gathering row projected by the builder wears the same Needs tools signal a
+  // crafting stage does while its Tool is neither held nor supplied by a station.
+  for (const [label, toolsMissing] of [['lacks', true], ['has', false]]) {
+    it(`a ready gathering run that ${label} its Tool ${toolsMissing ? 'shows' : 'does not show'} Needs tools`, async () => {
+      const [run] = new RunJournalBuilder({
+        gatheringRunSource: {
+          getActiveRuns: () => [{
+            id: 'g1', craftingSystemId: 'sys-1', environmentId: 'env-1', taskId: 't1',
+            status: 'waitingTime', lifecycleVersion: 1, runRevision: 0,
+            timeGate: { requiredSeconds: 60, availableAt: 100 },
+          }],
+          getRunHistory: () => []
+        },
+        getGatheringTask: () => ({ name: 'Forage', resolutionMode: 'straight' }),
+        gatheringToolsMissing: () => toolsMissing,
+        nowWorldTime: () => 200
+      }).buildListing({ actor: { id: 'a', uuid: 'Actor.a', isOwner: true }, viewer: { isGM: false } }).activeRuns;
+      const target = await harness.mount({ run, now: 200 });
+      const chip = target.querySelector('[data-run-attention]');
+      assert.equal(Boolean(chip), toolsMissing);
+      if (!toolsMissing) return;
+      assert.equal(chip.getAttribute('data-run-attention'), 'tools');
+      assert.equal(chipToneOf(chip), 'warning');
+      assert.ok(chip.textContent.includes('needsTools'));
     });
   }
 

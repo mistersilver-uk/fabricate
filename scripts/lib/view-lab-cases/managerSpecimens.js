@@ -349,13 +349,14 @@ const ICON_BUTTON_KEYS = Object.freeze([
   'ghost',
   'danger',
   'ghost-danger',
+  'ghost-danger-rest',
   'size-24',
   'size-26',
   'disabled',
   'expand',
 ]);
 
-/** Sized to the fixture's 360px ground and the height of its nine rows and the notes beneath. */
+/** Sized to the fixture's 360px ground and the height of its ten rows and the notes beneath. */
 const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
 
 /**
@@ -1196,7 +1197,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-icon-buttons-specimen',
     label:
-      'Specimen, mounted through the published seam — nine icon buttons in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each a glyph alone beside a caption the companion draws, after two steps: a click on the last, the Batch notes disclosure, whose callback passed aria-expanded true in its own update and showed the companion’s notes line Quench each ingot before the next pour beneath it, the pointer still resting on that button’s raised tile; and Tab from the danger button, which put keyboard focus on the ghost-danger Remove Ember salt, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face, on its danger fill and ink. Reading top to bottom: a neutral pen on its 34px bordered face; a primary check in the success ink and edge; a ghost ellipsis 28px tall with no edge or fill; a danger trash in the danger ink and edge; the focused ghost-danger xmark; an xmark at size 24 and one at size 26, each a square of that side; and a disabled arrow at 62% opacity. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the hover text each button writes and the tooltip’s opening and closing are the mounted suite’s',
+      'Specimen, mounted through the published seam — ten icon buttons in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each a glyph alone beside a caption the companion draws, after two steps: a click on the last, the Batch notes disclosure, whose callback passed aria-expanded true in its own update and showed the companion’s notes line Quench each ingot before the next pour beneath it, the pointer still resting on that button’s raised tile; and Tab from the danger button, which put keyboard focus on the ghost-danger Remove Ember salt, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face, on its danger fill and ink. Reading top to bottom: a neutral pen on its 34px bordered face; a primary check in the success ink and edge; a ghost ellipsis 28px tall with no edge or fill; a danger trash in the danger ink and edge; the focused ghost-danger xmark; a second ghost-danger xmark that nothing focuses, 28px square with no edge or fill and the subtle ink, as a ghost rests; an xmark at size 24 and one at size 26, each a square of that side; and a disabled arrow at 62% opacity. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the hover text each button writes and the tooltip’s opening and closing are the mounted suite’s',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -1238,6 +1239,12 @@ export const CASES = Object.freeze([
           selector: `${ICON_BUTTON('ghost-danger')}:focus-visible`,
           styles:
             'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-danger-text); background-color: var(--fab-danger-soft)',
+        },
+        // The role at rest, which the focused row above cannot show: no edge, no fill, the subtle ink.
+        {
+          selector: ICON_BUTTON('ghost-danger-rest'),
+          styles:
+            'width: 28px; height: 28px; color: var(--fab-text-subtle); border-top-color: rgba(0, 0, 0, 0); background-color: rgba(0, 0, 0, 0)',
         },
         { selector: ICON_BUTTON('size-24'), styles: 'width: 24px; height: 24px' },
         { selector: ICON_BUTTON('size-26'), styles: 'width: 26px; height: 26px' },

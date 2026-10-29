@@ -705,7 +705,6 @@ function createStore(calls = [], options = {}) {
     showVisibilitySummary: true,
     canShowEnvironmentsTab: selectedFeatures.gathering === true,
     environments,
-    environmentsLoading: false,
     environmentsError: null,
     // Library-derived per-environment composition counts (tasks/events matched in).
     environmentTaskCounts: options.environmentTaskCounts || {

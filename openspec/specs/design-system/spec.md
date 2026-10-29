@@ -1411,6 +1411,7 @@ A second pill component is a MISSING DENSITY on that chip and never a new member
 The `action` density is the adjacent button's geometry IN FULL — height, corner, type size and inline padding — and never its height alone, truncated or not.
 A state chip standing in an action cluster with 34px buttons MUST take it, because a chip that matches one of the four reads as a fifth control drawn wrong; a toolbar count chip is not in such a cluster and keeps its own density.
 The `header` density is that geometry at the 38px rung, and a state chip in `PageHeader`'s action group MUST take it beside the header's 38px actions, while an edit card's cluster keeps `action` at 34 (issue 2257 D10).
+A truncating chip (`truncate`) MUST keep its leading glyph and the start of its label at every density and end in an ellipsis, so a label that does not fit loses its tail and never its glyph (issue 2751).
 
 A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehicle or a place — is an avatar, with `shape` CALLER-SUPPLIED because actor type is system-defined and eligibility comes from a GM world setting rather than a type map.
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
@@ -2888,6 +2889,7 @@ A list that declares `loading` MUST NOT draw its empty or no-match panel while i
 A list declares only the states it can reach: one with no reachable failure, or whose failure a sibling pane reports, passes no `error`, and then draws no body in that state rather than an empty or no-match claim.
 A list that loads together with its view takes the view's composition instead, and a pane that is not a list keeps its own no-state panel.
 The manager's crafting system library, gathering environment browser and Knowledge roster are its first callers (issue 2548).
+The gathering environment browser reads a synchronous setting, so it declares only `error`, and its detail names a next step beneath the raw error (issue 2626).
 
 #### Scenario: A browse list is loading
 

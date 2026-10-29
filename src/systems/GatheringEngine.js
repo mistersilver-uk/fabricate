@@ -55,6 +55,7 @@ import {
   answeredD100Roll,
   describeD100Check,
   evaluatePreparedD100Check,
+  gatheringTaskRequiresPlayerCheck,
   offersD100Prompt,
 } from './gatheringD100Check.js';
 import {
@@ -5562,10 +5563,6 @@ function normalizeRunItems(items, { actor = null } = {}) {
       });
     })
     .filter((item) => item.actorUuid && (item.itemUuid || item.componentId));
-}
-
-function gatheringTaskRequiresPlayerCheck(task) {
-  return ['routed', 'progressive'].includes(stringOrNull(task?.resolutionMode));
 }
 
 function versionedEffect(effectId, kind, planned, apply) {

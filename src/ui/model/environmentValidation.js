@@ -6,7 +6,6 @@
 export function emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
   return {
     canShowEnvironmentsTab,
-    environmentsLoading: false,
     environmentsError: error,
     environments: [],
     selectedEnvironmentId: '',

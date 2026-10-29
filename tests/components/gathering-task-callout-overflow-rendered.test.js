@@ -1,7 +1,8 @@
 /**
- * Issue 2559: a long blocked-reason callout stays inside its chip, and so inside a narrow task row.
- * An unmapped code falls back to the reason's own message, which a provider or a translation can
- * make far longer than the chip. Measured in Chromium on the text itself, not the chip's box.
+ * Issues 2559 and 2751: a long blocked-reason callout stays inside its chip, and so inside a narrow
+ * task row, and keeps its glyph and the start of its text, ending in an ellipsis. An unmapped code
+ * falls back to the reason's own message, which a provider or a translation can make far longer
+ * than the chip. Measured in Chromium on the text itself, not the chip's box.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -72,12 +73,17 @@ const measure = () =>
   tab.evaluate(() => {
     const row = document.querySelector('[data-case="row"] .gathering-task-row');
     const chip = row.querySelector(':scope [data-gathering-callouts] > *');
-    const label = [...chip.childNodes].findLast(
-      (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== ''
-    );
+    const walker = document.createTreeWalker(chip, NodeFilter.SHOW_TEXT);
+    let label = null;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.textContent.trim() !== '') label = node;
+    }
     const range = document.createRange();
     range.selectNodeContents(label);
     const text = range.getBoundingClientRect();
+    range.setStart(label, 0);
+    range.setEnd(label, 3);
+    const start = range.getBoundingClientRect();
     let seen = { left: text.left, right: text.right };
     for (let node = chip; node && node !== row; node = node.parentElement) {
       if (getComputedStyle(node).overflowX === 'visible') continue;
@@ -85,14 +91,24 @@ const measure = () =>
       seen = { left: Math.max(seen.left, box.left), right: Math.min(seen.right, box.right) };
     }
     const bounds = row.getBoundingClientRect();
+    const box = chip.getBoundingClientRect();
+    const glyph = chip.querySelector(':scope > i').getBoundingClientRect();
+    const host = label.parentElement;
     return {
       title: chip.getAttribute('title'),
       text: chip.textContent.trim(),
       overflowX: getComputedStyle(chip).overflowX,
-      textScrollWidth: chip.scrollWidth,
-      textClientWidth: chip.clientWidth,
+      textScrollWidth: host.scrollWidth,
+      textClientWidth: host.clientWidth,
+      textHost: {
+        overflowX: getComputedStyle(host).overflowX,
+        textOverflow: getComputedStyle(host).textOverflow,
+      },
       seen,
       row: { left: bounds.left, right: bounds.right },
+      chip: { left: box.left, right: box.right },
+      glyph: { left: glyph.left, right: glyph.right },
+      start: { left: start.left, right: start.right },
     };
   });
 
@@ -114,5 +130,22 @@ describe('gathering task row callout overflow, rendered (issue 2559)', () => {
     const found = await measure();
     assert.equal(found.title, LONG_LABEL);
     assert.equal(found.text, LONG_LABEL);
+  });
+
+  it('keeps the leading glyph and the start of the text, and ends in an ellipsis (issue 2751)', async () => {
+    const found = await measure();
+    assert.ok(
+      found.glyph.left >= found.chip.left - 0.01 && found.glyph.right <= found.chip.right + 0.01,
+      `the glyph ${JSON.stringify(found.glyph)} is clipped by the chip ${JSON.stringify(found.chip)}`
+    );
+    assert.ok(
+      found.start.left >= found.glyph.right - 0.01 && found.start.right <= found.chip.right + 0.01,
+      `the first characters ${JSON.stringify(found.start)} sit beside the glyph, inside the chip`
+    );
+    assert.deepEqual(
+      [found.textHost.overflowX, found.textHost.textOverflow],
+      ['hidden', 'ellipsis'],
+      'the clipped text ends in an ellipsis'
+    );
   });
 });

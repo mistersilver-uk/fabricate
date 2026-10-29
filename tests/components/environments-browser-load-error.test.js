@@ -1,7 +1,7 @@
 /**
- * The gathering environment list's loading and error forms, mounted (issue 2548): `ListState`
- * replaces the list body under the kept filter bar, and the `{shown} of {total}` chip, which would
- * read a false 0 of 0, is omitted.
+ * The gathering environment list's error form, mounted (issues 2548, 2626): `ListState` replaces
+ * the list body under the kept filter bar, and the `{shown} of {total}` chip, which would read a
+ * false 0 of 0, is omitted. The list has no loading form: its settings read is synchronous.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -71,7 +71,11 @@ describe('the environment list draws its load states through ListState (issue 25
       notice.querySelector('.fab-notice-title')?.textContent,
       'Could Not Load Environments'
     );
-    assert.equal(notice.querySelector('.fab-notice-detail')?.textContent, FAILURE);
+    assert.equal(
+      notice.querySelector('.fab-notice-detail')?.textContent,
+      `${FAILURE}\nClose and reopen this window to try again.`,
+      'the raw error, then the next step on its own line'
+    );
     assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
     assert.ok(
       Boolean(target.querySelector('.manager-environments-toolbar')),
@@ -81,19 +85,13 @@ describe('the environment list draws its load states through ListState (issue 25
     assert.ok(Boolean(target.querySelector(labCaseSelector('manager-environments-load-error'))));
   });
 
-  it('a pending load draws the busy region and its status line, masking the error', () => {
+  it('draws no busy region: the settings read is synchronous, so the list has no loading form', () => {
+    // `environmentsLoading` is a deliberately stale prop: the view no longer reads it.
     mountView({ environmentsLoading: true, environmentsError: FAILURE });
-
-    const region = target.querySelector(':scope .manager-table-scroll > .fabricate-list-state');
-    assert.ok(Boolean(region), 'the loading region renders in the list body');
-    assert.equal(region.getAttribute('aria-busy'), 'true');
-    assert.equal(region.querySelector('[role="status"]')?.textContent, 'Loading environments...');
-    assert.ok(!target.querySelector('[data-environments-error]'), 'loading masks the error');
-    assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
+    assert.ok(!target.querySelector('[aria-busy]'), 'no busy region');
     assert.ok(
-      Boolean(target.querySelector('.manager-environments-toolbar')),
-      'the filter bar stays'
+      Boolean(target.querySelector('[data-environments-error]')),
+      'the failure still draws'
     );
-    assert.ok(!countChip(), 'no count chip');
   });
 });
