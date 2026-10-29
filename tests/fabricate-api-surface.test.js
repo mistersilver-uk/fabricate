@@ -398,7 +398,15 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       Chip: {
         version: 1,
-        props: { tone: optional, density: optional, children: requiredText },
+        props: {
+          tone: optional,
+          density: optional,
+          emphasis: optional,
+          icon: optional,
+          mono: optional,
+          struck: optional,
+          children: requiredText,
+        },
         rest: true,
         root: 'any',
         overlays: false,

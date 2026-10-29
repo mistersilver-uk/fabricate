@@ -2048,7 +2048,7 @@ The published components, in publication order:
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
 | `Kicker` | 1 | `any` | `as`, `tone`, `children` (text, required) | yes |
-| `Chip` | 1 | `any` | `tone`, `density`, `children` (text, required) | yes |
+| `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `any` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
@@ -2226,10 +2226,21 @@ This is `InfoStrip`'s badge set.
 `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
 At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short.
 At `default` a long label wraps inside the chip.
+`emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
+It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
+The figures stated for `neutral` hold for a chip with no `emphasis`; measure the combination you draw.
+What the chip draws for a value outside the set is private; today that is the default chip.
+`icon` is optional Font Awesome classes for a leading glyph, hidden from assistive technology; absent, no glyph is drawn.
+The glyph is never the chip's name, so a chip whose meaning rests on it carries that meaning in its label.
+`mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
+`struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
+It is drawn and never announced, so the label says the state.
+Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
+A Fabricate that predates `emphasis`, `icon`, `mono` and `struck` refuses each with `"<key>" is not a data attribute`, and `describe('Chip').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
 `tone` is colour alone, so the label says the state.
 A label changed through `update` is not announced; a live region is yours to provide.
-Every other tone, emphasis and density the component draws is private.
+Every other tone and density the component draws, and its `lit` emphasis, is private.
 The chip is an inline mark: give its `target` `display: flex`, so the mark is a flex item as every Fabricate site draws it and `target` is exactly as tall as the mark.
 Rest `data-*` is for your own hooks.
 `data-chip-*` names are the chip's own.

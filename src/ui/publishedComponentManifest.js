@@ -156,6 +156,10 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     props: Object.freeze({
       tone: Object.freeze({ kind: 'data' }),
       density: Object.freeze({ kind: 'data' }),
+      emphasis: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
+      mono: Object.freeze({ kind: 'data' }),
+      struck: Object.freeze({ kind: 'data' }),
       children: Object.freeze({ kind: 'text', required: true }),
     }),
     rest: true,

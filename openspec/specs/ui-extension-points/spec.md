@@ -450,7 +450,9 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s, `Button`'s and `IconButton`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
+- `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, `icon`, `busy`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
+- `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) were added to an entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
@@ -811,6 +813,16 @@ Each group states the accepted values of every key that entry publishes.
   - `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
     At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: the companion keeps a `list` label short.
     At `default` a long label wraps inside the chip.
+  - `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
+    It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
+    The figures stated for `neutral` hold for a chip with no `emphasis`; the companion measures the combination it draws.
+    What the chip draws for a value outside the set is private; today that is the default chip.
+  - `icon` is optional Font Awesome classes for a leading glyph, hidden from assistive technology; absent, no glyph is drawn.
+    The glyph is never the chip's name, so a chip whose meaning rests on it carries that meaning in its label.
+  - `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
+  - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
+    It is drawn and never announced, so the label says the state.
+  - Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
   - It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
     `tone` is colour alone, so the label says the state.
     A label changed through `update` is not announced; a live region is the companion's.
@@ -906,7 +918,7 @@ Each group states the accepted values of every key that entry publishes.
   - The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so the companion never mounts a notice with an action inside a tinted panel.
     Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: the companion passes a verb phrase.
   - It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
-- **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
+- **Private:** every other `Chip` tone and density, and its `lit` emphasis; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
 
 ### The issue 2452 components
 

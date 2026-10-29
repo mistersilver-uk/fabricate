@@ -397,7 +397,7 @@ const JS_ARIA_READERS = Object.freeze({
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
 });
 
-/** The classes `tone` and `density` can write beside the root class, private values included. */
+/** The classes `tone`, `density`, `emphasis`, `mono` and `struck` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
   'is-warning',
@@ -418,6 +418,12 @@ const PUBLISHED_CHIP_CLASSES = new Set([
   'is-tag-run',
   'is-inspector',
   'is-header',
+  'is-outlined',
+  'is-lit',
+  'is-bare',
+  'is-solid',
+  'is-mono',
+  'is-struck',
 ]);
 /** The manager layout classes a sheet rule reaches a chip under; no extension target sits in one. */
 const CHIP_LAYOUT_ANCESTORS = new Set([
@@ -437,7 +443,7 @@ const CHIP = Object.freeze({
   root: 'manager-chip',
   writable: PUBLISHED_CHIP_CLASSES,
   ancestors: CHIP_LAYOUT_ANCESTORS,
-  drawsChildren: false,
+  drawsChildren: 'caller',
 });
 const CARD = Object.freeze({
   root: 'fabricate-card',
@@ -2887,8 +2893,8 @@ describe('the module sheet against the published Chip', () => {
     assert.equal(selectors.length, 15, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
-      ['tone', 'density', 'children'],
-      'a published key that draws a classed child reopens cannotMatchPublished and fab-hit-area'
+      ['tone', 'density', 'emphasis', 'icon', 'mono', 'struck', 'children'],
+      'a published key that draws a classed child reopens cannotMatchPublished'
     );
   });
 
@@ -2897,7 +2903,6 @@ describe('the module sheet against the published Chip', () => {
     ['a class the published keys cannot write', `${MANAGER} .manager-chip.manager-tag-pill`],
     ['a published class beside an unwritable one', `${MANAGER} .manager-chip.is-list.is-empty`],
     ['the :disabled state', `${MANAGER} .manager-chip:disabled`],
-    ['a classed glyph child', `${MANAGER} .manager-chip .fa-circle`],
     ['a pinned layout ancestor', `${MANAGER} .manager-vocabulary-row > .manager-chip`],
     ['another class that only starts with the root', `${MANAGER} .manager-chip-row`],
   ]) {
@@ -2913,6 +2918,8 @@ describe('the module sheet against the published Chip', () => {
     `${MANAGER} .manager-chip > span`,
     `${MANAGER} .manager-chip ~ div > .manager-chip`,
     `${MANAGER} .manager-chip.is-row`,
+    `${MANAGER} .manager-chip.is-lit.is-struck`,
+    `${MANAGER} .manager-chip .fa-circle`,
     `${MANAGER} :is(.manager-chip.manager-tag-pill, .manager-pill)`,
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published chip`, () => {
