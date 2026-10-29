@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     // Issue 1506: the journal's status pill retired into the shared chip.
-    ...SELECT_COMPILED_MODULES,
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     // The shared primitives this tree draws.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RunProgress.svelte',
