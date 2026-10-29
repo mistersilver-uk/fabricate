@@ -2582,6 +2582,7 @@ The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab in
 The import report, the import folder mapping and the add-from-catalogue picker take `trapFocus`, so each is `aria-modal` (issue 2682).
 Focus enters on the report's close control, the mapping's match-by-name checkbox and the picker's search field, Tab stays inside, and Escape closes it.
 On close focus returns to the control that opened it, or to the manager window when there is none.
+The return lands a frame after the close and is skipped when focus is by then on an element other than the page, so a trapped dialog opened in that frame keeps the focus it took (issue 2759).
 The picker's apply action is busy rather than disabled while its run is in flight, so a refused run leaves focus on it inside the dialog.
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
@@ -2611,6 +2612,13 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the GM opens the import report, the import folder mapping or the add-from-catalogue picker
 - **THEN** focus is inside the dialog, and Tab from its last control wraps to its close control
 - **AND** Escape closes it once and focus returns to the opener, or to the manager window when there is none
+
+#### Scenario: A trapped dialog opens as another closes
+
+- **WHEN** a trapped dialog closes and another trapped dialog opens before the next frame
+- **THEN** focus stays in the dialog that opened
+- **AND** the closed dialog's opener is not focused
+- **AND** focus the app moved to a control in that frame is not taken back
 
 #### Scenario: A press on the dialog's surface
 
