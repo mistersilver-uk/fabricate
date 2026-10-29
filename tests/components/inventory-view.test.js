@@ -14,7 +14,7 @@ import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
-  SELECT_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -86,8 +86,8 @@ const harness = createMountedComponentHarness({
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     ...PAGINATION_COMPILED_MODULES,
-    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
-    ...SELECT_COMPILED_MODULES,
+    // The searchable popover's compiled closure, spread rather than copied.
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',

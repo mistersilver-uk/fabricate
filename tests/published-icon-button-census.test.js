@@ -63,7 +63,7 @@ const ICON_BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost',
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost:not(:disabled):hover',
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost:focus-visible',
-  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger',
+  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled)',
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled):hover',
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button',
@@ -82,11 +82,13 @@ const ICON_BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button i',
 ]);
 
-/** The ghost roles' keyboard faces: each repaints the glyph and fill under `:focus-visible` and draws no ring. */
-const GHOST_FOCUS_FACES = Object.freeze([
-  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost:focus-visible',
-  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible',
-]);
+/** The ghost roles' keyboard faces and what each repaints under `:focus-visible`; neither draws a ring. */
+const GHOST_FOCUS_FACES = Object.freeze({
+  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost:focus-visible':
+    ['color', 'background'],
+  'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible':
+    ['border-color', 'color', 'background'],
+});
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
@@ -122,14 +124,14 @@ describe('the module sheet and every component style against the published IconB
   it('draws a published icon button alike under any ancestor, with the module ring alone', () => {
     const reaching = reachingOf(census());
     assert.deepEqual(placementFaults(reaching, ICON_BUTTON, []), []);
-    const faces = reaching.filter(({ written }) => GHOST_FOCUS_FACES.includes(written));
+    const faces = reaching.filter(({ written }) => written in GHOST_FOCUS_FACES);
     assert.deepEqual(
       faces.map(({ written, rule }) => [
         written,
         declarationsOf(rule).map(([property]) => property),
       ]),
-      GHOST_FOCUS_FACES.map((written) => [written, ['color', 'background']]),
-      'the ghost faces repaint the glyph and fill and draw no ring'
+      Object.entries(GHOST_FOCUS_FACES),
+      'the ghost faces repaint the glyph and fill, the danger one its edge too, and draw no ring'
     );
     const ringed = reaching.filter((row) => !faces.includes(row));
     assert.deepEqual(ringFaults(ringed, ICON_BUTTON), []);

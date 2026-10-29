@@ -17,6 +17,7 @@ import {
 } from '../src/systems/journalRunCommands.js';
 import { preparedDecisionPolicy } from '../src/systems/preparedDecisionPolicy.js';
 import { executePublicGather } from '../src/systems/publicGatheringAttempt.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
 import {
   buildEngine,
@@ -437,6 +438,16 @@ test('a timed d100 run, a straight task and routed or progressive tasks describe
   });
   const waiting = timed.runManager.getActiveRuns(timed.actor)[0];
   assert.ok(waiting.timeGate, 'a timed run carries its time gate');
+  // The Journal offers the completion selector exactly where the engine will not prompt.
+  const projected = new RunJournalBuilder({
+    gatheringRunSource: timed.runManager,
+    getGatheringTask: () => timed.environment.tasks[0],
+    nowWorldTime: () => timed.clock.worldTime,
+  }).buildListing({
+    actor: Object.create(timed.actor, { isOwner: { value: true } }),
+    viewer: timed.viewer,
+  }).activeRuns[0];
+  assert.equal(projected.derivedStatus, 'waiting');
   timed.clock.worldTime += 120;
   const timedDescriptor = await timed.engine.describeVersionedStageCheck({
     actor: timed.actor,
@@ -445,6 +456,7 @@ test('a timed d100 run, a straight task and routed or progressive tasks describe
     requestId: 'describe',
   });
   assert.equal(timedDescriptor.required, false);
+  assert.equal(projected.actions.setCompletionMode, !timedDescriptor.required);
 
   const yieldGroup = {
     id: 'yield',

@@ -6,7 +6,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { setGatheringEngine } from '../../src/bootstrap/gatheringRuntime.js';
+import { journalFacade } from '../../src/bootstrap/journalFacade.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
+import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
@@ -3164,23 +3167,71 @@ test('completion-mode switching is limited to an active countdown without a play
     runRevision: 0,
     timeGate,
   });
+  const modes = { 'straight-task': 'straight', 'timed-d100': 'd100', routed: 'routed', progressive: 'progressive' };
   const listing = makeBuilder({
     worldTime: 200,
     gatheringActive: [
       gatheringRun('straight', 'straight-task'),
-      gatheringRun('rolled', 'rolled-task'),
+      gatheringRun('d100', 'timed-d100'),
+      gatheringRun('routed', 'routed'),
+      gatheringRun('progressive', 'progressive'),
       gatheringRun('ready', 'straight-task', { requiredSeconds: 600, availableAt: 100 }),
     ],
-    getGatheringTask: (_environmentId, taskId) => ({
-      name: taskId,
-      resolutionMode: taskId === 'straight-task' ? 'straight' : 'd100',
-    }),
+    getGatheringTask: (_environmentId, taskId) => ({ name: taskId, resolutionMode: modes[taskId] }),
   }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
   const byId = Object.fromEntries(listing.activeRuns.map((run) => [run.id, run]));
 
   assert.equal(byId.straight.actions.setCompletionMode, true);
-  assert.equal(byId.rolled.actions.setCompletionMode, false, 'player rolls stay manual');
+  assert.equal(byId.d100.actions.setCompletionMode, true, 'a timed d100 run completes without a player check');
+  assert.equal(byId.routed.actions.setCompletionMode, false, 'a routed run prompts for a check');
+  assert.equal(byId.progressive.actions.setCompletionMode, false, 'a progressive run prompts for a check');
   assert.equal(byId.ready.actions.setCompletionMode, false, 'a matured gate is no longer counting down');
+});
+
+test('the engine predicate prompts for routed, progressive and untimed d100 runs only', () => {
+  const timed = { requiredSeconds: 600, availableAt: 800 };
+  const needs = (resolutionMode, timeGate = null) =>
+    gatheringRunNeedsPlayerCheck({ task: { resolutionMode }, run: timeGate ? { timeGate } : {} });
+  assert.deepEqual(
+    ['straight', 'd100', 'routed', 'progressive'].map((mode) => [needs(mode), needs(mode, timed)]),
+    [[false, false], [true, false], [true, true], [true, true]]
+  );
+});
+
+test('a gathering task without a resolution mode is a d100 task, as the spec defaults it', () => {
+  const hasCheck = (run) => makeBuilder()._gatheringRunHasPlayerCheck({ task: { name: 'Plain' } }, run);
+  assert.equal(hasCheck({}), true, 'an untimed run prompts a d100 check');
+  assert.equal(hasCheck({ timeGate: { requiredSeconds: 600, availableAt: 800 } }), false, 'a timed run needs none');
+  assert.equal(makeBuilder()._gatheringRunHasPlayerCheck({ task: null }, {}), true, 'an unseen task counts as prompting');
+});
+
+test('every Journal builder, station views included, gets the award-choice claimability from one factory', () => {
+  const seen = [];
+  const facade = Object.assign(Object.create(journalFacade), {
+    recipeManager: {},
+    craftingEngine: { awardChoiceClaimability: (run, actor) => {
+        seen.push([run, actor]);
+        return () => 'claim';
+      },
+    },
+  });
+  const builder = facade._getRunJournalBuilder();
+  assert.equal(builder._awardChoiceClaimability({ run: 'r', actor: 'a' })(), 'claim');
+  assert.deepEqual(seen, [['r', 'a']]);
+  assert.equal(facade._getRunJournalBuilder(), builder, 'the no-station builder is cached');
+});
+
+test('the Journal task fallback carries the resolution mode the selector decides on', () => {
+  setGatheringEngine({
+    _findEnvironment: () => ({ tasks: [{ id: 't1', name: 'Hunt', img: 'a.webp', resolutionMode: 'routed' }] }),
+  });
+  try {
+    assert.deepEqual(journalFacade._resolveJournalGatheringTask('env-1', 't1'), {
+      name: 'Hunt', img: 'a.webp', resolutionMode: 'routed',
+    });
+  } finally {
+    setGatheringEngine(null);
+  }
 });
 
 test('salvage remains outside versioned completion-mode controls', () => {

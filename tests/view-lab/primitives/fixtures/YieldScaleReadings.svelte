@@ -21,7 +21,7 @@
   const labels = $derived({
     ...(thresholdKey && {
       threshold: (entry) =>
-        format(thresholdKey, { chance: entry.chance, threshold: 101 - entry.chance }),
+        format(thresholdKey, { chance: entry.chance, threshold: entry.threshold }),
     }),
     ...(readings && { evidence: (entry) => readings[entry.id] }),
     quantity: (entry) => format(quantityKey, { n: entry.qty }),

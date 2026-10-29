@@ -1861,6 +1861,7 @@
           "id": "greyfell",
           "name": "Greyfell Scree",
           "chance": 100,
+          "threshold": 1,
           "qty": 3,
           "icon": "fas fa-hammer",
           "tint": "slate"
@@ -1869,6 +1870,7 @@
           "id": "iron",
           "name": "Iron Nodule",
           "chance": 70,
+          "threshold": 31,
           "qty": 2,
           "icon": "fas fa-hammer",
           "tint": "mist"
@@ -1877,6 +1879,7 @@
           "id": "silver",
           "name": "Silver Seam",
           "chance": 30,
+          "threshold": 71,
           "qty": 1,
           "icon": "fas fa-star",
           "tint": "bone"
@@ -1885,6 +1888,7 @@
           "id": "skyfall",
           "name": "Skyfall Shard",
           "chance": 5,
+          "threshold": 96,
           "qty": 1,
           "icon": "fas fa-star",
           "tint": "lavender"
@@ -1902,7 +1906,7 @@
       "thresholdKey": "FABRICATE.App.Journal.Yields.HighRollThreshold",
       "labelKey": "FABRICATE.App.Journal.Yields.PreviewTitle"
     },
-    "note": "Wired as `RunDetail.svelte:582-602` wires a d100 run's preview: the heading, each threshold and each quantity are the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author."
+    "note": "Wired as `RunDetail.svelte` wires a d100 run's preview: the heading, each authored threshold and each quantity are the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",

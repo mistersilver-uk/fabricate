@@ -126,6 +126,7 @@ const BOOTSTRAP_MODULES = [
   'src/bootstrap/gatheringRuntime.js',
   'src/bootstrap/hooks.js',
   'src/bootstrap/journalFacade.js',
+  'src/bootstrap/journalGatheringTools.js',
   'src/bootstrap/journalOperations.js',
   'src/bootstrap/migrations.js',
   'src/bootstrap/publicApi.js',
