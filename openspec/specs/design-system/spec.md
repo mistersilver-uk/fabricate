@@ -2889,7 +2889,6 @@ A list declares only the states it can reach: one with no reachable failure, or 
 A list that loads together with its view takes the view's composition instead, and a pane that is not a list keeps its own no-state panel.
 The manager's crafting system library, gathering environment browser and Knowledge roster are its first callers (issue 2548).
 The gathering environment browser reads a synchronous setting, so it declares only `error`, and its detail names a next step beneath the raw error (issue 2626).
-A `Notice` detail MUST break at its newlines, so a failure that joins several messages draws one per line.
 
 #### Scenario: A browse list is loading
 

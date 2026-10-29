@@ -8759,7 +8759,7 @@
         "EmptyHint": "Create a gathering environment to start configuring where players can gather.",
         "EmptyActionHint": "Create the first environment and configure its gathering tasks.",
         "ErrorTitle": "Could Not Load Environments",
-        "ErrorHint": "Close and reopen this window to try again. The browser console has the error.",
+        "ErrorHint": "Close and reopen this window to try again.",
         "StoreUnavailable": "Gathering environment data is not available.",
         "ValidationSummary": "Resolve {count} validation issues before saving.",
         "ValidationSummaryOne": "Resolve 1 validation issue before saving.",

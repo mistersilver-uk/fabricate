@@ -73,7 +73,7 @@ describe('the environment list draws its load states through ListState (issue 25
     );
     assert.equal(
       notice.querySelector('.fab-notice-detail')?.textContent,
-      `${FAILURE}\nClose and reopen this window to try again. The browser console has the error.`,
+      `${FAILURE}\nClose and reopen this window to try again.`,
       'the raw error, then the next step on its own line'
     );
     assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
@@ -86,6 +86,7 @@ describe('the environment list draws its load states through ListState (issue 25
   });
 
   it('draws no busy region: the settings read is synchronous, so the list has no loading form', () => {
+    // `environmentsLoading` is a deliberately stale prop: the view no longer reads it.
     mountView({ environmentsLoading: true, environmentsError: FAILURE });
     assert.ok(!target.querySelector('[aria-busy]'), 'no busy region');
     assert.ok(
