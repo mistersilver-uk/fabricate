@@ -70,8 +70,8 @@
     {#if detail}<span class="fab-complication-effect-detail">{detail}</span>{/if}
   </span>
   {#if control === 'switch'}
-    <!-- `aria-pressed` on a plain button is the house switch pattern; the repo uses no
-         `role="switch"` anywhere and `StatusToggle` records that rule explicitly. -->
+    <!-- This row keeps `aria-pressed`: it stages an edit the Save applies, which is the
+         `pressed` half of the design-system `semantics` rule. -->
     <StatusToggle {on} ariaLabel={accessibleName} {disabled} onclick={() => onToggle(!on)} />
   {/if}
   {#if headAction}<span class="fab-complication-effect-head-action">{@render headAction()}</span

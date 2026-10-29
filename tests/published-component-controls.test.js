@@ -336,6 +336,13 @@ const NESTED_NAMES = Object.freeze({
       heldBy: 'tests/components/published-modal-mounted.test.js: the published Modal names',
     },
   },
+  ToggleCard: {
+    'src/ui/svelte/components/StatusToggle.svelte: button': {
+      keys: ['title'],
+      heldBy:
+        'tests/components/published-toggle-card-mounted.test.js: the published ToggleCard names',
+    },
+  },
   Pagination: {
     'src/ui/svelte/components/IconButton.svelte: button': {
       keys: ['previousLabel', 'nextLabel'],
@@ -381,6 +388,14 @@ const FORWARDED_CALLBACKS = Object.freeze({
       as: 'onclick',
       listeners: ['dismissFromOutside', 'handleKeydown'],
       heldBy: 'tests/components/published-modal-mounted.test.js: closing the published Modal',
+    },
+  },
+  ToggleCard: {
+    onToggle: {
+      by: 'toggle',
+      as: 'onclick',
+      heldBy:
+        'tests/components/published-toggle-card-mounted.test.js: a press on the published ToggleCard',
     },
   },
   Pagination: {

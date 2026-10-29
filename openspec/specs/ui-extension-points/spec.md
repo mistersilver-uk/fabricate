@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`.
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`.
 
 ### The descriptor
 
@@ -445,6 +445,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `ActionMenu` (issue 2652).
 - The published set continues with `Modal` (issue 2656).
 - The published set continues with `ListRow` (issue 2784).
+- The published set continues with `ToggleCard` (issue 2775).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -457,6 +458,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
+- `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
@@ -484,7 +486,7 @@ Its `openProps` and `nameClass` are never published, being attributes and a clas
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` and an `ActionMenu` item's `data` are not attribute channels, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652), and `Modal` too (issue 2656), and `ListRow` too (issue 2784); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652), and `Modal` too (issue 2656), and `ListRow` too (issue 2784), and `ToggleCard` too (issue 2775); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -1025,8 +1027,9 @@ Each group states the accepted values of every key that entry publishes.
     On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
   - `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: the companion passes a verb phrase.
 - **`StatusToggle`.**
-  - It is the design system's switch (`<Toggle>` in the library), drawn as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off and takes effect when it is pressed.
-    It exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology, and it draws no text of its own.
+  - It is the design system's switch (`<Toggle>` in the library), drawn as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off.
+    By default it exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology; `semantics` makes it a switch.
+    It draws no text of its own.
     A choice between two named things is not a switch: the companion draws its own control for it.
   - `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
     Fabricate coerces nothing, so only `true` and `false` are in the contract.
@@ -1034,9 +1037,12 @@ Each group states the accepted values of every key that entry publishes.
     The switch draws no pending state, so a companion whose change takes time says so in text of its own, and its `onclick` treats a press that arrives before the `update` as another press from the state last passed.
     A companion that refuses the change passes `on` unchanged and says why in text of its own, so the switch never shows a state the companion does not hold.
   - `onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+  - `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
+    The design-system capability's rule on announcing a switch says which to pass.
+    Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and `on` alone, so none of them is an `aria` key or a rest key.
   - `ariaLabel` is the switch's name and is required whether or not `aria-labelledby` is passed.
-    It is final display text, the same in both states, because `aria-pressed` says which holds.
-  - `ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
+    It is final display text, the same in both states, because `aria-pressed` or `aria-checked` says which holds.
+  - `ariaLabel` names the setting so that "pressed" or "on" means the setting is in effect: "Group by category", "Hidden tasks".
     It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
   - The companion draws the setting's name as visible text beside the switch, from one string that it also passes as `ariaLabel`, and passes both again in any `update` that changes the text, so the spoken name always contains the words the user sees; the label does not press the switch unless the companion wires it to `onclick`.
     A name of white space alone leaves the switch with no name, so the companion never passes one.
@@ -1056,7 +1062,7 @@ Each group states the accepted values of every key that entry publishes.
   - The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
     An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side, and the companion leaves that much inside any edge of its own that clips.
-  - The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
+  - The switch states whether it is on to assistive technology with `aria-pressed`, or with `aria-checked` under `semantics` `switch`; how it looks does not carry the state on its own.
     Under forced colours the switch draws in system colours and keeps its state visible.
   - A switch mounted inside a `.tabs` element carries no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
@@ -1700,6 +1706,35 @@ Each group states the accepted values of every key that entry publishes.
   - An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not replaces the row, so where the button holds focus the companion moves focus to an element of its own first.
     `destroy` removes the row.
 - **Private:** `ListRow`'s figures, its colours beyond what its group states, its mark's size, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists, headings, cards and densities.
+
+### The issue 2775 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`ToggleCard`.**
+  - It is the design system's toggle card (`<ToggleCard>` in the library): a bordered card holding a glyph, a title with a second line under it, and a switch, for one setting that is on or off.
+    The switch is the one `StatusToggle` draws, so its keyboard, focus, forced-colours and ring rules are that group's.
+    The card is not itself a control: a press on the title or the second line does nothing, and the switch is the only focusable element Fabricate draws in `target`.
+  - `title` is required final display text, the setting's name, drawn as the card's title and used as the switch's accessible name, the same in both states.
+    A name of white space alone leaves the switch with no name, so the companion never passes one.
+    The name never states a position, so no "on", "off", "show" or "hide" at its start or end, as the `StatusToggle` group states.
+  - `sub` is optional final display text drawn under the title in a quieter ink; absent, the second line is empty.
+    It is not part of the switch's name and is not tied to it with `aria-describedby`, so a sentence that must be heard when the switch takes focus belongs in `title`.
+  - `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
+  - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+    Fabricate coerces nothing, so only `true` and `false` are in the contract.
+    The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when the companion's `update` passes it, which may be after the press returns.
+    A companion that refuses the change passes `on` unchanged and says why in text of its own, so the card never shows a state the companion does not hold.
+  - `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
+    The design-system capability's rule on announcing a switch says which to pass.
+  - `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+    The companion works out the new state from the `on` it last passed.
+    It is not called by `mount`, `update` or `destroy`.
+  - The switch has no unavailable state at version 1, as the `StatusToggle` group states, and the card takes no `disabled`.
+  - A card is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it grows to the width of `target`.
+  - The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
+  - It takes no rest keys, so a `data-*` key is refused (M8).
+- **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and tone classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
 
 ### The publishable subset
 

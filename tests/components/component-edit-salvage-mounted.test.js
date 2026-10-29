@@ -323,7 +323,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-sub'));
     const button = node.querySelector('button.fabricate-toggle');
     assert.ok(button, 'the switch is a plain button');
-    assert.equal(button.getAttribute('role'), null, 'aria-pressed is the house pattern, not role=switch');
+    assert.equal(button.getAttribute('role'), null, 'a staged edit keeps aria-pressed, not role=switch');
     assert.ok(
       button.querySelector('.manager-status-toggle-track[aria-hidden="true"] > .manager-status-toggle-knob'),
       'track + knob, both aria-hidden'

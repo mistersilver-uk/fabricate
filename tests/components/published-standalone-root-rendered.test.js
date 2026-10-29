@@ -120,6 +120,7 @@ const MOVERS = Object.freeze([
   'Pagination',
   'IconPicker',
   'ActionMenu',
+  'ToggleCard',
 ]);
 /**
  * What the harness writes on both targets; ink is left to each host. The width is the companion's
@@ -179,6 +180,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'fullWidth',
   'disabled',
   'busy',
+  'semantics',
   'label',
   'fill',
   'density',
@@ -191,7 +193,10 @@ const VOCABULARY_KEYS = Object.freeze([
   'as',
   'footerLayout',
 ]);
-const DECLARED_VOCABULARIES = Object.freeze({ columns: Object.freeze(['1', '2', '3']) });
+const DECLARED_VOCABULARIES = Object.freeze({
+  columns: Object.freeze(['1', '2', '3']),
+  semantics: Object.freeze(['pressed', 'switch']),
+});
 
 /** The keys of the object literal `name` declares in a component's script, frozen or not. */
 function objectKeysOf(ast, name) {
@@ -256,13 +261,13 @@ function comparedLiterals(ast, local) {
  * A published key's vocabulary, read from its component: its default, unless the key is required,
  * and each value it maps or compares.
  */
-function vocabularyOf(entry, key) {
+function vocabularyOf(entry, key, declaredBy = DECLARED_VOCABULARIES) {
   const ast = componentAstOf(entry.path);
   const prop = propLocals(ast).find((local) => local.key === key);
   const fallback = literalOf(ast, prop?.fallback);
   if (typeof fallback === 'boolean') return { kind: 'boolean', values: ['false', 'true'] };
-  if (DECLARED_VOCABULARIES[key]) {
-    return { kind: 'listed', fallback, values: DECLARED_VOCABULARIES[key] };
+  if (declaredBy[key]) {
+    return { kind: 'listed', fallback, values: declaredBy[key] };
   }
   const read = [
     ...objectKeysOf(ast, `${key.toUpperCase()}_CLASSES`),
@@ -309,7 +314,12 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 26, 'each vocabulary key the sixteen publish was read');
+    assert.equal(held, 29, 'each vocabulary key the seventeen publish was read');
+  });
+
+  it('declares the semantics set StatusToggle itself reads, so a third value cannot hide', () => {
+    const { values } = vocabularyOf(entryNamed('StatusToggle'), 'semantics', {});
+    assert.deepEqual([...values].sort(byName), [...DECLARED_VOCABULARIES.semantics].sort(byName));
   });
 
   it('reads the rungs Select maps for size from its frozen table', () => {
@@ -1107,6 +1117,48 @@ for (const palette of PALETTES) {
 
     before(() => {
       measured = MEASURED[palette];
+    });
+
+    it('draws a ToggleCard second line in the muted ink and no larger than its title, and a long title inside its target', async () => {
+      const cards = SPECIMENS.filter(({ name }) => name === 'ToggleCard');
+      assert.ok(
+        cards.some(({ id }) => id === 'card-long-title'),
+        'a long-title card is drawn'
+      );
+      for (const { id, width } of cards) {
+        for (const host of HOSTS) {
+          const muted = await measured.tab.evaluate(
+            (selector) => {
+              const probe = document.createElement('span');
+              probe.style.color = 'var(--fab-text-muted)';
+              document.querySelector(selector).firstElementChild.append(probe);
+              const { color } = getComputedStyle(probe);
+              probe.remove();
+              return color;
+            },
+            `${hostOf(id, host)} [data-target]`
+          );
+          const drawn = measured.reads.rest[id][host];
+          const [title, sub] = drawn.filter((element) => element.tag === 'p');
+          assert.equal(sub.properties.color, muted, `${id} ${host} second line ink`);
+          assert.notEqual(title.properties.color, muted, `${id} ${host} title ink`);
+          assert.ok(
+            parseFloat(sub.properties['font-size']) <= parseFloat(title.properties['font-size']),
+            `${id} ${host} second line is no larger than the title`
+          );
+          const overflow = await measured.tab.evaluate(
+            (selector) => {
+              const line = document
+                .querySelector(selector)
+                .querySelector('.manager-recipe-status-title');
+              return line.scrollWidth - line.clientWidth;
+            },
+            `${hostOf(id, host)} [data-target]`
+          );
+          assert.ok(overflow <= 0, `${id} ${host} title wraps inside its card`);
+          assert.ok(drawn[0].box[0] <= width, `${id} ${host} card stays inside its target`);
+        }
+      }
     });
 
     it('draws each bare specimen inside one display: contents standalone style root', async () => {

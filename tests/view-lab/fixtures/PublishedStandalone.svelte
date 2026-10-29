@@ -1,5 +1,5 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issues 2456, 2679, 2680). It mounts the sixteen
+  A View Lab specimen, not a Fabricate surface (issues 2456, 2679, 2680). It mounts the seventeen
   entries that state `standaloneRoot` through the page-session seam `game.fabricate.api.ui` binds,
   as a companion does, with the wiring `publishedStandaloneSpecimen.js` states.
   `tests/view-lab/mount.js` mounts it for `?specimen=published-standalone` only.
@@ -9,22 +9,31 @@
   same in both, so the two frames differ only by the root.
 
   The ground is three 360px columns on `--fab-bg-1`, the ground the standalone style root paints
-  none of: the five issue 2456 widened, the field and the search field in the first, the stepper,
-  the segmented control, the option cards, the tabs and the pager in the second, and the select,
-  the icon picker, the action menu, the opener and the dialog in the third. None carries a
-  `fabricate` class or a theme attribute, so the ink and scheme their content shows are the
-  root's; an open panel is drawn on the standalone layer. A case addresses the ground by
-  `data-lab-standalone-ground`, a column by `data-lab-standalone-column` and each target by its
-  `data-lab-standalone-target` key; the targets of the button, icon button, switch, search field,
-  stepper, action menu and opener are `display: flex`, as their groups ask of a companion; the
-  rest are blocks.
+  none of; none carries a `fabricate` class or a theme attribute, so the ink and scheme their
+  content shows are the root's, and an open panel is drawn on the standalone layer. The first
+  column holds the five issue 2456 widened, the switch and card states, the field and the search
+  field; the second the stepper, segmented control, option cards, tabs, pager and an off card;
+  the third the select, icon picker, action menu, opener, dialog and two more cards. A case
+  addresses the ground by `data-lab-standalone-ground`, a column by `data-lab-standalone-column`
+  and each target by its `data-lab-standalone-target` key; the button, icon button, switch, search
+  field, stepper, action menu and opener targets are `display: flex`, as their groups ask of a
+  companion; the rest are blocks.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
   import { COLUMNS, mountStandaloneSpecimen } from './publishedStandaloneSpecimen.js';
 
   const KEYS = COLUMNS.flat();
-  const FLEX = new Set(['button', 'icon-button', 'toggle', 'search', 'stepper', 'menu', 'opener']);
+  const FLEX = new Set([
+    'button',
+    'icon-button',
+    'toggle',
+    'toggle-switch',
+    'search',
+    'stepper',
+    'menu',
+    'opener',
+  ]);
 
   let targets = $state({});
 

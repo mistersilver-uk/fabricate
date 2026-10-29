@@ -3,8 +3,9 @@
  * seam registered with the adapter's own table, under a Fabricate window root: the one native
  * button its default host draws, its state, a press and its `onclick`, an update that keeps the
  * node and its focus, its two `aria` keys read off the button, every refusal the entry adds, and
- * the standalone style root it is drawn under in a companion's own shell (issue 2456). The default
- * host is held here because the static gates pin it to the default of the unpublished `as`.
+ * the standalone style root it is drawn under in a companion's own shell (issue 2456), and its
+ * `semantics` key (issue 2775). The default host is held here because the static gates pin it to
+ * the default of the unpublished `as`.
  * Limit: happy-dom activates no button from a key, so the View Lab's toggles case holds the Space
  * press, and no accessible name is computed here: that case's Playwright clause reads it.
  */
@@ -312,6 +313,56 @@ describe('an aria key on the published StatusToggle', () => {
       handle.destroy();
     }
   });
+});
+
+describe('the semantics key of the published StatusToggle', () => {
+  const attrs = (node) =>
+    ['role', 'aria-pressed', 'aria-checked'].map((name) => node.getAttribute(name));
+
+  for (const [on, checked] of [
+    [false, 'false'],
+    [true, 'true'],
+  ]) {
+    it(`announces semantics "switch" as role switch with aria-checked="${checked}" and no aria-pressed`, async () => {
+      const { handle, calls, button } = mountToggle({ semantics: 'switch', on });
+      await settle();
+      assert.deepEqual(attrs(button()), ['switch', null, checked]);
+      assert.equal(button().getAttribute('aria-label'), NAME);
+      button().click();
+      assert.deepEqual(calls, [[]], 'a press still reports once, with no argument');
+      assert.deepEqual(reports, []);
+      handle.destroy();
+    });
+  }
+
+  it('moves the same focused button between the two announcements when an update changes semantics', async () => {
+    const { handle, button } = mountToggle({ semantics: 'switch', on: true });
+    await settle();
+    const node = button();
+    node.focus();
+    assert.equal(handle.update(base({ semantics: 'pressed', on: true })), true);
+    await settle();
+    assert.ok(button() === node && document.activeElement === node, 'same node, focus kept');
+    assert.deepEqual(attrs(node), [null, 'true', null]);
+    assert.equal(handle.update(base({ on: false })), true);
+    await settle();
+    assert.deepEqual(attrs(node), [null, 'false', null], 'omitting semantics is pressed');
+    assert.equal(handle.update(base({ semantics: 'switch' })), true);
+    await settle();
+    assert.deepEqual(attrs(node), ['switch', null, 'false']);
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  for (const value of ['Switch', 'toggle', '', true, 1]) {
+    it(`draws pressed for the out-of-set semantics ${JSON.stringify(value)}`, async () => {
+      const { handle, button } = mountToggle({ semantics: value });
+      await settle();
+      assert.deepEqual(attrs(button()), [null, 'false', null]);
+      assert.deepEqual(reports, []);
+      handle.destroy();
+    });
+  }
 });
 
 describe('what the published StatusToggle refuses', () => {

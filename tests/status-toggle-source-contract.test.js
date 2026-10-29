@@ -99,8 +99,9 @@ test('every recorded exemption is still earned, at the count it was recorded wit
   }
 });
 
-test('no component announces a switch as role="switch"', () => {
-  // The house pattern is `aria-pressed` on a plain control (issue 651).
+test('no component hand-writes role="switch": the primitive\'s semantics option is the one place', () => {
+  // `aria-pressed` on a plain control is the manager's pattern (issue 651); a press that writes
+  // the setting at once is announced through `StatusToggle`'s `semantics="switch"`, never by hand.
   const positiveControl = COMPONENTS[PRIMITIVE] ?? '';
   assert.ok(
     positiveControl.includes('aria-pressed'),
@@ -113,9 +114,9 @@ test('no component announces a switch as role="switch"', () => {
   assert.deepEqual(
     offenders,
     [],
-    '`aria-pressed` on a plain control is the house switch pattern; `role="switch"` is a second ' +
-      'announcement of the same state that no assistive-technology assertion in this ' +
-      'repository expects:\n  ' + offenders.join('\n  ')
+    'a switch is announced by `<StatusToggle semantics="switch">`; a hand-written ' +
+      '`role="switch"` is a second source of truth for that announcement:\n  ' +
+      offenders.join('\n  ')
   );
 });
 

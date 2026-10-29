@@ -10,6 +10,7 @@
   | `icon` | Font Awesome classes | `'fas fa-circle'` | `''` renders NO glyph slot at all: a slot holding an empty `<i>` still reserves its column and left-indents the copy away from the cards around it. |
   | `title` / `sub` / `toggleLabel` | pre-localized strings | `''` | The heading, its second line, and the switch's accessible name, which falls back to the visible title. |
   | `on` / `disabled` | booleans | `false` | The switch's state and whether it is operable. |
+  | `semantics` | `'pressed'` \| `'switch'` | `'pressed'` | Handed to the switch unchanged: what its button announces, per `StatusToggle`. |
   | `toggleTitle` | pre-localized string | `''` | A tooltip for the SWITCH rather than the card, and often the only explanation of why the switch is disabled. Emitted as `\|\| undefined`, because an empty string renders a present-but-blank tooltip. |
   | `section` / `field` / `subDataAttr` / `toggleDataAttr` | attribute names | `''` | Hooks on the card, the switch's field name, the sub-line and the switch. Each is absent when unset, and each is rendered with an empty-string value per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
   | `onToggle()` | function | no-op | The caller owns `on`. |
@@ -18,8 +19,8 @@
   - THE MARKUP IS A BYTE-FAITHFUL EXTRACTION of the two shipped status cards — same element tree,
     same class names, same ARIA — so retrofitting those cards onto this component is a no-op DOM
     diff, and changing the structure makes this a THIRD source of truth rather than retiring the
-    second. `aria-pressed` on a plain `<button>` is the house pattern; the repository uses
-    `role="switch"` nowhere.
+    second. The switch announces `aria-pressed` by default and `role="switch"` with
+    `aria-checked` under `semantics="switch"`, as `StatusToggle` states.
   - THE SWITCH ITSELF IS `<StatusToggle>`, a composition rather than a competing primitive: this
     card owns icon, title, sub-line and the card's own state class, and the shared switch owns the
     track, the knob and the reading.
@@ -40,8 +41,16 @@
     field = '',
     subDataAttr = '',
     toggleDataAttr = '',
+    semantics = 'pressed',
     onToggle = () => {},
   } = $props();
+
+  const subHook = $derived(subDataAttr ? { [subDataAttr]: '' } : {});
+  const toggleHook = $derived(toggleDataAttr ? { [toggleDataAttr]: '' } : {});
+
+  function toggle() {
+    onToggle(!on);
+  }
 </script>
 
 <div
@@ -53,20 +62,18 @@
   {/if}
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
-    <p
-      class="manager-recipe-status-sub manager-muted"
-      {...subDataAttr ? { [subDataAttr]: '' } : {}}
-    >
+    <p class="manager-recipe-status-sub manager-muted" {...subHook}>
       {sub}
     </p>
   </div>
   <StatusToggle
     {on}
     {disabled}
+    {semantics}
     ariaLabel={toggleLabel || title}
     data-recipe-field={field || undefined}
     title={toggleTitle || undefined}
-    {...toggleDataAttr ? { [toggleDataAttr]: '' } : {}}
-    onclick={() => onToggle(!on)}
+    {...toggleHook}
+    onclick={toggle}
   />
 </div>

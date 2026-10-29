@@ -118,6 +118,7 @@ describe('an entry drawn under the standalone style root', () => {
     'IconPicker',
     'ActionMenu',
     'Modal',
+    'ToggleCard',
   ];
 
   it('describes the entry without standaloneRoot, which only its group states', () => {

@@ -21,6 +21,7 @@ import {
   isStrip,
   moduleRing,
   sameDeclarations,
+  selectorsNaming,
   selectorsWithRules,
   writtenSelector,
 } from './publishedComponentGate.js';
@@ -48,6 +49,22 @@ export const TOGGLE = Object.freeze({
   disables: false,
   undrawn: new Set(['manager-tool-setting-toggle-input', 'manager-status-toggle-label']),
   ringExtras: Object.freeze([['box-shadow', 'none']]),
+});
+
+/**
+ * The published `ToggleCard`'s root (issue 2775): the class its file writes beside the root and the
+ * state classes `on` writes, the classes under which a sheet rule lays a status card out, no
+ * extension target sitting in one. No published key writes `variant`, so the tone classes are not.
+ */
+export const TOGGLE_CARD = Object.freeze({
+  root: 'fabricate-toggle-card',
+  writable: new Set(['manager-recipe-status-card', 'is-on', 'is-off']),
+  ancestors: new Set([
+    'manager-checks-flag-list',
+    'manager-checks-breakage-trigger',
+    'manager-tool-system-enabled',
+  ]),
+  drawsChildren: true,
 });
 
 /** The classes under which a sheet rule redraws a bare `button`; no extension target sits in one. */
@@ -178,6 +195,22 @@ function censusSelectors(file, css, shape, { spelled, own = new Set() } = {}) {
       rule,
       within,
     }));
+}
+
+/** Every selector of `sheets` naming a part of `parts` with no `shape.root` or pinned ancestor above it. */
+export function partFaults(sheets, parts, shape) {
+  return sheets.flatMap(([file, css]) =>
+    parts.flatMap((part) =>
+      selectorsNaming(css, part).flatMap((complex) => {
+        const compounds = compoundsOf(complex);
+        const at = compounds.findLastIndex((compound) => classesOf(compound).includes(part));
+        const above =
+          at === -1 ? [] : compounds.slice(0, at).flatMap((compound) => classesOf(compound));
+        const held = above.includes(shape.root) || above.some((name) => shape.ancestors.has(name));
+        return held ? [] : [`${file}: ${writtenSelector(css, complex)}`];
+      })
+    )
+  );
 }
 
 /** The pinned ancestors of `shape` that keep none of `census` off a published mount, so are stale. */
