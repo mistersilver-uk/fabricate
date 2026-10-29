@@ -1615,7 +1615,8 @@ A change that makes a listed component fail a static rule, or stops it being a c
 - **A per-item spread is stripped or the check fails, and the check fails closed.**
 Every spread attribute in a published closure is traced to the published `data` it comes from.
 A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that reads no published `data` and is not an object literal, a published key that is not `data`, and a literal.
-A script-level `const` or `$derived` local that is not an object literal is traced by the names it reads, less the parameters and declarations inside its own expression.
+A script-level `const` or `$derived` local that is not an object literal is traced by the names it reads, less the parameters and declarations inside its own expression that the file does not also bind at its top level.
+A name the file also binds at its top level, as a `const`, `$derived`, `let`, `var`, class or `$props()` local, counts wherever it is read, so a same-name shadow of it fails closed.
 It holds no data when every name it reads is clean, and it is unnameable, so a spread of an alias of an item fails closed like one of the item, when it reads any other.
 A name is clean when it is an import of the file, a function declared in the file (a limit below), one of the runes `$derived`, `$state`, `$effect`, `$inspect` and `$host`, or one of `Array`, `Boolean`, `Date`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Set`, `String`, `Symbol`, `Infinity`, `NaN`, `undefined`, `globalThis`, `window`, `document` and `console`.
 Every other name no rule resolves is unnameable: a top-level `let`, a class, the whole `$props()` object and any name not listed.
@@ -1637,7 +1638,6 @@ A script-level `const` or `$derived` that reads published `data` only through a 
 A plain-key value of a script-level object literal, such as `{ items }` or `{ a: items[0] }`, because the check traces only a literal's spreads and computed keys.
 A snippet passed to a child component that forwards it through its rest props.
 A child component that a script module in the closure also draws, which no component tag reads.
-A read of a published name that a parameter or declaration inside the same expression also names, such as `sections.map(({ sections }) => sections)`, because the exclusion of inner names is by name and not by scope.
 A value built up by a mutation after its declaration, such as `const box = {}; Object.assign(box, items[0])` or an array pushed to in an `$effect`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.

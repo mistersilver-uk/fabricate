@@ -936,6 +936,74 @@ describe('the per-item spreads of a published closure', () => {
     });
   });
 
+  describe('counts a read of a file-scope name that an inner declaration shadows (issue 2756)', () => {
+    const UNNAMED = 'src/Fx.svelte: a spread of an item the entry does not publish';
+    const shadowing = {
+      'a callback parameter read outside the callback': 'items.map((items) => items)[0]',
+      'a callback parameter that is also the argument': '((items) => items[0])(items)',
+      'a declaration inside a callback': '((f) => { const items = f; return items; })(items[0])',
+      'a shadow in one argument beside a read in another':
+        'Math.max(items[0], [1].map((items) => items)[0])',
+      'a function expression parameter': '(function (items) { return items; })(items[0])',
+      'a catch parameter':
+        '(function (f) { try { f(); } catch (items) { return items; } })(items[0])',
+      'a destructured callback parameter': 'items.map(({ items }) => items)[0]',
+    };
+    for (const [shape, expression] of Object.entries(shadowing)) {
+      it(`fails ${shape}`, () => {
+        const code = `${PROPS} const a = $derived(${expression});`;
+        assert.deepEqual(idsOf(code, '<i {...a}></i>'), [UNNAMED]);
+      });
+    }
+
+    it('fails a shadow of a script local that holds data', () => {
+      const code = `${PROPS} const first = items[0]; const a = $derived([1].map((first) => 1).concat(first)[0]);`;
+      assert.deepEqual(idsOf(code, '<i {...a}></i>'), [UNNAMED]);
+    });
+
+    it('fails a shadow of a top-level let, var or class, which the tracer cannot name', () => {
+      const shadowed = (declaration) =>
+        `${PROPS} ${declaration} const a = $derived([1].map((first) => 1).concat(first)[0]);`;
+      for (const declaration of [
+        'let first = items[0];',
+        'var first = items[0];',
+        'let first = 1;',
+        'class first {}',
+      ]) {
+        assert.deepEqual(idsOf(shadowed(declaration), '<i {...a}></i>'), [UNNAMED], declaration);
+      }
+    });
+
+    it('fails a shadow whose outer read is the only one, an accepted fail-closed cost', () => {
+      const code = `${PROPS} const a = $derived([1].map((items) => items)[0]);`;
+      assert.deepEqual(idsOf(code, '<i {...a}></i>'), [UNNAMED]);
+    });
+
+    it('passes a differently named callback parameter and a shadow of a name that holds no data', () => {
+      const passing = [
+        'const a = $derived([1].map((n) => n).concat(tone)[0]);',
+        'const k = 5; const a = $derived([1].map((k) => k)[0]);',
+        'const a = $derived([1].map((tone) => tone)[0]);',
+      ];
+      for (const alias of passing) {
+        assert.deepEqual(idsOf(`${PROPS} ${alias}`, '<i {...a}></i>'), [], alias);
+      }
+    });
+  });
+
+  describe('records the mutation shapes the item-spread gate does not trace (issue 2756)', () => {
+    // Stated limits: these assert today's result and flip when mutations are traced.
+    it('passes a value built up by Object.assign after its declaration (a stated limit)', () => {
+      const code = `${PROPS} const box = {}; Object.assign(box, items[0]);`;
+      assert.deepEqual(idsOf(code, '<i {...box}></i>'), []);
+    });
+
+    it('passes an array pushed to in an $effect (a stated limit)', () => {
+      const code = `${PROPS} const seen = []; $effect(() => { seen.push(items[0]); });`;
+      assert.deepEqual(idsOf(code, '<i {...seen[0]}></i>'), []);
+    });
+  });
+
   describe('fails closed on a snippet that goes anywhere but a render (issue 2607)', () => {
     const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
     const UNNAMED = 'src/Fx.svelte: a spread of an item the entry does not publish';
