@@ -13,7 +13,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls `onClose`. |
-  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled or is the page; only then is the dialog `aria-modal` (issue 2662). |
+  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled or is the page, a frame after close and only if focus is then on the page; only then is the dialog `aria-modal` (issue 2662). |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
@@ -227,8 +227,11 @@
     first?.focus?.();
     return {
       destroy() {
-        // A frame later, so an opener the answer's own flow re-enables can take focus back.
-        view?.requestAnimationFrame?.(() => restoreFocus(opener, held));
+        // A frame later, so an opener the answer's own flow re-enables can take focus back; skipped
+        // once focus has moved on to an element other than the page.
+        view?.requestAnimationFrame?.(() => {
+          if (isPage(node.ownerDocument.activeElement)) restoreFocus(opener, held);
+        });
       },
     };
   }

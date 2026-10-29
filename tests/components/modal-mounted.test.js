@@ -6,7 +6,12 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import {
+  createRawSnippet,
+  flushSync,
+  mount,
+  unmount,
+} from '../../node_modules/svelte/src/index-client.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -600,6 +605,74 @@ describe('the Modal dialog inline style', () => {
   });
 });
 
+describe('Modal focus restore after a trapped dialog closes (issue 2759)', () => {
+  const frame = () => new Promise((settle) => document.defaultView.requestAnimationFrame(settle));
+
+  async function openerAndClosedDialog() {
+    const opener = document.createElement('button');
+    opener.type = 'button';
+    document.body.append(opener);
+    opener.focus();
+    await harness.mount({ open: true, title: 'A', body, trapFocus: true, onClose: () => {} });
+    return opener;
+  }
+
+  it('leaves focus in a trapped dialog opened in the same frame as the one that closed', async () => {
+    const opener = await openerAndClosedDialog();
+    const { default: Modal } = await harness.loadRawModule(`${MODAL_PATH}.js`);
+    const second = document.createElement('div');
+    second.className = 'fabricate-manager';
+    document.body.append(second);
+    let b = null;
+    try {
+      await harness.setProps({ open: false });
+      b = mount(Modal, {
+        target: second,
+        props: { open: true, title: 'B', body, trapFocus: true, onClose: () => {} },
+      });
+      flushSync();
+      const next = [...document.querySelectorAll('[data-manager-modal]')].find(
+        (node) => node.getAttribute('aria-label') === 'B'
+      );
+      assert.ok(next.contains(document.activeElement), 'the new dialog took focus on open');
+      await frame();
+      assert.ok(next.contains(document.activeElement), 'and the closed one did not pull it out');
+    } finally {
+      if (b) unmount(b);
+      second.remove();
+      opener.remove();
+      await frame();
+    }
+  });
+
+  it('leaves focus on a page control the app focused before the frame elapsed', async () => {
+    const opener = await openerAndClosedDialog();
+    const other = document.createElement('button');
+    other.type = 'button';
+    document.body.append(other);
+    try {
+      await harness.setProps({ open: false });
+      other.focus();
+      await frame();
+      assert.ok(document.activeElement === other, 'the app’s own focus move stands');
+    } finally {
+      other.remove();
+      opener.remove();
+    }
+  });
+
+  it('still returns focus to the opener when focus has fallen to the page', async () => {
+    const opener = await openerAndClosedDialog();
+    try {
+      await harness.setProps({ open: false });
+      await frame();
+      assert.ok(document.activeElement === opener, 'focus returns to the opener');
+    } finally {
+      opener.remove();
+    }
+  });
+});
+
 describe('Modal host and window lifecycle', () => {
   const closeInto = (calls) => () => {
     calls.push([]);
@@ -707,8 +780,6 @@ describe('Modal host and window lifecycle', () => {
   it('counts a panel inside only the dialog that opened it, with two dialogs open', async () => {
     const [aCalls, bCalls] = [[], []];
     await harness.mount({ open: true, title: 'A', body, onClose: closeInto(aCalls) });
-    const { mount, unmount, flushSync } =
-      await import('../../node_modules/svelte/src/index-client.js');
     const { default: Modal } = await harness.loadRawModule(`${MODAL_PATH}.js`);
     const second = document.createElement('div');
     second.className = 'fabricate-manager';

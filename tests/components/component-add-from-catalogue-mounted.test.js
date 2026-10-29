@@ -625,8 +625,6 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('traps focus: in on open at the search field, Tab wraps, Escape closes, focus returns (issue 2682)', async () => {
-    // The last test's dialog is ended first, so the focus it restores lands before the opener's.
-    dialog.remount();
     await assertTrapsFocus({
       open: (onClose) => open({ onClose }),
       close: () => dialog.setProps({ open: false }),
