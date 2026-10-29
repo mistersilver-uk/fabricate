@@ -189,6 +189,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'persistent',
   'activePanelOnly',
   'as',
+  'footerLayout',
 ]);
 const DECLARED_VOCABULARIES = Object.freeze({ columns: Object.freeze(['1', '2', '3']) });
 
@@ -308,7 +309,7 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 25, 'each vocabulary key the sixteen publish was read');
+    assert.equal(held, 26, 'each vocabulary key the sixteen publish was read');
   });
 
   it('reads the rungs Select maps for size from its frozen table', () => {
@@ -682,6 +683,19 @@ function pagerWraps({ id }) {
     const parts = [...pager.children].map((part) => part.getBoundingClientRect());
     return parts.some((one) => parts.some((other) => other.top >= one.bottom - 0.5));
   });
+}
+
+/** The open dialog's footer in `host`: its buttons' widths, its column gap and its content width. */
+function equalFooter({ id, host }) {
+  const { container } = globalThis.standaloneParts(id, host);
+  const footer = container.querySelector('.manager-modal-footer');
+  const style = getComputedStyle(footer);
+  const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+  return {
+    widths: [...footer.querySelectorAll('button')].map((b) => b.getBoundingClientRect().width),
+    gap: Number.parseFloat(style.columnGap),
+    content: footer.clientWidth - padding,
+  };
 }
 
 /**
@@ -1195,6 +1209,18 @@ for (const palette of PALETTES) {
         true,
         true,
       ]);
+    });
+
+    it('splits the equal footer into two even shares through the slot’s display: contents wrapper, in both hosts', async () => {
+      const id = 'modal-equal-footer';
+      for (const host of HOSTS) {
+        await showPanel(measured.tab, id, host);
+        const { widths, gap, content } = await measured.tab.evaluate(equalFooter, { id, host });
+        assert.equal(widths.length, 2, `${host}: the two footer buttons`);
+        assert.ok(Math.abs(widths[0] - widths[1]) <= 1, `${host}: even shares, ${widths}`);
+        const filled = widths[0] + widths[1] + gap;
+        assert.ok(Math.abs(filled - content) <= 1, `${host}: ${filled} fills ${content}`);
+      }
     });
 
     it('draws nothing alike by accident: the root carries the ink and the reduced-motion rule', async () => {

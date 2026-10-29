@@ -472,6 +472,14 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       }
     ),
     'modal-header-only': modal({ closeOnOutsideClick: false }, {}),
+    'modal-equal-footer': modal(
+      { footerLayout: 'equal' },
+      {
+        body: '<p style="margin:0">Assign the activity to the chosen characters.</p>',
+        footer:
+          '<button type="button">Assign</button><button type="button">Assign and start</button>',
+      }
+    ),
   }),
 });
 

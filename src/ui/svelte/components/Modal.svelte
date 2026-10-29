@@ -44,9 +44,10 @@
     every mode (issue 2661).
   - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
   - Published through `game.fabricate.api.ui` with `open`, `title`, `subtitle`, `closeLabel`,
-    `closeOnOutsideClick`, `onClose`, `body` and `footer` only (`ui-extension-points`' issue 2656
-    group): a published dialog moves no focus and states no inline style, and an Escape a
-    companion's slot content does not keep stops at it; `tests/components/published-modal-mounted.test.js`.
+    `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose`, `body` and
+    `footer` only (`ui-extension-points`' issue 2656 group): a published dialog moves focus only
+    with `trapFocus` and states no inline style, and an Escape a companion's slot content does not
+    keep stops at it; `tests/components/published-modal-mounted.test.js`.
 
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new
