@@ -1299,6 +1299,7 @@ The holder CONSUMES `ArrowUp`, `ArrowDown`, `Home`, `End` and `Enter`, plus `Arr
 Tab is never the holder's: it moves focus among the panel's own focusable elements as the browser does, Tab from the last of them closes the panel without choosing, moves focus to the trigger, or to the anchor, and leaves the browser to move it on from there, and Shift+Tab from the first closes the panel and returns focus to the trigger, or to the anchor, because the panel is portaled and the element after the portal host is not the element after the trigger (issue 2676), where the overflow menu instead returns focus to its trigger, as its requirement states.
 The panel's list is `tabindex="-1"`, so a scrolling list is no tab stop of its own and the panel's tab stops are its query field and the controls its header and footer draw.
 A trigger holder with no query field whose panel draws a footer moves a forward Tab into the panel's first tab stop rather than closing it when the footer has an enabled stop, and otherwise Tab closes it, so a footer action stays reachable from the keyboard (issue 2702).
+That Tab is claimed before a dialog the picker sits in handles Tab, so a trapping `Modal` whose last control is such a trigger lets it enter the footer rather than wrapping it to the dialog's first control (issue 2739).
 The panel also closes without choosing, moving no focus, once focus moves to an element outside the picker's root, its anchor and the panel, and not when the browser window loses focus (issue 2598).
 The picker's trigger stops the propagation of every key but Tab, with or without Shift, so a host's own key handlers never act on a key the picker consumed, and Tab reaches the host once an open panel is closed; the trigger declares `data-keyboard-focus`, so Foundry's Tab binding never takes Tab or Shift+Tab from it.
 Four of those keys are THE CARET'S FIRST wherever the holder is a text field, and the holder takes each of them only from the edge at which the caret would not move: `Home` and `ArrowLeft` only with the caret at offset 0, `End` and `ArrowRight` only with it at the end of the value, never over a selection of any width.
@@ -2578,6 +2579,10 @@ An Escape on a closed `Select` or `IconPicker` trigger inside it dismisses it, a
 A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
 The dialog element is a focus target, `tabindex="-1"` carrying `data-keyboard-focus="true"`, so a pointer press on its surface outside every control focuses the dialog, Foundry's keybindings stay held off, and Tab or Shift+Tab from it moves to its first or its last control, the close control being the first; it keeps its elevation and draws no focus ring (issue 2661).
 The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog, though Tab from a picker's panel opened inside it moves on from the picker's trigger, and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
+The import report, the import folder mapping and the add-from-catalogue picker take `trapFocus`, so each is `aria-modal` (issue 2682).
+Focus enters on the report's close control, the mapping's match-by-name checkbox and the picker's search field, Tab stays inside, and Escape closes it.
+On close focus returns to the control that opened it, or to the manager window when there is none.
+The picker's apply action is busy rather than disabled while its run is in flight, so a refused run leaves focus on it inside the dialog.
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
@@ -2586,7 +2591,7 @@ A step that would lose work confirms first.
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
 The shared `Modal` draws ONE frame, the library's banded Modal specimen, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
 It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then, when focus is nowhere, the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
-Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, wrapping from its last control to its first, a Tab that a picker's panel opened inside it moves on from a trigger that is the dialog's last control included (issue 2699), it owns every key while open, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, wrapping from its last control to its first, a Tab that a picker's panel opened inside it moves on from a trigger that is the dialog's last control included (issue 2699), save that a Tab from a search-free picker's trigger enters its panel's footer first (issue 2739), a Tab with focus fallen to the page, as when the focused control is removed, enters it (issue 2682), it owns every key while open, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 
@@ -2601,12 +2606,18 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **AND** Escape on an open category list closes that list and leaves the modal open
 - **AND** Escape on a closed category select's trigger dismisses the modal once
 
+#### Scenario: An import or catalogue dialog opens
+
+- **WHEN** the GM opens the import report, the import folder mapping or the add-from-catalogue picker
+- **THEN** focus is inside the dialog, and Tab from its last control wraps to its close control
+- **AND** Escape closes it once and focus returns to the opener, or to the manager window when there is none
+
 #### Scenario: A press on the dialog's surface
 
 - **WHEN** the import report is open and the user presses its header band outside the close control
 - **THEN** focus is on the dialog and no keyboard ring and no elevation change is drawn
 - **AND** a following Escape dismisses the modal once and Foundry's dismiss keybinding closes no window
-- **AND** the import report's dialog carries no `aria-modal`, while the roll prompt's carries `aria-modal="true"`
+- **AND** the import report's dialog carries `aria-modal="true"`, as the roll prompt's does, because both take `trapFocus`
 
 #### Scenario: A roll prompt opens outside every Fabricate window
 

@@ -240,8 +240,12 @@ const COMPONENTS = {
   'tint-anchored': [TintAnchoredHost, {}],
   modal: [Modal, componentKind === 'modal' ? modalProps() : {}],
   // A dialog holding an IconPicker, a Select and a SetPicker, trapping focus under `?trap=1`, for
-  // the Tab and Escape proof (issues 2676, 2699).
-  'modal-picker': [ModalPickerHost, { trapFocus: params.get('trap') === '1' }],
+  // the Tab and Escape proof (issues 2676, 2699); `?last=footer` ends it on a search-free footer
+  // picker (issue 2739).
+  'modal-picker': [
+    ModalPickerHost,
+    { trapFocus: params.get('trap') === '1', footerPicker: params.get('last') === 'footer' },
+  ],
   actorbar: [
     ActorSelectTopBar,
     {

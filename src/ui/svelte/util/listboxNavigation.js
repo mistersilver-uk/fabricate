@@ -258,16 +258,18 @@ function panelTabStops(panel) {
 }
 
 /** Whether the key is Tab or Shift+Tab with no other modifier, outside a composition. */
-function plainTab(event) {
+export function plainTab(event) {
   return (
     event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing
   );
 }
 
-/** `null` for a key but a plain Tab; else `{ entry }`, the stop of `panel` a forward Tab enters. */
-export function triggerTab(event, panel) {
-  if (!plainTab(event)) return null;
-  return { entry: (!event.shiftKey && panelTabStops(panel)[0]) || null };
+/** A forward plain Tab moves focus to the first stop of `panel`, if any, and claims the key. */
+export function tabInto(event, panel) {
+  const entry = plainTab(event) && !event.shiftKey && panelTabStops(panel)[0];
+  if (!entry) return;
+  event.preventDefault();
+  entry.focus();
 }
 
 /** A Tab leaving the panel: `'forward'` from its last stop, `'back'` from its first, or `null`. */

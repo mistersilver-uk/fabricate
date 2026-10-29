@@ -16,6 +16,7 @@ import {
   createComponentScopeHarness,
   drainMicrotasks,
 } from '../helpers/componentScopeMountModules.js';
+import { assertTrapsFocus } from '../helpers/modalTrapContract.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -230,8 +231,8 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     applyButton().click();
     await drainMicrotasks();
     assert.deepEqual(recorder.events, ['start:coal'], 'the first write is open');
-    assert.equal(applyButton().disabled, true, 'and the control is inert, so the guard is REACHED');
-    // …and the flag itself, not merely the disabled attribute.
+    assert.equal(applyButton().getAttribute('aria-disabled'), 'true', 'and the control is inert');
+    // …and the busy press is swallowed, so a second Apply starts no second run.
     applyButton().click();
     await drainMicrotasks();
     assert.deepEqual(recorder.events, ['start:coal'], 'a second Apply adds no second run');
@@ -453,6 +454,28 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     assert.match(countText(), /1 selected/);
   });
 
+  it('keeps focus on Apply through a refused run, so the trap still holds it (issue 2682)', async () => {
+    const recorder = recordingAdd({ gated: true });
+    await open({ recorder });
+    tick('coal');
+    applyButton().focus();
+    applyButton().click();
+    await drainMicrotasks();
+    assert.equal(applyButton().disabled, false, 'busy, never disabled, so focus is not dropped');
+    assert.equal(applyButton().getAttribute('aria-busy'), 'true');
+    assert.equal(applyButton().getAttribute('aria-disabled'), 'true');
+    recorder.release();
+    await drainMicrotasks();
+    const refusal = refusingAdd(['orphan']);
+    await dialog.setProps({ onAdd: refusal.onAdd });
+    tick('orphan');
+    applyButton().focus();
+    applyButton().click();
+    await drainMicrotasks();
+    assert.deepEqual(refusal.calls, ['orphan'], 'the refused run ran');
+    assert.ok(document.activeElement === applyButton(), 'focus is still on Apply');
+  });
+
   it('and the adopted rows leave the offer while the refused one stays put', async () => {
     // The other half of the same run, driven the way the live root drives it.
     const recorder = refusingAdd(['orphan']);
@@ -542,7 +565,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await drainMicrotasks();
 
     assert.equal(cancelButton().disabled, true, 'Cancel stays inert under the run');
-    assert.equal(applyButton().disabled, true, 'and so does Apply');
+    assert.equal(applyButton().getAttribute('aria-busy'), 'true', 'and Apply stays busy');
     assert.ok(
       [...document.querySelectorAll('[data-component-add-from-catalogue-select]')].every(
         (box) => box.disabled
@@ -593,12 +616,24 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
       'with the banded frame’s 26px close'
     );
     assert.equal(root.getAttribute('role'), 'dialog');
-    assert.ok(!root.hasAttribute('aria-modal'), 'traps no focus, so it is not announced as modal');
+    assert.equal(root.getAttribute('aria-modal'), 'true', 'it traps focus, so it is modal');
     assert.match(root.querySelector('h3').textContent, /Add from catalogue to Forge/);
     assert.ok(
       Boolean(document.querySelector('[data-manager-modal-close]')),
       'and keeps the chrome’s own close control'
     );
+  });
+
+  it('traps focus: in on open at the search field, Tab wraps, Escape closes, focus returns (issue 2682)', async () => {
+    // The last test's dialog is ended first, so the focus it restores lands before the opener's.
+    dialog.remount();
+    await assertTrapsFocus({
+      open: (onClose) => open({ onClose }),
+      close: () => dialog.setProps({ open: false }),
+      dialog: '[data-component-add-from-catalogue-dialog]',
+      landing: '[data-component-add-from-catalogue-search]',
+      last: '[data-component-add-from-catalogue-cancel]',
+    });
   });
 
   it('closes once on Escape in the search field, claims the key and keeps it from the window', async () => {
