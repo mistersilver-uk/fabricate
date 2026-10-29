@@ -8755,7 +8755,6 @@
       },
       "Environments": {
         "Title": "Gathering Environments",
-        "Loading": "Loading environments...",
         "EmptyTitle": "No Environments Yet",
         "EmptyHint": "Create a gathering environment to start configuring where players can gather.",
         "EmptyActionHint": "Create the first environment and configure its gathering tasks.",
