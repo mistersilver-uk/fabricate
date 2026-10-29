@@ -86,6 +86,7 @@ const UNREACHED = Object.freeze([
 const UNHOVERED = Object.freeze(['card-filled', 'well-labelled', 'well-unlabelled']);
 const INERT = Object.freeze([
   'button-disabled',
+  'button-busy',
   'search-empty',
   'search-holding',
   'select-form-chosen',
@@ -175,6 +176,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'on',
   'fullWidth',
   'disabled',
+  'busy',
   'label',
   'fill',
   'density',

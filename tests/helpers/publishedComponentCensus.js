@@ -88,15 +88,25 @@ export function compoundsOf(complex) {
   return compounds;
 }
 
+/** The test for a descendant class a mount cannot hold, per the shape's `drawsChildren`. */
+function unheldClassIn(drawsChildren, spelled, undrawn) {
+  if (drawsChildren === undefined) throw new TypeError('a census shape states drawsChildren');
+  if (drawsChildren === 'caller') return () => false;
+  if (!drawsChildren) return () => true;
+  return (name) => (name.startsWith('manager-') && !spelled.has(name)) || undrawn.has(name);
+}
+
 /**
  * Whether no element a published component draws at `shape.root` can match `complex`: its root
  * compound takes a class the published keys cannot write, or `:disabled` where the shape does not
  * say `disables`, or an earlier compound is a pinned ancestor, or a later one needs a descendant
- * the mount cannot hold. `drawsChildren` is `false` for a root whose published keys draw no
- * classed descendant, as `Chip` and `Button` are; any other root holds no descendant classed
- * `manager-*` unless a published closure spells that class, nor one of `undrawn`, the classes a
- * closure spells that no published key draws. An attribute selector never makes a selector safe,
- * and anything else fails closed, a root named only inside `:has()` included.
+ * the mount cannot hold. A shape states `drawsChildren`: `false` for a root whose published keys
+ * draw no classed descendant; `'caller'` for a root whose `icon` key draws a glyph child in classes
+ * the companion chooses, as `Chip` and `Button` do, so no classed descendant is kept off; `true`
+ * for any other root, which holds no descendant classed `manager-*` unless a published closure
+ * spells that class, nor one of `undrawn`, the classes a closure spells that no published key
+ * draws. An attribute selector never makes a selector safe, and anything else fails closed, a
+ * root named only inside `:has()` included.
  */
 export function cannotMatchPublished(complex, shape, spelled = new Set()) {
   const { root, writable, ancestors, drawsChildren, disables = false, undrawn = new Set() } = shape;
@@ -108,9 +118,7 @@ export function cannotMatchPublished(complex, shape, spelled = new Set()) {
   const disabled =
     !disables &&
     own.selectors.some((part) => part.type === 'PseudoClassSelector' && part.name === 'disabled');
-  const unheld = drawsChildren
-    ? (name) => (name.startsWith('manager-') && !spelled.has(name)) || undrawn.has(name)
-    : () => true;
+  const unheld = unheldClassIn(drawsChildren, spelled, undrawn);
   const classedChild = compounds.slice(at + 1).some((compound) => classesOf(compound).some(unheld));
   const pinnedAncestor = compounds
     .slice(0, at)
