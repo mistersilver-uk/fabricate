@@ -227,12 +227,13 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     // The pager's page-size control is a segmented radiogroup. A click shows no focus ring, so the 50
-    // segment is clicked and ArrowRight goes to the radio the click focused, committing 75 with a ring.
+    // segment is clicked, then ArrowRight on its radio commits 75 with a keyboard ring.
     query: { tab: 'inventory' },
     steps: [
       ...choosePageSize('50', '.inventory-grid-pagination'),
       {
-        selector: '.inventory-grid-pagination [data-pagination-size-option="50"]',
+        selector:
+          '.inventory-grid-pagination [data-pagination-size-option="50"] .manager-segment-input',
         press: 'ArrowRight',
       },
     ],
