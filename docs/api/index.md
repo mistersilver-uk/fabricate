@@ -2055,7 +2055,7 @@ The published components, in publication order:
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
 | `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `size`, `icon`, `busy`, `type`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
-| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
+| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
@@ -2663,11 +2663,29 @@ To return focus to a stepper, focus its input, `target.querySelector('input')`.
 `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
 Outside this, what is drawn for `min`, `max` or `step` is private.
 The arrow keys and the wheel step to the next point on the grid from `min`, which is not always `value ± step`, so check what you are given.
+`disabled` is `true` or `false`, and `false` when absent.
+`true` disables the input and both buttons together and draws the stepper dimmed, so it takes no focus, is left out of the tab order and reports nothing.
+Use it for a quantity the user may read but cannot change right now, with the reason in text beside it, because a keyboard or screen-reader user tabs past a disabled stepper and nothing at it can say why.
+Never pass `true` while the input or a button holds focus, an `update` made inside `onChange` included: move focus to another control of yours first.
+The dimmed stepper is not held to the contrast floor.
+`allowUnset` is `true` or `false`, and `false` when absent.
+`true` is for a quantity that can be absent: `value` may then be `null`, which draws the input blank, and clearing the input calls `onChange` with `null`.
+Pass `null` back to leave the quantity unset, or a number to set it; if you pass `value` unchanged the input shows it again once it loses focus, as for a refused number.
+An unset stepper has no bound to stop at, so neither button is disabled, and a press starts from `min`, or from `0` where `min` is absent: the increment button reports one `step` above that start and the decrement button one `step` below it, each clamped to `min` and `max`.
+Without `allowUnset` a `value` of `null` is outside the contract, and what is drawn for it is private.
+`fill` is `true` or `false`, and `false` when absent.
+`true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so give `target` the width you want it to fill; absent, the stepper hugs its content.
+`density` is `default` or `comfortable`, and `default` when absent.
+`comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
+What the stepper draws for a value outside the set is private; today that is the default density.
+Fabricate coerces none of `disabled`, `allowUnset` and `fill` to a boolean, so only `true` and `false` are in the contract: the string `'false'` disables the stepper, allows it to be unset and stretches it.
+A Fabricate that predates `disabled`, `allowUnset`, `fill` and `density` refuses each with `"<key>" is not a prop of Stepper`, and `describe('Stepper').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so if you refused the earlier call you are told again.
+Where `allowUnset` is `true` the argument is `null` when an edit clears the input or leaves it holding no number, a lone minus sign among them.
 Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so do not assume the window is open when `onChange` runs; a mount you have destroyed reports nothing.
 The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so if you hold whole numbers, round it and pass your own value back.
 Pass an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
-An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
+An edit that clamps to `value`, leaves the input empty (unless `allowUnset` is `true`, which reports `null`) or leaves it holding no number is not reported.
 `onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
 The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when your `update` passes it.
 To refuse a number, pass `value` unchanged.
@@ -2675,8 +2693,8 @@ The input shows what was typed until it loses focus, and Fabricate then replaces
 Fabricate announces nothing when it restores a refused value; explain a refusal in your own live region.
 At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
 Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, move focus to the input, `target.querySelector('input')`, in the same handler.
-The stepper has no unavailable state at version 1 beyond its bounds.
-Do not draw a quantity the user cannot change right now as a stepper: destroy it, moving focus first if one of its parts holds it, and show the number as text of your own.
+Beyond its bounds, the stepper's one unavailable state is `disabled`.
+Where the quantity is not worth showing at all, destroy the stepper, moving focus first if one of its parts holds it, and show the number as text of your own.
 Answer a refused edit in text of your own, in a live region.
 The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
 The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
@@ -2685,8 +2703,8 @@ In a `<form>`, Enter in the input submits it as implicit submission does, with o
 `Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
-The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so leave no room for it, provided nothing of your own clips inside the stepper's box.
-Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max` are private.
+The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max` are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
 

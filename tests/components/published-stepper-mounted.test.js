@@ -356,7 +356,7 @@ describe('what the published Stepper refuses', () => {
   });
 
   for (const key of [
-    'disabled',
+    'placeholder',
     'inputProps',
     'formatValue',
     'orientation',

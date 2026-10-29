@@ -455,7 +455,8 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
-- `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
+- `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
+- `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
 - `Field`'s `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1; publishing one later is additive.
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
@@ -1068,11 +1069,28 @@ Each group states the accepted values of every key that entry publishes.
   - `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
     `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
     A `min`, `max` or `step` outside this is outside the contract, and what is drawn for it is private.
+  - `disabled` is `true` or `false`, and `false` when absent.
+    `true` disables the input and both buttons together and draws the stepper dimmed, so it takes no focus, is left out of the tab order and reports nothing.
+    The companion uses it for a quantity the user may read but cannot change right now, with the reason in text beside it, because a keyboard or screen-reader user tabs past a disabled stepper and nothing at it can say why.
+    The companion never passes `true` while the input or a button holds focus, an `update` made inside `onChange` included: it moves focus to another control of its own first.
+    The dimmed stepper is not held to the contrast floor.
+  - `allowUnset` is `true` or `false`, and `false` when absent.
+    `true` is for a quantity that can be absent: `value` may then be `null`, which draws the input blank, and clearing the input calls `onChange` with `null`.
+    The companion passes `null` back to leave the quantity unset, or a number to set it; if it passes `value` unchanged the input shows it again once it loses focus, as for a refused number.
+    An unset stepper has no bound to stop at, so neither button is disabled, and a press starts from `min`, or from `0` where `min` is absent: the increment button reports one `step` above that start and the decrement button one `step` below it, each clamped to `min` and `max`.
+    Without `allowUnset` a `value` of `null` is outside the contract, and what is drawn for it is private.
+  - `fill` is `true` or `false`, and `false` when absent.
+    `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so the companion gives `target` the width it wants filled; absent, the stepper hugs its content.
+  - `density` is `default` or `comfortable`, and `default` when absent.
+    `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
+    What the stepper draws for a value outside the set is private; today that is the default density.
+  - Fabricate coerces none of `disabled`, `allowUnset` and `fill` to a boolean, so only `true` and `false` are in the contract: the string `'false'` disables the stepper, allows it to be unset and stretches it.
   - `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so a companion that refused the earlier call is told again.
+    Where `allowUnset` is `true` the argument is `null` when an edit clears the input or leaves it holding no number, a lone minus sign among them.
     Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so `onChange` can run then; a mount the companion has destroyed reports nothing.
     The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so a companion that holds whole numbers rounds it and passes its own value back.
     A companion passes an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
-    An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
+    An edit that clamps to `value`, leaves the input empty (unless `allowUnset` is `true`, which reports `null`) or leaves it holding no number is not reported.
     `onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
   - The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when the companion's `update` passes it.
     A companion that refuses a number passes `value` unchanged.
@@ -1080,8 +1098,8 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate announces nothing when it restores a refused value; the companion explains a refusal in its own live region.
   - At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
     Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, the companion moves focus to the input, `target.querySelector('input')`, in the same handler.
-  - The stepper has no unavailable state at version 1 beyond its bounds.
-    A quantity the user cannot change right now is not drawn as a stepper: the companion destroys it, moving focus first if one of its parts holds it, and shows the number as text of its own.
+  - Beyond its bounds, the stepper's one unavailable state is `disabled`.
+    Where the quantity is not worth showing at all, the companion destroys the stepper, moving focus first if one of its parts holds it, and shows the number as text of its own.
     A refused edit is answered in text of the companion's, in a live region.
   - The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
     The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
@@ -1090,8 +1108,8 @@ Each group states the accepted values of every key that entry publishes.
   - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
-  - The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
-- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
+  - The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, and inside the stepper's own outer edge in every case, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
+- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
 
 ### The issue 2453 components
 
@@ -1922,7 +1940,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Stepper` with `value: 2`, `max: 3`, the three names and `onChange` inside a Fabricate window, and the user presses the increment button
 - **THEN** Fabricate calls `onChange` once, with `3`, and the input still shows `2` until the companion's `update` passes `value: 3`
 - **AND** after that `update` the increment button is disabled, and a typed value the companion refuses is replaced by `value` when the input loses focus
-- **AND** a mount that omits `decrementLabel` throws M9, and one that passes `disabled` throws M8
+- **AND** a mount that omits `decrementLabel` throws M9, and one that passes `placeholder` throws M8
 
 #### Scenario: A bound value
 
