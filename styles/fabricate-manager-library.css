@@ -346,6 +346,7 @@
   width: 28px;
   height: 28px;
   min-height: 28px;
+  flex: 0 0 28px;
   border-color: transparent;
   border-radius: 7px;
   color: var(--fab-text-subtle);
@@ -359,12 +360,15 @@
   background: var(--fab-surface-raised);
 }
 
-.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger {
+/* The ghost-danger rest face: quiet like a ghost, outranking the role's rest rule by its `is-ghost` class so import order never decides it. The hover and keyboard faces below draw the danger edge themselves; the keyboard face ties this rule and stands after it (issue 2632). */
+.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled) {
+  border-color: transparent;
   color: var(--fab-text-subtle);
 }
 
 .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled):hover,
 .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible {
+  border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }

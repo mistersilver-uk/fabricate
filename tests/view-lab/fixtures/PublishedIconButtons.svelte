@@ -1,8 +1,8 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issue 2601). It mounts nine `IconButton`s through
+  A View Lab specimen, not a Fabricate surface (issue 2601). It mounts ten `IconButton`s through
   the page-session seam `game.fabricate.api.ui` binds, as a companion does, each named by its
   `ariaLabel` and each beside a caption of the companion's own: one per published role at the
-  default rung, the two compact rungs, a disabled one, and a disclosure whose `onclick` shows the
+  default rung, a second ghost-danger that nothing focuses, the two compact rungs, a disabled one, and a disclosure whose `onclick` shows the
   notes region the companion draws beneath it and passes `aria-expanded` in its own `update`.
   Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js` mounts
   it for `?specimen=published-icon-buttons` only; each button's tree takes the tooltip facade the
@@ -34,6 +34,11 @@
       'ghost-danger',
       'ghost-danger',
       { icon: 'fas fa-xmark', ariaLabel: 'Remove Ember salt', role: 'ghost-danger' },
+    ],
+    [
+      'ghost-danger-rest',
+      'ghost-danger, unfocused',
+      { icon: 'fas fa-xmark', ariaLabel: 'Remove Cinder salt', role: 'ghost-danger' },
     ],
     ['size-24', "size '24'", { icon: 'fas fa-xmark', ariaLabel: 'Dismiss the hint', size: '24' }],
     ['size-26', "size '26'", { icon: 'fas fa-xmark', ariaLabel: 'Close the notes', size: '26' }],

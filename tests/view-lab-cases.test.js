@@ -1433,6 +1433,11 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles:
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-danger-text); background-color: var(--fab-danger-soft)',
     },
+    {
+      selector: labIconButton('ghost-danger-rest'),
+      styles:
+        'width: 28px; height: 28px; color: var(--fab-text-subtle); border-top-color: rgba(0, 0, 0, 0); background-color: rgba(0, 0, 0, 0)',
+    },
     { selector: labIconButton('size-24'), styles: 'width: 24px; height: 24px' },
     { selector: labIconButton('size-26'), styles: 'width: 26px; height: 26px' },
     { selector: labIconButton('disabled'), styles: 'opacity: 0.62' },
@@ -7121,6 +7126,7 @@ test('the icon buttons specimen case presses and keyboard-focuses the buttons th
       ['primary', ''],
       ['ghost', ''],
       ['danger', ''],
+      ['ghost-danger', ''],
       ['ghost-danger', ''],
       ['neutral', '24'],
       ['neutral', '26'],

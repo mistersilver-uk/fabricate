@@ -119,6 +119,29 @@ function measure(variant) {
 const markup = {};
 const measured = {};
 
+/** The authoring row with a delete handler, whose remove control is the app's one ghost-danger. */
+const REMOVABLE = Object.freeze({
+  area: 'fabricate-manager',
+  props: {
+    ...VARIANTS.authoring.props,
+    onDelete() {},
+    deleteLabel: 'Remove Choking dust',
+  },
+});
+
+/** Runs IN THE PAGE: the remove control at rest, its edge, ink and fill, and its box. */
+function measureRemove() {
+  const button = document.querySelector('[data-probe="removable"] [data-complication-remove]');
+  const style = getComputedStyle(button);
+  const box = button.getBoundingClientRect();
+  return {
+    border: style.borderTopColor,
+    ink: style.color,
+    ground: style.backgroundColor,
+    box: [box.width, box.height],
+  };
+}
+
 describe('2445 the complication row variants keep their frozen geometry', () => {
   before(async () => {
     await harness.setup();
@@ -127,15 +150,20 @@ describe('2445 the complication row variants keep their frozen geometry', () => 
         markup[variant] = (await harness.mount(props)).innerHTML;
         harness.remount();
       }
+      markup.removable = (await harness.mount(REMOVABLE.props)).innerHTML;
     } finally {
       harness.teardown();
     }
     const scoped = scopedComponentCss(resolve(repoRoot, ROW_PATH)).css;
-    const areas = Object.entries(VARIANTS)
+    const probes = [
+      ...Object.entries(VARIANTS).map(([variant, { area }]) => [variant, area]),
+      ['removable', REMOVABLE.area],
+    ];
+    const areas = probes
       .map(
-        ([variant, { area }]) =>
+        ([probe, area]) =>
           `<div class="fabricate ${area}" data-fabricate-theme="fabricate">` +
-          `<div data-probe="${variant}" style="width:420px">${markup[variant]}</div></div>`
+          `<div data-probe="${probe}" style="width:420px">${markup[probe]}</div></div>`
       )
       .join('');
     const browser = await chromium.launch();
@@ -149,6 +177,7 @@ describe('2445 the complication row variants keep their frozen geometry', () => 
       for (const variant of Object.keys(VARIANTS)) {
         measured[variant] = await page.evaluate(measure, variant);
       }
+      measured.remove = await page.evaluate(measureRemove);
     } finally {
       await browser.close();
     }
@@ -176,4 +205,14 @@ describe('2445 the complication row variants keep their frozen geometry', () => 
       );
     });
   }
+
+  // RED (issue 2632): the remove control drew the danger edge and ink at rest.
+  it("RED: the authoring row's remove control rests quiet, with no edge or fill", () => {
+    assert.deepEqual(measured.remove, {
+      border: 'rgba(0, 0, 0, 0)',
+      ink: 'rgba(217, 184, 156, 0.56)',
+      ground: 'rgba(0, 0, 0, 0)',
+      box: [28, 28],
+    });
+  });
 });
