@@ -130,6 +130,10 @@ test('a canvas station reaches versioned gathering execution', async (t) => {
 
     await t.test('the Journal row and the execute command agree on Tool readiness', async () => {
       for (const task of icecapRecords) task.timeRequirement = { hours: 1 };
+      // The seeded roll for the alembic's breakage chance is not what this test is about.
+      const system = f.craftingSystemManager.getSystem('lab-herbalism');
+      const breakageAuthority = system.toolBreakage;
+      system.toolBreakage = { authority: 'checkDriven' };
       const alembic = game.actors
         .get('lab-actor-idrin')
         .items.find((item) => item.name === 'Glass Alembic');
@@ -179,6 +183,7 @@ test('a canvas station reaches versioned gathering execution', async (t) => {
         assert.equal(resolved?.success, true, JSON.stringify(resolved));
         assert.equal(activeRun(second), null, 'the station resolved the run');
       } finally {
+        system.toolBreakage = breakageAuthority;
         for (const task of icecapRecords) delete task.timeRequirement;
       }
     });

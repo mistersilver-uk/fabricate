@@ -25,6 +25,7 @@ import IconPicker from './svelte/components/IconPicker.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
 import InspectorCard from './svelte/components/InspectorCard.svelte';
 import Kicker from './svelte/components/Kicker.svelte';
+import ListRow from './svelte/components/ListRow.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
 import Modal from './svelte/components/Modal.svelte';
@@ -76,6 +77,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/IconPicker.svelte': IconPicker,
   'src/ui/svelte/components/ActionMenu.svelte': ActionMenu,
   'src/ui/svelte/components/Modal.svelte': Modal,
+  'src/ui/svelte/components/ListRow.svelte': ListRow,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

@@ -133,6 +133,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // The picker's own trigger, its `trigger` snippet, which no guard hides.
   'src/ui/svelte/components/IconPicker.svelte: button': 'always',
+  // The whole-row button, drawn only while `onOpen` holds a function (issue 2784).
+  'src/ui/svelte/components/ListRow.svelte: button': 'onOpen',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   // One tab button for each item of `tabs`.
@@ -275,6 +277,12 @@ const OWN_NAMES = Object.freeze({
     keys: ['ariaLabel'],
     heldBy:
       'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
+  },
+  // `name`, which the entry requires, drawn in a span of the button's own content.
+  'src/ui/svelte/components/ListRow.svelte: button': {
+    entry: 'ListRow',
+    keys: ['name'],
+    heldBy: 'tests/components/published-list-row-mounted.test.js: the published ListRow names',
   },
   // `ariaLabel`, through the `$derived` that falls back to Fabricate's own copy.
   'src/ui/svelte/components/IconPicker.svelte: button': {
