@@ -226,12 +226,19 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory page size control',
     smokeLabels: [],
     reaches: 'beyond',
-    // The pager's page-size control is a segmented radiogroup: choosing the 75 segment moves the active tile onto it.
+    // The pager's page-size control is a segmented radiogroup. A click shows no focus ring, so the 50
+    // segment is clicked and ArrowRight goes to the radio the click focused, committing 75 with a ring.
     query: { tab: 'inventory' },
-    steps: choosePageSize('75', '.inventory-grid-pagination'),
+    steps: [
+      ...choosePageSize('50', '.inventory-grid-pagination'),
+      {
+        selector: '.inventory-grid-pagination [data-pagination-size-option="50"]',
+        press: 'ArrowRight',
+      },
+    ],
     expectSelector:
       '.inventory-grid-pagination [data-pagination-size-option="75"].is-active ' +
-      '.manager-segment-input:checked',
+      '.manager-segment-input:checked:focus-visible',
     // Inside the pager, which is inside the captured window.
     expectContained: [
       { container: '.inventory-grid-pagination', target: '[data-pagination-size-option="75"]' },
