@@ -2166,6 +2166,7 @@ The last entry spans the rest of the fill, and its `value` is not read.
 An entry that spans 1e-9 or less on the scale of `max` is not drawn, so the segments drawn make up the fill.
 That bound is absolute, so a `max` of 1e-9 or less reads every entry as nothing.
 A list that draws one segment or none draws one fill: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+`Meter` has no `tone` key of its own, and `"tone" is not a data attribute`: for one tone across the whole fill, pass one entry, as `segments: [{ tone: 'accent' }]`.
 The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
 No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
 The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so always state each segment as text beside the meter and in `valueText`; the bar alone never carries the split.

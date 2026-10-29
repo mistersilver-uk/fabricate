@@ -531,6 +531,7 @@ describe('a key a leaf does not publish', () => {
     ['StatBox', 'valueDataAttr', 'is not a data attribute'],
     ['Meter', 'aria-label', 'is not a data attribute'],
     ['Meter', 'labelId', 'is not a data attribute'],
+    ['Meter', 'tone', 'is not a data attribute'],
     ['InfoStrip', 'ariaLabel', 'is not a data attribute'],
     ['Kicker', 'class', 'is not a data attribute'],
     ['Chip', 'class', 'is not a data attribute'],
