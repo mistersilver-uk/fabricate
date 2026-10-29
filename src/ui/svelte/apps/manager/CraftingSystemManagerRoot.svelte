@@ -4467,7 +4467,6 @@
     {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
         environments={gathering.environmentList}
-        environmentsLoading={$viewState.environmentsLoading}
         environmentsError={$viewState.environmentsError}
         environmentDraft={gathering.environmentDraftForDisplay}
         environmentDraftDirty={$viewState.environmentDraftDirty}

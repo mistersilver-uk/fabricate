@@ -128,6 +128,61 @@ test('a canvas station reaches versioned gathering execution', async (t) => {
       }
     });
 
+    await t.test('the Journal row and the execute command agree on Tool readiness', async () => {
+      for (const task of icecapRecords) task.timeRequirement = { hours: 1 };
+      const alembic = game.actors
+        .get('lab-actor-idrin')
+        .items.find((item) => item.name === 'Glass Alembic');
+      assert.ok(alembic, 'the lab holds a real alembic copy');
+      try {
+        const services = gatherer(station);
+        const startMatured = async () => {
+          app._activeCanvasTool = station;
+          const started = await attempt(services);
+          assert.equal(started?.accepted, true, JSON.stringify(started));
+          game.time.worldTime += 7200;
+          return started.runId;
+        };
+        const row = (runId) =>
+          services.listJournalForActor({}).activeRuns.find((entry) => entry.id === runId);
+        // The row's verdict, then the command's: the two must be the same answer.
+        const agree = async (runId, available, label) => {
+          const projected = row(runId).actions;
+          assert.equal(projected.execute, available, `${label}: projected`);
+          assert.equal(projected.disabledReason, available ? null : 'toolRequired', label);
+          if (available) return resolve(services, activeRun(runId));
+          const refused = await resolve(services, activeRun(runId));
+          assert.equal(refused?.success, false, `${label}: ${JSON.stringify(refused)}`);
+          assert.match(refused.message, /gathering tools are no longer available/u, label);
+          assert.ok(activeRun(runId), `${label}: a refusal leaves the run`);
+          return refused;
+        };
+
+        const first = await startMatured();
+        app._activeCanvasTool = null;
+        await agree(first, false, 'no copy and no station');
+        actor.items.push(alembic);
+        try {
+          const held = await agree(first, true, 'a held copy');
+          assert.equal(held?.success, true, JSON.stringify(held));
+        } finally {
+          actor.items.splice(actor.items.indexOf(alembic), 1);
+        }
+
+        const second = await startMatured();
+        const supplied = row(second).actions;
+        assert.equal(supplied.execute, true, "the viewer's station");
+        app._activeCanvasTool = null;
+        await agree(second, false, 'the station cleared');
+        app._activeCanvasTool = station;
+        const resolved = await agree(second, true, 'the station again');
+        assert.equal(resolved?.success, true, JSON.stringify(resolved));
+        assert.equal(activeRun(second), null, 'the station resolved the run');
+      } finally {
+        for (const task of icecapRecords) delete task.timeRequirement;
+      }
+    });
+
     // The run's execution journal holds the Tool evidence its plan and apply agreed on.
     function toolEvidence(runId) {
       const run = f.gatheringRunManager.getRunHistory(actor).find((entry) => entry.id === runId);

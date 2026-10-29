@@ -32,7 +32,6 @@
 
   let {
     environments = [],
-    environmentsLoading = false,
     environmentsError = '',
     environmentDraft = null,
     environmentDraftDirty = false,
@@ -628,7 +627,7 @@
             onChange={(next) => (ui.biomeFilter = next)}
           />
         </span>
-        {#if !environmentsLoading && !environmentsError}
+        {#if !environmentsError}
           <Chip
             >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
               .replace('{shown}', filteredEnvironments.length)
@@ -652,12 +651,12 @@
         aria-label={text('FABRICATE.Admin.Manager.Environment.Table', 'Environments table')}
       >
         <ListState
-          loading={environmentsLoading}
-          loadingLabel={text('FABRICATE.Admin.Environments.Loading', 'Loading environments...')}
           error={environmentsError
             ? text('FABRICATE.Admin.Environments.ErrorTitle', 'Could Not Load Environments')
             : ''}
-          errorDetail={environmentsError}
+          errorDetail={environmentsError
+            ? `${environmentsError}\n${text('FABRICATE.Admin.Environments.ErrorHint', 'Close and reopen this window to try again.')}`
+            : ''}
           errorProps={{ 'data-environments-error': true }}
         >
           {#if environmentList.length === 0}

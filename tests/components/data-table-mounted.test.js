@@ -9,7 +9,7 @@ import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
-  SELECT_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -22,7 +22,7 @@ const harness = createMountedComponentHarness({
   rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
-    ...SELECT_COMPILED_MODULES,
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     ...PAGINATION_COMPILED_MODULES,
     DATA_TABLE,
   ],
