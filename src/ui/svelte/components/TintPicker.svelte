@@ -13,7 +13,7 @@
   | `allowNone` / `unset` | booleans | `false` | `allowNone` offers No colour: the strip's leading cell, or the panel's `footerAction`, which clears and closes. `unset` is true when the caller holds no authored colour: `normalizedToken` folds an absent value onto a preset, so without it the palette marks that preset selected for a model that has chosen nothing. |
   | `noneSelected` | boolean or `null` | `null` | Whether the strip's No-colour cell is marked. `null` derives it from `unset`; a bulk-edit stage passes `false` for "leave unchanged", which marks nothing at all. |
   | `onClear` | function or `null` | `null` | The No-colour handler, separate from `onChange` because the two are different instructions; a caller that does not pass it cannot offer No colour. |
-  | `presetGridLabel` / `customHexLabel` / `noneLabel` | pre-localized strings | their English through `localizeOr` | The palette's name (the strip's `group`, the panel and its `listbox`), the hex field's caption and No colour's name (issue 2257). |
+  | `presetGridLabel` / `customHexLabel` / `noneLabel` | pre-localized strings | their English, localized through the `APP_LOCALIZER` context | The palette's name (the strip's `group`, the panel and its `listbox`), the hex field's caption and No colour's name (issue 2257). |
 
   Invariants:
   - No colour is offered only when `allowNone` is true and `onClear` is a function.
@@ -25,8 +25,10 @@
     the sheet's inset ring, never the focus outline (issues 2257 and 2459).
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
-  import { localizeOr } from '../util/localizeOr.js';
+  import { getContext } from 'svelte';
+
+  import { localizeWith } from '../../../utils/localizeWithFallback.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import {
     MANAGER_COLOR_TOKENS,
     managerColorTokenLabel,
@@ -35,12 +37,15 @@
   } from '../util/managerColorTokens.js';
   import SearchablePopover from './SearchablePopover.svelte';
 
+  const localize = getContext(APP_LOCALIZER);
+  const copy = (key, fallback) => localizeWith(localize, key, undefined, fallback);
+
   let {
     colorToken = 'sage',
     customColor = '',
-    presetGridLabel = localizeOr('FABRICATE.Common.TintPicker.Presets', 'Colour presets'),
-    customHexLabel = localizeOr('FABRICATE.Common.TintPicker.CustomHex', 'Custom hex'),
-    noneLabel = localizeOr('FABRICATE.Common.TintPicker.None', 'No colour'),
+    presetGridLabel = copy('FABRICATE.Common.TintPicker.Presets', 'Colour presets'),
+    customHexLabel = copy('FABRICATE.Common.TintPicker.CustomHex', 'Custom hex'),
+    noneLabel = copy('FABRICATE.Common.TintPicker.None', 'No colour'),
     allowCustom = false,
     unset = false,
     layout = 'popover',
@@ -54,7 +59,7 @@
     bounds = undefined,
   } = $props();
 
-  const searchText = localizeOr('FABRICATE.Common.TintPicker.Search', 'Search colours');
+  const searchText = copy('FABRICATE.Common.TintPicker.Search', 'Search colours');
 
   const presets = $derived(
     MANAGER_COLOR_TOKENS.map((preset) => ({
@@ -139,6 +144,7 @@
           aria-pressed={noColourSelected ? 'true' : 'false'}
           title={noneLabel}
           data-manager-color-none
+          data-keyboard-focus="true"
           onclick={() => onClear()}
         >
           <span class="manager-color-swatch manager-color-swatch-none" aria-hidden="true">
@@ -154,6 +160,7 @@
           aria-pressed={isPresetSelected(preset.token) ? 'true' : 'false'}
           title={preset.label}
           data-manager-color-token={preset.token}
+          data-keyboard-focus="true"
           style={tintSwatchStyle(preset.token, '')}
           onclick={() => selectPreset(preset.token)}
         >
@@ -174,7 +181,7 @@
     squareTiles
     keyHints
     showFilteredCount
-    filteredCountTemplate={localizeOr('FABRICATE.Common.TintPicker.Count', '{matched} of {total}')}
+    filteredCountTemplate={copy('FABRICATE.Common.TintPicker.Count', '{matched} of {total}')}
     options={presetOptions}
     value={unset ? '' : normalizedToken(colorToken)}
     onSelect={selectPreset}

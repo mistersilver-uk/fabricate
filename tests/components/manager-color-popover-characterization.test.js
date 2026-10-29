@@ -71,14 +71,14 @@ const LAYOUTS = Object.freeze({
   inline: Object.freeze({
     mark: 'aria-pressed',
     group: '[role="group"]',
-    mount: (props) => harness.mount({ layout: 'inline', ...props }),
+    mount: (props, options) => harness.mount({ layout: 'inline', ...props }, options),
   }),
   popover: Object.freeze({
     mark: 'aria-selected',
     group: `${PANEL} [role="listbox"]`,
-    mount: async (props) => {
+    mount: async (props, options) => {
       const anchor = stageAnchor();
-      await harness.mount({ anchor: () => anchor, open: true, ...props });
+      await harness.mount({ anchor: () => anchor, open: true, ...props }, options);
       return document;
     },
   }),
@@ -130,6 +130,12 @@ function withI18n(i18n) {
   return () => {
     globalThis.game.i18n = previous;
   };
+}
+
+/** The Svelte context a Fabricate root mounts its tree with, carrying `localize` (issue 2784). */
+async function localizerContext(localize) {
+  const { APP_LOCALIZER } = await harness.loadRawModule('src/ui/svelte/util/appLocalizer.js');
+  return new Map([[APP_LOCALIZER, localize]]);
 }
 
 before(async () => {
@@ -196,37 +202,32 @@ for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
     });
 
     it('names the palette through the shared keys when a caller passes no label (issue 2257)', async () => {
-      const restore = withI18n({
-        localize: (key) => TINT_PICKER_KEYS[key] ?? key,
-        format: (key) => key,
-      });
-      try {
-        const scope = await mount({
-          colorToken: 'sage',
-          allowCustom: true,
-          allowNone: true,
-          onClear: () => {},
-        });
-        assert.equal(scope.querySelector(group).getAttribute('aria-label'), '[presets]');
-        assert.equal(
-          scope.querySelector('.manager-color-custom').textContent.trim(),
-          '[custom-hex]'
-        );
-        const none =
-          layout === 'inline'
-            ? scope.querySelector('[data-manager-color-none]').getAttribute('aria-label')
-            : footerAction().textContent.trim();
-        assert.equal(none, '[none]');
-      } finally {
-        restore();
-      }
+      const context = await localizerContext((key) => TINT_PICKER_KEYS[key] ?? key);
+      const scope = await mount(
+        { colorToken: 'sage', allowCustom: true, allowNone: true, onClear: () => {} },
+        { context }
+      );
+      assert.equal(scope.querySelector(group).getAttribute('aria-label'), '[presets]');
+      assert.equal(scope.querySelector('.manager-color-custom').textContent.trim(), '[custom-hex]');
+      const none =
+        layout === 'inline'
+          ? scope.querySelector('[data-manager-color-none]').getAttribute('aria-label')
+          : footerAction().textContent.trim();
+      assert.equal(none, '[none]');
     });
 
-    it('falls back to English when no i18n is installed (issue 2257)', async () => {
-      const restore = withI18n(undefined);
+    it('falls back to English under no localizer context, asking game.i18n for nothing (issue 2784)', async () => {
+      const asked = [];
+      const ask = (key) => {
+        asked.push(key);
+        return `[${key}]`;
+      };
+      const restore = withI18n({ localize: ask, format: ask });
       try {
         const scope = await mount({ colorToken: 'sage' });
         assert.equal(scope.querySelector(group).getAttribute('aria-label'), 'Colour presets');
+        assert.equal(scope.querySelector('[data-manager-color-token="sage"]').title, 'Sage');
+        assert.deepEqual(asked, [], 'the palette reads no Foundry global for its copy');
       } finally {
         restore();
       }
@@ -305,6 +306,20 @@ describe('1036 TintPicker — the inline strip (issue 2257)', () => {
       pressedStates(target),
       onlyPressed(null, { none: true }),
       'a bulk stage left unchanged presses nothing at all'
+    );
+  });
+
+  it('marks every cell for keyboard focus, so Foundry runs no keybinding while one holds it (issue 2784)', async () => {
+    const target = await LAYOUTS.inline.mount({
+      colorToken: 'sage',
+      allowNone: true,
+      onClear() {},
+    });
+    const cells = [...target.querySelectorAll('button')];
+    assert.equal(cells.length, 11, 'No colour and the ten presets');
+    assert.deepEqual(
+      cells.map((cell) => cell.getAttribute('data-keyboard-focus')),
+      Array.from({ length: 11 }, () => 'true')
     );
   });
 

@@ -61,6 +61,10 @@
       "reason": "no-consumer: stageLabel, positionLabel and returnLabel are function props Fabricate calls while it renders, which no shipped kind carries, and view is bindable; a companion pages with published Buttons."
     },
     {
+      "path": "src/ui/svelte/components/TintPicker.svelte",
+      "reason": "pending:#2791: its onChange is called from the strip's own buttons and handed to SearchablePopover as onSelect, a shape no forwarded-callback pin admits, so publishing the strip waits on splitting it from the popover."
+    },
+    {
       "path": "src/ui/svelte/components/ToggleCard.svelte",
       "reason": "no-consumer: a titled card around StatusToggle, which is published on its own."
     },
