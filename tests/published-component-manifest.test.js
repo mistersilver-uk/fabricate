@@ -461,7 +461,7 @@ const CARD = Object.freeze({
 });
 const EMPTY = Object.freeze({
   root: 'manager-empty',
-  writable: new Set(['is-filtered']),
+  writable: new Set(['is-filtered', 'is-compact', 'is-inline', 'is-note']),
   ancestors: new Set([
     'manager-task-required-tools-scroll',
     'journal-detail-pane',
@@ -3125,7 +3125,7 @@ describe('the module sheet and every component style against the published Empty
     assert.equal(selectors.length, 3, 'the census EmptyState was published on');
     assert.deepEqual(
       publishedShapeOf('EmptyState'),
-      [['icon', 'title', 'hint', 'filtered', 'children'], 'any'],
+      [['icon', 'title', 'hint', 'compact', 'inline', 'note', 'filtered', 'children'], 'any'],
       'a published key that writes a class reopens cannotMatchPublished'
     );
   });
@@ -3133,7 +3133,7 @@ describe('the module sheet and every component style against the published Empty
   const unsafe = (css) => unsafeOf(syntheticCensus(EMPTY, css));
 
   for (const [claim, selector] of [
-    ['a state class no published key writes', '.manager-empty.is-compact'],
+    ['a state class no published key writes', '.manager-empty.is-field'],
     [
       'the required-tools scroll above it',
       '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty',
@@ -3153,6 +3153,10 @@ describe('the module sheet and every component style against the published Empty
   for (const selector of [
     '.manager-empty',
     '.manager-empty.is-filtered',
+    '.manager-empty.is-compact',
+    '.manager-empty.is-inline',
+    '.manager-empty.is-note',
+    '.manager-empty.is-note > div > i',
     '.manager-empty > div > p',
     '.manager-empty .companion-way-out',
   ]) {

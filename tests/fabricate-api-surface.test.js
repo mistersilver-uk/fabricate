@@ -350,7 +350,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       FillBar: {
         version: 1,
-        props: { value: optional, tone: optional, color: optional, density: optional },
+        props: {
+          value: optional,
+          tone: optional,
+          color: optional,
+          shares: optional,
+          density: optional,
+        },
         rest: true,
         root: 'any',
         overlays: false,
@@ -427,7 +433,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       EmptyState: {
         version: 1,
-        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
+        props: {
+          icon: optional,
+          title: optional,
+          hint: optional,
+          compact: optional,
+          inline: optional,
+          note: optional,
+          filtered: optional,
+          children: slot,
+        },
         rest: true,
         root: 'any',
         overlays: false,
