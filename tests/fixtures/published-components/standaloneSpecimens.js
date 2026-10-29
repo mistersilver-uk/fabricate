@@ -375,6 +375,17 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'segmented-compact': chosenSegment({ density: 'compact' }),
     'segmented-field': chosenSegment({ density: 'field' }),
     'segmented-inline': chosenSegment({ density: 'inline' }),
+    'segmented-accent': chosenSegment({ tone: 'accent' }),
+    'segmented-accent-soft': chosenSegment({ tone: 'accent-soft' }),
+    'segmented-info': chosenSegment({ tone: 'info' }),
+    'segmented-tag': chosenSegment({ tone: 'tag' }),
+    'segmented-pill': chosenSegment({ shape: 'pill' }),
+    'segmented-info-variant': chosenSegment({
+      tone: 'accent',
+      options: SEGMENTS.map((segment) =>
+        segment.value === 'all' ? { ...segment, variant: 'info' } : segment
+      ),
+    }),
     'segmented-icon-disabled': chosenSegment({
       options: [
         { value: 'all', label: 'All', icon: 'fas fa-list' },

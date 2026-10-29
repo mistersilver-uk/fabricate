@@ -612,6 +612,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: required,
           fill: optional,
           density: optional,
+          tone: optional,
+          shape: optional,
         },
         rest: true,
         root: 'any',

@@ -423,6 +423,27 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('marks the track is-info for tone="info" and for no other tone', async () => {
+    const info = await harness.mount({ options: OPTIONS, value: 'destroyed', tone: 'info' });
+    const track = info.querySelector('.manager-segmented');
+    assert.ok(track.classList.contains('is-info'), 'tone="info" marks the TRACK');
+    assert.ok(
+      !track.classList.contains('is-accent') && !track.classList.contains('is-accent-soft'),
+      'and none of the accent tones'
+    );
+    assert.equal(info.querySelectorAll('.manager-segment.is-info').length, 0, 'no segment is marked');
+    harness.remount();
+
+    for (const tone of ['accent', 'accent-soft', 'tag', 'wat']) {
+      const other = await harness.mount({ options: OPTIONS, value: 'destroyed', tone });
+      assert.ok(
+        !other.querySelector('.manager-segmented').classList.contains('is-info'),
+        `tone="${tone}" does not mark the track is-info`
+      );
+      harness.remount();
+    }
+  });
+
   it('composes the pill run with the compact density and the badge slot', async () => {
     // The consuming lane passes all three.
     const root = await harness.mount({

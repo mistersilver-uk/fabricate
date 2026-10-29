@@ -422,6 +422,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
       fill: Object.freeze({ kind: 'data' }),
       density: Object.freeze({ kind: 'data' }),
+      tone: Object.freeze({ kind: 'data' }),
+      shape: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',

@@ -3,11 +3,13 @@
  * 2644): the four selectors that name its root class, each under an ancestor no extension target
  * sits in, the classes its file spells on the root and on a segment, and the keyboard ring its own
  * scoped rule draws on the segment, 2px wide and 2px clear, which clears 3:1 on the grounds a
- * published control sits on, the track's and the selected segment's fill included.
+ * published control sits on, the track's fill and the selected segment's default or soft fill
+ * included, and falls short against the solid fill of a neighbouring selected segment under the
+ * `accent` and `info` tones (issue 2774).
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, and takes on
  * trust that no extension target sits under one of `TRACK.ancestors` or inside the radiogroup.
  * Limit: the classes no published key writes are unreached only while a companion passes no
- * private option member or `density`; one that passes `variant`, `count` or `badge` still draws it.
+ * private option member, `density` or `tone` value; one that passes `count` or `badge` still draws it.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -26,17 +28,19 @@ import {
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
 import { SHIPPED, byName, declarationsOf, gatedRoot } from './helpers/publishedComponentGate.js';
+import { collectStyleCorpus, rulesIn } from './helpers/styleBlockScan.js';
+import { shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
 
 const COMPONENT = 'src/ui/svelte/components/SegmentedControl.svelte';
 
 /**
- * The published track's root: the classes `fill` and `density` write beside it, the four row
- * classes a Fabricate rule redraws it under, and the classes its file spells that no published
- * key draws: the tally, the badge, the other densities, the tones, the pill and the icon-only run.
+ * The published track's root: the classes `fill`, `density`, `tone` and `shape` write beside it, the
+ * four row classes a Fabricate rule redraws it under, and the classes its file spells that no
+ * published key draws: the tally, the badge, the other densities, the tag tone and the icon-only run.
  */
 const TRACK = Object.freeze({
   root: 'manager-segmented',
-  writable: new Set(['is-fill', 'is-inline']),
+  writable: new Set(['is-fill', 'is-inline', 'is-accent', 'is-accent-soft', 'is-info', 'is-pill']),
   ancestors: new Set([
     'manager-checks-tier-row',
     'manager-recipe-ingredient-option-row',
@@ -51,16 +55,13 @@ const TRACK = Object.freeze({
     'is-compact',
     'is-field',
     'is-tag',
-    'is-accent',
-    'is-accent-soft',
-    'is-pill',
     'is-icon-only',
   ]),
 });
 
-/** A published segment: its default class and the state classes `value` and `disabled` write. */
+/** A published segment: its default class and the state classes `value`, `disabled` and `variant` write. */
 const SEGMENT = Object.freeze({
-  writable: new Set(['manager-segment', 'is-active', 'is-disabled']),
+  writable: new Set(['manager-segment', 'is-active', 'is-disabled', 'is-info']),
 });
 
 /** The four selectors that name the root, each kept off a published control by its ancestor. */
@@ -74,6 +75,9 @@ const ROW_RULES = Object.freeze([
 const OWN_RING = '.manager-segment:has(:focus-visible)';
 /** The four grounds the group names, under the track's fill and the selected segment's over it. */
 const GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']);
+/** The selected fills of the soft tones and the solid fills of the `accent` and `info` tones. */
+const SOFT_FILLS = Object.freeze(['--fab-accent-soft', '--fab-info-soft']);
+const SOLID_FILLS = Object.freeze(['--fab-accent', '--fab-info']);
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
@@ -94,8 +98,11 @@ describe('the module sheet and every component style against the published Segme
     const entry = entryNamed('SegmentedControl');
     assert.deepEqual(
       [Object.keys(entry.props), gatedRoot(entry)],
-      [['options', 'value', 'onChange', 'ariaLabel', 'fill', 'density'], 'fabricate'],
-      'a published tone, shape, icon-only run, density rung, class or wider root reopens the census'
+      [
+        ['options', 'value', 'onChange', 'ariaLabel', 'fill', 'density', 'tone', 'shape'],
+        'fabricate',
+      ],
+      'a published icon-only run, density rung, class or wider root reopens the census'
     );
   });
 
@@ -152,6 +159,10 @@ describe('the segmented control census, synthetic', () => {
     '.manager-segmented',
     '.manager-segmented.is-fill',
     '.manager-segmented.is-inline',
+    '.manager-segmented.is-pill',
+    '.manager-segmented.is-accent',
+    '.manager-segmented.is-accent-soft',
+    '.manager-segmented.is-info',
     '.fabricate .manager-segmented',
     '.manager-segmented input',
     '.manager-segmented[data-x]',
@@ -170,6 +181,20 @@ describe('the keyboard ring on the published SegmentedControl’s segment', () =
       ['--fab-surface-soft', ground],
       ['--fab-surface-active', ground],
       ['--fab-surface-active', '--fab-surface-soft', ground],
+      ...SOFT_FILLS.flatMap((fill) => [
+        [fill, '--fab-surface-soft', ground],
+        [fill, ground],
+      ]),
     ]),
+  });
+
+  it('falls short of 3:1 in all seven themes against the solid fill of a neighbouring selected segment', () => {
+    const themes = themePalettes(rulesIn(collectStyleCorpus()['styles/fabricate.css']));
+    for (const fill of SOLID_FILLS) {
+      for (const ground of GROUNDS) {
+        const short = shortfalls(themes, '--fab-accent', [fill, '--fab-surface-soft', ground], 3);
+        assert.equal(short.length, 7, `${fill} over ${ground}`);
+      }
+    }
   });
 });
