@@ -4,7 +4,18 @@
  * elsewhere never locks a candidate (issue 1644). A candidate's `claimed` is what the rest of the
  * stage takes of that stack: exclusive component and tag claims plus the essence allocation's units.
  */
-import { idOf, normalizeList, stringOrNull } from '../../systems/gatheringEngineInternals.js';
+import {
+  idOf,
+  normalizeList,
+  numberOrNull,
+  stringOrEmpty,
+  stringOrNull,
+} from '../../systems/gatheringEngineInternals.js';
+import {
+  STAGE_BLOCKERS,
+  missingGroupBlocker,
+  unfundedEssenceGroupIds,
+} from '../../systems/stageReadiness.js';
 
 import { selectedIngredientIndex } from './runJournalIngredientOptions.js';
 
@@ -89,5 +100,59 @@ export function choiceAvailability({
     groupId,
     selectedOptionIndex: selectedIngredientIndex(group, optionOverrides, selection),
     options,
+  };
+}
+
+/** The consumed items a started stage has not fully removed, for the tool exclusion. */
+export function startedStageItems(runStep, items) {
+  const uuids = new Set(
+    normalizeList(runStep?.preparedConsumption?.consumedSummary)
+      .map((entry) => stringOrNull(entry?.itemUuid))
+      .filter(Boolean)
+  );
+  return new Set(items.filter((item) => uuids.has(stringOrNull(item?.uuid))));
+}
+
+/**
+ * The stage's answer when its route resolves to no authored set: none has been chosen, or the
+ * one that was has gone. An unstarted stage waits on a pick — a ROUTE pick specifically, which
+ * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
+ * F5) — while a started one has no pick left to make and reports the recipe edit instead.
+ */
+export function unchosenRouteAvailability(setId, routes, started = false) {
+  return {
+    success: false,
+    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.route,
+    knownMaterialShortfall: false,
+    awaitingChoice: !started,
+    selectedIngredientSetId: setId,
+    routes,
+    staleRoute: true,
+    missingGroups: [],
+    choices: [],
+    requirements: [],
+    essencePool: null,
+  };
+}
+
+/**
+ * A route's own count of what the player would have to ACQUIRE to take it, used to rank the
+ * alternatives. Essence and currency gaps count too: every one of them refuses the stage.
+ */
+export function acquisitionShortfallCount(selection) {
+  const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
+  return normalizeList(selection?.missingGroups).filter(
+    (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
+  ).length;
+}
+
+export function safeMissingGroup(group) {
+  const id = missingGroupId(group);
+  return {
+    id,
+    name: stringOrEmpty(group?.group?.name ?? group?.name),
+    ingredientId: stringOrNull(group?.ingredient?.id),
+    need: numberOrNull(group?.need),
+    have: numberOrNull(group?.have),
   };
 }

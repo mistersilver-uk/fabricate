@@ -291,6 +291,7 @@ A stage you have not yet begun has nothing consumed to return.
 ### When ready
 
 During an active countdown without a player check, **When ready** offers **Ask me** and **Complete**.
+A timed d100 gathering run needs no check, so it offers the choice; a timed routed or progressive gathering run asks for one and does not.
 **Ask me** is the default and leaves the ready run waiting for your action.
 **Complete** allows eligible stages to complete when world time advances.
 

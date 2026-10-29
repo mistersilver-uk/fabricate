@@ -96,6 +96,7 @@ After starting a task, open the [Journal]({% link player-app/journal.md %}) and 
 Depending on the task, this is **Collect**, **Roll a d100** (untimed runs), or **Roll check**.
 A timed run must first finish its world-time countdown.
 Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
+A timed d100 run needs no check, so it offers **When ready**; a timed routed or progressive run asks for a check and does not.
 Starting still applies the task's established stamina, node, and reservation rules.
 Cancelling later retains costs already incurred and results already delivered.
 

@@ -15,6 +15,16 @@ export function offersD100Prompt({ task, run }) {
   return task?.resolutionMode === 'd100' && !run?.timeGate;
 }
 
+/** A routed or progressive task always resolves through a player check. */
+export function gatheringTaskRequiresPlayerCheck(task) {
+  return ['routed', 'progressive'].includes(stringOrNull(task?.resolutionMode));
+}
+
+/** Whether resolving this run asks its player for a check: what execute prompts for. */
+export function gatheringRunNeedsPlayerCheck({ task, run }) {
+  return gatheringTaskRequiresPlayerCheck(task) || offersD100Prompt({ task, run });
+}
+
 /**
  * The versioned descriptor: a `1d100` with a situational bonus and no target, since every row and
  * event grades itself. An opaque blind run's check is secret, so its prompt names no formula.

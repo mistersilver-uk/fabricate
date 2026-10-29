@@ -222,6 +222,7 @@ It exposes pause/resume, manual execution, cancellation and an eligible completi
 Arming cancellation replaces the sibling actions with confirm/keep controls in the bar.
 In the opened run's header the bar's plain control line sits on the card's right content edge after the identity block.
 The completion switch is visible on an actively counting-down stage without a player check even when unresolved materials block automatic execution.
+A gathering run has a player check exactly when the engine prompts for one on resolve: a routed or progressive task, or an untimed d100 task; a timed d100 run needs none and offers the switch.
 Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.
 

@@ -1,6 +1,7 @@
 import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
+import { gatheringRunNeedsPlayerCheck } from '../../systems/gatheringD100Check.js';
 import {
   actorToOption,
   idOf,
@@ -34,12 +35,10 @@ import {
   classifyStageReadiness,
   ingredientKind,
   isChoiceBlocker,
-  missingGroupBlocker,
   resolveStageToolStates,
   scopedEssenceAllocation,
   selectedIngredientItems,
   stageSelectionInputsComplete,
-  unfundedEssenceGroupIds,
 } from '../../systems/stageReadiness.js';
 import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.js';
 import { cloneJson } from '../../utils/scalars.js';
@@ -65,7 +64,14 @@ import {
   inFlightAwardJournal,
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
-import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
+import {
+  acquisitionShortfallCount,
+  choiceAvailability,
+  missingGroupId,
+  safeMissingGroup,
+  startedStageItems,
+  unchosenRouteAvailability,
+} from './runJournalChoiceAvailability.js';
 import { d100PreviewEntries } from './runJournalD100Preview.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 import {
@@ -2040,7 +2046,7 @@ export class RunJournalBuilder {
       fallbackTitle: stringOrEmpty(run.label) || stringOrEmpty(run.taskId),
     });
     const hasPlayerCheck =
-      runType === 'gathering' ? this._gatheringRunHasPlayerCheck(gatheringContext) : false;
+      runType === 'gathering' ? this._gatheringRunHasPlayerCheck(gatheringContext, run) : false;
 
     const derivedStatus = this._derivePassthroughStatus({ status, timeGate, worldTime, run });
     return {
@@ -2171,9 +2177,9 @@ export class RunJournalBuilder {
     }
   }
 
-  _gatheringRunHasPlayerCheck({ task } = {}) {
-    const resolutionMode = stringOrNull(task?.resolutionMode) || 'd100';
-    return resolutionMode !== 'straight';
+  // A task the viewer cannot see is treated as prompting, so its selector stays hidden.
+  _gatheringRunHasPlayerCheck({ task } = {}, run) {
+    return !task || gatheringRunNeedsPlayerCheck({ task, run });
   }
 
   /**
@@ -2851,12 +2857,6 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 }
 
 /**
- * The stage's answer when its route resolves to no authored set: none has been chosen, or the
- * one that was has gone. An unstarted stage waits on a pick — a ROUTE pick specifically, which
- * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
- * F5) — while a started one has no pick left to make and reports the recipe edit instead.
- */
-/**
  * Whether the current stage has begun, independently of whether this viewer may act on it. A
  * surface that reads `actions.atStageStart` for the FACT loses it whenever the authority is
  * refusing, the viewer is not the owner, or the run needs recovery (issue 1648, UX2-2).
@@ -2864,52 +2864,4 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 function projectedStageStart(stageStart) {
   if (stageStart === null || stageStart === undefined) return null;
   return { required: stageStart.required === true, started: stageStart.started === true };
-}
-
-/** The consumed items a started stage has not fully removed, for the tool exclusion. */
-function startedStageItems(runStep, items) {
-  const uuids = new Set(
-    normalizeList(runStep?.preparedConsumption?.consumedSummary)
-      .map((entry) => stringOrNull(entry?.itemUuid))
-      .filter(Boolean)
-  );
-  return new Set(items.filter((item) => uuids.has(stringOrNull(item?.uuid))));
-}
-
-function unchosenRouteAvailability(setId, routes, started = false) {
-  return {
-    success: false,
-    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.route,
-    knownMaterialShortfall: false,
-    awaitingChoice: !started,
-    selectedIngredientSetId: setId,
-    routes,
-    staleRoute: true,
-    missingGroups: [],
-    choices: [],
-    requirements: [],
-    essencePool: null,
-  };
-}
-
-/**
- * A route's own count of what the player would have to ACQUIRE to take it, used to rank the
- * alternatives. Essence and currency gaps count too: every one of them refuses the stage.
- */
-function acquisitionShortfallCount(selection) {
-  const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
-  return normalizeList(selection?.missingGroups).filter(
-    (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
-  ).length;
-}
-
-function safeMissingGroup(group) {
-  const id = missingGroupId(group);
-  return {
-    id,
-    name: stringOrEmpty(group?.group?.name ?? group?.name),
-    ingredientId: stringOrNull(group?.ingredient?.id),
-    need: numberOrNull(group?.need),
-    have: numberOrNull(group?.have),
-  };
 }

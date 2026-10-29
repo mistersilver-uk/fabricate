@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
+import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
@@ -3164,23 +3165,50 @@ test('completion-mode switching is limited to an active countdown without a play
     runRevision: 0,
     timeGate,
   });
+  const modes = { 'straight-task': 'straight', 'timed-d100': 'd100', routed: 'routed', progressive: 'progressive' };
   const listing = makeBuilder({
     worldTime: 200,
     gatheringActive: [
       gatheringRun('straight', 'straight-task'),
-      gatheringRun('rolled', 'rolled-task'),
+      gatheringRun('d100', 'timed-d100'),
+      gatheringRun('routed', 'routed'),
+      gatheringRun('progressive', 'progressive'),
       gatheringRun('ready', 'straight-task', { requiredSeconds: 600, availableAt: 100 }),
     ],
-    getGatheringTask: (_environmentId, taskId) => ({
-      name: taskId,
-      resolutionMode: taskId === 'straight-task' ? 'straight' : 'd100',
-    }),
+    getGatheringTask: (_environmentId, taskId) => ({ name: taskId, resolutionMode: modes[taskId] }),
   }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
   const byId = Object.fromEntries(listing.activeRuns.map((run) => [run.id, run]));
 
   assert.equal(byId.straight.actions.setCompletionMode, true);
-  assert.equal(byId.rolled.actions.setCompletionMode, false, 'player rolls stay manual');
+  assert.equal(byId.d100.actions.setCompletionMode, true, 'a timed d100 run completes without a player check');
+  assert.equal(byId.routed.actions.setCompletionMode, false, 'a routed run prompts for a check');
+  assert.equal(byId.progressive.actions.setCompletionMode, false, 'a progressive run prompts for a check');
   assert.equal(byId.ready.actions.setCompletionMode, false, 'a matured gate is no longer counting down');
+});
+
+test('the projection and the engine agree on which gathering runs prompt a player check', () => {
+  const timed = { requiredSeconds: 600, availableAt: 800 };
+  const modes = ['straight', 'd100', 'routed', 'progressive'];
+  const hasCheck = (mode, timeGate) =>
+    makeBuilder({
+      worldTime: 200,
+      gatheringActive: [
+        { id: 'run', craftingSystemId: 'sys-1', environmentId: 'env-1', taskId: mode, status: 'waitingTime',
+          lifecycleVersion: 1, runRevision: 0, ...(timeGate && { timeGate }) },
+      ],
+      getGatheringTask: () => ({ name: mode, resolutionMode: mode }),
+    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0].actions
+      .setCompletionMode !== true;
+  for (const mode of modes) {
+    assert.equal(
+      hasCheck(mode, timed),
+      gatheringRunNeedsPlayerCheck({ task: { resolutionMode: mode }, run: { timeGate: timed } }),
+      `${mode} timed`
+    );
+  }
+  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'd100' }, run: {} }), true, 'untimed d100 prompts');
+  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'd100' }, run: { timeGate: timed } }), false);
+  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'straight' }, run: {} }), false);
 });
 
 test('salvage remains outside versioned completion-mode controls', () => {
