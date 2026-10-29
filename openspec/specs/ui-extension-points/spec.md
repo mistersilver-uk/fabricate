@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published entry's root is `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published entry's root is `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`.
 
 ### The descriptor
 
@@ -458,7 +458,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
 - `EditorTabs`' `badges`, `annotated`, `danger`, `buttonIdStem`, `panelIdStem` and `tooltipIdStem` are not published at version 1, and so neither are its marks nor a tab's name override, description or padlock; publishing one later is additive.
 - `RadioCardGroup`'s `groupName`, `cardId`, `hint` and `legendVisible` are not published at version 1, and `optionBody` is never published, being a snippet called with arguments; publishing one of the first four later is additive.
-- `SegmentedControl`'s `groupName`, `iconOnly`, `tone`, `shape` and its `compact` and `field` densities are not published at version 1, and nor are an option's `variant`, `count`, `badge` or `validationTarget`; publishing one later is additive.
+- `SegmentedControl`'s `groupName`, `iconOnly`, its `compact` and `field` densities and its `tag` tone are not published at version 1, and nor are an option's `success`, `warning`, `danger` and `neutral` variants, `count`, `badge` or `validationTarget`; publishing one later is additive.
 Its `optionDataAttr` is never published, because it takes an attribute name.
 - `Pagination`'s `showPageSize`, `multiPageOnly` and `edge` are not published at version 1; publishing one later is additive.
 - `IconPicker`'s `disabled`, `iconOnly` and `bounds` are not published at version 1; publishing one later is additive.
@@ -583,7 +583,7 @@ The element carries the classes `fabricate` and `fabricate-standalone-root`, no 
 Registration refuses a `standaloneRoot` that is neither absent nor `true`, and one on a `root` other than `'any'`, as The manifest and versioning states.
 - The standalone style root is judged at `mount` and `mountMany` only, is never an overlay host, and is removed by `destroy` and by a fault, so `target` is left as it was.
 It is removed by reference, wherever it then is; a companion's re-render that already took it away with the old content leaves nothing to remove, and supersedes the claim as it does any mount's.
-- It states the Fabricate window's ink and its dark colour scheme and paints no ground: in a window or dialog of its own the companion paints `--fab-bg-1` on `target`, or nests the entry in an `InspectorCard` or `Well`, as for `Callout`, because on Foundry's light theme whatever an entry draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the `ActionMenu` trigger among them, the switch's off face, `Field`'s ink and the caption and hint the companion draws in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, the `form` `Select` trigger's and the `IconPicker` trigger's ink on theirs, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows; `RadioCardGroup`'s cards, a default `Pagination` bar, the `inline` and `toolbar` `Select` triggers, and the list, menu or dialog an overlay entry opens paint their own ground.
+- It states the Fabricate window's ink and its dark colour scheme and paints no ground: in a window or dialog of its own the companion paints `--fab-bg-1` on `target`, or nests the entry in an `InspectorCard` or `Well`, as for `Callout`, because on Foundry's light theme whatever an entry draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the `ActionMenu` trigger among them, the switch's off face, `Field`'s ink and the caption and hint the companion draws in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, the `form` `Select` trigger's and the `IconPicker` trigger's ink on theirs, `SegmentedControl`'s labels at `density` `'default'` or in the `'pill'` shape, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows; `RadioCardGroup`'s cards, a default `Pagination` bar, the `inline` and `toolbar` `Select` triggers, and the list, menu or dialog an overlay entry opens paint their own ground.
 `--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window (issue 2432).
 - A companion's content in a content slot of such a mount takes the Fabricate window's ink, dark colour scheme, palette tokens, focus ring and reduced-motion rule, as it does in a Fabricate window; Fabricate's heading normalisation does not reach it, so a heading there takes Foundry's own face and ink.
 - An entry whose root is `'fabricate'` or `'manager'`, mounted in a content slot of such a mount with no Fabricate root above, is refused.
@@ -1322,10 +1322,11 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`SegmentedControl`.**
   - It is the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
-  - `options` is required and is an array of `{ value, label, icon, disabled }` items.
+  - `options` is required and is an array of `{ value, label, icon, variant, disabled }` items.
     `value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
     `label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so the companion never passes one.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+    `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
     An item's other members are private, and a companion passes none; a function in one is M10.
   - `value` is the `value` of the selected option and defaults to `''`.
@@ -1337,6 +1338,12 @@ Each group states the accepted values of every key that entry publishes.
   - `ariaLabel` is required and is the radiogroup's name, final display text.
   - `fill` is `true` or `false` and defaults to `false`: `true` stretches the track across `target` and gives every segment an equal share.
   - `density` is `'default'` or `'inline'` and defaults to `'default'`; any other value is private.
+  - `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
+    An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
+  - `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
+  - Naming `tone`, `shape` and an option's `variant` is additive, and `SegmentedControl`'s `version` stays 1: before them `tone` and `shape` were refused as rest keys (M13) and `variant` was private.
+    A Fabricate that predates them refuses `tone` and `shape`, and `describe` names them only once the running Fabricate publishes them, so a companion that passes either reads `describe('SegmentedControl')` first.
+    A `describe` that names `tone` is from a Fabricate that keeps a `variant`'s tint in an accent track.
   - The radios share one name Fabricate makes unique to the mount, so two controls never uncheck each other.
   - Fabricate handles and stops no key: the platform moves focus and the check to the next or previous enabled radio on the arrow keys, wrapping, and Space checks the focused radio, each check calling `onChange`.
     Focus moves only among one control's radios and never out of `target`.
@@ -1350,9 +1357,11 @@ Each group states the accepted values of every key that entry publishes.
   - Rest `data-*` attributes land on the radiogroup, never on a segment or a radio.
   - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
     An empty `options` draws the named radiogroup with no segment and no radio, so nothing inside `target` takes focus; pass at least one option where the control must be reachable.
-  - The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, and the companion leaves room for it inside any edge of its own that clips.
-    The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the control on one of those four grounds.
-- **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member or `density`, and how Fabricate draws a segmented control in its own rows, pager and editors.
+  - The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, or 3px in the `'pill'` shape, and the companion leaves room for it inside any edge of its own that clips.
+    The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's or, in the `'pill'` shape, over the ground, in every palette but for the solid fill of the `'accent'` and `'info'` tones, and falls short against `--fab-bg-3` in two, so the companion mounts the control on one of those four grounds.
+    With `tone` `'accent'` or `'info'` the ring is not guaranteed against the solid fill of a neighbouring selected segment, which it falls short of in every palette.
+    The selected state is carried by weight alone under forced colors, and by nothing in the `'pill'` shape.
+- **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member, `variant`, `density`, `tone` or `shape` value, and how Fabricate draws a segmented control in its own rows, pager and editors.
 
 ### The issue 2646 components
 
@@ -1953,7 +1962,8 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `SegmentedControl` with `options`, `value`, `ariaLabel` and `onChange` inside a Fabricate window and the user presses ArrowRight on the checked radio
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
-- **AND** a mount that omits `ariaLabel` throws M9, and one that passes `groupName` throws M13
+- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, and one that passes `groupName` throws M13
+- **AND** a mount that omits `ariaLabel` throws M9
 
 #### Scenario: A published pager
 

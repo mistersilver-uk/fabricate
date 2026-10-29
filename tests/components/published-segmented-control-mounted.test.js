@@ -166,7 +166,7 @@ function assertRefused(overrides, tail) {
 }
 
 describe('the published SegmentedControl', () => {
-  it('describes the six keys its manifest entry publishes, at the fabricate root', () => {
+  it('describes the eight keys its manifest entry publishes, at the fabricate root', () => {
     const described = ui().describe('SegmentedControl');
     assert.deepEqual(Object.keys(described.props), [
       'options',
@@ -175,6 +175,8 @@ describe('the published SegmentedControl', () => {
       'ariaLabel',
       'fill',
       'density',
+      'tone',
+      'shape',
     ]);
     assert.deepEqual(described.props.onChange, { kind: 'callback', required: true });
     assert.equal(described.root, 'any');
@@ -230,6 +232,33 @@ describe('the published SegmentedControl', () => {
     await settle();
     assert.ok(group().classList.contains('is-inline'));
     handle.destroy();
+  });
+
+  it('draws tone and shape on the radiogroup and an info option’s variant on its selected segment', async () => {
+    const options = [
+      { value: 'solo', label: 'Solo' },
+      { value: 'group', label: 'Group', variant: 'info' },
+    ];
+    const pill = mountControl({ options, value: 'group', tone: 'accent-soft', shape: 'pill' });
+    await settle();
+    for (const name of ['is-accent-soft', 'is-pill']) {
+      assert.ok(pill.group().classList.contains(name), `the radiogroup carries ${name}`);
+    }
+    assert.ok(pill.segment('group').classList.contains('is-info'), 'the selected info option');
+    assert.ok(!pill.segment('solo').classList.contains('is-info'), 'and no other segment');
+    assert.equal(pill.handle.update({ ...pill.props, value: 'solo' }), true);
+    await settle();
+    assert.ok(
+      !pill.segment('group').classList.contains('is-info'),
+      'the tint is the selected one’s'
+    );
+    pill.handle.destroy();
+
+    const info = mountControl({ tone: 'info' });
+    await settle();
+    assert.ok(info.group().classList.contains('is-info'));
+    assert.ok(!info.group().classList.contains('is-pill'), 'no shape unless passed');
+    info.handle.destroy();
   });
 
   it('draws the named radiogroup with no segment and no radio for an empty options', async () => {
@@ -461,15 +490,7 @@ describe('a choice on the published SegmentedControl', () => {
 });
 
 describe('what the published SegmentedControl refuses', () => {
-  for (const key of [
-    'groupName',
-    'optionDataAttr',
-    'iconOnly',
-    'tone',
-    'shape',
-    'class',
-    'aria-labelledby',
-  ]) {
+  for (const key of ['groupName', 'optionDataAttr', 'iconOnly', 'class', 'aria-labelledby']) {
     it(`refuses ${key}, which it does not publish (M13)`, () => {
       assertRefused({ [key]: 'x' }, `"${key}" is not a data attribute`);
     });

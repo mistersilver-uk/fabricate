@@ -178,6 +178,8 @@ const VOCABULARY_KEYS = Object.freeze([
   'label',
   'fill',
   'density',
+  'tone',
+  'shape',
   'layout',
   'columns',
   'persistent',
@@ -302,7 +304,7 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 18, 'each vocabulary key the sixteen publish was read');
+    assert.equal(held, 20, 'each vocabulary key the sixteen publish was read');
   });
 
   it('reads the rungs Select maps for size from its frozen table', () => {
