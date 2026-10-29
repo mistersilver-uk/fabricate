@@ -208,6 +208,12 @@
   });
 
   const environmentList = $derived(environments || []);
+  const errorHint = $derived(
+    text(
+      'FABRICATE.Admin.Environments.ErrorHint',
+      'Close and reopen this window to try again. The browser console has the error.'
+    )
+  );
   // Lightweight projection for the Realms tab membership editor.
   const selectedGatheringSystemConfig = $derived(
     gatheringConfig?.systems?.[selectedSystemId] || {}
@@ -654,7 +660,7 @@
           error={environmentsError
             ? text('FABRICATE.Admin.Environments.ErrorTitle', 'Could Not Load Environments')
             : ''}
-          errorDetail={environmentsError}
+          errorDetail={environmentsError ? `${environmentsError}\n${errorHint}` : ''}
           errorProps={{ 'data-environments-error': true }}
         >
           {#if environmentList.length === 0}

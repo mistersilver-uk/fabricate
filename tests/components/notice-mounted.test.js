@@ -394,6 +394,11 @@ describe('1505 Notice — the API the library states', () => {
     assert.match(detail, /color:\s*var\(--fab-text-muted\)/, 'the detail is neutral at every tone');
     assert.match(
       detail,
+      /white-space:\s*pre-line/,
+      'a multi-line detail, such as a joined list of errors, breaks at its newlines'
+    );
+    assert.match(
+      detail,
       /font-variant-numeric:\s*tabular-nums/,
       'a live count sentence must not jitter as the run resolves'
     );

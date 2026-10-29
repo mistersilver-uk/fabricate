@@ -590,8 +590,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <div class="fab-notice-body">
               <div class="fab-notice-title">This recipe cannot be saved</div>
-              <div class="fab-notice-detail">Step 2 has no ingredients, and the Critical result
-              set routes to a tier that no longer exists.</div>
+              <div class="fab-notice-detail">Step 2 has no ingredients, and the Critical result set routes to a tier that no longer exists.</div>
             </div>
             <button type="button" class="fab-notice-button" data-probe="notice-action">Show both</button>
             <button type="button" class="fab-notice-button is-dismiss" data-probe="notice-dismiss"

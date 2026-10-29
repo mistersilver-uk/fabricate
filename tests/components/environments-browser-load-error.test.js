@@ -71,7 +71,11 @@ describe('the environment list draws its load states through ListState (issue 25
       notice.querySelector('.fab-notice-title')?.textContent,
       'Could Not Load Environments'
     );
-    assert.equal(notice.querySelector('.fab-notice-detail')?.textContent, FAILURE);
+    assert.equal(
+      notice.querySelector('.fab-notice-detail')?.textContent,
+      `${FAILURE}\nClose and reopen this window to try again. The browser console has the error.`,
+      'the raw error, then the next step on its own line'
+    );
     assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
     assert.ok(
       Boolean(target.querySelector('.manager-environments-toolbar')),
