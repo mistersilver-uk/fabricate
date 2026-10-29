@@ -6,6 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { setGatheringEngine } from '../../src/bootstrap/gatheringRuntime.js';
+import { journalFacade } from '../../src/bootstrap/journalFacade.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
@@ -3186,29 +3188,50 @@ test('completion-mode switching is limited to an active countdown without a play
   assert.equal(byId.ready.actions.setCompletionMode, false, 'a matured gate is no longer counting down');
 });
 
-test('the projection and the engine agree on which gathering runs prompt a player check', () => {
+test('the engine predicate prompts for routed, progressive and untimed d100 runs only', () => {
   const timed = { requiredSeconds: 600, availableAt: 800 };
-  const modes = ['straight', 'd100', 'routed', 'progressive'];
-  const hasCheck = (mode, timeGate) =>
-    makeBuilder({
-      worldTime: 200,
-      gatheringActive: [
-        { id: 'run', craftingSystemId: 'sys-1', environmentId: 'env-1', taskId: mode, status: 'waitingTime',
-          lifecycleVersion: 1, runRevision: 0, ...(timeGate && { timeGate }) },
-      ],
-      getGatheringTask: () => ({ name: mode, resolutionMode: mode }),
-    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0].actions
-      .setCompletionMode !== true;
-  for (const mode of modes) {
-    assert.equal(
-      hasCheck(mode, timed),
-      gatheringRunNeedsPlayerCheck({ task: { resolutionMode: mode }, run: { timeGate: timed } }),
-      `${mode} timed`
-    );
+  const needs = (resolutionMode, timeGate = null) =>
+    gatheringRunNeedsPlayerCheck({ task: { resolutionMode }, run: timeGate ? { timeGate } : {} });
+  assert.deepEqual(
+    ['straight', 'd100', 'routed', 'progressive'].map((mode) => [needs(mode), needs(mode, timed)]),
+    [[false, false], [true, false], [true, true], [true, true]]
+  );
+});
+
+test('a gathering task without a resolution mode is a d100 task, as the spec defaults it', () => {
+  const hasCheck = (run) => makeBuilder()._gatheringRunHasPlayerCheck({ task: { name: 'Plain' } }, run);
+  assert.equal(hasCheck({}), true, 'an untimed run prompts a d100 check');
+  assert.equal(hasCheck({ timeGate: { requiredSeconds: 600, availableAt: 800 } }), false, 'a timed run needs none');
+  assert.equal(makeBuilder()._gatheringRunHasPlayerCheck({ task: null }, {}), true, 'an unseen task counts as prompting');
+});
+
+test('every Journal builder, station views included, gets the award-choice claimability from one factory', () => {
+  const seen = [];
+  const facade = Object.assign(Object.create(journalFacade), {
+    recipeManager: {},
+    craftingEngine: { awardChoiceClaimability: (run, actor) => {
+        seen.push([run, actor]);
+        return () => 'claim';
+      },
+    },
+  });
+  const builder = facade._getRunJournalBuilder();
+  assert.equal(builder._awardChoiceClaimability({ run: 'r', actor: 'a' })(), 'claim');
+  assert.deepEqual(seen, [['r', 'a']]);
+  assert.equal(facade._getRunJournalBuilder(), builder, 'the no-station builder is cached');
+});
+
+test('the Journal task fallback carries the resolution mode the selector decides on', () => {
+  setGatheringEngine({
+    _findEnvironment: () => ({ tasks: [{ id: 't1', name: 'Hunt', img: 'a.webp', resolutionMode: 'routed' }] }),
+  });
+  try {
+    assert.deepEqual(journalFacade._resolveJournalGatheringTask('env-1', 't1'), {
+      name: 'Hunt', img: 'a.webp', resolutionMode: 'routed',
+    });
+  } finally {
+    setGatheringEngine(null);
   }
-  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'd100' }, run: {} }), true, 'untimed d100 prompts');
-  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'd100' }, run: { timeGate: timed } }), false);
-  assert.equal(gatheringRunNeedsPlayerCheck({ task: { resolutionMode: 'straight' }, run: {} }), false);
 });
 
 test('salvage remains outside versioned completion-mode controls', () => {

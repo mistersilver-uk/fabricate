@@ -213,7 +213,7 @@ export const journalFacade = {
     const environment = getGatheringEngine()?._findEnvironment?.(environmentId);
     const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
     const task = tasks.find((entry) => entry?.id === taskId);
-    return task ? { name: task.name, img: task.img } : null;
+    return task ? { name: task.name, img: task.img, resolutionMode: task.resolutionMode } : null;
   },
 
   /** Labels history written before awards captured name and img. Best-effort and synchronous. */

@@ -2187,9 +2187,13 @@ export class RunJournalBuilder {
     return missing === true ? { blocker: STAGE_BLOCKERS.tool } : null;
   }
 
-  // A task the viewer cannot see is treated as prompting, so its selector stays hidden.
-  _gatheringRunHasPlayerCheck({ task } = {}, run) {
-    return !task || gatheringRunNeedsPlayerCheck({ task, run });
+  // An absent mode is d100, as authored tasks default; a task the viewer cannot see counts as
+  // prompting, so its selector stays hidden.
+  _gatheringRunHasPlayerCheck(context, run) {
+    const task = context?.task;
+    if (!task) return true;
+    const resolutionMode = stringOrNull(task.resolutionMode) || 'd100';
+    return gatheringRunNeedsPlayerCheck({ task: { ...task, resolutionMode }, run });
   }
 
   /**
