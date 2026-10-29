@@ -603,6 +603,33 @@
   },
   {
     "spec": "<Segmented>",
+    "cap": "info · solid",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "fixed": "an option’s value, not its words",
+      "rolled": "an option’s value, not its words",
+      "Value mode": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "options": [
+        {
+          "value": "fixed",
+          "label": "Fixed"
+        },
+        {
+          "value": "rolled",
+          "label": "Rolled"
+        }
+      ],
+      "value": "fixed",
+      "groupName": "pl-info",
+      "ariaLabel": "Value mode",
+      "tone": "info"
+    }
+  },
+  {
+    "spec": "<Segmented>",
     "cap": "fill",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",

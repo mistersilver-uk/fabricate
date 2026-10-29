@@ -134,6 +134,8 @@ When `onChange` returns, `SegmentedControl` sets each radio's check from `value`
 The `SegmentedControl` segment keeps its own ring, the 2px accent at a 2px offset drawn on the segment around its visually hidden radio, which the `tag` tone turns inward to a -2px offset.
 An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted` on every density and tone, and clear 4.5:1 in all seven themes on its track's ground, or on `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` where a tag track paints none (issues 2685 and 2368).
 `SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644).
+The `info` tone fills the chosen segment solid `--fab-info` inked `--fab-on-info` and leaves the idle segments bare, as the `accent` tone does in the accent family, and clears 4.5:1 in all seven themes (issue 2774).
+An option whose `variant` is `info` keeps its `--fab-info-soft` tint, `--fab-info-border` edge and `--fab-info-text` ink inside an `accent` or `accent-soft` track, so a track's tone never hides what choosing that one option means (issue 2774).
 
 #### Scenario: A caller's key has no translation
 

@@ -8,7 +8,7 @@
   | `options` | `[{ value, label, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (empty falls back to a name unique to the mount) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
-  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
+  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'`/`'info'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart; `info` is the solid fill of the info family, as `accent` is of the accent one. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
 
   Callbacks:
   - `onChange(value)` — the chosen option's `value`. When it returns, or throws, each radio is
@@ -66,7 +66,7 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${density === 'inline' ? ' is-inline' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}${extraClasses}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${density === 'inline' ? ' is-inline' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${tone === 'info' ? ' is-info' : ''}${shape === 'pill' ? ' is-pill' : ''}${extraClasses}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...rest}
@@ -327,10 +327,18 @@
     color: var(--fab-on-accent);
   }
 
-  .manager-segmented.is-accent .manager-segment:not(.is-active) {
+  .manager-segmented.is-accent .manager-segment:not(.is-active),
+  .manager-segmented.is-info .manager-segment:not(.is-active) {
     border-color: transparent;
     background: none;
     color: var(--fab-text-muted);
+  }
+
+  /* INFO tone: the accent tone's construction in the info family. */
+  .manager-segmented.is-info .manager-segment.is-active {
+    border-color: var(--fab-info);
+    background: var(--fab-info);
+    color: var(--fab-on-info);
   }
 
   /* Both selectors reach (0,4,0), because the shipped `.is-active .manager-segment-count` below is
@@ -339,7 +347,9 @@
     color: inherit;
   }
 
-  .manager-segmented.is-accent .manager-segment:not(.is-active) .manager-segment-count {
+  .manager-segmented.is-info .manager-segment.is-active .manager-segment-count,
+  .manager-segmented.is-accent .manager-segment:not(.is-active) .manager-segment-count,
+  .manager-segmented.is-info .manager-segment:not(.is-active) .manager-segment-count {
     color: inherit;
   }
 
@@ -441,6 +451,15 @@
     border-color: var(--fab-danger-border);
     background: var(--fab-danger-soft);
     color: var(--fab-danger-text);
+  }
+
+  /* An info option inside an accent track keeps its own tint: the variant says what choosing this
+     segment means, and the track's tone rules above out-specify the ramp. */
+  .manager-segmented.is-accent .manager-segment.is-active.is-info,
+  .manager-segmented.is-accent-soft .manager-segment.is-active.is-info {
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
+    color: var(--fab-info-text);
   }
 
   /* `:not(.is-disabled)` is load-bearing: without it a disabled segment still recolours under the

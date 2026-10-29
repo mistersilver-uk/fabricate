@@ -1259,6 +1259,18 @@ const STATE_TINTS = Object.freeze([
     'var(--fab-accent-soft)',
     'the `accent-soft` tone, the chosen chip’s face, `.k-chip.sel` (library.html:191)',
   ],
+  [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented.is-info .manager-segment.is-active',
+    'var(--fab-info)',
+    'the `info` tone: the accent tone’s solid chosen face in the info family',
+  ],
+  [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented.is-accent .manager-segment.is-active.is-info, .manager-segmented.is-accent-soft .manager-segment.is-active.is-info',
+    'var(--fab-info-soft)',
+    'a per-option info variant inside an accent track keeps naming what choosing it means',
+  ],
   ...['success', 'info', 'warning', 'danger'].map((family) => [
     `${COMPONENTS}/SegmentedControl.svelte`,
     `.manager-segment.is-active.is-${family}`,

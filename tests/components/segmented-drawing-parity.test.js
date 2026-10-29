@@ -27,8 +27,9 @@ const shipped = scopedComponentCss(resolve(repoRoot, COMPONENT));
 
 /** Each form: the props its callers pass, the drawn well that draws it, and how many uses draw it. */
 const FORMS = Object.freeze({
-  default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field)', uses: 10 },
+  default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field, .info)', uses: 10 },
   tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
+  info: { props: { tone: 'info' }, drawn: '.k-seg.info', uses: 1 },
   inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 33 },
   field: { props: { density: 'field' }, drawn: '.k-seg.field:not(.tag)', uses: 1 },
   // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet, so its geometry is
