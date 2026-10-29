@@ -2042,7 +2042,7 @@ The published components, in publication order:
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
 | `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
 | `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
-| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `density` | yes |
+| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
@@ -2140,10 +2140,19 @@ The tile is inline: give its `target` `display: flex`, so the tile is a flex ite
 `value` is 0–100 and is clamped.
 `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
 `color` is a `var(--fab-…)` colour token reference, and it overrides `tone`.
+`shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
+A share's `tone` is one of the six tones above, and it defaults to `success`; a tone outside them draws `neutral`.
+A share states its colour by `tone` alone, so a stack of more than six contributors repeats a hue.
+A member of a share other than `weight` and `tone` is private.
+The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
+A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
+A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an array draws the one fill from `tone` and `color`.
+Stacked, `tone` and `color` are not read and the bar carries no tone attribute.
+The shares are colour and width alone and are not announced, and neighbouring tones can sit under 3:1 against each other, so state each share as text beside the bar.
+A Fabricate that predates `shares` refuses it with `"shares" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `density` is `default` or `compact`.
 It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
 A value that must be announced is a `Meter`.
-It draws one fill; a fill in segments is a `Meter`.
 
 ### Meter
 

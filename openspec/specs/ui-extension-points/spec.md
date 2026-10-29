@@ -471,7 +471,7 @@ Its `triggerClass`, `menuClass` and `triggerProps` are never published, being cl
 - `Modal`'s `trapFocus`, `initialFocus`, `onSubmit`, `footerLayout` and `width` are not published at version 1; publishing one later is additive.
 Its `dialogProps` is never published, being attributes under another name.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
-- `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
+- `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
@@ -738,6 +738,15 @@ Each group states the accepted values of every key that entry publishes.
   - `value` is 0–100, clamped.
   - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
   - `color` is a `var(--fab-…)` colour token reference, which overrides `tone`.
+  - `shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
+    A share's `tone` is one of the six tones above, and it defaults to `success`; a tone outside them draws `neutral`.
+    A share states its colour by `tone` alone, so a stack of more than six contributors repeats a hue.
+    A member of a share other than `weight` and `tone` is private.
+    The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
+    A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
+    A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an array draws the one fill from `tone` and `color`.
+    Stacked, `tone` and `color` are not read and the bar carries no tone attribute.
+    The shares are colour and width alone and are not announced, and neighbouring tones can sit under 3:1 against each other, so the companion states each share as text beside the bar.
   - `density` is `default` or `compact`.
   - It is decorative: it has no role and no name and reaches no assistive technology, so the companion states the reading as text beside it.
     A value that must be announced is a `Meter`.

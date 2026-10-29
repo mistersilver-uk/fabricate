@@ -528,7 +528,6 @@ describe('a key a leaf does not publish', () => {
     ['Avatar', 'class', 'is not a prop of Avatar'],
     ['Medallion', 'src', 'is not a prop of Medallion'],
     ['FillBar', 'class', 'is not a data attribute'],
-    ['FillBar', 'shares', 'is not a data attribute'],
     ['StatBox', 'valueDataAttr', 'is not a data attribute'],
     ['Meter', 'aria-label', 'is not a data attribute'],
     ['Meter', 'labelId', 'is not a data attribute'],

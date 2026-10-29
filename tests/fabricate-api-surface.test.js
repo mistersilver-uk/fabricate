@@ -350,7 +350,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       FillBar: {
         version: 1,
-        props: { value: optional, tone: optional, color: optional, density: optional },
+        props: {
+          value: optional,
+          tone: optional,
+          color: optional,
+          shares: optional,
+          density: optional,
+        },
         rest: true,
         root: 'any',
         overlays: false,
