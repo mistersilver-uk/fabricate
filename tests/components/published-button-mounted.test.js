@@ -333,20 +333,7 @@ describe('the published Button, disabled', () => {
 });
 
 describe('what the published Button refuses', () => {
-  for (const key of [
-    'tag',
-    'href',
-    'target',
-    'rel',
-    'type',
-    'size',
-    'icon',
-    'busy',
-    'class',
-    'element',
-    'title',
-    'aria-label',
-  ]) {
+  for (const key of ['tag', 'href', 'target', 'rel', 'class', 'element', 'title', 'aria-label']) {
     it(`refuses ${key}, which it does not publish (M13)`, () => {
       assertRefused({ [key]: 'x' }, `"${key}" is not a data attribute`);
     });

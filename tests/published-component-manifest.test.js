@@ -385,19 +385,27 @@ const ARIA_KEY_SUITES = Object.freeze({
 });
 
 /**
- * Every DOM read under `src/` of a shipped `aria` key or of `aria-pressed`, which a published
- * `data` key drives, beside why no published control is the element it reads.
+ * The ARIA attributes a published `data` key writes beside the `aria` keys: `aria-pressed` by
+ * `StatusToggle`'s `on`, and `aria-busy` and `aria-disabled` by `Button`'s `busy`.
+ */
+const DRIVEN_ARIA = Object.freeze(['aria-pressed', 'aria-busy', 'aria-disabled']);
+
+/**
+ * Every DOM read under `src/` of a shipped `aria` key or of a `DRIVEN_ARIA` attribute, beside why
+ * no published control is the element it reads.
  */
 const JS_ARIA_READERS = Object.freeze({
   'src/ui/svelte/apps/journal/RunAwardChoice.svelte: querySelector([data-award-choice-id] button[aria-pressed]:not([disabled]))':
     'under a Fabricate hook',
   'src/ui/svelte/apps/manager/validationAnnouncement.js: getAttribute(aria-labelledby)':
     "on Fabricate's own validation targets",
+  'src/ui/svelte/apps/manager/validationFocus.js: getAttribute(aria-disabled)':
+    "on Fabricate's own validation targets",
   'src/ui/svelte/components/Modal.svelte: closest([aria-expanded="true"])':
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
 });
 
-/** The classes `tone` and `density` can write beside the root class, private values included. */
+/** The classes `tone`, `density`, `emphasis`, `mono` and `struck` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
   'is-warning',
@@ -418,6 +426,12 @@ const PUBLISHED_CHIP_CLASSES = new Set([
   'is-tag-run',
   'is-inspector',
   'is-header',
+  'is-outlined',
+  'is-lit',
+  'is-bare',
+  'is-solid',
+  'is-mono',
+  'is-struck',
 ]);
 /** The manager layout classes a sheet rule reaches a chip under; no extension target sits in one. */
 const CHIP_LAYOUT_ANCESTORS = new Set([
@@ -437,7 +451,7 @@ const CHIP = Object.freeze({
   root: 'manager-chip',
   writable: PUBLISHED_CHIP_CLASSES,
   ancestors: CHIP_LAYOUT_ANCESTORS,
-  drawsChildren: false,
+  drawsChildren: 'caller',
 });
 const CARD = Object.freeze({
   root: 'fabricate-card',
@@ -464,7 +478,7 @@ const NOTICE = Object.freeze({
 });
 
 /**
- * The published `Button`: the classes `role` and `fullWidth` write beside its root, which
+ * The published `Button`: the classes `role`, `fullWidth` and `size` write beside its root, which
  * `Button.svelte` is held to, and the classes under which a sheet rule redraws a button, no
  * extension target sitting in one. `disables` says a published key writes `disabled`, so
  * `:disabled` keeps no selector off the button.
@@ -478,6 +492,8 @@ const BUTTON = Object.freeze({
     'is-dashed',
     'is-warning-action',
     'is-full-width',
+    'is-size-28',
+    'is-size-38',
   ]),
   ancestors: new Set([
     'manager-tool-inspector-foot',
@@ -508,12 +524,9 @@ const BUTTON = Object.freeze({
     'manager-scoped-shared-head',
     'manager-scoped-roster-system',
   ]),
-  drawsChildren: false,
+  drawsChildren: 'caller',
   disables: true,
 });
-
-/** The classes `Button.svelte` spells that no published key writes. */
-const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-28', 'is-size-38']);
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
@@ -529,7 +542,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 21 sheet rules that draw a published button, each one compound with nothing above it. */
+/** The 25 sheet rules that draw a published button, none with a compound above its root. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -539,6 +552,8 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled)',
   "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-38',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-28',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
@@ -552,26 +567,36 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover",
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
-]);
-/**
- * The three rules no published button can match, which fail closed: an anchor's, a glyph child's,
- * and the busy face, whose `aria-busy` the seam refuses (issue 2540).
- */
-const BUTTON_UNMATCHED_RULES = Object.freeze([
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:is(a)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button i',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
+]);
+/** The rule no published button can match, which fails closed: an anchor's, since `tag` is unpublished. */
+const BUTTON_UNMATCHED_RULES = Object.freeze([
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:is(a)',
 ]);
 /** The sheet rule a button matches only through a `data-*` hook Fabricate writes. */
 const BUTTON_DATA_HOOK_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]',
 ]);
 
+/** The marker of a rule that draws a published `Button`'s own face, which `BUTTON_FAMILY_RULES` pins. */
+const BUTTON_FACE = 'button-face';
+/** Why a rule on a `Select` trigger or option reads no attribute a companion sets. */
+const SELECT_TRIGGER_REASON = Object.freeze({
+  reason:
+    'the published Select publishes no disabled or readonly, so its trigger takes no aria-disabled',
+});
+const SELECT_OPTION_REASON = Object.freeze({
+  reason:
+    "the published Select's options are { value, label } by contract, so no in-contract row takes aria-disabled",
+});
+
 /**
- * Every selector that reads a shipped `aria` key, or `aria-pressed`, which a published `data` key
- * drives, as written, beside the class that keeps it off a published control: a pinned ancestor
- * above it, which no extension target sits under, or a class the element holding the attribute
- * needs, which no published closure spells.
+ * Every selector that reads a shipped `aria` key or a `DRIVEN_ARIA` attribute, as written, beside
+ * what keeps it off a published control: a pinned ancestor above it, which no extension target
+ * sits under; a class the element holding the attribute needs, which no published closure
+ * spells; `BUTTON_FACE`, for a rule `BUTTON_FAMILY_RULES` pins as drawing the button; or a stated
+ * `{ reason }` where a published closure spells the class.
  */
 const ARIA_KEY_SELECTORS = Object.freeze([
   [
@@ -606,14 +631,88 @@ const ARIA_KEY_SELECTORS = Object.freeze([
     "src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset button.fab-bulk-inset-row:not([aria-pressed='true']):enabled:hover)",
     'fab-bulk-inset-row',
   ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-recipe-editor.css: .fabricate-select .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled)",
+    SELECT_TRIGGER_REASON,
+  ],
+  [
+    "styles/fabricate-manager-recipe-editor.css: .fabricate-select .fabricate-select-trigger[data-routing-overview-tone='warning']:not([aria-disabled='true']):not(:disabled)",
+    SELECT_TRIGGER_REASON,
+  ],
+  [
+    "styles/fabricate-manager-recipe-editor.css: .fabricate-select .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible",
+    SELECT_TRIGGER_REASON,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-select.css: .fabricate-select-trigger[aria-disabled='true']",
+    SELECT_TRIGGER_REASON,
+  ],
+  [
+    "styles/fabricate-select.css: .fabricate-select-option[aria-disabled='true']",
+    SELECT_OPTION_REASON,
+  ],
+  [
+    "src/ui/svelte/apps/crafting/RollPromptFooter.svelte: .prompt-action:not(.is-primary, [aria-disabled='true']):hover",
+    'prompt-action',
+  ],
+  [
+    "src/ui/svelte/apps/crafting/RollPromptFooter.svelte: .prompt-action[aria-disabled='true']",
+    'prompt-action',
+  ],
+  [
+    "src/ui/svelte/components/ModifierPillSelect.svelte: :global(.manager-availability-multi .manager-availability-menu-button[aria-disabled='true'])",
+    'manager-availability-menu-button',
+  ],
+  [
+    "src/ui/svelte/components/ModifierPillSelect.svelte: :global(\n    .manager-availability-multi .manager-availability-menu-button[aria-disabled='true']:hover\n  )",
+    'manager-availability-menu-button',
+  ],
+  [
+    "src/ui/svelte/components/RangeBarMarker.svelte: .fab-band-strip-marker[aria-disabled='true']",
+    'fab-band-strip-marker',
+  ],
 ]);
 
 /**
  * Whether `kept` keeps one `attributeSelectors` reading off a published control: as a `pinned`
- * ancestor above the attribute, or as a class its own element requires that `spelled` lacks.
+ * ancestor above the attribute, as a class its own element requires that `spelled` lacks, as a
+ * button-drawing rule, or as a stated `{ reason }`.
  */
-const keptOff = ({ above, bearers }, kept, pinned, spelled) =>
-  (pinned.has(kept) && above.includes(kept)) || (bearers.includes(kept) && !spelled.has(kept));
+const keptOff = ({ written, above, bearers }, kept, pinned, spelled) => {
+  if (kept === BUTTON_FACE) return BUTTON_FAMILY_RULES.includes(written);
+  if (typeof kept === 'object') return kept.reason.length > 0;
+  return (
+    (pinned.has(kept) && above.includes(kept)) || (bearers.includes(kept) && !spelled.has(kept))
+  );
+};
 
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
 const CARD_FAMILY_RULES = Object.freeze([
@@ -1332,12 +1431,12 @@ describe('each entry matches its component declaration', () => {
     }
   });
 
-  it('pins every DOM read under src/ of a shipped aria key or aria-pressed, with why it reads no published control', () => {
+  it('pins every DOM read under src/ of a shipped aria key or a driven ARIA attribute, with why it reads no published control', () => {
     const names = [...new Set(PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry)))];
     const files = sourceAstEntriesUnder('src');
     assert.ok(files.length > 900, `src/ was read: ${files.length} files`);
     assert.deepEqual(
-      attributeReads(files, [...names, 'aria-pressed']).sort(byName),
+      attributeReads(files, [...names, ...DRIVEN_ARIA]).sort(byName),
       Object.keys(JS_ARIA_READERS).sort(byName),
       'a script that reads a published ARIA attribute off a control a companion mounted acts on it'
     );
@@ -2887,8 +2986,8 @@ describe('the module sheet against the published Chip', () => {
     assert.equal(selectors.length, 15, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
-      ['tone', 'density', 'children'],
-      'a published key that draws a classed child reopens cannotMatchPublished and fab-hit-area'
+      ['tone', 'density', 'emphasis', 'icon', 'mono', 'struck', 'children'],
+      'a published key that draws a classed child reopens cannotMatchPublished'
     );
   });
 
@@ -2897,7 +2996,6 @@ describe('the module sheet against the published Chip', () => {
     ['a class the published keys cannot write', `${MANAGER} .manager-chip.manager-tag-pill`],
     ['a published class beside an unwritable one', `${MANAGER} .manager-chip.is-list.is-empty`],
     ['the :disabled state', `${MANAGER} .manager-chip:disabled`],
-    ['a classed glyph child', `${MANAGER} .manager-chip .fa-circle`],
     ['a pinned layout ancestor', `${MANAGER} .manager-vocabulary-row > .manager-chip`],
     ['another class that only starts with the root', `${MANAGER} .manager-chip-row`],
   ]) {
@@ -2913,6 +3011,8 @@ describe('the module sheet against the published Chip', () => {
     `${MANAGER} .manager-chip > span`,
     `${MANAGER} .manager-chip ~ div > .manager-chip`,
     `${MANAGER} .manager-chip.is-row`,
+    `${MANAGER} .manager-chip.is-lit.is-struck`,
+    `${MANAGER} .manager-chip .fa-circle`,
     `${MANAGER} :is(.manager-chip.manager-tag-pill, .manager-pill)`,
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published chip`, () => {
@@ -3185,7 +3285,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 25 selectors: 21 that draw it, three it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 27 selectors: 25 that draw it, one it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -3209,6 +3309,10 @@ describe('the module sheet and every component style against the published Butto
           'role',
           'fullWidth',
           'disabled',
+          'size',
+          'icon',
+          'busy',
+          'type',
           'children',
           'onclick',
           'aria-expanded',
@@ -3220,7 +3324,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key or aria-pressed in eight selectors of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-busy or aria-disabled in 25 selectors of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(
@@ -3228,7 +3332,7 @@ describe('the module sheet and every component style against the published Butto
       ['aria-expanded', 'aria-describedby', 'aria-labelledby'],
       'the aria keys the census reads'
     );
-    const reading = [...names, 'aria-pressed'].flatMap((name) =>
+    const reading = [...names, ...DRIVEN_ARIA].flatMap((name) =>
       attributeSelectors(everyStylesheet(), name)
     );
     assert.deepEqual(
@@ -3245,7 +3349,7 @@ describe('the module sheet and every component style against the published Butto
     for (const [index, [written, kept]] of ARIA_KEY_SELECTORS.entries()) {
       assert.ok(
         keptOff(reading[index], kept, pinned, spelled),
-        `${written} is kept off by ${kept}`
+        `${written} is kept off by ${JSON.stringify(kept)}`
       );
     }
   });
@@ -3340,8 +3444,8 @@ describe('the module sheet and every component style against the published Butto
     );
     assert.deepEqual(
       [...new Set(tokens)].filter((token) => onRoot.has(token)).sort(byName),
-      [BUTTON.root, ...BUTTON.writable, ...UNPUBLISHED_BUTTON_CLASSES].sort(byName),
-      'a class the file spells that a rule names on the button is writable, or pinned unpublished'
+      [BUTTON.root, ...BUTTON.writable].sort(byName),
+      'a class the file spells that a rule names on the button is writable'
     );
   });
 
@@ -3389,11 +3493,10 @@ describe('the module sheet and every component style against the published Butto
   const reachingIn = (css) => writtenOf(reachingOf(buttonCensus(css)));
 
   for (const [claim, selector] of [
-    ['a class no published key writes', '.fabricate-button.is-size-38'],
+    ['a class no published key writes', '.fabricate-button.is-size-44'],
     ['the armed state, which no published key writes', '.fabricate-button.is-danger.is-armed'],
     ['a per-site class', '.fabricate-button.fabricate-button.manager-recipe-sort-direction'],
     ['a pinned ancestor', '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button'],
-    ['a classed child', '.fabricate-button .fa-plus'],
   ]) {
     it(`admits a selector that needs ${claim}`, () => {
       assert.equal(buttonCensus(`${selector} { gap: 0 }`).length, 1);
@@ -3408,6 +3511,9 @@ describe('the module sheet and every component style against the published Butto
     '.fabricate-manager .fabricate-button',
     '.fabricate-button > span',
     '.fabricate-button[data-x]',
+    '.fabricate-button.is-size-38',
+    '.fabricate-button .fa-plus',
+    '.fabricate-button .manager-x',
     '.manager-tools-authority-heading .fabricate-button',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published button`, () => {
@@ -3423,9 +3529,9 @@ describe('the module sheet and every component style against the published Butto
   });
 
   it('reaches through a class once a published key writes it', () => {
-    const sized = { ...BUTTON, writable: new Set([...BUTTON.writable, 'is-size-38']) };
-    const census = syntheticCensus(sized, '.fabricate-button.is-size-38 { gap: 0 }');
-    assert.deepEqual(writtenOf(reachingOf(census)), ['sheet.css: .fabricate-button.is-size-38']);
+    const armed = { ...BUTTON, writable: new Set([...BUTTON.writable, 'is-armed']) };
+    const census = syntheticCensus(armed, '.fabricate-button.is-armed { gap: 0 }');
+    assert.deepEqual(writtenOf(reachingOf(census)), ['sheet.css: .fabricate-button.is-armed']);
   });
 
   it('names a pinned ancestor that keeps no selector off the button as stale', () => {

@@ -206,7 +206,14 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'button-danger': button({ role: 'danger', children: 'Delete', onclick: press }),
     'button-warning': button({ role: 'warning', children: 'Override', onclick: press }),
     'button-full-width': button({ fullWidth: true, children: 'Start batch', onclick: press }),
+    'button-size-28': button({ size: '28', children: 'Add choice', onclick: press }),
+    'button-size-38': button({ size: '38', children: 'Register item', onclick: press }),
     'button-disabled': disabledButton({ disabled: true, children: 'Not yet', onclick: press }),
+    'button-busy': {
+      props: { busy: true, children: 'Saving…', onclick: press },
+      reach: reach('button', 'button', { inert: true }),
+    },
+    'button-icon': button({ icon: 'fas fa-plus', children: 'Add step', onclick: press }),
   }),
   StatusToggle: Object.freeze({
     'toggle-off': button({ on: false, ariaLabel: 'Group by category', onclick: press }),

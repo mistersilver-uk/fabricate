@@ -450,7 +450,9 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s, `Button`'s and `IconButton`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
-- `Button`'s `size`, `icon`, `busy`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
+- `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
+- `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
+- `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
@@ -644,10 +646,10 @@ The gate also holds that the closure of an `overlays: true` entry names no `reso
 
 ### Interactive components
 
-- A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, which only a `Button` whose `type` key says so draws as another type, an `<input>`, a `<select>` or a `<textarea>`.
+- A control never submits a `<form>` it is mounted in, except that a `Button` whose `type` is `submit` submits it as its group states, and a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 That exception reaches a radio and a number input too where the form has a submit button: Enter there submits the form, as on a text-like input.
-- A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so the companion resets no form a published control is in, or destroys and mounts the control again (read from Svelte 5.56 source, not run).
+- A `reset` of the `<form>` a control is in, a `Button` whose `type` is `reset` making one, changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so the companion resets no form a published control is in, or destroys and mounts the control again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
@@ -811,6 +813,16 @@ Each group states the accepted values of every key that entry publishes.
   - `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
     At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: the companion keeps a `list` label short.
     At `default` a long label wraps inside the chip.
+  - `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
+    It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
+    The figures stated for `neutral` hold for a chip with no `emphasis`; the companion measures the combination it draws.
+    What the chip draws for a value outside the set is private; today that is the default chip.
+  - `icon` is optional Font Awesome classes for a leading glyph, hidden from assistive technology; absent, no glyph is drawn.
+    The glyph is never the chip's name, so a chip whose meaning rests on it carries that meaning in its label.
+  - `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
+  - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
+    It is drawn and never announced, so the label says the state.
+  - Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
   - It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
     `tone` is colour alone, so the label says the state.
     A label changed through `update` is not announced; a live region is the companion's.
@@ -906,7 +918,7 @@ Each group states the accepted values of every key that entry publishes.
   - The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so the companion never mounts a notice with an action inside a tinted panel.
     Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: the companion passes a verb phrase.
   - It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
-- **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
+- **Private:** every other `Chip` tone and density, and its `lit` emphasis; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
 
 ### The issue 2452 components
 
@@ -918,7 +930,9 @@ Each group states the accepted values of every key that entry publishes.
     The button hugs its label on one line while it has the room.
     Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
     A label of white space alone draws a button with no name, so the companion never passes one.
-    The button draws no glyph: a leading glyph is not published at version 1, and a glyph-only button is `IconButton`.
+  - `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
+    The label stays the button's whole name, so the glyph never replaces it: a glyph-only button is `IconButton`.
+  - `size` is `''`, `'28'` or `'38'`, a string, and defaults to `''`: `''` draws the default rung, and `'28'` and `'38'` the 28px and 38px rungs of the design system's height scale; what it draws for any other value, a number included, is private.
   - `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
     The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
   - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
@@ -936,17 +950,25 @@ Each group states the accepted values of every key that entry publishes.
     It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button, and it opens no tooltip, so nothing at the button can say why.
     A verb the user is refused for a reason stays enabled, and its press answers with the reason, in a `Notice` or a notification of the companion's.
     The unavailable label is not held to the contrast floor.
-    The companion never passes `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work leaves the button enabled.
-  - Fabricate coerces neither `fullWidth` nor `disabled` to a boolean, so only `true` and `false` are in the contract: the string `'false'` spans `target` and disables the button.
-  - The button has no busy state at version 1.
-    While a press is being handled the companion leaves the button enabled, ignores every further press, a held Enter key's repeats among them, and where the wait is perceptible passes `children` that say so.
+    The companion never passes `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work passes `busy`, which leaves the button enabled.
+  - `busy` is `true` or `false`.
+    `true` marks an action in flight: the button keeps its place in the tab order and its focus, takes `aria-busy="true"` and `aria-disabled="true"` and never `disabled`, is drawn dimmed under the progress cursor, and a press, a held Enter key's repeats among them, calls neither `onclick` nor a `submit`.
+    `busy` beside `disabled` draws the disabled face.
+    The busy label is not held to the contrast floor.
+  - The button draws no busy label, so the companion passes `children` that say what is in flight where the wait is perceptible, because the control otherwise reads as idle while it refuses.
     A change to a focused button's label is not reliably announced, so the companion announces the outcome itself, with a `Notice` or a live region of its own.
-    When the work ends it passes the first label again, or moves focus and then removes the button.
+    When the work ends it passes `busy: false` and the first label again, or moves focus and then removes the button.
+  - Fabricate coerces none of `fullWidth`, `disabled` and `busy` to a boolean, so only `true` and `false` are in the contract: the string `'false'` spans `target`, disables the button and marks it busy.
+  - `type` is `button`, `submit` or `reset`, and defaults to `button`; a value outside the set draws `button`, never the browser's own default of `submit`.
+    A `submit` button submits the `<form>` that holds `target` once `onclick` has returned, so the companion mounts it inside a form of its own and handles that form's `submit` event; `onclick` takes no argument, so it cannot cancel the submit, and the companion cancels it in the `submit` event.
+    As the form's first submit button it is also pressed by implicit submission, so Enter in a text field of that form calls `onclick` and then submits it, and while `busy` that Enter submits nothing.
+    A `reset` button resets that form.
+    A form submit in Foundry closes a DialogV2 and saves an editable document sheet, so the companion mounts a `submit` button only in a form it owns.
   - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
     It inherits `target`'s face; its size, weight and ink are its own.
     The companion aligns its own content to the button by centring, never by restating its height.
   - A companion's own window or dialog carries no Fabricate root, so the button is drawn there under the standalone style root, and a dialog the companion opens still draws Foundry's own buttons.
-  - It is never a form's submit button: a companion that submits a `<form>` of its own from a press calls that form's `requestSubmit()` in `onclick`.
+  - Without `type: 'submit'` it is never a form's submit button: a companion that submits a `<form>` of its own from a press calls that form's `requestSubmit()` in `onclick`.
   - Two buttons side by side are two mounts in two targets, which the companion lays out as a wrapping row `--fab-space-2` apart.
     A `target` is never Foundry's `.form-footer`, which resizes a button that is its child.
   - The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
