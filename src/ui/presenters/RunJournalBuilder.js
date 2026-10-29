@@ -1,6 +1,7 @@
 import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
+import { gatheringRunNeedsPlayerCheck } from '../../systems/gatheringD100Check.js';
 import {
   actorToOption,
   idOf,
@@ -34,12 +35,10 @@ import {
   classifyStageReadiness,
   ingredientKind,
   isChoiceBlocker,
-  missingGroupBlocker,
   resolveStageToolStates,
   scopedEssenceAllocation,
   selectedIngredientItems,
   stageSelectionInputsComplete,
-  unfundedEssenceGroupIds,
 } from '../../systems/stageReadiness.js';
 import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.js';
 import { cloneJson } from '../../utils/scalars.js';
@@ -65,7 +64,14 @@ import {
   inFlightAwardJournal,
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
-import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
+import {
+  acquisitionShortfallCount,
+  choiceAvailability,
+  missingGroupId,
+  safeMissingGroup,
+  startedStageItems,
+  unchosenRouteAvailability,
+} from './runJournalChoiceAvailability.js';
 import { d100PreviewEntries } from './runJournalD100Preview.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 import {
@@ -251,6 +257,7 @@ export class RunJournalBuilder {
    *   it. It is supplied so the per-pass snapshot built here is the same complete value the
    *   crafting and visibility passes build (issue 1228) rather than a half of one — see
    *   `passInventorySnapshot`'s header for what a half-snapshot does to each consumer.
+   * @param {Function} [deps.gatheringToolsMissing] `({actor, run}) => boolean`: execute would refuse the run for a Tool.
    * @param {Function} [deps.getDismissedRunKeys] `({actorUuid, viewerId}) => Iterable<string>`.
    * @param {Function} [deps.getJournalActionAvailability] `() => {available, reason}`.
    * @param {Function} [deps.getComponentSourceActors] `({actor, run}) => object[]`.
@@ -283,6 +290,7 @@ export class RunJournalBuilder {
     affordCurrency = null,
     affordCurrencySpends = null,
     getAwardChoiceClaimability = null,
+    gatheringToolsMissing = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -318,6 +326,8 @@ export class RunJournalBuilder {
     this._affordCurrencySpends =
       typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
     this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
+    this._gatheringToolsMissing =
+      typeof gatheringToolsMissing === 'function' ? gatheringToolsMissing : () => false;
   }
 
   /**
@@ -2015,14 +2025,7 @@ export class RunJournalBuilder {
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
     const status = stringOrNull(run.status) || (terminal ? 'succeeded' : 'inProgress');
     const timeGate = plainObjectOrNull(run.timeGate);
-    const startedAt =
-      runType === 'gathering' ? numberOrNull(run.startedAtWorldTime) : numberOrNull(run.startedAt);
-    const updatedAt =
-      runType === 'gathering' ? numberOrNull(run.updatedAtWorldTime) : numberOrNull(run.updatedAt);
-    const finishedAt =
-      runType === 'gathering'
-        ? numberOrNull(run.completedAtWorldTime)
-        : numberOrNull(run.finishedAt);
+    const { startedAt, updatedAt, finishedAt } = passthroughTimes(run, runType);
 
     const gatheringContext =
       runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer, actor }) : null;
@@ -2040,7 +2043,7 @@ export class RunJournalBuilder {
       fallbackTitle: stringOrEmpty(run.label) || stringOrEmpty(run.taskId),
     });
     const hasPlayerCheck =
-      runType === 'gathering' ? this._gatheringRunHasPlayerCheck(gatheringContext) : false;
+      runType === 'gathering' ? this._gatheringRunHasPlayerCheck(gatheringContext, run) : false;
 
     const derivedStatus = this._derivePassthroughStatus({ status, timeGate, worldTime, run });
     return {
@@ -2055,6 +2058,12 @@ export class RunJournalBuilder {
         derivedStatus,
         timeGate,
         hasPlayerCheck,
+        selectionAvailability: this._gatheringToolBlocker({
+          run,
+          actor,
+          live: !terminal && !withheld,
+          context: gatheringContext,
+        }),
         entitled: !gatheringContext?.blind || viewer?.isGM === true,
         evidenceEntitled: historyEntitled && (!gatheringContext?.blind || viewer?.isGM === true),
         authority,
@@ -2171,9 +2180,20 @@ export class RunJournalBuilder {
     }
   }
 
-  _gatheringRunHasPlayerCheck({ task } = {}) {
-    const resolutionMode = stringOrNull(task?.resolutionMode) || 'd100';
-    return resolutionMode !== 'straight';
+  /** The Tool blocker of a live gathering run; a blind or withheld row reports none. */
+  _gatheringToolBlocker({ run, actor, live, context }) {
+    const missing =
+      live && context && !context.blind && this._gatheringToolsMissing({ actor, run });
+    return missing === true ? { blocker: STAGE_BLOCKERS.tool } : null;
+  }
+
+  // An absent mode is d100, as authored tasks default; a task the viewer cannot see counts as
+  // prompting, so its selector stays hidden.
+  _gatheringRunHasPlayerCheck(context, run) {
+    const task = context?.task;
+    if (!task) return true;
+    const resolutionMode = stringOrNull(task.resolutionMode) || 'd100';
+    return gatheringRunNeedsPlayerCheck({ task: { ...task, resolutionMode }, run });
   }
 
   /**
@@ -2511,9 +2531,9 @@ export class RunJournalBuilder {
       recoveryEvidence?.required === true || recoveryEvidence?.status === 'planned';
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
-    const craftingStage = current && live && runType === 'crafting';
     // The one cause this stage is refused for, as the engine's own commands classify it.
-    const stageBlocker = craftingStage ? (selectionAvailability?.blocker ?? null) : null;
+    const stageBlocker =
+      current && live && executableType ? (selectionAvailability?.blocker ?? null) : null;
     const materialBlocked = stageBlocker !== null && !isChoiceBlocker(stageBlocker);
     // A stage with its own start is not resolvable until the player has begun it: the roll
     // is withheld rather than offered and then refused (M13/M15).
@@ -2801,6 +2821,15 @@ export class RunJournalBuilder {
   }
 }
 
+function passthroughTimes(run, runType) {
+  const gathering = runType === 'gathering';
+  return {
+    startedAt: numberOrNull(gathering ? run.startedAtWorldTime : run.startedAt),
+    updatedAt: numberOrNull(gathering ? run.updatedAtWorldTime : run.updatedAt),
+    finishedAt: numberOrNull(gathering ? run.completedAtWorldTime : run.finishedAt),
+  };
+}
+
 function normalizeRevision(value) {
   const revision = Number(value);
   return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
@@ -2851,12 +2880,6 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 }
 
 /**
- * The stage's answer when its route resolves to no authored set: none has been chosen, or the
- * one that was has gone. An unstarted stage waits on a pick — a ROUTE pick specifically, which
- * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
- * F5) — while a started one has no pick left to make and reports the recipe edit instead.
- */
-/**
  * Whether the current stage has begun, independently of whether this viewer may act on it. A
  * surface that reads `actions.atStageStart` for the FACT loses it whenever the authority is
  * refusing, the viewer is not the owner, or the run needs recovery (issue 1648, UX2-2).
@@ -2864,52 +2887,4 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 function projectedStageStart(stageStart) {
   if (stageStart === null || stageStart === undefined) return null;
   return { required: stageStart.required === true, started: stageStart.started === true };
-}
-
-/** The consumed items a started stage has not fully removed, for the tool exclusion. */
-function startedStageItems(runStep, items) {
-  const uuids = new Set(
-    normalizeList(runStep?.preparedConsumption?.consumedSummary)
-      .map((entry) => stringOrNull(entry?.itemUuid))
-      .filter(Boolean)
-  );
-  return new Set(items.filter((item) => uuids.has(stringOrNull(item?.uuid))));
-}
-
-function unchosenRouteAvailability(setId, routes, started = false) {
-  return {
-    success: false,
-    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.route,
-    knownMaterialShortfall: false,
-    awaitingChoice: !started,
-    selectedIngredientSetId: setId,
-    routes,
-    staleRoute: true,
-    missingGroups: [],
-    choices: [],
-    requirements: [],
-    essencePool: null,
-  };
-}
-
-/**
- * A route's own count of what the player would have to ACQUIRE to take it, used to rank the
- * alternatives. Essence and currency gaps count too: every one of them refuses the stage.
- */
-function acquisitionShortfallCount(selection) {
-  const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
-  return normalizeList(selection?.missingGroups).filter(
-    (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
-  ).length;
-}
-
-function safeMissingGroup(group) {
-  const id = missingGroupId(group);
-  return {
-    id,
-    name: stringOrEmpty(group?.group?.name ?? group?.name),
-    ingredientId: stringOrNull(group?.ingredient?.id),
-    need: numberOrNull(group?.need),
-    have: numberOrNull(group?.have),
-  };
 }
