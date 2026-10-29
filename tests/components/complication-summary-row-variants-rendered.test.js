@@ -129,16 +129,22 @@ const REMOVABLE = Object.freeze({
   },
 });
 
-/** Runs IN THE PAGE: the remove control at rest, its edge, ink and fill, and its box. */
+/** Runs IN THE PAGE: the remove control at rest, its edge, ink, fill and box, and the subtle ink. */
 function measureRemove() {
   const button = document.querySelector('[data-probe="removable"] [data-complication-remove]');
   const style = getComputedStyle(button);
   const box = button.getBoundingClientRect();
+  const probe = document.createElement('i');
+  probe.style.color = 'var(--fab-text-subtle)';
+  button.append(probe);
+  const subtle = getComputedStyle(probe).color;
+  probe.remove();
   return {
     border: style.borderTopColor,
     ink: style.color,
     ground: style.backgroundColor,
     box: [box.width, box.height],
+    subtle,
   };
 }
 
@@ -206,11 +212,12 @@ describe('2445 the complication row variants keep their frozen geometry', () => 
     });
   }
 
-  // RED (issue 2632): the remove control drew the danger edge and ink at rest.
+  // RED (issue 2632): the remove control rests quiet, with no edge or fill, subtle ink, 28 square.
   it("RED: the authoring row's remove control rests quiet, with no edge or fill", () => {
-    assert.deepEqual(measured.remove, {
+    const { subtle, ...rest } = measured.remove;
+    assert.deepEqual(rest, {
       border: 'rgba(0, 0, 0, 0)',
-      ink: 'rgba(217, 184, 156, 0.56)',
+      ink: subtle,
       ground: 'rgba(0, 0, 0, 0)',
       box: [28, 28],
     });
