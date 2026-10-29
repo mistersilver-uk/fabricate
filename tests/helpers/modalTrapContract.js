@@ -21,7 +21,6 @@ const frame = (view) => new Promise((settle) => view.requestAnimationFrame(settl
 
 export async function assertTrapsFocus({ open, close, dialog, landing, last }) {
   const doc = globalThis.document;
-  await frame(doc.defaultView);
   const opener = doc.createElement('button');
   doc.body.append(opener);
   opener.focus();
