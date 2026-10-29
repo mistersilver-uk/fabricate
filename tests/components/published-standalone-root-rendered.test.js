@@ -76,6 +76,7 @@ const UNDRAWN_SCOPED = Object.freeze({
 const UNREACHED = Object.freeze([
   'card-filled',
   'button-disabled',
+  'stepper-disabled',
   'well-labelled',
   'well-unlabelled',
   'icon-button-disabled',
@@ -87,6 +88,7 @@ const UNHOVERED = Object.freeze(['card-filled', 'well-labelled', 'well-unlabelle
 const INERT = Object.freeze([
   'button-disabled',
   'button-busy',
+  'stepper-disabled',
   'search-empty',
   'search-holding',
   'select-form-chosen',
@@ -306,7 +308,7 @@ describe('the standalone specimen table', () => {
         held += 1;
       }
     }
-    assert.equal(held, 22, 'each vocabulary key the sixteen publish was read');
+    assert.equal(held, 25, 'each vocabulary key the sixteen publish was read');
   });
 
   it('reads the rungs Select maps for size from its frozen table', () => {

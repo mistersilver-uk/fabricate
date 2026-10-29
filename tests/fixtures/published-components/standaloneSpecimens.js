@@ -230,6 +230,19 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       props: unboundedStepper({ value: 1.5, step: 0.5 }),
       reach: reach('[data-stepper-decrement]'),
     },
+    'stepper-disabled': {
+      props: stepper({ disabled: true }),
+      reach: inertHover('[data-stepper-decrement]'),
+    },
+    'stepper-fill': { props: stepper({ fill: true }), reach: reach('[data-stepper-decrement]') },
+    'stepper-comfortable': {
+      props: stepper({ density: 'comfortable' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
+    'stepper-unset': {
+      props: stepper({ value: null, allowUnset: true }),
+      reach: reach('[data-stepper-decrement]'),
+    },
   }),
   SearchField: Object.freeze({
     'search-empty': {

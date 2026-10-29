@@ -74,6 +74,7 @@ const BARE_INPUT_ANCESTORS = new Set([
   'fabricate-search',
   'fabricate-slider',
   'form-group',
+  'manager-checks-trigger-step-operand',
   'manager-checks-trigger-value',
   'manager-component-entry-alias-field',
   'manager-condition-add',
@@ -100,6 +101,7 @@ const FIELD_ATTRIBUTES = new Set([
   'min',
   'max',
   'step',
+  'disabled',
   'aria-label',
   'data-stepper-input',
   'data-validation-focused',
@@ -190,8 +192,7 @@ const refusesNumber = (part) =>
 
 /**
  * Whether an `input` compound cannot match the published number field: it requires an attribute
- * the field never carries, a `type` other than `number`, no `type`, no `fab-stepper-input`, or
- * `:disabled`, which no published key writes.
+ * the field never carries, a `type` other than `number`, no `type`, or no `fab-stepper-input`.
  */
 function unmatchable(compound) {
   return compound.selectors.some((part) => {
@@ -201,7 +202,7 @@ function unmatchable(compound) {
       return name === 'type' && refusesNumber(part);
     }
     if (part.type !== 'PseudoClassSelector') return false;
-    return part.name === 'disabled' || negatesType(part) || negatesField(part);
+    return negatesType(part) || negatesField(part);
   });
 }
 
@@ -303,6 +304,10 @@ describe('the module sheet and every component style against the published Stepp
           'min',
           'max',
           'step',
+          'disabled',
+          'allowUnset',
+          'fill',
+          'density',
           'ariaLabel',
           'decrementLabel',
           'incrementLabel',
@@ -310,7 +315,7 @@ describe('the module sheet and every component style against the published Stepp
         ],
         'fabricate',
       ],
-      'a published disabled, placeholder, orientation, density, fill, attribute or wider root reopens them'
+      'a published placeholder, orientation, attribute or wider root reopens them'
     );
   });
 });
@@ -346,7 +351,6 @@ describe('the stepper census, synthetic', () => {
   for (const selector of [
     '.a input[type="text"]',
     '.a input:not([type])',
-    '.a input:disabled',
     '.a input[data-recipe-field]',
     '.host-row input',
     '.host-row :is(input, textarea)',
@@ -362,6 +366,8 @@ describe('the stepper census, synthetic', () => {
 
   for (const selector of [
     '.a input',
+    '.a input:disabled',
+    '.a input[disabled]',
     '.a input[type="number"]',
     '.a input:is([type="text"], [type="number"])',
     '.a :is(input, textarea)',
