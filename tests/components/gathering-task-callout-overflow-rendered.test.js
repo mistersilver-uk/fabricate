@@ -1,7 +1,8 @@
 /**
- * Issue 2559: a long blocked-reason callout stays inside its chip, and so inside a narrow task row.
- * An unmapped code falls back to the reason's own message, which a provider or a translation can
- * make far longer than the chip. Measured in Chromium on the text itself, not the chip's box.
+ * Issues 2559 and 2751: a long blocked-reason callout stays inside its chip, and so inside a narrow
+ * task row, and keeps its glyph and the start of its text, ending in an ellipsis. An unmapped code
+ * falls back to the reason's own message, which a provider or a translation can make far longer
+ * than the chip. Measured in Chromium on the text itself, not the chip's box.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
