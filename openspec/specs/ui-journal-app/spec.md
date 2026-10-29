@@ -222,11 +222,11 @@ It exposes pause/resume, manual execution, cancellation and an eligible completi
 Arming cancellation replaces the sibling actions with confirm/keep controls in the bar.
 In the opened run's header the bar's plain control line sits on the card's right content edge after the identity block.
 The completion switch is visible on an actively counting-down stage without a player check even when unresolved materials block automatic execution.
-A gathering run has a player check exactly when the engine prompts for one on resolve: a routed or progressive task, or an untimed d100 task; a timed d100 run needs none and offers the switch.
+A gathering run has a player check exactly when the engine prompts for one on resolve: a routed or progressive task, or a d100 run started without a time gate; a timed d100 run needs none and offers the switch, and a task the viewer cannot see counts as prompting.
 Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.
-A live gathering run whose task needs a Tool that is neither held by the actor nor supplied by the viewer's Active Canvas Tool projects `actions.execute` false with `actions.disabledReason` `toolRequired`, and its row and detail show **Needs tools**, because the gathering `execute` command refuses on the same presence match (`matchGatheringTools`) under the command's own station.
-A blind, withheld or finished gathering row reports no Tool need.
+A live, visible (non-blind, non-withheld) gathering run whose task needs a Tool that is neither held by the actor nor supplied by the viewer's Active Canvas Tool projects `actions.execute` false with `actions.disabledReason` `toolRequired`, and its row and detail show **Needs tools**, because the gathering `execute` command refuses on the same presence match (`matchGatheringTools`) under the command's own station.
+Tool prerequisite and requirement gates stay with the command, and a blind, withheld or finished gathering row reports no Tool need.
 
 ### Authority Reasons and Recovery
 

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { gatheringRunToolsMissing } from '../../src/bootstrap/journalGatheringTools.js';
+import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { runAttentionPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
@@ -22,13 +23,19 @@ const craftingSystemManager = {
   toolMatchesItemByIdentity: () => false,
 };
 
-function makeEngine({ tools = [TOOL], missingReference = null } = {}) {
+function makeEngine({
+  tools = [TOOL],
+  missingToolIds = [],
+  disabledToolIds = [],
+  missingReference = null,
+} = {}) {
   return {
+    _hasBlockedToolReferences: GatheringEngine.prototype._hasBlockedToolReferences,
     _resolveWaitingRunContext: () =>
       missingReference
         ? { missingReference }
         : { system: { id: SYSTEM_ID }, environment: { id: 'env-1' }, task: TASK },
-    _resolveTaskTools: () => ({ tools, missingToolIds: [], disabledToolIds: [] }),
+    _resolveTaskTools: () => ({ tools, missingToolIds, disabledToolIds }),
   };
 }
 
@@ -53,9 +60,20 @@ test('a run needing a Tool is blocked with no copy and no station, and ready wit
   );
 });
 
-test('a run needing no Tool, or one that no longer resolves, is never blocked here', () => {
+test('a run needing no Tool, with a stale Tool reference, or that no longer resolves, is never blocked here', () => {
   assert.equal(missing({ engine: makeEngine({ tools: [] }) }), false);
   assert.equal(missing({ engine: makeEngine({ missingReference: 'task' }) }), false);
+  const stale = { tools: [TOOL] };
+  assert.equal(
+    missing({ engine: makeEngine({ ...stale, missingToolIds: ['gone'] }) }),
+    false,
+    'a deleted reference'
+  );
+  assert.equal(
+    missing({ engine: makeEngine({ ...stale, disabledToolIds: ['off'] }) }),
+    false,
+    'a disabled one'
+  );
   const throwing = {
     _resolveWaitingRunContext: () => {
       throw new Error('unresolvable');

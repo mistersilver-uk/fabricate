@@ -114,10 +114,8 @@ export function startedStageItems(runStep, items) {
 }
 
 /**
- * The stage's answer when its route resolves to no authored set: none has been chosen, or the
- * one that was has gone. An unstarted stage waits on a pick — a ROUTE pick specifically, which
- * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
- * F5) — while a started one has no pick left to make and reports the recipe edit instead.
+ * A stage whose route resolves to no authored set: unstarted, it waits on a route pick; started,
+ * it reports the recipe edit.
  */
 export function unchosenRouteAvailability(setId, routes, started = false) {
   return {
@@ -136,8 +134,8 @@ export function unchosenRouteAvailability(setId, routes, started = false) {
 }
 
 /**
- * A route's own count of what the player would have to ACQUIRE to take it, used to rank the
- * alternatives. Essence and currency gaps count too: every one of them refuses the stage.
+ * What the player must acquire to take a route, essence and currency gaps included, to rank the
+ * alternatives.
  */
 export function acquisitionShortfallCount(selection) {
   const unfunded = unfundedEssenceGroupIds(selection?.essencePool);

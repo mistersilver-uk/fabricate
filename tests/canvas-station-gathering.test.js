@@ -153,6 +153,7 @@ test('a canvas station reaches versioned gathering execution', async (t) => {
           if (available) return resolve(services, activeRun(runId));
           const refused = await resolve(services, activeRun(runId));
           assert.equal(refused?.success, false, `${label}: ${JSON.stringify(refused)}`);
+          assert.match(refused.message, /gathering tools are no longer available/u, label);
           assert.ok(activeRun(runId), `${label}: a refusal leaves the run`);
           return refused;
         };

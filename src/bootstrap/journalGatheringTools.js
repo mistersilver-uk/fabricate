@@ -1,8 +1,7 @@
 /**
- * The Journal's read of a live gathering run's Tool readiness (issue 2745): the same
- * `matchGatheringTools` presence match execute's availability check starts from, over the tools the
- * run's execute resolves, with the viewer's station standing in for a held copy. Tool prerequisite
- * gates are asynchronous and stay with the command.
+ * The Journal's synchronous read of a live gathering run's Tool readiness: execute's
+ * `matchGatheringTools` presence match under the viewer's station. Tool prerequisite gates stay with
+ * the command.
  */
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
 
@@ -17,7 +16,10 @@ export function gatheringRunToolsMissing({
   try {
     const resolved = engine?._resolveWaitingRunContext?.({ actor, run });
     if (!resolved || resolved.missingReference) return false;
-    const { tools } = engine._resolveTaskTools(resolved);
+    const resolvedTools = engine._resolveTaskTools(resolved);
+    // Execute clears a run with a stale or disabled Tool reference instead of refusing it.
+    if (engine._hasBlockedToolReferences(resolvedTools)) return false;
+    const { tools } = resolvedTools;
     if (tools.length === 0) return false;
     const { system, task } = resolved;
     return (

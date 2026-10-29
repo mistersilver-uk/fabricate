@@ -70,7 +70,7 @@ Where a run needs something from **you**, a second badge sits beside the status 
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
   **Needs tools** clears while a [tool station]({% link canvas-interactables.md %}#virtual-present-station-tools) you activated supplies the missing tool, and returns when that station is no longer active.
-  A gathering run shows it too, when its task needs a tool you do not hold, and its ready action stays unavailable until you hold the tool or a station supplies it.
+  A gathering run shows it too, when its task needs a tool you have no working copy of, and its ready action stays unavailable until you have one or a station supplies it.
 
 A small bolt before the status badge, labelled **Finishes this stage as time passes**, means the run's current stage will complete on its own once its wait is over.
 It shows only for a run that is set to complete as time passes, is not paused, and is still waiting on its time gate.
