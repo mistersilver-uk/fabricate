@@ -426,14 +426,21 @@ function spreadTracer(entry, reader) {
       const names = new Map();
       const imports = new Set();
       const functions = new Set();
-      scopeNames.set(file, { imports, functions });
+      const others = new Set();
+      scopeNames.set(file, { imports, functions, others });
       for (const exported of topLevel(ast)) {
         const statement = exported.declaration ?? exported;
         if (exported.type === 'ImportDeclaration') {
           for (const specifier of exported.specifiers) imports.add(specifier.local.name);
         }
         if (statement.type === 'FunctionDeclaration') functions.add(statement.id.name);
+        if (statement.type === 'ClassDeclaration') others.add(statement.id.name);
         if (statement.type !== 'VariableDeclaration') continue;
+        if (statement.kind !== 'const') {
+          for (const { id } of statement.declarations) {
+            for (const name of boundNames(id)) others.add(name);
+          }
+        }
         for (const { id, init } of statement.declarations) {
           const callee = init?.callee;
           const derived = callee?.name === '$derived' || callee?.object?.name === '$derived';
@@ -451,6 +458,14 @@ function spreadTracer(entry, reader) {
       return [file, names];
     })
   );
+  const propNames = new Map(
+    files.map((file) => [file, new Set(propLocals(asts.get(file)).map(({ local }) => local))])
+  );
+  /** Whether `file` binds `name` at its top level to something the tracer resolves or fails closed on. */
+  const boundAtTopLevel = (name, file) =>
+    scriptLocals.get(file).has(name) ||
+    propNames.get(file).has(name) ||
+    scopeNames.get(file).others.has(name);
   const active = new Set();
   const guarded = (id, trace) => {
     if (active.has(id)) return [];
@@ -571,7 +586,9 @@ function spreadTracer(entry, reader) {
     if (kind === 'literal') return literalOrigins(value, file);
     if (kind === 'rest') return [];
     const inside = declaredWithin(value);
-    const reads = [...referencedNames(value)].filter((read) => !inside.has(read));
+    const reads = [...referencedNames(value)].filter(
+      (read) => !inside.has(read) || boundAtTopLevel(read, file)
+    );
     return reads.some((read) => nameOrigins(read, file, []).some(holdsData)) ? [UNNAMEABLE] : [];
   }
 
