@@ -257,6 +257,7 @@ export class RunJournalBuilder {
    *   it. It is supplied so the per-pass snapshot built here is the same complete value the
    *   crafting and visibility passes build (issue 1228) rather than a half of one — see
    *   `passInventorySnapshot`'s header for what a half-snapshot does to each consumer.
+   * @param {Function} [deps.gatheringToolsMissing] `({actor, run}) => boolean`: execute would refuse the run for a Tool.
    * @param {Function} [deps.getDismissedRunKeys] `({actorUuid, viewerId}) => Iterable<string>`.
    * @param {Function} [deps.getJournalActionAvailability] `() => {available, reason}`.
    * @param {Function} [deps.getComponentSourceActors] `({actor, run}) => object[]`.
@@ -289,6 +290,7 @@ export class RunJournalBuilder {
     affordCurrency = null,
     affordCurrencySpends = null,
     getAwardChoiceClaimability = null,
+    gatheringToolsMissing = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -324,6 +326,8 @@ export class RunJournalBuilder {
     this._affordCurrencySpends =
       typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
     this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
+    this._gatheringToolsMissing =
+      typeof gatheringToolsMissing === 'function' ? gatheringToolsMissing : () => false;
   }
 
   /**
@@ -2021,14 +2025,7 @@ export class RunJournalBuilder {
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
     const status = stringOrNull(run.status) || (terminal ? 'succeeded' : 'inProgress');
     const timeGate = plainObjectOrNull(run.timeGate);
-    const startedAt =
-      runType === 'gathering' ? numberOrNull(run.startedAtWorldTime) : numberOrNull(run.startedAt);
-    const updatedAt =
-      runType === 'gathering' ? numberOrNull(run.updatedAtWorldTime) : numberOrNull(run.updatedAt);
-    const finishedAt =
-      runType === 'gathering'
-        ? numberOrNull(run.completedAtWorldTime)
-        : numberOrNull(run.finishedAt);
+    const { startedAt, updatedAt, finishedAt } = passthroughTimes(run, runType);
 
     const gatheringContext =
       runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer, actor }) : null;
@@ -2061,6 +2058,12 @@ export class RunJournalBuilder {
         derivedStatus,
         timeGate,
         hasPlayerCheck,
+        selectionAvailability: this._gatheringToolBlocker({
+          run,
+          actor,
+          live: !terminal && !withheld,
+          context: gatheringContext,
+        }),
         entitled: !gatheringContext?.blind || viewer?.isGM === true,
         evidenceEntitled: historyEntitled && (!gatheringContext?.blind || viewer?.isGM === true),
         authority,
@@ -2175,6 +2178,13 @@ export class RunJournalBuilder {
     } catch {
       return true;
     }
+  }
+
+  /** The Tool blocker of a live gathering run; a blind or withheld row reports none. */
+  _gatheringToolBlocker({ run, actor, live, context }) {
+    const missing =
+      live && context && !context.blind && this._gatheringToolsMissing({ actor, run });
+    return missing === true ? { blocker: STAGE_BLOCKERS.tool } : null;
   }
 
   // A task the viewer cannot see is treated as prompting, so its selector stays hidden.
@@ -2517,9 +2527,9 @@ export class RunJournalBuilder {
       recoveryEvidence?.required === true || recoveryEvidence?.status === 'planned';
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
-    const craftingStage = current && live && runType === 'crafting';
     // The one cause this stage is refused for, as the engine's own commands classify it.
-    const stageBlocker = craftingStage ? (selectionAvailability?.blocker ?? null) : null;
+    const stageBlocker =
+      current && live && executableType ? (selectionAvailability?.blocker ?? null) : null;
     const materialBlocked = stageBlocker !== null && !isChoiceBlocker(stageBlocker);
     // A stage with its own start is not resolvable until the player has begun it: the roll
     // is withheld rather than offered and then refused (M13/M15).
@@ -2805,6 +2815,15 @@ export class RunJournalBuilder {
       ...(grants.length > 0 && { grants }),
     };
   }
+}
+
+function passthroughTimes(run, runType) {
+  const gathering = runType === 'gathering';
+  return {
+    startedAt: numberOrNull(gathering ? run.startedAtWorldTime : run.startedAt),
+    updatedAt: numberOrNull(gathering ? run.updatedAtWorldTime : run.updatedAt),
+    finishedAt: numberOrNull(gathering ? run.completedAtWorldTime : run.finishedAt),
+  };
 }
 
 function normalizeRevision(value) {

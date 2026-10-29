@@ -225,6 +225,8 @@ The completion switch is visible on an actively counting-down stage without a pl
 A gathering run has a player check exactly when the engine prompts for one on resolve: a routed or progressive task, or an untimed d100 task; a timed d100 run needs none and offers the switch.
 Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.
+A live gathering run whose task needs a Tool that is neither held by the actor nor supplied by the viewer's Active Canvas Tool projects `actions.execute` false with `actions.disabledReason` `toolRequired`, and its row and detail show **Needs tools**, because the gathering `execute` command refuses on the same presence match (`matchGatheringTools`) under the command's own station.
+A blind, withheld or finished gathering row reports no Tool need.
 
 ### Authority Reasons and Recovery
 

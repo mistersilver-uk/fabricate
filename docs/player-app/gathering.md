@@ -95,6 +95,7 @@ New gathering runs wait for manual collection by default.
 After starting a task, open the [Journal]({% link player-app/journal.md %}) and use its ready action.
 Depending on the task, this is **Collect**, **Roll a d100** (untimed runs), or **Roll check**.
 A timed run must first finish its world-time countdown.
+If the task needs a tool, the run's Journal entry shows **Needs tools** and its ready action stays unavailable until you hold the tool or an active station supplies it.
 Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
 A timed d100 run needs no check, so it offers **When ready**; a timed routed or progressive run asks for a check and does not.
 Starting still applies the task's established stamina, node, and reservation rules.
