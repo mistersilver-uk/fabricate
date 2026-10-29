@@ -27,9 +27,13 @@ import {
   localizeGathering,
   getGatheringEngine,
 } from './gatheringRuntime.js';
+import { gatheringRunToolsMissing } from './journalGatheringTools.js';
 
-/** The Journal projector's seams, over `recipeManager`: the shared one or a station view. */
-function createRunJournalBuilder(facade, recipeManager) {
+/**
+ * The Journal projector's seams, over `recipeManager`: the shared one or a station view. A
+ * gathering run's Tool readiness consults the same `presentTools` the station view carries.
+ */
+function createRunJournalBuilder(facade, recipeManager, presentTools = null) {
   return new RunJournalBuilder({
     craftingRunManager: facade.craftingRunManager,
     salvageRunManager: facade.salvageRunManager,
@@ -88,6 +92,17 @@ function createRunJournalBuilder(facade, recipeManager) {
     getDismissedRunKeys: ({ actorUuid, viewerId }) =>
       facade.getDismissedJournalRunKeys({ actorUuid, viewerId }),
     getJournalActionAvailability: () => facade.getJournalRunAuthorityAvailability(),
+    // The settle's own claimability, so a tile is disabled exactly when a pick would refuse.
+    getAwardChoiceClaimability: ({ run, actor }) =>
+      facade.craftingEngine?.awardChoiceClaimability?.(run, actor) ?? (() => null),
+    gatheringToolsMissing: ({ actor, run }) =>
+      gatheringRunToolsMissing({
+        engine: getGatheringEngine(),
+        craftingSystemManager: facade.craftingSystemManager,
+        actor,
+        run,
+        presentTools,
+      }),
   });
 }
 
@@ -169,73 +184,7 @@ export const journalFacade = {
   },
 
   _getRunJournalBuilder() {
-    if (!this._runJournalBuilder) {
-      this._runJournalBuilder = new RunJournalBuilder({
-        craftingRunManager: this.craftingRunManager,
-        salvageRunManager: this.salvageRunManager,
-        gatheringRunSource: this.gatheringRunManager,
-        recipeManager: this.recipeManager,
-        resolutionModeService: this.resolutionModeService,
-        recipeVisibility: this.recipeVisibilityService,
-        getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
-        getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
-        getGatheringTask: (environmentId, taskId) =>
-          this._resolveJournalGatheringTask(environmentId, taskId),
-        // Consulted only for a GM viewer; a player sees the generic blind label (issue 901).
-        getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
-        // History names a blind task only once the reveal policy disclosed it, never because the
-        // viewer owns the actor (D-027); the engine makes the chat card's identical decision.
-        isGatheringIdentityHidden: (args) =>
-          getGatheringEngine()?.isHistoricalBlindIdentityHidden?.(args) === true,
-        getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
-        getComponent: (systemId, componentId) =>
-          this._resolveJournalComponent(systemId, componentId),
-        getViewer: () => game.user,
-        localize: (key, data) => localizeGathering(key, data),
-        nowWorldTime: () => this.getWorldTime(),
-        // Unread here, but the snapshot must match every other pass's (issue 1228).
-        resolveComponentForItem: findMatchingComponent,
-        getComponentSourceActors: ({ actor, run }) => {
-          const uuids = Array.isArray(run?.componentSourceActorUuids)
-            ? run.componentSourceActorUuids
-            : [];
-          const sources = uuids
-            .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
-            .filter(Boolean);
-          if (sources.length > 0) return sources;
-          return actor ? [actor] : [];
-        },
-        resolveItemEssences: ({ item, recipe }) => {
-          const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
-          return resolveItemEssences(
-            item,
-            resolvedComponentsFor(system),
-            recipe?.craftingSystemId,
-            findMatchingComponent
-          );
-        },
-        affordCurrency: ({ actor, recipe, match }) =>
-          buildCurrencyAffordProbe(
-            actor,
-            recipe,
-            this.craftingEngine?._currencySeams?.() ?? {}
-          )(match),
-        // The aggregate: two currency ingredients affordable alone but not together (issue 1648).
-        affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
-          affordsCurrencySpends(
-            actor,
-            recipe,
-            currencySpends,
-            this.craftingEngine?._currencySeams?.() ?? {}
-          ),
-        getDismissedRunKeys: ({ actorUuid, viewerId }) =>
-          this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
-        getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
-        // The settle's own claimability, so a tile is disabled exactly when a pick would refuse.
-        getAwardChoiceClaimability: ({ run, actor }) =>
-          this.craftingEngine?.awardChoiceClaimability?.(run, actor) ?? (() => null),
-      });
-    }
+    this._runJournalBuilder ??= createRunJournalBuilder(this, this.recipeManager);
     return this._runJournalBuilder;
   },
 
@@ -264,7 +213,7 @@ export const journalFacade = {
     const environment = getGatheringEngine()?._findEnvironment?.(environmentId);
     const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
     const task = tasks.find((entry) => entry?.id === taskId);
-    return task ? { name: task.name, img: task.img } : null;
+    return task ? { name: task.name, img: task.img, resolutionMode: task.resolutionMode } : null;
   },
 
   /** Labels history written before awards captured name and img. Best-effort and synchronous. */
@@ -311,7 +260,7 @@ export const journalFacade = {
     const builder =
       recipeManager === this.recipeManager
         ? this._getRunJournalBuilder()
-        : createRunJournalBuilder(this, recipeManager);
+        : createRunJournalBuilder(this, recipeManager, options.presentTools);
     return builder.buildListing({ actor, viewer: game.user });
   },
 };

@@ -6,7 +6,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
-  SELECT_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -30,8 +30,9 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...PAGINATION_COMPILED_MODULES,
-    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
-    ...SELECT_COMPILED_MODULES,
+    // The searchable popover's compiled closure and the labelled field the search field renders.
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
@@ -41,7 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],
-  // `EmptyState` arrives through the `SELECT_COMPILED_MODULES` spread above.
+  // `EmptyState` arrives through the `SEARCHABLE_POPOVER_COMPILED_MODULES` spread above.
 
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
   // picker, which resolves its portal host by walking up to the nearest Fabricate application

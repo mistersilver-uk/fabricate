@@ -1411,6 +1411,7 @@ A second pill component is a MISSING DENSITY on that chip and never a new member
 The `action` density is the adjacent button's geometry IN FULL — height, corner, type size and inline padding — and never its height alone, truncated or not.
 A state chip standing in an action cluster with 34px buttons MUST take it, because a chip that matches one of the four reads as a fifth control drawn wrong; a toolbar count chip is not in such a cluster and keeps its own density.
 The `header` density is that geometry at the 38px rung, and a state chip in `PageHeader`'s action group MUST take it beside the header's 38px actions, while an edit card's cluster keeps `action` at 34 (issue 2257 D10).
+A truncating chip (`truncate`) MUST keep its leading glyph and the start of its label at every density and end in an ellipsis, so a label that does not fit loses its tail and never its glyph (issue 2751).
 
 A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehicle or a place — is an avatar, with `shape` CALLER-SUPPLIED because actor type is system-defined and eligibility comes from a GM world setting rather than a type map.
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
@@ -2582,6 +2583,7 @@ The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab in
 The import report, the import folder mapping and the add-from-catalogue picker take `trapFocus`, so each is `aria-modal` (issue 2682).
 Focus enters on the report's close control, the mapping's match-by-name checkbox and the picker's search field, Tab stays inside, and Escape closes it.
 On close focus returns to the control that opened it, or to the manager window when there is none.
+The return lands a frame after the close and is skipped when focus is by then on an element other than the page, so a trapped dialog opened in that frame keeps the focus it took (issue 2759).
 The picker's apply action is busy rather than disabled while its run is in flight, so a refused run leaves focus on it inside the dialog.
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
@@ -2611,6 +2613,13 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the GM opens the import report, the import folder mapping or the add-from-catalogue picker
 - **THEN** focus is inside the dialog, and Tab from its last control wraps to its close control
 - **AND** Escape closes it once and focus returns to the opener, or to the manager window when there is none
+
+#### Scenario: A trapped dialog opens as another closes
+
+- **WHEN** a trapped dialog closes and another trapped dialog opens before the next frame
+- **THEN** focus stays in the dialog that opened
+- **AND** the closed dialog's opener is not focused
+- **AND** focus the app moved to a control in that frame is not taken back
 
 #### Scenario: A press on the dialog's surface
 
@@ -2888,6 +2897,7 @@ A list that declares `loading` MUST NOT draw its empty or no-match panel while i
 A list declares only the states it can reach: one with no reachable failure, or whose failure a sibling pane reports, passes no `error`, and then draws no body in that state rather than an empty or no-match claim.
 A list that loads together with its view takes the view's composition instead, and a pane that is not a list keeps its own no-state panel.
 The manager's crafting system library, gathering environment browser and Knowledge roster are its first callers (issue 2548).
+The gathering environment browser reads a synchronous setting, so it declares only `error`, and its detail names a next step beneath the raw error (issue 2626).
 
 #### Scenario: A browse list is loading
 

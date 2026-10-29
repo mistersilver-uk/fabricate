@@ -6,7 +6,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
-  SELECT_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
@@ -46,8 +46,8 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...PAGINATION_COMPILED_MODULES,
-    // Issue 1504: the shared `<Select>`'s whole compiled closure.
-    ...SELECT_COMPILED_MODULES,
+    // The searchable popover's compiled closure.
+    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // Issue 1515: the pane's search is the shared field and its refusal banner the shared
     // notice. A component the tree renders and this list omits HANGS the suite (reported as

@@ -11,7 +11,7 @@
   | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` \| `'header'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
   | `mono` / `struck` / `icon` | booleans / Font Awesome classes | `false` / `false` / `''` | Numerals in the mono face with `tabular-nums`, so columns of counts, DCs and quantities line up; the MUTED VARIANT, a value switched off in the scope being read, composing with every tone, which owns the ink; and a leading glyph. |
   | `swatch` / `tint` | bare `--fab-tag-*` keys | `''` | A leading colour DOT (the chip is ABOUT a colour) and an ink for the WHOLE chip (the chip IS that colour). Both are validated to a bare key before interpolation into a `style` attribute, both ride `--fab-chip-color`, and the tint wins when both are set. |
-  | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line and clipped; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
+  | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line, keeps the glyph and the start of the label and ends in an ellipsis; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
   | `removable` / `removeLabel` / `onRemove` | boolean / string / function | `false` / `undefined` / `null` | The chip is a MEMBERSHIP TOKEN in an editable set rather than a state the GM can only read; see the invariants for the three shapes `removable` refuses. |
   | `disabled` / `class` | boolean / class string | `false` / `''` | The chip and its remove control go inert together, written before the rest spread so a call site that passed it through the spread is unaffected; and an EXTRA class, for a caller that also needs layout context from the global sheet. |
   | `element` | bindable | `null` | The rendered DOM node. `bind:this` on a component yields the INSTANCE, so a caller that must measure or focus the chip has no other way to reach it. |
@@ -182,6 +182,7 @@
       {disabled}
       aria-label={removeLabel || undefined}
       onclick={remove}><i class="fas fa-xmark" aria-hidden="true"></i></button
+    >{:else if truncate}<span class="manager-chip-label">{@render children?.()}</span
     >{:else}{@render children?.()}{/if}</svelte:element
 >
 
@@ -441,6 +442,7 @@
   .manager-chip.is-truncated .manager-chip-label {
     min-width: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .manager-chip-remove {

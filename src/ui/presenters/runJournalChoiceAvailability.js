@@ -4,7 +4,18 @@
  * elsewhere never locks a candidate (issue 1644). A candidate's `claimed` is what the rest of the
  * stage takes of that stack: exclusive component and tag claims plus the essence allocation's units.
  */
-import { idOf, normalizeList, stringOrNull } from '../../systems/gatheringEngineInternals.js';
+import {
+  idOf,
+  normalizeList,
+  numberOrNull,
+  stringOrEmpty,
+  stringOrNull,
+} from '../../systems/gatheringEngineInternals.js';
+import {
+  STAGE_BLOCKERS,
+  missingGroupBlocker,
+  unfundedEssenceGroupIds,
+} from '../../systems/stageReadiness.js';
 
 import { selectedIngredientIndex } from './runJournalIngredientOptions.js';
 
@@ -89,5 +100,57 @@ export function choiceAvailability({
     groupId,
     selectedOptionIndex: selectedIngredientIndex(group, optionOverrides, selection),
     options,
+  };
+}
+
+/** The consumed items a started stage has not fully removed, for the tool exclusion. */
+export function startedStageItems(runStep, items) {
+  const uuids = new Set(
+    normalizeList(runStep?.preparedConsumption?.consumedSummary)
+      .map((entry) => stringOrNull(entry?.itemUuid))
+      .filter(Boolean)
+  );
+  return new Set(items.filter((item) => uuids.has(stringOrNull(item?.uuid))));
+}
+
+/**
+ * A stage whose route resolves to no authored set: unstarted, it waits on a route pick; started,
+ * it reports the recipe edit.
+ */
+export function unchosenRouteAvailability(setId, routes, started = false) {
+  return {
+    success: false,
+    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.route,
+    knownMaterialShortfall: false,
+    awaitingChoice: !started,
+    selectedIngredientSetId: setId,
+    routes,
+    staleRoute: true,
+    missingGroups: [],
+    choices: [],
+    requirements: [],
+    essencePool: null,
+  };
+}
+
+/**
+ * What the player must acquire to take a route, essence and currency gaps included, to rank the
+ * alternatives.
+ */
+export function acquisitionShortfallCount(selection) {
+  const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
+  return normalizeList(selection?.missingGroups).filter(
+    (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
+  ).length;
+}
+
+export function safeMissingGroup(group) {
+  const id = missingGroupId(group);
+  return {
+    id,
+    name: stringOrEmpty(group?.group?.name ?? group?.name),
+    ingredientId: stringOrNull(group?.ingredient?.id),
+    need: numberOrNull(group?.need),
+    have: numberOrNull(group?.have),
   };
 }

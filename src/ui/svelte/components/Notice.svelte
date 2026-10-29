@@ -219,6 +219,7 @@
     font-weight: 400;
     line-height: 1.55;
     font-variant-numeric: tabular-nums;
+    white-space: pre-line;
   }
 
   .fab-notice-button {

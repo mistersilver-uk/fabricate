@@ -362,7 +362,6 @@ export function createEnvironmentDraftSection({
 
       return {
         canShowEnvironmentsTab: true,
-        environmentsLoading: false,
         environmentsError: null,
         environments,
         environmentTaskCounts,
