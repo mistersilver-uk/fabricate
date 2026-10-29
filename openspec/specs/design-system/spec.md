@@ -50,6 +50,7 @@ The selectable dense form's opt-in `inset="row"` MUST take the dense row's space
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
 ListRow is shipped; a browse list's loading and error forms are `ListState`'s, not the row's (issue 2548).
+`ListRow` is published through `game.fabricate.api.ui` (issue 2784) with only `name`, `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled` and `onOpen`, which the seam calls with no argument, as its group in `ui-extension-points` states.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.

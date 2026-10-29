@@ -8,13 +8,14 @@
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
  * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination`, `IconPicker`,
- * `ActionMenu` and `Modal` mount here as leaves; what each draws and refuses is
+ * `ActionMenu`, `Modal` and `ListRow` mount here as leaves; what each draws and refuses is
  * `published-button-mounted.test.js`'s,
  * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
  * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
  * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s,
  * `published-pagination-mounted.test.js`'s, `published-icon-picker-mounted.test.js`'s,
- * `published-action-menu-mounted.test.js`'s and `published-modal-mounted.test.js`'s.
+ * `published-action-menu-mounted.test.js`'s, `published-modal-mounted.test.js`'s and
+ * `published-list-row-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -447,6 +448,15 @@ const LEAVES = Object.freeze([
       root.ownerDocument.querySelector('[data-manager-modal]').getAttribute('aria-label'),
     drawn: ['Rename the reagent', 'Rename the tool'],
   },
+  {
+    name: 'ListRow',
+    under: 'fabricate',
+    root: '.fabricate-list-row',
+    props: { name: 'Iron ingot', onOpen() {} },
+    next: { name: 'Ember salt', onOpen() {} },
+    read: (root) => root.querySelector('button').textContent.trim(),
+    drawn: ['Iron ingot', 'Ember salt'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -619,6 +629,11 @@ describe('a key a leaf does not publish', () => {
       'class',
       'data-x',
     ].map((key) => ['Modal', key, 'is not a prop of Modal']),
+    ...['density', 'openProps', 'aside', 'class'].map((key) => [
+      'ListRow',
+      key,
+      'is not a data attribute',
+    ]),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

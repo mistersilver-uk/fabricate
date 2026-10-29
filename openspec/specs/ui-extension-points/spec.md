@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published entry's root is `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`.
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`.
 
 ### The descriptor
 
@@ -444,6 +444,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `IconPicker` (issue 2647).
 - The published set continues with `ActionMenu` (issue 2652).
 - The published set continues with `Modal` (issue 2656).
+- The published set continues with `ListRow` (issue 2784).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -472,6 +473,8 @@ Its `open` is not published at version 1, and publishing it later as a `value` k
 Its `triggerClass`, `menuClass` and `triggerProps` are never published, being classes and attributes under other names, and nor is `trigger`, a snippet called with arguments.
 - `Modal`'s `trapFocus`, `initialFocus`, `onSubmit`, `footerLayout` and `width` are not published at version 1; publishing one later is additive.
 Its `dialogProps` is never published, being attributes under another name.
+- `ListRow`'s `density`, `layout`, `markSize`, `truncateName`, `inset`, `detailAlign` and `bodyBasis`, and its `leading`, `badges`, `meta`, `children`, `aside` and `trailing` snippets, are not published at version 1; publishing one later is additive.
+Its `openProps` and `nameClass` are never published, being attributes and a class under other names.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
@@ -479,7 +482,7 @@ Its `dialogProps` is never published, being attributes under another name.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` and an `ActionMenu` item's `data` are not attribute channels, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652), and `Modal` too (issue 2656); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652), and `Modal` too (issue 2656), and `ListRow` too (issue 2784); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -573,7 +576,7 @@ Fabricate's gate holds this, because the runtime does not refuse the resync's `f
 - `'fabricate'`: `target` needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root.
 Fabricate's window frames carry it (the player window, the Manager and the interactable windows), so both extension targets have it; Foundry writes an application's `classes` on the frame element, above `.window-content`.
 - `'manager'`: `target` needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
-- No entry published at version 1 states `'fabricate'` or `'manager'`; the values remain for a later entry, and M16's ancestor refusals apply to it.
+- `ListRow` (issue 2784) is the one entry that states `'fabricate'`, and no entry states `'manager'`; M16's ancestor refusals apply to both.
 - `mount` and `mountMany` decide it by class, with `target.closest`, and refuse a target outside the root with M16, `mountMany` judging each item.
 It is checked at `mount` and `mountMany` only.
 A Foundry 14 detached window's target is judged the same way.
@@ -663,7 +666,7 @@ In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter a
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, a published behaviour kept so a companion's Tab handling does not change, and in an open `IconPicker` list's query field, where it closes the list and moves focus on from, or back to, the trigger, as each group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops Escape, as each group states.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
 An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
-- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states, and the module's base stylesheet draws the same 1px inset ring on every other input and textarea under a Fabricate root except a checkbox, radio, range, color, file, button, submit, reset or image input, so a number, search or date input outside a `Field` takes it too.
+- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, a `ListRow` button, whose 2px ring is drawn inside the row's edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states, and the module's base stylesheet draws the same 1px inset ring on every other input and textarea under a Fabricate root except a checkbox, radio, range, color, file, button, submit, reset or image input, so a number, search or date input outside a `Field` takes it too.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, which its group names by its glyph's `label`.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
@@ -704,7 +707,7 @@ Where the entry's rest keys land on the control itself, `data-cursor` is refused
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
-  The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states.
+  The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so does the name a `ListRow` button holds.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1649,6 +1652,37 @@ Each group states the accepted values of every key that entry publishes.
     A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
 - **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its width, height and placement, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
+### The issue 2784 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`ListRow`.**
+  - It is the design system's list row (`<ListRow>` in the library): a mark, a name, an optional detail and an optional quantity on one bordered row, which with `onOpen` is one whole-row button.
+    Without `onOpen` it draws nothing focusable; with it, the button is the only focusable element inside `target`, so to return focus to the row the companion focuses `target.querySelector('button')`.
+  - `name` is required and is final display text, drawn as the row's name with its whole text as the name's native `title`, and with `onOpen` it opens the button's accessible name.
+  - `detail` is optional final display text drawn after the name, and `''` or absence draws none.
+  - `quantity` is a number or a string drawn at the row's end in tabular figures, `0` included, and `null` or absence draws none.
+    With `onOpen` the button's accessible name is its text: the name, then the detail and the quantity.
+  - `art` is an image path drawn as the row's mark, with no alternative text, and `''` or absence draws `icon` instead.
+  - `icon` is a Font Awesome class string drawn as the mark where there is no `art` and hidden from assistive technology, and it defaults to `'fas fa-box'`.
+  - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone, as `Medallion`'s does.
+  - `tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
+    It adds no text or glyph, so the companion states what the tone means in `detail` as well.
+  - `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
+  - `selected` is `true` or `false`, or absent or `null`, and is read only with `onOpen`: `true` writes `aria-pressed="true"` on the button and draws the selected face, an accent edge and the active fill, `false` writes `aria-pressed="false"`, and absence or `null` writes no `aria-pressed`, so the button is a plain button.
+    Any other value but `null` is read as `false`, and a selected danger row keeps its danger fill and takes a 1px accent edge inside its border.
+  - `disabled` is `true` or `false`, defaults to `false`, and is read only with `onOpen`: `true` disables the button natively, so a press calls nothing and the button leaves the tab order, and dims the row.
+  - `onOpen` is an optional callback, called with no argument, on each press of the button by pointer, Enter or Space while it is not `disabled`; passing it draws the whole row as one button, and omitting it draws the read-only row.
+    It is not called by `mount`, `update` or `destroy`.
+    The row draws no state of its own: a press shows a new `selected` only when the companion's `update` passes it.
+  - It takes rest keys, `data-*` attributes that land on the row's root, not on the button, so no rest name is reserved; Fabricate writes its own `data-list-row` there after them, so a key of that name is not written.
+  - Its row, button and marks come from Fabricate's module sheet, rooted at `.fabricate-list-row`, so `target` needs a Fabricate window ancestor (`root: 'fabricate'`), and a target with none is refused (M16).
+  - The button's keyboard ring is the window's accent ring, 2px wide and drawn 2px inside the row's edge on a layer that covers the row, in place of the ring the module draws around a button.
+    The row paints its own opaque fill, and the ring clears 3:1 against it and against the selected, hovered, success and danger fills over it in every palette, whatever ground the companion mounts the row on.
+  - An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not replaces the row, so where the button holds focus the companion moves focus to an element of its own first.
+    `destroy` removes the row.
+- **Private:** `ListRow`'s figures, its colours beyond what its group states, its mark's size, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists, headings, cards and densities.
+
 ### The publishable subset
 
 Each term is defined here and used in this sense throughout.
@@ -2046,6 +2080,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** focus moves to the first item when the menu opens, and ArrowDown skips the disabled item to the third
 - **AND** Fabricate calls `onSelect` once with the third item's `id`, closes the menu, and returns focus to the trigger
 - **AND** a mount that omits `ariaLabel` throws M9, and one that passes `heading` throws M8
+
+#### Scenario: A published list row
+
+- **WHEN** a companion mounts `ListRow` under a Fabricate window with `name: 'Iron ingot'`, `quantity: 3`, `selected: true` and an `onOpen`
+- **THEN** one native button covers the row, named by its text, with `aria-pressed="true"` and `data-keyboard-focus="true"`
+- **AND** a press calls `onOpen` with no argument, and an `update` that omits `onOpen` draws the read-only row with nothing focusable
 
 #### Scenario: A published dialog
 

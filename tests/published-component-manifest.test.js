@@ -586,6 +586,11 @@ const SELECT_TRIGGER_REASON = Object.freeze({
   reason:
     'the published Select publishes no disabled or readonly, so its trigger takes no aria-disabled',
 });
+/** Why a rule on a `ListRow` row reads the `aria-pressed` its own `selected` writes (issue 2784). */
+const LIST_ROW_FACE_REASON = Object.freeze({
+  reason:
+    "the rule draws the published ListRow's own selected or hover face, which `selected` drives as its group states",
+});
 const SELECT_OPTION_REASON = Object.freeze({
   reason:
     "the published Select's options are { value, label } by contract, so no in-contract row takes aria-disabled",
@@ -605,19 +610,19 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   ],
   [
     "styles/fabricate-list-primitives.css: .fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
-    'fabricate-list-row-open',
+    LIST_ROW_FACE_REASON,
   ],
   [
     "styles/fabricate-list-primitives.css: .fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
-    'fabricate-list-row-open',
+    LIST_ROW_FACE_REASON,
   ],
   [
     "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
-    'fabricate-list-row-open',
+    LIST_ROW_FACE_REASON,
   ],
   [
     "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
-    'fabricate-list-row-open',
+    LIST_ROW_FACE_REASON,
   ],
   [
     "src/ui/svelte/apps/InteractableConfigRoot.svelte: .fab-ic-actions :global(.fabricate-button[aria-pressed='true'])",
@@ -1305,7 +1310,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges thirty-one focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1323,6 +1328,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/EditorTabs.svelte: button',
       'src/ui/svelte/components/IconButton.svelte: button',
       'src/ui/svelte/components/IconPicker.svelte: button',
+      'src/ui/svelte/components/ListRow.svelte: button',
       'src/ui/svelte/components/Modal.svelte: div',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
@@ -1395,6 +1401,7 @@ describe('each entry matches its component declaration', () => {
         'IconPicker.onChange: 1',
         'ActionMenu.onSelect: 1',
         'Modal.onClose: 0',
+        'ListRow.onOpen: 0',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3052,6 +3059,7 @@ describe('the module sheet and every component style against the published Inspe
         'IconPicker',
         'ActionMenu',
         'Modal',
+        'ListRow',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );

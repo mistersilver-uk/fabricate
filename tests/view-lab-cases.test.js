@@ -1197,6 +1197,12 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fab-notice', styles: 'display: flex; background-color: var(--fab-warning-soft)' },
     { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
     { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
+    // The selected published list row's accent edge and active fill (issue 2784).
+    {
+      selector: ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
+      styles:
+        'border-top-color: var(--fab-accent-border); background-color: var(--fab-surface-active)',
+    },
   ],
   // The published controls (issue 2452): the action button at each tone at its own box, type and
   // ink, the focused action's drawn ring, then the redrawn notice's success title and the default

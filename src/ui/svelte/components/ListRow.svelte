@@ -5,7 +5,8 @@
      and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `bodyBasis="fill"`
      gives a form's body `flex: 1 1 0`, so text under the name wraps inside it and the trailing
      figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
-     `data-list-row` wins. -->
+     `data-list-row` wins. Toggling `onOpen` replaces the root, re-creating `leading`, `trailing`
+     and `aside` (issue 2784). -->
 <script>
   import Medallion from './Medallion.svelte';
 
@@ -58,12 +59,27 @@
   const uid = $props.id();
   const isDefault = $derived(density === 'default');
   const isCard = $derived(layout === 'card');
-  const form = $derived(
-    Boolean(onOpen || openProps || leading || badges || meta || children || aside) ||
-      isDefault ||
-      isCard
+  // Every form but the button's: `onOpen` is read only by `{#if}` and the press, so each form
+  // takes its own root (issue 2784).
+  const shaped = $derived(
+    Boolean(openProps || leading || badges || meta || children || aside) || isDefault || isCard
   );
-  const rowInset = $derived(inset === 'row' && form && !isDefault && !isCard);
+  const rowClass = (form) => [
+    'fabricate-list-row',
+    extraClass,
+    {
+      'is-positive': tone === 'positive',
+      'is-muted': muted,
+      'is-truncated': truncateName,
+      'is-form': form,
+      'is-default': isDefault,
+      'is-card': isCard,
+      'is-row-inset': inset === 'row' && form && !isDefault && !isCard,
+      'is-detail-end': detailAlign === 'end',
+      'is-body-fill': bodyBasis === 'fill' && form,
+      'is-danger': tone === 'danger',
+    },
+  ];
   const mark = $derived(MARK_SIZES.has(markSize) ? markSize : 22);
   const describedBy = $derived(
     [
@@ -97,7 +113,7 @@
   }
 </script>
 
-{#snippet content()}
+{#snippet content(form)}
   {#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>
   {:else if mark === 38}<Medallion {art} {icon} {tint} alt="" size={38} />
   {:else if mark === 30}<Medallion {art} {icon} {tint} alt="" size={30} />
@@ -124,21 +140,7 @@
   {#if quantity != null}<span class="fabricate-list-row-quantity">{quantity}</span>{/if}
 {/snippet}
 
-<div
-  class={['fabricate-list-row', extraClass]}
-  class:is-positive={tone === 'positive'}
-  class:is-muted={muted}
-  class:is-truncated={truncateName}
-  class:is-form={form}
-  class:is-default={isDefault}
-  class:is-card={isCard}
-  class:is-row-inset={rowInset}
-  class:is-detail-end={detailAlign === 'end'}
-  class:is-body-fill={bodyBasis === 'fill' && form}
-  class:is-danger={tone === 'danger'}
-  {...rest}
-  data-list-row={isDefault ? 'default' : 'dense'}
->
+{#snippet inner(form)}
   {#if onOpen}
     <button
       {...passed}
@@ -148,7 +150,7 @@
       aria-pressed={pressed}
       {disabled}
       data-keyboard-focus="true"
-      onclick={open}>{@render content()}</button
+      onclick={open}>{@render content(form)}</button
     >
   {:else if openProps}
     <div
@@ -156,12 +158,24 @@
       class={['fabricate-list-row-open', openProps.class]}
       aria-describedby={describedBy}
     >
-      {@render content()}
+      {@render content(form)}
     </div>
   {:else}
-    {@render content()}
+    {@render content(form)}
   {/if}
   {#if trailing && form}<span class="fabricate-list-row-trailing">{@render trailing()}</span>
   {:else if trailing}{@render trailing()}{/if}
-  {#if aside}<div class="fabricate-list-row-aside" id={`${uid}-aside`}>{@render aside()}</div>{/if}
-</div>
+  {#if aside}<div class="fabricate-list-row-aside" id={`${uid}-aside`}>
+      {@render aside()}
+    </div>{/if}
+{/snippet}
+
+{#if onOpen}
+  <div class={rowClass(true)} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
+    {@render inner(true)}
+  </div>
+{:else}
+  <div class={rowClass(shaped)} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
+    {@render inner(shaped)}
+  </div>
+{/if}

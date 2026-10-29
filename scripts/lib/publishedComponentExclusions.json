@@ -25,10 +25,6 @@
       "reason": "no-consumer: a toolbar section around the manager's filter controls; a companion arranges its own published controls."
     },
     {
-      "path": "src/ui/svelte/components/ListRow.svelte",
-      "reason": "event-argument: onOpen is called with the click event, which a companion callback cannot receive."
-    },
-    {
       "path": "src/ui/svelte/components/ListState.svelte",
       "reason": "no-consumer: the loading and error forms of a Fabricate manager list, whose state the companion's own list does not share; publishing it later is additive."
     },

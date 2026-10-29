@@ -186,6 +186,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-alchemy-known-recipe',
     'player-alchemy-workbench',
     'player-alchemy-chooser',
+    // The specimen that mounts it through the published seam (issue 2784).
+    'manager-published-leaves-specimen',
   ]),
   // A browse list's loading and error forms (issue 2548): the systems library loading, the
   // environment browser's failed load and the Knowledge roster loading.

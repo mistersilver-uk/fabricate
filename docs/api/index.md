@@ -1989,7 +1989,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no published component's root is `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`.
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no component published before it has the root `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; [issue #2784](https://github.com/mistersilver-uk/fabricate/issues/2784) publishes `ListRow` at the root `fabricate`.
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2070,6 +2070,7 @@ The published components, in publication order:
 | `IconPicker` | 1 | `any` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
 | `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
+| `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3753,6 +3754,69 @@ save.addEventListener('click', async () => {
 // `dialog.destroy()` when the panel goes away, moving focus to the opener first if the dialog holds it.
 ```
 
+### ListRow
+
+`ListRow` draws the design system's list row (`<ListRow>` in the library): a mark, a name, an optional detail and an optional quantity on one bordered row, which with `onOpen` is one whole-row button.
+Without `onOpen` it draws nothing focusable; with it, the button is the only focusable element inside `target`, so to return focus to the row, focus `target.querySelector('button')`.
+`name` is required and is final display text, drawn as the row's name with its whole text as the name's native `title`, and with `onOpen` it opens the button's accessible name.
+`detail` is optional final display text drawn after the name, and `''` or absence draws none.
+`quantity` is a number or a string drawn at the row's end in tabular figures, `0` included, and `null` or absence draws none.
+With `onOpen` the button's accessible name is its text: the name, then the detail and the quantity.
+`art` is an image path drawn as the row's mark, with no alternative text, and `''` or absence draws `icon` instead.
+`icon` is a Font Awesome class string drawn as the mark where there is no `art` and hidden from assistive technology, and it defaults to `'fas fa-box'`.
+`tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone, as `Medallion`'s does.
+`tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
+It adds no text or glyph, so state what the tone means in `detail` as well.
+`muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
+`selected` is `true` or `false`, or absent or `null`, and is read only with `onOpen`: `true` writes `aria-pressed="true"` on the button and draws the selected face, an accent edge and the active fill, `false` writes `aria-pressed="false"`, and absence or `null` writes no `aria-pressed`, so the button is a plain button.
+Any other value but `null` is read as `false`, and a selected danger row keeps its danger fill and takes a 1px accent edge inside its border.
+`disabled` is `true` or `false`, defaults to `false`, and is read only with `onOpen`: `true` disables the button natively, so a press calls nothing and the button leaves the tab order, and dims the row.
+`onOpen` is an optional callback, called with no argument, on each press of the button by pointer, Enter or Space while it is not `disabled`; passing it draws the whole row as one button, and omitting it draws the read-only row.
+It is not called by `mount`, `update` or `destroy`.
+The row draws no state of its own: a press shows a new `selected` only when your `update` passes it.
+
+`ListRow` takes rest props, `data-*` attributes that land on the row's root, not on the button, so no rest name is reserved; Fabricate writes its own `data-list-row` there after them, so a prop of that name is not written.
+`ListRow` needs a Fabricate window ancestor, because its row, button and marks come from Fabricate's module sheet, rooted at `.fabricate-list-row`.
+Your own window or dialog carries no Fabricate root, so the row is refused there with `ListRow needs a Fabricate window ancestor`.
+The button's keyboard ring is the window's accent ring, 2px wide and drawn 2px inside the row's edge on a layer that covers the row, in place of the ring the module draws around a button.
+The row paints its own opaque fill, and the ring clears 3:1 against it and against the selected, hovered, success and danger fills over it in every palette, whatever ground you mount the row on.
+An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not replaces the row, so where the button holds focus, move focus to an element of your own first.
+`destroy` removes the row.
+Its figures, its colours beyond what this section states, its mark's size, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists, headings, cards and densities are private.
+`density`, `layout`, `markSize`, `truncateName`, `inset`, `detailAlign` and `bodyBasis`, and the `leading`, `badges`, `meta`, `children`, `aside` and `trailing` snippets, are not published at version 1, and `openProps`, `nameClass` and `class` never are, so each is refused.
+
+A worked list follows: one selectable row per reagent, in a panel inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['ListRow'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the row describes none: draw your own row there.
+if (fabUi?.describe?.('ListRow')?.props.onOpen?.kind !== 'callback') return;
+
+const props = (reagent) => ({
+  name: reagent.name,
+  detail: reagent.kind,
+  quantity: reagent.quantity,
+  art: reagent.img,
+  selected: reagent.id === selectedId,
+  onOpen: () => select(reagent.id),
+  'data-acme-reagent': reagent.id,
+});
+const rows = reagents.map((reagent) => {
+  const target = document.createElement('li');
+  list.append(target);
+  return fabUi.mount('ListRow', { target, props: props(reagent) });
+});
+
+function select(id) {
+  selectedId = id;
+  // Every prop again on each update; the pressed row keeps its button and its focus.
+  for (const [index, row] of rows.entries()) row.update(props(reagents[index]));
+}
+
+// `row.destroy()` for each row when the panel goes away, moving focus first if a row holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3930,7 +3994,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal` and `ListRow` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -4108,7 +4172,7 @@ A published component draws a control only where its section says so, and each c
   Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, a published behaviour kept so your Tab handling does not change, and in an open `IconPicker` list's query field, where it closes the list and moves focus on from, or back to, the trigger, as each section states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops Escape, as each section states.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks you to close that `Modal`, as its section states.
   An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
-- A control draws its own mark for keyboard focus where the component's `root` is `any` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each section states.
+- A control draws its own mark for keyboard focus where the component's `root` is `any` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, a `ListRow` button, whose 2px ring is drawn inside the row's edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each section states.
   A text-like input or textarea you draw in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that section states.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none, except an `IconPicker` row, which its section names by its glyph's `label`.
@@ -4150,6 +4214,7 @@ A published component draws a control only where its section says so, and each c
   Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under a standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
+  The name a `ListRow` button holds carries its own text as a native `title`, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

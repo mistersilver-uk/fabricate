@@ -60,7 +60,7 @@ const LEAVES_GROUND = [
 ].reduce((ground, root) => `${ground}:has(> section > div > ${root})`, 'div');
 
 /** How many mounts `tests/view-lab/fixtures/PublishedLeaves.svelte` makes, one section each. */
-const LEAF_MOUNTS = 28;
+const LEAF_MOUNTS = 30;
 
 /** Each mount that fixture makes inside another's content slot, as host, host root and nested names. */
 const NESTED_LEAF_MOUNTS = Object.freeze([
@@ -569,7 +569,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-leaves-specimen',
     label:
-      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box; then, each on that lighter ground, a dashed empty panel holding a glyph tile, a serif title and a hint over a centred primary button, a warning notice whose detail wraps to two lines, and the quieter filtered panel holding a hint over a centred neutral button. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box; then, each on that lighter ground, a dashed empty panel holding a glyph tile, a serif title and a hint over a centred primary button, a warning notice whose detail wraps to two lines, and the quieter filtered panel holding a hint over a centred neutral button; then two list rows, Iron ingot read-only with its art, its Metal detail and its quantity 3, and Silver ore as a selected whole-row button on the active fill with an accent edge. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
     // Beyond the smoke: a companion mounts each through `api.ui`, in states no one screen draws together.
     reaches: 'beyond',
     smokeLabels: [],
@@ -670,15 +670,20 @@ export const CASES = Object.freeze([
         },
         { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
         { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
+        {
+          selector: ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
+          styles:
+            'border-top-color: var(--fab-accent-border); background-color: var(--fab-surface-active)',
+        },
       ],
     },
-    // Sized to the fixture's 880px ground and the height of its seven rows; `expectContained` holds
+    // Sized to the fixture's 880px ground and the height of its eight rows; `expectContained` holds
     // the ground inside `.window-content`.
-    position: { width: 1024, height: 720 },
+    position: { width: 1024, height: 780 },
     kinds: ['manager', 'specimen'],
     // Every component mounted here is a broad signal, routed here by its override: the seven
     // leaves (issue 2448), then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and
-    // `Notice` (issue 2451), then `Button` (issue 2452).
+    // `Notice` (issue 2451), then `Button` (issue 2452), then `ListRow` (issue 2784).
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
