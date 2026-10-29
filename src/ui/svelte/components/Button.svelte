@@ -9,7 +9,7 @@
   | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'dashed'` \| `'warning'` | `'neutral'` | A CLOSED set; see the invariants for how a caller picks. An unrecognised value renders neutral. |
   | `tag` | `'button'` \| `'a'` | `'button'` | An unrecognised value, and `tag="a"` with an empty `href`, render a `<button>`. |
   | `href` / `target` / `rel` | anchor attributes | `''` / `undefined` / `undefined` | Emitted only when an anchor is rendered. An explicit `rel` always wins; unset with `target="_blank"` it defaults to `noreferrer`. |
-  | `type` / `disabled` | native button type / boolean | `'button'` / `false` | Both emitted only on a `<button>`, so a manager button inside a form-adjacent card never submits by accident and `disabled` is ignored and warned about on an anchor. |
+  | `type` / `disabled` | `'button'` \| `'submit'` \| `'reset'` / boolean | `'button'` / `false` | Both emitted only on a `<button>`, so a manager button inside a form-adjacent card never submits by accident and `disabled` is ignored and warned about on an anchor. A closed set: an unrecognised `type` renders `'button'`, because the browser reads one as `'submit'`. |
   | `fullWidth` / `size` | boolean / `''` \| `'28'` \| `'38'` | `false` / `''` | `is-full-width`, which is not a role because width states something about the CONTAINER rather than about the verb; and the control-height rung, named as a string, where an unrecognised value resolves to `''` rather than an unstyled `is-size-*`. |
   | `icon` | Font Awesome class string | `''` | The leading glyph, drawn as a hidden `<i>` before `children`; empty draws none. `children` stays the required label, because the icon-only form is `IconButton`. |
   | `busy` | boolean | `false` | An action in flight: writes `aria-busy` and `aria-disabled`, never `disabled`, so focus and arm state survive, and swallows the press. `disabled` beside it still renders disabled. |
@@ -89,6 +89,8 @@
 
   const TAGS = new Set(['button', 'a']);
 
+  const TYPES = new Set(['button', 'submit', 'reset']);
+
   const resolvedTag = $derived(
     TAGS.has(tag) && !(tag === 'a' && !String(href ?? '').trim()) ? tag : 'button'
   );
@@ -108,7 +110,9 @@
   const resolvedRel = $derived(rel ?? (target === '_blank' ? 'noreferrer' : undefined));
 
   const attributes = $derived(
-    resolvedTag === 'a' ? { href, target, rel: resolvedRel } : { type, disabled }
+    resolvedTag === 'a'
+      ? { href, target, rel: resolvedRel }
+      : { type: TYPES.has(type) ? type : 'button', disabled }
   );
 
   $effect(() => {

@@ -2053,7 +2053,7 @@ The published components, in publication order:
 | `InspectorCard` | 1 | `any` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
-| `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
+| `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `size`, `icon`, `busy`, `type`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
@@ -2435,7 +2435,9 @@ const saved = fabUi.mount('Notice', {
 The button hugs its label on one line while it has the room.
 Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: pass a short verb phrase and give the button the room for one line.
 A label of white space alone draws a button with no name, so never pass one.
-The button draws no glyph: a leading glyph is not published at version 1, and a glyph-only button is [`IconButton`](#iconbutton).
+`icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
+The label stays the button's whole name, so the glyph never replaces it: a glyph-only button is [`IconButton`](#iconbutton).
+`size` is `''`, `'28'` or `'38'`, a string, and defaults to `''`: `''` draws the default rung, and `'28'` and `'38'` the 28px and 38px rungs of the design system's height scale; what it draws for any other value, a number included, is private.
 `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
 The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
 `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
@@ -2453,17 +2455,26 @@ In a block `target` a `dashed` button hugs its label too, as every native button
 It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button, and it opens no tooltip, so nothing at the button can say why.
 A verb the user is refused for a reason stays enabled, and its press answers with the reason, in a `Notice` or a notification of your own.
 The unavailable label is not held to the contrast floor.
-Never pass `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work leaves the button enabled.
-Fabricate coerces neither `fullWidth` nor `disabled` to a boolean, so only `true` and `false` are in the contract: the string `'false'` spans `target` and disables the button.
-The button has no busy state at version 1.
-While a press is being handled leave the button enabled, ignore every further press, a held Enter key's repeats among them, and where the wait is perceptible pass `children` that say so.
+Never pass `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work passes `busy`, which leaves the button enabled.
+`busy` is `true` or `false`.
+`true` marks an action in flight: the button keeps its place in the tab order and its focus, takes `aria-busy="true"` and `aria-disabled="true"` and never `disabled`, is drawn dimmed under the progress cursor, and a press, a held Enter key's repeats among them, calls neither `onclick` nor a `submit`.
+`busy` beside `disabled` draws the disabled face.
+The busy label is not held to the contrast floor.
+The button draws no busy label, so pass `children` that say what is in flight where the wait is perceptible, because the control otherwise reads as idle while it refuses.
 A change to a focused button's label is not reliably announced, so announce the outcome yourself, with a `Notice` or a live region of your own.
-When the work ends pass the first label again, or move focus and then remove the button.
+When the work ends pass `busy: false` and the first label again, or move focus and then remove the button.
+Fabricate coerces none of `fullWidth`, `disabled` and `busy` to a boolean, so only `true` and `false` are in the contract: the string `'false'` spans `target`, disables the button and marks it busy.
+`type` is `button`, `submit` or `reset`, and defaults to `button`; a value outside the set draws `button`, never the browser's own default of `submit`.
+A `submit` button submits the `<form>` that holds `target` once `onclick` has returned, so mount it inside a form of your own and handle that form's `submit` event; `onclick` takes no argument, so it cannot cancel the submit, and you cancel it in the `submit` event.
+As the form's first submit button it is also pressed by implicit submission, so Enter in a text field of that form calls `onclick` and then submits it, and while `busy` that Enter submits nothing.
+A `reset` button resets that form.
+A form submit in Foundry closes a DialogV2 and saves an editable document sheet, so mount a `submit` button only in a form you own.
+A Fabricate that predates `size`, `icon`, `busy` and `type` refuses each with `"<key>" is not a data attribute`, and `describe('Button').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 It is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog.
 It inherits `target`'s face; its size, weight and ink are its own.
 Align your own content to the button by centring, never by restating its height.
 Your own window or dialog carries no Fabricate root, so the button is drawn there under the standalone style root, and a dialog you open still draws Foundry's own buttons.
-It is never a form's submit button: to submit a `<form>` of your own from a press, call that form's `requestSubmit()` in `onclick`.
+Without `type: 'submit'` it is never a form's submit button: to submit a `<form>` of your own from a press, call that form's `requestSubmit()` in `onclick`.
 Two buttons side by side are two mounts in two targets, which you lay out as a wrapping row `--fab-space-2` apart.
 A `target` is never Foundry's `.form-footer`, which resizes a button that is its child.
 The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
@@ -4035,11 +4046,11 @@ A later move between windows is not carried to a mount, and a theme change made 
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
+A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, which only a `Button` whose `type` says so draws as another type, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a `Button` whose `type` is `submit` submits it as its section states, and a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
   That exception reaches a radio and a number input too where the form has a submit button: Enter there submits the form, as on a text-like input.
-- A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so reset no form a published control is in, or destroy the control and mount it again (read from Svelte 5.56 source, not run).
+- A `reset` of the `<form>` a control is in, a `Button` whose `type` is `reset` making one, changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so reset no form a published control is in, or destroy the control and mount it again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each section states, and Foundry's keybindings stay held off as the bullet above states.
