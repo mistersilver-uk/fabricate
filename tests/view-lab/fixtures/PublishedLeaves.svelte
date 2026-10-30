@@ -30,6 +30,7 @@
 </script>
 
 <script>
+  import { TAG_TONES as TAGS } from '../../fixtures/published-components/fillBarTones.js';
   import { LAB_SYSTEM_IDS, buildLabContent } from '../world/labContent.js';
 
   const smithing = buildLabContent().systems.find(({ id }) => id === LAB_SYSTEM_IDS.SMITHING);
@@ -54,7 +55,17 @@
     ['FillBar', { value: 0 }],
     ['FillBar', { value: 64 }],
     ['FillBar', { value: 100, density: 'compact' }],
+    ['FillBar', { value: 100, shares: TAGS.map((tone) => ({ weight: 1, tone })) }],
     ['Meter', { value: 3, max: 11, label: 'Labourers', valueText: '3 of 11 labourers' }],
+    [
+      'Meter',
+      {
+        value: 10,
+        max: 10,
+        label: 'Contributors',
+        segments: TAGS.map((tone) => ({ value: 1, tone })),
+      },
+    ],
     ['BandedBar', { rows: [{ name: 'Event chance', percent: 62 }] }],
     [
       'BandedBar',
