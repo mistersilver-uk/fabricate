@@ -2048,7 +2048,7 @@ The published components, in publication order:
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
 | `Kicker` | 1 | `any` | `as`, `tone`, `size`, `children` (text, required) | yes |
-| `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `children` (text, required) | yes |
+| `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `truncate`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `any` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `compact`, `inline`, `note`, `filtered`, `children` (slot) | yes |
@@ -2250,7 +2250,7 @@ For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry locali
 This is `InfoStrip`'s badge set.
 `neutral` is the recessive tone and clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface` only.
 `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
-At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short.
+At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short or set `truncate`.
 At `default` a long label wraps inside the chip.
 `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
 It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
@@ -2261,8 +2261,12 @@ The glyph is never the chip's name, so a chip whose meaning rests on it carries 
 `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
 `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
 It is drawn and never announced, so the label says the state.
-Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
-A Fabricate that predates `emphasis`, `icon`, `mono` and `struck` refuses each with `"<key>" is not a data attribute`, and `describe('Chip').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+`truncate` is `true` or `false`; `true` keeps the label to one line and ends it in an ellipsis where `target` is too narrow, at any `density`, keeping the `icon` glyph whole.
+The ellipsis is drawn only: the label stays whole in the chip's text and so in its name, and the colour, `mono`, `struck` and `icon` are drawn as without it.
+To let a reader see the clipped text, pass the full label as `data-tooltip-text`, which opens on pointer hover only, so it never carries what the label does not.
+The chip ends at the width `target` has, so a `target` that is a flex item of your row needs `min-width: 0` and a `flex-shrink` above 0, or the row overflows instead of the label ending in an ellipsis.
+Fabricate coerces none of `mono`, `struck` and `truncate` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
+A Fabricate that predates `emphasis`, `icon`, `mono`, `struck` and `truncate` refuses each with `"<key>" is not a data attribute`, and `describe('Chip').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
 `tone` is colour alone, so the label says the state.
 A label changed through `update` is not announced; a live region is yours to provide.

@@ -413,6 +413,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           icon: optional,
           mono: optional,
           struck: optional,
+          truncate: optional,
           children: requiredText,
         },
         rest: true,

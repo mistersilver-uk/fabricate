@@ -559,7 +559,6 @@ describe('a key a leaf does not publish', () => {
     ['Chip', 'element', 'is not a data attribute'],
     ['Chip', 'swatch', 'is not a data attribute'],
     ['Chip', 'tint', 'is not a data attribute'],
-    ['Chip', 'truncate', 'is not a data attribute'],
     ['Chip', 'iconOnly', 'is not a data attribute'],
     ['Chip', 'presentation', 'is not a data attribute'],
     ['Rail', 'class', 'is not a data attribute'],
