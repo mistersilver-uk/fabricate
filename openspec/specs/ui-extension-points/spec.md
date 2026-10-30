@@ -539,6 +539,16 @@ A host spaces a content slot's children by `gap`, except where its group states 
 - Fabricate attaches the element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and a companion's components, effects, listeners and bound values inside it keep running, though an overlay entry mounted in it closes its open panel, as Overlays states.
 Each detach and attach is a DOM removal and insertion, so the browser resets what it resets on those: an `<iframe>` reloads, playing media pauses, focus and scroll positions inside the slot element are lost, CSS animations restart, and a custom element receives `disconnectedCallback` and `connectedCallback`.
 That happens when the content slot is omitted and requested again, when an `update` makes the component replace the element holding it, and when a Foundry 14 window is detached or re-attached, which also moves the content to another document.
+- A component draws a `slot` key only at render sites that can never be live together, and the manifest test judges it.
+A _render site_ is a `{@render}` call of the key's local, counted once for each call of the snippet that holds it.
+Two sites are apart when they lie in different branches of one `{#if}` chain, `{:else if}` and `{:else}` included.
+Two sites that one call of a snippet draws are apart by where they lie inside the snippet, and sites of different calls only by where the calls lie.
+A snippet counts as the place its calls draw from only when it is declared at the top level of the template under a name it has once, at least one call renders it, and nothing else refers to it, such as a script alias, an export or a prop passed to a component.
+No call may lie inside an `{#each}`, `{#key}`, `{#snippet}`, boundary or component, and a site inside one of those blocks fails.
+Each site is `?.()`, or lies in the consequent of an `{#if}` or `{:else if}` whose test is the key's local or an `&&` chain with the local as a conjunct; an `||`, `??`, `!` or `{:else}` is no guard.
+A site inside a `<button>`, `<span>`, `<a>` or `<p>`, the calls of its snippet included, needs the key to state `element: 'span'`.
+The check fails closed: a callee that another binding shadows or that is no identifier, a read of the local other than as a render callee or a test, and a transition or animation in a file with more than one site each fail.
+
 - A companion fills it by mounting its own component into it, or by appending an element it owns.
 In a `<span>` content slot what it appends is phrasing content, a `<span>` for a mount target.
 It styles and attributes its own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
@@ -2268,6 +2278,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `ListRow` under a Fabricate window with `name: 'Iron ingot'`, `quantity: 3`, `selected: true` and an `onOpen`
 - **THEN** one native button covers the row, named by its text, with `aria-pressed="true"` and `data-keyboard-focus="true"`
 - **AND** a press calls `onOpen` with no argument, and an `update` that omits `onOpen` draws the read-only row with nothing focusable
+
+#### Scenario: A slot key drawn in exclusive branches
+
+- **WHEN** a component draws a `slot` key at one render tag in the button branch of an `{#if onOpen}` chain and at another in its `{:else}` branch, each guarded
+- **THEN** the manifest test accepts the key
+- **AND** it names the key as a fault when a second render tag lies in the same branch, or one lies outside the chain, or a snippet holding the tag is rendered by two calls in one branch
 
 #### Scenario: A published list row with an aside
 

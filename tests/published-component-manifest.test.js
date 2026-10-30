@@ -40,12 +40,12 @@
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
- * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
- * local, not a snippet forwarded to a child or read through an alias; a forwarded `text` or `slot`
+ * Limit: for a `text` key `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the
+ * prop's own local, not a snippet forwarded to a child or read through an alias; a forwarded `text`
  * key fails closed and a forwarded `data` key is not seen. It matches by name, so it does not see
- * a `{@const}` or an `{#await … then}` binding that shadows the local, nor a local tested in an
- * `{#if}` other than its own guard. Nor does it see a foreign `{#if}` around a render tag, `?.()`
- * or guarded, so a slot another prop hides is not refused.
+ * a `{@const}` or an `{#await … then}` binding that shadows the local. Nor does it see a foreign
+ * `{#if}` around a render tag, `?.()` or guarded. A `slot` key is judged by `slotSiteFaults` in
+ * `helpers/publishedSlotSites.js`, which states its own limit.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
@@ -142,6 +142,7 @@ import {
   unheldClauses,
 } from './helpers/publishedComponentGate.js';
 import { OVERLAY_ACTIONS, hostResolverImports } from './helpers/publishedComponentPublishable.js';
+import { conjuncts, slotSiteFaults } from './helpers/publishedSlotSites.js';
 
 /**
  * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
@@ -168,17 +169,18 @@ const renderCall = (tag) =>
   tag.expression.type === 'ChainExpression' ? tag.expression.expression : tag.expression;
 
 /**
- * Every render tag in the consequent of an `{#if}` whose whole test is the local the tag calls.
- * An `{:else if}` is no guard: its consequent is drawn only while every earlier test is false.
+ * Every render tag in the consequent of an `{#if}` or `{:else if}` whose test is the local the tag
+ * calls, or an `&&` chain with that local as a conjunct. A later branch is guarded only by its own test.
  */
 function guardedRenderTags(ast) {
   const guarded = new Set();
   for (const block of walkNodes(ast.fragment)) {
-    if (block.type !== 'IfBlock' || block.elseif || block.test.type !== 'Identifier') continue;
+    if (block.type !== 'IfBlock') continue;
+    const tested = conjuncts(block.test);
     for (const node of walkNodes(block.consequent)) {
       if (node.type !== 'RenderTag') continue;
       const { callee } = renderCall(node);
-      if (callee?.type === 'Identifier' && callee.name === block.test.name) guarded.add(node);
+      if (callee?.type === 'Identifier' && tested.includes(callee.name)) guarded.add(node);
     }
   }
   return guarded;
@@ -233,28 +235,17 @@ function textRenderFaults(key, spec, calls) {
 }
 
 /**
- * What a `slot` key's spec and render calls break: `{ kind, element? }` with a `<div>` or
- * `<span>` element, drawn by exactly one bare render tag, `?.()` or guarded, that no `{#each}`,
- * `{#key}`, `{#snippet}` or component holds, so the one slot element is drawn once and never taken
- * in turn.
+ * What a `slot` key's spec and render sites break: `{ kind, element? }` with a `<div>` or `<span>`
+ * element, drawn at render sites that can never be live together, each `?.()` or guarded, in no
+ * `{#each}`, `{#key}`, `{#snippet}` that is not a qualifying one, or component (`slotSiteFaults`).
  */
-function slotFaults(key, spec, calls) {
+function slotFaults(key, spec, ast, local) {
   const faults = [];
   if (spec.required !== undefined) faults.push(`${key} is a slot key that states required`);
   if (spec.element !== undefined && !SLOT_ELEMENTS.has(spec.element)) {
     faults.push(`${key} is a slot key whose element is ${spec.element}`);
   }
-  if (calls.length === 0) faults.push(`${key} is a slot key no render tag draws`);
-  if (calls.length > 1) faults.push(`${key} is a slot key more than one render tag draws`);
-  if (calls.some((call) => call.args > 0)) {
-    faults.push(`${key} is a slot key rendered with an argument`);
-  }
-  if (!calls.every(toleratesAbsence)) {
-    faults.push(`${key} is a slot key rendered without ?. or an {#if} guard`);
-  }
-  if (calls.some((call) => call.repeated)) {
-    faults.push(`${key} is a slot key rendered inside {#each}, {#key}, {#snippet} or a component`);
-  }
+  faults.push(...slotSiteFaults(ast, key, spec, local));
   return faults;
 }
 
@@ -355,7 +346,7 @@ function declarationFaults(entry, ast) {
     faults.push(...valueFaults(key, spec, entry, declared));
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
-    if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
+    if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, ast, prop.local));
     faults.push(...elementFaults(key, spec));
     if ((spec.kind === 'data' || spec.kind === 'value') && calls.length > 0) {
       faults.push(`${key} is a ${spec.kind} key rendered as a snippet`);
@@ -1684,9 +1675,9 @@ describe('each entry matches its component declaration', () => {
       '</script>',
       '<div>{@render clean?.()}{@render twice?.()}{@render twice?.()}{@render bare()}</div>',
       '{@render given?.(1)}',
-      '{#each [1] as item (item)}<p>{@render listed?.()}</p>{/each}',
-      '{#key clean}<p>{@render keyed?.()}</p>{/key}',
-      '{#snippet row()}<p>{@render snipped?.()}</p>{/snippet}',
+      '{#each [1] as item (item)}<div>{@render listed?.()}</div>{/each}',
+      '{#key 1}<div>{@render keyed?.()}</div>{/key}',
+      '{#snippet row()}<div>{@render snipped?.()}</div>{/snippet}',
       '<Wrapper>{@render wrapped?.()}</Wrapper>',
     ].join('\n')
   ).ast;
@@ -1763,7 +1754,7 @@ describe('each entry matches its component declaration', () => {
     [
       '<script>',
       '  let { plain, boxed, note, a: first, b: second, other, alt, chained, negated, joined,',
-      '    foreign, twice, given, listed, nested } = $props();',
+      '    foreign, twice, given, listed, nested, either, grouped, coalesced, later, deep } = $props();',
       '</script>',
       '{#if plain}{@render plain()}{/if}',
       '{#if boxed}<span>{@render boxed()}</span>{/if}',
@@ -1779,6 +1770,11 @@ describe('each entry matches its component declaration', () => {
       '{#if given}{@render given(1)}{/if}',
       '{#if listed}{#each [1] as item (item)}{@render listed()}{/each}{/if}',
       '{#if nested}{#if other}{@render nested()}{/if}{/if}',
+      '{#if either || other}{@render either()}{/if}',
+      '{#if other && (grouped || negated)}{@render grouped()}{/if}',
+      '{#if coalesced ?? other}{@render coalesced()}{/if}',
+      '{#if other}<p></p>{:else if negated}{@render later()}{/if}',
+      '{#if other && joined && deep}{@render deep()}{/if}',
     ].join('\n')
   ).ast;
   const guardFaultsOf = (props) => declarationFaults({ props }, GUARDED);
@@ -1787,7 +1783,14 @@ describe('each entry matches its component declaration', () => {
 
   it('passes a slot key and an optional text key whose bare render tag its own {#if} guards', () => {
     assert.deepEqual(guardFaultsOf({ plain: slot }), [], 'directly in the consequent');
-    assert.deepEqual(guardFaultsOf({ boxed: slot }), [], 'inside an element in the consequent');
+    assert.deepEqual(
+      guardFaultsOf({ boxed: { kind: 'slot', element: 'span' } }),
+      [],
+      'inside an element in the consequent'
+    );
+    assert.deepEqual(guardFaultsOf({ chained: slot }), [], 'under {:else if} that tests it');
+    assert.deepEqual(guardFaultsOf({ joined: slot }), [], 'as a conjunct of an && chain');
+    assert.deepEqual(guardFaultsOf({ deep: slot }), [], 'as the last of three conjuncts');
     assert.deepEqual(guardFaultsOf({ note: { kind: 'text' } }), [], 'an optional text key');
     assert.deepEqual(guardFaultsOf({ a: slot }), [], 'a renamed local, guarded by its local name');
     assert.deepEqual(
@@ -1799,9 +1802,11 @@ describe('each entry matches its component declaration', () => {
 
   for (const [claim, key, fault] of [
     ['in the alternate of its own {#if}', 'alt', UNGUARDED],
-    ['under {:else if}, which an earlier test can hide', 'chained', UNGUARDED],
+    ['under {:else if} that tests another local', 'later', UNGUARDED],
+    ['under a test that ors it with another expression', 'either', UNGUARDED],
+    ['under a test that nests it in an or inside an and', 'grouped', UNGUARDED],
+    ['under a test that coalesces it', 'coalesced', UNGUARDED],
     ['under a test that negates it', 'negated', UNGUARDED],
-    ['under a test that joins it with another expression', 'joined', UNGUARDED],
     ['under a test that names another local', 'foreign', UNGUARDED],
     ['under a test that names the key and not its renamed local', 'b', UNGUARDED],
     ['twice in one guard', 'twice', 'is a slot key more than one render tag draws'],
@@ -1810,6 +1815,210 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names a slot key rendered ${claim} as a fault`, () => {
       assert.deepEqual(guardFaultsOf({ [key]: slot }), [`${key} ${fault}`]);
+    });
+  }
+
+  const SITE_HEAD = '<script>\n  let { s, a, c } = $props();\n</script>\n';
+  const sitesOf = (markup, spec = slot, head = SITE_HEAD) =>
+    declarationFaults({ props: { s: spec } }, templateOf('Sites.svelte', head + markup).ast);
+  const MORE_THAN_ONE = 's is a slot key more than one render tag draws';
+  const SNIPPET = 's is a slot key whose snippet fails: ';
+
+  for (const [claim, markup] of [
+    [
+      'in the branches of one {#if} chain, {:else if} and {:else} included',
+      '{#if a}<b>{@render s?.()}</b>{:else if c}<i>{@render s?.()}</i>{:else}{@render s?.()}{/if}',
+    ],
+    [
+      'through a snippet rendered in exclusive branches',
+      '{#snippet row()}{@render s?.()}{/snippet}{#if a}{@render row()}{:else}{@render row()}{/if}',
+    ],
+    [
+      'through one call of a snippet that branches inside',
+      '{#snippet row(x)}{#if x}{@render s?.()}{:else}{@render s?.()}{/if}{/snippet}{@render row(a)}',
+    ],
+    [
+      'under an && chain and an {:else if} that each test it',
+      '{#if a && s}{@render s()}{:else if s}{@render s()}{/if}',
+    ],
+  ]) {
+    it(`passes a slot key drawn ${claim}`, () => {
+      assert.deepEqual(sitesOf(markup), []);
+    });
+  }
+
+  for (const [claim, markup, faults, head] of [
+    ['twice in one branch', '{#if a}{@render s?.()}{@render s?.()}{/if}', [MORE_THAN_ONE]],
+    [
+      'once in a chain and once beside it',
+      '{#if a}{@render s?.()}{/if}{@render s?.()}',
+      [MORE_THAN_ONE],
+    ],
+    [
+      'twice in one {:else if} branch',
+      '{#if a}<b></b>{:else if c}{@render s?.()}{@render s?.()}{/if}',
+      [MORE_THAN_ONE],
+    ],
+    [
+      'by two instances of a snippet that branches inside',
+      '{#snippet row(x)}{#if x}{@render s?.()}{:else}{@render s?.()}{/if}{/snippet}{@render row(a)}{@render row(c)}',
+      [MORE_THAN_ONE],
+    ],
+    [
+      'by two calls of a snippet in one branch',
+      '{#snippet row()}{@render s?.()}{/snippet}{#if a}{@render row()}{@render row()}{/if}',
+      [MORE_THAN_ONE],
+    ],
+    [
+      'by a snippet one call renders inside {#each}',
+      '{#snippet row()}{@render s?.()}{/snippet}{#each [1] as i (i)}{@render row()}{/each}',
+      [`s ${REPEATED}`, `${SNIPPET}row is rendered inside EachBlock`],
+    ],
+    [
+      'by a snippet one call renders inside a component',
+      '{#snippet row()}{@render s?.()}{/snippet}<Box>{@render row()}</Box>',
+      [`s ${REPEATED}`, `${SNIPPET}row is rendered inside Component`],
+    ],
+    [
+      'by a snippet that renders itself',
+      '{#snippet row()}{@render s?.()}{@render row()}{/snippet}{@render row()}',
+      [`s ${REPEATED}`, `${SNIPPET}row is rendered inside SnippetBlock`],
+    ],
+    [
+      'by a snippet passed to a component',
+      '{#snippet row()}{@render s?.()}{/snippet}<Box {row} />{@render row()}',
+      [`s ${REPEATED}`, `${SNIPPET}row is referenced other than by a render call`],
+    ],
+    [
+      'by a snippet a script aliases',
+      '{#snippet row()}{@render s?.()}{/snippet}{@render row()}',
+      [`s ${REPEATED}`, `${SNIPPET}row is referenced other than by a render call`],
+      '<script>\n  let { s } = $props();\n  const alias = row;\n</script>\n',
+    ],
+    [
+      'by a snippet the module exports',
+      '{#snippet row()}{@render s?.()}{/snippet}{@render row()}',
+      [`s ${REPEATED}`, `${SNIPPET}row is referenced other than by a render call`],
+      '<script module>\n  export { row };\n</script>\n<script>\n  let { s } = $props();\n</script>\n',
+    ],
+    [
+      'by a snippet declared inside a component',
+      '<Box>{#snippet row()}{@render s?.()}{/snippet}</Box>',
+      [`s ${REPEATED}`, `${SNIPPET}row is declared inside another block`],
+    ],
+    [
+      'by a snippet declared inside a boundary',
+      '<svelte:boundary>{#snippet failed()}{@render s?.()}{/snippet}</svelte:boundary>',
+      [`s ${REPEATED}`, `${SNIPPET}failed is declared inside another block`],
+    ],
+    [
+      'by a snippet declared twice',
+      '{#snippet row()}{@render s?.()}{/snippet}{#snippet row()}{/snippet}{@render row()}',
+      [`s ${REPEATED}`, `${SNIPPET}row is declared more than once`],
+    ],
+    [
+      'by a callee a snippet parameter binds again',
+      '{#snippet row(s)}{@render s?.()}{/snippet}{@render row(a)}',
+      [
+        's is a slot key whose local is bound again in the template',
+        's is a slot key whose local is read other than as a render callee or a test',
+      ],
+      '<script>\n  let { s, a } = $props();\n</script>\n',
+    ],
+    [
+      'through a callee that is no identifier',
+      '{@render (a ? s : c)?.()}',
+      ['s is a slot key no render tag draws'],
+    ],
+    [
+      'with its local stored for a render the gate does not see',
+      '{#if a}{@render s?.()}{:else}{@render s?.()}{/if}',
+      ['s is a slot key whose local is read other than as a render callee or a test'],
+      '<script>\n  let { s, a } = $props();\n  const kept = s || a;\n</script>\n',
+    ],
+    [
+      'in exclusive branches of a file with a transition',
+      '{#if a}<div transition:fade>{@render s?.()}</div>{:else}{@render s?.()}{/if}',
+      ['s is a slot key in a file with a transition or animation'],
+    ],
+    [
+      'inside a <button> without stating element span',
+      '<button>{@render s?.()}</button>',
+      ['s is a slot key inside phrasing content that does not state element span'],
+    ],
+  ]) {
+    it(`names a slot key drawn ${claim} as a fault`, () => {
+      assert.deepEqual(sitesOf(markup, slot, head), faults);
+    });
+  }
+
+  it('passes a slot key inside a <button> that states element span', () => {
+    assert.deepEqual(
+      sitesOf('<button>{@render s?.()}</button>', { kind: 'slot', element: 'span' }),
+      []
+    );
+  });
+
+  const LIST_ROW = 'src/ui/svelte/components/ListRow.svelte';
+  const LIST_ROW_KEYS = {
+    leading: { kind: 'slot', element: 'span' },
+    badges: { kind: 'slot', element: 'span' },
+    meta: { kind: 'slot', element: 'span' },
+    trailing: { kind: 'slot', element: 'span' },
+  };
+  const listRowFaults = (source) =>
+    declarationFaults({ props: LIST_ROW_KEYS }, templateOf(LIST_ROW, source).ast);
+  // ratchet-exempt(source-pin): the real ListRow is the gate's input, and the test judges the gate's verdict
+  const LIST_ROW_SOURCE = readFileSync(resolve(import.meta.dirname, '..', LIST_ROW), 'utf8');
+
+  it('passes ListRow as it is, for the four keys the issue publishes', () => {
+    // ratchet-exempt(source-pin): the unmutated source is the baseline the mutations are judged against
+    assert.deepEqual(listRowFaults(LIST_ROW_SOURCE), []);
+  });
+
+  for (const [claim, from, to, fault] of [
+    [
+      'a fourth call of its content snippet in the button branch',
+      '      onclick={open}>{@render content(true)}</button',
+      '      onclick={open}>{@render content(true)}{@render content(true)}</button',
+      'leading is a slot key more than one render tag draws',
+    ],
+    [
+      'one call of its content snippet inside {#each}',
+      '  {:else}\n    {@render content(form)}\n  {/if}',
+      '  {:else}\n    {#each [1] as i (i)}{@render content(form)}{/each}\n  {/if}',
+      `leading ${REPEATED}`,
+    ],
+    [
+      'its trailing guard narrowed to a test that no longer names it',
+      '{#if trailing && form}',
+      '{#if form}',
+      `trailing ${UNGUARDED}`,
+    ],
+    [
+      'its leading guard dropped',
+      '{#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      '{#if mark}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      `leading ${UNGUARDED}`,
+    ],
+    [
+      'a script alias of its content snippet',
+      '  const uid = $props.id();',
+      '  const uid = $props.id();\n  const alias = content;',
+      'leading is a slot key whose snippet fails: content is referenced other than by a render call',
+    ],
+    [
+      'its leading slot stored for a later render',
+      '  const uid = $props.id();',
+      '  const uid = $props.id();\n  const kept = leading || badges;',
+      'leading is a slot key whose local is read other than as a render callee or a test',
+    ],
+  ]) {
+    it(`names ListRow with ${claim} as a fault`, () => {
+      assert.equal(LIST_ROW_SOURCE.split(from).length, 2, 'the mutation applies once');
+      const faults = listRowFaults(LIST_ROW_SOURCE.replace(from, to));
+      // ratchet-exempt(source-pin): a mutation of the gate's input; the assertion is the verdict
+      assert.ok(faults.includes(fault), `${fault} in ${JSON.stringify(faults)}`);
     });
   }
 
