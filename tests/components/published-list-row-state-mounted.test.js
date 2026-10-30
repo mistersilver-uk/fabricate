@@ -163,6 +163,13 @@ describe('the published ListRow busy', () => {
     handle.destroy();
   });
 
+  it('reads busy by truthiness, so the string false marks the row busy', async () => {
+    const { handle, row } = mountRow({ busy: 'false' });
+    await settle();
+    assert.equal(row().getAttribute('aria-busy'), 'true');
+    handle.destroy();
+  });
+
   it('stays natively disabled beside disabled, with no aria-disabled', async () => {
     const { handle, button } = mountRow({ onOpen() {}, busy: true, disabled: true });
     await settle();
@@ -173,18 +180,20 @@ describe('the published ListRow busy', () => {
   });
 
   it('detaches leading while busy and attaches the same element again, intact, when it ends', async () => {
-    const { handle, row, mark } = mountRow({ onOpen() {}, leading: true });
+    const { handle, row, mark } = mountRow({ onOpen() {}, leading: true, markSize: 34 });
     const slot = handle.slot('leading');
     const portrait = slot.ownerDocument.createElement('span');
     portrait.textContent = 'portrait';
     slot.append(portrait);
     await settle();
     assert.ok(slot.isConnected && !mark(), 'leading in place of the mark');
-    assert.equal(handle.update({ name: NAME, onOpen() {}, leading: true, busy: true }), true);
+    const kept = { name: NAME, onOpen() {}, leading: true, markSize: 34 };
+    assert.equal(handle.update({ ...kept, busy: true }), true);
     await settle();
     assert.ok(!slot.isConnected, 'detached while busy');
     assert.deepEqual(glyphClasses(mark()), SPINNER, 'the spinner in its place');
-    assert.equal(handle.update({ name: NAME, onOpen() {}, leading: true }), true);
+    assert.equal(mark().style.width, '34px', 'sized by markSize');
+    assert.equal(handle.update(kept), true);
     await settle();
     assert.ok(handle.slot('leading') === slot && slot.isConnected, 'the same element again');
     assert.ok(row().contains(portrait), 'with its content');

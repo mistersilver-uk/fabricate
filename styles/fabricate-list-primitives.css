@@ -633,7 +633,7 @@
   color: var(--fab-text-secondary);
 }
 
-.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'], [aria-disabled='true'])) {
   background: var(--fab-surface-raised);
   color: var(--fab-text-secondary);
 }
@@ -642,7 +642,7 @@
   opacity: 0.62;
 }
 
-/* A busy row's button keeps focus and refuses a press, so it shows the progress cursor (issue 2851). */
+/* A busy row's button keeps focus and refuses a press, so it shows the progress cursor and, by the hover rule's `aria-disabled` exclusion, no hover wash (issue 2851). */
 .fabricate-list-row.is-busy > .fabricate-list-row-open:enabled {
   cursor: progress;
 }

@@ -2,7 +2,7 @@
  * Issue 2851 — a read-only `ListRow`'s selected face and a busy row, measured in Chromium: the face
  * paints the active wash and the accent edge on each of the four grounds a published row is
  * mounted on without moving the row's box, and the spinner takes the mark's box exactly, with the
- * busy button under the progress cursor.
+ * busy button under the progress cursor and refusing the hover wash.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -133,5 +133,17 @@ describe('ListRow busy, rendered (issue 2851)', () => {
   it('shows the progress cursor on a busy button, where an idle one shows the pointer', async () => {
     assert.equal((await rowOf('open')).cursor, 'pointer');
     assert.equal((await rowOf('busyOpen')).cursor, 'progress');
+  });
+
+  it('lights an idle button’s row on hover and leaves a busy one on the plain fill', async () => {
+    const plain = await rowOf('plain');
+    const hovered = async (caseId) => {
+      await tab.hover(`[data-case="${caseId}"] .fabricate-list-row-open`);
+      const { fill } = await rowOf(caseId);
+      await tab.mouse.move(0, 0);
+      return fill;
+    };
+    assert.notEqual(await hovered('open'), plain.fill, 'an idle row takes the hover wash');
+    assert.equal(await hovered('busyOpen'), plain.fill, 'a busy row refuses it');
   });
 });

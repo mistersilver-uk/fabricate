@@ -90,7 +90,7 @@ const LIST_ROW_FAMILY = Object.freeze([
   ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
-  ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
+  ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'], [aria-disabled='true']))",
   '.fabricate-list-row:has(> .fabricate-list-row-open:disabled)',
   // The density, layout and truncation rules (issue 2850).
   '.fabricate-list-row.is-default',
@@ -115,14 +115,21 @@ const LIST_ROW_FAMILY = Object.freeze([
 /** The rule that strips the module ring from the row's button, and the one that rings its overlay. */
 const STRIP = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible`;
 const RING = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible::after`;
-/** The grounds a published row paints beneath its ring, a card's `--fab-bg-2` among them, each over the row's own opaque fill, top first. */
+/**
+ * The grounds beneath a published row's ring, top first: its own opaque fill, a card's included,
+ * and each translucent state fill, which replaces that fill, over each ground a row is mounted on.
+ */
 const ROW_GROUNDS = Object.freeze([
   ['--fab-bg-1'],
   ['--fab-bg-2'],
-  ['--fab-surface-active', '--fab-bg-1'],
-  ['--fab-surface-raised', '--fab-bg-1'],
-  ['--fab-success-soft', '--fab-bg-1'],
-  ['--fab-danger-soft', '--fab-bg-1'],
+  ...[
+    '--fab-surface-active',
+    '--fab-surface-raised',
+    '--fab-success-soft',
+    '--fab-danger-soft',
+  ].flatMap((wash) =>
+    ['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2'].map((ground) => [wash, ground])
+  ),
 ]);
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);

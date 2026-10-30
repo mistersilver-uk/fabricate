@@ -163,3 +163,34 @@ describe('the published ListRow density, layout, truncateName and detailAlign', 
     handle.destroy();
   });
 });
+
+describe('the published ListRow trailing across a density or layout change', () => {
+  for (const [key, value] of [
+    ['density', 'default'],
+    ['layout', 'card'],
+  ]) {
+    it(`moves the bare trailing slot element into its wrapper for ${key} ${JSON.stringify(value)}, and back`, async () => {
+      const { handle, row } = mountRow({ trailing: true });
+      const slot = handle.slot('trailing');
+      const control = slot.ownerDocument.createElement('button');
+      control.type = 'button';
+      control.textContent = 'Edit';
+      slot.append(control);
+      await settle();
+      const wrapper = () => slot.closest('.fabricate-list-row-trailing');
+      assert.ok(slot.isConnected && !wrapper(), 'bare in the dense row');
+      assert.equal(handle.update({ name: NAME, trailing: true, [key]: value }), true);
+      await settle();
+      assert.ok(
+        handle.slot('trailing') === slot && slot.isConnected,
+        'the same element, connected'
+      );
+      assert.ok(wrapper()?.parentElement === row(), 'moved into the form’s trailing wrapper');
+      assert.ok(slot.contains(control), 'with its children');
+      assert.equal(handle.update({ name: NAME, trailing: true }), true);
+      await settle();
+      assert.ok(slot.isConnected && !wrapper() && slot.contains(control), 'and moved back, intact');
+      handle.destroy();
+    });
+  }
+});

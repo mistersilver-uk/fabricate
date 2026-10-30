@@ -3,7 +3,8 @@
   the page-session seam `game.fabricate.api.ui` binds, as a companion does, at the geometry and
   state keys it publishes: a read-only row at the 26px mark, a whole-row button at 28, a
   default-density button at 30, a four-column board of truncated rows at 30, a four-column board of
-  34px cards, three read-only stage rows whose second is current and selected, and a busy button.
+  34px cards, three read-only stage rows, the second current and selected and the third, not yet
+  reachable, muted, and a busy button.
   Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js` mounts it
   for `?specimen=published-list-row-forms` only.
 
@@ -46,9 +47,9 @@
     [
       'stages',
       [
-        { name: 'Gather the ore', detail: 'Done', muted: true },
+        { name: 'Gather the ore', detail: 'Done' },
         { name: 'Quench the blade', detail: 'Now', selected: true, current: 'step' },
-        { name: 'Temper the edge', detail: 'Next' },
+        { name: 'Temper the edge', detail: 'Not yet reachable', muted: true },
       ],
     ],
     [

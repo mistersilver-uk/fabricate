@@ -63,7 +63,7 @@ test("the ladder's empty-tier text clears 4.5:1 on the tier it is drawn on", () 
 const OPEN = '> .fabricate-list-row-open';
 const STATES = Object.freeze({
   selected: `.fabricate-list-row:not(.is-danger):has(${OPEN}[aria-pressed='true'])`,
-  hover: `.fabricate-list-row:not(.is-danger):has(${OPEN}:enabled:hover:not([aria-pressed='true']))`,
+  hover: `.fabricate-list-row:not(.is-danger):has(${OPEN}:enabled:hover:not([aria-pressed='true'], [aria-disabled='true']))`,
   danger: '.fabricate-list-row.is-danger',
 });
 

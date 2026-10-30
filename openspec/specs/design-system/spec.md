@@ -43,7 +43,7 @@ The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without c
 ListRow MAY also draw a selectable form, at `density` dense or default and `layout` row or card.
 Its `markSize` is a rung of the art ladder, 22, 26, 28, 30, 34 or 38, drawn by a literal Medallion size each, and any other value draws the 22px mark.
 With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
-Without `onOpen`, a `selected` of true MUST draw the selected face on the dense row's own box and inset and write no `aria-pressed`; `current` writes `aria-current` and `busy` writes `aria-busy` and draws a spinning glyph in place of the mark, on the button with `onOpen` and on the root without it, and a busy button keeps its focus and refuses a press (issue 2851).
+Without `onOpen`, a `selected` of true MUST draw the selected face on the row's own box and inset and write no `aria-pressed`; `current` writes `aria-current` and `busy` writes `aria-busy` and draws a spinning glyph in place of the mark, on the button with `onOpen` and on the root without it, and a busy button keeps its focus and refuses a press (issue 2851).
 The button is named by any `leading` text, then the item's name, then each state the row shows only visually.
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
 `<BrowseCard>` is merged into ListRow's `layout="card"`, which a browse card MUST render through.
