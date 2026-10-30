@@ -630,6 +630,60 @@
   },
   {
     "spec": "<Segmented>",
+    "cap": "compact · bg-1 well",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "warn": "an option’s value, not its words",
+      "fail": "an option’s value, not its words",
+      "On fail": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "options": [
+        {
+          "value": "warn",
+          "label": "Warn"
+        },
+        {
+          "value": "fail",
+          "label": "Fail"
+        }
+      ],
+      "value": "warn",
+      "groupName": "pl-compact",
+      "ariaLabel": "On fail",
+      "density": "compact"
+    }
+  },
+  {
+    "spec": "<Segmented>",
+    "cap": "field · bg-1 well",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "minor": "an option’s value, not its words",
+      "major": "an option’s value, not its words",
+      "Severity": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "options": [
+        {
+          "value": "minor",
+          "label": "Minor"
+        },
+        {
+          "value": "major",
+          "label": "Major"
+        }
+      ],
+      "value": "minor",
+      "groupName": "pl-field",
+      "ariaLabel": "Severity",
+      "density": "field"
+    }
+  },
+  {
+    "spec": "<Segmented>",
     "cap": "fill",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",

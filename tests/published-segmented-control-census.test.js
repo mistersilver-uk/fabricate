@@ -36,11 +36,20 @@ const COMPONENT = 'src/ui/svelte/components/SegmentedControl.svelte';
 /**
  * The published track's root: the classes `fill`, `density`, `tone` and `shape` write beside it, the
  * four row classes a Fabricate rule redraws it under, and the classes its file spells that no
- * published key draws: the tally, the badge, the other densities, the tag tone and the icon-only run.
+ * published key draws: the tally, the badge, the tag tone and the icon-only run.
  */
 const TRACK = Object.freeze({
   root: 'manager-segmented',
-  writable: new Set(['is-fill', 'is-inline', 'is-accent', 'is-accent-soft', 'is-info', 'is-pill']),
+  writable: new Set([
+    'is-fill',
+    'is-compact',
+    'is-field',
+    'is-inline',
+    'is-accent',
+    'is-accent-soft',
+    'is-info',
+    'is-pill',
+  ]),
   ancestors: new Set([
     'manager-checks-tier-row',
     'manager-recipe-ingredient-option-row',
@@ -49,14 +58,7 @@ const TRACK = Object.freeze({
   ]),
   drawsChildren: true,
   disables: false,
-  undrawn: new Set([
-    'manager-segment-count',
-    'is-badge',
-    'is-compact',
-    'is-field',
-    'is-tag',
-    'is-icon-only',
-  ]),
+  undrawn: new Set(['manager-segment-count', 'is-badge', 'is-tag', 'is-icon-only']),
 });
 
 /** A published segment: its default class and the state classes `value`, `disabled` and `variant` write. */
@@ -102,7 +104,7 @@ describe('the module sheet and every component style against the published Segme
         ['options', 'value', 'onChange', 'ariaLabel', 'fill', 'density', 'tone', 'shape'],
         'fabricate',
       ],
-      'a published icon-only run, density rung, class or wider root reopens the census'
+      'a published icon-only run, tag tone, class or wider root reopens the census'
     );
   });
 
@@ -145,7 +147,7 @@ describe('the segmented control census, synthetic', () => {
 
   for (const [claim, selector] of [
     ['the tag tone', '.manager-segmented.is-tag .manager-segment'],
-    ['the compact density', '.manager-segmented.is-compact'],
+    ['the icon-only run', '.manager-segmented.is-icon-only .manager-segment'],
     ['a tally', '.manager-segmented .manager-segment-count'],
     ['a row ancestor', '.manager-checks-tier-row .manager-segmented'],
   ]) {
@@ -159,6 +161,8 @@ describe('the segmented control census, synthetic', () => {
     '.manager-segmented',
     '.manager-segmented.is-fill',
     '.manager-segmented.is-inline',
+    '.manager-segmented.is-compact',
+    '.manager-segmented.is-field',
     '.manager-segmented.is-pill',
     '.manager-segmented.is-accent',
     '.manager-segmented.is-accent-soft',

@@ -251,6 +251,40 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  // A per-option `title` hint is a Foundry tooltip (`data-tooltip-text`), never a native `title`,
+  // and it never becomes the name: the label stays the radio's accessible name.
+  it('draws an option title as data-tooltip-text, and in icon-only drops the native title it replaces', async () => {
+    const options = [
+      { value: 'destroyed', label: 'Destroyed', title: 'The item is removed' },
+      { value: 'inert', label: 'Becomes inert' }
+    ];
+    const labelled = await harness.mount({ options, value: 'destroyed', groupName: 'g' });
+    assert.deepEqual(
+      [...labelled.querySelectorAll('.manager-segment')].map((n) => n.getAttribute('data-tooltip-text')),
+      ['The item is removed', null]
+    );
+    assert.equal(labelled.querySelectorAll('[title]').length, 0, 'no native title');
+    harness.remount();
+
+    const iconOnly = await harness.mount({ options, value: 'destroyed', groupName: 'g', iconOnly: true });
+    assert.deepEqual(
+      [...iconOnly.querySelectorAll('.manager-segment')].map((n) => [
+        n.getAttribute('title'),
+        n.getAttribute('data-tooltip-text')
+      ]),
+      [
+        [null, 'The item is removed'],
+        ['Becomes inert', null]
+      ],
+      'a hint replaces the native label tooltip, and an unhinted tile keeps it'
+    );
+    assert.deepEqual(
+      [...iconOnly.querySelectorAll('.manager-segment-label')].map((n) => n.textContent),
+      ['Destroyed', 'Becomes inert'],
+      'the label is still the name'
+    );
+  });
+
   // The View Lab's `manager-essences-grid` case steps on `[data-essence-view-option="grid"]`,
   // which is this hook. `view-lab-screenshots.mjs` calls `target.click()`, whose hit-target
   // check requires the element under the click point to BE the target or a DESCENDANT of it —

@@ -412,6 +412,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
         segment.value === 'all' ? { ...segment, variant: 'info' } : segment
       ),
     }),
+    'segmented-titled': chosenSegment({
+      density: 'compact',
+      options: SEGMENTS.map((segment) => ({ ...segment, title: `Show ${segment.label}` })),
+    }),
     'segmented-icon-disabled': chosenSegment({
       options: [
         { value: 'all', label: 'All', icon: 'fas fa-list' },
