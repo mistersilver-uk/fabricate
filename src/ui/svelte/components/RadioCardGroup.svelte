@@ -1,7 +1,7 @@
 <!--
   A fieldset of radio cards for one choice among a few options, drawn as the library's
-  `<OptionCards>`: one card per option with an optional chip, a title, a description line and an
-  optional `optionBody` beneath them.
+  `<OptionCards>`: one card per option with an optional chip, a title and badge, a description
+  line, an example line and an optional `optionBody` beneath them.
 
   Props:
   | prop | values | default | contract |
@@ -10,7 +10,7 @@
   | `groupName` | string | `''` | The radios' shared `name`, unique per rendered group; empty falls back to a name unique to the mount. |
   | `legend` | string | `''` | The fieldset's name, final display text, visually hidden unless `legendVisible`; required by contract. |
   | `hint` | string | `''` | Final display text drawn as a warning note under the legend; none when empty. |
-  | `options` | `{ value, label, description?, icon? }[]` | `[]` | One card per entry, keyed by a unique `value`; `label` and `description` are final display text (`localizeOptions` resolves a keyed list). A label is required by contract, the description and `icon` are optional, and an option carries no disabled flag, reason or badge: `disabledOptions` owns those. |
+  | `options` | `{ value, label, description?, example?, badge?, icon? }[]` | `[]` | One card per entry, keyed by a unique `value`; `label`, `description`, `example` and `badge.label` are final display text (`localizeOptions` resolves a keyed list). A label is required by contract, the rest are optional, and an option carries no disabled flag or reason: `disabledOptions` owns those. `example` is a third text line under the description. `badge` is `{ label, tone? }`, a chip beside the title whose `tone` is one of `BADGE_TONES` (any other draws `secondary`), and an empty or non-string `label` draws none. |
   | `disabled` | boolean | `false` | Disables the whole group, which dims every card and fires no `onChange`. |
   | `disabledOptions` | `{ value, reason }[]` | `[]` | Each entry disables the option it names and draws its already-localized `reason` beneath the description; `reason` is required by contract and an empty one draws nothing. An entry naming no option is ignored. One entry per value: the first non-empty reason wins, and a later empty one does not erase an earlier one. |
   | `layout` | `'row'` \| `'stacked'` | `'row'` | Chip beside the text, or chip over it. The caller states it (`stacked` on three or more tracks); it is never derived from `columns`, and a reflowed card keeps it. |
@@ -30,8 +30,9 @@
     group's hooks, `data-radio-card-group` among them; `class` is appended to the root's own.
 
   Invariants:
-  - Each radio is named by its option's title and described by its description, its reason and
-    its option body, whichever render (`field-mounted.test.js`).
+  - Each radio is named by its option's title and described by its badge, description, example,
+    reason and option body, whichever render, so the badge is announced once and never joins the
+    name (`field-mounted.test.js`).
   - The face is the primitive's alone; the one caller rule naming its family is a margin, pinned
     by `searchable-popover-area-scope.test.js` and `option-cards-specimen-geometry.test.js`.
   - The chip is `Medallion` inside a wrapper that owns the disabled dim, because `Medallion`
@@ -43,8 +44,12 @@
     every radio (`searchable-popover-area-scope.test.js`).
 -->
 <script>
+  import Chip from './Chip.svelte';
   import Field from './Field.svelte';
   import Medallion from './Medallion.svelte';
+
+  // The Chip tones that clear 4.5:1 on the card's rest and chosen grounds in every palette.
+  const BADGE_TONES = new Set(['positive', 'warning', 'info', 'danger', 'accent', 'secondary']);
 
   let {
     cardId = undefined,
@@ -80,6 +85,13 @@
   );
 
   const isOff = (option) => disabled || reasons.has(option.value);
+  const badgeOf = (option) =>
+    typeof option.badge?.label === 'string' && option.badge.label
+      ? {
+          label: option.badge.label,
+          tone: BADGE_TONES.has(option.badge.tone) ? option.badge.tone : 'secondary',
+        }
+      : null;
   const describedBy = (index, parts) =>
     parts
       .filter(([, renders]) => renders)
@@ -117,6 +129,8 @@
     {#each options as option, index (option.value)}
       {@const chosen = option.value === value}
       {@const hasDesc = Boolean(option.description)}
+      {@const hasExample = Boolean(option.example)}
+      {@const badge = badgeOf(option)}
       {@const reason = reasons.get(option.value) || ''}
       <label
         class="manager-resolution-option"
@@ -139,16 +153,39 @@
             >
           {/if}
           <span class="manager-resolution-option-text">
-            <span
-              class="manager-resolution-option-name"
-              id={`${uid}-${index}-title`}
-              data-tool-choice-title>{option.label}</span
-            >
+            {#snippet title()}
+              <span
+                class="manager-resolution-option-name"
+                id={`${uid}-${index}-title`}
+                data-tool-choice-title>{option.label}</span
+              >
+            {/snippet}
+            {#if badge}
+              <span class="manager-resolution-option-line">
+                {@render title()}
+                <Chip
+                  tone={badge.tone}
+                  density="inspector"
+                  class="manager-resolution-option-badge"
+                  id={`${uid}-${index}-badge`}
+                  data-radio-card-badge>{badge.label}</Chip
+                >
+              </span>
+            {:else}
+              {@render title()}
+            {/if}
             {#if hasDesc}
               <span
                 class="manager-resolution-option-desc"
                 id={`${uid}-${index}-desc`}
                 data-tool-choice-description>{option.description}</span
+              >
+            {/if}
+            {#if hasExample}
+              <span
+                class="manager-resolution-option-example"
+                id={`${uid}-${index}-example`}
+                data-radio-card-example>{option.example}</span
               >
             {/if}
             {#if reason}
@@ -167,7 +204,9 @@
             disabled={isOff(option)}
             aria-labelledby={`${uid}-${index}-title`}
             aria-describedby={describedBy(index, [
+              ['badge', Boolean(badge)],
               ['desc', hasDesc],
+              ['example', hasExample],
               ['reason', Boolean(reason)],
               ['body', Boolean(optionBody)],
             ])}

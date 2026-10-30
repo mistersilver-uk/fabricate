@@ -106,6 +106,7 @@ const harness = createMountedComponentHarness({
     component('SlotTile'),
     component('ChoiceOptionList'),
     component('SlotRow'),
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),

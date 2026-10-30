@@ -50,6 +50,7 @@ const radioHarness = createMountedComponentHarness({
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/Medallion.svelte',
   ],
@@ -305,6 +306,52 @@ describe('RadioCardGroup names each radio by its title and describes it by what 
     const root = await mountGroup();
     assert.ok(!radioOf(root, 'bare').hasAttribute('aria-describedby'));
     assert.equal(describedIds(radioOf(root, 'open')).length, 1, 'a described option keeps its id');
+  });
+
+  it('draws no line, badge or example element for an option that passes none, leaving the title a direct child of the text column', async () => {
+    const root = await mountGroup({ optionBody: body });
+    assert.equal(root.querySelectorAll('.manager-resolution-option-line').length, 0);
+    assert.equal(
+      root.querySelectorAll('[data-radio-card-badge], [data-radio-card-example]').length,
+      0
+    );
+    for (const { value } of OPTIONS) {
+      const title = cardOf(root, value).querySelector('[data-tool-choice-title]');
+      assert.ok(title.parentElement.classList.contains('manager-resolution-option-text'), value);
+    }
+    assert.deepEqual(
+      describedIds(radioOf(root, 'open')).map((id) => byId(id).className),
+      ['manager-resolution-option-desc', 'manager-resolution-option-body']
+    );
+  });
+
+  it('describes a radio by its badge, description, example, reason and body in that order, and dims a disabled option’s badge and example', async () => {
+    const root = await mountGroup({
+      optionBody: body,
+      options: [
+        {
+          value: 'later',
+          label: 'Later',
+          description: 'Not yet.',
+          example: 'Next week.',
+          badge: { label: 'Soon', tone: 'info' },
+        },
+      ],
+      value: '',
+      disabledOptions: [{ value: 'later', reason: 'Coming soon' }],
+    });
+    assert.deepEqual(
+      describedIds(radioOf(root, 'later')).map((id) => byId(id).textContent.trim()),
+      ['Soon', 'Not yet.', 'Next week.', 'Coming soon', 'later']
+    );
+    const card = cardOf(root, 'later');
+    assert.ok(card.classList.contains('is-disabled'));
+    assert.ok(card.querySelector('.manager-resolution-option-badge[data-radio-card-badge]'));
+    assert.equal(
+      card.querySelector('[data-tool-choice-title]').textContent,
+      'Later',
+      'the badge stays out of the name'
+    );
   });
 
   it('disables a named option for real and ignores an entry that names none', async () => {

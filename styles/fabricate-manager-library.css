@@ -3463,7 +3463,17 @@
   color: var(--fab-text);
 }
 
+/* The title and its badge share a wrapping line, so a long badge drops beneath the title rather than past the card. */
+.fabricate-option-cards .manager-resolution-option-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip) var(--fab-space-2);
+  min-width: 0;
+}
+
 .fabricate-option-cards .manager-resolution-option-desc,
+.fabricate-option-cards .manager-resolution-option-example,
 .fabricate-option-cards .manager-resolution-option-reason {
   color: var(--fab-text-muted);
   font-size: 10.5px;
@@ -3507,7 +3517,9 @@
 
 .fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-icon,
 .fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-name,
+.fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-badge,
 .fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-desc,
+.fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-example,
 .fabricate-option-cards .manager-resolution-option.is-disabled input[type='radio'] {
   opacity: 0.45;
 }
