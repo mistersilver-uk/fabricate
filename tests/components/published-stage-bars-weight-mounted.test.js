@@ -133,6 +133,23 @@ describe('the published StageBars, weight', () => {
     });
   }
 
+  it('keeps the proportions of weights too large to sum', async () => {
+    const bars = mountStages({ stages: STAGES([1e308, 1e308, 2e307]) });
+    await settle();
+    assert.deepEqual(sharesOf(bars.columns()), [45.45, 45.45, 9.09]);
+    bars.handle.destroy();
+  });
+
+  for (const stages of [null, 'abc', {}]) {
+    it(`draws the group as before for stages ${JSON.stringify(stages)} and reports nothing`, async () => {
+      const bars = mountStages({ stages });
+      await settle();
+      assert.ok(bars.group(), 'the named group is drawn');
+      assert.equal(bars.columns(), '');
+      bars.handle.destroy();
+    });
+  }
+
   it('draws equal bars, with no template, when no stage names a valid weight', async () => {
     const bars = mountStages({ stages: STAGES([0, -1, '2', undefined]) });
     await settle();

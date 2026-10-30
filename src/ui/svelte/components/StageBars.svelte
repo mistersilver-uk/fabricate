@@ -35,9 +35,11 @@
   const weighted = (stage) => Number.isFinite(stage?.weight) && stage.weight > 0;
   const weightOf = (stage) => (weighted(stage) ? stage.weight : 1);
   const columns = $derived.by(() => {
-    if (!stages.some(weighted)) return undefined;
-    const total = stages.reduce((sum, stage) => sum + weightOf(stage), 0);
-    return stages.map((stage) => `minmax(0, ${(weightOf(stage) / total) * 100}fr)`).join(' ');
+    if (!Array.isArray(stages) || !stages.some(weighted)) return undefined;
+    const largest = Math.max(...stages.map(weightOf));
+    const ratios = stages.map((stage) => weightOf(stage) / largest);
+    const total = ratios.reduce((sum, ratio) => sum + ratio, 0);
+    return ratios.map((ratio) => `minmax(0, ${(ratio / total) * 100}fr)`).join(' ');
   });
 
   function percentOf(stage) {
