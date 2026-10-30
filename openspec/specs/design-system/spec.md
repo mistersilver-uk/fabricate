@@ -1011,7 +1011,7 @@ The 8px and 9px rungs are read from that companion's measured scales; a new rung
 
 `StatBox` MUST take a `layout` that is `'default'` or `'start'`, defaulting to `'default'`, the centred serif figure over its label that every in-app caller draws.
 `'start'` draws the label first and the figure beneath it, both start-aligned, with the figure in the monospace face at 14px and weight 500, the heaviest weight the shipped mono face has; any other value draws `'default'`.
-`StatBox` MUST take an optional `note`, text, drawn as one line after the figure and label in either layout at 10px in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
+`StatBox` MUST take an optional `note`, text, drawn after the figure and label in either layout at 10px, wrapping at the box's width and never clipped, in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
 The DOM order MUST be the visual order: figure then label at `'default'`, label then figure at `'start'`, and the note last in both.
 The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
 Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.

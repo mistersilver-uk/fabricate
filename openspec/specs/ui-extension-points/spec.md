@@ -826,7 +826,7 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `default`, `info` or `danger`.
   - `layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
     Any other value draws `default`.
-  - `note` is optional text, final display text, drawn as a line after the figure and label in either layout; an empty `note` draws nothing.
+  - `note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
     In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
   - A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, which `describe('StatBox').props` shows; adding either is additive, and the entry stays at `version` 1.
   - The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
