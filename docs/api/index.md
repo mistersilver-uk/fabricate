@@ -2042,7 +2042,7 @@ The published components, in publication order:
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
 | `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint`, `icon` | no |
 | `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
-| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
+| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `origin`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone`, `layout`, `note` | yes |
@@ -2058,7 +2058,7 @@ The published components, in publication order:
 | `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops`, `nullLabel`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
-| `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
+| `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `gap`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `any` | `as` (required), `children` (slot) | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot) | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
@@ -2165,7 +2165,16 @@ Each tag name reads against the bar's track no weaker than the weakest of the si
 That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
 Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card, so never leave a share to its colour.
 The bar draws no label, so no ink is paired with a tag name.
-`density` is `default` or `compact`.
+`origin` is `start` or `center`, and `start` when absent or any other value.
+`center` reads `value` as -100 to 100, clamped, and grows the fill from the midpoint of the track: to the right in `--fab-success-text` above zero, to the left in `--fab-danger-text` below it, and a fill of no width at zero.
+It runs left to right in every writing direction, as `shares` do, and `tone`, `color` and `shares` are not read, so the bar carries no tone attribute.
+A bipolar bar has no midpoint mark, and the success and danger inks are the pale text inks, so state the signed reading as text beside it.
+A Fabricate that predates `origin` refuses it with `"origin" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
+`density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
+`thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so never leave a reading to its colour.
+The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
+A Fabricate that predates `thin` draws the default track and refuses nothing, and `describe` cannot tell you which one is running; adding it is additive, and the entry stays at `version` 1.
 It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
 A value that must be announced is a `Meter`.
 
@@ -2940,7 +2949,7 @@ const select = fabUi.mount('Select', { target, props: props() });
 ### StageBars
 
 `StageBars` draws how far a staged process has come: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value; it draws no control.
-`stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+`stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
 A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
 So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
 `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too.
@@ -2948,7 +2957,12 @@ A stage whose `valueText` is absent, `''` or not a string announces its percenta
 Pass a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
 Naming `valueText` is additive, and the entry stays at `version` 1.
 A Fabricate that predates it ignores it and announces the percentage, and `describe` cannot tell you which one is running.
-A member other than `name`, `label`, `valueText` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+`weight` is the stage's share of the row: a finite number above zero, else 1, so the bars are each `weight` over the sum of the weights wide and a list that names none draws equal bars.
+A `weight` that is a numeric string reads 1, and a bar narrower than its caption cuts the caption off with an ellipsis.
+Naming `weight` is additive, and the entry stays at `version` 1: a Fabricate that predates it draws equal bars, and `describe` cannot tell you which one is running.
+A member other than `name`, `label`, `valueText`, `value` and `weight` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+`gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
+A Fabricate that predates `gap` refuses it with `"gap" is not a data attribute`, and `describe('StageBars').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
 `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
 A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so keep each name short.

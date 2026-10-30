@@ -358,6 +358,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           tone: optional,
           color: optional,
           shares: optional,
+          origin: optional,
           density: optional,
         },
         rest: true,
@@ -560,7 +561,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       StageBars: {
         version: 1,
-        props: { stages: required, currentIndex: optional, numbered: optional, ariaLabel: required },
+        props: {
+          stages: required,
+          currentIndex: optional,
+          numbered: optional,
+          gap: optional,
+          ariaLabel: required,
+        },
         rest: true,
         root: 'any',
         overlays: false,
