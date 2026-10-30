@@ -862,7 +862,7 @@ Each group states the accepted values of every key that entry publishes.
   - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
     It is drawn and never announced, so the label says the state.
   - `truncate` is `true` or `false`; `true` keeps the label to one line and ends it in an ellipsis where `target` is too narrow, at any `density`, keeping the `icon` glyph whole.
-    The ellipsis is drawn only: the label stays whole in the chip's text and so in its name, and the colour, `mono`, `struck` and `icon` are drawn as without it.
+    The ellipsis is drawn only: the label stays whole in the chip's text and so in its name, and the colour, `mono`, `struck` and `icon` are drawn as without it; only the corner changes, to a pill (`border-radius: 999px`).
     A reader who needs the clipped text passes the full label as `data-tooltip-text`, which opens on pointer hover only, so it never carries what the label does not.
     The chip ends at the width `target` has, so a `target` that is a flex item of the companion's row needs `min-width: 0` and a `flex-shrink` above 0, or the row overflows instead of the label ending in an ellipsis.
   - Fabricate coerces none of `mono`, `struck` and `truncate` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
