@@ -96,7 +96,8 @@ test('a ruled kind passes at its own selector, heights and corner only', () => {
       assert.equal(passes([selector], height, corner + 1), false, `${selector}, another corner`);
     }
   }
-  assert.equal(passes(['.fab-avatar'], 30, 9), false, 'a ruling holds at its own heights');
+  assert.equal(passes(['.fab-avatar'], 34, 9), true, 'the 34 band is 9 already');
+  assert.equal(passes(['.fab-avatar'], 38, 7), false, 'a ruling holds at its own heights');
   assert.equal(passes(['.manager-nav-subitem'], 44, 7), false, 'a wrapped row at two lines');
 });
 

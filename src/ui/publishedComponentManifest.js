@@ -51,6 +51,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       size: Object.freeze({ kind: 'data' }),
       shape: Object.freeze({ kind: 'data' }),
       tint: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',

@@ -35,17 +35,17 @@ const contract = defineClosedTokenContract({
 
   // Two tokens, asserted separately so a failure names the one that went missing. The class is what
   // the restatement clause polices.
-  emits: Object.freeze([`class="${CONTRACT_CLASS}"`, "data-avatar={art ? 'image' : 'initials'}"]),
+  emits: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-avatar={mode}']),
 
   primitiveWrites: {
-    count: 5,
+    count: 6,
     why:
       'the primitive itself, which writes the class so that no call site has to remember it. ' +
-      'The count is 5 rather than 1 because the token is the STEM of two element classes ' +
-      'beneath it — `fab-avatar-img` and `fab-avatar-initials` — and of the two custom ' +
-      'properties the box style interpolates, `--fab-avatar-initials` and `--fab-avatar-tint`, ' +
-      'and the shared clause matches by SUBSTRING. That is the shape a caller writing any of ' +
-      'the five would be caught by, so the count is pinned rather than the match narrowed',
+      'The count is 6 rather than 1 because the token is the STEM of two element classes ' +
+      'beneath it — `fab-avatar-img` and `fab-avatar-initials` — and of the three custom ' +
+      'properties the box style interpolates, `--fab-avatar-initials`, `--fab-avatar-glyph` and ' +
+      '`--fab-avatar-tint`, and the shared clause matches by SUBSTRING. That is the shape a ' +
+      'caller writing any of the six would be caught by, so the count is pinned rather than the match narrowed',
   },
 
   classOnlyRemedy:

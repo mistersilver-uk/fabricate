@@ -485,6 +485,10 @@ Its `openProps` and `nameClass` are never published, being attributes and a clas
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `FillBar`'s `tone`, and so a `shares` entry's and a `Meter` segment's, took the ten tag names `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` and `slate` (issue 2789) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates them draws each `neutral` and refuses nothing, which `describe` cannot show.
+- `Avatar`'s `icon`, its rungs `28` and `30`, and `Medallion`'s rungs `24`, `28`, `32`, `34`, `36` and `44` (issue 2813) were added at `version` 1: an added optional key or accepted value is additive, so neither entry's `version` changed.
+A Fabricate that predates `icon` refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows by leaving the key out.
+A Fabricate that predates a `Medallion` rung draws that size at its edge with the corner `9` and refuses nothing.
+A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draws any size, at the same ratio, and refuses nothing.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
@@ -502,7 +506,7 @@ It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an 
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
-- Adding a component, an optional prop, a descriptor member, a handle method, a prop `kind` or a widening of an entry's root is additive, and so is adding a value to a key's accepted values where the key's group states that a value outside its accepted set draws as unset, as `Medallion`'s `tone` and `ink` do: a Fabricate that predates the value draws the unset render and refuses nothing.
+- Adding a component, an optional prop, a descriptor member, a handle method, a prop `kind` or a widening of an entry's root is additive, and so is adding a value to a key's accepted values where the key's group states that a value outside its accepted set draws as unset, as `Medallion`'s `tone` and `ink` do, and so is adding a rung to a size ladder, which a Fabricate that predates it draws at its edge: a Fabricate that predates the value draws the unset render and refuses nothing.
 - Where a group says nothing of a value outside a key's accepted set, or calls what is drawn for it private, a companion passes only the values that group lists.
 - A companion treats an unknown name, member, kind or root as absent, and never assumes the list is closed.
 `typeof ui.load === 'function'` also says that `mount` honours `onFault`.
@@ -728,18 +732,20 @@ A control whose face is a glyph alone is published only with a key for its name 
 Each group states the accepted values of every key that entry publishes.
 
 - **`Avatar`.**
-  - `art` is an image path; a falsy one draws the initials of `name`.
-    A path that fails to load draws the browser's broken image, never the initials.
+  - `art` is an image path; a falsy one draws `icon` where it is set and the initials of `name` where it is not.
+    A path that fails to load draws the browser's broken image, never the fallback.
   - `name` is required and is the only source of the initials.
   - `alt` is read only when `art` is set, and `''` marks the image decorative.
-  - `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
+  - `size` is `26`, `28`, `30` or `32`, the portrait ladder, and defaults to `32`.
   - `shape` is `round` or `square`.
   - `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-  - `name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
+  - `icon` is Font Awesome classes drawn in place of the initials when `art` is falsy, and is unset by default; it is drawn at 0.4 of `size`, rounded, in the tile's own ink.
+  - `icon` is additive at `version` `1`: a Fabricate that predates it refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows.
+  - `name` is never announced and the initials and the glyph are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`Medallion`.**
   - `art` is an image path; a falsy one draws `icon`, Font Awesome classes whose default is `fas fa-scroll`.
-  - `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
-  - `glyph` is the ladder's glyph for that rung: `10`, `11`, `12` or `15`.
+  - `size` is required and is `22`, `24`, `26`, `28`, `30`, `32`, `34`, `36`, `38` or `44`, the art ladder.
+  - `glyph` is the ladder's glyph size for that rung: `10`, `10`, `11`, `11`, `12`, `13`, `14`, `14`, `15` or `18`, in the order of the sizes above.
   - `alt` is as for `Avatar`.
   - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
   - `variant` is `''` or `glyph-chip`.
@@ -748,6 +754,9 @@ Each group states the accepted values of every key that entry publishes.
   - A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
   - A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
   - A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
+  - The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
+  - The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.
+  - A `size` off the ladder draws at its edge with the corner `9` and is not published.
   - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`FillBar`.**
   - `value` is 0–100, clamped.

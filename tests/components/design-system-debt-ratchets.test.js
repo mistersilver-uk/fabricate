@@ -2341,8 +2341,8 @@ test('every sized box in the sheet and every scoped block takes its size band’
 
 /** The two size ladders `design-system/spec.md` publishes: a record's art and an actor's portrait. */
 const SIZE_LADDERS = Object.freeze({
-  art: new Set([22, 26, 30, 38]),
-  portrait: new Set([26, 32]),
+  art: new Set([22, 24, 26, 28, 30, 32, 34, 36, 38, 44]),
+  portrait: new Set([26, 28, 30, 32]),
 });
 
 /** The components that ARE the art tile, each with its own default size and the ladder it is held to. */
@@ -2411,7 +2411,7 @@ test('each art tile is held to its own kind of ladder', () => {
       "import Medallion from './Medallion.svelte';" +
       "import Portrait from '../components/Avatar.svelte';</script>" +
       '<Avatar size={32} /><Avatar size={38} /><Avatar size={size} />' +
-      '<Medallion size={38} /><Medallion size={32} /><Medallion />' +
+      '<Medallion size={38} /><Medallion size={46} /><Medallion />' +
       '<Portrait size={50} />',
     ['src/ui/svelte/Fixture.svelte']
   );
@@ -2419,7 +2419,7 @@ test('each art tile is held to its own kind of ladder', () => {
     artTileSizes(fixture)
       .filter((site) => !isOnLadder(site))
       .map((site) => `${site.kind} ${site.size}`),
-    ['portrait 38', 'portrait dynamic', 'art 32', 'art 40', 'portrait 50'],
+    ['portrait 38', 'portrait dynamic', 'art 46', 'art 40', 'portrait 50'],
     'a portrait at its 32px rung is on its ladder and a 38px portrait is not, while a record tile ' +
       'is held to the art ladder and its 40px default is off it, and an aliased import is held to the ladder of the file it imports'
   );
@@ -2448,8 +2448,8 @@ test('no new art tile renders at an off-ladder size', (t) => {
   checkGate(
     t,
     ART_SIZE_GATE,
-    'Art and portraits carry their own size ladders — art at 22, 26, 30 and 38, default 26; a ' +
-      'portrait at 32 alone and 26 stacked — and this ' +
+    'Art and portraits carry their own size ladders — art at 22, 24, 26, 28, 30, 32, 34, 36, 38 and 44, ' +
+      'default 26; a portrait at 26, 28, 30 and 32 — and this ' +
       'gate fails a render site off its ladder that the base commit does not have. A new one is not ' +
       'automatically wrong: restricting `size` would move almost every art tile in the app, so ' +
       'the geometry sweep owns that correction. What a new site does mean is that a decision was ' +

@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `art` | resolved image path | `''` | Falsy renders the glyph fallback. Named for the artwork it carries rather than for an element's `src`. |
   | `src` | DEPRECATED alias for `art` | `''` | Kept for ONE release so an out-of-tree caller is not broken by the rename; `art` wins where both are passed. Delete it, and this row, in the next release. |
-  | `icon` / `size` / `glyph` | Font Awesome classes / px | see source / `40` / `''` | The glyph used when `art` is falsy, the tile's edge length (whose corner follows its art rung: 6 at 22, 7 at 26 and 30, else 9), and the glyph's own font size for a tile large enough that the default reads as a speck. `glyph` is a prop rather than a `size`-derived calc because deriving it would re-type all ~40 medallions at once. |
+  | `icon` / `size` / `glyph` | Font Awesome classes / px | see source / `40` / `''` | The glyph used when `art` is falsy, the tile's edge length (whose corner follows its art rung: 6 at 22 and 24, 7 at 26, 28, 30 and 32, 11 at 44, else 9), and the glyph's own font size for a tile large enough that the default reads as a speck. `glyph` is a prop rather than a `size`-derived calc because deriving it would re-type all ~40 medallions at once. |
   | `alt` | string | `''` | Image alt text, passed EXPLICITLY wherever `art` is set; the contract is that the decision was TAKEN. `medallion-art-contract.test.js` reds on an art-bearing call site that names no `alt`, and on one reaching for the deprecated alias to escape it. |
   | `tint` | bare `--fab-tag-*` key | `''` | Recolours the GLYPH and nothing else. Unset is byte-identical to the shipped render, because the glyph reads the token through a `var()` fallback. |
   | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
@@ -50,8 +50,8 @@
   const glyphPx = $derived(Math.max(0, Number(glyph) || 0));
 
   // The art ladder's corner at each rung (design-system spec, "Geometry comes from the published
-  // ladders"); a size off the ladder keeps the shipped 9.
-  const RUNG_CORNERS = { 22: 6, 26: 7, 30: 7 };
+  // ladders"); 34, 36, 38 and a size off the ladder keep the shipped 9.
+  const RUNG_CORNERS = { 22: 6, 24: 6, 26: 7, 28: 7, 30: 7, 32: 7, 44: 11 };
   const corner = $derived(RUNG_CORNERS[boxHeight] ?? 9);
 
   const safeTint = $derived(
@@ -71,6 +71,7 @@
   class:is-glyph-chip={isGlyphChip}
   class:is-corner-6={corner === 6}
   class:is-corner-7={corner === 7}
+  class:is-corner-11={corner === 11}
   class:is-tone-success={safeTone === 'success'}
   class:is-tone-danger={safeTone === 'danger'}
   class:is-tone-accent={safeTone === 'accent'}
@@ -118,6 +119,10 @@
 
   .fab-medallion.is-corner-7 {
     border-radius: 7px;
+  }
+
+  .fab-medallion.is-corner-11 {
+    border-radius: 11px;
   }
 
   .fab-medallion.is-tone-success {

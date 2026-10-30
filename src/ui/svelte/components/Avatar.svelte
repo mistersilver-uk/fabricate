@@ -1,14 +1,15 @@
 <!--
   AN ACTOR'S PORTRAIT: a fixed-size tile drawing the actor's artwork, or their INITIALS when there
-  is none. It is not the icon chip, which carries a RECORD's artwork with a GLYPH fallback. An
-  import-free leaf.
+  is none, or a Font Awesome glyph when the caller asks for one. It is not the icon chip, which
+  carries a RECORD's artwork with a GLYPH fallback. An import-free leaf.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `art` | resolved image path | `''` | Falsy renders the initials fallback, and THE FALLBACK TRIGGER IS THE CALLER'S: this never compares against Foundry's default-artwork constant, which would make it an importing component. |
   | `name` / `alt` | strings | `''` | The only source of the initials, where an empty name renders an empty tile rather than a placeholder glyph; and image alt text, passed EXPLICITLY wherever `art` is set, so that the decision was TAKEN. `avatar-source-contract.test.js` reds on an art-bearing call site that names no `alt`. |
-  | `size` | px | `32` | Edge length, unrestricted by the art ladder; the shipped population is held by the art-size gate in `design-system-debt-ratchets.test.js`. |
+  | `icon` | Font Awesome classes | `''` | Drawn in place of the initials when `art` is falsy; unset keeps the initials. The glyph is 0.4 of the edge, rounded. |
+  | `size` | px | `32` | Edge length, unrestricted by the art ladder; the portrait ladder is 26, 28, 30 and 32, and the shipped population is held by the art-size gate in `design-system-debt-ratchets.test.js`. |
   | `shape` | `'round'` \| `'square'` | `'round'` | A person, or a party/vehicle/place. A CLOSED set compared against a literal, so an unrecognised value renders the default rather than an unpainted `is-*`. |
   | `tint` | bare `--fab-tag-*` key | `''` | Unset is byte-identical to a flat tile. |
 
@@ -28,7 +29,15 @@
     rather than `toLocaleUpperCase`, so the mark does not depend on the host locale.
 -->
 <script>
-  let { art = '', name = '', alt = '', size = 32, shape = 'round', tint = '' } = $props();
+  let {
+    art = '',
+    name = '',
+    alt = '',
+    size = 32,
+    shape = 'round',
+    tint = '',
+    icon = '',
+  } = $props();
 
   const SHAPES = new Set(['round', 'square']);
 
@@ -41,6 +50,14 @@
   const INITIALS_RATIO = 0.3125;
 
   const initialsPx = $derived(Math.round(boxSize * INITIALS_RATIO));
+
+  const GLYPH_RATIO = 0.4;
+
+  const glyphPx = $derived(Math.round(boxSize * GLYPH_RATIO));
+
+  const glyphClass = $derived(typeof icon === 'string' ? icon.trim() : '');
+
+  const mode = $derived(art ? 'image' : glyphClass ? 'glyph' : 'initials');
 
   function initialsOf(value) {
     const words = String(value ?? '')
@@ -65,6 +82,7 @@
 
   const boxStyle = $derived(
     `width:${boxSize}px;height:${boxSize}px;--fab-avatar-initials:${initialsPx}px` +
+      (glyphClass ? `;--fab-avatar-glyph:${glyphPx}px` : '') +
       (safeTint ? `;--fab-avatar-tint:var(--fab-tag-${safeTint})` : '')
   );
 </script>
@@ -73,12 +91,14 @@
   class="fab-avatar"
   class:is-square={isSquare}
   class:has-tint={Boolean(safeTint)}
-  data-avatar={art ? 'image' : 'initials'}
+  data-avatar={mode}
   data-avatar-tint={safeTint || undefined}
   style={boxStyle}
 >
   {#if art}
     <img class="fab-avatar-img" src={art} {alt} />
+  {:else if glyphClass}
+    <i class={glyphClass} aria-hidden="true"></i>
   {:else}
     <span class="fab-avatar-initials" aria-hidden="true">{initials}</span>
   {/if}
@@ -117,5 +137,9 @@
     font-size: var(--fab-avatar-initials, 10px);
     font-weight: 700;
     line-height: 1;
+  }
+
+  .fab-avatar > i {
+    font-size: var(--fab-avatar-glyph, 0.9rem);
   }
 </style>

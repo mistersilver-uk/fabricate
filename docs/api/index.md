@@ -2040,7 +2040,7 @@ The published components, in publication order:
 | Component | Version | Root | Props | Rest |
 | --- | --- | --- | --- | --- |
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
-| `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
+| `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint`, `icon` | no |
 | `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
 | `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
@@ -2104,16 +2104,19 @@ The current tier keeps its valence colour and is marked by a location-dot glyph 
 
 ### Avatar
 
-`Avatar` draws an actor's portrait as a fixed-size tile: the artwork, or the initials of the name.
-`art` is an image path, and a falsy one draws the initials of `name`; a path that fails to load draws the browser's broken image, never the initials.
+`Avatar` draws an actor's portrait as a fixed-size tile: the artwork, a glyph you name, or the initials of the name.
+`art` is an image path, and a falsy one draws `icon` where it is set and the initials of `name` where it is not; a path that fails to load draws the browser's broken image, never the fallback.
 That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `name` is required and is the only source of the initials.
 `alt` is read only when `art` is set, and `''` marks the image decorative.
-`size` is `26` or `32`, the portrait ladder, and defaults to `32`.
+`size` is `26`, `28`, `30` or `32`, the portrait ladder, and defaults to `32`.
 `shape` is `round` or `square`.
 `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
+`icon` is Font Awesome classes drawn in place of the initials when `art` is falsy, and is unset by default; it is drawn at 0.4 of `size`, rounded, in the tile's own ink.
+`icon` takes classes from the sheet the running Foundry ships; a class absent from that build draws an empty box.
+`icon` is additive at `version` `1`: a Fabricate that predates it refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows.
+`name` is never announced and the initials and the glyph are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### Medallion
@@ -2123,8 +2126,8 @@ The tile is inline: give its `target` `display: flex`, so the tile is a flex ite
 That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `icon` takes Font Awesome classes from the sheet the running Foundry ships (6 Pro on Foundry 13, 7 Pro on Foundry 14); a class absent from that build draws an empty box.
-`size` is required and is `22`, `26`, `30` or `38`, the art ladder.
-`glyph` is the ladder's glyph size for that rung: `10`, `11`, `12` or `15`.
+`size` is required and is `22`, `24`, `26`, `28`, `30`, `32`, `34`, `36`, `38` or `44`, the art ladder.
+`glyph` is the ladder's glyph size for that rung: `10`, `10`, `11`, `11`, `12`, `13`, `14`, `14`, `15` or `18`, in the order of the sizes above.
 `alt` is as for `Avatar`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
@@ -2133,6 +2136,9 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
 A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
 A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
+The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
+The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.
+A `size` off the ladder draws at its edge with the corner `9` and is not published.
 The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
