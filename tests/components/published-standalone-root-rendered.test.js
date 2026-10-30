@@ -290,6 +290,26 @@ function valueOf(vocabulary, props, key) {
 
 const entryNamed = (name) => PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
 
+/**
+ * The `Entry key` pairs the manifest publishes for the widened entries under a key in
+ * VOCABULARY_KEYS.
+ */
+const publishedVocabularyPairs = () =>
+  new Set(
+    WIDENED.flatMap(({ name, props }) =>
+      Object.keys(props)
+        .filter((key) => VOCABULARY_KEYS.includes(key))
+        .map((key) => `${name} ${key}`)
+    )
+  );
+
+/** Fails, naming each pair, unless `actual` and `expected` hold the same pairs. */
+function assertSamePairs(actual, expected, message) {
+  const missing = [...expected].filter((pair) => !actual.has(pair)).sort(byName);
+  const extra = [...actual].filter((pair) => !expected.has(pair)).sort(byName);
+  assert.deepEqual({ missing, extra }, { missing: [], extra: [] }, message);
+}
+
 describe('the standalone specimen table', () => {
   it('names exactly the entries drawn under the standalone style root', () => {
     assert.deepEqual(
@@ -299,22 +319,27 @@ describe('the standalone specimen table', () => {
   });
 
   it('draws every value of each vocabulary key the entries publish, compared or declared', () => {
-    let held = 0;
+    const read = new Set();
+    const held = new Set();
     for (const [name, specimens] of Object.entries(STANDALONE_SPECIMENS)) {
       const entry = entryNamed(name);
       for (const key of VOCABULARY_KEYS) {
         if (!Object.hasOwn(entry.props, key)) continue;
         const vocabulary = vocabularyOf(entry, key);
+        read.add(`${name} ${key}`);
         assert.ok(vocabulary.values.length > 1, `${name} ${key} reads a vocabulary`);
         const drawn = new Set(
           Object.values(specimens).map(({ props }) => valueOf(vocabulary, props, key))
         );
         const expected = [...vocabulary.values].sort(byName);
         assert.deepEqual([...drawn].sort(byName), expected, `${name} ${key}`);
-        held += 1;
+        held.add(`${name} ${key}`);
       }
     }
-    assert.equal(held, 29, 'each vocabulary key the seventeen publish was read');
+    const published = publishedVocabularyPairs();
+    assert.ok(published.size > 0, 'the entries publish vocabulary keys');
+    assertSamePairs(read, published, 'each vocabulary key the entries publish was read');
+    assertSamePairs(held, read, 'each vocabulary key read was held');
   });
 
   it('declares the semantics set StatusToggle itself reads, so a third value cannot hide', () => {
