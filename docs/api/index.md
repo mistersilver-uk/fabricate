@@ -2165,7 +2165,11 @@ Each tag name reads against the bar's track no weaker than the weakest of the si
 That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
 Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card, so never leave a share to its colour.
 The bar draws no label, so no ink is paired with a tag name.
-`density` is `default` or `compact`.
+`density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
+`thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so never leave a reading to its colour.
+The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
+A Fabricate that predates `thin` draws the default track and refuses nothing, and `describe` cannot tell you which one is running; adding it is additive, and the entry stays at `version` 1.
 It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
 A value that must be announced is a `Meter`.
 

@@ -10,7 +10,7 @@
   | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'`, or a tag name: `'ember'` \| `'butter'` \| `'peach'` \| `'verdant'` \| `'mist'` \| `'azure'` \| `'lavender'` \| `'rose'` \| `'bone'` \| `'slate'` | `'success'` | A tag name paints the matching `--fab-tag-*` token, so a stack of more than six contributors keeps a hue each. An unknown tone, a token spelling or any other tag key falls back to `neutral` rather than rendering an unpainted fill. |
   | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
   | `shares` | `{ weight, tone?, color? }[]` | `[]` | Two or more draw the fill as abutting shares, left to right in every writing direction, each `weight / Σweight` of it and painted as `tone` and `color`; fewer draw the single fill. A `weight` that is not a finite number above zero reads 0, a numeric string included, and shares that all read 0 draw nothing. A `null` entry reads as `{}`, and a `shares` that is not an array draws the single fill. No share takes a minimum width. Stacked, the track carries no `data-fill-bar-tone` and `tone`/`color` are not read. The published form is `{ weight, tone? }`; a member other than those is private. |
-  | `density` / `class` | `'compact'` \| `'default'` / class string | `'default'` / `''` | A 6px or 8px track height, and an extra class appended to the primitive's own. |
+  | `density` / `class` | `'default'` \| `'compact'` \| `'thin'` / class string | `'default'` / `''` | An 8px, 6px or 4px track height, and an extra class appended to the primitive's own. `thin` also drops the track's border and paints it `--fab-bg-3`, so the fill is the whole 4px. |
 
   Rest spread:
   - `{...rest}` lands on the track root, written after `class`, and carries a caller's `data-*` hook.
@@ -66,6 +66,7 @@
 <span
   class={['fab-fill-bar', extraClass]}
   class:is-sm={density === 'compact'}
+  class:is-thin={density === 'thin'}
   data-fill-bar-tone={stacked ? undefined : resolvedTone}
   {...rest}
 >
@@ -102,6 +103,12 @@
 
   .fab-fill-bar.is-sm {
     height: 6px;
+  }
+
+  .fab-fill-bar.is-thin {
+    height: 4px;
+    border: 0;
+    background: var(--fab-bg-3);
   }
 
   .fab-fill-bar-fill {

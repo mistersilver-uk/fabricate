@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `rows` | `{ id?, name, percent, fill? }[]` | `[]` | `percent` is 0–100 and is printed as given. `fill` is a `FillBar` tone, its ten tag names included, or a ramp key, and anything else paints `neutral`; absent, it is read off the ramp at `percent` in `direction`. A single row's `name` is its visible caption and default accessible name, and an empty one draws no caption. Every row, a single one included, carries `data-banded-bar-row`, `-track` and `-percent` keyed `id ?? index`. |
   | `direction` | `'ascending'` \| `'descending'` | `'ascending'` | `ascending` is the drop-rate ramp (better is rarer); `descending` is the risk scale, the hazard at a high chance. |
-  | `density` | `'default'` \| `'compact'` | `'default'` | Forwarded to `FillBar`. At `compact` a single row stays a meter but draws the histogram's band row. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | Forwarded to `FillBar`, any value but `compact` as `default`. At `compact` a single row stays a meter but draws the histogram's band row. |
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class={…}`; on the single-row meter a rest
@@ -31,6 +31,7 @@
     ...rest
   } = $props();
 
+  const barDensity = $derived(density === 'compact' ? 'compact' : 'default');
   const single = $derived(rows.length === 1 ? rows[0] : null);
 
   function fillOf(row) {
@@ -47,7 +48,7 @@
   <span class="fab-banded-bar-name">{row.name}</span>
   <FillBar
     value={row.percent}
-    {density}
+    density={barDensity}
     tone={fill.tone}
     color={fill.color}
     aria-hidden={hidden ? 'true' : undefined}
@@ -77,7 +78,7 @@
       <span class="fab-banded-bar-row" data-banded-bar-row={key}>
         <FillBar
           value={single.percent}
-          {density}
+          density={barDensity}
           tone={fill.tone}
           color={fill.color}
           data-banded-bar-track={key}
