@@ -702,9 +702,9 @@ export const CASES = Object.freeze([
         },
       ],
     },
-    // Sized to the fixture's 880px ground and the height of its eight rows; `expectContained` holds
-    // the ground inside `.window-content`.
-    position: { width: 1024, height: 780 },
+    // Sized to the fixture's 880px ground and the height of its rows, with room for the next mount;
+    // `expectContained` holds the ground inside `.window-content`.
+    position: { width: 1024, height: 860 },
     kinds: ['manager', 'specimen'],
     // Every component mounted here is a broad signal, routed here by its override: the seven
     // leaves (issue 2448), then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and
