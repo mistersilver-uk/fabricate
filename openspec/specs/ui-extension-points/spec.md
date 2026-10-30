@@ -775,7 +775,7 @@ Each group states the accepted values of every key that entry publishes.
   - `shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
     A share's `tone` is one of the sixteen tones above, and it defaults to `success`; a tone outside them draws `neutral`.
     A share states its colour by `tone` alone, so a stack of more than sixteen contributors repeats a tone.
-    A member of a share other than `weight` and `tone` is private.
+    A member of a share other than `weight` and `tone` is private, and Fabricate drops it from the copy it renders, so a `color` on a share paints nothing.
     The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
     A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
     A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an array draws the one fill from `tone` and `color`.
@@ -1864,6 +1864,7 @@ A _candidate_ is a `designSystemPrimitives` row with scope `shared`, or a `notAP
 The _publishable subset_ is the candidates that pass the static rules below.
 The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
 A _stripped member_ is a per-item member of a published `data` key that `STRIPPED_ITEM_MEMBERS` in `src/ui/publishedComponentProps.js` names.
+An _allowed member_ is a per-item member of a published `data` key that `ALLOWED_ITEM_MEMBERS` in the same file names, and the seam passes only those.
 
 - **A candidate is publishable when it passes every static rule.**
   - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
@@ -1915,6 +1916,7 @@ A child component that a script module in the closure also draws, which no compo
 A value built up by a mutation after its declaration, such as `const box = {}; Object.assign(box, items[0])` or an array pushed to in an `$effect`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
+It also keeps only the members `ALLOWED_ITEM_MEMBERS` names for a key whose component draws a member the published form does not state: a `FillBar` share keeps `weight` and `tone`, so a `color`, `background` or any other member it carries is dropped and never drawn.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
 A dropped `aria-label` is release-noted.
 

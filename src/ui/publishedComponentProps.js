@@ -149,10 +149,46 @@ export function withoutMember(value, path) {
   return copy;
 }
 
-/** The validated copy of one `data` value, less the per-item members `STRIPPED_ITEM_MEMBERS` names. */
+/**
+ * The only per-item members the seam passes from a published `data` value, each as `<Entry>.<key>`.
+ * It names a key whose component draws a member the published form does not state, such as a
+ * `FillBar` share's inline `color`, which no attribute spread carries and so no stripped row can name.
+ */
+export const ALLOWED_ITEM_MEMBERS = Object.freeze({
+  'FillBar.shares': Object.freeze(['weight', 'tone']),
+});
+
+/**
+ * `value` with each item reduced to the members `allowed` names, as a new tree. An array is read item
+ * by item and an object as one item; a value that is not an array or a plain object is returned as it is.
+ */
+export function onlyMembers(value, allowed) {
+  if (Array.isArray(value)) return value.map((item) => onlyMembers(item, allowed));
+  if (!hasPlainPrototype(value)) return value;
+  const copy = {};
+  for (const name of allowed) {
+    if (!Object.hasOwn(value, name)) continue;
+    Object.defineProperty(copy, name, {
+      value: value[name],
+      enumerable: true,
+      writable: true,
+    });
+  }
+  return copy;
+}
+
+/**
+ * The validated copy of one `data` value, less the per-item members `STRIPPED_ITEM_MEMBERS` names
+ * and holding only those `ALLOWED_ITEM_MEMBERS` names.
+ */
 function strippedCopy(entry, key, value) {
-  const stripped = STRIPPED_PATHS.get(`${entry.name}.${key}`) ?? [];
-  return stripped.reduce((kept, { path }) => withoutMember(kept, path), value);
+  const id = `${entry.name}.${key}`;
+  const kept = (STRIPPED_PATHS.get(id) ?? []).reduce(
+    (copy, { path }) => withoutMember(copy, path),
+    value
+  );
+  const allowed = ALLOWED_ITEM_MEMBERS[id];
+  return allowed ? onlyMembers(kept, allowed) : kept;
 }
 
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */

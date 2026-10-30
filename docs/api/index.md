@@ -2153,7 +2153,7 @@ Any other `tone` draws `neutral`, a token spelling, a raw colour or a different 
 `shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
 A share's `tone` is one of the sixteen tones above, and it defaults to `success`; a tone outside them draws `neutral`.
 A share states its colour by `tone` alone, so a stack of more than sixteen contributors repeats a tone.
-A member of a share other than `weight` and `tone` is private.
+A member of a share other than `weight` and `tone` is private, and Fabricate drops it from the copy it renders, so a `color` on a share paints nothing.
 The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
 A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
 A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an array draws the one fill from `tone` and `color`.
