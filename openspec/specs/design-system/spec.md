@@ -41,6 +41,7 @@ The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detai
 The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
 The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
 ListRow MAY also draw a selectable form, at `density` dense or default and `layout` row or card.
+Its `markSize` is a rung of the art ladder, 22, 26, 28, 30, 34 or 38, drawn by a literal Medallion size each, and any other value draws the 22px mark.
 With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
 The button is named by any `leading` text, then the item's name, then each state the row shows only visually.
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
@@ -50,7 +51,7 @@ The selectable dense form's opt-in `inset="row"` MUST take the dense row's space
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
 ListRow is shipped; a browse list's loading and error forms are `ListState`'s, not the row's (issue 2548).
-`ListRow` is published through `game.fabricate.api.ui` (issue 2784) with only `name`, `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled` and `onOpen`, which the seam calls with no argument, the `aside` content slot (issue 2793) and the `leading`, `badges`, `meta` and `trailing` content slots (issue 2843), as its group in `ui-extension-points` states.
+`ListRow` is published through `game.fabricate.api.ui` (issue 2784) with only `name`, `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled` and `onOpen`, which the seam calls with no argument, the `aside` content slot (issue 2793), the `leading`, `badges`, `meta` and `trailing` content slots (issue 2843), and `markSize`, `density`, `layout`, `truncateName` and `detailAlign` (issue 2850), as its group in `ui-extension-points` states.
 ListRow draws every form in one root and its `aside` by one render tag, so the seam's `aside` element is never moved while it is requested; `leading`, `badges` and `meta` move with `onOpen` and `trailing` with the selectable form, as that group states.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 

@@ -101,6 +101,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/publishedComponentCensus.js': 'ast',
   'tests/helpers/publishedComponentGate.js': 'ast',
   'tests/helpers/publishedComponentPublishable.js': 'ast',
+  'tests/helpers/publishedListRowSeam.js': 'fixture',
   'tests/helpers/publishedStepperFixture.js': 'fixture',
   'tests/helpers/recordedRollParse.js': 'fixture',
   'tests/helpers/renderedManagerShell.js': 'fixture',

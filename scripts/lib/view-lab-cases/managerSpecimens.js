@@ -359,6 +359,22 @@ const BARE_TRAILING = '[data-lab-list-row-trailing]';
 /** Sized to the fixture's 320px ground and the height of its three rows. */
 const SLOT_WINDOW = Object.freeze({ width: 440, height: 360 });
 
+/** The forms fixture's ground and one section's first published row, by the section's key. */
+const FORMS_GROUND = '[data-lab-list-row-forms]';
+const FORM_ROW = (key) =>
+  `${FORMS_GROUND} > [data-lab-list-row-form="${key}"] > div:first-child .fabricate-list-row`;
+/** Each one-row section's key and mark rung, and each board's. */
+const FORM_MARKS = Object.freeze([
+  ['portrait', 26],
+  ['queue', 28],
+  ['default', 30],
+  ['board', 30],
+  ['cards', 34],
+]);
+
+/** Sized to the fixture's 480px ground and the height of its five sections. */
+const FORMS_WINDOW = Object.freeze({ width: 600, height: 520 });
+
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
 const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
@@ -1331,6 +1347,49 @@ export const CASES = Object.freeze([
       ],
     },
     position: SLOT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-list-row-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — list rows at the geometry ListRow publishes, in a 480px column on the --fab-bg-2 ground, 8px apart. Reading top to bottom: Mira Voss, a read-only dense row with a 26px glyph mark and its Contributor detail; Ember salt reserve, a whole-row button with a 28px mark and its quantity 3 at the selectable form’s tighter inset; Moonlit Glade, a whole-row button at the default density, its 30px mark at a 12px by 16px inset with an 11px corner; then a four-column board of read-only rows, each a 30px mark and the long name Forge a Pattern-Welded Blade of the Deep Seam cut to one line with an ellipsis, its Recipe detail held at the row’s end; and a four-column board of cards on the card ground at an 11px corner, each a 34px mark above the same name, cut to one line with an ellipsis, over its Forest detail. The frame draws inside the manager window and is the evidence for it alone; the row heights each rung sets and the card’s column are the rendered suite’s, and the keys’ update and removal the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-list-row-forms' },
+    steps: [],
+    // Every section's rows the fixture's effect mounted, the last board's fourth card among them.
+    expectSelector: `${FORMS_GROUND}:has(> [data-lab-list-row-form="portrait"] .fabricate-list-row):has(> [data-lab-list-row-form="board"] > div:nth-child(4) .fabricate-list-row) > [data-lab-list-row-form="cards"] > div:nth-child(4) .fabricate-list-row.is-card > .fabricate-list-row-open`,
+    expectContained: [
+      ...FORM_MARKS.map(([key]) => ({ container: FORMS_GROUND, target: FORM_ROW(key) })),
+      { container: '.window-content', target: FORMS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // Each section's mark at its rung, the default row's inset, the board's one-line name and
+        // the card's column at its corner.
+        ...FORM_MARKS.map(([key, size]) => ({
+          selector: `${FORM_ROW(key)} .fab-medallion`,
+          styles: `width: ${size}px; height: ${size}px`,
+        })),
+        {
+          selector: FORM_ROW('default'),
+          styles: 'padding-top: 12px; padding-left: 16px; border-top-left-radius: 11px',
+        },
+        {
+          selector: `${FORM_ROW('board')} .fabricate-list-row-name`,
+          styles: 'text-overflow: ellipsis; white-space: nowrap; overflow-x: hidden',
+        },
+        {
+          selector: FORM_ROW('cards'),
+          styles:
+            'flex-direction: column; border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+        },
+      ],
+    },
+    position: FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

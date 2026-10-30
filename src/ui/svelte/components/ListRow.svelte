@@ -7,11 +7,12 @@
      figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
      `data-list-row` wins. One root holds every form; `aside` has one render tag, `leading`, `badges`
      and `meta` sit in `content`, which one of three exclusive branches renders, and `trailing` has
-     a wrapped tag and a bare one, so the published seam can fill each (issues 2793 and 2843). -->
+     a wrapped tag and a bare one, so the published seam can fill each (issues 2793 and 2843).
+     `markSize` is a rung of Medallion's art ladder, drawn by a literal tag each (issue 2850). -->
 <script>
   import Medallion from './Medallion.svelte';
 
-  const MARK_SIZES = new Set([22, 26, 30, 38]);
+  const MARK_SIZES = new Set([22, 26, 28, 30, 34, 38]);
   // The control's own attributes: an `openProps` key naming one, or any click handler, is
   // dropped, so the row's win.
   const OWNED_KEYS = new Set([
@@ -117,7 +118,9 @@
 {#snippet content(form)}
   {#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>
   {:else if mark === 38}<Medallion {art} {icon} {tint} alt="" size={38} />
+  {:else if mark === 34}<Medallion {art} {icon} {tint} alt="" size={34} />
   {:else if mark === 30}<Medallion {art} {icon} {tint} alt="" size={30} />
+  {:else if mark === 28}<Medallion {art} {icon} {tint} alt="" size={28} />
   {:else if mark === 26}<Medallion {art} {icon} {tint} alt="" size={26} />
   {:else}<Medallion {art} {icon} {tint} alt="" size={22} />{/if}
   {#if form}

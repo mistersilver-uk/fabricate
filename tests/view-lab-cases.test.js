@@ -419,6 +419,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
   'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
+  'tests/view-lab/fixtures/PublishedListRowForms.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
@@ -882,6 +883,9 @@ const labListRowAside = (key) =>
 /** The slots fixture's host for one slot in one section's published row, by the section's key. */
 const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
+/** The forms fixture's first published row in one section, by the section's key. */
+const labListRowForm = (key) =>
+  `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:first-child .fabricate-list-row`;
 /** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
@@ -1472,6 +1476,33 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector:
         '[data-lab-list-row-slots] > [data-lab-list-row="bare"] .fabricate-list-row > span > span:has(> [data-lab-list-row-trailing])',
       styles: 'display: contents',
+    },
+  ],
+  // The published list row's geometry (issue 2850): each section's mark at its rung, the default
+  // row's inset, the truncated board's one-line name and the card's column at its corner.
+  'manager-published-list-row-forms-specimen': [
+    ...[
+      ['portrait', 26],
+      ['queue', 28],
+      ['default', 30],
+      ['board', 30],
+      ['cards', 34],
+    ].map(([key, size]) => ({
+      selector: `${labListRowForm(key)} .fab-medallion`,
+      styles: `width: ${size}px; height: ${size}px`,
+    })),
+    {
+      selector: labListRowForm('default'),
+      styles: 'padding-top: 12px; padding-left: 16px; border-top-left-radius: 11px',
+    },
+    {
+      selector: `${labListRowForm('board')} .fabricate-list-row-name`,
+      styles: 'text-overflow: ellipsis; white-space: nowrap; overflow-x: hidden',
+    },
+    {
+      selector: labListRowForm('cards'),
+      styles:
+        'flex-direction: column; border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
     },
   ],
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled
@@ -7197,6 +7228,26 @@ test('the list row slots specimen case measures the slots each row the slots fix
     NON_VERB_CONTROLS['manager-published-list-row-slots-specimen'].map(({ selector }) => selector),
     'each slot host the fixture requests is measured'
   );
+});
+
+test('the list row forms specimen case measures the mark rung each section of the forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedListRowForms.svelte'
+  );
+  for (const hook of ['data-lab-list-row-forms', 'data-lab-list-row-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rungs = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'markSize')
+    .map((node) => node.value.value);
+  const measured = getCaseById('manager-published-list-row-forms-specimen')
+    .expectLayout.controls.filter(({ selector }) => selector.endsWith('.fab-medallion'))
+    .map(({ styles }) => Number.parseFloat(/width: (\d+)px/u.exec(styles)[1]));
+  assert.deepEqual(measured, rungs, 'each section’s mark is measured at the rung it mounts');
+  assert.deepEqual(rungs, [26, 28, 30, 30, 34], 'the four rungs Premium draws, and a board');
 });
 
 test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {

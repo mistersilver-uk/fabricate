@@ -37,19 +37,28 @@ import { propertiesOf, shortfalls, themePalettes } from './helpers/themePaletteC
 const SHEET = 'styles/fabricate-list-primitives.css';
 
 /**
- * The published row's root: the classes `tone`, `muted`, `onOpen` and the requested slots write
- * beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
+ * The published row's root: the classes `tone`, `muted`, `onOpen`, the requested slots, `density`,
+ * `layout`, `truncateName` and `detailAlign` (issue 2850) write beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
  * spells that no published key draws.
  */
 const LIST_ROW = Object.freeze({
   root: 'fabricate-list-row',
-  writable: new Set(['is-positive', 'is-danger', 'is-muted', 'is-form']),
+  writable: new Set([
+    'is-positive',
+    'is-danger',
+    'is-muted',
+    'is-form',
+    'is-default',
+    'is-card',
+    'is-truncated',
+    'is-detail-end',
+  ]),
   ancestors: new Set(),
   drawsChildren: true,
   undrawn: new Set(['fabricate-list-row-children']),
 });
 
-/** The 29 rules that draw a published row, every one in its sheet. */
+/** The 41 rules that draw a published row, every one in its sheet. */
 const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row',
   '.fabricate-list-row .fabricate-list-row-name',
@@ -80,14 +89,28 @@ const LIST_ROW_FAMILY = Object.freeze([
   ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
   '.fabricate-list-row:has(> .fabricate-list-row-open:disabled)',
+  // The density, layout and truncation rules (issue 2850).
+  '.fabricate-list-row.is-default',
+  '.fabricate-list-row.is-default > button.fabricate-list-row-open::after',
+  '.fabricate-list-row.is-card',
+  '.fabricate-list-row.is-card > .fabricate-list-row-open',
+  '.fabricate-list-row.is-card > .fabricate-list-row-open > .fabricate-list-row-body',
+  '.fabricate-list-row.is-card > button.fabricate-list-row-open::after',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-name',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-detail',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-detail',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-head > .fabricate-list-row-name',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-badges',
+  '.fabricate-list-row.is-truncated.is-detail-end .fabricate-list-row-detail',
 ]);
 
 /** The rule that strips the module ring from the row's button, and the one that rings its overlay. */
 const STRIP = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible`;
 const RING = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible::after`;
-/** The grounds a published row paints beneath its ring, each over the row's own opaque fill, top first. */
+/** The grounds a published row paints beneath its ring, a card's `--fab-bg-2` among them, each over the row's own opaque fill, top first. */
 const ROW_GROUNDS = Object.freeze([
   ['--fab-bg-1'],
+  ['--fab-bg-2'],
   ['--fab-surface-active', '--fab-bg-1'],
   ['--fab-surface-raised', '--fab-bg-1'],
   ['--fab-success-soft', '--fab-bg-1'],
@@ -103,7 +126,7 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published ListRow', () => {
-  it('reaches a published row through 29 of the 44 selectors that name its root', () => {
+  it('reaches a published row through 41 of the 44 selectors that name its root', () => {
     const shipped = census();
     assert.equal(shipped.length, 44, 'the census of every selector naming the root');
     assert.deepEqual(writtenOf(reachingOf(shipped)), inSheet(LIST_ROW_FAMILY));
@@ -133,11 +156,16 @@ describe('the module sheet and every component style against the published ListR
           'badges',
           'meta',
           'trailing',
+          'markSize',
+          'density',
+          'layout',
+          'truncateName',
+          'detailAlign',
         ],
         'fabricate',
         true,
       ],
-      'a published density, layout, truncateName, slot, openProps, class or wider root reopens the census'
+      'a published inset, bodyBasis, children, openProps, class or wider root reopens the census'
     );
   });
 
@@ -194,8 +222,8 @@ describe('the list row census, synthetic', () => {
   const reachingIn = (css) => writtenOf(reachingOf(syntheticCensus(LIST_ROW, css)));
 
   for (const selector of [
-    '.fabricate-list-row.is-card',
-    '.fabricate-list-row.is-truncated .fabricate-list-row-name',
+    '.fabricate-list-row.is-row-inset',
+    '.fabricate-list-row.is-body-fill .fabricate-list-row-body',
     '.fabricate-list-row .fabricate-list-row-children',
   ]) {
     it(`admits ${selector}, which a published row cannot take`, () => {
@@ -210,6 +238,8 @@ describe('the list row census, synthetic', () => {
     '.fabricate-list-row[data-x]',
     '.fabricate-list-row .fabricate-list-row-aside',
     '.fabricate-list-row .fabricate-list-row-badges',
+    '.fabricate-list-row.is-card',
+    '.fabricate-list-row.is-truncated .fabricate-list-row-name',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published row`, () => {
       assert.deepEqual(reachingIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);
