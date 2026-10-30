@@ -1,7 +1,7 @@
 /**
  * The module sheet and every component style against the published `Stepper` (issue 2452): every
  * selector outside its own file that names one of its classes or `data-stepper-*` hooks, and every
- * bare `input` rule its number field can take, each of which a published stepper either cannot
+ * bare `input` rule its number or formatted field can take, each of which a published stepper either cannot
  * match or sits under a pinned ancestor of, but the module rules pinned by their written text. The
  * existing bare-button census already covers its two buttons.
  * Limit: the census takes on trust that no extension target sits under a pinned ancestor, and
@@ -52,7 +52,7 @@ const STEPPER_ANCESTORS = new Set([
   'data-salvage-dc-override',
 ]);
 
-/** The module rules a bare `input` compound reaches a published stepper's number field through, as written. */
+/** The module rules a bare `input` compound reaches a published stepper's number or formatted field through, as written. */
 const BARE_INPUT_RULES = Object.freeze([
   'styles/fabricate-base.css: .fabricate input:focus',
   'styles/fabricate-base.css: .fabricate input:focus-visible',
@@ -61,6 +61,8 @@ const BARE_INPUT_RULES = Object.freeze([
   'styles/fabricate-base.css: .fabricate input[data-validation-focused]',
   "styles/fabricate-base.css: .fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']))[data-validation-focused]",
   'styles/fabricate-manager-shell.css: .fabricate-manager input',
+  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]',
+  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:disabled',
 ]);
 
 /** The classes under which a rule redraws a bare `input`; no extension target sits in one. */
@@ -79,12 +81,15 @@ const BARE_INPUT_ANCESTORS = new Set([
   'manager-component-entry-alias-field',
   'manager-condition-add',
   'manager-condition-modifier-value',
+  'manager-drop-count-editor',
   'manager-drop-editor-card',
+  'manager-drop-quantity-cell',
   'manager-drop-rate-percent',
   'manager-environment-drop-adjustment-input',
   'manager-gathering-event-edit-view',
   'manager-gathering-task-edit-view',
   'manager-prerequisite-path-input',
+  'manager-recipe-option-search',
   'manager-salvage-dc-controls',
   'manager-task-dc-row',
   'manager-tool-label-field',
@@ -93,7 +98,10 @@ const BARE_INPUT_ANCESTORS = new Set([
   'manager-vocabulary-form',
 ]);
 
-/** The attributes the published number field can carry, so a compound requiring another cannot match it. */
+/** The `type` values of the published field: `number`, and `text` in the formatted mode `format` opens. */
+const FIELD_TYPES = new Set(['number', 'text']);
+
+/** The attributes the published field can carry, so a compound requiring another cannot match it. */
 const FIELD_ATTRIBUTES = new Set([
   'type',
   'class',
@@ -102,8 +110,17 @@ const FIELD_ATTRIBUTES = new Set([
   'max',
   'step',
   'disabled',
+  'placeholder',
+  'inputmode',
+  'role',
+  'style',
   'aria-label',
+  'aria-valuemin',
+  'aria-valuemax',
+  'aria-valuenow',
+  'aria-valuetext',
   'data-stepper-input',
+  'data-stepper-endpoint',
   'data-validation-focused',
 ]);
 
@@ -175,7 +192,7 @@ const negatesType = (part) =>
     (inner) => inner.type === 'AttributeSelector' && inner.name === 'type' && !inner.matcher
   );
 
-/** Whether a `:not()` holds the field's own class alone, which the published number field always carries. */
+/** Whether a `:not()` holds the field's own class alone, which the published field always carries. */
 const negatesField = (part) =>
   negatesAlone(
     part,
@@ -183,16 +200,17 @@ const negatesField = (part) =>
   );
 
 /**
- * Whether a `type` matcher requires a type other than `number`: only `=` and `~=` name a whole
- * value, and the attribute's value is matched without case, so a prefix, suffix, substring or
- * dash matcher may still take `number`.
+ * Whether a `type` matcher requires a type other than `number` or `text`: only `=` and `~=` name a
+ * whole value, and the attribute's value is matched without case, so a prefix, suffix, substring
+ * or dash matcher may still take either.
  */
 const refusesNumber = (part) =>
-  ['=', '~='].includes(part.matcher) && unquoted(part.value).toLowerCase() !== 'number';
+  ['=', '~='].includes(part.matcher) && !FIELD_TYPES.has(unquoted(part.value).toLowerCase());
 
 /**
- * Whether an `input` compound cannot match the published number field: it requires an attribute
- * the field never carries, a `type` other than `number`, no `type`, or no `fab-stepper-input`.
+ * Whether an `input` compound cannot match the published field: it requires an attribute
+ * the field never carries, a `type` other than `number` or `text`, no `type`, or no
+ * `fab-stepper-input`.
  */
 function unmatchable(compound) {
   return compound.selectors.some((part) => {
@@ -282,7 +300,7 @@ describe('the module sheet and every component style against the published Stepp
     }
   });
 
-  it('reaches a published number field through the seven module rules a bare input takes, and no other', () => {
+  it('reaches a published number or formatted field through the nine module rules a bare input takes, and no other', () => {
     const census = shippedBareInputs();
     assert.deepEqual(writtenOf(reachingOf(census)), [...BARE_INPUT_RULES].sort(byName));
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
@@ -308,6 +326,10 @@ describe('the module sheet and every component style against the published Stepp
           'allowUnset',
           'fill',
           'density',
+          'placeholder',
+          'format',
+          'stops',
+          'nullLabel',
           'ariaLabel',
           'decrementLabel',
           'incrementLabel',
@@ -315,7 +337,7 @@ describe('the module sheet and every component style against the published Stepp
         ],
         'fabricate',
       ],
-      'a published placeholder, orientation, attribute or wider root reopens them'
+      'a published orientation, input attribute, input id or wider root reopens them'
     );
   });
 });
@@ -349,13 +371,13 @@ describe('the stepper census, synthetic', () => {
   }
 
   for (const selector of [
-    '.a input[type="text"]',
+    '.a input[type="url"]',
     '.a input:not([type])',
     '.a input[data-recipe-field]',
     '.host-row input',
     '.host-row :is(input, textarea)',
     '.a input.manager-name',
-    '.a input[type~="text"]',
+    '.a input[type~="url"]',
     '.a input:not([type], .b)',
     '.a input:not(.fab-stepper-input)',
   ]) {
@@ -369,6 +391,8 @@ describe('the stepper census, synthetic', () => {
     '.a input:disabled',
     '.a input[disabled]',
     '.a input[type="number"]',
+    '.a input[type="text"]',
+    '.a input[type~="text"]',
     '.a input:is([type="text"], [type="number"])',
     '.a :is(input, textarea)',
     '.a input.fab-stepper-input',

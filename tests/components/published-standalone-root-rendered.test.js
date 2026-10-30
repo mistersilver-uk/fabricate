@@ -184,6 +184,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'label',
   'fill',
   'density',
+  'format',
   'tone',
   'shape',
   'layout',
