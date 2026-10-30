@@ -590,6 +590,29 @@
     }
   },
   {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "stat box — label first, with a note",
+    "draws": ".k-stat",
+    "path": "src/ui/svelte/components/StatBox.svelte",
+    "props": {
+      "value": "3 of 5",
+      "label": "Stages done",
+      "layout": "start",
+      "note": "Two to go"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "stat box — label first, with a note",
+    "draws": ".k-stat",
+    "path": "src/ui/svelte/components/StatBox.svelte",
+    "props": {
+      "value": "12 days",
+      "label": "Duration",
+      "layout": "start"
+    }
+  },
+  {
     "spec": "<EssenceChip>",
     "cap": "row badges — the reference’s essence dot, count only",
     "draws": ":scope > div > span",
