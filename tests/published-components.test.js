@@ -10,7 +10,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
-import { withoutMember } from '../src/ui/publishedComponentProps.js';
+import {
+  ALLOWED_ITEM_MEMBERS,
+  onlyMembers,
+  withoutMember,
+} from '../src/ui/publishedComponentProps.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -1782,5 +1786,32 @@ describe('a per-item member the seam strips', () => {
       { yields: [{ name: 'x' }, { name: 'y' }], props: { b: 2 } },
     ]);
     assert.deepEqual(tiers[0].yields[0].props, { a: 1 }, 'the value it was given is unchanged');
+  });
+
+  it('keeps only the allowed members of each item, and leaves a primitive or null entry as it is', () => {
+    const shares = [{ weight: 1, tone: 'ember', color: 'red', label: 'x' }, null, 3, { weight: 2 }];
+    assert.deepEqual(onlyMembers(shares, ['weight', 'tone']), [
+      { weight: 1, tone: 'ember' },
+      null,
+      3,
+      { weight: 2 },
+    ]);
+    assert.deepEqual(shares[0].color, 'red', 'the value it was given is unchanged');
+    assert.deepEqual(onlyMembers({ weight: 1, color: 'red' }, ['weight']), { weight: 1 });
+    assert.equal(onlyMembers('not data', ['weight']), 'not data');
+  });
+
+  it('reads an allowed member of the item itself, never one inherited from its prototype', () => {
+    const item = Object.create({ tone: 'ember' });
+    item.weight = 1;
+    assert.deepEqual(onlyMembers([item], ['weight', 'tone']), [{ weight: 1 }]);
+  });
+
+  it('names, in every ALLOWED_ITEM_MEMBERS row, a published data key of a published entry', () => {
+    for (const row of Object.keys(ALLOWED_ITEM_MEMBERS)) {
+      const [name, key] = row.split('.');
+      const entry = PUBLISHED_COMPONENT_MANIFEST.find((candidate) => candidate.name === name);
+      assert.equal(entry?.props[key]?.kind, 'data', `${row} names a published data key`);
+    }
   });
 });

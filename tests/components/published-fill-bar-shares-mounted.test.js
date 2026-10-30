@@ -212,6 +212,33 @@ describe('the published FillBar, shares', () => {
     bar.handle.destroy();
   });
 
+  it('paints a share by its tone alone, never an inline colour a share carries', async () => {
+    const bar = mountBar({
+      value: 50,
+      shares: [
+        { weight: 1, tone: 'ember', color: 'red' },
+        { weight: 1, tone: 'azure', color: 'var(--fab-tag-rose)', background: 'blue' },
+      ],
+    });
+    await settle();
+    assert.deepEqual(tonesOf(bar.shares()), ['is-ember', 'is-azure']);
+    for (const share of bar.shares()) {
+      assert.equal(share.style.background, '', 'no inline background');
+      assert.doesNotMatch(share.getAttribute('style'), /red|blue|--fab-tag-rose/u);
+    }
+    bar.handle.update({
+      value: 50,
+      shares: [
+        { weight: 1, tone: 'rose', color: 'red' },
+        { weight: 1, color: 'green' },
+      ],
+    });
+    await settle();
+    assert.deepEqual(tonesOf(bar.shares()), ['is-rose', 'is-success']);
+    for (const share of bar.shares()) assert.equal(share.style.background, '');
+    bar.handle.destroy();
+  });
+
   it('accepts no raw colour as a share tone', async () => {
     const bar = mountBar({
       value: 50,
