@@ -191,8 +191,8 @@ A companion that intends to own its layout should own its scroller explicitly ra
 The World Downtime route is exempt from the shared narrow-width `.manager-body` stack, and that exemption is what keeps the host a definite-height grid rather than a content-sized one, so a later responsive change must preserve it.
 Core enforces no minimum Manager window size and makes no no-horizontal-overflow promise for this panel — explicitly unlike the player seam, whose equivalent guarantee is stated at the player window's enforced 1024x640 floor.
 Responsive behaviour inside the target is the companion's, and a companion wanting container queries declares its own container on its own root.
-- **The Manager root is a containing block and a stacking context, and both reach into the panel.**
-`container-type: inline-size` on the Manager root means a `position: fixed` descendant of the target positions against the Manager rather than the viewport, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
+- **The Manager root is a stacking context, and that reaches into the panel.**
+A `position: fixed` descendant of the target positions against the viewport, as the root's `container-type: inline-size` does not contain it, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
 Content that must paint above anything outside the Manager is portalled outside the Manager element.
 - **Theme tokens reach the panel by inheritance rather than by a stamped attribute**, because the Manager mounts lazily and carries no theme attribute of its own, so a companion reading the custom properties live re-skins with no remount and one snapshotting them into JavaScript at mount does not; content a companion renders outside the Manager subtree inherits the document's tokens instead.
 - **The `--fab-tag-*` tint family is available to a companion, and it is wider than the set Core offers a GM.**
@@ -461,7 +461,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `icon` and `size` (issue 2818) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
-- `Modal`'s `width`, a free CSS length, and a scrim are not published at version 1; publishing one later is additive.
+- `Modal`'s `width`, a free CSS length, is not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
@@ -1708,8 +1708,9 @@ Each group states the accepted values of every key that entry publishes.
     The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
     It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
     An `overlayHost` that is a region of the companion's own, such as a pane inside its window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
-    Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and a companion that dims its region draws a layer of its own in it, which the dialog is drawn over wherever that layer sets no higher `z-index`.
-    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it where the region clips overflow.
+    Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+    Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and a companion that dims its region draws a layer of its own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
+    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
     Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
@@ -1720,7 +1721,7 @@ Each group states the accepted values of every key that entry publishes.
     `destroy` removes the dialog, so where the dialog or a control in it holds focus the companion moves focus to an element of its own first.
   - A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as Overlays states.
     A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
-- **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its width, height and placement, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
+- **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its height and placement beyond what its group states, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
 ### The issue 2784 components
 

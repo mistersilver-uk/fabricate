@@ -1627,8 +1627,8 @@ The inline size makes no such promise: Fabricate enforces no minimum Manager win
 Measured across an ordinary width ladder the target's inline size runs from about 1178px down to about 378px.
 Responsive behaviour inside the target is yours; if you want container queries, declare `container-type` on your own root.
 
-**`position: fixed` positions against the Manager, not the viewport.**
-The Manager root carries `container-type: inline-size`, which implies layout containment and makes it the containing block for fixed-position descendants.
+**`position: fixed` positions against the viewport unless your own root contains it.**
+The Manager root's `container-type: inline-size` does not make it the containing block for fixed-position descendants; `contain: layout` or a `transform` on your own root does.
 Anchor your popovers to your own root instead of assuming viewport coordinates.
 
 **`isolation: isolate` caps z-index escape.**
@@ -1885,7 +1885,7 @@ The element handed to `mount` is a bare `div` inside the player window's content
 Each omission is deliberate, and a companion can rely on all three:
 
 - **No scroller.** The player window's content area already scrolls, and a second scroller inside it produces a nested double scroll.
-- **No CSS container.** `container-type` implies `contain: layout`, which would make the target a containing block for fixed-position descendants and silently mis-position a companion's popovers.
+- **No CSS container.** A companion that wants container queries declares one on its own root.
   A fixed-position element inside the target positions against the viewport.
 - **No padding or background.** The companion owns its own inset and surface.
 
@@ -3733,8 +3733,9 @@ Pass an `overlayHost` inside the same Fabricate window, or none, because the clo
 The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
 An `overlayHost` that is a region of your own, such as a pane inside your window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
-Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over wherever that layer sets no higher `z-index`.
-The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it where the region clips overflow.
+Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
+The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
 Its height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
 Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.

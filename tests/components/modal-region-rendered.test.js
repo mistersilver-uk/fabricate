@@ -196,4 +196,17 @@ describe('the Modal hosted in a companion region through the overlayHost option'
     assert.equal(read.dialog, 640, 'min(640px, 100vh − 64px) at 800px');
     assert.ok(read.dialog > read.region, `${read.dialog} exceeds the region’s ${read.region}`);
   });
+
+  it('caps the height at the viewport height less 64px when the window is short', async () => {
+    const read = await inFixture(
+      '&region=contain',
+      () => {
+        const dialog = document.querySelector('[data-manager-modal]');
+        dialog.querySelector('.manager-modal-body').style.height = '900px';
+        return dialog.getBoundingClientRect().height;
+      },
+      { width: DESKTOP.width, height: 500 }
+    );
+    assert.equal(read, 436, 'min(640px, 100vh − 64px) at 500px');
+  });
 });

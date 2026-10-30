@@ -11,9 +11,7 @@
 
   Its element is a BARE div and deliberately declares nothing but its own height: no padding,
   no background, no scroller (`.fabricate-app-content` already scrolls, and a second scroller
-  produces a nested double scroll) and no `container-type` (which implies `contain: layout`
-  and would silently make this element the containing block for a companion's fixed-position
-  popovers). A companion that wants container queries declares one on its own root, whose
+  produces a nested double scroll) and no `container-type`. A companion that wants container queries declares one on its own root, whose
   inline size is this element's.
 -->
 <script>
