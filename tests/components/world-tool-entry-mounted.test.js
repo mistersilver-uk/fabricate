@@ -91,6 +91,7 @@ const harness = createMountedComponentHarness({
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus

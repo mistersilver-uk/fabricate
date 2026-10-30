@@ -77,6 +77,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     ...[
       'RunActionBar',

@@ -132,6 +132,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       writeCompiledSvelte(selectModule);
     }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Medallion.svelte');
     // The manager's ONE labelled push-button (issue 1118).

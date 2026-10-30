@@ -1,6 +1,6 @@
 /**
  * The module sheet and every component style against the published `RadioCardGroup` (issue 2601):
- * the 36 selectors that name its root class, which of them a published group can match, where
+ * the 40 selectors that name its root class, which of them a published group can match, where
  * those sit and what they draw, the one rule that names a writable root class without the root,
  * the classes its file spells on the root and on a card, and the keyboard ring on its radio, which
  * the accent draws 2px wide and 2px clear and which clears 3:1 on the grounds a published group
@@ -90,11 +90,11 @@ const reachingOf = (census) => census.filter(({ safe }) => !safe);
 const census = () => shippedCensus(GROUP, 'RadioCardGroup');
 
 describe('the module sheet and every component style against the published RadioCardGroup', () => {
-  it('reaches a published group through 31 of the 36 selectors that name its root', () => {
+  it('reaches a published group through 35 of the 40 selectors that name its root', () => {
     const shipped = census();
-    assert.equal(shipped.length, 36, 'the census of every selector naming the root');
+    assert.equal(shipped.length, 40, 'the census of every selector naming the root');
     assert.deepEqual(writtenOf(shipped.filter(({ safe }) => safe)), [...UNREACHED].sort(byName));
-    assert.equal(reachingOf(shipped).length, 31);
+    assert.equal(reachingOf(shipped).length, 35);
     assert.deepEqual(
       staleAncestors(GROUP, shipped, publishedManagerClasses()),
       [],
