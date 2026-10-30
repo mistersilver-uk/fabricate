@@ -3320,9 +3320,13 @@ const group = fabUi.mount('RadioCardGroup', { target, props: props() });
 ### SegmentedControl
 
 `SegmentedControl` draws the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
-`options` is required and is an array of `{ value, label, icon, variant, disabled }` items.
+`options` is required and is an array of `{ value, label, title, icon, variant, disabled }` items.
 `value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
 `label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so never pass one.
+`title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
+It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
+It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
+A `title` that is not a string, or is white space alone, draws no tooltip.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
 `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -3335,10 +3339,14 @@ The platform checks the reached radio first; when `onChange` returns, Fabricate 
 Focus stays on the reached radio, drawn unchecked, so after you decline a change move focus to `target.querySelector('input[type="radio"]:checked')`.
 `ariaLabel` is required and is the radiogroup's name, final display text.
 `fill` is `true` or `false` and defaults to `false`: `true` stretches the track across `target` and gives every segment an equal share.
-`density` is `'default'` or `'inline'` and defaults to `'default'`; any other value is private.
+`density` is `'default'`, `'compact'`, `'field'` or `'inline'` and defaults to `'default'`; any other value is private.
+`'compact'` and `'field'` draw the track on the `--fab-bg-1` fill, with smaller segments in a looser well, each taking an equal share, and `'field'` also edges the selected segment in the accent border.
+Neither sets the height of a card or panel you draw around the control, so size that yourself.
 `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
 An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
 `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
+Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
+A Fabricate that predates them draws a `'compact'` or `'field'` `density` as it does now, without having promised it, and ignores a `title`, and `describe` names the same props before and after, so require the Fabricate release that publishes them if you rely on either.
 Naming `tone`, `shape` and an option's `variant` is additive, and `SegmentedControl`'s `version` stays 1: before them `tone` and `shape` were refused as rest keys and `variant` was private.
 A Fabricate that predates them refuses `tone` and `shape`, and `describe` names them only once the running Fabricate publishes them, so read `describe('SegmentedControl')` before you pass either.
 A `describe` that names `tone` is from a Fabricate that keeps a `variant`'s tint in an accent track.
@@ -3358,7 +3366,8 @@ An empty `options` draws the named radiogroup with no segment and no radio, so n
 The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, or 3px in the `'pill'` shape; leave room for it inside any edge of your own that clips.
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's or, in the `'pill'` shape, over the ground, in every palette but for the solid fill of the `'accent'` and `'info'` tones, and falls short against `--fab-bg-3` in two, so mount the control on one of those four grounds.
 With `tone` `'accent'` or `'info'` the ring is not guaranteed against the solid fill of a neighbouring selected segment, which it falls short of in every palette.
-The selected state is carried by weight alone under forced colors, and by nothing in the `'pill'` shape.
+On a `'compact'` or `'field'` track the ring reaches the track's inner edge and no further, so it is drawn over the track's `--fab-bg-1` fill alone.
+The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
 `groupName`, `iconOnly`, `optionDataAttr` and a `class` are refused, because a rest key must be a `data-*` attribute, so the control never draws an icon-only run or a hook of yours on a segment.
 
 A worked control follows: an ingredient filter on a panel you draw inside a Fabricate window, for example in an extension target.
@@ -4314,6 +4323,7 @@ A published component draws a control only where its section says so, and each c
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   The name a `ListRow` button holds carries its own text as a native `title`, as its section states.
+  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

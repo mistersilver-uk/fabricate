@@ -469,7 +469,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
 - `EditorTabs`' `badges`, `annotated`, `danger`, `buttonIdStem`, `panelIdStem` and `tooltipIdStem` are not published at version 1, and so neither are its marks nor a tab's name override, description or padlock; publishing one later is additive.
 - `RadioCardGroup`'s `groupName`, `cardId`, `hint` and `legendVisible` are not published at version 1, and `optionBody` is never published, being a snippet called with arguments; publishing one of the first four later is additive.
-- `SegmentedControl`'s `groupName`, `iconOnly`, its `compact` and `field` densities and its `tag` tone are not published at version 1, and nor are an option's `success`, `warning`, `danger` and `neutral` variants, `count`, `badge` or `validationTarget`; publishing one later is additive.
+- `SegmentedControl`'s `groupName`, `iconOnly` and its `tag` tone are not published at version 1, and nor are an option's `success`, `warning`, `danger` and `neutral` variants, `count`, `badge` or `validationTarget`; publishing one later is additive.
 Its `optionDataAttr` is never published, because it takes an attribute name.
 - `Pagination`'s `showPageSize`, `multiPageOnly` and `edge` are not published at version 1; publishing one later is additive.
 - `IconPicker`'s `disabled`, `iconOnly` and `bounds` are not published at version 1; publishing one later is additive.
@@ -721,6 +721,7 @@ Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fa
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so does the name a `ListRow` button holds.
+  A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1420,9 +1421,13 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`SegmentedControl`.**
   - It is the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
-  - `options` is required and is an array of `{ value, label, icon, variant, disabled }` items.
+  - `options` is required and is an array of `{ value, label, title, icon, variant, disabled }` items.
     `value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
     `label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so the companion never passes one.
+    `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
+    It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
+    It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
+    A `title` that is not a string, or is white space alone, draws no tooltip.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
     `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -1435,10 +1440,14 @@ Each group states the accepted values of every key that entry publishes.
     Focus stays on the reached radio, drawn unchecked, so a companion that declines moves focus to `target.querySelector('input[type="radio"]:checked')`.
   - `ariaLabel` is required and is the radiogroup's name, final display text.
   - `fill` is `true` or `false` and defaults to `false`: `true` stretches the track across `target` and gives every segment an equal share.
-  - `density` is `'default'` or `'inline'` and defaults to `'default'`; any other value is private.
+  - `density` is `'default'`, `'compact'`, `'field'` or `'inline'` and defaults to `'default'`; any other value is private.
+    `'compact'` and `'field'` draw the track on the `--fab-bg-1` fill, with smaller segments in a looser well, each taking an equal share, and `'field'` also edges the selected segment in the accent border.
+    Neither sets the height of a card or panel the companion draws around the control, so the companion sizes that itself.
   - `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
     An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
   - `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
+  - Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
+    A Fabricate that predates them draws a `'compact'` or `'field'` `density` as it does now, without having promised it, and ignores a `title`, and `describe` names the same props before and after, so a companion that relies on either requires the Fabricate release that publishes them.
   - Naming `tone`, `shape` and an option's `variant` is additive, and `SegmentedControl`'s `version` stays 1: before them `tone` and `shape` were refused as rest keys (M13) and `variant` was private.
     A Fabricate that predates them refuses `tone` and `shape`, and `describe` names them only once the running Fabricate publishes them, so a companion that passes either reads `describe('SegmentedControl')` first.
     A `describe` that names `tone` is from a Fabricate that keeps a `variant`'s tint in an accent track.
@@ -1458,7 +1467,8 @@ Each group states the accepted values of every key that entry publishes.
   - The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, or 3px in the `'pill'` shape, and the companion leaves room for it inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's or, in the `'pill'` shape, over the ground, in every palette but for the solid fill of the `'accent'` and `'info'` tones, and falls short against `--fab-bg-3` in two, so the companion mounts the control on one of those four grounds.
     With `tone` `'accent'` or `'info'` the ring is not guaranteed against the solid fill of a neighbouring selected segment, which it falls short of in every palette.
-    The selected state is carried by weight alone under forced colors, and by nothing in the `'pill'` shape.
+    On a `'compact'` or `'field'` track the ring reaches the track's inner edge and no further, so it is drawn over the track's `--fab-bg-1` fill alone.
+    The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
 - **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member, `variant`, `density`, `tone` or `shape` value, and how Fabricate draws a segmented control in its own rows, pager and editors.
 
 ### The issue 2646 components
@@ -1931,7 +1941,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states and a native `title` where its own group states one, as `IconPicker`'s trigger and `StageBars`' captions do, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states, a native `title` where its own group states one, as `IconPicker`'s trigger and `StageBars`' captions do, and a `SegmentedControl` option's `data-tooltip-text`, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -2135,7 +2145,8 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `SegmentedControl` with `options`, `value`, `ariaLabel` and `onChange` inside a Fabricate window and the user presses ArrowRight on the checked radio
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
-- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, and one that passes `groupName` throws M13
+- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and not as its radio's name
+- **AND** a mount that passes `groupName` throws M13
 - **AND** a mount that omits `ariaLabel` throws M9
 
 #### Scenario: A published pager
