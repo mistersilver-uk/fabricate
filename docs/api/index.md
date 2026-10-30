@@ -2048,14 +2048,14 @@ The published components, in publication order:
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
 | `Kicker` | 1 | `any` | `as`, `tone`, `size`, `children` (text, required) | yes |
-| `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `children` (text, required) | yes |
+| `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `truncate`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `any` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `compact`, `inline`, `note`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
 | `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `size`, `icon`, `busy`, `type`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `semantics`, `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
-| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
+| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops`, `nullLabel`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
@@ -2256,7 +2256,7 @@ For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry locali
 This is `InfoStrip`'s badge set.
 `neutral` is the recessive tone and clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface` only.
 `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
-At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short.
+At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short or set `truncate`.
 At `default` a long label wraps inside the chip.
 `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
 It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
@@ -2267,8 +2267,12 @@ The glyph is never the chip's name, so a chip whose meaning rests on it carries 
 `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
 `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
 It is drawn and never announced, so the label says the state.
-Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
-A Fabricate that predates `emphasis`, `icon`, `mono` and `struck` refuses each with `"<key>" is not a data attribute`, and `describe('Chip').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+`truncate` is `true` or `false`; `true` keeps the label to one line and ends it in an ellipsis where `target` is too narrow, at any `density`, keeping the `icon` glyph whole.
+The ellipsis is drawn only: the label stays whole in the chip's text and so in its name, and the colour, `mono`, `struck` and `icon` are drawn as without it; only the corner changes, to a pill (`border-radius: 999px`).
+To let a reader see the clipped text, pass the full label as `data-tooltip-text`, which opens on pointer hover only, so it never carries what the label does not.
+The chip ends at the width `target` has, so a `target` that is a flex item of your row needs `min-width: 0` and a `flex-shrink` above 0, or the row overflows instead of the label ending in an ellipsis.
+Fabricate coerces none of `mono`, `struck` and `truncate` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
+A Fabricate that predates `emphasis`, `icon`, `mono`, `struck` and `truncate` refuses each with `"<key>" is not a data attribute`, and `describe('Chip').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
 `tone` is colour alone, so the label says the state.
 A label changed through `update` is not announced; a live region is yours to provide.
@@ -2675,7 +2679,7 @@ const toggle = fabUi.mount('StatusToggle', { target, props: props() });
 
 ### Stepper
 
-`Stepper` draws the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+`Stepper` draws the design system's stepper: a native `<input type="number">`, or a text field where `format` is set, between a decrement and an increment `<button>`, for a number the user types or steps.
 The input is the control, so the number is always typeable.
 `value` is required and is the finite number the stepper holds.
 A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
@@ -2704,10 +2708,37 @@ Without `allowUnset` a `value` of `null` is outside the contract, and what is dr
 `density` is `default` or `comfortable`, and `default` when absent.
 `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
 What the stepper draws for a value outside the set is private; today that is the default density.
+`placeholder` is optional text, shown in the input while it is empty.
+It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; pass the text already localised and never rely on it as a name, because `ariaLabel` names the input and a placeholder does not.
+Fabricate draws it in the muted ink, which clears the contrast floor, and a `placeholder` that is not text is outside the contract.
+`format` is `signed` or `unlimited`, and absent for the plain number field.
+Either value draws a text field with the spinbutton role in place of the number field, and the field reports a number only when the user presses Enter or it loses focus, where the number field reports on every keystroke.
+A `signed` field draws a positive number with a leading plus, as `+5`, zero as `0` and a negative number with a hyphen-minus, as `-5`, and reads an optional plus, hyphen-minus or true minus sign followed by digits with an optional decimal point, as `1.5`, `.5` or `5.`; any other text, such as `1e3` or `5%`, is not a number.
+The `signed` field asks the browser for its decimal keypad, `inputmode="decimal"`, which some touch keypads show without a minus key, so offer the buttons too where negative numbers matter on touch.
+An `unlimited` field draws every number but zero as itself, with no plus, and draws `0` as the `nullLabel` words, as "No limit", for a quantity whose zero means there is none; it takes those words in any case, or `0`, as that endpoint, and reports the endpoint as `0`, never `null`.
+Without `nullLabel`, an `unlimited` field draws `0` as the number, and `allowUnset` is outside the contract.
+An `unlimited` field is meant for a `min` of `0`: a `min` above `0` is outside the contract, and with no `min` a negative number is reachable and the endpoint sits mid-range; a typed `0` selects the endpoint before `min` clamps it.
+Under either value the field restores the displayed text when what was typed is empty or no number, and clamps a typed number to `min` and `max`.
+Text that is no number is restored silently, with no call to `onChange`, so show any refusal message in its own live region.
+Both buttons and the Up and Down keys move to the next stop above or below the held number, or by `step` clamped to `min` and `max` where `stops` is empty, and Home and End move to the lowest and highest stop, or to `min` and `max` where there are none.
+Enter in the field never submits a `<form>`, and Escape, while the typed text differs from the displayed text, restores the displayed text and goes no further, so it closes no window; with no such difference Escape is not caught.
+The field carries `aria-valuemin`, `aria-valuemax`, `aria-valuenow` and `aria-valuetext`, the last being the displayed text and the endpoint carrying no `aria-valuenow`, and the wheel over the focused field steps nothing.
+Under `format` where `allowUnset` is `true` and there is no `nullLabel`, a `null` value draws the field blank, and clearing the field then pressing Enter or leaving it reports `null`.
+`stops` is an optional array of finite numbers, the values the buttons and the Up and Down keys step between under `format`.
+Fabricate sorts it ascending and drops repeats and any entry that is not a finite number, and a `stops` that is not an array counts as none.
+A press moves to the nearest stop strictly above or below the held number, so a held number on no stop stays exact until the user steps it, and a typed number is clamped to `min` and `max` and never moved to a stop.
+A stop outside `min` or `max` stays reachable by both buttons, the Up and Down keys, Home and End, while a typed number is clamped, and `aria-valuemin` and `aria-valuemax` come from the lowest and highest stop.
+Without `format` it changes nothing.
+`nullLabel` is optional text, the words drawn for the one state that is not a number.
+Under `format` it names `null` for a `signed` field: `value` may then be `null`, which draws the words one step below the lowest stop, a press down from the lowest stop reports `null`, and typing the words, in any case, reports `null`; the decrement button is disabled there.
+Under `unlimited` it names `0`, as stated for `format`, and the endpoint's field is drawn in the muted ink and, unfilled and horizontal, widens to the words' length.
+A `nullLabel` that is not a non-empty string counts as none, and without `format` it changes nothing.
+Fabricate coerces none of `format`, `stops`, `nullLabel` and `placeholder`: a `format` other than exactly `signed` or `unlimited`, a boolean, a number or another case among them, draws the plain number field, and `stops` and `nullLabel` then change nothing.
 Fabricate coerces none of `disabled`, `allowUnset` and `fill` to a boolean, so only `true` and `false` are in the contract: the string `'false'` disables the stepper, allows it to be unset and stretches it.
-A Fabricate that predates `disabled`, `allowUnset`, `fill` and `density` refuses each with `"<key>" is not a prop of Stepper`, and `describe('Stepper').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops` and `nullLabel` refuses each with `"<key>" is not a prop of Stepper`, and `describe('Stepper').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so if you refused the earlier call you are told again.
 Where `allowUnset` is `true` the argument is `null` when an edit clears the input or leaves it holding no number, a lone minus sign among them.
+Under `format` it is called when the user presses Enter, a button, an arrow key, Home or End, or the field loses focus, and never per keystroke, with `0` for the `unlimited` endpoint and `null` for the `signed` one.
 Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so do not assume the window is open when `onChange` runs; a mount you have destroyed reports nothing.
 The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so if you hold whole numbers, round it and pass your own value back.
 Pass an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
@@ -2723,14 +2754,15 @@ Beyond its bounds, the stepper's one unavailable state is `disabled`.
 Where the quantity is not worth showing at all, destroy the stepper, moving focus first if one of its parts holds it, and show the number as text of your own.
 Answer a refused edit in text of your own, in a live region.
 The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
-The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
-In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
-`Stepper` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
+The stepper does not catch Escape, except under `format` as stated for it: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
+Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
+`Stepper` takes no rest props, so a `data-*` prop, an `id` and a `title` are refused with `"<key>" is not a prop of Stepper`.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
-Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max` are private.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and the box of the `format` field inside a Fabricate Manager window, are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
 

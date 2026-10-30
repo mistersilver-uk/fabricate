@@ -119,7 +119,8 @@ function unheldClassIn(drawsChildren, spelled, undrawn) {
  * say `disables`, or an earlier compound is a pinned ancestor, or a later one needs a descendant
  * the mount cannot hold. A shape states `drawsChildren`: `false` for a root whose published keys
  * draw no classed descendant; `'caller'` for a root whose `icon` key draws a glyph child in classes
- * the companion chooses, as `Chip` and `Button` do, so no classed descendant is kept off; `true`
+ * the companion chooses, as `Chip` and `Button` do (and whose `truncate` wraps the label in
+ * `Chip`'s own `manager-chip-label`), so no classed descendant is kept off; `true`
  * for any other root, which holds no descendant classed `manager-*` unless a published closure
  * spells that class, nor one of `undrawn`, the classes a closure spells that no published key
  * draws. An attribute selector never makes a selector safe, and anything else fails closed, a

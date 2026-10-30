@@ -198,13 +198,9 @@ const FOCUSABLE_REACH = Object.freeze({
   // In snippets both branches of `{#if isVertical}` render, which reach reads as unguarded.
   'src/ui/svelte/components/Stepper.svelte: button[data-stepper-decrement]': 'always',
   'src/ui/svelte/components/Stepper.svelte: button[data-stepper-increment]': 'always',
-  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="number"]': {
-    defaults: ['formatValue', 'parseValue'],
-    heldBy:
-      'tests/components/published-stepper-mounted.test.js: the default draws the number field',
-  },
-  // The formatted mode's, drawn only when `formatValue` and `parseValue`, which the entry does not publish, are set.
-  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': null,
+  // The number field and the formatted mode's text field are the two branches of one guard, on `format`.
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="number"]': 'format',
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': 'format',
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
