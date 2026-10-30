@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `options` | `[{ value, label, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
+  | `options` | `[{ value, label, title?, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `title` is a plain-text hint, already localized, drawn as the segment's Foundry tooltip (`data-tooltip-text`) under the pointer only and never as the radio's accessible name, which stays the label. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (empty falls back to a name unique to the mount) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'`/`'info'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart; `info` is the solid fill of the info family, as `accent` is of the accent one. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
@@ -57,6 +57,8 @@
     }
   }
 
+  const hintOf = ({ title }) => (typeof title === 'string' && title.trim() ? title : undefined);
+
   // Class list for one segment; the variant tint applies to the ACTIVE segment only.
   function segmentClass(option) {
     const active = option.value === value;
@@ -73,11 +75,12 @@
   bind:this={track}
 >
   {#each options as option, i (option.value)}
-    <!-- `title` ONLY in the icon-only variant, the pointer half of what the clipped label already
-         gives the a11y tree; `undefined` omits it, so a labelled consumer's markup is untouched. -->
+    {@const hint = hintOf(option)}
+    <!-- A native `title` only in icon-only and without a hint; a hint is `data-tooltip-text`. -->
     <label
       class={segmentClass(option)}
-      title={iconOnly ? option.label : undefined}
+      title={iconOnly && !hint ? option.label : undefined}
+      data-tooltip-text={hint}
       {...segmentHooks[i]}
     >
       <input

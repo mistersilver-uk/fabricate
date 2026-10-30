@@ -137,6 +137,7 @@ An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted
 `SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644), and issue 2774 adds its `tone` (`accent`, `accent-soft` or `info`), its `shape` (`pill`) and an option's `variant` (`info`) to the published keys.
 The `info` tone fills the chosen segment solid `--fab-info` inked `--fab-on-info` and leaves the idle segments bare, as the `accent` tone does in the accent family, and clears 4.5:1 in all seven themes (issue 2774).
 An option whose `variant` is `info` keeps its `--fab-info-soft` tint, `--fab-info-border` edge and `--fab-info-text` ink inside an `accent` or `accent-soft` track, so a track's tone never hides what choosing that one option means (issue 2774).
+Issue 2814 adds the `compact` and `field` densities and an option's `title` to the published keys: the `compact` and `field` tracks paint `--fab-bg-1` and clear the same 4.5:1 ink floors there, and a `title` is the segment's `data-tooltip-text`, a pointer hint that is never the radio's accessible name.
 
 #### Scenario: A caller's key has no translation
 
