@@ -452,6 +452,8 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s, `Button`'s and `IconButton`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `field` and `fill`, are not published at version 1; publishing one later is additive.
+- `FillBar`'s track skin is not published at version 1; publishing it later is additive.
+- `FillBar`'s bipolar fill and a gapped multi-track form are not published at version 1.
 - `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
@@ -481,6 +483,7 @@ Its `dialogProps` is never published, being attributes under another name, and n
 Its `openProps` and `nameClass` are never published, being attributes and a class under other names.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `FillBar`'s `tone`, and so a `shares` entry's and a `Meter` segment's, took the ten tag names `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` and `slate` (issue 2789) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates them draws each `neutral` and refuses nothing, which `describe` cannot show.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
@@ -746,17 +749,24 @@ Each group states the accepted values of every key that entry publishes.
   - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`FillBar`.**
   - `value` is 0–100, clamped.
-  - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
+  - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, or a tag name, `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` or `slate`, and defaults to `success`.
+    A tag name paints the `--fab-tag-*` token of the same name, and it is one of `Avatar`'s tint keys: `sage`, `aqua` and `mauve` are tint keys too and are not tones.
+    Any other `tone` draws `neutral`, a token spelling, a raw colour or a different case included.
   - `color` is a `var(--fab-…)` colour token reference, which overrides `tone`.
   - `shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
-    A share's `tone` is one of the six tones above, and it defaults to `success`; a tone outside them draws `neutral`.
-    A share states its colour by `tone` alone, so a stack of more than six contributors repeats a hue.
+    A share's `tone` is one of the sixteen tones above, and it defaults to `success`; a tone outside them draws `neutral`.
+    A share states its colour by `tone` alone, so a stack of more than sixteen contributors repeats a tone.
     A member of a share other than `weight` and `tone` is private.
     The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
     A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
     A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an array draws the one fill from `tone` and `color`.
     Stacked, `tone` and `color` are not read and the bar carries no tone attribute.
     The shares are colour and width alone and are not announced, and neighbouring tones can sit under 3:1 against each other, so the companion states each share as text beside the bar.
+    A Fabricate that predates the tag names refuses nothing and draws each `neutral`, and `describe` cannot tell the companion which one is running, so it states each share as text beside the bar on either; adding them is additive, and the entry stays at `version` 1.
+    Each tag name reads against the bar's track no weaker than the weakest of the six tones does, in every palette, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`.
+    That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
+    Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card.
+    The bar draws no label, so no ink is paired with a tag name.
   - `density` is `default` or `compact`.
   - It is decorative: it has no role and no name and reaches no assistive technology, so the companion states the reading as text beside it.
     A value that must be announced is a `Meter`.
@@ -769,6 +779,8 @@ Each group states the accepted values of every key that entry publishes.
     An entry that spans 1e-9 or less on the scale of `max` is not drawn, so the segments drawn make up the fill.
     That bound is absolute, so a `max` of 1e-9 or less reads every entry as nothing.
     A list that draws one segment or none draws one fill: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+    A segment's `tone` takes the tag names as `FillBar`'s does, and a name outside the tones draws `neutral`, as `segments: [{ value: 3, tone: 'ember' }, { tone: 'azure' }]`.
+    A Fabricate that predates the tag names draws each `neutral`, and refuses nothing.
     `Meter` has no `tone` key of its own, and `"tone" is not a data attribute`: for one tone across the whole fill, the companion passes one entry, as `segments: [{ tone: 'accent' }]`.
     The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
     No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
@@ -784,8 +796,9 @@ Each group states the accepted values of every key that entry publishes.
   - `rows` is required and is `{ id?, name, percent, fill? }[]`.
     `name` is required in every row, and `percent` is a whole number 0–100, printed as `<percent>%`.
   - One row is a meter named by its `name`, which is also its visible caption; several are a histogram; none draws nothing.
-  - `fill` is a `FillBar` tone, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
+  - `fill` is a `FillBar` tone, the ten tag names included, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
     Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
+    A tag name paints as `FillBar`'s does, and a name outside every set draws `neutral`, as does a Fabricate that predates the tag names.
   - Every `id` is unique.
   - `direction` is `ascending` or `descending`.
   - `density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.

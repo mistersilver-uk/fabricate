@@ -2140,11 +2140,13 @@ The tile is inline: give its `target` `display: flex`, so the tile is a flex ite
 
 `FillBar` draws a rounded track with a fill as wide as its value.
 `value` is 0–100 and is clamped.
-`tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
+`tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, or a tag name, `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` or `slate`, and defaults to `success`.
+A tag name paints the `--fab-tag-*` token of the same name, and it is one of `Avatar`'s tint keys: `sage`, `aqua` and `mauve` are tint keys too and are not tones.
+Any other `tone` draws `neutral`, a token spelling, a raw colour or a different case included.
 `color` is a `var(--fab-…)` colour token reference, and it overrides `tone`.
 `shares` is an array of `{ weight, tone? }`: two or more draw the fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is `value` wide.
-A share's `tone` is one of the six tones above, and it defaults to `success`; a tone outside them draws `neutral`.
-A share states its colour by `tone` alone, so a stack of more than six contributors repeats a hue.
+A share's `tone` is one of the sixteen tones above, and it defaults to `success`; a tone outside them draws `neutral`.
+A share states its colour by `tone` alone, so a stack of more than sixteen contributors repeats a tone.
 A member of a share other than `weight` and `tone` is private.
 The shares run left to right in every writing direction and abut with no gap, and no share takes a minimum width, so one narrower than a pixel may not be seen.
 A `weight` that is not a finite number above zero reads 0, a numeric string and `Infinity` included, and shares that all read 0 draw nothing.
@@ -2152,6 +2154,11 @@ A `null` entry reads as `{}`, and one entry, none or a `shares` that is not an a
 Stacked, `tone` and `color` are not read and the bar carries no tone attribute.
 The shares are colour and width alone and are not announced, and neighbouring tones can sit under 3:1 against each other, so state each share as text beside the bar.
 A Fabricate that predates `shares` refuses it with `"shares" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates the tag names refuses nothing and draws each `neutral`, and `describe` cannot tell you which one is running, so state each share as text beside the bar on either; adding them is additive, and the entry stays at `version` 1.
+Each tag name reads against the bar's track no weaker than the weakest of the six tones does, in every palette, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`.
+That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
+Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card, so never leave a share to its colour.
+The bar draws no label, so no ink is paired with a tag name.
 `density` is `default` or `compact`.
 It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
 A value that must be announced is a `Meter`.
@@ -2168,6 +2175,8 @@ The last entry spans the rest of the fill, and its `value` is not read.
 An entry that spans 1e-9 or less on the scale of `max` is not drawn, so the segments drawn make up the fill.
 That bound is absolute, so a `max` of 1e-9 or less reads every entry as nothing.
 A list that draws one segment or none draws one fill: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+A segment's `tone` takes the tag names as `FillBar`'s does, and a name outside the tones draws `neutral`, as `segments: [{ value: 3, tone: 'ember' }, { tone: 'azure' }]`.
+A Fabricate that predates the tag names draws each `neutral`, and refuses nothing.
 `Meter` has no `tone` key of its own, and `"tone" is not a data attribute`: for one tone across the whole fill, pass one entry, as `segments: [{ tone: 'accent' }]`.
 The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
 No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
@@ -2186,8 +2195,9 @@ It draws no figure, so the visible reading is yours to draw.
 `rows` is required and is `{ id?, name, percent, fill? }[]`.
 `name` is required in every row, `percent` is a whole number 0–100 printed as `<percent>%`, and every `id` is unique.
 One row is a meter named by its `name`, which is also its visible caption; several rows are a histogram; an empty `rows` draws nothing.
-`fill` is a `FillBar` tone, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
+`fill` is a `FillBar` tone, the ten tag names included, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
 Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
+A tag name paints as `FillBar`'s does, and a name outside every set draws `neutral`, as does a Fabricate that predates the tag names.
 `direction` is `ascending` or `descending`.
 `density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.
 In a histogram the bars are hidden from assistive technology and each row is read as its name and its percentage; the list carries no name, so head it with your own text.
