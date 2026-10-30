@@ -7,9 +7,9 @@
  * colors beyond that weight. Read off the rules.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { splitSelectorList, collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import {
   declaredToken,
@@ -55,9 +55,7 @@ for (const rung of RUNGS) {
 
   test(`the ${rung} track's padding is 4px, so a 2px ring at a 2px offset ends at the track's inner edge`, () => {
     const padding = token(track(rung), 'padding');
-    const resolved = new RegExp(String.raw`${padding}:\s*(\d+)px`, 'u').exec(
-      readFileSync('styles/fabricate-tokens.css', 'utf8')
-    );
+    const resolved = new RegExp(String.raw`${padding}:\s*(\d+)px`, 'u').exec(readStylesheet());
     assert.equal(resolved?.[1], '4');
   });
 
