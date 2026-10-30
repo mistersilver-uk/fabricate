@@ -5,7 +5,8 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `stages` | `{ name?, label?, valueText?, value }[]` | `[]` | `value` is the stage's fill, 0–100, and the bar announces it as a whole number, truncated, so an unfinished stage never reads 100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. `valueText`, final text, is the bar's `aria-valuetext` in place of its percentage when it is a non-empty string. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. |
+  | `stages` | `{ name?, label?, valueText?, value, weight? }[]` | `[]` | `value` is the stage's fill, 0–100, and the bar announces it as a whole number, truncated, so an unfinished stage never reads 100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. `valueText`, final text, is the bar's `aria-valuetext` in place of its percentage when it is a non-empty string. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. `weight` is the stage's share of the row: a finite number above zero, else 1, and the bars are `weight / Σweight` wide, so a list that names none, or no valid one, draws equal bars. |
+  | `gap` | `'default'` \| `'tight'` | `'default'` | `'tight'` draws the 2px gap between bars where `default` draws 6px; any other value reads `'default'`. |
   | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills and carries `aria-current="step"`. A finished bar reads success and the rest neutral. |
   | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name, in muted ink and the mono face, the position at weight 500. A named caption carries its stage's `name` as its `title`, so a name the ellipsis cuts shows whole under the pointer. |
   | `ariaLabel` / `ariaLabelledBy` | string / string | `''` / `''` | Exactly one names the group; `ariaLabelledBy` where the caller renders the kicker. |
@@ -24,11 +25,22 @@
     stages = [],
     currentIndex = 0,
     numbered = true,
+    gap = 'default',
     ariaLabel = '',
     ariaLabelledBy = '',
     class: extraClass = '',
     ...rest
   } = $props();
+
+  const weighted = (stage) => Number.isFinite(stage?.weight) && stage.weight > 0;
+  const weightOf = (stage) => (weighted(stage) ? stage.weight : 1);
+  const columns = $derived.by(() => {
+    if (!Array.isArray(stages) || !stages.some(weighted)) return undefined;
+    const largest = Math.max(...stages.map(weightOf));
+    const ratios = stages.map((stage) => weightOf(stage) / largest);
+    const total = ratios.reduce((sum, ratio) => sum + ratio, 0);
+    return ratios.map((ratio) => `minmax(0, ${(ratio / total) * 100}fr)`).join(' ');
+  });
 
   function percentOf(stage) {
     return Math.min(100, Math.max(0, Number(stage?.value) || 0));
@@ -54,6 +66,8 @@
 
 <div
   class={['fab-stage-bars', extraClass]}
+  class:is-tight={gap === 'tight'}
+  style:grid-template-columns={columns}
   role="group"
   aria-label={ariaLabel || undefined}
   aria-labelledby={ariaLabelledBy || undefined}
@@ -91,6 +105,10 @@
     grid-auto-columns: minmax(0, 1fr);
     grid-auto-flow: column;
     gap: var(--fab-space-chip);
+  }
+
+  .fab-stage-bars.is-tight {
+    gap: var(--fab-space-2xs);
   }
 
   .fab-stage-bars-stage {

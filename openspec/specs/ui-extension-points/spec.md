@@ -191,8 +191,8 @@ A companion that intends to own its layout should own its scroller explicitly ra
 The World Downtime route is exempt from the shared narrow-width `.manager-body` stack, and that exemption is what keeps the host a definite-height grid rather than a content-sized one, so a later responsive change must preserve it.
 Core enforces no minimum Manager window size and makes no no-horizontal-overflow promise for this panel — explicitly unlike the player seam, whose equivalent guarantee is stated at the player window's enforced 1024x640 floor.
 Responsive behaviour inside the target is the companion's, and a companion wanting container queries declares its own container on its own root.
-- **The Manager root is a containing block and a stacking context, and both reach into the panel.**
-`container-type: inline-size` on the Manager root means a `position: fixed` descendant of the target positions against the Manager rather than the viewport, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
+- **The Manager root is a stacking context, and that reaches into the panel.**
+A `position: fixed` descendant of the target positions against the viewport, as the root's `container-type: inline-size` does not contain it, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
 Content that must paint above anything outside the Manager is portalled outside the Manager element.
 - **Theme tokens reach the panel by inheritance rather than by a stamped attribute**, because the Manager mounts lazily and carries no theme attribute of its own, so a companion reading the custom properties live re-skins with no remount and one snapshotting them into JavaScript at mount does not; content a companion renders outside the Manager subtree inherits the document's tokens instead.
 - **The `--fab-tag-*` tint family is available to a companion, and it is wider than the set Core offers a GM.**
@@ -453,14 +453,17 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `FillBar`'s track skin is not published at version 1; publishing it later is additive.
-- `FillBar`'s bipolar fill and a gapped multi-track form are not published at version 1.
+- `FillBar`'s gapped multi-track form is not published at version 1.
 - `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `swatch`, `tint`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `truncate` (issue 2817) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates it refuses it with `"truncate" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatBox`'s `layout` and `note` (issue 2819) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `icon` and `size` (issue 2818) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `width`, a free CSS length, is not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
@@ -492,6 +495,8 @@ A Fabricate that predates `icon` refuses it with `"icon" is not a prop of Avatar
 A Fabricate that predates a `Medallion` rung draws that size at its edge with the corner `9` and refuses nothing.
 A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draws any size, at the same ratio, and refuses nothing.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key and neither is published; `format` (issue 2787) opens the formatted mode through two formatters Fabricate holds, `signed` and `unlimited`, and a companion's own formatter is not published at version 1; publishing one later needs a new prop kind, which is additive.
+- `FillBar`'s `density` took `thin` (issue 2821) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the default track and refuses nothing, which `describe` cannot show.
+- `FillBar`'s `origin` (issue 2821) was added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"origin" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -780,7 +785,14 @@ Each group states the accepted values of every key that entry publishes.
     That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
     Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card.
     The bar draws no label, so no ink is paired with a tag name.
-  - `density` is `default` or `compact`.
+  - `origin` is `start` or `center`, and `start` when absent or any other value.
+    `center` reads `value` as -100 to 100, clamped, and grows the fill from the midpoint of the track: to the right in `--fab-success-text` above zero, to the left in `--fab-danger-text` below it, and a fill of no width at zero.
+    It runs left to right in every writing direction, as `shares` do, and `tone`, `color` and `shares` are not read, so the bar carries no tone attribute.
+    A bipolar bar has no midpoint mark, and the success and danger inks are the pale text inks, so the companion states the signed reading as text beside it.
+  - `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track; any other value draws `default`.
+    `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+    Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so the colour never carries a reading alone.
+    The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
   - It is decorative: it has no role and no name and reaches no assistive technology, so the companion states the reading as text beside it.
     A value that must be announced is a `Meter`.
 - **`Meter`.**
@@ -821,7 +833,15 @@ Each group states the accepted values of every key that entry publishes.
   - `label` is required.
   - `icon` is optional Font Awesome classes.
   - `tone` is `default`, `info` or `danger`.
+  - `layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
+    Any other value draws `default`.
+  - `note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
+    In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
+  - A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, which `describe('StatBox').props` shows; adding either is additive, and the entry stays at `version` 1.
   - The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+  - The box has no role and adds no accessible name, and the label is not a heading.
+    A screen reader reads its text in the order it is drawn: the figure then the label at `default`, the label then the figure at `start`, and the note last in both.
+    The companion passes a `label` that reads sensibly before the figure and after it, and a `note` that adds to them and never repeats either.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
   - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
@@ -1255,7 +1275,7 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`StageBars`.**
   - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
-  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
     A bar's `aria-valuenow` is the clamped value truncated to a whole number, so a stage short of 100 never announces 100 and none announces a fraction.
@@ -1263,7 +1283,12 @@ Each group states the accepted values of every key that entry publishes.
     The companion passes a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
     Naming `valueText` is additive, and `StageBars`' `version` stays 1: before it a stage's `valueText` was unnamed and so private.
     `describe` cannot tell a companion whether the running Fabricate announces it, and one that predates it announces the percentage.
-    A member other than `name`, `label`, `valueText` and `value` is private, and an empty `stages` draws the named group with no bar.
+    `weight` is the stage's share of the row: a finite number above zero, else 1, so the bars are each `weight` over the sum of the weights wide and a list that names none draws equal bars.
+    A `weight` that is a numeric string reads 1, and a bar narrower than its caption cuts the caption off with an ellipsis.
+    Naming `weight` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws equal bars, which `describe` cannot show.
+    A member other than `name`, `label`, `valueText`, `value` and `weight` is private, and an empty `stages` draws the named group with no bar.
+  - `gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
+    Naming `gap` (issue 2821) is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"gap" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
   - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
     A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
@@ -1273,7 +1298,7 @@ Each group states the accepted values of every key that entry publishes.
   - Rest `data-*` attributes land on the group root.
   - It needs no Fabricate ancestor, and draws the same under any.
   - It is not a live region: an `update` redraws the bars in place and announces nothing.
-- **Private:** `StageBars`' track height and corner, its gaps, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
+- **Private:** `StageBars`' track height and corner, its gaps beyond `gap`'s two, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
 
 ### The issue 2601 components
 
@@ -1689,6 +1714,10 @@ Each group states the accepted values of every key that entry publishes.
     `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
     A name of white space alone leaves its element with no name, so the companion never passes one.
+  - `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
+    It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
+  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+    A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
     `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
     An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
@@ -1740,9 +1769,13 @@ Each group states the accepted values of every key that entry publishes.
     Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`, and with `trapFocus` a key stops at the document.
   - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the close control, its ring and the theme are drawn as this group states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button the companion draws in a slot would act on them; under the standalone style root the companion passes none, and the dialog opens on the standalone layer.
-    The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
+    The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
     It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
-    Its width, height and placement are otherwise private.
+    An `overlayHost` that is a region of the companion's own, such as a pane inside its window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
+    Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+    Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and a companion that dims its region draws a layer of its own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
+    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+    Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
     A `target` in its `body` or `footer` slot sits inside the dialog on that layer, so an entry the companion mounts there is under a Fabricate root and takes no standalone style root of its own.
@@ -1752,7 +1785,7 @@ Each group states the accepted values of every key that entry publishes.
     `destroy` removes the dialog, so where the dialog or a control in it holds focus the companion moves focus to an element of its own first.
   - A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as Overlays states.
     A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
-- **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its width, height and placement, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
+- **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its height and placement beyond what its group states, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
 ### The issue 2784 components
 
@@ -2232,6 +2265,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onClose` once, the Escape reaches no bubble-phase `keydown` listener above the dialog's host, and Foundry's dismiss keybinding closes no window
 - **AND** the dialog stays open until the companion's `update` passes `open: false` with its other keys
 - **AND** a mount that omits `closeLabel` throws M9, and one that passes `width` throws M8
+
+#### Scenario: A published picker dialog with a glyph and a width rung
+
+- **WHEN** a companion mounts `Modal` with `open: true`, `icon: 'fas fa-plus'` and `size: 'sm'`
+- **THEN** the header band draws a glyph hidden from assistive technology before the title, and the dialog is 500px wide
+- **AND** an `update` that omits `icon` and `size` draws no glyph and a 560px dialog, and a `size` outside the set draws 560px
+
+#### Scenario: A published dialog hosted in a companion region
+
+- **WHEN** a companion mounts `Modal` with an `overlayHost` that is a pane of its own inside a Fabricate window, over a layer of its own in that pane
+- **THEN** the dialog is drawn inside the pane, centred in it where the pane makes itself the containing block of fixed content and centred in the browser window's viewport where it does not
+- **AND** the dialog is drawn over the companion's layer and no layer of Fabricate's covers the pane
 
 #### Scenario: A trapped published dialog in a companion root with its own stacking context
 

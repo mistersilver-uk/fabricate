@@ -521,6 +521,12 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       }
     ),
     'modal-header-only': modal({ closeOnOutsideClick: false }, {}),
+    'modal-icon': modal(
+      { icon: 'fas fa-plus', subtitle: 'Pick one to add' },
+      { body: '<p style="margin:0">Choose what this stage requires.</p>' }
+    ),
+    'modal-size-sm': modal({ size: 'sm' }, { body: '<p style="margin:0">A narrow picker.</p>' }),
+    'modal-size-lg': modal({ size: 'lg' }, { body: '<p style="margin:0">A wide picker.</p>' }),
     'modal-equal-footer': modal(
       { footerLayout: 'equal' },
       {
