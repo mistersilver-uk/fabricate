@@ -455,6 +455,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
@@ -471,8 +472,9 @@ Its `triggerClass` and `triggerStyle` are never published, being a class and a s
 - `ActionMenu`'s `disabled`, `heading`, `panelLabel`, `triggerIcon` and `triggerTitle` are not published at version 1, and nor is an item's `tone`; publishing one later is additive.
 Its `open` is not published at version 1, and publishing it later as a `value` key is additive.
 Its `triggerClass`, `menuClass` and `triggerProps` are never published, being classes and attributes under other names, and nor is `trigger`, a snippet called with arguments.
-- `Modal`'s `trapFocus`, `initialFocus`, `onSubmit`, `footerLayout` and `width` are not published at version 1; publishing one later is additive.
-Its `dialogProps` is never published, being attributes under another name.
+- `Modal`'s `onSubmit` and `width` are not published at version 1; publishing one later is additive.
+A `<form>` Fabricate drew around both slots would make an untyped button the companion draws in one submit it, so a form-style dialog wraps its fields in a `<form>` of its own in the `body` slot, handles that form's `submit`, and submits it from a footer `Button`'s `onclick` with `requestSubmit()`.
+Its `dialogProps` is never published, being attributes under another name, and nor is `initialFocusSelector`, being a selector.
 - `ListRow`'s `density`, `layout`, `markSize`, `truncateName`, `inset`, `detailAlign` and `bodyBasis`, and its `leading`, `badges`, `meta`, `children`, `aside` and `trailing` snippets, are not published at version 1; publishing one later is additive.
 Its `openProps` and `nameClass` are never published, being attributes and a class under other names.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
@@ -658,7 +660,7 @@ That exception reaches a radio and a number input too where the form has a submi
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
-A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, as its group states.
+A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, and with `trapFocus` every key stops at the document, as its group states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
 Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
@@ -672,6 +674,7 @@ Where the entry's rest keys land on the control itself, `data-validation-focused
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
 A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
 - Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its group states, each never out of `target`.
+A `Modal` with `trapFocus` is the exception to that rule: Fabricate moves focus into its dialog as it opens, keeps Tab inside it, and returns focus to the element that held it a frame after it closes, as its group states.
 An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its group states.
 An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its group names, and back to the trigger when a choice, Escape or Tab closes it, as its group states.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so the companion moves focus to an element of its own before it calls either.
@@ -1592,7 +1595,7 @@ Each group states the accepted values of every key that entry publishes.
 - **`Modal`.**
   - It is Fabricate's dialog (`<Modal>` in the library): a panel drawn over the window, in an overlay, with a header band holding the companion's title, an optional subtitle and a close control, then the companion's body and footer in their content slots.
     It is for one step the user finishes or dismisses before going on.
-    It draws nothing focusable inside `target`, so the companion returns focus to an element of its own, the control that opened the dialog.
+    It draws nothing focusable inside `target`, so the companion returns focus to an element of its own, the control that opened the dialog, unless `trapFocus` returns it, as the lines below state.
   - `open` is `true` to draw the dialog and `false` or absent to draw none, and the companion opens and closes it only through `update`.
     While `open` is `false`, `target` is empty under a Fabricate root and holds only the empty standalone style root elsewhere, and while it is `true`, `target` holds one empty element of Fabricate's, inside that root where it is written, which is private.
     `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
@@ -1603,7 +1606,7 @@ Each group states the accepted values of every key that entry publishes.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
     A name of white space alone leaves its element with no name, so the companion never passes one.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
-    `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a row aligned to the end of a footer band, spaced by `gap`, of which the companion makes at most one primary.
+    `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
     An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
     The dialog's height is capped, so the companion scrolls tall content inside one element of its own in the body, which it gives `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
     A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
@@ -1621,13 +1624,28 @@ Each group states the accepted values of every key that entry publishes.
     An Escape held down calls it again on each repeat.
     It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
     Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing; only while `target` is disconnected is the dialog not drawn, as Overlays states.
-    A companion that closes the dialog while focus is on it or inside it, or in a panel of an overlay entry it mounts in a slot, first moves focus to an element of its own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
-  - Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
+    A companion that closes the dialog while focus is on it or inside it, or in a panel of an overlay entry it mounts in a slot, first moves focus to an element of its own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page; with `trapFocus`, Fabricate returns it a frame later, as the lines below state.
+  - Without `trapFocus`, Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
     Tab moves focus as the browser does from any element but the dialog itself, so it can leave the dialog, except that Tab in the query field of an `IconPicker` the companion mounts in a slot moves on from that picker's trigger, as its group states, and that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
     Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
     The dialog is a `role="dialog"` named by `title` and is not announced as modal, because Tab can move focus out of it and the window behind it still takes input; the companion moves focus into the dialog when it opens and back to its opener when it closes.
     An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so the companion moves focus into the dialog onto an element that does not act on Enter, or ignores a `keydown` whose `repeat` is `true`.
     A pointer press on the dialog's surface, outside every control, moves focus to the dialog itself, which holds Foundry's keybindings off and draws no focus ring, so Escape then calls `onClose` as Escape in the dialog does, and Tab or Shift+Tab then moves focus to its first or its last control, unless an open ApplicationV1 `Dialog` takes the Tab, as above.
+  - `trapFocus` is `true` or `false` and defaults to `false`; Fabricate does not coerce it to a boolean, so only `true` and `false` are in the contract: the string `'false'` traps focus.
+    With `true`, as the dialog is drawn Fabricate moves focus into it, onto the control `initialFocus` names or else its first control, the close control, and the dialog carries `aria-modal="true"`, so it is announced as modal.
+    Tab from its last control moves focus to its first, Shift+Tab from its first to its last, and a Tab with focus on the page, as after the focused control was removed, moves focus into it.
+    Every key but Escape pressed in the dialog bubbles to its host and the host's ancestors and stops at the document, so no bubble-phase window listener hears it, Foundry's keybindings among them.
+    Nothing covers the window behind the dialog, which still takes a pointer press, so a press there can move focus out of the dialog.
+    A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog the companion opens in that frame keeps the focus it took (issue 2759).
+    An Enter held on the control that opened the dialog presses the control focus entered on with each repeat, the close control included, so the companion names a control that does not act on Enter with `initialFocus`, or ignores a `keydown` whose `repeat` is `true`.
+    The companion passes `trapFocus` in the `update` that opens the dialog and keeps it until the one that closes it; what changing it while the dialog is open does is private.
+  - `initialFocus` is optional text that names where focus enters with `trapFocus`: the first control in the dialog, in document order, that carries a `data-initial-focus` attribute equal to the text or sits inside an element that does, so the companion marks an element of its own in a slot, as a search field or the `target` of a published entry it mounts there.
+    The text is compared as it is and never read as a selector, so where no control matches, or the value is no string, focus enters on the first control, and without `trapFocus` it moves nothing.
+    Fabricate does not ask whether a control is drawn, so the companion marks a control that is drawn: a hidden one takes no focus, which stays where it was.
+    It is read as the dialog opens, so an `update` that changes it takes effect the next time the dialog opens.
+  - `footerLayout` is `'end'` or `'equal'` and defaults to `'end'`: `'end'` draws the footer's top-level children in a row aligned to the end of the band, and `'equal'` gives each of them one equal share of the band's width, in the order the companion appends them.
+    A child takes its share as a box, so a published `Button` the companion mounts in an element of its own there fills it only with `fullWidth`.
+    What the footer draws for a value outside the set is private; today that is `'end'`.
   - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
     A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed closes nothing (issue 2677).
@@ -1635,7 +1653,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
     Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
     Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
-    Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
+    Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`, and with `trapFocus` a key stops at the document.
   - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the close control, its ring and the theme are drawn as this group states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button the companion draws in a slot would act on them; under the standalone style root the companion passes none, and the dialog opens on the standalone layer.
     The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
@@ -2092,7 +2110,14 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` inside a Fabricate window with `open: true`, its `title`, `closeLabel` and `onClose`, fills its `body` slot with a text field, focuses that field and presses Escape
 - **THEN** Fabricate calls `onClose` once, the Escape reaches no bubble-phase `keydown` listener above the dialog's host, and Foundry's dismiss keybinding closes no window
 - **AND** the dialog stays open until the companion's `update` passes `open: false` with its other keys
-- **AND** a mount that omits `closeLabel` throws M9, and one that passes `trapFocus` throws M8
+- **AND** a mount that omits `closeLabel` throws M9, and one that passes `width` throws M8
+
+#### Scenario: A trapped published dialog in a companion root with its own stacking context
+
+- **WHEN** a companion mounts `Modal` with `trapFocus` `true` and `initialFocus` `'search'` in a root of its own that sets `isolation: isolate` inside a Fabricate window, marks a search field in its `body` slot with `data-initial-focus="search"`, and opens it from a button of its own
+- **THEN** the dialog is drawn outside `target`, in the nearest `.fabricate-app` above that root or in an `overlayHost` the companion passes inside it, focus moves onto the search field, and the dialog carries `aria-modal="true"`
+- **AND** Tab from its last control moves focus to its close control
+- **AND** a frame after an `update` closes it, focus is on the opener, unless a trapped dialog the companion opened in that frame holds it
 
 #### Scenario: A panel opened from a published dialog
 

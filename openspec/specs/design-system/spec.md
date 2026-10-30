@@ -2589,7 +2589,9 @@ On close focus returns to the control that opened it, or to the manager window w
 The return lands a frame after the close and is skipped when focus is by then on an element other than the page, so a trapped dialog opened in that frame keeps the focus it took (issue 2759).
 The picker's apply action is busy rather than disabled while its run is in flight, so a refused run leaves focus on it inside the dialog.
 A step that would lose work confirms first.
-`Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
+`Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states (issue 2776).
+`initialFocus` names where a trapped dialog's focus enters by the `data-initial-focus` value of an element in the dialog, compared as text, and a Fabricate caller that needs a selector passes `initialFocusSelector`, which is never published.
+`footerLayout` `equal` lays the footer out as a grid of equal columns, so a footer child under a `display: contents` wrapper, as a published slot's, takes its share.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
 `Modal`'s subtitle carries no `manager-muted` class, so no `.fabricate-manager` view rule restyles it and it is drawn alike in the Manager and the player window (issue 2663).
 

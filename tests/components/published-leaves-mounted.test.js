@@ -619,16 +619,9 @@ describe('a key a leaf does not publish', () => {
       'class',
       'data-x',
     ].map((key) => ['ActionMenu', key, 'is not a prop of ActionMenu']),
-    ...[
-      'width',
-      'dialogProps',
-      'trapFocus',
-      'initialFocus',
-      'footerLayout',
-      'onSubmit',
-      'class',
-      'data-x',
-    ].map((key) => ['Modal', key, 'is not a prop of Modal']),
+    ...['width', 'dialogProps', 'initialFocusSelector', 'onSubmit', 'class', 'data-x'].map(
+      (key) => ['Modal', key, 'is not a prop of Modal']
+    ),
     ...['density', 'openProps', 'aside', 'class'].map((key) => [
       'ListRow',
       key,

@@ -53,9 +53,7 @@ const REQUIRED = Object.freeze({ title: 'Rename the reagent', closeLabel: 'Close
 const UNPUBLISHED = Object.freeze([
   'width',
   'dialogProps',
-  'trapFocus',
-  'initialFocus',
-  'footerLayout',
+  'initialFocusSelector',
   'onSubmit',
   'class',
   'data-x',

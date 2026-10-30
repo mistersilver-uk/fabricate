@@ -386,9 +386,10 @@ const ARIA_KEY_SUITES = Object.freeze({
 
 /**
  * The ARIA attributes a published `data` key writes beside the `aria` keys: `aria-pressed` by
- * `StatusToggle`'s `on`, and `aria-busy` and `aria-disabled` by `Button`'s `busy`.
+ * `StatusToggle`'s `on`, `aria-busy` and `aria-disabled` by `Button`'s `busy`, and `aria-modal` by
+ * `Modal`'s `trapFocus`.
  */
-const DRIVEN_ARIA = Object.freeze(['aria-pressed', 'aria-busy', 'aria-disabled']);
+const DRIVEN_ARIA = Object.freeze(['aria-pressed', 'aria-busy', 'aria-disabled', 'aria-modal']);
 
 /**
  * Every DOM read under `src/` of a shipped `aria` key or of a `DRIVEN_ARIA` attribute, beside why
@@ -3336,7 +3337,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-busy or aria-disabled in 25 selectors of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-busy, aria-disabled or aria-modal in 25 selectors of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(

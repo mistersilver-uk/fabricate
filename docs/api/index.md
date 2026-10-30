@@ -2069,7 +2069,7 @@ The published components, in publication order:
 | `Pagination` | 1 | `any` | `totalCount` (required), `pageSize` (required), `pageIndex`, `pageSizeOptions` (required), `onPageChange` (callback, required), `onPageSizeChange` (callback, required), `persistent`, `ariaLabel` (required), `navLabel` (required), `previousLabel` (required), `nextLabel` (required), `perPageLabel` (required), `rangeTemplate` (required), `pageTemplate` (required), `density` | no |
 | `IconPicker` | 1 | `any` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
-| `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
+| `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -3622,7 +3622,7 @@ const menu = fabUi.mount('ActionMenu', {
 
 `Modal` draws Fabricate's dialog (`<Modal>` in the design-system library): a panel drawn over the window, in an overlay, with a header band holding your title, an optional subtitle and a close control, then your body and footer in their content slots.
 It is for one step the user finishes or dismisses before going on.
-It draws nothing focusable inside `target`, so return focus to an element of your own, the control that opened the dialog.
+It draws nothing focusable inside `target`, so return focus to an element of your own, the control that opened the dialog, unless `trapFocus` returns it, as the lines below state.
 `open` is `true` to draw the dialog and `false` or absent to draw none, and you open and close it only through `update`.
 While it is closed, `target` is empty under a Fabricate root and holds only the empty standalone style root elsewhere, and while it is open, `target` holds one empty element of Fabricate's, inside that root where it is written, which is private.
 An `update` replaces every prop, so pass the dialog's other props with `open` on each one, `title`, `closeLabel` and `onClose` among them.
@@ -3633,7 +3633,7 @@ A component with an overlay that you mount in a slot closes its open panel when 
 `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the [`IconButton`](#iconbutton) section states.
 Never pass a name of white space alone, which leaves its element with no name.
 `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
-`footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a row aligned to the end of a footer band, spaced by `gap`, of which you make at most one primary.
+`footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which you make at most one primary.
 An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
 The dialog's height is capped, so scroll tall content inside one element of your own in the body, which you give `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
 Give your dialog at least one control of your own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
@@ -3651,7 +3651,9 @@ With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
 An Escape held down calls it again on each repeat.
 It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
 Fabricate does not close the dialog itself: it stays open until your `update` closes it or you call `destroy`, so to keep it open, as before a step that would lose work, do nothing; only while `target` is disconnected is the dialog not drawn, as [Overlays](#overlays) states.
-If you close the dialog while focus is on it or inside it, or in the panel of a component with an overlay that you mount in a slot, first move focus to an element of your own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
+If you close the dialog while focus is on it or inside it, or in the panel of a component with an overlay that you mount in a slot, first move focus to an element of your own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page; with `trapFocus`, Fabricate returns it a frame later, as the lines below state.
+
+Without `trapFocus`:
 
 - Fabricate moves no focus: when the dialog opens, focus stays where it was, so move it into your own content from a later task, as from a `setTimeout`, once the dialog is drawn.
 - Tab moves focus as the browser does from any element but the dialog itself, so it can leave the dialog, except that Tab in the query field of an `IconPicker` you mount in a slot moves on from that picker's trigger, as its section states, and that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
@@ -3659,6 +3661,26 @@ If you close the dialog while focus is on it or inside it, or in the panel of a 
 - The dialog is a `role="dialog"` named by `title` and is not announced as modal, because Tab can move focus out of it and the window behind it still takes input; move focus into the dialog when it opens and back to its opener when it closes.
 - An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so move focus into the dialog onto an element that does not act on Enter, or ignore a `keydown` whose `repeat` is `true`.
 - A pointer press on the dialog's surface, outside every control, moves focus to the dialog itself, which holds Foundry's keybindings off and draws no focus ring, so Escape then calls `onClose` as Escape in the dialog does, and Tab or Shift+Tab then moves focus to its first or its last control, unless an open ApplicationV1 `Dialog` takes the Tab, as above.
+
+`trapFocus` is `true` or `false` and defaults to `false`; Fabricate does not coerce it to a boolean, so only `true` and `false` are in the contract: the string `'false'` traps focus.
+With `true`, as the dialog is drawn Fabricate moves focus into it, onto the control `initialFocus` names or else its first control, the close control, and the dialog carries `aria-modal="true"`, so it is announced as modal.
+Tab from its last control moves focus to its first, Shift+Tab from its first to its last, and a Tab with focus on the page, as after the focused control was removed, moves focus into it.
+Every key but Escape pressed in the dialog bubbles to its host and the host's ancestors and stops at the document, so no bubble-phase window listener hears it, Foundry's keybindings among them.
+Nothing covers the window behind the dialog, which still takes a pointer press, so a press there can move focus out of the dialog.
+A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog you open in that frame keeps the focus it took (issue 2759).
+An Enter held on the control that opened the dialog presses the control focus entered on with each repeat, the close control included, so name a control that does not act on Enter with `initialFocus`, or ignore a `keydown` whose `repeat` is `true`.
+Pass `trapFocus` in the `update` that opens the dialog and keep it until the one that closes it; what changing it while the dialog is open does is private.
+`initialFocus` is optional text that names where focus enters with `trapFocus`: the first control in the dialog, in document order, that carries a `data-initial-focus` attribute equal to the text or sits inside an element that does, so mark an element of your own in a slot, as a search field or the `target` of a published component you mount there.
+The text is compared as it is and never read as a selector, so where no control matches, or the value is no string, focus enters on the first control, and without `trapFocus` it moves nothing.
+Fabricate does not ask whether a control is drawn, so mark a control that is drawn: a hidden one takes no focus, which stays where it was.
+It is read as the dialog opens, so an `update` that changes it takes effect the next time the dialog opens.
+`footerLayout` is `'end'` or `'equal'` and defaults to `'end'`: `'end'` draws the footer's top-level children in a row aligned to the end of the band, and `'equal'` gives each of them one equal share of the band's width, in the order you append them.
+A child takes its share as a box, so a [`Button`](#button) you mount in an element of your own there fills it only with `fullWidth`.
+What the footer draws for a value outside the set is private; today that is `'end'`.
+Each of `trapFocus`, `initialFocus` and `footerLayout` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
+
+In every mode:
+
 - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field you draw in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
 - Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so your own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
 - An element of yours in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published component mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed calls no `onClose` and the dialog stays open (issue 2677).
@@ -3666,7 +3688,7 @@ If you close the dialog while focus is on it or inside it, or in the panel of a 
 - Escape reaches your own `keydown` listeners inside the dialog's slots before it stops.
 - Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
 - Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
-- Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
+- Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`, and with `trapFocus` a key stops at the document.
 
 The dialog is the component's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
 Pass an `overlayHost` inside the same Fabricate window, or none, because the close control, its ring and the theme are drawn as this section states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button you draw in a slot would act on them; in your own window or dialog pass none, and the dialog opens on the standalone layer.
@@ -3682,7 +3704,8 @@ An `update` while the dialog is open redraws its header in place and keeps its s
 A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as [Overlays](#overlays) states.
 A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
 Its frame, band, type and spacing figures, its colours beyond what this section states, its width, height and placement, the element it keeps in `target`, and its `manager-modal-*` classes and `data-manager-modal*` hooks are private.
-`trapFocus`, `initialFocus`, `onSubmit`, `footerLayout` and `width` are not published at version 1, and `dialogProps` never is, so each is refused, as is a `class`.
+`onSubmit` and `width` are not published at version 1, and `dialogProps` and `initialFocusSelector` never are, so each is refused, as is a `class`.
+A `<form>` Fabricate drew around both slots would make an untyped button you draw in one submit it, so for a form-style dialog wrap your fields in a `<form>` of your own in the `body` slot, handle its `submit`, and submit it from a footer `Button`'s `onclick` with `requestSubmit()`.
 
 A worked dialog follows: renaming a reagent from a button of yours on a panel inside a Fabricate window, for example in an extension target.
 
@@ -4164,7 +4187,7 @@ A published component draws a control only where its section says so, and each c
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each section states, and Foundry's keybindings stay held off as the bullet above states.
-  A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, as its section states.
+  A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, and with `trapFocus` every key stops at the document, as its section states.
   A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
   Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each section states, and Space on release.
   In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
@@ -4179,6 +4202,7 @@ A published component draws a control only where its section says so, and each c
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
 - Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its section states, each never out of `target`.
+  A `Modal` with `trapFocus` is the exception to that rule: Fabricate moves focus into its dialog as it opens, keeps Tab inside it, and returns focus to the element that held it a frame after it closes, as its section states.
   An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its section states.
   An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its section names, and back to the trigger when a choice, Escape or Tab closes it, as its section states.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so move focus to an element of your own before you call either.
