@@ -356,10 +356,12 @@ describe('what the published Stepper refuses', () => {
   });
 
   for (const key of [
-    'placeholder',
     'inputProps',
     'formatValue',
+    'parseValue',
     'orientation',
+    'id',
+    'title',
     'class',
     'data-acme-id',
   ]) {

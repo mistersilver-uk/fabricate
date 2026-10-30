@@ -462,8 +462,9 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
+- `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
+- `Stepper`'s `placeholder`, `format`, `stops` and `nullLabel` (issue 2787) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
 - `Field`'s `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1; publishing one later is additive.
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
@@ -489,7 +490,7 @@ Its `openProps` and `nameClass` are never published, being attributes and a clas
 A Fabricate that predates `icon` refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows by leaving the key out.
 A Fabricate that predates a `Medallion` rung draws that size at its edge with the corner `9` and refuses nothing.
 A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draws any size, at the same ratio, and refuses nothing.
-- `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
+- `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key and neither is published; `format` (issue 2787) opens the formatted mode through two formatters Fabricate holds, `signed` and `unlimited`, and a companion's own formatter is not published at version 1; publishing one later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -1096,7 +1097,7 @@ Each group states the accepted values of every key that entry publishes.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The switch therefore opens no tooltip and keeps its own cursor, so the pointer is shown its name only as the companion's label beside it, and what the setting does goes in text beside it, tied to it with `aria-describedby`.
 - **`Stepper`.**
-  - It is the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+  - It is the design system's stepper: a native `<input type="number">`, or a text field where `format` is set, between a decrement and an increment `<button>`, for a number the user types or steps.
     The input is the control, so the number is always typeable.
   - `value` is required and is the finite number the stepper holds.
     A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
@@ -1124,9 +1125,36 @@ Each group states the accepted values of every key that entry publishes.
   - `density` is `default` or `comfortable`, and `default` when absent.
     `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
     What the stepper draws for a value outside the set is private; today that is the default density.
+  - `placeholder` is optional text, shown in the input while it is empty.
+    It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; the companion passes the text already localised and never relies on it as a name, because `ariaLabel` names the input and a placeholder does not.
+    Fabricate draws it in the muted ink, which clears the contrast floor, and a `placeholder` that is not text is outside the contract.
+  - `format` is `signed` or `unlimited`, and absent for the plain number field.
+    Either value draws a text field with the spinbutton role in place of the number field, and the field reports a number only when the user presses Enter or it loses focus, where the number field reports on every keystroke.
+    A `signed` field draws a positive number with a leading plus, as `+5`, zero as `0` and a negative number with a hyphen-minus, as `-5`, and reads an optional plus, hyphen-minus or true minus sign followed by digits with an optional decimal point, as `1.5`, `.5` or `5.`; any other text, such as `1e3` or `5%`, is not a number.
+    The `signed` field asks the browser for its decimal keypad, `inputmode="decimal"`, which some touch keypads show without a minus key, so the companion offers the buttons too where negative numbers matter on touch.
+    An `unlimited` field draws every number but zero as itself, with no plus, and draws `0` as the `nullLabel` words, as "No limit", for a quantity whose zero means there is none; it takes those words in any case, or `0`, as that endpoint, and reports the endpoint as `0`, never `null`.
+    Without `nullLabel`, an `unlimited` field draws `0` as the number, and `allowUnset` is outside the contract.
+    An `unlimited` field is meant for a `min` of `0`: a `min` above `0` is outside the contract, and with no `min` a negative number is reachable and the endpoint sits mid-range; a typed `0` selects the endpoint before `min` clamps it.
+    Under either value the field restores the displayed text when what was typed is empty or no number, and clamps a typed number to `min` and `max`.
+    Text that is no number is restored silently, with no call to `onChange`, so the companion shows any refusal message in its own live region.
+    Both buttons and the Up and Down keys move to the next stop above or below the held number, or by `step` clamped to `min` and `max` where `stops` is empty, and Home and End move to the lowest and highest stop, or to `min` and `max` where there are none.
+    Enter in the field never submits a `<form>`, and Escape, while the typed text differs from the displayed text, restores the displayed text and goes no further, so it closes no window; with no such difference Escape is not caught.
+    The field carries `aria-valuemin`, `aria-valuemax`, `aria-valuenow` and `aria-valuetext`, the last being the displayed text and the endpoint carrying no `aria-valuenow`, and the wheel over the focused field steps nothing.
+    Under `format` where `allowUnset` is `true` and there is no `nullLabel`, a `null` value draws the field blank, and clearing the field then pressing Enter or leaving it reports `null`.
+  - `stops` is an optional array of finite numbers, the values the buttons and the Up and Down keys step between under `format`.
+    Fabricate sorts it ascending and drops repeats and any entry that is not a finite number, and a `stops` that is not an array counts as none.
+    A press moves to the nearest stop strictly above or below the held number, so a held number on no stop stays exact until the user steps it, and a typed number is clamped to `min` and `max` and never moved to a stop.
+    A stop outside `min` or `max` stays reachable by both buttons, the Up and Down keys, Home and End, while a typed number is clamped, and `aria-valuemin` and `aria-valuemax` come from the lowest and highest stop.
+    Without `format` it changes nothing.
+  - `nullLabel` is optional text, the words drawn for the one state that is not a number.
+    Under `format` it names `null` for a `signed` field: `value` may then be `null`, which draws the words one step below the lowest stop, a press down from the lowest stop reports `null`, and typing the words, in any case, reports `null`; the decrement button is disabled there.
+    Under `unlimited` it names `0`, as stated for `format`, and the endpoint's field is drawn in the muted ink and, unfilled and horizontal, widens to the words' length.
+    A `nullLabel` that is not a non-empty string counts as none, and without `format` it changes nothing.
+  - Fabricate coerces none of `format`, `stops`, `nullLabel` and `placeholder`: a `format` other than exactly `signed` or `unlimited`, a boolean, a number or another case among them, draws the plain number field, and `stops` and `nullLabel` then change nothing.
   - Fabricate coerces none of `disabled`, `allowUnset` and `fill` to a boolean, so only `true` and `false` are in the contract: the string `'false'` disables the stepper, allows it to be unset and stretches it.
   - `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so a companion that refused the earlier call is told again.
     Where `allowUnset` is `true` the argument is `null` when an edit clears the input or leaves it holding no number, a lone minus sign among them.
+    Under `format` it is called when the user presses Enter, a button, an arrow key, Home or End, or the field loses focus, and never per keystroke, with `0` for the `unlimited` endpoint and `null` for the `signed` one.
     Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so `onChange` can run then; a mount the companion has destroyed reports nothing.
     The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so a companion that holds whole numbers rounds it and passes its own value back.
     A companion passes an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
@@ -1142,14 +1170,15 @@ Each group states the accepted values of every key that entry publishes.
     Where the quantity is not worth showing at all, the companion destroys the stepper, moving focus first if one of its parts holds it, and shows the number as text of its own.
     A refused edit is answered in text of the companion's, in a live region.
   - The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
-    The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
-    In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
-  - It takes no rest keys, so a `data-*` key is refused (M8).
-  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
+    The stepper does not catch Escape, except under `format` as stated for it: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
+    Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
+    Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
+  - It takes no rest keys, so a `data-*` key, an `id` and a `title` are refused (M8).
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, and inside the stepper's own outer edge in every case, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
-- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
+- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, the box of the `format` field inside a Fabricate Manager window, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
 
 ### The issue 2453 components
 
@@ -2064,7 +2093,14 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Stepper` with `value: 2`, `max: 3`, the three names and `onChange` inside a Fabricate window, and the user presses the increment button
 - **THEN** Fabricate calls `onChange` once, with `3`, and the input still shows `2` until the companion's `update` passes `value: 3`
 - **AND** after that `update` the increment button is disabled, and a typed value the companion refuses is replaced by `value` when the input loses focus
-- **AND** a mount that omits `decrementLabel` throws M9, and one that passes `placeholder` throws M8
+- **AND** a mount that omits `decrementLabel` throws M9, and one that passes `orientation` throws M8
+
+#### Scenario: A published formatted stepper
+
+- **WHEN** a companion mounts `Stepper` with `value: 0`, `min: 0`, `format: 'unlimited'`, `nullLabel: 'No limit'`, the three names and `onChange`, and the user presses the increment button
+- **THEN** the field first reads "No limit", and Fabricate calls `onChange` once, with `1`
+- **AND** after an `update` that passes `value: 1` the field reads `1`, and the user pressing the decrement button makes Fabricate call `onChange` with `0`, never `null`
+- **AND** a `format` of `'Unlimited'` draws the plain number field, and a mount that passes `formatValue` throws M8
 
 #### Scenario: A bound value
 

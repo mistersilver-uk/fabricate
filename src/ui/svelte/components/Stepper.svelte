@@ -1,8 +1,7 @@
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
-  mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts, not the only
-  path. A click-only stepper is a keyboard regression, so the input always stays editable. It
-  imports nothing but Svelte: props only, no util imports.
+  mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
+  stepper is a keyboard regression, so the input stays editable. It imports nothing but Svelte.
 
   Props:
   | prop | values | default | contract |
@@ -17,8 +16,9 @@
   | `density` | `'default'` \| `'comfortable'` | `'default'` | `comfortable` raises EVERY target — the typeable input included — to at least 24x24 for WCAG 2.2 §2.5.8. |
   | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
   | `formatValue` / `parseValue` | functions \| `null` | `null` | Both together opt into the FORMATTED mode below; without them the `type="number"` path and its commit-on-input are unchanged. `parseValue(text)` returns a finite number, `null` for the null endpoint, or anything else for invalid text. |
+  | `format` | `'signed'` \| `'unlimited'` | `''` | A built-in formatter, the published way into the FORMATTED mode; `formatValue` and `parseValue` win where both are given, and any other value leaves the `type="number"` path. `signed` draws a leading `+` on positives; `unlimited` draws `0` as `nullLabel` and reports `0` rather than `null`. Typing `nullLabel` selects the endpoint. |
   | `stops` | `number[]` | `[]` | The formatted mode's ordered stepping values. Empty steps by `step` within `min`/`max`. |
-  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop. Without it a `null` value is unset: blank, with the placeholder. At the endpoint the input carries `data-stepper-endpoint`, reads muted at rest and, horizontal and unfilled, widens to the label's character count, so only a mono Latin label fits exactly. |
+  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop, or the `unlimited` zero. Without it a `null` value is unset: blank, with the placeholder. At the endpoint the input carries `data-stepper-endpoint`, reads muted at rest and, horizontal and unfilled, widens to the label's character count, so only a mono Latin label fits exactly. |
 
   Callbacks:
   - `onChange(value)` — the clamped number on every accepted edit, and `null` when an `allowUnset`
@@ -26,21 +26,15 @@
 
   Invariants:
   - `inputProps` CARRIES ATTRIBUTES AND `data-*` ONLY, NEVER EVENT HANDLERS. The spread sits after
-    `oninput={onInput} onblur={onBlur}` — it has to, so an explicit attribute a caller passes wins —
-    which means an `oninput` or `onblur` routed through it silently REPLACES the commit path: the
-    control keeps rendering and stepping and simply stops reporting edits. Put behaviour in
-    `onChange`.
-  - A refused value snaps back on blur: Svelte leaves an `<input>` whose `value` never changed as
-    typed, so after the next flush a blurred input still connected and unfocused is rewritten to
-    the held value.
+    `oninput={onInput} onblur={onBlur}` so an explicit attribute wins, which means an `oninput` or
+    `onblur` routed through it silently REPLACES the commit path. Put behaviour in `onChange`.
+  - A refused value snaps back on blur, in both modes: after the next flush a blurred input still
+    connected and unfocused is rewritten to the held value.
   - `disabled` is the TOP-LEVEL prop, never an `inputProps` key: the adjuncts read the top-level
-    prop, so `inputProps={{ disabled: … }}` would leave −/+ live on a control the caller believes is
-    off while every DOM assertion checking `input.disabled` still passed.
-  - NAMING IS `ariaLabel`, NEVER A WRAPPING `<label>`. A `<label>` with no `for` binds to its FIRST
-    labelable descendant, which here is the − button, so a caption and a Stepper inside one
-    `<label>` makes clicking the caption DECREMENT the value;
-    `tests/components/stepper-call-site-contract.test.js` fails any such `<label>` in `src/ui/svelte`
-    while allowing a `<label for>` naming the input's own id, which is a different binding.
+    prop, so `inputProps={{ disabled: … }}` would leave −/+ live on a control that looks off.
+  - NAMING IS `ariaLabel`, NEVER A WRAPPING `<label>`: a `<label>` with no `for` binds to its FIRST
+    labelable descendant, the − button, so clicking the caption would DECREMENT the value;
+    `tests/components/stepper-call-site-contract.test.js` fails any such `<label>`.
   - THE FORMATTED MODE is a `role="spinbutton"` text input that commits only on Enter or blur, and
     restores its committed display for invalid text. Enter never submits an enclosing form, and
     Escape during an edit restores without blurring and stops before Foundry's `core.dismiss`.
@@ -67,6 +61,7 @@
     inputProps = {},
     formatValue = null,
     parseValue = null,
+    format = '',
     stops = [],
     nullLabel = '',
     onChange = () => {},
@@ -129,34 +124,51 @@
 
   const isBlank = (candidate) => candidate === null || candidate === undefined || candidate === '';
 
-  const isFormatted = $derived(
-    typeof formatValue === 'function' && typeof parseValue === 'function'
-  );
+  const custom = $derived(typeof formatValue === 'function' && typeof parseValue === 'function');
+  const builtIn = $derived(!custom && ['signed', 'unlimited'].includes(format) ? format : '');
+  const unlimited = $derived(builtIn === 'unlimited');
+  const isFormatted = $derived(custom || builtIn !== '');
   const numericStops = $derived(
     [...new Set((Array.isArray(stops) ? stops : []).filter(Number.isFinite))].sort((a, b) => a - b)
   );
   const lowestStop = $derived(numericStops[0] ?? min ?? null);
   const highestStop = $derived(numericStops.at(-1) ?? max ?? null);
-  const hasEndpoint = $derived(isFormatted && Boolean(nullLabel));
-  const atEndpoint = $derived(hasEndpoint && isBlank(value));
-  const committedFrom = $derived(isBlank(value) ? null : numericValue);
+  const hasEndpoint = $derived(isFormatted && typeof nullLabel === 'string' && nullLabel !== '');
+  const endpointValue = $derived(unlimited ? 0 : null);
+  const committedFrom = $derived(unlimited || !isBlank(value) ? numericValue : null);
+  const atEndpoint = $derived(hasEndpoint && committedFrom === endpointValue);
+
+  const SIGNED_NUMBER = /^[+\-\u2212]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+  const formatText = (number) =>
+    custom
+      ? formatValue(number)
+      : builtIn === 'signed' && number > 0
+        ? `+${number}`
+        : String(number);
+
+  function parseText(text) {
+    if (custom) return parseValue(text);
+    if (hasEndpoint && text.toLowerCase() === nullLabel.toLowerCase()) return null;
+    return SIGNED_NUMBER.test(text) ? Number(text.replace('\u2212', '-')) : Number.NaN;
+  }
 
   function displayFor(candidate) {
-    if (candidate === null) return hasEndpoint ? nullLabel : '';
-    return String(formatValue(candidate) ?? '');
+    if (hasEndpoint && candidate === endpointValue) return nullLabel;
+    return candidate === null ? '' : String(formatText(candidate) ?? '');
   }
 
   const formattedDisplay = $derived(isFormatted ? displayFor(committedFrom) : '');
 
   /** The value one step from `from` (`null` is unset or the endpoint), or `undefined` to stay. */
   function formattedStep(from, direction) {
-    if (from === null) return atEndpoint && direction < 0 ? undefined : (lowestStop ?? 0);
+    if (hasEndpoint && from === endpointValue && direction < 0) return undefined;
+    if (from === null) return lowestStop ?? 0;
     let next;
     if (numericStops.length === 0) next = clamp(from + direction * step);
     else if (direction > 0) next = numericStops.find((stop) => stop > from);
     else next = numericStops.findLast((stop) => stop < from);
     if (next !== undefined && next !== from) return next;
-    return direction < 0 && hasEndpoint ? null : undefined;
+    return direction < 0 && hasEndpoint ? endpointValue : undefined;
   }
 
   const decrementBlocked = $derived(
@@ -166,18 +178,23 @@
     isFormatted ? formattedStep(committedFrom, 1) === undefined : atMax
   );
 
-  function emitFormatted(next, input) {
+  async function emitFormatted(next, input) {
     if (next !== undefined) {
       const changed = next === null ? !isBlank(value) : isBlank(value) || next !== numericValue;
       if (changed) onChange(next);
     }
-    if (input) input.value = next === undefined ? formattedDisplay : displayFor(next);
+    if (!input) return;
+    input.value = next === undefined ? formattedDisplay : displayFor(next);
+    await tick();
+    if (input.isConnected && input.ownerDocument.activeElement !== input)
+      input.value = formattedDisplay;
   }
 
   function parsedDraft(text) {
-    if (text === '') return !hasEndpoint && allowUnset ? null : undefined;
-    const parsed = parseValue(text);
-    if (parsed === null) return hasEndpoint ? null : undefined;
+    if (text === '') return !hasEndpoint && !unlimited && allowUnset ? null : undefined;
+    const parsed = parseText(text);
+    if (parsed === null) return hasEndpoint ? endpointValue : undefined;
+    if (unlimited && hasEndpoint && parsed === 0) return endpointValue;
     return Number.isFinite(parsed) ? clamp(parsed) : undefined;
   }
 
@@ -204,13 +221,17 @@
       return;
     }
     if (event.key === 'Enter') {
+      if (event.isComposing) return;
       event.preventDefault();
       commitDraft(input);
       return;
     }
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+    const next = keyedValue(event.key);
+    const vertical = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+    if (next === undefined && !vertical) return;
     event.preventDefault();
-    emitFormatted(keyedValue(event.key), input);
+    if (next !== undefined) emitFormatted(next, input);
   }
 
   function stepAdjunct(direction) {
@@ -228,13 +249,12 @@
       class="fab-stepper-input"
       data-stepper-input
       data-stepper-endpoint={atEndpoint ? '' : undefined}
-      style:--fab-stepper-endpoint-ch={hasEndpoint ? Array.from(nullLabel).length : undefined}
       value={formattedDisplay}
       {disabled}
       aria-label={ariaLabel || undefined}
       aria-valuemin={lowestStop ?? undefined}
       aria-valuemax={highestStop ?? undefined}
-      aria-valuenow={committedFrom ?? undefined}
+      aria-valuenow={atEndpoint ? undefined : (committedFrom ?? undefined)}
       aria-valuetext={formattedDisplay || undefined}
       onkeydown={onFormattedKeydown}
       onblur={(event) => commitDraft(event.currentTarget)}
@@ -294,6 +314,7 @@
   class:is-vertical={isVertical}
   class:is-comfortable={isComfortable}
   class:is-fill={fill}
+  style:--fab-stepper-endpoint-ch={hasEndpoint ? Array.from(nullLabel).length : undefined}
 >
   {#if isVertical}
     {@render incrementAdjunct()}

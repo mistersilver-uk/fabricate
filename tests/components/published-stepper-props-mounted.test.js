@@ -7,108 +7,12 @@
  * Limit: happy-dom computes no layout, so the widths and hit targets are the View Lab's.
  */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 
-import { recorder } from '../helpers/publishedComponentFakes.js';
-import {
-  PUBLISHED_ADAPTER,
-  PUBLISHED_COMPILED_MODULES,
-  PUBLISHED_RAW_MODULES,
-  PUBLISHED_RUNE_MODULES,
-  PUBLISHED_SEAM,
-  fabricateTarget,
-  recordEscapes,
-  settle,
-  shippedSeam,
-} from '../helpers/publishedComponentModules.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { settle } from '../helpers/publishedComponentModules.js';
+import { base, installStepperSeam, type } from '../helpers/publishedStepperFixture.js';
 
-const NAMES = Object.freeze({
-  ariaLabel: 'Days to credit',
-  decrementLabel: 'Decrease days to credit',
-  incrementLabel: 'Increase days to credit',
-});
-
-const harness = createMountedComponentHarness({
-  repoRoot: resolve(import.meta.dirname, '../..'),
-  tmpPrefix: 'fabricate-published-stepper-props-',
-  rawModules: PUBLISHED_RAW_MODULES,
-  runeModules: PUBLISHED_RUNE_MODULES,
-  compiledModules: PUBLISHED_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/published/PublishedComponentHost.svelte',
-});
-
-let seamParts;
-let reports;
-let escaped;
-let targets;
-let stopRecording;
-
-const ui = () =>
-  shippedSeam({
-    ...seamParts,
-    report: (...args) => {
-      reports.push(args);
-    },
-  });
-
-before(async () => {
-  await harness.setup();
-  const { publishedComponentRuntime: runtime, COMPONENTS: components } =
-    await harness.loadRuneModule(PUBLISHED_ADAPTER);
-  const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
-  seamParts = { createPublishedComponents, runtime, components };
-  stopRecording = recordEscapes((error) => {
-    escaped.push(error);
-  });
-});
-
-after(() => {
-  stopRecording();
-  return harness.teardown();
-});
-
-beforeEach(() => {
-  reports = [];
-  escaped = [];
-  targets = [];
-});
-
-afterEach(() => {
-  for (const shell of targets) shell.remove();
-  assert.deepEqual(escaped, [], 'nothing was thrown past the seam');
-  assert.deepEqual(reports, [], 'nothing was reported');
-});
-
-/** The props of a stepper at 2 with its three names and an `onChange` that keeps nothing, with `overrides` over them. */
-const base = (overrides = {}) => ({ value: 2, ...NAMES, onChange() {}, ...overrides });
-
-/** A stepper mounted with `props` over `base`, recording `onChange`: its target, handle, calls and parts. */
-function mountStepper(props = {}) {
-  const change = recorder();
-  const target = fabricateTarget(targets, 'fabricate');
-  const handle = ui().mount('Stepper', {
-    target,
-    props: base({ onChange: change.record, ...props }),
-  });
-  return {
-    target,
-    handle,
-    calls: change.calls,
-    record: change.record,
-    root: () => target.querySelector('.fab-stepper'),
-    input: () => target.querySelector('input'),
-    decrement: () => target.querySelector('button[data-stepper-decrement]'),
-    increment: () => target.querySelector('button[data-stepper-increment]'),
-  };
-}
-
-/** Types `raw` into `input` as a user would, firing the real `input` event. */
-function type(input, raw) {
-  input.value = raw;
-  input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
-}
+const { ui, mountStepper } = installStepperSeam('fabricate-published-stepper-props-');
 
 /** A node's authored classes, without Svelte's scope hash. */
 const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));

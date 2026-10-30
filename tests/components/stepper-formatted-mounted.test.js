@@ -97,7 +97,7 @@ describe('Stepper formatted mode: identity and ARIA', () => {
     assert.equal(input.getAttribute('aria-valuetext'), 'Otherwise');
     assert.ok(!input.hasAttribute('aria-valuenow'), 'the endpoint is not a number');
     assert.equal(
-      input.style.getPropertyValue('--fab-stepper-endpoint-ch'),
+      input.closest('.fab-stepper').style.getPropertyValue('--fab-stepper-endpoint-ch'),
       String('Otherwise'.length),
       'the label length the unfilled endpoint width reads'
     );
@@ -106,7 +106,10 @@ describe('Stepper formatted mode: identity and ARIA', () => {
   it('marks only a named null endpoint, in the fill form as well', async () => {
     const unset = await mountStepper({ ...FORMATTED, value: null, allowUnset: true });
     assert.ok(!unset.input.hasAttribute('data-stepper-endpoint'), 'an unset value is unmarked');
-    assert.equal(unset.input.style.getPropertyValue('--fab-stepper-endpoint-ch'), '');
+    assert.equal(
+      unset.input.closest('.fab-stepper').style.getPropertyValue('--fab-stepper-endpoint-ch'),
+      ''
+    );
     harness.remount();
     const filled = await mountStepper({ ...OTHERWISE, value: null, fill: true });
     assert.ok(filled.input.hasAttribute('data-stepper-endpoint'), 'the fill form marks it');
