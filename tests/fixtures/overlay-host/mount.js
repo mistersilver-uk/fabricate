@@ -12,6 +12,7 @@ import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton
 
 import AnchoredPopoverHost from './AnchoredPopoverHost.svelte';
 import ModalPickerHost from './ModalPickerHost.svelte';
+import { hostInRegion } from './modalRegion.js';
 import TintAnchoredHost from './TintAnchoredHost.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -166,6 +167,8 @@ function modalProps() {
     title: 'Import report',
     subtitle: 'Three components imported',
     trapFocus: params.get('trap') === '1',
+    icon: params.get('icon') ?? undefined,
+    size: params.get('size') ?? undefined,
     onClose: () => {
       document.body.dataset.modalCloses = String(Number(document.body.dataset.modalCloses) + 1);
     },
@@ -254,6 +257,9 @@ const COMPONENTS = {
     },
   ],
 };
+
+// `?region=plain|contain|transform` hosts the dialog in a companion's region (issue 2818).
+if (params.get('region')) hostInRegion(target, mountPoint, params.get('region'));
 
 // `?layer=<name>` measures the product cascade rather than the flat sheet.
 if (params.get('layer')) await loadSheetInLayer(params.get('layer'));

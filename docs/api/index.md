@@ -1627,8 +1627,8 @@ The inline size makes no such promise: Fabricate enforces no minimum Manager win
 Measured across an ordinary width ladder the target's inline size runs from about 1178px down to about 378px.
 Responsive behaviour inside the target is yours; if you want container queries, declare `container-type` on your own root.
 
-**`position: fixed` positions against the Manager, not the viewport.**
-The Manager root carries `container-type: inline-size`, which implies layout containment and makes it the containing block for fixed-position descendants.
+**`position: fixed` positions against the viewport unless your own root contains it.**
+The Manager root's `container-type: inline-size` does not make it the containing block for fixed-position descendants; `contain: layout` or a `transform` on your own root does.
 Anchor your popovers to your own root instead of assuming viewport coordinates.
 
 **`isolation: isolate` caps z-index escape.**
@@ -1885,7 +1885,7 @@ The element handed to `mount` is a bare `div` inside the player window's content
 Each omission is deliberate, and a companion can rely on all three:
 
 - **No scroller.** The player window's content area already scrolls, and a second scroller inside it produces a nested double scroll.
-- **No CSS container.** `container-type` implies `contain: layout`, which would make the target a containing block for fixed-position descendants and silently mis-position a companion's popovers.
+- **No CSS container.** A companion that wants container queries declares one on its own root.
   A fixed-position element inside the target positions against the viewport.
 - **No padding or background.** The companion owns its own inset and surface.
 
@@ -2069,7 +2069,7 @@ The published components, in publication order:
 | `Pagination` | 1 | `any` | `totalCount` (required), `pageSize` (required), `pageIndex`, `pageSizeOptions` (required), `onPageChange` (callback, required), `onPageSizeChange` (callback, required), `persistent`, `ariaLabel` (required), `navLabel` (required), `previousLabel` (required), `nextLabel` (required), `perPageLabel` (required), `rangeTemplate` (required), `pageTemplate` (required), `density` | no |
 | `IconPicker` | 1 | `any` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
-| `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
+| `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `icon`, `size`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback) | yes |
 | `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
 
@@ -3698,6 +3698,10 @@ A component with an overlay that you mount in a slot closes its open panel when 
 `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
 `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the [`IconButton`](#iconbutton) section states.
 Never pass a name of white space alone, which leaves its element with no name.
+`icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
+It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
+`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
 `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
 `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which you make at most one primary.
 An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
@@ -3743,7 +3747,7 @@ It is read as the dialog opens, so an `update` that changes it takes effect the 
 `footerLayout` is `'end'` or `'equal'` and defaults to `'end'`: `'end'` draws the footer's top-level children in a row aligned to the end of the band, and `'equal'` gives each of them one equal share of the band's width, in the order you append them.
 A child takes its share as a box, so a [`Button`](#button) you mount in an element of your own there fills it only with `fullWidth`.
 What the footer draws for a value outside the set is private; today that is `'end'`.
-Each of `trapFocus`, `initialFocus` and `footerLayout` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
+Each of `trapFocus`, `initialFocus`, `footerLayout`, `icon` and `size` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
 
 In every mode:
 
@@ -3758,9 +3762,13 @@ In every mode:
 
 The dialog is the component's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
 Pass an `overlayHost` inside the same Fabricate window, or none, because the close control, its ring and the theme are drawn as this section states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button you draw in a slot would act on them; in your own window or dialog pass none, and the dialog opens on the standalone layer.
-The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
+The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
-Its width, height and placement are otherwise private.
+An `overlayHost` that is a region of your own, such as a pane inside your window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
+Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
+The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+Its height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
 Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.
 A `target` in its `body` or `footer` slot sits inside the dialog on that layer, so a component you mount there is under a Fabricate root and is drawn with no standalone style root of its own.

@@ -1818,7 +1818,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="notes">
       <div><h5>Canonical spec</h5><ul>
         <li><b>panel</b> radius 11 · <code>--fab-bg-1</code> · 1px <code>--fab-border-strong</code> · <code>--fab-shadow-lg</code> · <b>width</b> <code>min(560px, 100vw &minus; 48px)</code> by default; the 460px here is the specimen&rsquo;s stage, not a width the component draws</li>
-        <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in muted ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph. No header icon</li>
+        <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in muted ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph. An optional <b>icon</b> is a 12px glyph in <code>--fab-accent-text</code> before the title, with the same 12px gap; none draws no element</li>
         <li><b>body</b> padded 16, its sections 16 apart</li>
         <li><b>footer</b> a <code>--fab-bg-2</code> band under a hairline, padded 12/16/16, its actions 8 apart and right-aligned, at most one primary; <code>footerLayout="equal"</code> gives every child one equal share (a grid of <code>minmax(0, 1fr)</code> columns, through a <code>display: contents</code> wrapper)</li>
         <li>Portals into the application root, or into the host the overlay chain picks for a published mount, so it stacks above the window rather than under it</li>
@@ -1832,7 +1832,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>onClose</b> = no-op &mdash; called on the close button, on Escape inside the dialog and, with <b>closeOnOutsideClick</b>, on an outside click or an Escape outside it; the caller sets <b>open</b> false from it</li>
         <li><b>title · subtitle</b> &mdash; the dialog takes its accessible name from <b>title</b></li>
         <li><b>closeLabel</b> = 'Close' &mdash; the close renders as an icon alone, so it takes its own name</li>
-        <li><b>width</b> = 560px, clamped to the viewport</li>
+        <li><b>width</b> = 560px, clamped to the viewport &middot; <b>size</b> sm | md | lg = md &mdash; 500px, 560px and 620px through a class, so a published dialog states no inline style; a caller&rsquo;s <b>width</b> outranks it</li>
+        <li><b>icon</b> = '' &mdash; Font Awesome classes for the header glyph, hidden from assistive technology</li>
         <li><b>body</b> and <b>footer</b> snippets</li>
         <li><b>dialogProps</b> &mdash; an object spread onto the dialog element, for the caller&rsquo;s own <code>data-*</code> hooks only, never a <code>class</code></li>
         <li><b>closeOnOutsideClick</b> = true &mdash; <code>false</code> keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls <b>onClose</b></li>
@@ -1842,7 +1843,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       </ul></div>
     </div>
     <div class="delta">It is distinct from a core <code>DialogV2</code>: this is a mounted Svelte surface inside the application, for a multi-step flow with its own state; a one-shot confirmation is still <code>confirmDialog</code>.<span class="cite"><b>Modal.svelte</b> (issue 877) · <b>RollPrompt.svelte</b> · <b>ImportFolderMappingModal.svelte</b> · <b>ImportReportModal.svelte</b> · <b>ComponentAddFromCatalogueDialog.svelte</b></span></div>
-    <div class="delta ok"><code>Modal</code> is published through <code>game.fabricate.api.ui</code> (issue 2656), with <code>trapFocus</code>, <code>initialFocus</code> and <code>footerLayout</code> (issue 2776).</div>
+    <div class="delta ok"><code>Modal</code> is published through <code>game.fabricate.api.ui</code> (issue 2656), with <code>trapFocus</code>, <code>initialFocus</code> and <code>footerLayout</code> (issue 2776), and with <code>icon</code> and <code>size</code> (issue 2818). It draws no scrim, and its width and height caps follow the browser window, so a region it is hosted in clips it rather than shrinking it.</div>
     <div class="delta ok"><b>The subtitle inks <code>--fab-text-muted</code> (issue 2670).</b> The specimen&rsquo;s <code>--fab-text-subtle</code> measures 3.34&ndash;3.78:1 on <code>--fab-bg-2</code> in six palettes at 10.5px, under the 4.5:1 floor, and the spec already inks small text muted for the same reason (issue 2178); the size, weight and 1px gap are unchanged.</div>
   </div>
 

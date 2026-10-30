@@ -511,6 +511,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       open: Object.freeze({ kind: 'data' }),
       title: Object.freeze({ kind: 'data', required: true }),
       subtitle: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
       closeLabel: Object.freeze({ kind: 'data', required: true }),
       closeOnOutsideClick: Object.freeze({ kind: 'data' }),
       trapFocus: Object.freeze({ kind: 'data' }),
