@@ -123,6 +123,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       label: Object.freeze({ kind: 'data', required: true }),
       icon: Object.freeze({ kind: 'data' }),
       tone: Object.freeze({ kind: 'data' }),
+      layout: Object.freeze({ kind: 'data' }),
+      note: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
