@@ -453,7 +453,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `FillBar`'s track skin is not published at version 1; publishing it later is additive.
-- `FillBar`'s bipolar fill and a gapped multi-track form are not published at version 1.
+- `FillBar`'s gapped multi-track form is not published at version 1.
 - `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `swatch`, `tint`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
@@ -493,6 +493,7 @@ A Fabricate that predates a `Medallion` rung draws that size at its edge with th
 A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draws any size, at the same ratio, and refuses nothing.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key and neither is published; `format` (issue 2787) opens the formatted mode through two formatters Fabricate holds, `signed` and `unlimited`, and a companion's own formatter is not published at version 1; publishing one later needs a new prop kind, which is additive.
 - `FillBar`'s `density` took `thin` (issue 2821) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the default track and refuses nothing, which `describe` cannot show.
+- `FillBar`'s `origin` (issue 2821) was added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"origin" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -781,6 +782,10 @@ Each group states the accepted values of every key that entry publishes.
     That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
     Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card.
     The bar draws no label, so no ink is paired with a tag name.
+  - `origin` is `start` or `center`, and `start` when absent or any other value.
+    `center` reads `value` as -100 to 100, clamped, and grows the fill from the midpoint of the track: to the right in `--fab-success-text` above zero, to the left in `--fab-danger-text` below it, and a fill of no width at zero.
+    It runs left to right in every writing direction, as `shares` do, and `tone`, `color` and `shares` are not read, so the bar carries no tone attribute.
+    A bipolar bar has no midpoint mark, and the success and danger inks are the pale text inks, so the companion states the signed reading as text beside it.
   - `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track; any other value draws `default`.
     `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
     Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so the colour never carries a reading alone.

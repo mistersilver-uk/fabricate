@@ -2042,7 +2042,7 @@ The published components, in publication order:
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
 | `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint`, `icon` | no |
 | `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
-| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
+| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `origin`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
@@ -2165,6 +2165,11 @@ Each tag name reads against the bar's track no weaker than the weakest of the si
 That is not 3:1 everywhere, as the shipped tones are not either, so the colour never carries a share alone.
 Under 3:1 are `ember`, `azure` and `slate` in `foundry-native`, `ember` and `slate` in `ironblood-forge` and `slate` in `hearth-herb`, in `foundry-native` on `--fab-bg-2` as well as on a card, and the rest on a card, so never leave a share to its colour.
 The bar draws no label, so no ink is paired with a tag name.
+`origin` is `start` or `center`, and `start` when absent or any other value.
+`center` reads `value` as -100 to 100, clamped, and grows the fill from the midpoint of the track: to the right in `--fab-success-text` above zero, to the left in `--fab-danger-text` below it, and a fill of no width at zero.
+It runs left to right in every writing direction, as `shares` do, and `tone`, `color` and `shares` are not read, so the bar carries no tone attribute.
+A bipolar bar has no midpoint mark, and the success and danger inks are the pale text inks, so state the signed reading as text beside it.
+A Fabricate that predates `origin` refuses it with `"origin" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
 `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
 Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so never leave a reading to its colour.

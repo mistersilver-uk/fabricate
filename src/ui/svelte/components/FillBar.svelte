@@ -10,6 +10,7 @@
   | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'`, or a tag name: `'ember'` \| `'butter'` \| `'peach'` \| `'verdant'` \| `'mist'` \| `'azure'` \| `'lavender'` \| `'rose'` \| `'bone'` \| `'slate'` | `'success'` | A tag name paints the matching `--fab-tag-*` token, so a stack of more than six contributors keeps a hue each. An unknown tone, a token spelling or any other tag key falls back to `neutral` rather than rendering an unpainted fill. |
   | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
   | `shares` | `{ weight, tone?, color? }[]` | `[]` | Two or more draw the fill as abutting shares, left to right in every writing direction, each `weight / Σweight` of it and painted as `tone` and `color`; fewer draw the single fill. A `weight` that is not a finite number above zero reads 0, a numeric string included, and shares that all read 0 draw nothing. A `null` entry reads as `{}`, and a `shares` that is not an array draws the single fill. No share takes a minimum width. Stacked, the track carries no `data-fill-bar-tone` and `tone`/`color` are not read. The published form is `{ weight, tone? }`; a member other than those is private. |
+  | `origin` | `'start'` \| `'center'` | `'start'` | `'center'` reads `value` as -100–100, clamped, and grows the fill from the track's midpoint: right in `--fab-success-text` above zero, left in `--fab-danger-text` below it, and a fill of no width at zero. It is left to right in every writing direction, as `shares` are, and `tone`, `color` and `shares` are not read; the track carries no `data-fill-bar-tone`. Any other `origin` reads `'start'`. |
   | `density` / `class` | `'default'` \| `'compact'` \| `'thin'` / class string | `'default'` / `''` | An 8px, 6px or 4px track height, and an extra class appended to the primitive's own. `thin` also drops the track's border and paints it `--fab-bg-3`, so the fill is the whole 4px. |
 
   Rest spread:
@@ -27,6 +28,7 @@
     tone = 'success',
     color = '',
     shares = [],
+    origin = 'start',
     density = 'default',
     class: extraClass = '',
     ...rest
@@ -51,6 +53,13 @@
     if (Number.isNaN(numeric)) return 0;
     return Math.min(100, Math.max(0, numeric));
   });
+  const centred = $derived(origin === 'center');
+  const signed = $derived.by(() => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return 0;
+    return Math.min(100, Math.max(-100, numeric));
+  });
+  const reach = $derived(Math.abs(signed) / 2);
   const resolvedTone = $derived(TONES.includes(tone) ? tone : 'neutral');
 
   const parts = $derived((Array.isArray(shares) ? shares : []).map((share) => share ?? {}));
@@ -67,10 +76,15 @@
   class={['fab-fill-bar', extraClass]}
   class:is-sm={density === 'compact'}
   class:is-thin={density === 'thin'}
-  data-fill-bar-tone={stacked ? undefined : resolvedTone}
+  data-fill-bar-tone={centred || stacked ? undefined : resolvedTone}
   {...rest}
 >
-  {#if stacked}
+  {#if centred}
+    <span
+      class={['fab-fill-bar-fill', signed > 0 && 'is-positive', signed < 0 && 'is-negative']}
+      style={`left: ${signed < 0 ? 50 - reach : 50}%; width: ${reach}%;`}
+    ></span>
+  {:else if stacked}
     <span class="fab-fill-bar-fill is-stacked" style={`width: ${pct}%;`}>
       {#each parts as share, index (index)}
         <span
@@ -124,6 +138,14 @@
     overflow: hidden;
     direction: ltr;
     background: none;
+  }
+
+  .fab-fill-bar-fill.is-positive {
+    background: var(--fab-success-text);
+  }
+
+  .fab-fill-bar-fill.is-negative {
+    background: var(--fab-danger-text);
   }
 
   .fab-fill-bar-fill.is-success,

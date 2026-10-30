@@ -83,6 +83,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       tone: Object.freeze({ kind: 'data' }),
       color: Object.freeze({ kind: 'data' }),
       shares: Object.freeze({ kind: 'data' }),
+      origin: Object.freeze({ kind: 'data' }),
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
