@@ -557,6 +557,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       layout: Object.freeze({ kind: 'data' }),
       truncateName: Object.freeze({ kind: 'data' }),
       detailAlign: Object.freeze({ kind: 'data' }),
+      current: Object.freeze({ kind: 'data' }),
+      busy: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'fabricate',

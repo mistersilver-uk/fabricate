@@ -1997,8 +1997,8 @@ describe('each entry matches its component declaration', () => {
     ],
     [
       'its leading guard dropped',
-      '{#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>',
-      '{#if mark}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      '{#if leading && !busy}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      '{#if mark && !busy}<span class="fabricate-list-row-leading">{@render leading()}</span>',
       `leading ${UNGUARDED}`,
     ],
     [

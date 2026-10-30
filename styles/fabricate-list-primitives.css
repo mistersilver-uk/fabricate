@@ -616,16 +616,19 @@
   color: var(--fab-text-secondary);
 }
 
-.fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']) {
+.fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']),
+.fabricate-list-row.is-selected-face {
   border-color: var(--fab-accent-border);
 }
 
-.fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true']) {
+.fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true']),
+.fabricate-list-row.is-danger.is-selected-face {
   box-shadow: inset 0 0 0 1px var(--fab-accent-border);
 }
 
-/* A selected row is a fill behind the edge, the multi-select rule; a danger row keeps its ground and takes the ring. The lighter washes ink secondary because muted falls under 4.5:1 on them. */
-.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true']) {
+/* A selected row is a fill behind the edge, the multi-select rule, whether pressed or read-only (`is-selected-face`); a danger row keeps its ground and takes the ring. The lighter washes ink secondary because muted falls under 4.5:1 on them. */
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true']),
+.fabricate-list-row.is-selected-face:not(.is-danger) {
   background: var(--fab-surface-active);
   color: var(--fab-text-secondary);
 }
@@ -637,6 +640,11 @@
 
 .fabricate-list-row:has(> .fabricate-list-row-open:disabled) {
   opacity: 0.62;
+}
+
+/* A busy row's button keeps focus and refuses a press, so it shows the progress cursor (issue 2851). */
+.fabricate-list-row.is-busy > .fabricate-list-row-open:enabled {
+  cursor: progress;
 }
 
 /* THE DATA TABLE (issue 1782): records compared down columns, under a caption that states the heading and the count. Rooted at the class `DataTable.svelte` writes, so it paints in the manager and the player window alike; the drop rules card restates its frame through its own card class. */

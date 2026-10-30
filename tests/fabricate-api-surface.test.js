@@ -756,6 +756,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           layout: optional,
           truncateName: optional,
           detailAlign: optional,
+          current: optional,
+          busy: optional,
         },
         rest: true,
         root: 'fabricate',

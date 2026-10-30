@@ -1,5 +1,5 @@
 /**
- * The module sheet and every component style against the published `ListRow` (issue 2784): the 44
+ * The module sheet and every component style against the published `ListRow` (issue 2784): the 48
  * selectors that name its root, which of them a published row can match, where those sit and what
  * they draw, the bare `button` rules its whole-row button also takes, and the focus mark that
  * button draws in place of the module ring: an accent ring 2px wide inset 2px on the overlay that
@@ -38,7 +38,8 @@ const SHEET = 'styles/fabricate-list-primitives.css';
 
 /**
  * The published row's root: the classes `tone`, `muted`, `onOpen`, the requested slots, `density`,
- * `layout`, `truncateName` and `detailAlign` (issue 2850) write beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
+ * `layout`, `truncateName` and `detailAlign` (issue 2850), and a read-only `selected` and `busy`
+ * (issue 2851) write beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
  * spells that no published key draws.
  */
 const LIST_ROW = Object.freeze({
@@ -52,13 +53,15 @@ const LIST_ROW = Object.freeze({
     'is-card',
     'is-truncated',
     'is-detail-end',
+    'is-selected-face',
+    'is-busy',
   ]),
   ancestors: new Set(),
   drawsChildren: true,
   undrawn: new Set(['fabricate-list-row-children']),
 });
 
-/** The 41 rules that draw a published row, every one in its sheet. */
+/** The 45 rules that draw a published row, every one in its sheet. */
 const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row',
   '.fabricate-list-row .fabricate-list-row-name',
@@ -102,6 +105,11 @@ const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row.is-truncated .fabricate-list-row-head > .fabricate-list-row-name',
   '.fabricate-list-row.is-truncated .fabricate-list-row-badges',
   '.fabricate-list-row.is-truncated.is-detail-end .fabricate-list-row-detail',
+  // The read-only selected face and the busy button (issue 2851).
+  '.fabricate-list-row.is-selected-face',
+  '.fabricate-list-row.is-danger.is-selected-face',
+  '.fabricate-list-row.is-selected-face:not(.is-danger)',
+  '.fabricate-list-row.is-busy > .fabricate-list-row-open:enabled',
 ]);
 
 /** The rule that strips the module ring from the row's button, and the one that rings its overlay. */
@@ -126,9 +134,9 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published ListRow', () => {
-  it('reaches a published row through 41 of the 44 selectors that name its root', () => {
+  it('reaches a published row through 45 of the 48 selectors that name its root', () => {
     const shipped = census();
-    assert.equal(shipped.length, 44, 'the census of every selector naming the root');
+    assert.equal(shipped.length, 48, 'the census of every selector naming the root');
     assert.deepEqual(writtenOf(reachingOf(shipped)), inSheet(LIST_ROW_FAMILY));
     assert.deepEqual(
       staleAncestors(LIST_ROW, shipped, publishedManagerClasses()),
@@ -161,6 +169,8 @@ describe('the module sheet and every component style against the published ListR
           'layout',
           'truncateName',
           'detailAlign',
+          'current',
+          'busy',
         ],
         'fabricate',
         true,
@@ -187,8 +197,12 @@ describe('the module sheet and every component style against the published ListR
           `${SHEET}: .fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])`,
           { 'box-shadow': 'inset 0 0 0 1px var(--fab-accent-border)' },
         ],
+        [
+          `${SHEET}: .fabricate-list-row.is-danger.is-selected-face`,
+          { 'box-shadow': 'inset 0 0 0 1px var(--fab-accent-border)' },
+        ],
       ].sort(([a], [b]) => byName(a, b)),
-      'the button reset, the strip, the overlay ring and the selected danger row’s edge'
+      'the button reset, the strip, the overlay ring and the selected danger row’s edge, pressed or read-only'
     );
   });
 

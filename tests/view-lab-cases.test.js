@@ -883,9 +883,9 @@ const labListRowAside = (key) =>
 /** The slots fixture's host for one slot in one section's published row, by the section's key. */
 const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
-/** The forms fixture's first published row in one section, by the section's key. */
-const labListRowForm = (key) =>
-  `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:first-child .fabricate-list-row`;
+/** The forms fixture's published row in one section, by the section's key and its place, first by default. */
+const labListRowForm = (key, place = 1) =>
+  `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:nth-child(${place}) .fabricate-list-row`;
 /** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
@@ -1479,7 +1479,8 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
   ],
   // The published list row's geometry (issue 2850): each section's mark at its rung, the default
-  // row's inset, the truncated board's one-line name and the card's column at its corner.
+  // row's inset, the truncated board's one-line name and the card's column at its corner; and its
+  // state (issue 2851): the current stage's read-only face at the dense inset and the busy cursor.
   'manager-published-list-row-forms-specimen': [
     ...[
       ['portrait', 26],
@@ -1503,6 +1504,15 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: labListRowForm('cards'),
       styles:
         'flex-direction: column; border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+    },
+    {
+      selector: labListRowForm('stages', 2),
+      styles:
+        'background-color: var(--fab-surface-active); border-top-color: var(--fab-accent-border); padding-top: 8px; padding-left: 12px',
+    },
+    {
+      selector: `${labListRowForm('reward')} > .fabricate-list-row-open`,
+      styles: 'cursor: progress',
     },
   ],
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled

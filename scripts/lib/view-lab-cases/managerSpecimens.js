@@ -359,10 +359,10 @@ const BARE_TRAILING = '[data-lab-list-row-trailing]';
 /** Sized to the fixture's 320px ground and the height of its three rows. */
 const SLOT_WINDOW = Object.freeze({ width: 440, height: 360 });
 
-/** The forms fixture's ground and one section's first published row, by the section's key. */
+/** The forms fixture's ground and one section's published row, by its key and its place, first by default. */
 const FORMS_GROUND = '[data-lab-list-row-forms]';
-const FORM_ROW = (key) =>
-  `${FORMS_GROUND} > [data-lab-list-row-form="${key}"] > div:first-child .fabricate-list-row`;
+const FORM_ROW = (key, place = 1) =>
+  `${FORMS_GROUND} > [data-lab-list-row-form="${key}"] > div:nth-child(${place}) .fabricate-list-row`;
 /** Each one-row section's key and mark rung, and each board's. */
 const FORM_MARKS = Object.freeze([
   ['portrait', 26],
@@ -372,8 +372,8 @@ const FORM_MARKS = Object.freeze([
   ['cards', 34],
 ]);
 
-/** Sized to the fixture's 480px ground and the height of its five sections. */
-const FORMS_WINDOW = Object.freeze({ width: 600, height: 520 });
+/** Sized to the fixture's 480px ground and the height of its seven sections. */
+const FORMS_WINDOW = Object.freeze({ width: 600, height: 680 });
 
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
@@ -1354,22 +1354,25 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-list-row-forms-specimen',
     label:
-      'Specimen, mounted through the published seam — list rows at the geometry ListRow publishes, in a 480px column on the --fab-bg-2 ground, 8px apart. Reading top to bottom: Mira Voss, a read-only dense row with a 26px glyph mark and its Contributor detail; Ember salt reserve, a whole-row button with a 28px mark and its quantity 3 at the selectable form’s tighter inset; Moonlit Glade, a whole-row button at the default density, its 30px mark at a 12px by 16px inset with an 11px corner; then a four-column board of read-only rows, each a 30px mark and the long name Forge a Pattern-Welded Blade of the Deep Seam cut to one line with an ellipsis, its Recipe detail held at the row’s end; and a four-column board of cards on the card ground at an 11px corner, each a 34px mark above the same name, cut to one line with an ellipsis, over its Forest detail. The frame draws inside the manager window and is the evidence for it alone; the row heights each rung sets and the card’s column are the rendered suite’s, and the keys’ update and removal the mounted suite’s',
+      'Specimen, mounted through the published seam — list rows at the geometry and state ListRow publishes, in a 480px column on the --fab-bg-2 ground, 8px apart. Reading top to bottom: Mira Voss, a read-only dense row with a 26px glyph mark and its Contributor detail; Ember salt reserve, a whole-row button with a 28px mark and its quantity 3 at the selectable form’s tighter inset; Moonlit Glade, a whole-row button at the default density, its 30px mark at a 12px by 16px inset with an 11px corner; then a four-column board of read-only rows, each a 30px mark and the long name Forge a Pattern-Welded Blade of the Deep Seam cut to one line with an ellipsis, its Recipe detail held at the row’s end; and a four-column board of cards on the card ground at an 11px corner, each a 34px mark above the same name, cut to one line with an ellipsis, over its Forest detail; then three read-only stage rows 4px apart, Gather the ore muted with a dashed edge and its Done detail, Quench the blade the current step on the active fill with an accent edge at the dense row’s own inset and its Now detail, and Temper the edge plain with its Next detail; and Ember salt reserve, a busy whole-row button whose mark is a spinner glyph, with its Claiming the reward detail. The frame draws inside the manager window and is the evidence for it alone; the row heights each rung sets, the card’s column and the face on each ground are the rendered suites’, and the keys’ update and removal, the busy press and the ARIA each state writes are the mounted suites’',
     // Beyond the smoke: a companion mounts it through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-list-row-forms' },
     steps: [],
-    // Every section's rows the fixture's effect mounted, the last board's fourth card among them.
-    expectSelector: `${FORMS_GROUND}:has(> [data-lab-list-row-form="portrait"] .fabricate-list-row):has(> [data-lab-list-row-form="board"] > div:nth-child(4) .fabricate-list-row) > [data-lab-list-row-form="cards"] > div:nth-child(4) .fabricate-list-row.is-card > .fabricate-list-row-open`,
+    // Every section's rows the fixture's effect mounted, the last board's fourth card, the current
+    // stage and the busy reward's spinner among them.
+    expectSelector: `${FORMS_GROUND}:has(> [data-lab-list-row-form="portrait"] .fabricate-list-row):has(> [data-lab-list-row-form="board"] > div:nth-child(4) .fabricate-list-row):has(> [data-lab-list-row-form="stages"] > div:nth-child(2) .fabricate-list-row.is-selected-face[aria-current="step"]):has(> [data-lab-list-row-form="reward"] .fabricate-list-row-open[aria-busy="true"] .fa-spinner) > [data-lab-list-row-form="cards"] > div:nth-child(4) .fabricate-list-row.is-card > .fabricate-list-row-open`,
     expectContained: [
       ...FORM_MARKS.map(([key]) => ({ container: FORMS_GROUND, target: FORM_ROW(key) })),
+      ...[1, 2, 3].map((place) => ({ container: FORMS_GROUND, target: FORM_ROW('stages', place) })),
+      { container: FORMS_GROUND, target: FORM_ROW('reward') },
       { container: '.window-content', target: FORMS_GROUND },
     ],
     expectLayout: {
       controls: [
-        // Each section's mark at its rung, the default row's inset, the board's one-line name and
-        // the card's column at its corner.
+        // Each section's mark at its rung, the default row's inset, the board's one-line name, the
+        // card's column at its corner, the current stage's face at the dense inset and the busy cursor.
         ...FORM_MARKS.map(([key, size]) => ({
           selector: `${FORM_ROW(key)} .fab-medallion`,
           styles: `width: ${size}px; height: ${size}px`,
@@ -1386,6 +1389,15 @@ export const CASES = Object.freeze([
           selector: FORM_ROW('cards'),
           styles:
             'flex-direction: column; border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+        },
+        {
+          selector: FORM_ROW('stages', 2),
+          styles:
+            'background-color: var(--fab-surface-active); border-top-color: var(--fab-accent-border); padding-top: 8px; padding-left: 12px',
+        },
+        {
+          selector: `${FORM_ROW('reward')} > .fabricate-list-row-open`,
+          styles: 'cursor: progress',
         },
       ],
     },
