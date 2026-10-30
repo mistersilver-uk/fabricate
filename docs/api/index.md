@@ -2054,7 +2054,7 @@ The published components, in publication order:
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `compact`, `inline`, `note`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
 | `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `size`, `icon`, `busy`, `type`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
-| `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
+| `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `semantics`, `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
@@ -2071,13 +2071,14 @@ The published components, in publication order:
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
 | `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback) | yes |
+| `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal` and `ToggleCard` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -2582,8 +2583,9 @@ const disclosure = fabUi.mount('Button', { target, props: props() });
 
 ### StatusToggle
 
-`StatusToggle` draws the design system's switch as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off and takes effect when it is pressed.
-It exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology, and it draws no text of its own.
+`StatusToggle` draws the design system's switch as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off.
+By default it exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology; `semantics` makes it a switch.
+It draws no text of its own.
 A choice between two named things is not a switch: draw your own control for it.
 `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
 Fabricate coerces nothing, so only `true` and `false` are in the contract.
@@ -2591,9 +2593,12 @@ The button changes nothing itself: a press reports through `onclick`, and the sw
 The switch shows no pending state, so if your change takes time, say so in text of your own, and treat a press that arrives before your `update` as another press from the state you last passed.
 To refuse the change, pass `on` unchanged and say why in text of your own, so the switch never shows a state you do not hold.
 `onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+`semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
+Pass `pressed` for a staged edit that your own Save applies, and `switch` for a press that writes the setting at once.
+Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and `on` alone, so none of them is an `aria` prop or a rest key, and an older Fabricate refuses `semantics` with `"semantics" is not a data attribute`, which `describe('StatusToggle').props` shows.
 `ariaLabel` is the switch's name and is required whether or not you pass `aria-labelledby`.
-It is final display text, the same in both states, because `aria-pressed` says which holds.
-`ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
+It is final display text, the same in both states, because `aria-pressed` or `aria-checked` says which holds.
+`ariaLabel` names the setting so that "pressed" or "on" means the setting is in effect: "Group by category", "Hidden tasks".
 It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
 Draw the setting's name as visible text beside the switch, from one string that you also pass as `ariaLabel`, and pass both again in any `update` that changes the text, so the spoken name always contains the words the user sees; the label does not press the switch unless you wire it to `onclick`.
 A name of white space alone leaves the switch with no name, so never pass one.
@@ -2614,7 +2619,7 @@ Foundry gives a button a minimum height of 2em of its own font size, so in a Fou
 The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
 An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side; leave that much inside any edge of your own that clips.
-The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
+The switch states whether it is on to assistive technology with `aria-pressed`, or with `aria-checked` under `semantics` `switch`; how it looks does not carry the state on its own.
 Under forced colours the switch draws in system colours and keeps its state visible.
 Give a switch you mount inside a `.tabs` element no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
 Its track and knob sizes, its button's width, its 78px cap, its colours beyond what this section states, and what it draws for an `on` value other than `true` or `false` are private.
@@ -3840,6 +3845,56 @@ function select(id) {
 // `row.destroy()` for each row when the panel goes away, moving focus first if a row holds it.
 ```
 
+### ToggleCard
+
+`ToggleCard` draws the design system's toggle card: a bordered card holding a glyph, a title with a second line under it, and a switch, for one setting that is on or off.
+The switch is the one `StatusToggle` draws, so its keyboard, focus, forced-colours and ring rules are that section's.
+The card is not itself a control: a press on the title or the second line does nothing, and the switch is the only focusable element Fabricate draws in `target`.
+`title` is required final display text, the setting's name, drawn as the card's title and used as the switch's accessible name, the same in both states.
+A name of white space alone leaves the switch with no name, so never pass one.
+The name never states a position, so no "on", "off", "show" or "hide" at its start or end, as [StatusToggle](#statustoggle) states.
+`sub` is optional final display text drawn under the title in a quieter ink; absent, the second line is empty.
+It is not part of the switch's name and is not tied to it with `aria-describedby`, so put a sentence that must be heard when the switch takes focus in `title`.
+`icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
+`on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+Fabricate coerces nothing, so only `true` and `false` are in the contract.
+The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when your `update` passes it, which may be after the press returns.
+To refuse the change, pass `on` unchanged and say why in text of your own, so the card never shows a state you do not hold.
+`semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
+Pass `pressed` or `switch` as [StatusToggle](#statustoggle) states.
+`onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+Work out the new state from the `on` you last passed.
+It is not called by `mount`, `update` or `destroy`.
+The switch has no unavailable state at version 1, as [StatusToggle](#statustoggle) states, and the card takes no `disabled`.
+A card is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog, and it grows to the width of `target`.
+The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
+It takes no rest props, so a `data-*` attribute is refused with `"<key>" is not a prop of ToggleCard`.
+Its padding, gap, corner, border and fill figures, its type figures, its colours beyond what this section and [StatusToggle](#statustoggle) state, and the hooks and tone classes Fabricate's own callers use are private.
+
+A worked card follows: a setting of your own, named by the title the card draws.
+
+```javascript
+// After `load(['ToggleCard'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the card describes none: draw your own control there.
+if (!fabUi?.describe?.('ToggleCard')) return;
+
+let spend = acmeSettings.spendOnStart;
+const props = () => ({
+  title: 'Spend when this stage begins',
+  sub: 'The ingredient is used up as the stage starts.',
+  icon: 'fa-solid fa-hammer',
+  on: spend,
+  semantics: 'switch', // The press writes the setting at once.
+  onToggle: () => {
+    spend = !spend;
+    acmeSettings.spendOnStart = spend; // Your own state first.
+    card.update(props()); // Every prop again, with the new `on`.
+  },
+});
+const card = fabUi.mount('ToggleCard', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -4017,7 +4072,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal` and `ListRow` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow` and `ToggleCard` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -4246,7 +4301,7 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu` and `Modal` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal` and `ToggleCard` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
 The panel `Select`, `IconPicker`, `ActionMenu` or `Modal` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.

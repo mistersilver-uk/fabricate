@@ -253,6 +253,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     props: Object.freeze({
       on: Object.freeze({ kind: 'data', required: true }),
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      semantics: Object.freeze({ kind: 'data' }),
       onclick: Object.freeze({ kind: 'callback', required: true }),
       'aria-labelledby': Object.freeze({ kind: 'aria' }),
       'aria-describedby': Object.freeze({ kind: 'aria' }),
@@ -536,5 +537,21 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     }),
     rest: true,
     root: 'fabricate',
+  }),
+  Object.freeze({
+    name: 'ToggleCard',
+    path: 'src/ui/svelte/components/ToggleCard.svelte',
+    version: 1,
+    props: Object.freeze({
+      title: Object.freeze({ kind: 'data', required: true }),
+      sub: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
+      on: Object.freeze({ kind: 'data', required: true }),
+      semantics: Object.freeze({ kind: 'data' }),
+      onToggle: Object.freeze({ kind: 'callback', required: true }),
+    }),
+    rest: false,
+    root: 'any',
+    standaloneRoot: true,
   }),
 ]);

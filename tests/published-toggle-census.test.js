@@ -22,6 +22,7 @@ import {
   compoundsOf,
   dataHooksOf,
   entryNamed,
+  partFaults,
   placementFaults,
   publishedManagerClasses,
   ringFaults,
@@ -81,22 +82,6 @@ const TOGGLE_PARTS = Object.freeze(['manager-status-toggle-track', 'manager-stat
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
-/** Every selector of `sheets` that names a part of `parts` with neither `shape.root` nor a pinned ancestor above it. */
-function partFaults(sheets, parts, shape) {
-  return sheets.flatMap(([file, css]) =>
-    parts.flatMap((part) =>
-      selectorsNaming(css, part).flatMap((complex) => {
-        const compounds = compoundsOf(complex);
-        const at = compounds.findLastIndex((compound) => classesOf(compound).includes(part));
-        const above =
-          at === -1 ? [] : compounds.slice(0, at).flatMap((compound) => classesOf(compound));
-        const held = above.includes(shape.root) || above.some((name) => shape.ancestors.has(name));
-        return held ? [] : [`${file}: ${writtenSelector(css, complex)}`];
-      })
-    )
-  );
-}
-
 /** Every selector with a bare `button` compound, over every stylesheet, judged against the switch. */
 const shippedBareButtons = () =>
   everyStylesheet().flatMap(([file, css]) =>
@@ -120,7 +105,10 @@ describe('the module sheet and every component style against the published Statu
     );
     assert.deepEqual(
       [Object.keys(entryNamed('StatusToggle').props), gatedRoot(entryNamed('StatusToggle'))],
-      [['on', 'ariaLabel', 'onclick', 'aria-labelledby', 'aria-describedby'], 'fabricate'],
+      [
+        ['on', 'ariaLabel', 'semantics', 'onclick', 'aria-labelledby', 'aria-describedby'],
+        'fabricate',
+      ],
       'a published host, label, disabled state, class or wider root reopens the census'
     );
   });

@@ -46,6 +46,13 @@ const inertHover = (hover) => ({ ...reach(null, hover), inert: true });
 const button = (props) => ({ props, reach: reach('button') });
 const disabledButton = (props) => ({ props, reach: inertHover('button') });
 
+const card = (props) => ({
+  title: 'Spend when this stage begins',
+  sub: 'The ingredient is used up as the stage starts.',
+  onToggle: press,
+  ...props,
+});
+
 const unboundedStepper = (props) => ({
   value: 3,
   ariaLabel: 'Batch size',
@@ -218,6 +225,12 @@ export const STANDALONE_SPECIMENS = Object.freeze({
   StatusToggle: Object.freeze({
     'toggle-off': button({ on: false, ariaLabel: 'Group by category', onclick: press }),
     'toggle-on': button({ on: true, ariaLabel: 'Hidden tasks', onclick: press }),
+    'toggle-switch': button({
+      on: true,
+      semantics: 'switch',
+      ariaLabel: 'Spend when this stage begins',
+      onclick: press,
+    }),
   }),
   Stepper: Object.freeze({
     'stepper-mid': { props: stepper({}), reach: reach('[data-stepper-decrement]') },
@@ -479,6 +492,19 @@ export const STANDALONE_SPECIMENS = Object.freeze({
         footer:
           '<button type="button">Assign</button><button type="button">Assign and start</button>',
       }
+    ),
+  }),
+  ToggleCard: Object.freeze({
+    'card-off': button(card({ on: false })),
+    'card-on': button(card({ on: true, icon: 'fa-solid fa-hammer' })),
+    'card-switch': button(card({ on: true, semantics: 'switch' })),
+    'card-no-icon': button(card({ on: false, icon: '' })),
+    'card-long-title': button(
+      card({
+        on: false,
+        title:
+          'Spend MoonpetalSilverleafEmberSaltVerdigrisAlloyCatalystResidueInfusion when this stage begins',
+      })
     ),
   }),
 });

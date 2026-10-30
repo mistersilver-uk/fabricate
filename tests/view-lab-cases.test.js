@@ -6372,7 +6372,7 @@ test('every published component seam module, and the host, selects the specimens
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, the icon picker fixture's picker, the action menu fixture's menu, and the modal fixture's dialog. */
+/** The published components a specimen other than the leaves one draws, each in a fixture of its own. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6391,9 +6391,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'IconPicker',
   'ActionMenu',
   'Modal',
+  'ToggleCard',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu and Modal and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal and ToggleCard and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -8782,7 +8783,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 16, 'the fixture lays sixteen targets in its columns');
+  assert.equal(columns.flat().length, 21, 'the fixture lays twenty-one targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',

@@ -40,6 +40,7 @@ import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
+import ToggleCard from './svelte/components/ToggleCard.svelte';
 import Well from './svelte/components/Well.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 import { APP_TOOLTIPS } from './svelte/util/appLocalizer.js';
@@ -78,6 +79,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/ActionMenu.svelte': ActionMenu,
   'src/ui/svelte/components/Modal.svelte': Modal,
   'src/ui/svelte/components/ListRow.svelte': ListRow,
+  'src/ui/svelte/components/ToggleCard.svelte': ToggleCard,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

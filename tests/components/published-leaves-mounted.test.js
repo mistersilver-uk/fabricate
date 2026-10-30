@@ -457,6 +457,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('button').textContent.trim(),
     drawn: ['Iron ingot', 'Ember salt'],
   },
+  {
+    name: 'ToggleCard',
+    under: 'fabricate',
+    root: '.fabricate-toggle-card',
+    props: { title: 'Spend when this stage begins', on: false, onToggle() {} },
+    next: { title: 'Spend when this stage begins', on: true, onToggle() {} },
+    read: (root) => root.querySelector('button').getAttribute('aria-pressed'),
+    drawn: ['false', 'true'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -627,6 +636,18 @@ describe('a key a leaf does not publish', () => {
       key,
       'is not a data attribute',
     ]),
+    ...[
+      'variant',
+      'toggleLabel',
+      'toggleTitle',
+      'disabled',
+      'section',
+      'field',
+      'subDataAttr',
+      'toggleDataAttr',
+      'class',
+      'data-x',
+    ].map((key) => ['ToggleCard', key, 'is not a prop of ToggleCard']),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

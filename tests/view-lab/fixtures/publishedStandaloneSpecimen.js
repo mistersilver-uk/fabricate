@@ -1,17 +1,19 @@
 /**
  * The standalone specimen's wiring (issues 2456, 2679, 2680), which `PublishedStandalone.svelte`
  * lays out and mounts, and `tests/components/published-standalone-root-mounted.test.js` runs the
- * View Lab cases against: the sixteen entries that state `standaloneRoot`, each mounted into its
- * target by key, the `Well` in the `InspectorCard`'s slot, the `Field`'s slot holding a caption,
- * input and hint, and a closed `Modal` that a published `Button`, the opener, opens through
- * `update`. Every word is a companion's final text, so none is localized.
+ * View Lab cases against: the seventeen entries that state `standaloneRoot`, each mounted into a
+ * target by key (the switch and the card in more than one state), the `Well` in the
+ * `InspectorCard`'s slot, the `Field`'s slot holding a caption, input and hint, and a closed
+ * `Modal` that a published `Button`, the opener, opens through `update`. Every word is a
+ * companion's final text, so none is localized.
  */
 
-/** The fixture's three columns of target keys, top to bottom. */
+/** The fixture's three columns of target keys, top to bottom, one column to a line. */
+// prettier-ignore
 export const COLUMNS = Object.freeze([
-  Object.freeze(['button', 'icon-button', 'toggle', 'card', 'field', 'search']),
-  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager']),
-  Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal']),
+  Object.freeze(['button', 'icon-button', 'toggle', 'toggle-switch', 'toggle-card', 'card', 'field', 'search']),
+  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off']),
+  Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal', 'toggle-card-bare', 'toggle-card-long']),
 ]);
 
 const DIALOG = Object.freeze({
@@ -22,6 +24,22 @@ const DIALOG = Object.freeze({
 });
 
 const noop = () => {};
+
+const CARD = Object.freeze({
+  title: 'Spend when this stage begins',
+  sub: 'The ingredient is used up as the stage starts.',
+  on: false,
+});
+
+/** The cards beside the first: off, with no glyph, and with a title long enough to wrap. */
+const CARDS = Object.freeze({
+  'toggle-card-off': { icon: 'fa-solid fa-hammer' },
+  'toggle-card-bare': { icon: '' },
+  'toggle-card-long': {
+    title:
+      'Spend MoonpetalSilverleafEmberSaltVerdigrisAlloyCatalystResidueInfusion when this stage begins',
+  },
+});
 
 /** An element named `tag` in `slot`'s document, carrying `text` and `attributes`. */
 function drawn(slot, tag, text, attributes = {}) {
@@ -123,6 +141,24 @@ export function mountStandaloneSpecimen({ mount, targets }) {
     mount('StatusToggle', {
       target: targets.toggle,
       props: { on: true, ariaLabel: 'Hidden tasks', onclick: noop },
+    }),
+    mount('StatusToggle', {
+      target: targets['toggle-switch'],
+      props: { on: false, semantics: 'switch', ariaLabel: 'Spend on start', onclick: noop },
+    }),
+    ...Object.entries(CARDS).map(([key, props]) =>
+      mount('ToggleCard', { target: targets[key], props: { ...CARD, ...props, onToggle: noop } })
+    ),
+    mount('ToggleCard', {
+      target: targets['toggle-card'],
+      props: {
+        title: 'Spend when this stage begins',
+        sub: 'The ingredient is used up as the stage starts.',
+        icon: 'fa-solid fa-hammer',
+        on: true,
+        semantics: 'switch',
+        onToggle: noop,
+      },
     }),
     card,
     field,

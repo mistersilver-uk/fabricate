@@ -6,7 +6,8 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `as` | `'button'` \| `'indicator'` \| `'checkbox'` | `'button'` | A CLOSED set, and each is a different THING rather than a variant of the first; see the invariants. An unrecognised value renders the `button` host. |
-  | `on` | boolean | `false` | The state. Drives `is-on`/`is-off`, `aria-pressed` and the knob's travel. |
+  | `on` | boolean | `false` | The state. Drives `is-on`/`is-off`, `aria-pressed` (`aria-checked` under `semantics="switch"`) and the knob's travel. |
+  | `semantics` | `'pressed'` \| `'switch'` | `'pressed'` | A CLOSED set naming what the `button` host announces: `pressed` is a toggle button (`aria-pressed`), `switch` a press that writes the setting at once (`role="switch"`, `aria-checked`). An unrecognised value renders `pressed`; the other hosts ignore it. |
   | `label` / `ariaLabel` | pre-localized strings | `''` | The reading beside the switch and the accessible name, each dropped when empty. A site naming its switch through `aria-labelledby` passes that attribute through the rest spread. |
   | `disabled` | boolean | `false` | The `button` host's own attribute and the `checkbox` host's `<input>` attribute; meaningless on `indicator`. |
   | `onclick` / `onChange(checked)` / `trailing` | functions / snippet | no-op / no-op / `undefined` | The `button` host's handler, forwarded verbatim; the `checkbox` host's, named for the value because the `<input>` is an implementation detail of that host; and content rendered after the label. |
@@ -22,11 +23,12 @@
     rules are `openspec/specs/design-system/spec.md`'s.
 
   Invariants:
-  - THE THREE HOSTS ARE THREE THINGS. `button` is the pressable switch, with `aria-pressed` on a
-    plain `<button>` as the house pattern — this repository uses `role="switch"` nowhere;
-    `indicator` is a locked activation READING, a `<span role="img">`, deliberately not a disabled
-    button because there is nothing to press; and `checkbox` is a real `<input type="checkbox">`
-    inside a `<label>`, made invisible and laid over the track.
+  - THE THREE HOSTS ARE THREE THINGS. `button` is the pressable switch: `aria-pressed` on a plain
+    `<button>` for a staged edit the caller's own Save applies, `semantics="switch"` for a press
+    that writes the setting at once; `indicator` is a locked activation READING, a
+    `<span role="img">`, deliberately not a disabled button because there is nothing to press;
+    and `checkbox` is a real `<input type="checkbox">` inside a `<label>`, made invisible and laid
+    over the track.
   - EACH HOST'S EXTRA CLASS IS EMITTED HERE rather than remembered per call site, because both are
     load-bearing for the HOST: the sheet's hover rule excludes `.is-locked` by name, since
     `:disabled` cannot match a span, and the checkbox host's own class gives the label the box its
@@ -53,6 +55,7 @@
     onclick = () => {},
     onChange = () => {},
     trailing = undefined,
+    semantics = 'pressed',
     class: extraClass = '',
     ...rest
   } = $props();
@@ -67,6 +70,7 @@
   const host = $derived(HOSTS.includes(as) ? as : 'button');
   const isCheckbox = $derived(host === 'checkbox');
   const isIndicator = $derived(host === 'indicator');
+  const isSwitch = $derived(semantics === 'switch');
 
   const STATE_CLASSES = Object.freeze({ on: 'is-on', off: 'is-off' });
 
@@ -115,7 +119,9 @@
     type="button"
     class={classes}
     data-keyboard-focus="true"
-    aria-pressed={on}
+    role={isSwitch ? 'switch' : undefined}
+    aria-pressed={isSwitch ? undefined : on}
+    aria-checked={isSwitch ? on : undefined}
     aria-label={accessibleName}
     {disabled}
     {onclick}

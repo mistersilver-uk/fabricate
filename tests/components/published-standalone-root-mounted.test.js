@@ -96,6 +96,7 @@ const WIDENED = Object.freeze({
     onSelect() {},
   },
   Modal: { open: true, title: 'Rename the reagent', closeLabel: 'Close', onClose() {} },
+  ToggleCard: { title: 'Spend when this stage begins', on: false, onToggle() {} },
 });
 const BUTTON = WIDENED.Button;
 /** Each slot owner a nested target sits in, with its props but the slot. */

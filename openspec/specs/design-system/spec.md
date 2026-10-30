@@ -1158,6 +1158,12 @@ A data table (`DataTable`) is a `<table>` named by its visible caption's heading
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
 `TintPicker`'s inline cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
 Its popover is the picker's grid form: the swatches are square tiles, `option`s of a `listbox` named by the same label, each carrying `aria-selected`, true on the selected tile alone; free hex, where offered, is the panel's caller footer above the key hints, and No colour, where offered, is the picker's `footerAction` (issue 2459).
+A switch (`StatusToggle`) announces its state through its closed `semantics` prop (ruling issue 2775).
+`pressed`, the default, is for a staged edit that the caller's own Save applies: `aria-pressed` on a plain `<button>`, a toggle button that reports a pressed state.
+`switch` is for a press that writes the setting at once: `role="switch"` with `aria-checked`.
+Either way the accessible name is the setting's, the same in both states, so a label never inverts with the state.
+Every in-app caller keeps `pressed`, because the mounted tests and the Foundry smoke read `aria-pressed` off it; moving one site to `switch` is its own decision, and `tests/status-toggle-source-contract.test.js` holds that no component hand-writes `role="switch"`.
+`ToggleCard` passes `semantics` to its switch, and both are published through `game.fabricate.api.ui` (issue 2775), as their groups in `ui-extension-points` state.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.

@@ -193,11 +193,11 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647, 2652, 2656 and 2784 headings, by name and in the order the spec
+ * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784 and 2775 headings, by name and in the order the spec
  * states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652', '2656', '2784'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652', '2656', '2784', '2775'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -295,6 +295,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'ActionMenu',
       'Modal',
       'ListRow',
+      'ToggleCard',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -489,6 +490,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: {
           on: required,
           ariaLabel: required,
+          semantics: optional,
           onclick: { kind: 'callback', required: true },
           'aria-labelledby': { kind: 'aria', required: false },
           'aria-describedby': { kind: 'aria', required: false },
@@ -725,6 +727,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
+      },
+      ToggleCard: {
+        version: 1,
+        props: {
+          title: required,
+          sub: optional,
+          icon: optional,
+          on: required,
+          semantics: optional,
+          onToggle: { kind: 'callback', required: true },
+        },
+        rest: false,
+        root: 'any',
         overlays: false,
       },
     });

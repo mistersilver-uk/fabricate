@@ -386,10 +386,16 @@ const ARIA_KEY_SUITES = Object.freeze({
 
 /**
  * The ARIA attributes a published `data` key writes beside the `aria` keys: `aria-pressed` by
- * `StatusToggle`'s `on`, `aria-busy` and `aria-disabled` by `Button`'s `busy`, and `aria-modal` by
- * `Modal`'s `trapFocus`.
+ * `StatusToggle`'s `on`, `aria-checked` by its `on` under `semantics` `switch`, `aria-busy` and
+ * `aria-disabled` by `Button`'s `busy`, and `aria-modal` by `Modal`'s `trapFocus`.
  */
-const DRIVEN_ARIA = Object.freeze(['aria-pressed', 'aria-busy', 'aria-disabled', 'aria-modal']);
+const DRIVEN_ARIA = Object.freeze([
+  'aria-pressed',
+  'aria-checked',
+  'aria-busy',
+  'aria-disabled',
+  'aria-modal',
+]);
 
 /**
  * Every DOM read under `src/` of a shipped `aria` key or of a `DRIVEN_ARIA` attribute, beside why
@@ -1403,6 +1409,7 @@ describe('each entry matches its component declaration', () => {
         'ActionMenu.onSelect: 1',
         'Modal.onClose: 0',
         'ListRow.onOpen: 0',
+        'ToggleCard.onToggle: 0',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3061,6 +3068,7 @@ describe('the module sheet and every component style against the published Inspe
         'ActionMenu',
         'Modal',
         'ListRow',
+        'ToggleCard',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );
@@ -3337,7 +3345,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-busy, aria-disabled or aria-modal in 25 selectors of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 25 selectors of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(
