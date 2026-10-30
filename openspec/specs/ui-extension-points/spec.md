@@ -455,10 +455,11 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `FillBar`'s track skin is not published at version 1; publishing it later is additive.
 - `FillBar`'s bipolar fill and a gapped multi-track form are not published at version 1.
 - `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
+- `Chip`'s `swatch`, `tint`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Chip`'s `truncate` (issue 2817) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates it refuses it with `"truncate" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
@@ -860,7 +861,7 @@ Each group states the accepted values of every key that entry publishes.
     This is `InfoStrip`'s badge set.
     `neutral` is the recessive tone and clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface` only.
   - `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
-    At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: the companion keeps a `list` label short.
+    At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: the companion keeps a `list` label short or sets `truncate`.
     At `default` a long label wraps inside the chip.
   - `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
     It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
@@ -871,7 +872,11 @@ Each group states the accepted values of every key that entry publishes.
   - `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
   - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
     It is drawn and never announced, so the label says the state.
-  - Fabricate coerces neither `mono` nor `struck` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
+  - `truncate` is `true` or `false`; `true` keeps the label to one line and ends it in an ellipsis where `target` is too narrow, at any `density`, keeping the `icon` glyph whole.
+    The ellipsis is drawn only: the label stays whole in the chip's text and so in its name, and the colour, `mono`, `struck` and `icon` are drawn as without it; only the corner changes, to a pill (`border-radius: 999px`).
+    A reader who needs the clipped text passes the full label as `data-tooltip-text`, which opens on pointer hover only, so it never carries what the label does not.
+    The chip ends at the width `target` has, so a `target` that is a flex item of the companion's row needs `min-width: 0` and a `flex-shrink` above 0, or the row overflows instead of the label ending in an ellipsis.
+  - Fabricate coerces none of `mono`, `struck` and `truncate` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
   - It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
     `tone` is colour alone, so the label says the state.
     A label changed through `update` is not announced; a live region is the companion's.

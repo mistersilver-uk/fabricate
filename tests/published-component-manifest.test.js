@@ -412,7 +412,7 @@ const JS_ARIA_READERS = Object.freeze({
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
 });
 
-/** The classes `tone`, `density`, `emphasis`, `mono` and `struck` can write beside the root class, private values included. */
+/** The classes `tone`, `density`, `emphasis`, `mono`, `struck` and `truncate` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
   'is-warning',
@@ -439,6 +439,7 @@ const PUBLISHED_CHIP_CLASSES = new Set([
   'is-solid',
   'is-mono',
   'is-struck',
+  'is-truncated',
 ]);
 /** The manager layout classes a sheet rule reaches a chip under; no extension target sits in one. */
 const CHIP_LAYOUT_ANCESTORS = new Set([
@@ -3001,7 +3002,7 @@ describe('the module sheet against the published Chip', () => {
     assert.equal(selectors.length, 15, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
-      ['tone', 'density', 'emphasis', 'icon', 'mono', 'struck', 'children'],
+      ['tone', 'density', 'emphasis', 'icon', 'mono', 'struck', 'truncate', 'children'],
       'a published key that draws a classed child reopens cannotMatchPublished'
     );
   });
@@ -3027,6 +3028,8 @@ describe('the module sheet against the published Chip', () => {
     `${MANAGER} .manager-chip ~ div > .manager-chip`,
     `${MANAGER} .manager-chip.is-row`,
     `${MANAGER} .manager-chip.is-lit.is-struck`,
+    `${MANAGER} .manager-chip.is-truncated`,
+    `${MANAGER} .manager-chip .manager-chip-label`,
     `${MANAGER} .manager-chip .fa-circle`,
     `${MANAGER} :is(.manager-chip.manager-tag-pill, .manager-pill)`,
   ]) {

@@ -1,8 +1,8 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves,
   then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` (issue 2451), a
-  `Button` in each empty panel (issue 2452), and a read-only and a selected `ListRow` (issue 2784),
-  through the page-session seam
+  `Button` in each empty panel (issue 2452), a read-only and a selected `ListRow` (issue 2784), and
+  a truncated `Chip` in a one-track cell (issue 2817), through the page-session seam
   `game.fabricate.api.ui` binds, as a companion does: one mount per section, each into an element
   it owns. A mount's third member lists the mounts made inside its `children`
   content slot, each into a `div` the fixture appends there. The effect's teardown destroys the
@@ -145,6 +145,16 @@
     ],
     ['ListRow', { name: 'Iron ingot', detail: 'Metal', quantity: 3, art: artOf('sm-iron-ingot') }],
     ['ListRow', { name: 'Silver ore', detail: 'Ore', quantity: 1, selected: true, onOpen: ignore }],
+    [
+      'Chip',
+      {
+        tone: 'info',
+        density: 'list',
+        icon: 'fas fa-lock',
+        truncate: true,
+        children: 'Awaiting the guild master and the whole caravan',
+      },
+    ],
   ]);
 
   const targets = $state([]);

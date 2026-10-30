@@ -1211,6 +1211,11 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles:
         'border-top-color: var(--fab-accent-border); background-color: var(--fab-surface-active)',
     },
+    // The truncated published chip's label ends in an ellipsis (issue 2817).
+    {
+      selector: '.manager-chip.is-truncated > .manager-chip-label',
+      styles: 'overflow: hidden; text-overflow: ellipsis',
+    },
   ],
   // The published controls (issue 2452): the action button at each tone at its own box, type and
   // ink, the focused action's drawn ring, then the redrawn notice's success title and the default
@@ -6483,6 +6488,7 @@ test('the leaves specimen mounts every published component but TierTrack, Status
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
   const [{ container: ground }] = expectContained;
   const wrappedChip = `${ground} > section > div > .manager-chip:not(.is-list)`;
+  const truncatedChip = `${ground} > section > div > .manager-chip.is-truncated`;
   assert.deepEqual(
     expectContained.flatMap(({ target }) => /:nth-child\((\d+)\)/.exec(target)?.[1] ?? []),
     Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
@@ -6498,9 +6504,10 @@ test('the leaves specimen mounts every published component but TierTrack, Status
         target: `${hostRoot(pair)} [data-nested="${pair[1]}"] > *`,
       })),
       { container: wrappedChip, target: `${wrappedChip} > span` },
+      { container: `${ground} > section:nth-child(${mounted.length})`, target: truncatedChip },
       { container: '.window-content', target: ground },
     ],
-    'then each nested root inside its host root, the wrapped label inside its chip, and the ground inside the window'
+    'then each nested root inside its host root, the wrapped label inside its chip, the truncated chip inside its own cell, and the ground inside the window'
   );
   assert.deepEqual(
     expectContained

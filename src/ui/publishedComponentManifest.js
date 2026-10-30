@@ -163,6 +163,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       icon: Object.freeze({ kind: 'data' }),
       mono: Object.freeze({ kind: 'data' }),
       struck: Object.freeze({ kind: 'data' }),
+      truncate: Object.freeze({ kind: 'data' }),
       children: Object.freeze({ kind: 'text', required: true }),
     }),
     rest: true,

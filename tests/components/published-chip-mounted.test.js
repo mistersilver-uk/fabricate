@@ -1,8 +1,9 @@
 /**
- * The published `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) on Fabricate's real
- * Svelte runtime, through a fresh seam registered with the adapter's own table, into a companion
- * target under no Fabricate ancestor: the class each key writes beside the root, the glyph drawn
- * before the label, what a value outside a closed set draws, and an `update` that rewrites them.
+ * The published `Chip`'s `emphasis`, `icon`, `mono`, `struck` (issue 2772) and `truncate` (issue
+ * 2817) on Fabricate's real Svelte runtime, through a fresh seam registered with the adapter's own
+ * table, into a companion target under no Fabricate ancestor: the class each key writes beside the
+ * root, the glyph drawn before the label, the label wrapper `truncate` draws, what a value outside
+ * a closed set draws, and an `update` that rewrites them.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -208,5 +209,91 @@ describe('the published Chip, icon', () => {
     );
     assert.equal(chip().querySelectorAll('button, a, input, [tabindex]').length, 0);
     handle.destroy();
+  });
+});
+
+describe('the published Chip, truncate', () => {
+  const LONG = 'Awaiting the guild master and the whole caravan';
+
+  it('writes is-truncated and wraps the whole label in its own span, and removes both on update', async () => {
+    const { handle, chip } = mountChip({ truncate: true, children: LONG });
+    await settle();
+    assert.deepEqual(classesOf(chip()), [ROOT, 'is-truncated']);
+    const [label, ...rest] = chip().children;
+    assert.deepEqual(classesOf(label), ['manager-chip-label']);
+    assert.equal(label.textContent, LONG, 'the ellipsis is drawn only, the text stays whole');
+    assert.deepEqual(rest, []);
+    assert.equal(handle.update({ children: LONG }), true);
+    await settle();
+    assert.deepEqual(classesOf(chip()), [ROOT]);
+    assert.equal(chip().querySelectorAll('.manager-chip-label').length, 0);
+    assert.equal(chip().textContent, LONG);
+    assert.equal(handle.update({ children: LONG, truncate: true }), true);
+    await settle();
+    assert.deepEqual(classesOf(chip()), [ROOT, 'is-truncated'], 'and writes them again');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('draws nothing for false or an absent key', async () => {
+    const off = mountChip({ truncate: false });
+    const absent = mountChip();
+    await settle();
+    for (const { chip } of [off, absent]) {
+      assert.deepEqual(classesOf(chip()), [ROOT]);
+      assert.equal(chip().querySelectorAll('.manager-chip-label').length, 0);
+    }
+    off.handle.destroy();
+    absent.handle.destroy();
+  });
+
+  it('does not coerce a string, so the string "false" truncates', async () => {
+    const { handle, chip } = mountChip({ truncate: 'false' });
+    await settle();
+    assert.deepEqual(classesOf(chip()), [ROOT, 'is-truncated']);
+    handle.destroy();
+  });
+
+  it('composes with icon, mono, struck, a tone and the list density, the glyph kept beside the label', async () => {
+    const { handle, chip } = mountChip({
+      tone: 'info',
+      density: 'list',
+      icon: 'fas fa-lock',
+      mono: true,
+      struck: true,
+      truncate: true,
+      children: LONG,
+    });
+    await settle();
+    assert.deepEqual(classesOf(chip()), [
+      ROOT,
+      'is-info',
+      'is-mono',
+      'is-struck',
+      'is-truncated',
+      'is-list',
+    ]);
+    const [glyph, label, ...rest] = chip().children;
+    assert.deepEqual(classesOf(glyph), ['fas', 'fa-lock']);
+    assert.equal(glyph.getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(classesOf(label), ['manager-chip-label']);
+    assert.equal(chip().textContent, LONG, 'the chip’s whole text, so its name, is the label');
+    assert.deepEqual(rest, []);
+    handle.destroy();
+  });
+
+  it('carries the full label to a pointer through data-tooltip-text, and adds no role, focus or title', async () => {
+    const { handle, chip } = mountChip({
+      truncate: true,
+      children: LONG,
+      'data-tooltip-text': LONG,
+    });
+    await settle();
+    assert.equal(chip().getAttribute('data-tooltip-text'), LONG);
+    for (const name of ['role', 'tabindex', 'title', 'aria-label']) {
+      assert.ok(!chip().hasAttribute(name), `no ${name}`);
+    }
+    handle.destroy();
+    assert.deepEqual(reports, []);
   });
 });
