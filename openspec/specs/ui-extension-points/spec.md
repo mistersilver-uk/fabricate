@@ -460,6 +460,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `truncate` (issue 2817) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates it refuses it with `"truncate" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatBox`'s `layout` and `note` (issue 2819) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `icon` and `size` (issue 2818) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `width`, a free CSS length, is not published at version 1; publishing one later is additive.
@@ -823,7 +824,15 @@ Each group states the accepted values of every key that entry publishes.
   - `label` is required.
   - `icon` is optional Font Awesome classes.
   - `tone` is `default`, `info` or `danger`.
+  - `layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
+    Any other value draws `default`.
+  - `note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
+    In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
+  - A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, which `describe('StatBox').props` shows; adding either is additive, and the entry stays at `version` 1.
   - The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+  - The box has no role and adds no accessible name, and the label is not a heading.
+    A screen reader reads its text in the order it is drawn: the figure then the label at `default`, the label then the figure at `start`, and the note last in both.
+    The companion passes a `label` that reads sensibly before the figure and after it, and a `note` that adds to them and never repeats either.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
   - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.

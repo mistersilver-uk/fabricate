@@ -1007,6 +1007,37 @@ The 8px and 9px rungs are read from that companion's measured scales; a new rung
 - **THEN** its ink is `--fab-text-muted`, or `--fab-accent` for `accent`
 - **AND** it clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes
 
+### Requirement: A stat box's layout is a closed axis and its note is one optional line
+
+`StatBox` MUST take a `layout` that is `'default'` or `'start'`, defaulting to `'default'`, the centred serif figure over its label that every in-app caller draws.
+`'start'` draws the label first and the figure beneath it, both start-aligned, with the figure in the monospace face at 14px and weight 500, the heaviest weight the shipped mono face has; any other value draws `'default'`.
+`StatBox` MUST take an optional `note`, text, drawn after the figure and label in either layout at 10px, wrapping at the box's width and never clipped, in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
+The DOM order MUST be the visual order: figure then label at `'default'`, label then figure at `'start'`, and the note last in both.
+The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
+Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
+No in-app caller passes `layout` or `note`: the axis exists for the published `StatBox`, whose companion draws label-first tiles with a note line in two places.
+
+#### Scenario: A caller passes neither key
+
+- **WHEN** a stat box is drawn without `layout` or `note`
+- **THEN** it draws the same elements, in the same order, as it did before the axis existed
+
+#### Scenario: A caller passes a layout outside the set
+
+- **WHEN** a stat box is drawn with `layout` `'center'`, `'Start'`, `' start'` or the number 1
+- **THEN** it draws the `'default'` layout
+
+#### Scenario: A stat box is read by a screen reader
+
+- **WHEN** a stat box is drawn at `'start'` with a `note`
+- **THEN** its text is read as the label, the figure, then the note
+- **AND** no element of the box carries a role, an `aria-label`, an `aria-labelledby` or a `title`
+
+#### Scenario: A note is inked
+
+- **WHEN** a note is drawn in the `danger` tone on any page ground
+- **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.

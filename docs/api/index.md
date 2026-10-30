@@ -2045,7 +2045,7 @@ The published components, in publication order:
 | `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
-| `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
+| `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone`, `layout`, `note` | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
 | `Kicker` | 1 | `any` | `as`, `tone`, `size`, `children` (text, required) | yes |
 | `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `truncate`, `children` (text, required) | yes |
@@ -2210,12 +2210,20 @@ In a histogram the bars are hidden from assistive technology and each row is rea
 
 ### StatBox
 
-`StatBox` draws one figure over a micro-label in a bordered box.
+`StatBox` draws one figure and a micro-label in a bordered box.
 `value` is required and is the formatted figure.
 `label` is required.
 `icon` is optional Font Awesome classes for a glyph.
 `tone` is `default`, `info` or `danger`.
+`layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
+Any other value draws `default`.
+`note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
+In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
+A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, and `describe('StatBox').props` shows whether the running one publishes it; adding either is additive, and the entry stays at `version` 1.
 The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+A screen reader reads the box's text in the order it is drawn and adds no name of its own: the figure then the label at `default`, the label then the figure at `start`, and the note last in both.
+So pass a `label` that makes sense before the figure and after it, and a `note` that adds to them and never repeats either.
+The box has no role and the label is not a heading.
 
 ### InfoStrip
 

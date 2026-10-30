@@ -386,7 +386,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       StatBox: {
         version: 1,
-        props: { value: required, label: required, icon: optional, tone: optional },
+        props: {
+          value: required,
+          label: required,
+          icon: optional,
+          tone: optional,
+          layout: optional,
+          note: optional,
+        },
         rest: true,
         root: 'any',
         overlays: false,
