@@ -349,6 +349,16 @@ const LIST_ROW_ASIDE = (key) => `${LIST_ROW(key)} > .fabricate-list-row-aside`;
 /** Sized to the fixture's 320px ground and the height of its two rows. */
 const LIST_ROW_WINDOW = Object.freeze({ width: 440, height: 280 });
 
+/** The slots fixture's ground, one section's published row by its key, and a slot's host in it. */
+const SLOT_GROUND = '[data-lab-list-row-slots]';
+const SLOT_ROW = (key) => `${SLOT_GROUND} > [data-lab-list-row="${key}"] .fabricate-list-row`;
+const SLOT_HOST = (key, slot) => `${SLOT_ROW(key)} .fabricate-list-row-${slot}`;
+// The bare row's trailing mount target, the one child of the root that holds it (the mark and name are spans too).
+const BARE_TRAILING = '[data-lab-list-row-trailing]';
+
+/** Sized to the fixture's 320px ground and the height of its three rows. */
+const SLOT_WINDOW = Object.freeze({ width: 440, height: 360 });
+
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
 const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
@@ -1268,6 +1278,59 @@ export const CASES = Object.freeze([
       ],
     },
     position: LIST_ROW_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-list-row-slots-specimen',
+    label:
+      'Specimen, mounted through the published seam — three list rows, 8px apart in a 320px column on the --fab-bg-2 ground, each with content slots requested. Reading top to bottom: Moonpetal tincture, a whole-row button with the Stage 2 of 3 detail, a published glyph medallion in place of its mark, a published Fresh chip after its name, the companion’s line Due at dusk, Mira Voss tending beneath, and at the row’s end beside the button a published pencil icon button; then Ember salt reserve, a read-only row with its quantity 3, a published Low stock chip after its name and the pencil icon button at its end; then Cinder salt reserve, a read-only row at the dense inset with the pencil icon button as a bare flex item after its name. The two rows with badges take the tighter inset of a selectable form and the bare row keeps the dense row’s. The frame draws inside the manager window and is the evidence for it alone; which element a point lands on is the rendered suite’s, and the slots’ move, detach and re-attach are the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-list-row-slots' },
+    steps: [],
+    // Each row's last mount: the medallion, chip and note of the button row, and an icon button
+    // in each row's trailing slot, the bare row's a child of the root.
+    expectSelector: `${SLOT_GROUND}:has(> [data-lab-list-row="open"] .fabricate-list-row-open .fab-medallion):has(> [data-lab-list-row="open"] .fabricate-list-row-trailing button):has(> [data-lab-list-row="still"] .fabricate-list-row-badges .manager-chip):has(> [data-lab-list-row="still"] .fabricate-list-row-trailing button):has(> [data-lab-list-row="bare"] .fabricate-list-row > span > span button)`,
+    expectContained: [
+      ...['open', 'still', 'bare'].map((key) => ({
+        container: SLOT_ROW(key),
+        target: `${SLOT_ROW(key)} button:not(.fabricate-list-row-open)`,
+      })),
+      {
+        container: SLOT_ROW('open'),
+        target: `${SLOT_HOST('open', 'meta')} [data-lab-list-row-meta]`,
+      },
+      ...['open', 'still', 'bare'].map((key) => ({
+        container: SLOT_GROUND,
+        target: SLOT_ROW(key),
+      })),
+      { container: '.window-content', target: SLOT_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The slot hosts the row lays out, each lifted above the button's overlay, and the private
+        // wrapper and slot element that take no box.
+        ...[
+          ['open', 'leading'],
+          ['open', 'badges'],
+          ['open', 'meta'],
+          ['open', 'trailing'],
+          ['still', 'badges'],
+          ['still', 'trailing'],
+        ].flatMap(([key, slot]) => [
+          { selector: `${SLOT_HOST(key, slot)} > span`, styles: SLOT_BOX },
+          { selector: `${SLOT_HOST(key, slot)} > span > span`, styles: SLOT_BOX },
+        ]),
+        { selector: SLOT_HOST('open', 'trailing'), styles: 'position: relative; z-index: 2' },
+        { selector: SLOT_HOST('still', 'trailing'), styles: 'position: relative; z-index: 2' },
+        { selector: `${SLOT_ROW('bare')} > span:has(> span > ${BARE_TRAILING})`, styles: SLOT_BOX },
+        { selector: `${SLOT_ROW('bare')} > span > span:has(> ${BARE_TRAILING})`, styles: SLOT_BOX },
+      ],
+    },
+    position: SLOT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

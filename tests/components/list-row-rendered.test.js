@@ -3,7 +3,8 @@
  * content's height, a default row's button outgrows Foundry's fixed button height, a focused row's
  * ring sits inside the row where a scrolling list cannot clip it, and a truncated name keeps 6ch
  * before its badges wrap beneath it. Issue 2547: an untruncated name's badges follow the name.
- * Issue 2793: a point on the aside presses the button.
+ * Issue 2793: a point on the aside presses the button. Issue 2843: a point on a `trailing` control
+ * reaches it, and on content in `leading`, `badges` and `meta` reaches that content.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -30,6 +31,8 @@ const harness = createMountedComponentHarness({
 
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
 const open = () => {};
+const CONTROL =
+  '<button type="button" data-keyboard-focus="true" class="probe-control">Edit</button>';
 
 /** The rows measured below, by the case each is placed in. */
 const CASES = Object.freeze({
@@ -88,20 +91,48 @@ const CASES = Object.freeze({
     onOpen: open,
     aside: snippet('<div class="probe-aside"><span>Stage 2 of 3</span></div>'),
   },
+  // Issue 2843: the control the published seam fills `trailing` with, with `onOpen` and an aside,
+  // and bare in a row with no form; and content with a native `title` in each slot.
+  trailing: { name: 'Moonpetal tincture', onOpen: open, trailing: snippet(CONTROL) },
+  trailingAside: {
+    name: 'Moonpetal tincture',
+    onOpen: open,
+    aside: snippet('<div class="probe-aside"><span>Stage 2 of 3</span></div>'),
+    trailing: snippet(CONTROL),
+  },
+  bareTrailing: { name: 'Ember salt reserve', trailing: snippet(CONTROL) },
+  trailingDisabled: {
+    name: 'Moonpetal tincture',
+    onOpen: open,
+    disabled: true,
+    trailing: snippet(CONTROL),
+  },
+  hints: {
+    name: 'Moonpetal tincture',
+    onOpen: open,
+    leading: snippet('<span class="probe-hint" title="A leading hint">L</span>'),
+    badges: snippet('<span class="probe-hint" title="A badges hint">B</span>'),
+    meta: snippet('<span class="probe-hint" title="A meta hint">M</span>'),
+    aside: snippet('<div class="probe-aside"><span class="probe-hint">A</span></div>'),
+  },
 });
 
 /**
  * Core first, with Foundry's fixed button height in its own layer; the module sheet in
  * `layer(modules)`; the mark's scoped styles unlayered.
  */
-const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
+const page = (
+  markup,
+  sheet = readStylesheet()
+) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
-<style>@layer modules {${readStylesheet()}}</style>
+<style>@layer modules {${sheet}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, component('Medallion'))).css}</style>
 <style>:root{--font-primary:Arial,sans-serif}
 .probe-leading{display:block;width:56px;height:56px}
-.probe-badges{display:flex;gap:4px}.probe-badges>span{display:block;width:48px;height:14px}</style>
+.probe-badges{display:flex;gap:4px}.probe-badges>span{display:block;width:48px;height:14px}
+.probe-hint{display:inline-block;min-width:14px;min-height:14px}</style>
 </head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">
   <div data-case="card" style="width:220px">${markup.card}</div>
   <div data-case="tall" style="width:320px">${markup.tall}</div>
@@ -114,10 +145,20 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
   <div data-case="opening" style="width:320px">${markup.opening}</div>
   <div data-case="long-detail" style="width:320px">${markup.longDetail}</div>
   <div data-case="aside" style="width:320px">${markup.aside}</div>
+  <div data-case="trailing" style="width:320px">${markup.trailing}</div>
+  <div data-case="trailing-aside" style="width:320px">${markup.trailingAside}</div>
+  <div data-case="bare-trailing" style="width:320px">${markup.bareTrailing}</div>
+  <div data-case="trailing-disabled" style="width:320px">${markup.trailingDisabled}</div>
+  <div data-case="hints" style="width:320px">${markup.hints}</div>
 </div></body></html>`;
+
+/** The rule that lifts a trailing wrapper and the button's children above the button's overlay. */
+const LIFT =
+  '.fabricate-list-row > .fabricate-list-row-trailing,\n.fabricate-list-row > .fabricate-list-row-open > * {';
 
 let browser;
 let tab;
+let unlifted;
 
 before(async () => {
   const markup = {};
@@ -131,8 +172,16 @@ before(async () => {
     harness.teardown();
   }
   browser = await chromium.launch();
-  tab = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  // Tall enough to hold every case, which `elementFromPoint` needs: it answers null off-screen.
+  tab = await browser.newPage({ viewport: { width: 1280, height: 1600 } });
   await tab.setContent(page(markup), { waitUntil: 'load' });
+  // The same page without the `z-index: 2` rule on a trailing wrapper, the negative control.
+  const sheet = readStylesheet();
+  assert.equal(sheet.split(LIFT).length - 1, 1, 'the rule the control drops is in the sheet once');
+  const lifted = sheet.replace(LIFT, '.fabricate-list-row > .fabricate-list-row-open > * {');
+  assert.notEqual(lifted, sheet, 'and the control changed the sheet');
+  unlifted = await browser.newPage({ viewport: { width: 1280, height: 1600 } });
+  await unlifted.setContent(page(markup, lifted), { waitUntil: 'load' });
 });
 
 after(async () => {
@@ -375,5 +424,115 @@ describe('ListRow inset and detailAlign, rendered (issue 2321)', () => {
       Math.abs(long.detailWidth - long.areaWidth * 0.4) < 0.5,
       `the clipped detail is ${long.detailWidth}px of ${long.areaWidth}px`
     );
+  });
+});
+
+describe('ListRow slots, rendered (issue 2843)', () => {
+  /** What the element at the centre of `selector` in `caseId` is, in `page`: the control or the button. */
+  const hitAt = (view, caseId, selector) =>
+    view.evaluate(
+      ({ id, target }) => {
+        const row = document.querySelector(`[data-case="${id}"] .fabricate-list-row`);
+        const element = row.querySelector(target);
+        const { left, top, width, height } = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(left + width / 2, top + height / 2);
+        return {
+          element: hit === element,
+          button: hit === row.querySelector(':scope > .fabricate-list-row-open'),
+        };
+      },
+      { id: caseId, target: selector }
+    );
+
+  for (const caseId of ['trailing', 'trailing-aside']) {
+    it(`reaches a trailing control from a point on it in ${caseId}, above the button’s overlay`, async () => {
+      assert.deepEqual(await hitAt(tab, caseId, '.probe-control'), {
+        element: true,
+        button: false,
+      });
+    });
+  }
+
+  it('hits the button instead where the page drops the rule that lifts the trailing wrapper', async () => {
+    for (const caseId of ['trailing', 'trailing-aside']) {
+      assert.deepEqual(await hitAt(unlifted, caseId, '.probe-control'), {
+        element: false,
+        button: true,
+      });
+    }
+  });
+
+  it('draws the trailing wrapper a child of the root after the button, and a bare trailing as a child of the root', async () => {
+    const order = await tab.evaluate(() => {
+      const rowOf = (id) => document.querySelector(`[data-case="${id}"] .fabricate-list-row`);
+      const follows = (first, second) =>
+        Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return ['trailing', 'trailing-aside'].map((id) => {
+        const row = rowOf(id);
+        const button = row.querySelector(':scope > .fabricate-list-row-open');
+        const wrapper = row.querySelector('.fabricate-list-row-trailing');
+        return {
+          wrapperIsChild: wrapper.parentElement === row,
+          holdsControl: wrapper.querySelector('.probe-control') !== null,
+          buttonFirst: follows(button, wrapper),
+          buttonHoldsNone: button.querySelector('.probe-control') === null,
+        };
+      });
+    });
+    for (const drawn of order) {
+      assert.deepEqual(drawn, {
+        wrapperIsChild: true,
+        holdsControl: true,
+        buttonFirst: true,
+        buttonHoldsNone: true,
+      });
+    }
+    const bare = await tab.evaluate(() => {
+      const row = document.querySelector('[data-case="bare-trailing"] .fabricate-list-row');
+      const control = row.querySelector('.probe-control');
+      return {
+        child: control.parentElement === row,
+        wrapped: row.querySelector('.fabricate-list-row-trailing') !== null,
+        form: row.classList.contains('is-form'),
+      };
+    });
+    assert.deepEqual(bare, { child: true, wrapped: false, form: false });
+  });
+
+  it('dims a disabled row on its root, so an enabled trailing control inside it dims too', async () => {
+    const drawn = await tab.evaluate(() => {
+      const row = document.querySelector('[data-case="trailing-disabled"] .fabricate-list-row');
+      const control = row.querySelector('.probe-control');
+      return {
+        rootOpacity: getComputedStyle(row).opacity,
+        controlOpacity: getComputedStyle(control).opacity,
+        buttonDisabled: row.querySelector(':scope > .fabricate-list-row-open').disabled,
+        controlDisabled: control.disabled,
+        inside: row.contains(control),
+      };
+    });
+    assert.deepEqual(drawn, {
+      rootOpacity: '0.62',
+      controlOpacity: '1',
+      buttonDisabled: true,
+      controlDisabled: false,
+      inside: true,
+    });
+  });
+
+  it('shows the title of content in leading, badges and meta, and presses the button from the same point in the aside', async () => {
+    for (const hint of ['leading', 'badges', 'meta']) {
+      const hit = await tab.evaluate((slot) => {
+        const row = document.querySelector('[data-case="hints"] .fabricate-list-row');
+        const element = row.querySelector(`.fabricate-list-row-${slot} .probe-hint`);
+        const { left, top, width, height } = element.getBoundingClientRect();
+        return document.elementFromPoint(left + width / 2, top + height / 2) === element;
+      }, hint);
+      assert.equal(hit, true, `a point on the ${hint} content lands on it, where its title shows`);
+    }
+    assert.deepEqual(await hitAt(tab, 'hints', '.fabricate-list-row-aside .probe-hint'), {
+      element: false,
+      button: true,
+    });
   });
 });
