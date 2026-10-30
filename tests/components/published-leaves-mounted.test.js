@@ -629,7 +629,7 @@ describe('a key a leaf does not publish', () => {
     ...['width', 'dialogProps', 'initialFocusSelector', 'onSubmit', 'class', 'data-x'].map(
       (key) => ['Modal', key, 'is not a prop of Modal']
     ),
-    ...['density', 'openProps', 'aside', 'class'].map((key) => [
+    ...['density', 'openProps', 'trailing', 'class'].map((key) => [
       'ListRow',
       key,
       'is not a data attribute',

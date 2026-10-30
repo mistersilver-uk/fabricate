@@ -746,6 +746,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           selected: optional,
           disabled: optional,
           onOpen: { kind: 'callback', required: false },
+          aside: slot,
         },
         rest: true,
         root: 'fabricate',
@@ -834,7 +835,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     }
   });
 
-  it('states the one exception to a content slot’s gap, the normal flow Well’s group and docs section state', () => {
+  it('states the exception to a content slot’s gap, the normal flow the Well and ListRow groups and docs sections state', () => {
     const exception = (text) =>
       text
         .split('\n')
@@ -843,12 +844,12 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       [
         'the spec',
         SPECIFIED,
-        "A host spaces a content slot's children by `gap`, except where its group states it draws them in normal flow, as `Well` does; the companion then fills that slot with one element of its own that lays out its content.",
+        "A host spaces a content slot's children by `gap`, except where its group states it draws them in normal flow, as `Well` and `ListRow`'s `aside` do; the companion then fills that slot with one element of its own that lays out its content.",
       ],
       [
         'the docs',
         DOCUMENTED,
-        "A host spaces a content slot's children by `gap`, except where its section states it draws them in normal flow, as [`Well`](#well) does; you then fill that slot with one element of your own that lays out its content.",
+        "A host spaces a content slot's children by `gap`, except where its section states it draws them in normal flow, as [`Well`](#well) and [`ListRow`](#listrow)'s `aside` do; you then fill that slot with one element of your own that lays out its content.",
       ],
     ]) {
       assert.deepEqual(exception(text), [whole], `${where} states it once, tail and all`);
@@ -857,12 +858,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       entries
         .filter(([, prose]) => /\bin (?:the )?normal flow\b/u.test(prose))
         .map(([name]) => name);
-    assert.deepEqual(flowed([...specifiedComponentGroups()]), ['Well'], 'one spec group');
+    assert.deepEqual(
+      flowed([...specifiedComponentGroups()]),
+      ['Well', 'ListRow'],
+      'two spec groups, ListRow for its aside'
+    );
     const sections = documentedComponentSections().map((section) => [
       section.slice(0, section.indexOf('\n')),
       section,
     ]);
-    assert.deepEqual(flowed(sections), ['Well'], 'and one docs section');
+    assert.deepEqual(flowed(sections), ['Well', 'ListRow'], 'and two docs sections');
   });
 
   it('states every value the spec names for an interactive component under Ownership and theme', () => {

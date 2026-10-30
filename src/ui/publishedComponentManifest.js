@@ -547,6 +547,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       selected: Object.freeze({ kind: 'data' }),
       disabled: Object.freeze({ kind: 'data' }),
       onOpen: Object.freeze({ kind: 'callback' }),
+      aside: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
     root: 'fabricate',
