@@ -52,6 +52,8 @@
     ['Medallion', { size: 26, glyph: 11, icon: 'fas fa-hammer' }],
     ['Medallion', { size: 22, glyph: 10, icon: 'fas fa-gem', tint: 'rose' }],
     ['Medallion', { size: 30, glyph: 12, icon: 'fas fa-skull', tone: 'danger' }],
+    ['Medallion', { size: 22, glyph: 10, icon: 'fas fa-coins', tone: 'warning' }],
+    ['Medallion', { size: 22, glyph: 10, icon: 'fas fa-scroll', ink: 'info' }],
     ['FillBar', { value: 0 }],
     ['FillBar', { value: 64 }],
     ['FillBar', { value: 100, density: 'compact' }],
@@ -85,6 +87,7 @@
       { value: '3 of 5', label: 'Stages done', layout: 'start', note: 'Two to go to finish' },
     ],
     ['StatBox', { value: '12 days', label: 'Duration', layout: 'start', tone: 'info' }],
+    ['StatBox', { value: '5 of 5', label: 'Stages done', tone: 'success' }],
     [
       'InfoStrip',
       {

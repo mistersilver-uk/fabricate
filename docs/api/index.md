@@ -2131,11 +2131,15 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `alt` is as for `Avatar`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
-`tone` is `''`, `success`, `danger` or `accent`, and it outranks `tint`.
-`ink` is `''`, `success`, `danger` or `neutral`, it outranks `tint`, and it outranks `tone` on the glyph.
-A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
+`tone` is `''`, `success`, `danger`, `accent`, `warning` or `info`, and it outranks `tint`.
+`ink` is `''`, `success`, `danger`, `neutral`, `warning` or `info`, it outranks `tint`, and it outranks `tone` on the glyph.
+A `tone` paints the edge, ground and glyph in its family's `-border`, `-soft` and `-text` tokens, as `accent` does in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`; an `ink` inks the glyph alone in its family's `-text` token, and `neutral` in `--fab-text-secondary`.
 A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
 A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
+The `tone` and `ink` values `warning` and `info` are additive at `version` `1`: a Fabricate that predates them draws the tile as unset, and refuses nothing.
+A `tone`'s glyph clears the 4.5:1 small-text floor on its own ground over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and not over `--fab-bg-3`; an `ink` over a `tone`'s ground clears it on the same four.
+An `ink` on the untoned tile, whose ground is `--fab-bg-3` wherever the tile sits, clears the 3:1 non-text floor in every palette and not 4.5:1: `success`, `danger`, `info` and `neutral` fall under it in `hearth-herb`, and `danger` and `neutral` in `ironblood-forge`, the weakest `danger` at 3.50:1.
+A `tone` or an `ink` is colour alone and is not announced, so say the state it marks in text beside the tile.
 The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
 The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.
 A `size` off the ladder draws at its edge with the corner `9` and is not published.
@@ -2223,13 +2227,15 @@ In a histogram the bars are hidden from assistive technology and each row is rea
 `value` is required and is the formatted figure.
 `label` is required.
 `icon` is optional Font Awesome classes for a glyph.
-`tone` is `default`, `info` or `danger`.
+`tone` is `default`, `info`, `success` or `danger`, and any other value draws `default`.
+`info` and `success` ink the figure alone, in `--fab-info-text` and `--fab-success-text`, which clear the 4.5:1 small-text floor on the box's own `--fab-bg-1` fill in every palette.
 `layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
 Any other value draws `default`.
 `note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
 In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
 A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, and `describe('StatBox').props` shows whether the running one publishes it; adding either is additive, and the entry stays at `version` 1.
-The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+The `tone` `success` is additive at `version` 1: a Fabricate that predates it draws the figure in the `default` ink, and refuses nothing.
+The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger`, `info` or `success` tone means.
 A screen reader reads the box's text in the order it is drawn and adds no name of its own: the figure then the label at `default`, the label then the figure at `start`, and the note last in both.
 So pass a `label` that makes sense before the figure and after it, and a `note` that adds to them and never repeats either.
 The box has no role and the label is not a heading.
@@ -2377,8 +2383,9 @@ It is not a standing statement: a rule that is always true is not a notice.
 It is not a Foundry notification: it is drawn in your element, and `ui.notifications` knows nothing of it.
 `title` is required and is the sentence that names what happened, final display text.
 `detail` is optional final display text, a second line that says what to do next.
-`tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
-It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
+`tone` is `danger`, `warning`, `info`, `success` or `accent`, and defaults to `danger`; any other value draws `danger`.
+It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology, `danger` and `warning` share one and `info` and `accent` share another, so the title says the state.
+`accent` was the notice's own tone before it was published, so a Fabricate that predates its publication draws it too; it is additive at `version` 1.
 `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
 `action` is optional and is `{ label }`, drawing one button after the text; `label` is the button's whole accessible name, final display text.
 An `action` with no non-blank string `label`, or with no function to call (`onAction`, or its own `onClick` in a Fabricate caller), draws no button.
@@ -2420,13 +2427,13 @@ A notice is shown again only by a new `mount`, which is a new announcement.
 An `update` that clears `dismissable` removes a control that may hold focus, so move focus first.
 The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
 The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
-At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
+At `warning`, `info`, `success` and `accent` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
 So say in `title` whatever the reader must not miss.
 The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so never mount a notice with an action inside a tinted panel of your own.
 Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: pass a verb phrase.
 The dismiss glyph clears 3:1 against its tile at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
 It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
-The notice's own figures are private, and so are its `accent` tone and what it draws for a tone outside its set.
+The notice's own figures are private.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 `data-notice-*` names are the notice's own: a value you pass under one overwrites what the notice writes.

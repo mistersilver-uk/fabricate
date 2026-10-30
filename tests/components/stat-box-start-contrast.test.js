@@ -2,6 +2,7 @@
  * Issue 2819: the label-first `StatBox` and its note ink only tokens the default form already
  * uses, and each clears its floor in all seven themes on every ground the box can sit on: its own
  * `--fab-bg-1` fill, and the translucent danger fill over each page ground a companion draws on.
+ * Issue 2847: the `success` figure inks `--fab-success-text` and clears 4.5:1 on that fill.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -41,6 +42,7 @@ const NOTE = Object.freeze({
 const FIGURE = Object.freeze({
   default: '.fab-stat-box-value',
   info: '.fab-stat-box.is-info .fab-stat-box-value',
+  success: '.fab-stat-box.is-success .fab-stat-box-value',
   danger: '.fab-stat-box.is-danger .fab-stat-box-value',
 });
 
@@ -69,10 +71,13 @@ for (const { name, stack, tone } of GROUNDS) {
   });
 }
 
-test('the info figure clears 4.5:1 on the default fill in every theme, at both layouts', () => {
-  const ink = declaredToken(rules, FIGURE.info, 'color', STAT_BOX);
-  assert.deepEqual(shortfalls(themes, ink, [fillOf('.fab-stat-box')]), []);
-});
+for (const tone of ['info', 'success']) {
+  test(`the ${tone} figure inks its family and clears 4.5:1 on the default fill in every theme, at both layouts`, () => {
+    const ink = declaredToken(rules, FIGURE[tone], 'color', STAT_BOX);
+    assert.equal(ink, `--fab-${tone}-text`);
+    assert.deepEqual(shortfalls(themes, ink, [fillOf('.fab-stat-box')]), []);
+  });
+}
 
 test('the start layout restates no ink, so the figure keeps the tone it is measured at', () => {
   const start = rules.filter((entry) => entry.selector.includes('.is-start'));
