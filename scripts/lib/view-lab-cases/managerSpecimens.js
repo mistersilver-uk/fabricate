@@ -341,6 +341,14 @@ const CALLOUT_ACTIONS = `${CALLOUT('actions')} > .manager-callout-actions`;
 /** Sized to the fixture's 360px ground and the height of its six notes. */
 const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 560 });
 
+/** The list row fixture's ground, one section's published row by its key, and its aside host. */
+const LIST_ROW_GROUND = '[data-lab-list-row-ground]';
+const LIST_ROW = (key) => `${LIST_ROW_GROUND} > [data-lab-list-row="${key}"] .fabricate-list-row`;
+const LIST_ROW_ASIDE = (key) => `${LIST_ROW(key)} > .fabricate-list-row-aside`;
+
+/** Sized to the fixture's 320px ground and the height of its two rows. */
+const LIST_ROW_WINDOW = Object.freeze({ width: 440, height: 280 });
+
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
 const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
@@ -1223,6 +1231,45 @@ export const CASES = Object.freeze([
     position: CALLOUT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Callout.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-list-row-aside-specimen',
+    label:
+      'Specimen, mounted through the published seam — two list rows, 8px apart in a 320px column on the --fab-bg-2 ground, each with its aside content slot requested. Reading top to bottom: Moonpetal tincture, a whole-row button with its default box glyph and its Stage 2 of 3 detail, and beneath its mark, name and detail, on a line of its own across the row, the companion’s column of the line Due at dusk, Mira Voss tending over a published fill bar at 64; then Ember salt reserve, a read-only row with its quantity 3 and, on its own line beneath, the companion’s line Restocked by the caravan. Both rows take the tighter inset of a row with an aside, and each aside’s text is in the row’s muted ink and type. The frame draws inside the manager window and is the evidence for it alone; that a press on the aside presses the button is the rendered suite’s, and the slot’s detach, re-attach and stillness across an onOpen update are the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-list-rows' },
+    steps: [],
+    // Both rows the fixture's effect mounted, each aside holding the companion's element, the
+    // button row's holding the bar mounted in it.
+    expectSelector: `${LIST_ROW_GROUND}:has(> [data-lab-list-row="still"] .fabricate-list-row > .fabricate-list-row-aside [data-lab-list-row-aside]) > [data-lab-list-row="open"] .fabricate-list-row:has(> button.fabricate-list-row-open) > .fabricate-list-row-aside [data-lab-list-row-aside] .fab-fill-bar`,
+    expectContained: [
+      ...['open', 'still'].flatMap((key) => [
+        { container: LIST_ROW(key), target: `${LIST_ROW_ASIDE(key)} [data-lab-list-row-aside]` },
+        { container: LIST_ROW_GROUND, target: LIST_ROW(key) },
+      ]),
+      { container: '.window-content', target: LIST_ROW_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The aside's own line across the row, beneath the button's layer, the private wrapper
+        // and slot element that take no box, and the row's ink its text takes.
+        ...['open', 'still'].flatMap((key) => [
+          {
+            selector: LIST_ROW_ASIDE(key),
+            styles:
+              'position: relative; z-index: 0; flex-basis: 100%; color: var(--fab-text-muted)',
+          },
+          { selector: `${LIST_ROW_ASIDE(key)} > div`, styles: SLOT_BOX },
+          { selector: `${LIST_ROW_ASIDE(key)} > div > div`, styles: SLOT_BOX },
+        ]),
+      ],
+    },
+    position: LIST_ROW_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
