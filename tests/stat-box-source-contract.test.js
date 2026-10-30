@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. A NEW token: nothing else in the tree writes it. */
@@ -19,6 +20,8 @@ const DECLARED_PROPS = Object.freeze([
   'label',
   'icon',
   'tone',
+  'layout',
+  'note',
   'valueDataAttr',
   'labelDataAttr',
 ]);
@@ -41,11 +44,11 @@ const contract = defineClosedTokenContract({
   emits: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-stat-tone={resolvedTone}']),
 
   primitiveWrites: {
-    count: 3,
+    count: 4,
     why:
       'the primitive itself, which writes the class so that no call site has to remember it. ' +
-      'The count is 3 because the token is also the STEM of the two element classes beneath ' +
-      'it — `fab-stat-box-value` and `fab-stat-box-figure` — and the shared clause matches by ' +
+      'The count is 4 because the token is also the STEM of the three element classes beneath ' +
+      'it — `fab-stat-box-value`, `fab-stat-box-figure` and `fab-stat-box-note` — and the shared clause matches by ' +
       'substring. That is the shape a caller writing any of the three would be caught by, so ' +
       'the stem is deliberately not renamed to make this number 1',
   },
@@ -130,5 +133,38 @@ test('every literal hook name a stat-box call site passes is a data- attribute',
     [],
     'a hook name is spread onto the element as written, so a name outside the `data-` ' +
       `namespace becomes a real attribute or a real handler:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+/** Every node under `node` for which `test` holds, walked through the parsed tree. */
+function nodesWhere(node, test, found = []) {
+  if (node === null || typeof node !== 'object') return found;
+  if (test(node)) found.push(node);
+  for (const child of Object.values(node)) nodesWhere(child, test, found);
+  return found;
+}
+
+/** `layout` and `note` are for the published seam (issue 2819): an in-app caller draws the centred form. */
+test('no in-app caller passes a layout or a note, so every StatBox in the app keeps the centred form', () => {
+  const callers = sourceAstEntriesUnder('src').flatMap(([path, ast]) =>
+    nodesWhere(
+      ast.fragment ?? {},
+      (node) => node.type === 'Component' && node.name === 'StatBox'
+    ).map((node) => [path, node])
+  );
+  assert.ok(callers.length >= 6, `the scan found ${callers.length} callers`);
+  const offenders = callers
+    .filter(([, node]) =>
+      node.attributes.some(
+        (attribute) =>
+          ['layout', 'note'].includes(attribute.name) ||
+          (attribute.type === 'SpreadAttribute' && attribute.name === undefined)
+      )
+    )
+    .map(([path]) => path);
+  assert.deepEqual(
+    offenders,
+    [],
+    'a <StatBox> in the app names `layout` or `note`, or spreads props'
   );
 });

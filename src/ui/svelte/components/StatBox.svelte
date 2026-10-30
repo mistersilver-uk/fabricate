@@ -6,9 +6,17 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The figure, ALREADY FORMATTED by the caller: this component does no arithmetic and no localization. |
-  | `label` / `icon` | already-localized string / Font Awesome classes | `''` | The micro-label beneath the figure, rendered as a `Kicker`, and an optional leading glyph inside the value line. |
+  | `label` / `icon` | already-localized string / Font Awesome classes | `''` | The micro-label, rendered as a `Kicker`, and an optional leading glyph inside the value line. |
+  | `layout` | `'default'` \| `'start'` | `'default'` | `default` is the centred serif figure over its label. `start` is the label over a start-aligned mono figure. A CLOSED set: any other value draws `default`. |
+  | `note` | already-localized string | `''` | An optional line after the figure and label, in the muted ink, or the danger ink in the `danger` tone, whose fill leaves the muted ink under 4.5:1 on `--fab-bg-2`. Empty draws nothing. |
   | `tone` | `'default'` \| `'info'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. An unknown tone falls back to `default`. |
   | `valueDataAttr` / `labelDataAttr` | attribute names | `''` | Hooks on the value element and the label. Attribute-only, carrying no behaviour. |
+
+  Reading order:
+  - The DOM order is the reading order and the visual order: `default` is figure then label, `start`
+    is label then figure, and the note comes last in both. The box adds no role and no ARIA name, so
+    each piece is announced once, as written, and the glyph is hidden. The note continues the reading
+    and never repeats the label.
 
   Rest spread:
   - `{...rest}` lands on the box root, written after `class`, and exists for a test or screenshot
@@ -40,6 +48,8 @@
     label = '',
     icon = '',
     tone = 'default',
+    layout = 'default',
+    note = '',
     valueDataAttr = '',
     labelDataAttr = '',
     ...rest
@@ -48,24 +58,40 @@
   const TONES = new Set(['default', 'info', 'danger']);
 
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'default');
+  const labelFirst = $derived(layout === 'start');
 
   const valueHookAttributes = $derived(valueDataAttr ? { [valueDataAttr]: '' } : {});
   const labelHookAttributes = $derived(labelDataAttr ? { [labelDataAttr]: '' } : {});
 </script>
 
-<div
-  class="fab-stat-box"
-  class:is-info={resolvedTone === 'info'}
-  class:is-danger={resolvedTone === 'danger'}
-  data-stat-tone={resolvedTone}
-  {...rest}
->
+{#snippet figure()}
   <span class="fab-stat-box-value" class:has-icon={Boolean(icon)} {...valueHookAttributes}>
     {#if icon}<i class={icon} aria-hidden="true"></i>{/if}
     <span class="fab-stat-box-figure">{value}</span>
   </span>
+{/snippet}
+
+{#snippet caption()}
   <!-- ratchet-exempt(design-system): the spread is the one `labelDataAttr` hook the caller names, or nothing -->
   <Kicker as="span" {...labelHookAttributes}>{label}</Kicker>
+{/snippet}
+
+<div
+  class="fab-stat-box"
+  class:is-info={resolvedTone === 'info'}
+  class:is-danger={resolvedTone === 'danger'}
+  class:is-start={labelFirst}
+  data-stat-tone={resolvedTone}
+  {...rest}
+>
+  {#if labelFirst}
+    {@render caption()}
+    {@render figure()}
+  {:else}
+    {@render figure()}
+    {@render caption()}
+  {/if}
+  {#if note}<span class="fab-stat-box-note">{note}</span>{/if}
 </div>
 
 <style>
@@ -101,6 +127,38 @@
     font-size: 14px;
   }
 
+  .fab-stat-box-note {
+    display: block;
+    margin-top: var(--fab-space-1);
+    color: var(--fab-text-muted);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
+    font-size: 10px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .fab-stat-box.is-start {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: var(--fab-space-1);
+    text-align: start;
+  }
+
+  .fab-stat-box.is-start .fab-stat-box-value {
+    font-family: var(--fab-font-mono);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .fab-stat-box.is-start .fab-stat-box-value.has-icon {
+    justify-content: flex-start;
+  }
+
+  .fab-stat-box.is-start .fab-stat-box-note {
+    margin-top: 0;
+  }
+
   .fab-stat-box.is-info .fab-stat-box-value {
     color: var(--fab-info-text);
   }
@@ -111,7 +169,8 @@
   }
 
   .fab-stat-box.is-danger .fab-stat-box-value,
-  .fab-stat-box.is-danger .fab-stat-box-value i {
+  .fab-stat-box.is-danger .fab-stat-box-value i,
+  .fab-stat-box.is-danger .fab-stat-box-note {
     color: var(--fab-danger-text);
   }
 </style>

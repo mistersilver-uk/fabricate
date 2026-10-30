@@ -1007,6 +1007,37 @@ The 8px and 9px rungs are read from that companion's measured scales; a new rung
 - **THEN** its ink is `--fab-text-muted`, or `--fab-accent` for `accent`
 - **AND** it clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes
 
+### Requirement: A stat box's layout is a closed axis and its note is one optional line
+
+`StatBox` MUST take a `layout` that is `'default'` or `'start'`, defaulting to `'default'`, the centred serif figure over its label that every in-app caller draws.
+`'start'` draws the label first and the figure beneath it, both start-aligned, with the figure in the monospace face at 14px and weight 500, the heaviest weight the shipped mono face has; any other value draws `'default'`.
+`StatBox` MUST take an optional `note`, text, drawn after the figure and label in either layout at 10px, wrapping at the box's width and never clipped, in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
+The DOM order MUST be the visual order: figure then label at `'default'`, label then figure at `'start'`, and the note last in both.
+The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
+Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
+No in-app caller passes `layout` or `note`: the axis exists for the published `StatBox`, whose companion draws label-first tiles with a note line in two places.
+
+#### Scenario: A caller passes neither key
+
+- **WHEN** a stat box is drawn without `layout` or `note`
+- **THEN** it draws the same elements, in the same order, as it did before the axis existed
+
+#### Scenario: A caller passes a layout outside the set
+
+- **WHEN** a stat box is drawn with `layout` `'center'`, `'Start'`, `' start'` or the number 1
+- **THEN** it draws the `'default'` layout
+
+#### Scenario: A stat box is read by a screen reader
+
+- **WHEN** a stat box is drawn at `'start'` with a `note`
+- **THEN** its text is read as the label, the figure, then the note
+- **AND** no element of the box carries a role, an `aria-label`, an `aria-labelledby` or a `title`
+
+#### Scenario: A note is inked
+
+- **WHEN** a note is drawn in the `danger` tone on any page ground
+- **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
@@ -2626,7 +2657,10 @@ On close focus returns to the control that opened it, or to the manager window w
 The return lands a frame after the close and is skipped when focus is by then on an element other than the page, so a trapped dialog opened in that frame keeps the focus it took (issue 2759).
 The picker's apply action is busy rather than disabled while its run is in flight, so a refused run leaves focus on it inside the dialog.
 A step that would lose work confirms first.
-`Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states (issue 2776).
+`Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `icon`, `size`, `closeLabel`, `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states (issue 2776, issue 2818).
+`icon` draws an optional decorative glyph in the header band before the title, inked `--fab-accent-text`, which clears 4.5:1 on the `--fab-bg-2` header band in every palette, and absent it draws no element.
+`size` names the dialog's width as `sm` 500px, `md` 560px, the default, or `lg` 620px, set through a class and clamped to 48px short of the browser window's width; the roll prompt's own 500px, the import report's 620px and the catalogue picker's 580px stay their callers' `width`.
+The dialog draws no scrim, and its width and height caps follow the browser window rather than the element it is hosted in; it is centred in the nearest element above it that makes itself the containing block of fixed content, and in the viewport otherwise, as the `Modal` group in `ui-extension-points` states for a companion's region (issue 2818).
 `initialFocus` names where a trapped dialog's focus enters by the `data-initial-focus` value of an element in the dialog, compared as text, and a Fabricate caller that needs a selector passes `initialFocusSelector`, which is never published.
 `footerLayout` `equal` lays the footer out as a grid of equal columns, so a footer child under a `display: contents` wrapper, as a published slot's, takes its share.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
@@ -2662,6 +2696,12 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **THEN** focus stays in the dialog that opened
 - **AND** the closed dialog's opener is not focused
 - **AND** focus the app moved to a control in that frame is not taken back
+
+#### Scenario: A picker dialog takes a header glyph and a width rung
+
+- **WHEN** a caller draws `Modal` with `icon` `fas fa-plus` and `size` `sm`
+- **THEN** the header band draws a hidden glyph before the title in `--fab-accent-text`, and the dialog is 500px wide
+- **AND** a caller that passes neither draws the 560px dialog with no glyph, as before
 
 #### Scenario: A press on the dialog's surface
 

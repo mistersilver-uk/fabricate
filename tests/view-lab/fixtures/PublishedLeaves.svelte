@@ -81,6 +81,11 @@
     ['StatBox', { value: '3', label: 'Failed', tone: 'danger' }],
     ['StatBox', { value: '48', label: 'Hours remaining' }],
     [
+      'StatBox',
+      { value: '3 of 5', label: 'Stages done', layout: 'start', note: 'Two to go to finish' },
+    ],
+    ['StatBox', { value: '12 days', label: 'Duration', layout: 'start', tone: 'info' }],
+    [
       'InfoStrip',
       {
         label: 'Conditions',
