@@ -86,7 +86,7 @@
 
   const isOff = (option) => disabled || reasons.has(option.value);
   const badgeOf = (option) =>
-    typeof option.badge?.label === 'string' && option.badge.label
+    typeof option.badge?.label === 'string' && option.badge.label.trim()
       ? {
           label: option.badge.label,
           tone: BADGE_TONES.has(option.badge.tone) ? option.badge.tone : 'secondary',

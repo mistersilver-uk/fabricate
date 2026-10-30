@@ -325,7 +325,7 @@ describe('RadioCardGroup names each radio by its title and describes it by what 
     );
   });
 
-  it('describes a radio by its badge, description, example, reason and body in that order, and dims a disabled option’s badge and example', async () => {
+  it('describes a radio by its badge, description, example, reason and body in that order, and marks a disabled option’s badge and example disabled', async () => {
     const root = await mountGroup({
       optionBody: body,
       options: [

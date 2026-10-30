@@ -464,6 +464,7 @@ describe('an option’s example and badge on the published RadioCardGroup', () =
         { value: 'c', label: 'C', badge: { label: 7, tone: 'danger' } },
         { value: 'd', label: 'D', badge: { label: 'Muted', tone: 'muted' } },
         { value: 'e', label: 'E', badge: { tone: 'danger' }, example: '' },
+        { value: 'f', label: 'F', badge: { label: '  ', tone: 'danger' } },
       ],
       disabledOptions: [],
     });
@@ -474,7 +475,7 @@ describe('an option’s example and badge on the published RadioCardGroup', () =
     assert.ok(
       card('d').querySelector('[data-radio-card-badge]').classList.contains('is-secondary')
     );
-    for (const value of ['b', 'c', 'e']) {
+    for (const value of ['b', 'c', 'e', 'f']) {
       assert.equal(card(value).querySelector('[data-radio-card-badge]'), null, value);
       assert.equal(card(value).querySelector('.manager-resolution-option-line'), null, value);
       assert.equal(card(value).querySelector('[data-radio-card-example]'), null, value);
