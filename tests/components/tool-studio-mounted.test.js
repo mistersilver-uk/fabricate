@@ -111,6 +111,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',

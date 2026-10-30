@@ -786,6 +786,42 @@
     }
   },
   {
+    "spec": "<OptionCards>",
+    "cap": "row — badge and example",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RadioCardGroup.svelte",
+    "undrawn": {
+      "Pace": "the group’s legend, which the shipped group requires; the drawing draws none",
+      "careful": "an option’s value, not its words",
+      "quick": "an option’s value, not its words"
+    },
+    "props": {
+      "legend": "Pace",
+      "groupName": "pl-pace",
+      "value": "careful",
+      "columns": 2,
+      "layout": "row",
+      "options": [
+        {
+          "value": "careful",
+          "label": "Careful",
+          "description": "Take extra time over each step.",
+          "example": "For example, one extra day per stage.",
+          "badge": {
+            "label": "Slower",
+            "tone": "warning"
+          }
+        },
+        {
+          "value": "quick",
+          "label": "Quick",
+          "description": "Finish each step in a single day.",
+          "example": "For example, three days for three stages."
+        }
+      ]
+    }
+  },
+  {
     "spec": "<Field> <Select> <Search>",
     "draws": ".k-lbl",
     "path": "src/ui/svelte/components/Field.svelte",

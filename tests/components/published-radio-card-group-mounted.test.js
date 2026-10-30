@@ -396,6 +396,142 @@ describe('a choice on the published RadioCardGroup', () => {
   });
 });
 
+describe('an option’s example and badge on the published RadioCardGroup', () => {
+  const FLAGGED = Object.freeze([
+    {
+      value: 'breakable',
+      label: 'Breakable',
+      description: 'The check may break it.',
+      example: 'For example, a fumbled hammer.',
+      badge: { label: 'Risky', tone: 'warning' },
+    },
+    { value: 'immune', label: 'Immune', badge: { label: 'Safe', tone: 'positive' } },
+    { value: 'limited', label: 'Limited uses', example: 'For example, three swings.' },
+  ]);
+  const partIn = (card, selector) => card.querySelector(selector);
+  const idsOf = (radio) => radio.getAttribute('aria-describedby').split(' ');
+
+  it('draws the example as a third line and the badge as a toned chip beside the label', async () => {
+    const { card, radio } = mountGroup({ options: FLAGGED, disabledOptions: [] });
+    await settle();
+    const first = card('breakable');
+    assert.equal(partIn(first, '[data-radio-card-example]').textContent, FLAGGED[0].example);
+    const badge = partIn(first, '[data-radio-card-badge]');
+    assert.equal(badge.textContent, 'Risky');
+    assert.ok(badge.classList.contains('is-warning'));
+    const line = partIn(first, '.manager-resolution-option-line');
+    assert.ok(
+      line.contains(partIn(first, '[data-tool-choice-title]')) && line.contains(badge),
+      'the title and the badge share one line'
+    );
+    assert.ok(
+      Boolean(
+        partIn(first, '[data-tool-choice-description]').compareDocumentPosition(
+          partIn(first, '[data-radio-card-example]')
+        ) & Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the example follows the description'
+    );
+    assert.ok(radio('immune'), 'the radios are unchanged');
+  });
+
+  it('names the radio by its label alone and describes it by its badge, description and example once each', async () => {
+    const { card, radio } = mountGroup({ options: FLAGGED, disabledOptions: [] });
+    await settle();
+    const first = radio('breakable');
+    const title = partIn(card('breakable'), '[data-tool-choice-title]');
+    assert.equal(first.getAttribute('aria-labelledby'), title.id);
+    assert.equal(title.textContent, 'Breakable', 'the badge is not in the name');
+    assert.deepEqual(idsOf(first), [
+      partIn(card('breakable'), '[data-radio-card-badge]').id,
+      partIn(card('breakable'), '[data-tool-choice-description]').id,
+      partIn(card('breakable'), '[data-radio-card-example]').id,
+    ]);
+    assert.equal(new Set(idsOf(first)).size, 3, 'no part is listed twice');
+    assert.deepEqual(idsOf(radio('immune')), [
+      partIn(card('immune'), '[data-radio-card-badge]').id,
+    ]);
+    assert.deepEqual(idsOf(radio('limited')), [
+      partIn(card('limited'), '[data-radio-card-example]').id,
+    ]);
+  });
+
+  it('draws an unknown tone as secondary and no badge for an empty or non-string label', async () => {
+    const { card } = mountGroup({
+      options: [
+        { value: 'a', label: 'A', badge: { label: 'Odd', tone: 'rainbow' } },
+        { value: 'b', label: 'B', badge: { label: '', tone: 'danger' } },
+        { value: 'c', label: 'C', badge: { label: 7, tone: 'danger' } },
+        { value: 'd', label: 'D', badge: { label: 'Muted', tone: 'muted' } },
+        { value: 'e', label: 'E', badge: { tone: 'danger' }, example: '' },
+        { value: 'f', label: 'F', badge: { label: '  ', tone: 'danger' } },
+      ],
+      disabledOptions: [],
+    });
+    await settle();
+    assert.ok(
+      card('a').querySelector('[data-radio-card-badge]').classList.contains('is-secondary')
+    );
+    assert.ok(
+      card('d').querySelector('[data-radio-card-badge]').classList.contains('is-secondary')
+    );
+    for (const value of ['b', 'c', 'e', 'f']) {
+      assert.equal(card(value).querySelector('[data-radio-card-badge]'), null, value);
+      assert.equal(card(value).querySelector('.manager-resolution-option-line'), null, value);
+      assert.equal(card(value).querySelector('[data-radio-card-example]'), null, value);
+    }
+  });
+
+  it('draws each of the six tones as its Chip tone', async () => {
+    const tones = ['positive', 'warning', 'info', 'danger', 'accent', 'secondary'];
+    const { card } = mountGroup({
+      options: tones.map((tone) => ({ value: tone, label: tone, badge: { label: tone, tone } })),
+      disabledOptions: [],
+    });
+    await settle();
+    for (const tone of tones) {
+      assert.ok(
+        card(tone).querySelector('[data-radio-card-badge]').classList.contains(`is-${tone}`),
+        tone
+      );
+    }
+  });
+
+  it('removes both on an update that drops them, and draws no member it does not name', async () => {
+    const { handle, props, card, radio } = mountGroup({ options: FLAGGED, disabledOptions: [] });
+    await settle();
+    assert.equal(
+      handle.update({ ...props, options: FLAGGED.map(({ value, label }) => ({ value, label })) }),
+      true
+    );
+    await settle();
+    for (const { value } of FLAGGED) {
+      assert.equal(card(value).querySelector('[data-radio-card-badge]'), null, value);
+      assert.equal(card(value).querySelector('[data-radio-card-example]'), null, value);
+      assert.equal(card(value).querySelector('.manager-resolution-option-line'), null, value);
+      assert.ok(!radio(value).hasAttribute('aria-describedby'), value);
+    }
+    handle.update({
+      ...props,
+      options: [
+        { value: 'a', label: 'A', badge: { label: 'Hi', tone: 'info', class: 'x', id: 'y' } },
+      ],
+    });
+    await settle();
+    const badge = card('a').querySelector('[data-radio-card-badge]');
+    assert.ok(!badge.classList.contains('x') && badge.id !== 'y', 'a badge member is not spread');
+    assert.deepEqual(reports, []);
+    handle.destroy();
+  });
+
+  it('refuses a function in a badge (M10) and renders nothing', () => {
+    assertRefused(
+      { options: [{ value: 'a', label: 'A', badge: { label: () => 'x' } }] },
+      '"options" must not hold a function'
+    );
+  });
+});
+
 describe('what the published RadioCardGroup refuses', () => {
   for (const key of [
     'groupName',

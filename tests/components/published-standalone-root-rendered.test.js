@@ -69,9 +69,7 @@ const SCOPED_PATHS = [...new Set(WIDENED.flatMap(({ path }) => [...importClosure
   .sort(byName);
 const SCOPED = SCOPED_PATHS.map((path) => basename(path, '.svelte'));
 /** A scoped component no published key draws, with the key that would: none of its elements is drawn. */
-const UNDRAWN_SCOPED = Object.freeze({
-  Chip: "EditorTabs' unpublished badges and Select's unpublished badge and reason",
-});
+const UNDRAWN_SCOPED = Object.freeze({});
 /** The specimens in which Tab from the sentinel reaches nothing. */
 const UNREACHED = Object.freeze([
   'card-filled',

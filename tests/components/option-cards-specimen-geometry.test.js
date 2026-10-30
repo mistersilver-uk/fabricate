@@ -27,7 +27,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-option-cards-geometry-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
-  compiledModules: ['Field', 'Medallion', 'RadioCardGroup'].map(component),
+  compiledModules: ['Chip', 'Field', 'Medallion', 'RadioCardGroup'].map(component),
   componentPath: component('RadioCardGroup'),
 });
 

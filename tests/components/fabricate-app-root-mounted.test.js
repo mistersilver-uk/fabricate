@@ -278,6 +278,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',

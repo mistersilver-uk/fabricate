@@ -63,6 +63,7 @@ When an update disables or removes the arrow that holds focus, and focus has not
 Pagination is published through `game.fabricate.api.ui` (issue 2646).
 Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select (the search and filter controls) and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
+RadioCardGroup's optional per-option `example` MAY draw a third line under the description, and its optional `badge` `{ label, tone }` MAY draw a Chip beside the title in the `positive`, `warning`, `info`, `danger`, `accent` or `secondary` tone, any other tone drawing `secondary`; the radio is described by its badge, description, example, reason and option body, and named by its title alone.
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
 
