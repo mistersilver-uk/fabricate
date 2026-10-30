@@ -5,8 +5,9 @@
      and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `bodyBasis="fill"`
      gives a form's body `flex: 1 1 0`, so text under the name wraps inside it and the trailing
      figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
-     `data-list-row` wins. One root holds every form, and `aside` is drawn by one render tag, so the
-     published seam can fill it (issue 2793). -->
+     `data-list-row` wins. One root holds every form; `aside` has one render tag, `leading`, `badges`
+     and `meta` sit in `content`, which one of three exclusive branches renders, and `trailing` has
+     a wrapped tag and a bare one, so the published seam can fill each (issues 2793 and 2843). -->
 <script>
   import Medallion from './Medallion.svelte';
 

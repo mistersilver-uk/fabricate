@@ -418,6 +418,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
+  'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
@@ -878,6 +879,9 @@ const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 /** The list row fixture's aside host in one section's published row, by the section's key. */
 const labListRowAside = (key) =>
   `[data-lab-list-row-ground] > [data-lab-list-row="${key}"] .fabricate-list-row > .fabricate-list-row-aside`;
+/** The slots fixture's host for one slot in one section's published row, by the section's key. */
+const labListRowSlot = (key, slot) =>
+  `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
 /** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
@@ -1440,6 +1444,36 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${labListRowAside(key)} > div`, styles: 'display: contents' },
     { selector: `${labListRowAside(key)} > div > div`, styles: 'display: contents' },
   ]),
+  // The published list row's content slots (issue 2843): each slot host's private wrapper and
+  // slot element that take no box, the trailing wrapper lifted above the button's overlay, and the
+  // bare row's wrapper and slot element, children of the root.
+  'manager-published-list-row-slots-specimen': [
+    ...[
+      ['open', 'leading'],
+      ['open', 'badges'],
+      ['open', 'meta'],
+      ['open', 'trailing'],
+      ['still', 'badges'],
+      ['still', 'trailing'],
+    ].flatMap(([key, slot]) => [
+      { selector: `${labListRowSlot(key, slot)} > span`, styles: 'display: contents' },
+      { selector: `${labListRowSlot(key, slot)} > span > span`, styles: 'display: contents' },
+    ]),
+    ...['open', 'still'].map((key) => ({
+      selector: labListRowSlot(key, 'trailing'),
+      styles: 'position: relative; z-index: 2',
+    })),
+    {
+      selector:
+        '[data-lab-list-row-slots] > [data-lab-list-row="bare"] .fabricate-list-row > span:has(> span > [data-lab-list-row-trailing])',
+      styles: 'display: contents',
+    },
+    {
+      selector:
+        '[data-lab-list-row-slots] > [data-lab-list-row="bare"] .fabricate-list-row > span > span:has(> [data-lab-list-row-trailing])',
+      styles: 'display: contents',
+    },
+  ],
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled
   // face, the keyboard-focused ghost-danger's ring and face, and the pressed disclosure's hover.
   'manager-published-icon-buttons-specimen': [
@@ -7109,6 +7143,59 @@ test('the list row specimen case measures the aside each row the list row fixtur
       .filter((selector) => selector.endsWith('aside')),
     ['open', 'still'].map((key) => labListRowAside(key)),
     'each aside host is measured'
+  );
+});
+
+test('the list row slots specimen case measures the slots each row the slots fixture mounts through the seam requests', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedListRowSlots.svelte'
+  );
+  for (const name of ['ListRow', 'Medallion', 'Chip', 'IconButton']) {
+    assert.ok(
+      holds(
+        instance,
+        (node) =>
+          node.type === 'CallExpression' &&
+          (node.callee?.name === 'mount' || node.callee?.name === 'into') &&
+          node.arguments.some((argument) => argument.value === name)
+      ),
+      `the fixture mounts ${name}`
+    );
+  }
+  for (const hook of ['data-lab-list-row-slots', 'data-lab-list-row']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rows = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'ROWS').init.arguments[0].elements;
+  const keysOf = ({ properties }) => properties.map(({ key }) => key.name);
+  assert.deepEqual(
+    rows.map(({ elements }) => [elements[0].value, keysOf(elements[1])]),
+    [
+      ['open', ['name', 'detail', 'onOpen', 'leading', 'badges', 'meta', 'trailing']],
+      ['still', ['name', 'quantity', 'badges', 'trailing']],
+      ['bare', ['name', 'trailing']],
+    ],
+    'a whole-row button asking all four, a badged read-only row and a bare-trailing row'
+  );
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-list-row-slots-specimen'
+  );
+  assert.deepEqual(steps, [], 'a frame at rest');
+  for (const part of [
+    '.fab-medallion',
+    '.manager-chip',
+    '.fabricate-list-row > span > span button',
+  ]) {
+    assert.ok(expectSelector.includes(part), `the frame waits for ${part}`);
+  }
+  assert.deepEqual(
+    expectLayout.controls.map(({ selector }) => selector),
+    NON_VERB_CONTROLS['manager-published-list-row-slots-specimen'].map(({ selector }) => selector),
+    'each slot host the fixture requests is measured'
   );
 });
 

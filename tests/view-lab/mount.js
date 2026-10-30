@@ -792,6 +792,9 @@ const LAB_SPECIMENS = Object.freeze({
   'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
   // Issue 2793: a button row and a read-only row, each aside holding a companion's element.
   'published-list-rows': () => import('./fixtures/PublishedListRows.svelte'),
+  // Issue 2843: a button row, a badged read-only row and a bare-trailing row, filled with
+  // published components through `leading`, `badges`, `meta` and `trailing`.
+  'published-list-row-slots': () => import('./fixtures/PublishedListRowSlots.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
   // Issue 2601: a three-tab strip whose selection the companion's own update draws.

@@ -133,7 +133,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // The picker's own trigger, its `trigger` snippet, which no guard hides.
   'src/ui/svelte/components/IconPicker.svelte: button': 'always',
-  // The whole-row button, drawn only while `onOpen` holds a function (issue 2784).
+  // The whole-row button, drawn only while `onOpen` holds a function (issue 2784); a control in
+  // `trailing` is the companion's, so the file draws no other (issue 2843).
   'src/ui/svelte/components/ListRow.svelte: button': 'onOpen',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,

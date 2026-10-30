@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`.
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`.
 
 ### The descriptor
 
@@ -485,7 +485,7 @@ Its `triggerClass`, `menuClass` and `triggerProps` are never published, being cl
 - `Modal`'s `onSubmit` and `width` are not published at version 1; publishing one later is additive.
 A `<form>` Fabricate drew around both slots would make an untyped button the companion draws in one submit it, so a form-style dialog wraps its fields in a `<form>` of its own in the `body` slot, handles that form's `submit`, and submits it from a footer `Button`'s `onclick` with `requestSubmit()`.
 Its `dialogProps` is never published, being attributes under another name, and nor is `initialFocusSelector`, being a selector.
-- `ListRow`'s `density`, `layout`, `markSize`, `truncateName`, `inset`, `detailAlign` and `bodyBasis`, and its `leading`, `badges`, `meta`, `children` and `trailing` snippets, are not published at version 1; publishing one later is additive.
+- `ListRow`'s `density`, `layout`, `markSize`, `truncateName`, `inset`, `detailAlign` and `bodyBasis`, and its `children` snippet, are not published at version 1; publishing one later is additive.
 Its `openProps` and `nameClass` are never published, being attributes and a class under other names.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
@@ -498,6 +498,7 @@ A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draw
 - `FillBar`'s `density` took `thin` (issue 2821) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the default track and refuses nothing, which `describe` cannot show.
 - `FillBar`'s `origin` (issue 2821) was added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"origin" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `ListRow`'s `aside` (issue 2793) was added to its entry at `version` 1 as a content slot: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"aside" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `ListRow`'s `leading`, `badges`, `meta` and `trailing` (issue 2843) were added to its entry at `version` 1 as content slots: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`; its `children` and `openProps` are still refused.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -552,7 +553,7 @@ The check fails closed: a callee that another binding shadows or that is no iden
 - A companion fills it by mounting its own component into it, or by appending an element it owns.
 In a `<span>` content slot what it appends is phrasing content, a `<span>` for a mount target.
 It styles and attributes its own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
-- Focusable content a companion draws in a content slot is the companion's to mark `data-keyboard-focus="true"`, except in `ListRow`'s `aside`, where it draws none, as that group states.
+- Focusable content a companion draws in a content slot is the companion's to mark `data-keyboard-focus="true"`, except in `ListRow`'s `leading`, `badges`, `meta` and `aside`, where it draws none, as that group states.
 A `<button>` the companion draws there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
 The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
@@ -1804,11 +1805,11 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`ListRow`.**
   - It is the design system's list row (`<ListRow>` in the library): a mark, a name, an optional detail and an optional quantity on one bordered row, which with `onOpen` is one whole-row button.
-    Without `onOpen` it draws nothing focusable; with it, the button is the only focusable element Fabricate draws inside `target`, so to return focus to the row the companion focuses `target.querySelector('button')`.
+    Without `onOpen` it draws nothing focusable; with it, the button is the only focusable element Fabricate draws inside `target`, so to return focus to the row the companion focuses `target.querySelector('button')`, which a control the companion draws in `trailing` follows in document order.
   - `name` is required and is final display text, drawn as the row's name with its whole text as the name's native `title`, and with `onOpen` it opens the button's accessible name.
   - `detail` is optional final display text drawn after the name, and `''` or absence draws none.
   - `quantity` is a number or a string drawn at the row's end in tabular figures, `0` included, and `null` or absence draws none.
-    With `onOpen` the button's accessible name is its text: the name, then the detail and the quantity.
+    With `onOpen` the button's accessible name is its text in the order it is drawn: `leading`, the name, `badges`, `meta`, the detail, then the quantity; `meta` is also the button's description, so it is read twice.
   - `art` is an image path drawn as the row's mark, with no alternative text, and `''` or absence draws `icon` instead.
   - `icon` is a Font Awesome class string drawn as the mark where there is no `art` and hidden from assistive technology, and it defaults to `'fas fa-box'`.
   - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone, as `Medallion`'s does.
@@ -1830,8 +1831,25 @@ Each group states the accepted values of every key that entry publishes.
     With `onOpen` the aside sits beneath the layer the button draws over the row, so a pointer press anywhere on it presses the button, and the button's `aria-describedby` names the element holding the slot, so the aside's text is read as the button's description.
     So the companion draws text and marks there, as a published `FillBar` or `Chip`, and nothing focusable or pressable, without `onOpen` too, because an `update` that passes `onOpen` covers it.
     For the same reason a native `title` the companion puts on its content there never shows while the row has `onOpen`, because the pointer rests on the button's layer, not on that content.
-    The row never moves its content slot while it is requested: an `update` that passes or omits `onOpen`, or changes any other key, keeps the slot element in place.
-  - No published key draws a control inside the row at version 1: the button holds the row's own text and marks, and the aside lies beneath it, so a control that acts on the row's item, as an edit button, sits beside the row, outside `target`, after the row in focus order.
+    The row never moves `aside` while it is requested: an `update` that adds or drops `onOpen`, or changes any other key, keeps the slot element in place.
+  - `leading` is a content slot whose element is a `<span>`, drawn first in the row's content in place of the mark, so `art`, `icon` and `tint` are ignored while it is requested.
+    The companion draws a glyph or image of its own there, marked `aria-hidden="true"` where it adds nothing to the button's name.
+  - `badges` is a content slot whose element is a `<span>`, drawn after the name on the name's line, and wrapping beneath a name that fills the line.
+  - `meta` is a content slot whose element is a `<span>`, drawn beneath the name and its badges, and with `onOpen` the button's `aria-describedby` names it too.
+  - `trailing` is a content slot whose element is a `<span>`, drawn after the row's content at the row's end, beside the button and above the layer the button draws over the row.
+    It is the one slot that may hold controls: the companion draws one compact control there, a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, and a press on it does not call `onOpen`.
+    The control follows the row's button in focus order, an icon-only control carries a label of its own for its item, and chips go in `badges`.
+    `disabled` dims the whole row and disables no control in `trailing`, so the companion sets that control's own `disabled`.
+    The dimmed row also dims an enabled control in `trailing`, and a press on the gap around the control opens nothing.
+    The companion gives that control a target of at least 24 by 24 CSS pixels.
+  - Requesting `leading`, `badges` or `meta` draws the row at the inset Fabricate gives a row with an aside, and `trailing` alone does not.
+    The companion draws text and marks in `leading`, `badges` and `meta`, as a published `Chip`, and nothing focusable or pressable: with `onOpen` they lie inside the button, so a press on them presses it and calls `onOpen`, and an `update` that passes `onOpen` covers them without it.
+    The companion draws only phrasing content there (text, `span`, an `i` or `img` that is `aria-hidden` or has an `alt`), because with `onOpen` the hosts sit inside a native `button`, which forbids blocks, lists and headings, and an `alt`, `aria-label` or `title` on that content joins the button's accessible name.
+    The module sheet lifts them above the layer the button draws over the row, so a native `title` the companion puts on its content there shows, unlike in `aside`.
+  - An `update` that adds or drops `onOpen` moves `leading`, `badges` and `meta`, and one that requests the first of `onOpen`, `leading`, `badges`, `meta` and `aside`, or drops the last, moves `trailing`; only `aside` never moves.
+    Fabricate detaches the slot element and attaches the same one in its new place, with its content intact, and the browser resets what it resets on those, as Prop kinds states, which for a control in `trailing` includes focus.
+    So the companion changes none of those keys while focus is inside `trailing`, and moves focus to an element of its own first where it must.
+  - No other published key draws a control inside the row: `leading`, `badges` and `meta` lie inside the button and `aside` beneath its layer, so a control that acts on the row's item goes in `trailing`, or beside the row, outside `target`, after the row in focus order.
   - An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not draws or removes the button in the same row, so where the button holds focus the companion moves focus to an element of its own first.
     `destroy` removes the row.
 - **Private:** `ListRow`'s figures, its colours beyond what its group states, its mark's size, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists, headings, cards and densities.
@@ -2290,6 +2308,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, an `onOpen` and `aside: true`, and mounts a published `FillBar` in a `<div>` it appends to `handle.slot('aside')`
 - **THEN** the bar is drawn on a line of its own beneath the row's content, and the button's `aria-describedby` names the element holding the slot
 - **AND** an `update` that omits `onOpen` removes the button and keeps the row and the slot element in place, and one that omits `aside` detaches the slot element with the bar inside it
+
+#### Scenario: A published list row with leading, badges and meta
+
+- **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, a `detail`, an `onOpen` and `leading`, `badges` and `meta` requested, and appends a `<span>` of text to the slot element of each
+- **THEN** the button's accessible name reads the `leading` text, the name, the `badges` text, the `meta` text, then the detail, and its `aria-describedby` names the element holding `meta`
+- **AND** a native `title` on the content in any of the three shows, and an `update` that omits `onOpen` draws the three in the bare row with each slot element connected and its content intact
+
+#### Scenario: A published list row with a trailing control
+
+- **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, an `onOpen` and `trailing: true`, and appends a `<button type="button" data-keyboard-focus="true">` to `handle.slot('trailing')`
+- **THEN** a pointer press on the control reaches it and does not call `onOpen`, and the control follows the row's button in focus order
+- **AND** an `update` that changes `name`, `detail`, `quantity` or `selected` keeps the slot element in place
 
 #### Scenario: A published dialog
 
