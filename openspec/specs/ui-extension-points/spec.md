@@ -1264,7 +1264,7 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`StageBars`.**
   - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
-  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
     A bar's `aria-valuenow` is the clamped value truncated to a whole number, so a stage short of 100 never announces 100 and none announces a fraction.
@@ -1272,7 +1272,12 @@ Each group states the accepted values of every key that entry publishes.
     The companion passes a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
     Naming `valueText` is additive, and `StageBars`' `version` stays 1: before it a stage's `valueText` was unnamed and so private.
     `describe` cannot tell a companion whether the running Fabricate announces it, and one that predates it announces the percentage.
-    A member other than `name`, `label`, `valueText` and `value` is private, and an empty `stages` draws the named group with no bar.
+    `weight` is the stage's share of the row: a finite number above zero, else 1, so the bars are each `weight` over the sum of the weights wide and a list that names none draws equal bars.
+    A `weight` that is a numeric string reads 1, and a bar narrower than its caption cuts the caption off with an ellipsis.
+    Naming `weight` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws equal bars, which `describe` cannot show.
+    A member other than `name`, `label`, `valueText`, `value` and `weight` is private, and an empty `stages` draws the named group with no bar.
+  - `gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
+    Naming `gap` (issue 2821) is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"gap" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
   - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
     A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
@@ -1282,7 +1287,7 @@ Each group states the accepted values of every key that entry publishes.
   - Rest `data-*` attributes land on the group root.
   - It needs no Fabricate ancestor, and draws the same under any.
   - It is not a live region: an `update` redraws the bars in place and announces nothing.
-- **Private:** `StageBars`' track height and corner, its gaps, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
+- **Private:** `StageBars`' track height and corner, its gaps beyond `gap`'s two, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
 
 ### The issue 2601 components
 
