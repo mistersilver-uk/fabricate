@@ -95,6 +95,7 @@
   const sizeClass = $derived(
     Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
   );
+  const dialogClass = $derived(['fabricate-modal', sizeClass]);
 
   const FOCUSABLE =
     'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
@@ -327,7 +328,7 @@
   <div class="manager-modal-overlay" data-manager-modal-overlay use:followSlot></div>
   {#if attached}
     <div
-      class={['fabricate-modal', sizeClass]}
+      class={dialogClass}
       bind:this={dialog}
       role="dialog"
       aria-modal={trapFocus ? 'true' : undefined}
