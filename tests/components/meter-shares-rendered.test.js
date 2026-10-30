@@ -11,14 +11,17 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { SEMANTIC_TONES, TAG_TONES } from '../fixtures/published-components/fillBarTones.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { themePalettes } from '../helpers/themePaletteContrast.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const SCOPED = ['Meter', 'FillBar'];
-const TONES = ['success', 'warning', 'danger', 'info', 'accent', 'neutral', 'chartreuse'];
+const TONES = [...SEMANTIC_TONES, ...TAG_TONES, 'chartreuse'];
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -166,6 +169,50 @@ describe('Meter segments, rendered (issue 2182)', () => {
       assert.equal(shares.length, 2, `${tone} draws two segments`);
       assert.notEqual(single, 'rgba(0, 0, 0, 0)', `${tone} paints its single fill`);
       for (const share of shares) assert.equal(share.background, single, `${tone} segment`);
+    }
+  });
+
+  it('paints each tag name its own colour, distinct from the others and from neutral', () => {
+    const painted = TAG_TONES.map((tone) => rows[`fill-${tone}`].background);
+    for (const [index, background] of painted.entries()) {
+      assert.notEqual(background, 'rgba(0, 0, 0, 0)', `${TAG_TONES[index]} paints`);
+      assert.notEqual(
+        background,
+        rows['fill-neutral'].background,
+        `${TAG_TONES[index]} is not neutral`
+      );
+    }
+    assert.equal(new Set(painted).size, TAG_TONES.length, 'ten names paint ten colours');
+  });
+
+  it('paints an unknown name as neutral', () => {
+    assert.equal(rows['fill-chartreuse'].background, rows['fill-neutral'].background);
+  });
+
+  it('paints each tag name from its own token in all seven palettes', async () => {
+    const palettes = themePalettes(rulesIn(collectStyleCorpus()['styles/fabricate.css']));
+    assert.equal(palettes.size, 7);
+    for (const [theme, tokens] of palettes) {
+      const painted = await tab.evaluate(
+        ({ theme: id, tones }) => {
+          document.querySelector('.fabricate').dataset.fabricateTheme = id;
+          return tones.map(
+            (tone) =>
+              getComputedStyle(
+                document.querySelector(`[data-row="fill-${tone}"] .fab-fill-bar-fill`)
+              ).backgroundColor
+          );
+        },
+        { theme, tones: TAG_TONES }
+      );
+      const expected = TAG_TONES.map((tone) => {
+        const hex = tokens.get(`--fab-tag-${tone}`);
+        const [red, green, blue] = [1, 3, 5].map((at) =>
+          Number.parseInt(hex.slice(at, at + 2), 16)
+        );
+        return `rgb(${red}, ${green}, ${blue})`;
+      });
+      assert.deepEqual(painted, expected, theme);
     }
   });
 });

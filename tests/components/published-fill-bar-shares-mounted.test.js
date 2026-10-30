@@ -10,6 +10,11 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import {
+  OUT_OF_SET_TONES,
+  SEMANTIC_TONES,
+  TAG_TONES,
+} from '../fixtures/published-components/fillBarTones.js';
+import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
   PUBLISHED_RAW_MODULES,
@@ -130,7 +135,7 @@ describe('the published FillBar, shares', () => {
     bar.handle.destroy();
   });
 
-  for (const tone of ['success', 'warning', 'danger', 'info', 'accent', 'neutral']) {
+  for (const tone of SEMANTIC_TONES) {
     it(`paints a ${tone} share through its tone class`, async () => {
       const bar = mountBar({ value: 50, shares: [{ weight: 1, tone }, { weight: 1 }] });
       await settle();
@@ -147,6 +152,79 @@ describe('the published FillBar, shares', () => {
       bar.handle.destroy();
     });
   }
+
+  for (const tone of TAG_TONES) {
+    it(`paints a ${tone} share, a tag-palette name, through its tone class`, async () => {
+      const bar = mountBar({ value: 50, shares: [{ weight: 1, tone }, { weight: 1 }] });
+      await settle();
+      assert.deepEqual(tonesOf(bar.shares()), [`is-${tone}`, 'is-success']);
+      bar.handle.destroy();
+    });
+  }
+
+  it('draws one share of each tag name side by side, and rewrites and removes them on update', async () => {
+    const bar = mountBar({
+      value: 100,
+      shares: TAG_TONES.map((tone) => ({ weight: 1, tone })),
+    });
+    await settle();
+    assert.deepEqual(
+      tonesOf(bar.shares()),
+      TAG_TONES.map((tone) => `is-${tone}`)
+    );
+    const reversed = TAG_TONES.toReversed();
+    assert.equal(
+      bar.handle.update({ value: 100, shares: reversed.map((tone) => ({ weight: 1, tone })) }),
+      true
+    );
+    await settle();
+    assert.deepEqual(
+      tonesOf(bar.shares()),
+      reversed.map((tone) => `is-${tone}`)
+    );
+    assert.equal(bar.handle.update({ value: 100, tone: 'ember' }), true);
+    await settle();
+    assert.equal(bar.shares().length, 0, 'an update that omits shares draws the one fill');
+    assert.deepEqual(classesOf(bar.fill()), ['fab-fill-bar-fill', 'is-ember']);
+    bar.handle.destroy();
+  });
+
+  for (const tone of OUT_OF_SET_TONES) {
+    it(`paints ${JSON.stringify(tone)}, a name outside the closed set, neutral in a share`, async () => {
+      const bar = mountBar({ value: 50, shares: [{ weight: 1, tone }, { weight: 1 }] });
+      await settle();
+      assert.deepEqual(tonesOf(bar.shares()), ['is-neutral', 'is-success']);
+      bar.handle.destroy();
+    });
+  }
+
+  it('reads a share by weight and tone alone, whatever other member it carries', async () => {
+    const bar = mountBar({
+      value: 50,
+      shares: [
+        { weight: 1, tone: 'ember', color: 'red', label: 'x' },
+        { weight: 3, tone: 'azure' },
+      ],
+    });
+    await settle();
+    assert.deepEqual(tonesOf(bar.shares()), ['is-ember', 'is-azure']);
+    assert.deepEqual(growsOf(bar.shares()), [25, 75]);
+    bar.handle.destroy();
+  });
+
+  it('accepts no raw colour as a share tone', async () => {
+    const bar = mountBar({
+      value: 50,
+      shares: [
+        { weight: 1, tone: '#ff0000' },
+        { weight: 1, tone: 'rgb(0 0 0)' },
+      ],
+    });
+    await settle();
+    assert.deepEqual(tonesOf(bar.shares()), ['is-neutral', 'is-neutral']);
+    for (const share of bar.shares()) assert.doesNotMatch(share.getAttribute('style'), /#ff0000/u);
+    bar.handle.destroy();
+  });
 
   it('reads a weight that is not a finite number above zero as 0, a numeric string included', async () => {
     const bar = mountBar({
@@ -197,6 +275,26 @@ describe('the published FillBar, shares', () => {
       assert.equal(bar.shares().length, 0);
       assert.deepEqual(classesOf(bar.fill()), ['fab-fill-bar-fill', 'is-accent']);
       assert.equal(bar.track().getAttribute('data-fill-bar-tone'), 'accent');
+      bar.handle.destroy();
+    });
+  }
+
+  for (const tone of TAG_TONES) {
+    it(`paints the one fill ${tone}, a tag-palette name, and tags its track`, async () => {
+      const bar = mountBar({ value: 50, tone });
+      await settle();
+      assert.deepEqual(classesOf(bar.fill()), ['fab-fill-bar-fill', `is-${tone}`]);
+      assert.equal(bar.track().getAttribute('data-fill-bar-tone'), tone);
+      bar.handle.destroy();
+    });
+  }
+
+  for (const tone of OUT_OF_SET_TONES) {
+    it(`paints the one fill neutral for ${JSON.stringify(tone)}, a name outside the closed set`, async () => {
+      const bar = mountBar({ value: 50, tone });
+      await settle();
+      assert.deepEqual(classesOf(bar.fill()), ['fab-fill-bar-fill', 'is-neutral']);
+      assert.equal(bar.track().getAttribute('data-fill-bar-tone'), 'neutral');
       bar.handle.destroy();
     });
   }

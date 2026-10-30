@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `rows` | `{ id?, name, percent, fill? }[]` | `[]` | `percent` is 0–100 and is printed as given. `fill` is a semantic tone or a ramp key, and anything else paints `neutral`; absent, it is read off the ramp at `percent` in `direction`. A single row's `name` is its visible caption and default accessible name, and an empty one draws no caption. Every row, a single one included, carries `data-banded-bar-row`, `-track` and `-percent` keyed `id ?? index`. |
+  | `rows` | `{ id?, name, percent, fill? }[]` | `[]` | `percent` is 0–100 and is printed as given. `fill` is a `FillBar` tone, its ten tag names included, or a ramp key, and anything else paints `neutral`; absent, it is read off the ramp at `percent` in `direction`. A single row's `name` is its visible caption and default accessible name, and an empty one draws no caption. Every row, a single one included, carries `data-banded-bar-row`, `-track` and `-percent` keyed `id ?? index`. |
   | `direction` | `'ascending'` \| `'descending'` | `'ascending'` | `ascending` is the drop-rate ramp (better is rarer); `descending` is the risk scale, the hazard at a high chance. |
   | `density` | `'default'` \| `'compact'` | `'default'` | Forwarded to `FillBar`. At `compact` a single row stays a meter but draws the histogram's band row. |
 
