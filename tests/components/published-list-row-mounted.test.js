@@ -233,6 +233,13 @@ describe('the published ListRow with onOpen', () => {
     assert.deepEqual(reports, []);
   });
 
+  it('returns from mount with the button row drawn in full, its form class on the root', () => {
+    const { handle, row, button } = mountOpenable({ name: NAME });
+    assert.ok(Boolean(button()), 'the button, with no settle');
+    assert.deepEqual(sorted(authoredClasses(row())), sorted([ROOT, 'is-form']));
+    handle.destroy();
+  });
+
   it('draws the read-only row again on an update that omits onOpen, and the button on one that passes it', async () => {
     const { target, handle, row, button } = mountRow();
     await settle();

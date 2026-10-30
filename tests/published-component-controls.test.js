@@ -576,8 +576,27 @@ function isGuardRead(node, ancestors) {
 }
 
 /**
+ * Whether a reference is only tested for truthiness where it stands, as an `{#if}` test reads it:
+ * the one argument of `Boolean(…)`, the operand of `!`, the test of `?:` or the left of `&&`,
+ * none of which yields the function itself (issue 2793).
+ */
+function isTruthinessRead(node, parent) {
+  if (parent?.type === 'UnaryExpression') return parent.operator === '!';
+  if (parent?.type === 'ConditionalExpression') return parent.test === node;
+  if (parent?.type === 'LogicalExpression') return parent.operator === '&&' && parent.left === node;
+  return (
+    parent?.type === 'CallExpression' &&
+    parent.callee?.type === 'Identifier' &&
+    parent.callee.name === 'Boolean' &&
+    parent.arguments.length === 1 &&
+    parent.arguments[0] === node
+  );
+}
+
+/**
  * Where each reference to `local` sits: `'event'` in an admitted event attribute or a script
- * function only events reach, `'guard'` or `'other'`; its own declaration is none.
+ * function only events reach, `'guard'` in an `{#if}` test or a truthiness test, or `'other'`;
+ * its own declaration is none.
  */
 function referenceSites(ast, local, extra) {
   const sites = [];
@@ -595,7 +614,8 @@ function referenceSites(ast, local, extra) {
       const event =
         isEventReference(ancestors, extra) || ancestors.some((ancestor) => live.has(ancestor));
       if (event) sites.push('event');
-      else sites.push(isGuardRead(node, ancestors) ? 'guard' : 'other');
+      else if (isGuardRead(node, ancestors) || isTruthinessRead(node, parent)) sites.push('guard');
+      else sites.push('other');
     });
   }
   return sites;
@@ -2375,6 +2395,44 @@ describe('the called-from-an-event clause', () => {
   ]) {
     it(`names ${claim} as a fault`, () => {
       assert.deepEqual(faultsOf(key), [`${key} ${fault}`]);
+    });
+  }
+
+  const TESTED = templateOf(
+    'Tested.svelte',
+    [
+      '<script>',
+      '  let { asBoolean, negated, asTernary, andLeft, orLeft, nullish, andRight, invoked } = $props();',
+      '  const held = $derived([',
+      '    Boolean(asBoolean), !!negated, asTernary ? 1 : 0, andLeft && 1,',
+      '    orLeft || 1, nullish ?? 1, 1 && andRight, Boolean(invoked?.()),',
+      '  ]);',
+      '</script>',
+      '<p>{held}</p>',
+      '<button type="button" onclick={() => { asBoolean?.(); negated?.(); asTernary?.(); andLeft?.(); orLeft?.(); nullish?.(); andRight?.(); invoked?.(); }}>x</button>',
+    ].join('\n')
+  ).ast;
+  const testedFaults = (key) => eventFaults({ props: { [key]: callback } }, TESTED);
+
+  for (const [claim, key] of [
+    ['the argument of Boolean()', 'asBoolean'],
+    ['the operand of !', 'negated'],
+    ['the test of ?:', 'asTernary'],
+    ['the left of &&', 'andLeft'],
+  ]) {
+    it(`passes a key tested for truthiness as ${claim}, as an {#if} test reads it`, () => {
+      assert.deepEqual(testedFaults(key), []);
+    });
+  }
+
+  for (const [claim, key] of [
+    ['the left of ||, which yields the function', 'orLeft'],
+    ['the left of ??, which yields the function', 'nullish'],
+    ['the right of &&, which yields the function', 'andRight'],
+    ['a call inside Boolean()', 'invoked'],
+  ]) {
+    it(`names a key read as ${claim} as a fault`, () => {
+      assert.deepEqual(testedFaults(key), [`${key} ${OUTSIDE_AN_EVENT}`]);
     });
   }
 

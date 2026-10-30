@@ -244,6 +244,25 @@ describe('ListRow selectable form, rendered (issue 1778)', () => {
     assert.match(hit.name, /fabricate-list-row-name/, 'the name stays above the overlay');
   });
 
+  it('draws the aside beneath the button, across the row’s inner width', async () => {
+    const box = await tab.evaluate(() => {
+      const row = document.querySelector('[data-case="aside"] .fabricate-list-row');
+      const style = getComputedStyle(row);
+      const rect = (element) => element.getBoundingClientRect();
+      const inner =
+        rect(row).width -
+        ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce(
+          (sum, side) => sum + Number.parseFloat(style[side]),
+          0
+        );
+      const aside = rect(row.querySelector(':scope > .fabricate-list-row-aside'));
+      const button = rect(row.querySelector(':scope > .fabricate-list-row-open'));
+      return { top: aside.top, bottom: button.bottom, width: aside.width, inner };
+    });
+    assert.ok(box.top >= box.bottom - 0.01, `the aside ${JSON.stringify(box)} starts under it`);
+    assert.ok(Math.abs(box.width - box.inner) < 0.5, `and spans ${box.inner}px`);
+  });
+
   it('keeps a truncated name 6ch wide, wrapping its badges beneath it rather than past the row', async () => {
     const measure = (id) =>
       tab.evaluate((caseId) => {

@@ -189,6 +189,29 @@ describe('the published ListRow aside', () => {
     assert.equal(bar.update({ value: 10 }), false, 'and is no longer live');
   });
 
+  it('runs the spec scenario: a bar in the aside, onOpen omitted, then the aside omitted', async () => {
+    const fabUi = ui();
+    const { handle, row, host, button } = mountRow({ onOpen() {} }, fabUi);
+    const slot = handle.slot('aside');
+    const barTarget = slot.ownerDocument.createElement('div');
+    slot.append(barTarget);
+    fabUi.mount('FillBar', { target: barTarget, props: { value: 64 } });
+    await settle();
+    const bar = barTarget.querySelector('.fab-fill-bar');
+    assert.ok(host().contains(bar), 'the bar is drawn in the aside');
+    assert.equal(button().getAttribute('aria-describedby'), host().id);
+    const root = row();
+    assert.equal(handle.update({ name: NAME, aside: true }), true);
+    await settle();
+    assert.ok(!button(), 'the button is removed');
+    assert.ok(row() === root && host().contains(slot), 'the row and the slot element stay');
+    assert.equal(handle.update({ name: NAME }), true);
+    await settle();
+    assert.equal(slot.isConnected, false, 'the slot element is detached');
+    assert.ok(slot.contains(bar), 'with the bar inside it');
+    handle.destroy();
+  });
+
   it('M15: refuses a value that is not a boolean, and renders nothing', () => {
     for (const value of ['yes', 1, null]) {
       const target = fabricateTarget(targets);

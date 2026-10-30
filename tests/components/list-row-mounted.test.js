@@ -545,6 +545,30 @@ describe('ListRow selectable form (issue 1778)', () => {
     assert.ok(bare.querySelector('.fabricate-list-row-body'), 'the regions still render');
   });
 
+  // An inventory card's `interactive` toggle (issue 2793): one root throughout.
+  it('swaps the button for the inert div in the same root when onOpen goes, and back', async () => {
+    const props = {
+      name: 'Iron Ingot',
+      layout: 'card',
+      openProps: { class: 'site-card' },
+      leading: snippet('<span class="probe-leading"></span>'),
+    };
+    const target = await harness.mount({ ...props, onOpen: () => {} });
+    const row = target.querySelector('[data-list-row]');
+    const classes = [...row.classList].join(' ');
+    for (const [onOpen, tag] of [
+      [null, 'DIV'],
+      [() => {}, 'BUTTON'],
+    ]) {
+      await harness.setProps({ ...props, onOpen });
+      assert.ok(target.querySelector('[data-list-row]') === row, 'the same root');
+      assert.equal([...row.classList].join(' '), classes, 'with the same classes');
+      const wrapper = controlOf(target);
+      assert.equal(wrapper.tagName, tag);
+      assert.ok(wrapper.querySelector(':scope > .fabricate-list-row-leading > .probe-leading'));
+    }
+  });
+
   it('draws each mark rung literally, and takes 22 for any other value', async () => {
     const widths = [];
     const warned = [];

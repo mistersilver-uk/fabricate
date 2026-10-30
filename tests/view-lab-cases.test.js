@@ -875,10 +875,10 @@ const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${k
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
-/** The published note in one section of the callout fixture, by its key, and the actions host. */
 /** The list row fixture's aside host in one section's published row, by the section's key. */
 const labListRowAside = (key) =>
   `[data-lab-list-row-ground] > [data-lab-list-row="${key}"] .fabricate-list-row > .fabricate-list-row-aside`;
+/** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
 const LAB_CALLOUT_ACTIONS = `${labCallout('actions')} > .manager-callout-actions`;

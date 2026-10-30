@@ -542,7 +542,7 @@ That happens when the content slot is omitted and requested again, when an `upda
 - A companion fills it by mounting its own component into it, or by appending an element it owns.
 In a `<span>` content slot what it appends is phrasing content, a `<span>` for a mount target.
 It styles and attributes its own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
-- Focusable content a companion draws in a content slot is the companion's to mark `data-keyboard-focus="true"`.
+- Focusable content a companion draws in a content slot is the companion's to mark `data-keyboard-focus="true"`, except in `ListRow`'s `aside`, where it draws none, as that group states.
 A `<button>` the companion draws there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
 The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
@@ -1812,6 +1812,7 @@ Each group states the accepted values of every key that entry publishes.
     The row draws the content slot's children in normal flow, with no gap of its own, so the companion fills it with one element of its own that lays out its content; text there takes the row's ink and type, as the detail does.
     With `onOpen` the aside sits beneath the layer the button draws over the row, so a pointer press anywhere on it presses the button, and the button's `aria-describedby` names the element holding the slot, so the aside's text is read as the button's description.
     So the companion draws text and marks there, as a published `FillBar` or `Chip`, and nothing focusable or pressable, without `onOpen` too, because an `update` that passes `onOpen` covers it.
+    For the same reason a native `title` the companion puts on its content there never shows while the row has `onOpen`, because the pointer rests on the button's layer, not on that content.
     The row never moves its content slot while it is requested: an `update` that passes or omits `onOpen`, or changes any other key, keeps the slot element in place.
   - No published key draws a control inside the row at version 1: the button holds the row's own text and marks, and the aside lies beneath it, so a control that acts on the row's item, as an edit button, sits beside the row, outside `target`, after the row in focus order.
   - An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not draws or removes the button in the same row, so where the button holds focus the companion moves focus to an element of its own first.

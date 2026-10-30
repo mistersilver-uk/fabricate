@@ -62,10 +62,8 @@
   const shaped = $derived(
     Boolean(openProps || leading || badges || meta || children || aside) || isDefault || isCard
   );
-  // A published callback is read only by `{#if}` and the press, so the button's form follows the
-  // button it draws (issue 2784).
-  let openButton = $state(null);
-  const form = $derived(shaped || openButton !== null);
+  // `onOpen` is only tested here, so the published callback gate admits it (issue 2793).
+  const form = $derived(shaped || Boolean(onOpen));
   const rowClass = $derived([
     'fabricate-list-row',
     extraClass,
@@ -145,7 +143,6 @@
 <div class={rowClass} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
   {#if onOpen}
     <button
-      bind:this={openButton}
       {...passed}
       class={['fabricate-list-row-open', openProps?.class]}
       aria-describedby={describedBy}
