@@ -2,6 +2,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { SEMANTIC_TONES, TAG_TONES } from '../fixtures/published-components/fillBarTones.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -45,7 +46,7 @@ describe('FillBar (mounted)', () => {
   });
 
   it('paints each semantic tone through a class, never an inline literal', async () => {
-    for (const tone of ['success', 'warning', 'danger', 'info', 'accent', 'neutral']) {
+    for (const tone of [...SEMANTIC_TONES, ...TAG_TONES]) {
       const root = await harness.mount({ value: 50, tone });
       assert.ok(fillOf(root).classList.contains(`is-${tone}`), `${tone} selects its own rule`);
       assert.doesNotMatch(
@@ -58,9 +59,12 @@ describe('FillBar (mounted)', () => {
   });
 
   it('falls back to neutral for an unknown tone rather than rendering an unpainted fill', async () => {
-    const root = await harness.mount({ value: 50, tone: 'chartreuse' });
-    assert.ok(fillOf(root).classList.contains('is-neutral'));
-    assert.equal(root.querySelector('.fab-fill-bar').dataset.fillBarTone, 'neutral');
+    for (const tone of ['chartreuse', 'sage', 'gold']) {
+      const root = await harness.mount({ value: 50, tone });
+      assert.ok(fillOf(root).classList.contains('is-neutral'), tone);
+      assert.equal(root.querySelector('.fab-fill-bar').dataset.fillBarTone, 'neutral');
+      harness.remount();
+    }
   });
 
   it('applies a caller-owned colour inline, and it overrides the tone', async () => {

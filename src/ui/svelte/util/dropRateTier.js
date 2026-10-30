@@ -51,7 +51,7 @@ export function dropRateRampKey(value) {
 
 /** The colour a ramp key paints, or `''` for a key the ramp does not hold. */
 export function rampColour(key) {
-  return RAMP_COLOURS[key] ?? '';
+  return Object.hasOwn(RAMP_COLOURS, key) ? RAMP_COLOURS[key] : '';
 }
 
 export function dropRateTierColor(value) {

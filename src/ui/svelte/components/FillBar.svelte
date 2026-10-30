@@ -7,7 +7,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | 0–100 | `0` | Out-of-range and non-finite input is clamped, so a caller handing it a raw ratio cannot paint a 4000%-wide fill. |
-  | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'` | `'success'` | An unknown tone falls back to `neutral` rather than rendering an unpainted fill. |
+  | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'`, or a tag name: `'ember'` \| `'butter'` \| `'peach'` \| `'verdant'` \| `'mist'` \| `'azure'` \| `'lavender'` \| `'rose'` \| `'bone'` \| `'slate'` | `'success'` | A tag name paints the matching `--fab-tag-*` token, so a stack of more than six contributors keeps a hue each. An unknown tone, a token spelling or any other tag key falls back to `neutral` rather than rendering an unpainted fill. |
   | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
   | `shares` | `{ weight, tone?, color? }[]` | `[]` | Two or more draw the fill as abutting shares, left to right in every writing direction, each `weight / Σweight` of it and painted as `tone` and `color`; fewer draw the single fill. A `weight` that is not a finite number above zero reads 0, a numeric string included, and shares that all read 0 draw nothing. A `null` entry reads as `{}`, and a `shares` that is not an array draws the single fill. No share takes a minimum width. Stacked, the track carries no `data-fill-bar-tone` and `tone`/`color` are not read. The published form is `{ weight, tone? }`; a member other than those is private. |
   | `density` / `class` | `'compact'` \| `'default'` / class string | `'default'` / `''` | A 6px or 8px track height, and an extra class appended to the primitive's own. |
@@ -32,7 +32,19 @@
     ...rest
   } = $props();
 
-  const TONES = ['success', 'warning', 'danger', 'info', 'accent', 'neutral'];
+  const TAGS = [
+    'ember',
+    'butter',
+    'peach',
+    'verdant',
+    'mist',
+    'azure',
+    'lavender',
+    'rose',
+    'bone',
+    'slate',
+  ];
+  const TONES = ['success', 'warning', 'danger', 'info', 'accent', 'neutral', ...TAGS];
 
   const pct = $derived.by(() => {
     const numeric = Number(value);
@@ -135,5 +147,55 @@
   .fab-fill-bar-fill.is-neutral,
   .fab-fill-bar-share.is-neutral {
     background: var(--fab-text-subtle);
+  }
+
+  .fab-fill-bar-fill.is-ember,
+  .fab-fill-bar-share.is-ember {
+    background: var(--fab-tag-ember);
+  }
+
+  .fab-fill-bar-fill.is-butter,
+  .fab-fill-bar-share.is-butter {
+    background: var(--fab-tag-butter);
+  }
+
+  .fab-fill-bar-fill.is-peach,
+  .fab-fill-bar-share.is-peach {
+    background: var(--fab-tag-peach);
+  }
+
+  .fab-fill-bar-fill.is-verdant,
+  .fab-fill-bar-share.is-verdant {
+    background: var(--fab-tag-verdant);
+  }
+
+  .fab-fill-bar-fill.is-mist,
+  .fab-fill-bar-share.is-mist {
+    background: var(--fab-tag-mist);
+  }
+
+  .fab-fill-bar-fill.is-azure,
+  .fab-fill-bar-share.is-azure {
+    background: var(--fab-tag-azure);
+  }
+
+  .fab-fill-bar-fill.is-lavender,
+  .fab-fill-bar-share.is-lavender {
+    background: var(--fab-tag-lavender);
+  }
+
+  .fab-fill-bar-fill.is-rose,
+  .fab-fill-bar-share.is-rose {
+    background: var(--fab-tag-rose);
+  }
+
+  .fab-fill-bar-fill.is-bone,
+  .fab-fill-bar-share.is-bone {
+    background: var(--fab-tag-bone);
+  }
+
+  .fab-fill-bar-fill.is-slate,
+  .fab-fill-bar-share.is-slate {
+    background: var(--fab-tag-slate);
   }
 </style>
