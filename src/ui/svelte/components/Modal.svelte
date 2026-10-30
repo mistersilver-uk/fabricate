@@ -17,6 +17,8 @@
   | `initialFocus` | string | `''` | `trapFocus` focuses first the first focusable at or in an element whose `data-initial-focus` it equals (issue 2776). |
   | `initialFocusSelector` | selector | `''` | Else the element it matches; else the first focusable one. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer box one equal share of the rail, through `display: contents` wrappers. |
+  | `icon` | Font Awesome classes | `''` | A decorative glyph before the title, inked `--fab-accent-text`; `''` draws none (issue 2818). |
+  | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | Widths 500px, 560px and 620px, still clamped to the viewport; a value outside the set draws `md`, and a caller's `width` outranks it. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 
   Invariants (issue 2658):
@@ -83,8 +85,16 @@
     initialFocus = '',
     initialFocusSelector = '',
     footerLayout = 'end',
+    icon = '',
+    size = 'md',
     onSubmit = undefined,
   } = $props();
+
+  // The widths `size` names beyond the default; `md` is the stylesheet's own 560px.
+  const SIZE_CLASSES = Object.freeze({ sm: 'is-size-sm', lg: 'is-size-lg' });
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
+  );
 
   const FOCUSABLE =
     'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
@@ -317,7 +327,7 @@
   <div class="manager-modal-overlay" data-manager-modal-overlay use:followSlot></div>
   {#if attached}
     <div
-      class="fabricate-modal"
+      class={['fabricate-modal', sizeClass]}
       bind:this={dialog}
       role="dialog"
       aria-modal={trapFocus ? 'true' : undefined}
@@ -339,6 +349,9 @@
       use:modalKeys
     >
       <div class="manager-modal-header">
+        {#if icon}
+          <i class={['manager-modal-icon', icon]} aria-hidden="true"></i>
+        {/if}
         <div class="manager-modal-heading">
           <h3 class="manager-modal-title">{title}</h3>
           {#if subtitle}
@@ -397,6 +410,14 @@
     box-shadow: var(--fab-shadow-lg);
   }
 
+  .fabricate-modal.is-size-sm {
+    --manager-modal-width: 500px;
+  }
+
+  .fabricate-modal.is-size-lg {
+    --manager-modal-width: 620px;
+  }
+
   .manager-modal-header {
     display: flex;
     align-items: center;
@@ -405,6 +426,12 @@
     padding: var(--fab-space-3) var(--fab-space-4);
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
+  }
+
+  .manager-modal-icon {
+    flex: 0 0 auto;
+    color: var(--fab-accent-text);
+    font-size: 12px;
   }
 
   .manager-modal-heading {

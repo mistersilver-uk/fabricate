@@ -56,6 +56,8 @@ describe('the module sheet and every component style against the published Modal
           'open',
           'title',
           'subtitle',
+          'icon',
+          'size',
           'closeLabel',
           'closeOnOutsideClick',
           'trapFocus',
@@ -128,6 +130,17 @@ describe('the inks on the published Modal’s header band', () => {
 
   it('clears 3:1 for the close glyph on the header band in every palette', () => {
     assert.deepEqual(shortfalls(themes, '--fab-text-muted', ['--fab-bg-2'], 3), []);
+  });
+
+  it('clears 4.5:1 for the header glyph on the header band in every palette', () => {
+    const ink = declaredToken(
+      rulesIn(collectStyleCorpus()[COMPONENT]),
+      '.manager-modal-icon',
+      'color',
+      COMPONENT
+    );
+    assert.equal(ink, '--fab-accent-text');
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-bg-2']), []);
   });
 
   it('clears 4.5:1 for the subtitle on the header band in every palette', () => {

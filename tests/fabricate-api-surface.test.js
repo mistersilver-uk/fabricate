@@ -698,6 +698,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           open: optional,
           title: required,
           subtitle: optional,
+          icon: optional,
+          size: optional,
           closeLabel: required,
           closeOnOutsideClick: optional,
           trapFocus: optional,

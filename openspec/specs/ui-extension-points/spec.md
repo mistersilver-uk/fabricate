@@ -460,6 +460,8 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `icon` and `size` (issue 2818) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `width`, a free CSS length, and a scrim are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `placeholder`, `orientation`, `stops` and `nullLabel` are not published at version 1, `stops` and `nullLabel` acting only in the unpublished formatted mode; publishing one later is additive.
@@ -1648,6 +1650,10 @@ Each group states the accepted values of every key that entry publishes.
     `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
     A name of white space alone leaves its element with no name, so the companion never passes one.
+  - `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
+    It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
+  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+    A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
     `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
     An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
@@ -1699,9 +1705,12 @@ Each group states the accepted values of every key that entry publishes.
     Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`, and with `trapFocus` a key stops at the document.
   - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the close control, its ring and the theme are drawn as this group states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button the companion draws in a slot would act on them; under the standalone style root the companion passes none, and the dialog opens on the standalone layer.
-    The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
+    The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
     It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
-    Its width, height and placement are otherwise private.
+    An `overlayHost` that is a region of the companion's own, such as a pane inside its window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
+    Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and a companion that dims its region draws a layer of its own in it, which the dialog is drawn over wherever that layer sets no higher `z-index`.
+    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it where the region clips overflow.
+    Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
     A `target` in its `body` or `footer` slot sits inside the dialog on that layer, so an entry the companion mounts there is under a Fabricate root and takes no standalone style root of its own.
@@ -2184,6 +2193,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onClose` once, the Escape reaches no bubble-phase `keydown` listener above the dialog's host, and Foundry's dismiss keybinding closes no window
 - **AND** the dialog stays open until the companion's `update` passes `open: false` with its other keys
 - **AND** a mount that omits `closeLabel` throws M9, and one that passes `width` throws M8
+
+#### Scenario: A published picker dialog with a glyph and a width rung
+
+- **WHEN** a companion mounts `Modal` with `open: true`, `icon: 'fas fa-plus'` and `size: 'sm'`
+- **THEN** the header band draws a glyph hidden from assistive technology before the title, and the dialog is 500px wide
+- **AND** an `update` that omits `icon` and `size` draws no glyph and a 560px dialog, and a `size` outside the set draws 560px
+
+#### Scenario: A published dialog hosted in a companion region
+
+- **WHEN** a companion mounts `Modal` with an `overlayHost` that is a pane of its own inside a Fabricate window, over a layer of its own in that pane
+- **THEN** the dialog is drawn inside the pane, centred in it where the pane makes itself the containing block of fixed content and centred in the browser window's viewport where it does not
+- **AND** the dialog is drawn over the companion's layer and no layer of Fabricate's covers the pane
 
 #### Scenario: A trapped published dialog in a companion root with its own stacking context
 
