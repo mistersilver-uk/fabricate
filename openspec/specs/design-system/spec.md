@@ -977,6 +977,31 @@ A card never contains a card.
 - **WHEN** a caller rule under a `.fabricate-card` selector declares padding, background, border-radius or border outside a status tone
 - **THEN** `card-drawing-parity` fails and names the rule
 
+### Requirement: A kicker's size is a closed axis whose ink never changes
+
+`Kicker` MUST take a `size` that is `''`, `'8'` or `'9'`, a string naming the rung in px as `Button`'s and `IconButton`'s `size` do, and defaulting to `''`, the 8.5px scale every in-app caller draws.
+The 8px rung draws `0.11em` tracking and the 9px rung `0.12em`; every rung keeps weight 700, upper case, the UI face and a line height of 1.3.
+The number 8 or 9 is read as its string, and any other value outside the set draws the default rung.
+Every rung inks the muted tone, or `--fab-accent` for `accent`, and a rung MUST NOT state a `color`, so the 4.5:1 floor measured for the default holds at each rung.
+No in-app caller passes `size`: the axis exists for the published `Kicker`, whose companion draws 8px labels and 9px section heads.
+The 8px and 9px rungs are read from that companion's measured scales; a new rung is a design ruling and widens the closed set, never a free number.
+
+#### Scenario: A caller passes no size
+
+- **WHEN** a kicker is drawn without `size`
+- **THEN** it computes 8.5px at `0.11em` tracking, as it did before the axis existed
+
+#### Scenario: A caller passes a size outside the set
+
+- **WHEN** a kicker is drawn with `size` `'10'`, `'08'`, `' 8'`, `'large'` or the number 8.5
+- **THEN** it draws the default rung
+
+#### Scenario: A rung is inked
+
+- **WHEN** a kicker is drawn at the 8px or the 9px rung
+- **THEN** its ink is `--fab-text-muted`, or `--fab-accent` for `accent`
+- **AND** it clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
@@ -3017,7 +3042,7 @@ Measured at the gathering tab's event-chance hint: routed through the callout th
 It stays a bare line until a second independent caller justifies naming the shape.
 
 A converted select's KICKER-SHAPED caption is recorded as a caption the `Kicker` primitive does not serve, and is not to be re-proposed as one.
-The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
+The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking by default, with 8px and 9px rungs it offers the published companion, and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
 The second difference is structural and smaller — `Kicker` takes no `class` and no `style`, and its rest spread carries a hook and no `id`, so it cannot be the `aria-labelledby` target the trigger's accessible name now comes from — and it is second because it is a one-prop fix where the type is a design decision.
 The run bar's and run progress's kickers adopt `Kicker` (each as `<Kicker as="span">`), because their shipped subtle ink is under the 4.5:1 floor; its muted ink clears 4.5:1 on the run ground.
 Run progress keeps the `id` its group's `aria-labelledby` names on a wrapper span around the `Kicker`, since `Kicker` forwards no `id`.

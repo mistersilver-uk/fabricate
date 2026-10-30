@@ -9,6 +9,7 @@ import { relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
+import { sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. A NEW token: nothing else in the tree writes it. */
@@ -158,4 +159,28 @@ test('no element nested inside a Kicker re-declares the mark`s ink', () => {
       'moment the mark`s ink moves; delete the child`s `color` and let it inherit:\n- ' +
       offenders.join('\n- ')
   );
+});
+
+/** Every node under `node` for which `test` holds, walked through the parsed tree. */
+function nodesWhere(node, test, found = []) {
+  if (node === null || typeof node !== 'object') return found;
+  if (test(node)) found.push(node);
+  for (const child of Object.values(node)) nodesWhere(child, test, found);
+  return found;
+}
+
+/** The size axis is for the published seam (issue 2815): an in-app caller draws the 8.5px scale. */
+test('no in-app caller passes a size, so every Kicker in the app keeps the 8.5px scale', () => {
+  const callers = sourceAstEntriesUnder('src').flatMap(([path, ast]) =>
+    nodesWhere(
+      ast.fragment ?? {},
+      (node) => node.type === 'Component' && node.name === 'Kicker'
+    ).map((node) => [path, node])
+  );
+  assert.ok(callers.length >= 50, `the scan found ${callers.length} callers`);
+  // StatBox's spread is safe: a label data attribute must start with `data-`, so it cannot be `size`.
+  const offenders = callers
+    .filter(([, node]) => node.attributes.some((attribute) => attribute.name === 'size'))
+    .map(([path]) => path);
+  assert.deepEqual(offenders, [], 'a <Kicker> in the app names `size`; the app draws the default');
 });

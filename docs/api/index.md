@@ -2047,7 +2047,7 @@ The published components, in publication order:
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
-| `Kicker` | 1 | `any` | `as`, `tone`, `children` (text, required) | yes |
+| `Kicker` | 1 | `any` | `as`, `tone`, `size`, `children` (text, required) | yes |
 | `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `any` | `children` (slot) | yes |
@@ -2228,6 +2228,10 @@ Put a hook or a tooltip on your own `target` element, and carry each fact's mean
 `as` is `p`, `span` or `h3`, and defaults to `p`.
 An `update` that changes `as` replaces the kicker's root element; the mount, its handle and its claim on `target` are unchanged.
 `tone` is `default` or `accent`.
+`size` is `''`, `'8'` or `'9'`, a string, and defaults to `''`: `''` draws the 8.5px label, and `'8'` and `'9'` the 8px and 9px labels, at `0.11em` and `0.12em` tracking against the default's `0.11em`; what it draws for any other value is private.
+The 8px label is the smallest type Fabricate draws: keep it to a few words, and never let it alone carry a state or an instruction a user must act on.
+The size changes the type and never the ink, so the contrast figures below hold at every size.
+A Fabricate that predates `size` refuses it with `"size" is not a data attribute`, and `describe('Kicker').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 Its text is its whole name, announced as written, so pass sentence case and never an upper-case literal.
 `h3` makes it a level-3 heading, so pass it only where the kicker heads the content beneath it.
 It takes no `id`: to name a control or group with it, put the `id` on `target` and point `aria-labelledby` there.

@@ -7,6 +7,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `as` | `'p'` \| `'span'` \| `'h3'` | `'p'` | A micro-label is sometimes a heading and sometimes not. The union is MEASURED: 62 `<p>`, 3 `<span>` and 1 `<h3>` across `src/ui/svelte/**`. |
+  | `size` | `''` \| `'8'` \| `'9'` | `''` | The type rung in px, named as a string like `Button`'s and `IconButton`'s, and read as one, so the number 8 or 9 draws its rung; `''` is the 8.5px scale. A CLOSED set: any other value draws the default. The rung sets the size and its tracking, never the ink. |
   | `tone` / `children` | `'default'` \| `'accent'` / snippet | `'default'` / `undefined` | `accent` is `--fab-accent`, and the specimen states when: "Accent only when it names a whole section"; an unknown tone falls back to the default ink. `children` is the label text, already localized. |
 
   Rest spread:
@@ -21,13 +22,15 @@
     3.69:1 and 3.50:1 over the two grounds, under the 4.5:1 small-text floor
     `openspec/specs/design-system/spec.md` states, while the muted tone clears it in all seven
     palettes.
-  - THE TRACKING IS `0.11em`, NOT `.14em`; every shipped `.14em` is bound to a larger size.
+  - THE TRACKING IS `0.11em` AT 8 AND 8.5px AND `0.12em` AT 9px, NOT `.14em`; every shipped `.14em`
+    is bound to a larger size. Every rung inks the same muted or accent tone, which
+    `tests/components/kicker-size-contrast.test.js` holds clear of 4.5:1 for each rung.
   - It states the host's UI face itself, `var(--font-body, var(--font-primary, sans-serif))`, rather
     than inheriting its parent's, so a kicker inside mono evidence still draws the UI face (issue 2257
     D21; `tests/components/kicker-face-rendered.test.js`).
 -->
 <script>
-  let { as = 'p', tone = 'default', children = undefined, ...rest } = $props();
+  let { as = 'p', tone = 'default', size = '', children = undefined, ...rest } = $props();
 
   const HOSTS = new Set(['p', 'span', 'h3']);
 
@@ -36,10 +39,19 @@
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
 
   const accent = $derived(tone === 'accent');
+
+  const SIZE_RUNGS = { 8: true, 9: true };
+
+  const rung = $derived(Object.hasOwn(SIZE_RUNGS, String(size ?? '')) ? String(size) : '');
 </script>
 
-<svelte:element this={host} class="fab-kicker" class:is-accent={accent} {...rest}
-  >{@render children?.()}</svelte:element
+<svelte:element
+  this={host}
+  class="fab-kicker"
+  class:is-accent={accent}
+  class:is-size-8={rung === '8'}
+  class:is-size-9={rung === '9'}
+  {...rest}>{@render children?.()}</svelte:element
 >
 
 <style>
@@ -52,6 +64,16 @@
     letter-spacing: 0.11em;
     text-transform: uppercase;
     line-height: 1.3;
+  }
+
+  .fab-kicker.is-size-8 {
+    font-size: 8px;
+    letter-spacing: 0.11em;
+  }
+
+  .fab-kicker.is-size-9 {
+    font-size: 9px;
+    letter-spacing: 0.12em;
   }
 
   .fab-kicker.is-accent {

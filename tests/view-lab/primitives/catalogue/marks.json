@@ -388,7 +388,7 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "kicker — one size, one tracking",
+    "cap": "kicker — three sizes, one ink",
     "draws": ".k-kicker",
     "path": "src/ui/svelte/components/Kicker.svelte",
     "props": {
@@ -398,7 +398,7 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "kicker — one size, one tracking",
+    "cap": "kicker — three sizes, one ink",
     "draws": ".k-kicker",
     "path": "src/ui/svelte/components/Kicker.svelte",
     "props": {
@@ -409,7 +409,29 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "kicker — one size, one tracking",
+    "cap": "kicker — three sizes, one ink",
+    "draws": ".k-kicker",
+    "path": "src/ui/svelte/components/Kicker.svelte",
+    "props": {
+      "as": "span",
+      "size": "8"
+    },
+    "content": ["Stage · 8"]
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "kicker — three sizes, one ink",
+    "draws": ".k-kicker",
+    "path": "src/ui/svelte/components/Kicker.svelte",
+    "props": {
+      "as": "span",
+      "size": "9"
+    },
+    "content": ["Objectives · 9"]
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "kicker — three sizes, one ink",
     "draws": ".k-kicker",
     "path": "src/ui/svelte/components/Kicker.svelte",
     "props": {
