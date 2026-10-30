@@ -1416,12 +1416,19 @@ Each group states the accepted values of every key that entry publishes.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
 - **`RadioCardGroup`.**
   - It is the design system's option cards (`<OptionCards>` in the library): a named `<fieldset>` of cards, one for each item of `options`, each holding a native `<input type="radio">`, for one choice among a few options.
-  - `options` is required and is an array of `{ value, label, description, icon }` items, one card each, drawn in that order.
+  - `options` is required and is an array of `{ value, label, description, example, badge, icon }` items, one card each, drawn in that order.
     Each `value` is required and is a non-empty string, unique in the group; a list with a duplicate is unsupported and how it draws is private.
     Each `label` is required and is final display text, the radio's whole name; a label of white space alone leaves the radio with no name, so the companion never passes one.
     Each `description` is optional final display text drawn beneath the label, which describes the radio.
+    Each `example` is optional final display text drawn as a third line beneath the description, which describes the radio.
+    Each `badge` is optional and is `{ label, tone }`: `label` is final display text drawn in a chip beside the label, which describes the radio and never joins its name, and a `badge` whose `label` is not a non-empty string draws none.
+    A badge's `tone` is optional and is `'positive'`, `'warning'`, `'info'`, `'danger'`, `'accent'` or `'secondary'`, the chip's colour family; any other value draws `'secondary'`.
+    A radio's description reads its badge, description, example, reason and option body in that order, whichever render.
+    A badge's ink clears 4.5:1 on a card's rest ground and on a chosen card's in every palette, and a disabled option dims its badge with its label.
     Each `icon` is optional Font Awesome classes for a glyph drawn in a chip, hidden from assistive technology.
-    An item's other members are private and Fabricate draws nothing from them; a function in one is M10.
+    An item's other members, and a `badge`'s, are private and Fabricate draws nothing from them; a function in one is M10.
+    Naming `example` and `badge` is additive, and `RadioCardGroup`'s `version` stays 1: before them both were private members that drew nothing.
+    A Fabricate that predates them draws neither and refuses neither, and `describe` names no item member, so a companion puts text a reader must have in `label` or `description` too.
   - `value` is the chosen option's `value` and defaults to `''`: that option's card is drawn chosen and its radio checked, and a `value` that names no option leaves no card chosen.
   - `onChange` is a required callback, called with one argument, the chosen option's `value`, a string, when a press or a key checks a radio; it is never called for a disabled option or a disabled group, and a press on the chosen card calls nothing, because a checked radio fires no `change`.
     When `onChange` returns, or throws, Fabricate checks the radio of the mount's `value` again, so to accept a choice the companion makes the `update` that passes it from inside `onChange`, before any `await`, and the new card is drawn chosen; a choice the companion declines leaves the previous card chosen.

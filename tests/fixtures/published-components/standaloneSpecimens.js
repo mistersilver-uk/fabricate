@@ -402,6 +402,17 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       columns: 3,
     }),
     'cards-one-column': chosenCard({ columns: 1 }),
+    'cards-example-badge': chosenCard({
+      options: CARDS.map((card) =>
+        card.value === 'hand'
+          ? card
+          : {
+              ...card,
+              example: 'For example, a blade',
+              badge: { label: card.value === 'forge' ? 'Slow' : 'New', tone: 'warning' },
+            }
+      ),
+    }),
     'cards-disabled': {
       props: cardsProps({ disabled: true }),
       width: 480,
