@@ -137,6 +137,7 @@ An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted
 `SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644), and issue 2774 adds its `tone` (`accent`, `accent-soft` or `info`), its `shape` (`pill`) and an option's `variant` (`info`) to the published keys.
 The `info` tone fills the chosen segment solid `--fab-info` inked `--fab-on-info` and leaves the idle segments bare, as the `accent` tone does in the accent family, and clears 4.5:1 in all seven themes (issue 2774).
 An option whose `variant` is `info` keeps its `--fab-info-soft` tint, `--fab-info-border` edge and `--fab-info-text` ink inside an `accent` or `accent-soft` track, so a track's tone never hides what choosing that one option means (issue 2774).
+Issue 2814 adds the `compact` and `field` densities and an option's `title` to the published keys: the `compact` and `field` tracks paint `--fab-bg-1` and clear the same 4.5:1 ink floors there, and a `title` is the segment's `data-tooltip-text`, a pointer hint that is never the radio's accessible name.
 
 #### Scenario: A caller's key has no translation
 
@@ -892,8 +893,13 @@ A `Select` that shares a row with a non-compact search takes the `form` rung, so
 The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 `Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
-ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
-A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.
+ART — a record's tile, the icon chip — is 22, 24, 26, 28, 30, 32, 34, 36, 38 or 44 with 26 the default.
+Its radius is the radius ladder's band for the rung: 6 at 22 and 24, 7 at 26 to 32, 9 at 34 to 38 and 11 at 44.
+Its glyph is 10, 10, 11, 11, 12, 13, 14, 14, 15 and 18 at those ten rungs: the four rungs of the original ladder keep 10, 11, 12 and 15, and each added rung takes the nearest whole number to 0.4 of its edge.
+A rung is added only when a companion surface draws the tile at that size, and the six added rungs, 24, 28, 32, 34, 36 and 44, are the sizes a companion plugin draws its own record tiles at.
+A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, with 28 and 30 for a row's leading portrait, and the 32px rounded-square portrait takes radius 9.
+A square portrait takes radius 9 at every portrait rung, 26, 28, 30 and 32 alike, as the ruled portrait kind in the computed census draws it.
+A portrait with no artwork draws the actor's initials, or a Font Awesome glyph when the caller names one, at 0.4 of its edge rounded to a whole number.
 Two contradictions between that ladder and the radius rules below are settled here rather than left for a reader to arbitrate.
 "A fully rounded radius is for a shape whose contents are text alone" would, read literally, forbid the ROUND portrait the library mandates for a person; the round portrait is a stated CARVE-OUT from that sentence, because the corner is what says the mark is a person.
 And the radius rule puts 26 to 32px at radius 7 while the specimen's 32px square portrait is radius 9: for art and portraits the ladder in this paragraph GOVERNS, and the control radius rule does not reach them.
@@ -908,7 +914,7 @@ Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailH
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
 Issue 1523's sweep snapped the rest, and the remaining population is 5 off-ladder art tiles in 5 files, each under a `ratchet-exempt` reason: the 56px slot tile (the specimen's own tap target, not a record tile; issue 2257 D16), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill and in `OutcomeLadder`'s yield chip (maintainer, 2026-10-10); no portrait is off its ladder and no site passes a non-literal size.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
-The icon chip's corner follows its rung — 6 at 22, 7 at 26 and 30, 9 at 38 and at any size off the ladder — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
+The icon chip's corner follows its rung — 6 at 22 and 24, 7 at 26, 28, 30 and 32, 9 at 34, 36 and 38 and at any size off the ladder, 11 at 44 — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.

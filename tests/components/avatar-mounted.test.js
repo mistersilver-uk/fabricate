@@ -223,8 +223,8 @@ describe('Avatar (mounted) — the tint is class-gated, and the ring is the edge
 });
 
 describe('Avatar (mounted) — the corner at each portrait rung', () => {
-  it('is a circle at 26 and 32, and the rounded square takes the 32px portrait`s 9', async () => {
-    for (const size of [26, 32]) {
+  it('is a circle at 26 to 32, and the rounded square takes the 32px portrait`s 9', async () => {
+    for (const size of [26, 28, 30, 32]) {
       for (const [shape, classes] of [
         ['round', ['fab-avatar']],
         ['square', ['fab-avatar', 'is-square']],
@@ -243,5 +243,62 @@ describe('Avatar (mounted) — the corner at each portrait rung', () => {
         .map((d) => d.value);
     assert.deepEqual(radiusOf('.fab-avatar'), ['999px'], 'a person is round at every rung');
     assert.deepEqual(radiusOf('.fab-avatar.is-square'), ['9px'], 'the spec`s square portrait');
+  });
+});
+
+describe('Avatar (mounted) — the glyph fallback', () => {
+  const glyphOf = (root) => tileOf(root).querySelector('i');
+
+  it('draws the icon in place of the initials when there is no art', async () => {
+    const root = await harness.mount({
+      art: '',
+      name: 'Idrin',
+      icon: 'fa-solid fa-user',
+      size: 28,
+    });
+    assert.equal(tileOf(root).dataset.avatar, 'glyph');
+    assert.deepEqual(
+      [...glyphOf(root).classList].filter((name) => !name.startsWith('svelte-')),
+      ['fa-solid', 'fa-user']
+    );
+    assert.equal(glyphOf(root).getAttribute('aria-hidden'), 'true');
+    assert.ok(
+      !tileOf(root).querySelector('.fab-avatar-initials'),
+      'the glyph replaces the initials'
+    );
+  });
+
+  it('keeps the image when art is set, and the initials when no icon is', async () => {
+    const withArt = await harness.mount({
+      art: 'a.webp',
+      name: 'Idrin',
+      alt: '',
+      icon: 'fa-solid fa-user',
+    });
+    assert.equal(tileOf(withArt).dataset.avatar, 'image');
+    assert.ok(!glyphOf(withArt), 'art outranks the glyph');
+    harness.remount();
+    for (const icon of [undefined, '', ' '.repeat(3), 7]) {
+      const root = await harness.mount({ art: '', name: 'Idrin', icon });
+      assert.equal(tileOf(root).dataset.avatar, 'initials', JSON.stringify(icon));
+      assert.ok(!glyphOf(root));
+      assert.doesNotMatch(styleOf(root), /--fab-avatar-glyph/);
+      harness.remount();
+    }
+  });
+
+  it('sizes the glyph to 0.4 of the edge at each portrait rung', async () => {
+    for (const [size, glyph] of [
+      [26, 10],
+      [28, 11],
+      [30, 12],
+      [32, 13],
+    ]) {
+      const root = await harness.mount({ art: '', name: 'Idrin', icon: 'fa-solid fa-user', size });
+      const style = styleOf(root);
+      assert.ok(style.includes(`width:${size}px;height:${size}px`), `${size} sets its box`);
+      assert.ok(style.includes(`--fab-avatar-glyph:${glyph}px`), `${size} draws glyph ${glyph}`);
+      harness.remount();
+    }
   });
 });

@@ -2040,7 +2040,7 @@ The published components, in publication order:
 | Component | Version | Root | Props | Rest |
 | --- | --- | --- | --- | --- |
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
-| `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
+| `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint`, `icon` | no |
 | `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
 | `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
@@ -2055,7 +2055,7 @@ The published components, in publication order:
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
 | `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `size`, `icon`, `busy`, `type`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `semantics`, `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
-| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
+| `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops`, `nullLabel`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
@@ -2104,16 +2104,19 @@ The current tier keeps its valence colour and is marked by a location-dot glyph 
 
 ### Avatar
 
-`Avatar` draws an actor's portrait as a fixed-size tile: the artwork, or the initials of the name.
-`art` is an image path, and a falsy one draws the initials of `name`; a path that fails to load draws the browser's broken image, never the initials.
+`Avatar` draws an actor's portrait as a fixed-size tile: the artwork, a glyph you name, or the initials of the name.
+`art` is an image path, and a falsy one draws `icon` where it is set and the initials of `name` where it is not; a path that fails to load draws the browser's broken image, never the fallback.
 That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `name` is required and is the only source of the initials.
 `alt` is read only when `art` is set, and `''` marks the image decorative.
-`size` is `26` or `32`, the portrait ladder, and defaults to `32`.
+`size` is `26`, `28`, `30` or `32`, the portrait ladder, and defaults to `32`.
 `shape` is `round` or `square`.
 `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
+`icon` is Font Awesome classes drawn in place of the initials when `art` is falsy, and is unset by default; it is drawn at 0.4 of `size`, rounded, in the tile's own ink.
+`icon` takes classes from the sheet the running Foundry ships; a class absent from that build draws an empty box.
+`icon` is additive at `version` `1`: a Fabricate that predates it refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows.
+`name` is never announced and the initials and the glyph are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### Medallion
@@ -2123,8 +2126,8 @@ The tile is inline: give its `target` `display: flex`, so the tile is a flex ite
 That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `icon` takes Font Awesome classes from the sheet the running Foundry ships (6 Pro on Foundry 13, 7 Pro on Foundry 14); a class absent from that build draws an empty box.
-`size` is required and is `22`, `26`, `30` or `38`, the art ladder.
-`glyph` is the ladder's glyph size for that rung: `10`, `11`, `12` or `15`.
+`size` is required and is `22`, `24`, `26`, `28`, `30`, `32`, `34`, `36`, `38` or `44`, the art ladder.
+`glyph` is the ladder's glyph size for that rung: `10`, `10`, `11`, `11`, `12`, `13`, `14`, `14`, `15` or `18`, in the order of the sizes above.
 `alt` is as for `Avatar`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
@@ -2133,6 +2136,9 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
 A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
 A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
+The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
+The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.
+A `size` off the ladder draws at its edge with the corner `9` and is not published.
 The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
@@ -2673,7 +2679,7 @@ const toggle = fabUi.mount('StatusToggle', { target, props: props() });
 
 ### Stepper
 
-`Stepper` draws the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+`Stepper` draws the design system's stepper: a native `<input type="number">`, or a text field where `format` is set, between a decrement and an increment `<button>`, for a number the user types or steps.
 The input is the control, so the number is always typeable.
 `value` is required and is the finite number the stepper holds.
 A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
@@ -2702,10 +2708,37 @@ Without `allowUnset` a `value` of `null` is outside the contract, and what is dr
 `density` is `default` or `comfortable`, and `default` when absent.
 `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
 What the stepper draws for a value outside the set is private; today that is the default density.
+`placeholder` is optional text, shown in the input while it is empty.
+It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; pass the text already localised and never rely on it as a name, because `ariaLabel` names the input and a placeholder does not.
+Fabricate draws it in the muted ink, which clears the contrast floor, and a `placeholder` that is not text is outside the contract.
+`format` is `signed` or `unlimited`, and absent for the plain number field.
+Either value draws a text field with the spinbutton role in place of the number field, and the field reports a number only when the user presses Enter or it loses focus, where the number field reports on every keystroke.
+A `signed` field draws a positive number with a leading plus, as `+5`, zero as `0` and a negative number with a hyphen-minus, as `-5`, and reads an optional plus, hyphen-minus or true minus sign followed by digits with an optional decimal point, as `1.5`, `.5` or `5.`; any other text, such as `1e3` or `5%`, is not a number.
+The `signed` field asks the browser for its decimal keypad, `inputmode="decimal"`, which some touch keypads show without a minus key, so offer the buttons too where negative numbers matter on touch.
+An `unlimited` field draws every number but zero as itself, with no plus, and draws `0` as the `nullLabel` words, as "No limit", for a quantity whose zero means there is none; it takes those words in any case, or `0`, as that endpoint, and reports the endpoint as `0`, never `null`.
+Without `nullLabel`, an `unlimited` field draws `0` as the number, and `allowUnset` is outside the contract.
+An `unlimited` field is meant for a `min` of `0`: a `min` above `0` is outside the contract, and with no `min` a negative number is reachable and the endpoint sits mid-range; a typed `0` selects the endpoint before `min` clamps it.
+Under either value the field restores the displayed text when what was typed is empty or no number, and clamps a typed number to `min` and `max`.
+Text that is no number is restored silently, with no call to `onChange`, so show any refusal message in its own live region.
+Both buttons and the Up and Down keys move to the next stop above or below the held number, or by `step` clamped to `min` and `max` where `stops` is empty, and Home and End move to the lowest and highest stop, or to `min` and `max` where there are none.
+Enter in the field never submits a `<form>`, and Escape, while the typed text differs from the displayed text, restores the displayed text and goes no further, so it closes no window; with no such difference Escape is not caught.
+The field carries `aria-valuemin`, `aria-valuemax`, `aria-valuenow` and `aria-valuetext`, the last being the displayed text and the endpoint carrying no `aria-valuenow`, and the wheel over the focused field steps nothing.
+Under `format` where `allowUnset` is `true` and there is no `nullLabel`, a `null` value draws the field blank, and clearing the field then pressing Enter or leaving it reports `null`.
+`stops` is an optional array of finite numbers, the values the buttons and the Up and Down keys step between under `format`.
+Fabricate sorts it ascending and drops repeats and any entry that is not a finite number, and a `stops` that is not an array counts as none.
+A press moves to the nearest stop strictly above or below the held number, so a held number on no stop stays exact until the user steps it, and a typed number is clamped to `min` and `max` and never moved to a stop.
+A stop outside `min` or `max` stays reachable by both buttons, the Up and Down keys, Home and End, while a typed number is clamped, and `aria-valuemin` and `aria-valuemax` come from the lowest and highest stop.
+Without `format` it changes nothing.
+`nullLabel` is optional text, the words drawn for the one state that is not a number.
+Under `format` it names `null` for a `signed` field: `value` may then be `null`, which draws the words one step below the lowest stop, a press down from the lowest stop reports `null`, and typing the words, in any case, reports `null`; the decrement button is disabled there.
+Under `unlimited` it names `0`, as stated for `format`, and the endpoint's field is drawn in the muted ink and, unfilled and horizontal, widens to the words' length.
+A `nullLabel` that is not a non-empty string counts as none, and without `format` it changes nothing.
+Fabricate coerces none of `format`, `stops`, `nullLabel` and `placeholder`: a `format` other than exactly `signed` or `unlimited`, a boolean, a number or another case among them, draws the plain number field, and `stops` and `nullLabel` then change nothing.
 Fabricate coerces none of `disabled`, `allowUnset` and `fill` to a boolean, so only `true` and `false` are in the contract: the string `'false'` disables the stepper, allows it to be unset and stretches it.
-A Fabricate that predates `disabled`, `allowUnset`, `fill` and `density` refuses each with `"<key>" is not a prop of Stepper`, and `describe('Stepper').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops` and `nullLabel` refuses each with `"<key>" is not a prop of Stepper`, and `describe('Stepper').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so if you refused the earlier call you are told again.
 Where `allowUnset` is `true` the argument is `null` when an edit clears the input or leaves it holding no number, a lone minus sign among them.
+Under `format` it is called when the user presses Enter, a button, an arrow key, Home or End, or the field loses focus, and never per keystroke, with `0` for the `unlimited` endpoint and `null` for the `signed` one.
 Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so do not assume the window is open when `onChange` runs; a mount you have destroyed reports nothing.
 The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so if you hold whole numbers, round it and pass your own value back.
 Pass an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
@@ -2721,14 +2754,15 @@ Beyond its bounds, the stepper's one unavailable state is `disabled`.
 Where the quantity is not worth showing at all, destroy the stepper, moving focus first if one of its parts holds it, and show the number as text of your own.
 Answer a refused edit in text of your own, in a live region.
 The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
-The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
-In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
-`Stepper` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
+The stepper does not catch Escape, except under `format` as stated for it: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
+Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
+`Stepper` takes no rest props, so a `data-*` prop, an `id` and a `title` are refused with `"<key>" is not a prop of Stepper`.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
-Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max` are private.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and the box of the `format` field inside a Fabricate Manager window, are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
 
@@ -3318,9 +3352,13 @@ const group = fabUi.mount('RadioCardGroup', { target, props: props() });
 ### SegmentedControl
 
 `SegmentedControl` draws the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
-`options` is required and is an array of `{ value, label, icon, variant, disabled }` items.
+`options` is required and is an array of `{ value, label, title, icon, variant, disabled }` items.
 `value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
 `label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so never pass one.
+`title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
+It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
+It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
+A `title` that is not a string, or is white space alone, draws no tooltip.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
 `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -3333,10 +3371,14 @@ The platform checks the reached radio first; when `onChange` returns, Fabricate 
 Focus stays on the reached radio, drawn unchecked, so after you decline a change move focus to `target.querySelector('input[type="radio"]:checked')`.
 `ariaLabel` is required and is the radiogroup's name, final display text.
 `fill` is `true` or `false` and defaults to `false`: `true` stretches the track across `target` and gives every segment an equal share.
-`density` is `'default'` or `'inline'` and defaults to `'default'`; any other value is private.
+`density` is `'default'`, `'compact'`, `'field'` or `'inline'` and defaults to `'default'`; any other value is private.
+`'compact'` and `'field'` draw the track on the `--fab-bg-1` fill, with smaller segments in a looser well, each taking an equal share, and `'field'` also edges the selected segment in the accent border.
+Neither sets the height of a card or panel you draw around the control, so size that yourself.
 `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
 An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
 `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
+Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
+A Fabricate that predates them draws a `'compact'` or `'field'` `density` as it does now, without having promised it, and ignores a `title`, and `describe` names the same props before and after, so require the Fabricate release that publishes them if you rely on either.
 Naming `tone`, `shape` and an option's `variant` is additive, and `SegmentedControl`'s `version` stays 1: before them `tone` and `shape` were refused as rest keys and `variant` was private.
 A Fabricate that predates them refuses `tone` and `shape`, and `describe` names them only once the running Fabricate publishes them, so read `describe('SegmentedControl')` before you pass either.
 A `describe` that names `tone` is from a Fabricate that keeps a `variant`'s tint in an accent track.
@@ -3356,7 +3398,8 @@ An empty `options` draws the named radiogroup with no segment and no radio, so n
 The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, or 3px in the `'pill'` shape; leave room for it inside any edge of your own that clips.
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's or, in the `'pill'` shape, over the ground, in every palette but for the solid fill of the `'accent'` and `'info'` tones, and falls short against `--fab-bg-3` in two, so mount the control on one of those four grounds.
 With `tone` `'accent'` or `'info'` the ring is not guaranteed against the solid fill of a neighbouring selected segment, which it falls short of in every palette.
-The selected state is carried by weight alone under forced colors, and by nothing in the `'pill'` shape.
+On a `'compact'` or `'field'` track the ring reaches the track's inner edge and no further, so it is drawn over the track's `--fab-bg-1` fill alone.
+The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
 `groupName`, `iconOnly`, `optionDataAttr` and a `class` are refused, because a rest key must be a `data-*` attribute, so the control never draws an icon-only run or a hook of yours on a segment.
 
 A worked control follows: an ingredient filter on a panel you draw inside a Fabricate window, for example in an extension target.
@@ -4312,6 +4355,7 @@ A published component draws a control only where its section says so, and each c
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   The name a `ListRow` button holds carries its own text as a native `title`, as its section states.
+  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

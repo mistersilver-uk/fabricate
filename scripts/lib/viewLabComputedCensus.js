@@ -25,7 +25,7 @@ const JUDGED_HEIGHTS = new Set([22, 24, 26, 28, 30, 32, 34, 36, 38, 44]);
 export const RULED_KINDS = Object.freeze([
   Object.freeze({
     selector: '.fab-avatar',
-    heights: [32],
+    heights: [26, 28, 30, 32],
     corner: 9,
     reason: "an actor portrait, the portrait ladder's 32 single mark, not a control",
   }),

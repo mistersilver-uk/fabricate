@@ -256,6 +256,27 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       props: stepper({ value: null, allowUnset: true }),
       reach: reach('[data-stepper-decrement]'),
     },
+    'stepper-placeholder': {
+      props: stepper({ value: null, allowUnset: true, placeholder: 'Any' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
+    'stepper-signed': {
+      props: stepper({ value: 5, min: -10, format: 'signed' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
+    'stepper-unlimited': {
+      props: stepper({ value: 0, format: 'unlimited', nullLabel: 'No limit' }),
+      reach: reach('input', '[data-stepper-increment]'),
+    },
+    'stepper-stops-null': {
+      props: stepper({
+        value: null,
+        format: 'signed',
+        stops: [-5, 0, 5],
+        nullLabel: 'Otherwise',
+      }),
+      reach: reach('input', '[data-stepper-increment]'),
+    },
   }),
   SearchField: Object.freeze({
     'search-empty': {
@@ -411,6 +432,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       options: SEGMENTS.map((segment) =>
         segment.value === 'all' ? { ...segment, variant: 'info' } : segment
       ),
+    }),
+    'segmented-titled': chosenSegment({
+      density: 'compact',
+      options: SEGMENTS.map((segment) => ({ ...segment, title: `Show ${segment.label}` })),
     }),
     'segmented-icon-disabled': chosenSegment({
       options: [
