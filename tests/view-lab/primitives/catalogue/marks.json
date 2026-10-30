@@ -441,7 +441,7 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "icon chip — four sizes, tint on the glyph only",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
     "draws": ".k-ic",
     "path": "src/ui/svelte/components/Medallion.svelte",
     "props": {
@@ -453,7 +453,19 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "icon chip — four sizes, tint on the glyph only",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 24,
+      "icon": "fas fa-leaf",
+      "tint": "rose"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
     "draws": ".k-ic",
     "path": "src/ui/svelte/components/Medallion.svelte",
     "props": {
@@ -465,7 +477,19 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "icon chip — four sizes, tint on the glyph only",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 28,
+      "icon": "fas fa-hammer",
+      "tint": "aqua"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
     "draws": ".k-ic",
     "path": "src/ui/svelte/components/Medallion.svelte",
     "props": {
@@ -477,7 +501,43 @@
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
-    "cap": "icon chip — four sizes, tint on the glyph only",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 32,
+      "icon": "fas fa-flask",
+      "tint": "butter"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 34,
+      "icon": "fas fa-book",
+      "tint": "mauve"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 36,
+      "icon": "fas fa-book",
+      "tint": "ember"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
     "draws": ".k-ic",
     "path": "src/ui/svelte/components/Medallion.svelte",
     "props": {
@@ -485,6 +545,18 @@
       "size": 38,
       "icon": "fas fa-book",
       "tint": "peach"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — ten sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 44,
+      "icon": "fas fa-book",
+      "tint": "sage"
     }
   },
   {
