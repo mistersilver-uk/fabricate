@@ -458,6 +458,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Chip`'s `swatch`, `tint`, `truncate`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
 - `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
@@ -833,6 +834,10 @@ Each group states the accepted values of every key that entry publishes.
   - `as` is `p`, `span` or `h3`, and defaults to `p`.
     An `update` that changes `as` replaces the kicker's root element; the mount, its handle and its claim on `target` are unchanged.
   - `tone` is `default` or `accent`.
+  - `size` is `''`, `'8'` or `'9'`, a string, and defaults to `''`: `''` draws the 8.5px label, and `'8'` and `'9'` the 8px and 9px labels, at `0.11em` and `0.12em` tracking against the default's `0.11em`; what it draws for any other value is private.
+    The 8px label is the smallest type Fabricate draws: keep it to a few words, and never let it alone carry a state or an instruction a user must act on.
+    The size changes the type and never the ink, so the contrast figures below hold at every size.
+    A Fabricate that predates `size` refuses it with `"size" is not a data attribute`, and `describe('Kicker').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
   - Its text is its whole name, announced as written, so the companion passes sentence case and never an upper-case literal.
     `h3` makes it a level-3 heading, so the companion passes it only where the kicker heads the content beneath it.
     It takes no `id`: to name a control or group with it, the companion puts the `id` on `target` and points `aria-labelledby` there.

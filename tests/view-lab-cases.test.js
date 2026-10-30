@@ -1138,6 +1138,14 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
     { selector: '.fab-kicker.is-accent', styles: 'font-size: 8.5px; color: var(--fab-accent)' },
     {
+      selector: '.fab-kicker.is-size-8',
+      styles: 'font-size: 8px; color: var(--fab-text-muted)',
+    },
+    {
+      selector: '.fab-kicker.is-size-9',
+      styles: 'font-size: 9px; color: var(--fab-text-muted)',
+    },
+    {
       selector: '.manager-chip.is-warning.is-list',
       styles: 'font-size: 9px; color: var(--fab-warning-text)',
     },

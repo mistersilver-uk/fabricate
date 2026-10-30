@@ -99,6 +99,8 @@
     ['Kicker', { children: 'Standing with the Ironvale Caravan and every guild it supplies' }],
     ['Kicker', { as: 'h3', tone: 'accent', children: 'Guild standing' }],
     ['Kicker', { as: 'span', children: 'Renown' }],
+    ['Kicker', { size: '8', children: 'Stage' }],
+    ['Kicker', { size: '9', children: 'Objectives' }],
     ['Chip', { tone: 'warning', density: 'list', children: 'Preview' }],
     ['Chip', { tone: 'neutral', density: 'list', children: 'Locked' }],
     ['Chip', { children: 'Awaiting the guild master' }],
