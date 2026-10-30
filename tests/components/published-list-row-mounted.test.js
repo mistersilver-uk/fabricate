@@ -233,6 +233,13 @@ describe('the published ListRow with onOpen', () => {
     assert.deepEqual(reports, []);
   });
 
+  it('returns from mount with the button row drawn in full, its form class on the root', () => {
+    const { handle, row, button } = mountOpenable({ name: NAME });
+    assert.ok(Boolean(button()), 'the button, with no settle');
+    assert.deepEqual(sorted(authoredClasses(row())), sorted([ROOT, 'is-form']));
+    handle.destroy();
+  });
+
   it('draws the read-only row again on an update that omits onOpen, and the button on one that passes it', async () => {
     const { target, handle, row, button } = mountRow();
     await settle();
@@ -242,11 +249,12 @@ describe('the published ListRow with onOpen', () => {
     await settle();
     assert.ok(Boolean(button()), 'the button with it');
     assert.ok(row().classList.contains('is-form'));
-    assert.ok(row() !== readOnly, 'in a row that replaced the read-only one');
+    assert.ok(row() === readOnly, 'drawn in the same row');
     assert.equal(handle.update({ name: NAME }), true);
     await settle();
     assert.ok(!button(), 'and none again');
     assert.deepEqual(authoredClasses(row()), [ROOT]);
+    assert.ok(row() === readOnly, 'the row is kept');
     assert.equal(target.children.length, 1);
     handle.destroy();
   });
@@ -427,7 +435,6 @@ describe('what the published ListRow refuses', () => {
     'badges',
     'meta',
     'children',
-    'aside',
     'trailing',
     'class',
     'title',

@@ -790,6 +790,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-well': () => import('./fixtures/PublishedWell.svelte'),
   // Issue 2601: six standing notes, one per tone, one holding a published button in its actions.
   'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
+  // Issue 2793: a button row and a read-only row, each aside holding a companion's element.
+  'published-list-rows': () => import('./fixtures/PublishedListRows.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
   // Issue 2601: a three-tab strip whose selection the companion's own update draws.

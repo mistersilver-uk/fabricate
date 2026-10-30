@@ -3,6 +3,7 @@
  * content's height, a default row's button outgrows Foundry's fixed button height, a focused row's
  * ring sits inside the row where a scrolling list cannot clip it, and a truncated name keeps 6ch
  * before its badges wrap beneath it. Issue 2547: an untruncated name's badges follow the name.
+ * Issue 2793: a point on the aside presses the button.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -81,6 +82,12 @@ const CASES = Object.freeze({
     onOpen: open,
     inset: 'row',
   },
+  // Issue 2793: the aside the published seam fills, beneath the overlay.
+  aside: {
+    name: 'Moonpetal tincture',
+    onOpen: open,
+    aside: snippet('<div class="probe-aside"><span>Stage 2 of 3</span></div>'),
+  },
 });
 
 /**
@@ -106,6 +113,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
   <div data-case="still" style="width:320px">${markup.still}</div>
   <div data-case="opening" style="width:320px">${markup.opening}</div>
   <div data-case="long-detail" style="width:320px">${markup.longDetail}</div>
+  <div data-case="aside" style="width:320px">${markup.aside}</div>
 </div></body></html>`;
 
 let browser;
@@ -217,6 +225,42 @@ describe('ListRow selectable form, rendered (issue 1778)', () => {
     );
     assert.ok(within(ring.ring, ring.row), `the ring ${JSON.stringify(ring)} leaves the row`);
     assert.ok(within(ring.ring, ring.clip), 'and the scrolling list clips it');
+  });
+
+  it('presses the button from a point on the aside, which sits beneath its overlay', async () => {
+    const hit = await tab.evaluate(() => {
+      const row = document.querySelector('[data-case="aside"] .fabricate-list-row');
+      const at = (element) => {
+        const { left, top, width, height } = element.getBoundingClientRect();
+        return document.elementFromPoint(left + width / 2, top + height / 2);
+      };
+      const button = row.querySelector('.fabricate-list-row-open');
+      return {
+        aside: at(row.querySelector(':scope .probe-aside span')) === button,
+        name: at(row.querySelector('.fabricate-list-row-name')).className,
+      };
+    });
+    assert.equal(hit.aside, true, 'a point on the aside’s text lands on the button');
+    assert.match(hit.name, /fabricate-list-row-name/, 'the name stays above the overlay');
+  });
+
+  it('draws the aside beneath the button, across the row’s inner width', async () => {
+    const box = await tab.evaluate(() => {
+      const row = document.querySelector('[data-case="aside"] .fabricate-list-row');
+      const style = getComputedStyle(row);
+      const rect = (element) => element.getBoundingClientRect();
+      const inner =
+        rect(row).width -
+        ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce(
+          (sum, side) => sum + Number.parseFloat(style[side]),
+          0
+        );
+      const aside = rect(row.querySelector(':scope > .fabricate-list-row-aside'));
+      const button = rect(row.querySelector(':scope > .fabricate-list-row-open'));
+      return { top: aside.top, bottom: button.bottom, width: aside.width, inner };
+    });
+    assert.ok(box.top >= box.bottom - 0.01, `the aside ${JSON.stringify(box)} starts under it`);
+    assert.ok(Math.abs(box.width - box.inner) < 0.5, `and spans ${box.inner}px`);
   });
 
   it('keeps a truncated name 6ch wide, wrapping its badges beneath it rather than past the row', async () => {

@@ -5,8 +5,8 @@
      and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `bodyBasis="fill"`
      gives a form's body `flex: 1 1 0`, so text under the name wraps inside it and the trailing
      figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
-     `data-list-row` wins. Toggling `onOpen` replaces the root, re-creating `leading`, `trailing`
-     and `aside` (issue 2784). -->
+     `data-list-row` wins. One root holds every form, and `aside` is drawn by one render tag, so the
+     published seam can fill it (issue 2793). -->
 <script>
   import Medallion from './Medallion.svelte';
 
@@ -59,12 +59,12 @@
   const uid = $props.id();
   const isDefault = $derived(density === 'default');
   const isCard = $derived(layout === 'card');
-  // Every form but the button's: `onOpen` is read only by `{#if}` and the press, so each form
-  // takes its own root (issue 2784).
   const shaped = $derived(
     Boolean(openProps || leading || badges || meta || children || aside) || isDefault || isCard
   );
-  const rowClass = (form) => [
+  // `onOpen` is only tested here, so the published callback gate admits it (issue 2793).
+  const form = $derived(shaped || Boolean(onOpen));
+  const rowClass = $derived([
     'fabricate-list-row',
     extraClass,
     {
@@ -79,7 +79,7 @@
       'is-body-fill': bodyBasis === 'fill' && form,
       'is-danger': tone === 'danger',
     },
-  ];
+  ]);
   const mark = $derived(MARK_SIZES.has(markSize) ? markSize : 22);
   const describedBy = $derived(
     [
@@ -140,7 +140,7 @@
   {#if quantity != null}<span class="fabricate-list-row-quantity">{quantity}</span>{/if}
 {/snippet}
 
-{#snippet inner(form)}
+<div class={rowClass} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
   {#if onOpen}
     <button
       {...passed}
@@ -150,7 +150,7 @@
       aria-pressed={pressed}
       {disabled}
       data-keyboard-focus="true"
-      onclick={open}>{@render content(form)}</button
+      onclick={open}>{@render content(true)}</button
     >
   {:else if openProps}
     <div
@@ -168,14 +168,4 @@
   {#if aside}<div class="fabricate-list-row-aside" id={`${uid}-aside`}>
       {@render aside()}
     </div>{/if}
-{/snippet}
-
-{#if onOpen}
-  <div class={rowClass(true)} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
-    {@render inner(true)}
-  </div>
-{:else}
-  <div class={rowClass(shaped)} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
-    {@render inner(shaped)}
-  </div>
-{/if}
+</div>

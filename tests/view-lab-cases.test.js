@@ -417,6 +417,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
+  'tests/view-lab/fixtures/PublishedListRows.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
@@ -874,6 +875,9 @@ const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${k
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
+/** The list row fixture's aside host in one section's published row, by the section's key. */
+const labListRowAside = (key) =>
+  `[data-lab-list-row-ground] > [data-lab-list-row="${key}"] .fabricate-list-row > .fabricate-list-row-aside`;
 /** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
@@ -1426,6 +1430,16 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_CALLOUT_ACTIONS} > span`, styles: 'display: contents' },
     { selector: `${LAB_CALLOUT_ACTIONS} > span > span`, styles: 'display: contents' },
   ],
+  // The published list row's aside (issue 2793): each aside's own line beneath the button's layer,
+  // in the row's ink, and the private wrapper and slot element that take no box.
+  'manager-published-list-row-aside-specimen': ['open', 'still'].flatMap((key) => [
+    {
+      selector: labListRowAside(key),
+      styles: 'position: relative; z-index: 0; flex-basis: 100%; color: var(--fab-text-muted)',
+    },
+    { selector: `${labListRowAside(key)} > div`, styles: 'display: contents' },
+    { selector: `${labListRowAside(key)} > div > div`, styles: 'display: contents' },
+  ]),
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled
   // face, the keyboard-focused ghost-danger's ring and face, and the pressed disclosure's hover.
   'manager-published-icon-buttons-specimen': [
@@ -7046,6 +7060,55 @@ test('the well specimen case measures the well the well fixture mounts through t
   assert.ok(
     expectLayout.controls.some(({ selector }) => selector.endsWith('[data-lab-well-content]')),
     'the companion element the fixture draws is measured'
+  );
+});
+
+test('the list row specimen case measures the aside each row the list row fixture mounts through the seam requests', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedListRows.svelte');
+  for (const name of ['ListRow', 'FillBar']) {
+    assert.ok(
+      holds(
+        instance,
+        (node) =>
+          node.type === 'CallExpression' &&
+          node.callee?.name === 'mount' &&
+          node.arguments[0]?.value === name
+      ),
+      `the fixture mounts ${name}`
+    );
+  }
+  for (const hook of ['data-lab-list-row-ground', 'data-lab-list-row']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rows = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'ROWS').init.arguments[0].elements;
+  const keysOf = ({ properties }) => properties.map(({ key }) => key.name);
+  assert.deepEqual(
+    rows.map(({ elements }) => [elements[0].value, keysOf(elements[1])]),
+    [
+      ['open', ['name', 'detail', 'onOpen', 'aside']],
+      ['still', ['name', 'quantity', 'aside']],
+    ],
+    'a whole-row button and a read-only row, each requesting its aside'
+  );
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-list-row-aside-specimen'
+  );
+  assert.deepEqual(steps, [], 'a frame at rest');
+  assert.ok(
+    expectSelector.includes('> .fabricate-list-row-aside [data-lab-list-row-aside] .fab-fill-bar'),
+    'the frame waits for the bar mounted in the button row’s aside'
+  );
+  assert.deepEqual(
+    expectLayout.controls
+      .map(({ selector }) => selector)
+      .filter((selector) => selector.endsWith('aside')),
+    ['open', 'still'].map((key) => labListRowAside(key)),
+    'each aside host is measured'
   );
 });
 
