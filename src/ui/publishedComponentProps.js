@@ -150,13 +150,23 @@ export function withoutMember(value, path) {
 }
 
 /**
- * The only per-item members the seam passes from a published `data` value, each as `<Entry>.<key>`.
- * It names a key whose component draws a member the published form does not state, such as a
- * `FillBar` share's inline `color`, which no attribute spread carries and so no stripped row can name.
+ * The only per-item members the seam passes from a published `data` value, each as `<Entry>.<key>`,
+ * or as `<Entry>.<key>.<member>` for the items a member of each item holds (issue 2837). It names a
+ * key whose component draws a member the published form does not state, such as a `FillBar` share's
+ * inline `color`, which no attribute spread carries and so no stripped row can name.
  */
 export const ALLOWED_ITEM_MEMBERS = Object.freeze({
   'FillBar.shares': Object.freeze(['weight', 'tone']),
+  'StageBars.stages.shares': Object.freeze(['weight', 'tone']),
 });
+
+const ALLOWED_PATHS = Map.groupBy(
+  Object.entries(ALLOWED_ITEM_MEMBERS).map(([spec, allowed]) => {
+    const [entry, key, ...path] = spec.split('.');
+    return { id: `${entry}.${key}`, path, allowed };
+  }),
+  ({ id }) => id
+);
 
 /**
  * `value` with each item reduced to the members `allowed` names, as a new tree. An array is read item
@@ -173,6 +183,23 @@ export function onlyMembers(value, allowed) {
       enumerable: true,
       writable: true,
     });
+  }
+  return copy;
+}
+
+/**
+ * `value` with the items below the member `path` names reduced by `onlyMembers` to `allowed`, as a
+ * new tree, read as `withoutMember` reads its path; an empty `path` reduces `value`'s own items.
+ */
+export function onlyMembersAt(value, path, allowed) {
+  if (path.length === 0) return onlyMembers(value, allowed);
+  if (Array.isArray(value)) return value.map((item) => onlyMembersAt(item, path, allowed));
+  if (!hasPlainPrototype(value)) return value;
+  const [head, ...below] = path;
+  const copy = {};
+  for (const [name, field] of Object.entries(value)) {
+    const kept = name === head ? onlyMembersAt(field, below, allowed) : field;
+    Object.defineProperty(copy, name, { value: kept, enumerable: true, writable: true });
   }
   return copy;
 }
@@ -201,8 +228,10 @@ function strippedCopy(entry, key, value) {
     (copy, { path }) => withoutMember(copy, path),
     value
   );
-  const allowed = ALLOWED_ITEM_MEMBERS[id];
-  return allowed ? onlyMembers(kept, allowed) : kept;
+  return (ALLOWED_PATHS.get(id) ?? []).reduce(
+    (copy, { path, allowed }) => onlyMembersAt(copy, path, allowed),
+    kept
+  );
 }
 
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */

@@ -355,6 +355,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       currentIndex: Object.freeze({ kind: 'data' }),
       numbered: Object.freeze({ kind: 'data' }),
       gap: Object.freeze({ kind: 'data' }),
+      track: Object.freeze({ kind: 'data' }),
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
     }),
     rest: true,

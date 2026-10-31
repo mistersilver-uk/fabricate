@@ -597,6 +597,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           currentIndex: optional,
           numbered: optional,
           gap: optional,
+          track: optional,
           ariaLabel: required,
         },
         rest: true,

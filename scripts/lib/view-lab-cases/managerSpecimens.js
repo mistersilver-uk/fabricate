@@ -325,6 +325,16 @@ const STAGE_BARS_KEYS = Object.freeze(['forge', 'brew', 'copy']);
 /** Sized to the fixture's 360px ground and the height of its three groups. */
 const STAGE_BARS_WINDOW = Object.freeze({ width: 480, height: 320 });
 
+/** The stage bars forms fixture's ground, a row by its key, and one stage's track in a row. */
+const STAGE_BARS_FORMS = '[data-lab-stage-bars-forms]';
+const STAGE_BARS_FORM = (key) => `${STAGE_BARS_FORMS} > [data-lab-stage-bars-form="${key}"]`;
+const STAGE_BARS_FORM_TRACK = (key, stage) =>
+  `${STAGE_BARS_FORM(key)} [data-stage-bars-stage="${stage}"] .fab-fill-bar`;
+const STAGE_BARS_FORM_KEYS = Object.freeze(['states', 'thin-states', 'shares', 'default-shares']);
+
+/** Sized to the fixture's 360px ground and its four rows. */
+const STAGE_BARS_FORMS_WINDOW = Object.freeze({ width: 480, height: 360 });
+
 /** The field fixture's ground, and its one section's companion input and caption span. */
 const FIELD_GROUND = '[data-lab-field-ground]';
 const FIELD_SECTION = `${FIELD_GROUND} > [data-lab-field="name"]`;
@@ -1258,6 +1268,55 @@ export const CASES = Object.freeze([
       minInlineSize: { selector: `${STAGE_BARS_GROUND} .fab-stage-bars-track`, pixels: 72 },
     },
     position: STAGE_BARS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StageBars.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-stage-bars-forms-specimen',
+    label:
+      "Specimen, mounted through the published seam — four unnumbered stage groups in a 360px column on --fab-bg-2, each between a heading and a reading the companion draws, the second stage current in each. Reading top to bottom: Default track, three equal bars, Gather full in the success tone, Smelt a little under half full in the accent and Forge empty, each track 6px with a 1px edge on the raised surface, for comparison; Thin track, the same three stages on borderless --fab-bg-3 tracks, each fill the track's whole 6px; Shrine project, on the thin track at the tight 2px gap, three bars two, three and one parts wide, Survey full, split ember, azure and verdant three, two and one parts, Build three fifths full, split ember and azure evenly, in place of the accent, and Dedicate empty; then the same project on the default track. The frame cannot show forced colours, under which each thin track keeps a 1px edge, which the rendered suite measures",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-stage-bars-forms' },
+    steps: [],
+    // The thin row's current stage in its state paint, and the pooled current stage drawn as shares.
+    expectSelector: `${STAGE_BARS_FORMS}:has(> [data-lab-stage-bars-form="thin-states"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin[data-fill-bar-tone="accent"]) > [data-lab-stage-bars-form="shares"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin .fab-fill-bar-share:nth-child(2)`,
+    expectContained: [
+      ...STAGE_BARS_FORM_KEYS.map((key) => ({
+        container: STAGE_BARS_FORMS,
+        target: `${STAGE_BARS_FORM(key)} [role="group"]`,
+      })),
+      { container: '.window-content', target: STAGE_BARS_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // The default track's edge beside the thin track's, each 6px tall.
+        {
+          selector: STAGE_BARS_FORM_TRACK('states', 1),
+          styles: 'height: 6px; border-top-width: 1px; background-color: var(--fab-surface-raised)',
+        },
+        {
+          selector: STAGE_BARS_FORM_TRACK('thin-states', 1),
+          styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+        },
+        {
+          selector: STAGE_BARS_FORM_TRACK('shares', 0),
+          styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+        },
+        // A share of the current pooled stage, the whole 6px tall in its own tone.
+        {
+          selector: `${STAGE_BARS_FORM_TRACK('shares', 1)} .fab-fill-bar-share:first-child`,
+          styles: 'height: 6px; background-color: var(--fab-tag-ember)',
+        },
+        {
+          selector: STAGE_BARS_FORM_TRACK('default-shares', 1),
+          styles: 'height: 6px; border-top-width: 1px',
+        },
+      ],
+    },
+    position: STAGE_BARS_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `StageBars.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

@@ -415,6 +415,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
+  'tests/view-lab/fixtures/PublishedStageBarsForms.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
@@ -905,6 +906,9 @@ const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
 /** The button forms fixture's one control in a row, by the row's key. */
 const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form="${key}"] button`;
+/** The stage bars forms fixture's track of one stage in a row, by the row's key and the stage. */
+const labStageBarsForm = (key, stage) =>
+  `[data-lab-stage-bars-forms] > [data-lab-stage-bars-form="${key}"] [data-stage-bars-stage="${stage}"] .fab-fill-bar`;
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
@@ -1760,6 +1764,30 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: labFilterSegment('owned'),
       styles:
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+    },
+  ],
+  // The published stage bars' forms (issue 2837): the default track's edge beside the thin
+  // track's, each 6px, and a pooled stage's share the whole 6px in its own tone.
+  'manager-published-stage-bars-forms-specimen': [
+    {
+      selector: labStageBarsForm('states', 1),
+      styles: 'height: 6px; border-top-width: 1px; background-color: var(--fab-surface-raised)',
+    },
+    {
+      selector: labStageBarsForm('thin-states', 1),
+      styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+    },
+    {
+      selector: labStageBarsForm('shares', 0),
+      styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+    },
+    {
+      selector: `${labStageBarsForm('shares', 1)} .fab-fill-bar-share:first-child`,
+      styles: 'height: 6px; background-color: var(--fab-tag-ember)',
+    },
+    {
+      selector: labStageBarsForm('default-shares', 1),
+      styles: 'height: 6px; border-top-width: 1px',
     },
   ],
   // The published chip's forms (issue 2858): each square's side, and the dashed edge beside its
@@ -7630,6 +7658,35 @@ test('the segmented forms specimen case measures the rows, surface and rung the 
     'sized-panel-default',
     'panel-names',
   ]);
+});
+
+test('the stage bars forms specimen case measures the rows the stage bars forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedStageBarsForms.svelte'
+  );
+  for (const hook of ['data-lab-stage-bars-forms', 'data-lab-stage-bars-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value);
+  assert.deepEqual(keys, ['states', 'thin-states', 'shares', 'default-shares']);
+  const tracks = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'track')
+    .map((node) => node.value.value);
+  assert.deepEqual(
+    tracks,
+    ['thin', 'thin'],
+    'two rows on the thin track beside two on the default'
+  );
+  const { controls } = getCaseById('manager-published-stage-bars-forms-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-stage-bars-form="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(measured, ['states', 'thin-states', 'shares', 'shares', 'default-shares']);
 });
 
 test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {

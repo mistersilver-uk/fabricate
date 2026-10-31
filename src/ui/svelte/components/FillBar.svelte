@@ -62,7 +62,8 @@
   const reach = $derived(Math.abs(signed) / 2);
   const resolvedTone = $derived(TONES.includes(tone) ? tone : 'neutral');
 
-  const parts = $derived((Array.isArray(shares) ? shares : []).map((share) => share ?? {}));
+  // `Array.from`, not `map`, so a hole in a sparse array reads as `{}` too, as a `null` entry does.
+  const parts = $derived(Array.from(Array.isArray(shares) ? shares : [], (share) => share ?? {}));
   const stacked = $derived(parts.length > 1);
   const weightOf = ({ weight }) => (Number.isFinite(weight) && weight > 0 ? weight : 0);
   const grows = $derived.by(() => {
