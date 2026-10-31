@@ -687,11 +687,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-item-overview',
     'manager-published-leaves-specimen',
   ]),
-  // The at-a-glance figure (issue 1505).
+  // The at-a-glance figure (issue 1505), then the specimen of its content slot (issue 2841).
   'src/ui/svelte/components/StatBox.svelte': Object.freeze([
     'player-crafting-essence-shopping',
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
+    'manager-published-companion-forms-specimen',
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers. Then the
   // specimens that mount it through the published seam, its dismissal's two among them (issue 2452)

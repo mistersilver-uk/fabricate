@@ -11,12 +11,13 @@
   | `note` | already-localized string | `''` | An optional line after the figure and label, in the muted ink, or the danger ink in the `danger` tone, whose fill leaves the muted ink under 4.5:1 on `--fab-bg-2`. Empty draws nothing. |
   | `tone` | `'default'` \| `'info'` \| `'success'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph, and inks the label secondary, because the muted ink falls under 4.5:1 on that fill over `--fab-bg-2` (issue 2841). `success` has no in-app caller and serves the published seam (issue 2847). An unknown tone falls back to `default`. |
   | `valueDataAttr` / `labelDataAttr` | attribute names | `''` | Hooks on the value element and the label. Attribute-only, carrying no behaviour. |
+  | `children` | snippet | `undefined` | Content drawn after the figure and label and before the note, in a band as wide as the box's content, `--fab-space-2` below them, spacing its own children by `--fab-space-1` (issue 2841). Unset draws no band. |
 
   Reading order:
   - The DOM order is the reading order and the visual order: `default` is figure then label, `start`
-    is label then figure, and the note comes last in both. The box adds no role and no ARIA name, so
-    each piece is announced once, as written, and the glyph is hidden. The note continues the reading
-    and never repeats the label.
+    is label then figure, then the `children` band, and the note comes last in both. The box adds no
+    role and no ARIA name, so each piece is announced once, as written, and the glyph is hidden. The
+    note continues the reading and never repeats the label.
 
   Rest spread:
   - `{...rest}` lands on the box root, written after `class`, and exists for a test or screenshot
@@ -52,6 +53,7 @@
     note = '',
     valueDataAttr = '',
     labelDataAttr = '',
+    children = undefined,
     ...rest
   } = $props();
 
@@ -92,6 +94,7 @@
     {@render figure()}
     {@render caption()}
   {/if}
+  {#if children}<div class="fab-stat-box-slot">{@render children()}</div>{/if}
   {#if note}<span class="fab-stat-box-note">{note}</span>{/if}
 </div>
 
@@ -138,6 +141,13 @@
     overflow-wrap: anywhere;
   }
 
+  .fab-stat-box-slot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--fab-space-1);
+    margin-top: var(--fab-space-2);
+  }
+
   .fab-stat-box.is-start {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -158,6 +168,12 @@
 
   .fab-stat-box.is-start .fab-stat-box-note {
     margin-top: 0;
+  }
+
+  /* The start grid's own gap is space-1, so the band adds the rest of its space-2 and stretches. */
+  .fab-stat-box.is-start .fab-stat-box-slot {
+    justify-self: stretch;
+    margin-top: var(--fab-space-1);
   }
 
   .fab-stat-box.is-info .fab-stat-box-value {

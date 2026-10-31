@@ -24,6 +24,7 @@ const DECLARED_PROPS = Object.freeze([
   'note',
   'valueDataAttr',
   'labelDataAttr',
+  'children',
 ]);
 
 /** The hook props whose value is an attribute name the component spreads onto an element. */
@@ -44,11 +45,11 @@ const contract = defineClosedTokenContract({
   emits: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-stat-tone={resolvedTone}']),
 
   primitiveWrites: {
-    count: 4,
+    count: 5,
     why:
       'the primitive itself, which writes the class so that no call site has to remember it. ' +
-      'The count is 4 because the token is also the STEM of the three element classes beneath ' +
-      'it — `fab-stat-box-value`, `fab-stat-box-figure` and `fab-stat-box-note` — and the shared clause matches by ' +
+      'The count is 5 because the token is also the STEM of the four element classes beneath ' +
+      'it — `fab-stat-box-value`, `fab-stat-box-figure`, `fab-stat-box-slot` and `fab-stat-box-note` — and the shared clause matches by ' +
       'substring. That is the shape a caller writing any of the three would be caught by, so ' +
       'the stem is deliberately not renamed to make this number 1',
   },

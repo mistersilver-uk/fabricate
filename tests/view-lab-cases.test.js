@@ -428,6 +428,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedListRowForms.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedButtonForms.svelte',
+  'tests/view-lab/fixtures/PublishedCompanionForms.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
@@ -913,6 +914,9 @@ const labStageBarsForm = (key, stage) =>
 /** The fill bar bands fixture's one fill in a row, by the row's key. */
 const labFillBarBand = (key) =>
   `[data-lab-fill-bar-bands] > [data-lab-fill-bar-band="${key}"] .fab-fill-bar-fill`;
+/** A part of the companion forms fixture's row by its key. */
+const labCompanionForm = (key, part) =>
+  `[data-lab-companion-forms] > [data-lab-companion-form="${key}"] ${part}`;
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
@@ -1922,6 +1926,26 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '[data-lab-modal] [data-lab-modal-footer] button',
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The published stat box's content band (issue 2841): its grid and space at each layout, the
+  // thin track it holds, and the success figure.
+  'manager-published-companion-forms-specimen': [
+    {
+      selector: labCompanionForm('stat-progress', '.fab-stat-box-slot'),
+      styles: 'display: grid; row-gap: 4px; margin-top: 4px',
+    },
+    {
+      selector: labCompanionForm('stat-progress', '.fab-fill-bar'),
+      styles: 'height: 4px; background-color: var(--fab-bg-3)',
+    },
+    {
+      selector: labCompanionForm('stat-complete', '.fab-stat-box-value'),
+      styles: 'color: var(--fab-success-text)',
+    },
+    {
+      selector: labCompanionForm('stat-centred', '.fab-stat-box-slot'),
+      styles: 'display: grid; margin-top: 8px',
     },
   ],
   // The opener focus returned to after a close: its ring, by its shape.
@@ -7662,6 +7686,26 @@ test('the button forms specimen case measures the rung each row of the button fo
     .map(Number);
   assert.deepEqual(measured, rungs, 'each row’s control is measured at the rung it mounts');
   assert.deepEqual(rungs, [24, 26, 20, 22], 'the four rungs issue 2853 adds');
+});
+
+test('the companion forms specimen case contains every row the companion forms fixture mounts, in its order', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedCompanionForms.svelte'
+  );
+  for (const hook of ['data-lab-companion-forms', 'data-lab-companion-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rows = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id.name === 'ROWS'
+  );
+  const keys = rows.init.arguments[0].elements.map((row) => row.elements[0].value);
+  const contained = getCaseById('manager-published-companion-forms-specimen')
+    .expectContained.map(({ target }) => /data-lab-companion-form="([\w-]+)"/u.exec(target)?.[1])
+    .filter(Boolean);
+  assert.deepEqual(contained, keys, 'each row is held inside the ground');
 });
 
 test('the segmented forms specimen case measures the rows, surface and rung the segmented forms fixture mounts', () => {

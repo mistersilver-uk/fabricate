@@ -1039,6 +1039,9 @@ The DOM order MUST be the visual order: figure then label at `'default'`, label 
 The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
 Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
 No in-app caller passes `layout` or `note`: the axis exists for the published `StatBox`, whose companion draws label-first tiles with a note line in two places.
+`StatBox` MUST take an optional `children` snippet, drawn after the figure and label and before the note in either layout, in a band that is a one-column grid as wide as the box's content, spacing its children by `--fab-space-1`, `--fab-space-2` below the figure and label (issue 2841).
+Unset draws no band, so every in-app caller, none of which passes it, draws the same elements as before.
+The band adds no role and no name, so a `FillBar`, which has neither, drawn there as a progress tile's 4px track leaves the box read once, as written.
 
 #### Scenario: A caller passes neither key
 
@@ -1055,6 +1058,12 @@ No in-app caller passes `layout` or `note`: the axis exists for the published `S
 - **WHEN** a stat box is drawn at `'start'` with a `note`
 - **THEN** its text is read as the label, the figure, then the note
 - **AND** no element of the box carries a role, an `aria-label`, an `aria-labelledby` or a `title`
+
+#### Scenario: A progress tile draws its track in the band
+
+- **WHEN** a published stat box is mounted with `children` and a published `FillBar` at `density` `thin` in its slot
+- **THEN** the bar spans the box's content width, `--fab-space-2` below the figure and label, in either layout
+- **AND** the box's text is read as its layout's order with no name added
 
 #### Scenario: A note is inked
 

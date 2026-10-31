@@ -576,6 +576,20 @@ const CHIP_FORM_KEYS = Object.freeze([
 /** Sized to the fixture's 360px ground and its twelve rows. */
 const CHIP_FORMS_WINDOW = Object.freeze({ width: 480, height: 440 });
 
+/** The companion forms fixture's ground, a row by its key, and a part of the row's mount. */
+const COMPANION_FORMS = '[data-lab-companion-forms]';
+const COMPANION_FORM = (key) => `${COMPANION_FORMS} > [data-lab-companion-form="${key}"]`;
+const COMPANION_FORM_PART = (key, part) => `${COMPANION_FORM(key)} ${part}`;
+const COMPANION_FORM_KEYS = Object.freeze([
+  'stat-progress',
+  'stat-complete',
+  'stat-centred',
+  'stat-plain',
+]);
+
+/** Sized to the fixture's 360px ground and its rows. */
+const COMPANION_FORMS_WINDOW = Object.freeze({ width: 480, height: 420 });
+
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
 const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
@@ -2172,6 +2186,49 @@ export const CASES = Object.freeze([
     position: CHIP_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Chip.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-companion-forms-specimen',
+    label:
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in a 360px column on the window's --fab-bg-1 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading top to bottom: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; and the progress tile without the slot, the baseline the band adds to. Nothing here takes focus. The frame cannot show that a screen reader reads each tile once with nothing for the bar, which the rendered suite reads",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-companion-forms' },
+    steps: [],
+    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin) > [data-lab-companion-form="stat-plain"] .fab-stat-box`,
+    expectContained: [
+      ...COMPANION_FORM_KEYS.map((key) => ({
+        container: COMPANION_FORMS,
+        target: COMPANION_FORM(key),
+      })),
+      { container: '.window-content', target: COMPANION_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // The band's grid and its space at each layout, the thin track it holds, and the success figure.
+        {
+          selector: COMPANION_FORM_PART('stat-progress', '.fab-stat-box-slot'),
+          styles: 'display: grid; row-gap: 4px; margin-top: 4px',
+        },
+        {
+          selector: COMPANION_FORM_PART('stat-progress', '.fab-fill-bar'),
+          styles: 'height: 4px; background-color: var(--fab-bg-3)',
+        },
+        {
+          selector: COMPANION_FORM_PART('stat-complete', '.fab-stat-box-value'),
+          styles: 'color: var(--fab-success-text)',
+        },
+        {
+          selector: COMPANION_FORM_PART('stat-centred', '.fab-stat-box-slot'),
+          styles: 'display: grid; margin-top: 8px',
+        },
+      ],
+    },
+    position: COMPANION_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StatBox.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
