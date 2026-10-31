@@ -815,6 +815,10 @@ const LAB_SPECIMENS = Object.freeze({
   'published-option-cards': () => import('./fixtures/PublishedOptionCards.svelte'),
   // Issue 2644: an ingredient filter and a page size whose choice the companion's own update draws.
   'published-segmented': () => import('./fixtures/PublishedSegmented.svelte'),
+  // Issue 2856: the panel surface, the 34px rung and option names.
+  'published-segmented-forms': () => import('./fixtures/PublishedSegmentedForms.svelte'),
+  // Issue 2858: the icon-only chip under each published tone, a named chip and the dashed emphasis.
+  'published-chip-forms': () => import('./fixtures/PublishedChipForms.svelte'),
   // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.
   'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
   // Issue 2647: a reagent's icon whose choice the companion's own update draws.

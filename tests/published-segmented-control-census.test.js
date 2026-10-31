@@ -34,9 +34,10 @@ import { shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
 const COMPONENT = 'src/ui/svelte/components/SegmentedControl.svelte';
 
 /**
- * The published track's root: the classes `fill`, `density`, `tone` and `shape` write beside it, the
- * four row classes a Fabricate rule redraws it under, and the classes its file spells that no
- * published key draws: the tally, the badge, the tag tone and the icon-only run.
+ * The published track's root: the classes `fill`, `density`, `tone`, `shape`, `surface` and `size`
+ * write beside it (issue 2856), the four row classes a Fabricate rule redraws it under, and the
+ * classes its file spells that no published key draws: the tally, the badge, the tag tone and the
+ * icon-only run.
  */
 const TRACK = Object.freeze({
   root: 'manager-segmented',
@@ -49,6 +50,8 @@ const TRACK = Object.freeze({
     'is-accent-soft',
     'is-info',
     'is-pill',
+    'is-panel',
+    'is-size-34',
   ]),
   ancestors: new Set([
     'manager-checks-tier-row',
@@ -101,7 +104,18 @@ describe('the module sheet and every component style against the published Segme
     assert.deepEqual(
       [Object.keys(entry.props), gatedRoot(entry)],
       [
-        ['options', 'value', 'onChange', 'ariaLabel', 'fill', 'density', 'tone', 'shape'],
+        [
+          'options',
+          'value',
+          'onChange',
+          'ariaLabel',
+          'fill',
+          'density',
+          'tone',
+          'shape',
+          'surface',
+          'size',
+        ],
         'fabricate',
       ],
       'a published icon-only run, tag tone, class or wider root reopens the census'
@@ -167,6 +181,8 @@ describe('the segmented control census, synthetic', () => {
     '.manager-segmented.is-accent',
     '.manager-segmented.is-accent-soft',
     '.manager-segmented.is-info',
+    '.manager-segmented.is-panel',
+    '.manager-segmented.is-size-34',
     '.fabricate .manager-segmented',
     '.manager-segmented input',
     '.manager-segmented[data-x]',

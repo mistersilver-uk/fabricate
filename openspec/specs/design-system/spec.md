@@ -128,7 +128,7 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 ### Requirement: SegmentedControl takes already-localized option labels
 
 `SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
-An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+An option is `{ value, label, ariaLabel?, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
 The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
 `SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
 The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` takes its legend, hint, option labels and descriptions as final display text the caller resolves, with `localizeOptions` from `util/localizeOr.js` for an option list; no option carries `labelKey`, `fallback`, `descKey` or `descFallback`, and the group takes no `legendKey` or `hintKey`, so its closure calls no `game.i18n` (issue 2601).
@@ -142,6 +142,7 @@ An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted
 The `info` tone fills the chosen segment solid `--fab-info` inked `--fab-on-info` and leaves the idle segments bare, as the `accent` tone does in the accent family, and clears 4.5:1 in all seven themes (issue 2774).
 An option whose `variant` is `info` keeps its `--fab-info-soft` tint, `--fab-info-border` edge and `--fab-info-text` ink inside an `accent` or `accent-soft` track, so a track's tone never hides what choosing that one option means (issue 2774).
 Issue 2814 adds the `compact` and `field` densities and an option's `title` to the published keys: the `compact` and `field` tracks paint `--fab-bg-1` and clear the same 4.5:1 ink floors there, and a `title` is the segment's `data-tooltip-text`, a pointer hint that is never the radio's accessible name.
+Issue 2856 adds `surface`, `size` and an option's `ariaLabel` to the published keys: `surface: 'panel'` MUST fill the track with `--fab-bg-0` over every density's own fill and draw nothing in the `pill` shape or the `tag` tone, and its idle, hover and selected inks clear 4.5:1 there in all seven themes; `size: 34` MUST draw a 34px border-box track whose segments stretch inside its padding, because the `compact` and `field` tracks draw 36 and the `inline` one 30; and a non-blank option `ariaLabel` MUST be written as that radio's `aria-label` and MUST contain its `label` as one run of whole words, which the published seam refuses otherwise (M22).
 
 #### Scenario: A caller's key has no translation
 
@@ -216,6 +217,8 @@ Its info-family fill, border and ink MUST remain distinct from the single shared
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
+Chip's `ariaLabel` (issue 2858), beside an `icon` with no label, MUST draw the icon-only square, `role="img"` under that name on a non-interactive host other than `li`, and write the name as its `data-tooltip-text`; on a `button` or `a` host it MUST be the control's `aria-label`; beside a label on any other host it MUST hide the label from assistive technology and draw the name as visually hidden text, with no role and no change to the chip's layout, so the label MUST hold no control; the square takes no focus and offers no target, so the 24px pointer-target floor does not bind it, and its tone MUST NOT be the only carrier of the state it shows, which its glyph and name carry.
+Chip's `emphasis="dashed"` (issue 2858) MUST dash the tone's edge, which forced colours keep, for a locked or provisional chip whose text or name also says that state.
 IconButton's opt-in rungs `size="20"`, `size="22"`, `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
 The `20` and `22` rungs (issue 2853) sit below the 24px pointer target floor (WCAG 2.2 §2.5.8), so each MUST widen its pointer target to 24 by 24 about its centre with an absolutely positioned `::before`, which moves no layout, and the keyboard ring stays on the drawn box.
 The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).

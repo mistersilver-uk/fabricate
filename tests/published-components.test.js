@@ -1107,6 +1107,215 @@ describe('a contains key (issue 2852)', () => {
   });
 });
 
+const ITEMIZED = Object.freeze({
+  name: 'Itemized',
+  path: 'src/ui/svelte/components/Itemized.svelte',
+  version: 1,
+  props: {
+    options: { kind: 'data', required: true, itemContains: { ariaLabel: 'label' } },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Itemized' }),
+});
+
+describe('an itemContains key (issue 2856)', () => {
+  const mountOf = (ui, options) =>
+    ui.mount('Itemized', { target: new FakeTarget(), props: { options } });
+  const holds = (index, label, name) =>
+    `${PREFIX}"options[${index}].ariaLabel" must contain the text of "options[${index}].label" (${JSON.stringify(label)} is not in ${JSON.stringify(name)})`;
+
+  it('M22: refuses the first item whose non-blank name does not hold its label, naming it, on mount and update', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    const options = [
+      { label: 'Oak', ariaLabel: 'Oak, chosen by Mira' },
+      { label: 'Ash', ariaLabel: 'Ashen' },
+      { label: 'Yew', ariaLabel: 'Elm' },
+    ];
+    assert.throws(() => mountOf(ui, options), {
+      name: 'TypeError',
+      message: holds(1, 'Ash', 'Ashen'),
+    });
+    const handle = mountOf(ui, options.slice(0, 1));
+    assert.throws(() => handle.update({ options: [{ label: 'Oak tree', ariaLabel: 'Oak' }] }), {
+      message: holds(0, 'Oak tree', 'Oak'),
+    });
+  });
+
+  it('holds a numeric label as its digits', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    assert.doesNotThrow(() => mountOf(ui, [{ label: 25, ariaLabel: '25 per page' }]));
+    assert.throws(() => mountOf(ui, [{ label: 25, ariaLabel: 'Twenty-five' }]), {
+      message: holds(0, '25', 'Twenty-five'),
+    });
+  });
+
+  it('passes a name that is absent, blank or no string, an item that is no object, and a value that is no array', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    for (const ariaLabel of [undefined, '', '  ', 7, ['Elm']]) {
+      assert.doesNotThrow(() => mountOf(ui, [{ label: 'Oak', ariaLabel }]), String(ariaLabel));
+    }
+    assert.doesNotThrow(() => mountOf(ui, [null, 'Oak', 3]));
+    assert.doesNotThrow(() => mountOf(ui, { label: 'Oak', ariaLabel: 'Elm' }));
+  });
+
+  const itemizing = (spec) => ({ ...ITEMIZED, props: { options: spec } });
+  for (const [claim, spec, other] of [
+    ['a text key', { kind: 'text', itemContains: { ariaLabel: 'label' } }, '{"ariaLabel":"label"}'],
+    ['an empty object', { kind: 'data', itemContains: {} }, '{}'],
+    [
+      'a member paired with itself',
+      { kind: 'data', itemContains: { label: 'label' } },
+      '{"label":"label"}',
+    ],
+    [
+      'a partner that is no string',
+      { kind: 'data', itemContains: { ariaLabel: 1 } },
+      '{"ariaLabel":1}',
+    ],
+    ['a string', { kind: 'data', itemContains: 'label' }, 'label'],
+    ['null', { kind: 'data', itemContains: null }, 'null'],
+    ['an array', { kind: 'data', itemContains: ['label'] }, '["label"]'],
+  ]) {
+    it(`refuses at registration an itemContains of ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [itemizing(spec)], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Itemized "options" has an unknown itemContains "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+
+  it('leaves itemContains out of describe', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    assert.deepEqual(ui.describe('Itemized').props.options, { kind: 'data', required: true });
+  });
+});
+
+const WAIVED = Object.freeze({
+  name: 'Waived',
+  path: 'src/ui/svelte/components/Waived.svelte',
+  version: 1,
+  props: {
+    children: { kind: 'text', required: true, waivedBy: ['icon', 'ariaLabel'] },
+    icon: { kind: 'data' },
+    ariaLabel: { kind: 'data' },
+    note: { kind: 'data' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Waived' }),
+});
+
+describe('a waivedBy key (issue 2858)', () => {
+  const mountOf = (ui, props) => ui.mount('Waived', { target: new FakeTarget(), props });
+  const GLYPH = { icon: 'fas fa-lock', ariaLabel: 'Locked' };
+
+  it('takes an absent or empty key while every key its waivedBy lists holds a non-blank string', () => {
+    const { ui } = seamWith({ table: [WAIVED] });
+    for (const children of [undefined, '']) {
+      assert.doesNotThrow(() => mountOf(ui, { ...GLYPH, children }), String(children));
+    }
+  });
+
+  for (const [claim, props, message] of [
+    ['none of them', {}, 'Waived requires a non-empty "children"'],
+    [
+      'one of them',
+      { icon: 'fas fa-lock' },
+      'Waived requires a non-blank "ariaLabel" when "children" is empty',
+    ],
+    [
+      'the other',
+      { ariaLabel: 'Locked' },
+      'Waived requires a non-blank "icon" when "children" is empty',
+    ],
+    [
+      'a blank one',
+      { icon: '\t', ariaLabel: 'Locked' },
+      'Waived requires a non-blank "icon" when "children" is empty',
+    ],
+    [
+      'one that is no string',
+      { icon: 'fas fa-lock', ariaLabel: ['Locked'] },
+      'Waived requires a non-blank "ariaLabel" when "children" is empty',
+    ],
+  ]) {
+    it(`M9: refuses the empty key beside ${claim}, naming the first missing one, on mount and update`, () => {
+      const { ui } = seamWith({ table: [WAIVED] });
+      assert.throws(() => mountOf(ui, props), refusal(message));
+      const handle = mountOf(ui, { children: 'Locked' });
+      assert.throws(() => handle.update(props), refusal(message));
+    });
+  }
+
+  it('still reports the key required and states no waivedBy in describe', () => {
+    const { ui } = seamWith({ table: [WAIVED] });
+    assert.deepEqual(ui.describe('Waived').props.children, { kind: 'text', required: true });
+  });
+
+  const waiving = (spec, extra = {}) => ({
+    ...WAIVED,
+    props: { ...WAIVED.props, ...extra, children: spec },
+  });
+  for (const [claim, entry, other] of [
+    ['a key that is not required', waiving({ kind: 'text', waivedBy: ['icon'] }), '["icon"]'],
+    [
+      'a callback key',
+      waiving({ kind: 'callback', required: true, waivedBy: ['icon'] }),
+      '["icon"]',
+    ],
+    ['an empty list', waiving({ kind: 'text', required: true, waivedBy: [] }), '[]'],
+    [
+      'a name twice',
+      waiving({ kind: 'text', required: true, waivedBy: ['icon', 'icon'] }),
+      '["icon","icon"]',
+    ],
+    [
+      'an unpublished key',
+      waiving({ kind: 'text', required: true, waivedBy: ['nope'] }),
+      '["nope"]',
+    ],
+    ['itself', waiving({ kind: 'text', required: true, waivedBy: ['children'] }), '["children"]'],
+    [
+      'a text key',
+      waiving({ kind: 'text', required: true, waivedBy: ['label'] }, { label: { kind: 'text' } }),
+      '["label"]',
+    ],
+    [
+      'a required key',
+      waiving(
+        { kind: 'text', required: true, waivedBy: ['note'] },
+        { note: { kind: 'data', required: true } }
+      ),
+      '["note"]',
+    ],
+    ['a string', waiving({ kind: 'text', required: true, waivedBy: 'icon' }), 'icon'],
+  ]) {
+    it(`refuses at registration a waivedBy on ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Waived "children" has an unknown waivedBy "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();

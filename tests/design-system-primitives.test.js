@@ -697,6 +697,7 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
       ['player-crafting-simple'],
       [
         'manager-published-leaves-specimen',
+        'manager-published-chip-forms-specimen',
         'manager-recipes-narrow-status-row',
         'manager-recipes-inspector-cant-enable',
       ],
@@ -1055,12 +1056,13 @@ test('(a) a RadioCardGroup change publishes its six frames, then the specimen th
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a SegmentedControl change publishes its two frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a SegmentedControl change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/SegmentedControl.svelte';
   const frames = [
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
     'manager-published-segmented-specimen',
+    'manager-published-segmented-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

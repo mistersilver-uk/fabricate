@@ -212,21 +212,21 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
 
 /** THE ICON-ONLY CHIP CARRIES A NAME (issue 1506). */
 describe('1506 the icon-only chip — the accessible name it must carry', () => {
-  it('ships with an `aria-label` at every one of its call sites', () => {
+  it('ships with an `ariaLabel` at every one of its call sites', () => {
     const sites = [];
     const unnamed = [];
     for (const { path, source } of COMPONENTS) {
       for (const tag of openingTagsNamed(source, 'Chip')) {
         if (!/(?:^|\s)iconOnly(?![\w-])/.test(tag)) continue;
         sites.push(path);
-        if (!/(?:^|\s)aria-label=/.test(tag)) unnamed.push(path);
+        if (!/(?:^|\s)ariaLabel=/.test(tag)) unnamed.push(path);
       }
     }
 
     assert.deepEqual(
       unnamed,
       [],
-      'an icon-only chip ships with no `aria-label`. Its glyph is `aria-hidden` and its label is ' +
+      'an icon-only chip ships with no `ariaLabel`. Its glyph is `aria-hidden` and its label is ' +
         'suppressed, so it is announced as nothing at all — and a `title` is a tooltip rather ' +
         'than a name, which is precisely the defect this face was converted to stop reproducing'
     );

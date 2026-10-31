@@ -3150,12 +3150,16 @@ describe('world Component Catalogue (issue 1371)', () => {
         'coal: flame and tide, in the roster’s order, and no earth'
       );
       assert.deepEqual(
-        chips.map((chip) => chip.textContent.trim()),
+        chips.map((chip) => chip.querySelector('[aria-hidden="true"]:not(i)').textContent.trim()),
         ['2', '1'],
         'each chip is the COUNT — the larger of the two systems’ flame values'
       );
       assert.equal(chips[0].getAttribute('title'), 'Flame 2', 'the name and count on hover');
-      assert.equal(chips[0].getAttribute('aria-label'), 'Flame 2', 'and as the accessible name');
+      assert.equal(
+        chips[0].querySelector('.manager-chip-name').textContent,
+        'Flame 2',
+        'and as the accessible name, spoken beside the hidden count (issue 2858)'
+      );
       assert.ok(
         chips[0].classList.contains('manager-chip') &&
           chips[0].classList.contains('manager-essence-compact-chip'),
@@ -3206,7 +3210,7 @@ describe('world Component Catalogue (issue 1371)', () => {
           ...target.querySelectorAll(
             ':scope [data-scoped-list-row="resin"] [data-world-component-row-essence]'
           ),
-        ].map((chip) => `${chip.getAttribute('data-world-component-row-essence')}:${chip.textContent.trim()}`),
+        ].map((chip) => `${chip.getAttribute('data-world-component-row-essence')}:${chip.querySelector('[aria-hidden="true"]:not(i)').textContent.trim()}`),
         ['earth:2'],
         'the world section is drawn with no system roster behind it'
       );

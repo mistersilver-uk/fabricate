@@ -116,12 +116,12 @@ export function registerComponentsCases() {
       '[data-component-id="c1"] .manager-essence-compact-chip'
     );
     assert.equal(
-      compactEssenceChip?.textContent.trim(),
+      compactEssenceChip?.querySelector('[aria-hidden="true"]:not(i)').textContent.trim(),
       '2',
       'essence row should show only compact quantity text'
     );
     assert.equal(
-      compactEssenceChip?.getAttribute('aria-label'),
+      compactEssenceChip?.querySelector('.manager-chip-name').textContent,
       'Earth 2',
       'compact essence chip should expose the essence name and quantity accessibly'
     );

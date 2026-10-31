@@ -159,6 +159,13 @@ describe('ViewToggle (issue 2412)', () => {
     assert.ok(!group.classList.contains('is-compact'), 'density is not the caller’s');
   });
 
+  it('keeps the default surface and height when rest names surface or size (issue 2856)', async () => {
+    const root = await harness.mount({ ...LABELS, surface: 'panel', size: 34 });
+    const group = root.querySelector('[role="radiogroup"]');
+    assert.ok(!group.classList.contains('is-panel'), 'surface is not the caller’s');
+    assert.ok(!group.classList.contains('is-size-34'), 'size is not the caller’s');
+  });
+
   it('names one control’s radios alike and two controls’ apart', async () => {
     const first = await harness.mount({ ...LABELS });
     const second = await mountBeside(VIEW_TOGGLE, { ...LABELS });

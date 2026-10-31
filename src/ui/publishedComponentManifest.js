@@ -3,12 +3,14 @@
  * frozen `{ name, path, version, props, rest, root, restOn?, tooltip?, overlays?, lazy?,
  * standaloneRoot? }`,
  * appended and never interleaved, and a breaking change to one bumps its own `version` (issue
- * 2426). A prop is `{ kind, required?, requiredWhen?, contains?, element?, args? }`, its kind
- * `'data' | 'text' | 'slot' | 'callback' | 'aria'`:
+ * 2426). A prop is `{ kind, required?, requiredWhen?, waivedBy?, contains?, itemContains?, element?,
+ * args? }`, its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`: `waivedBy` lists the `data`
+ * keys whose non-blank strings together let a `required` key be empty (issue 2858),
  * `requiredWhen` names the `data` key while which it is required (issue 2452), `contains` the
- * `text` key whose text a `data` key's non-empty string must hold (issue 2852), a `text` key takes
- * a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says
- * `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
+ * `text` key whose text a `data` key's non-empty string must hold (issue 2852), `itemContains`
+ * the same of a `data` array's item members, as `{ <member>: <member it holds> }` (issue 2856),
+ * a `text` key takes a string, and a `slot` key is filled through `handle.slot`, in a `<div>`
+ * unless `element` says `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
  * `'manager'` (issue 2451). A `callback` key takes a function, called with its first `args`
  * arguments, none when unstated (issue 2452). An entry whose rest keys land on a control it draws
  * also states `restOn: 'control'`, which makes M13 refuse `RESERVED_ON_A_CONTROL` among its rest
@@ -168,7 +170,12 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       mono: Object.freeze({ kind: 'data' }),
       struck: Object.freeze({ kind: 'data' }),
       truncate: Object.freeze({ kind: 'data' }),
-      children: Object.freeze({ kind: 'text', required: true }),
+      children: Object.freeze({
+        kind: 'text',
+        required: true,
+        waivedBy: Object.freeze(['icon', 'ariaLabel']),
+      }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'children' }),
     }),
     rest: true,
     root: 'any',
@@ -456,7 +463,11 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     path: 'src/ui/svelte/components/SegmentedControl.svelte',
     version: 1,
     props: Object.freeze({
-      options: Object.freeze({ kind: 'data', required: true }),
+      options: Object.freeze({
+        kind: 'data',
+        required: true,
+        itemContains: Object.freeze({ ariaLabel: 'label' }),
+      }),
       value: Object.freeze({ kind: 'data' }),
       onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
@@ -464,6 +475,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
       tone: Object.freeze({ kind: 'data' }),
       shape: Object.freeze({ kind: 'data' }),
+      surface: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',

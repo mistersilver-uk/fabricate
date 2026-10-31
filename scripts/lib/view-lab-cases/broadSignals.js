@@ -766,10 +766,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-in-window',
   ]),
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
-  // Then the manager recipe row's two status pills and the inspector's chip row (issue 1589).
+  // Then the manager recipe row's two status pills and the inspector's chip row (issue 1589), and
+  // the forms the published seam draws (issue 2858).
   'src/ui/svelte/components/Chip.svelte': Object.freeze([
     'player-crafting-simple',
     'manager-published-leaves-specimen',
+    'manager-published-chip-forms-specimen',
     'manager-recipes-narrow-status-row',
     'manager-recipes-inspector-cant-enable',
   ]),
@@ -824,9 +826,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
-    // The control mounted through the published seam, keyboard-chosen (issue 2644), and the three
-    // that mount it with and without a Fabricate root above its target (issue 2679).
+    // The control mounted through the published seam, keyboard-chosen (issue 2644), its forms
+    // (issue 2856), and the three that mount it with and without a Fabricate root (issue 2679).
     'manager-published-segmented-specimen',
+    'manager-published-segmented-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

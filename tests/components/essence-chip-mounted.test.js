@@ -200,7 +200,8 @@ describe('EssenceChip — the essence-to-chip mapping, owned once (issue 1371 r1
     assert.equal(count.textContent, '2');
     assert.ok(!node.querySelector('.fab-essence-chip-name'), 'the name is not drawn unless asked');
     assert.equal(node.getAttribute('title'), 'Fire 2', 'the accessible name pairs name and count');
-    assert.equal(node.getAttribute('aria-label'), 'Fire 2');
+    // Spoken beside the hidden count, not an `aria-label` on a bare span (issue 2858).
+    assert.equal(node.querySelector('.manager-chip-name').textContent, 'Fire 2');
     essenceChip.remount();
   });
 
@@ -266,7 +267,7 @@ describe('ComponentRow — the badges carry the essence colour (M29 site a)', ()
       assert.ok(node.classList.contains('manager-essence-compact-chip'), 'the sheet’s row hook survives');
     }
     assert.equal(chips[0].getAttribute('title'), 'Fire 2');
-    assert.equal(chips[0].getAttribute('aria-label'), 'Fire 2');
+    assert.equal(chips[0].querySelector('.manager-chip-name').textContent, 'Fire 2');
     assert.equal(chips[0].getAttribute('data-component-essence'), 'fire');
     assert.equal(chips[0].querySelector('.fab-essence-chip-count').textContent, '2');
     row.remount();

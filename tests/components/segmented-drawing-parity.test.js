@@ -31,7 +31,23 @@ const FORMS = Object.freeze({
   tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
   info: { props: { tone: 'info' }, drawn: '.k-seg.info', uses: 1 },
   inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 33 },
-  compact: { props: { density: 'compact' }, drawn: '.k-seg.compact', uses: 1 },
+  compact: {
+    props: { density: 'compact' },
+    drawn: '.k-seg.compact:not(.panel, .size-34)',
+    uses: 1,
+  },
+  // The panel surface and the 34px rung (issue 2856), one specimen each; the rung's height is read.
+  compactPanel: {
+    props: { density: 'compact', surface: 'panel' },
+    drawn: '.k-seg.compact.panel',
+    uses: 1,
+  },
+  compactSized: {
+    props: { density: 'compact', size: 34 },
+    drawn: '.k-seg.compact.size-34',
+    uses: 1,
+    geometry: true,
+  },
   field: { props: { density: 'field' }, drawn: '.k-seg.field:not(.tag)', uses: 2 },
   // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet, so its geometry is
   // read too: the track's height and corner and the segments' type size.

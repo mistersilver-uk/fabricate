@@ -52,4 +52,6 @@
   density="default"
   tone=""
   shape=""
+  surface="default"
+  size=""
 />
