@@ -39,6 +39,8 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25).
     'src/ui/svelte/components/Medallion.svelte',
+    // The `check` rows' decorative box (issue 2836).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/InspectorPanel.svelte',
