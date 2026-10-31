@@ -257,14 +257,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
   // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
   // specimens that mount it through the published seam (issue 2452) and the forms specimen (issue
-  // 2852), and the three that mount it with and without a Fabricate root above its target (issue
-  // 2679).
+  // 2852), the companion forms specimen's dense rung (issue 2841), and the three that mount it with
+  // and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/Stepper.svelte': Object.freeze([
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
     'manager-published-button-forms-specimen',
+    'manager-published-companion-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

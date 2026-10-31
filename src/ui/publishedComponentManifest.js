@@ -311,6 +311,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
       decrementTooltip: Object.freeze({ kind: 'data' }),
       incrementTooltip: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',

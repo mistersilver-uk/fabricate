@@ -1071,6 +1071,18 @@ The band adds no role and no name, so a `FillBar`, which has neither, drawn ther
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
 - **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
 
+### Requirement: A stepper's dense rung keeps every pointer target at 24px
+
+`Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one (issue 2841).
+Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; the rung outranks `density` and pins `fill` at 26px.
+No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
+No in-app caller passes it: the rung exists for the published `Stepper`, whose companion draws a 26px quantity stepper inside a 38px row.
+
+#### Scenario: A dense stepper is pressed at its edge
+
+- **WHEN** a published stepper at `size` `26` is hit-tested at its decrement button's outermost pixel and at the pixel beyond it
+- **THEN** the pointer lands on the button, and then on the stepper's own edge
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
@@ -1129,7 +1141,7 @@ The variant adds no glow and no second line: a field whose wrapper draws the box
 The `Field` family, the compact search field and the chance slider's percent half copy that variant rather than the outset ring — the default search field is a wrapper-drawn field, whose shell takes the full accent on `:focus-within` — and every input that is not text-like — a checkbox, a radio, a range, a colour, a file and the four button types — keeps the outset one.
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
-The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
+The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable, and at the dense `size` `26` each sits at offset -1px, straddling the part's edge inside the stepper's outer edge (issue 2841).
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.

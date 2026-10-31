@@ -1947,6 +1947,24 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: labCompanionForm('stat-centred', '.fab-stat-box-slot'),
       styles: 'display: grid; margin-top: 8px',
     },
+    // The published stepper's dense rung (issue 2841): its box and cell, the focused plus's ring,
+    // and the default rung beside it.
+    {
+      selector: labCompanionForm('stepper-dense', '.fab-stepper'),
+      styles: 'height: 26px; padding-top: 0px',
+    },
+    {
+      selector: labCompanionForm('stepper-dense', '[data-stepper-decrement]'),
+      styles: 'width: 24px; height: 24px',
+    },
+    {
+      selector: labCompanionForm('stepper-dense', '[data-stepper-increment]:focus-visible'),
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: -1px',
+    },
+    {
+      selector: labCompanionForm('stepper-default', '.fab-stepper'),
+      styles: 'height: 28px; padding-top: 2px',
+    },
   ],
   // The opener focus returned to after a close: its ring, by its shape.
   'manager-published-modal-close': [

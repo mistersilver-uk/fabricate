@@ -585,10 +585,12 @@ const COMPANION_FORM_KEYS = Object.freeze([
   'stat-complete',
   'stat-centred',
   'stat-plain',
+  'stepper-dense',
+  'stepper-default',
 ]);
 
 /** Sized to the fixture's 360px ground and its rows. */
-const COMPANION_FORMS_WINDOW = Object.freeze({ width: 480, height: 420 });
+const COMPANION_FORMS_WINDOW = Object.freeze({ width: 480, height: 520 });
 
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
@@ -2191,13 +2193,13 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-specimen',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in a 360px column on the window's --fab-bg-1 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading top to bottom: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; and the progress tile without the slot, the baseline the band adds to. Nothing here takes focus. The frame cannot show that a screen reader reads each tile once with nothing for the bar, which the rendered suite reads",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in a 360px column on the window's --fab-bg-1 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading top to bottom: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus, its input and its plus each filling a 24px cell to that edge, its plus holding keyboard focus after Tab from its input, so the 2px accent ring straddles the button's edge inside the stepper's own; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons, for comparison. The frame cannot show that a screen reader reads each tile once with nothing for the bar, which the rendered suite reads, nor each step button's 24px pointer target, which the rendered suite hit-tests",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-companion-forms' },
-    steps: [],
-    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin) > [data-lab-companion-form="stat-plain"] .fab-stat-box`,
+    steps: [{ selector: COMPANION_FORM_PART('stepper-dense', 'input'), press: 'Tab' }],
+    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin):has(> [data-lab-companion-form="stepper-dense"] [data-stepper-increment]:focus-visible) > [data-lab-companion-form="stepper-default"] .fab-stepper`,
     expectContained: [
       ...COMPANION_FORM_KEYS.map((key) => ({
         container: COMPANION_FORMS,
@@ -2224,11 +2226,29 @@ export const CASES = Object.freeze([
           selector: COMPANION_FORM_PART('stat-centred', '.fab-stat-box-slot'),
           styles: 'display: grid; margin-top: 8px',
         },
+        // The dense stepper's box and cell, the focused plus's ring, and the default rung beside it.
+        {
+          selector: COMPANION_FORM_PART('stepper-dense', '.fab-stepper'),
+          styles: 'height: 26px; padding-top: 0px',
+        },
+        {
+          selector: COMPANION_FORM_PART('stepper-dense', '[data-stepper-decrement]'),
+          styles: 'width: 24px; height: 24px',
+        },
+        {
+          selector: COMPANION_FORM_PART('stepper-dense', '[data-stepper-increment]:focus-visible'),
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: -1px',
+        },
+        {
+          selector: COMPANION_FORM_PART('stepper-default', '.fab-stepper'),
+          styles: 'height: 28px; padding-top: 2px',
+        },
       ],
     },
     position: COMPANION_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
-    // `StatBox.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    // `StatBox.svelte` and `Stepper.svelte` are broad signals, each routed here by its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

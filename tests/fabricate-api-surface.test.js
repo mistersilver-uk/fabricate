@@ -559,6 +559,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onChange: { kind: 'callback', required: true },
           decrementTooltip: optional,
           incrementTooltip: optional,
+          size: optional,
         },
         rest: false,
         root: 'any',
