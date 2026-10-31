@@ -128,7 +128,7 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 ### Requirement: SegmentedControl takes already-localized option labels
 
 `SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
-An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+An option is `{ value, label, ariaLabel?, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
 The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
 `SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
 The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` takes its legend, hint, option labels and descriptions as final display text the caller resolves, with `localizeOptions` from `util/localizeOr.js` for an option list; no option carries `labelKey`, `fallback`, `descKey` or `descFallback`, and the group takes no `legendKey` or `hintKey`, so its closure calls no `game.i18n` (issue 2601).
@@ -142,6 +142,7 @@ An unselected `SegmentedControl` segment's label and badge ink `--fab-text-muted
 The `info` tone fills the chosen segment solid `--fab-info` inked `--fab-on-info` and leaves the idle segments bare, as the `accent` tone does in the accent family, and clears 4.5:1 in all seven themes (issue 2774).
 An option whose `variant` is `info` keeps its `--fab-info-soft` tint, `--fab-info-border` edge and `--fab-info-text` ink inside an `accent` or `accent-soft` track, so a track's tone never hides what choosing that one option means (issue 2774).
 Issue 2814 adds the `compact` and `field` densities and an option's `title` to the published keys: the `compact` and `field` tracks paint `--fab-bg-1` and clear the same 4.5:1 ink floors there, and a `title` is the segment's `data-tooltip-text`, a pointer hint that is never the radio's accessible name.
+Issue 2856 adds `surface`, `size` and an option's `ariaLabel` to the published keys: `surface: 'panel'` MUST fill the track with `--fab-bg-0` over every density's own fill and draw nothing in the `pill` shape or the `tag` tone, and its idle, hover and selected inks clear 4.5:1 there in all seven themes; `size: 34` MUST draw a 34px border-box track whose segments stretch inside its padding, because the `compact` and `field` tracks draw 36 and the `inline` one 30; and a non-blank option `ariaLabel` MUST be written as that radio's `aria-label` and MUST contain its `label` as one run of whole words, which the published seam refuses otherwise (M22).
 
 #### Scenario: A caller's key has no translation
 

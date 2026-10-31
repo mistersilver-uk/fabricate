@@ -508,6 +508,24 @@ const filterSegment = (value) =>
 /** Sized to the fixture's two 360px grounds, one above the other. */
 const SEGMENTED_WINDOW = Object.freeze({ width: 480, height: 240 });
 
+/** The segmented forms fixture's ground, a row by its key, its track, and a segment by value. */
+const SEGMENTED_FORMS = '[data-lab-segmented-forms]';
+const SEGMENTED_FORM = (key) => `${SEGMENTED_FORMS} > [data-lab-segmented-form="${key}"]`;
+const SEGMENTED_FORM_TRACK = (key) => `${SEGMENTED_FORM(key)} .manager-segmented`;
+const SEGMENTED_FORM_SEGMENT = (key, value) =>
+  `${SEGMENTED_FORM_TRACK(key)} label.manager-segment:has(> input[value="${value}"])`;
+const SEGMENTED_FORM_KEYS = Object.freeze([
+  'panel-names',
+  'panel-compact',
+  'own-compact',
+  'sized-compact',
+  'panel-inline',
+  'sized-panel-default',
+]);
+
+/** Sized to the fixture's 400px ground and its six rows. */
+const SEGMENTED_FORMS_WINDOW = Object.freeze({ width: 520, height: 370 });
+
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
 const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
@@ -1898,6 +1916,63 @@ export const CASES = Object.freeze([
       ],
     },
     position: SEGMENTED_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SegmentedControl.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-segmented-forms-specimen',
+    label:
+      "Specimen, mounted through the published seam — six segmented controls in a 400px column on the window's --fab-bg-1 ground, 8px apart, each beside a caption the companion draws. Reading top to bottom: a reward choice of Oak staff, Ash bow and Yew charm on the panel surface, its track filled --fab-bg-0, one step below the ground, whose Oak staff and Yew charm radios are named by their ariaLabel, after one step: ArrowRight pressed on the checked Oak staff radio, so the companion's update drew Ash bow selected, the raised tile in the primary ink at weight 600 with the accent keyboard ring 2px wide and 2px clear; then Characters and Party at the compact density in the accent tone, on the panel surface and, below it for comparison, on its own --fab-bg-1 track, Characters solid accent in each; then At least, Exactly and a dimmed disabled At most at the compact density in the info tone at size 34, a 34px track where the compact one is 36, At least solid info; then All and Mine at the inline density on the panel surface, All selected; then All, Mine and Shared at the default density at size 34 on the panel surface, a 34px track filled --fab-bg-0, All selected. The frame cannot show the radios' names, which the rendered suite reads from Chromium's accessibility tree",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-segmented-forms' },
+    steps: [
+      {
+        selector: `${SEGMENTED_FORM_TRACK('panel-names')} input[value="oak"]`,
+        press: 'ArrowRight',
+      },
+    ],
+    // The reached segment selected by the companion's own update, keyboard-focused, under the
+    // fixture's echo of the value, which only `onChange` writes.
+    expectSelector: `${SEGMENTED_FORMS} > [data-lab-segmented-form="panel-names"][data-lab-segmented-form-chosen="ash"] label.is-active:has(> input[value="ash"]:checked:focus-visible)`,
+    expectContained: [
+      ...SEGMENTED_FORM_KEYS.map((key) => ({
+        container: SEGMENTED_FORMS,
+        target: SEGMENTED_FORM(key),
+      })),
+      { container: '.window-content', target: SEGMENTED_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // The panel track's fill, beside its own-surface twin's, and the stated rung's height.
+        {
+          selector: SEGMENTED_FORM_TRACK('panel-compact'),
+          styles: 'height: 36px; background-color: var(--fab-bg-0)',
+        },
+        {
+          selector: SEGMENTED_FORM_TRACK('own-compact'),
+          styles: 'height: 36px; background-color: var(--fab-bg-1)',
+        },
+        { selector: SEGMENTED_FORM_TRACK('sized-compact'), styles: 'height: 34px' },
+        {
+          selector: SEGMENTED_FORM_TRACK('panel-inline'),
+          styles: 'height: 30px; background-color: var(--fab-bg-0)',
+        },
+        {
+          selector: SEGMENTED_FORM_TRACK('sized-panel-default'),
+          styles: 'height: 34px; background-color: var(--fab-bg-0)',
+        },
+        // The keyboard-reached segment's ring, ink and weight on the panel track.
+        {
+          selector: SEGMENTED_FORM_SEGMENT('panel-names', 'ash'),
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+        },
+      ],
+    },
+    position: SEGMENTED_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `SegmentedControl.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

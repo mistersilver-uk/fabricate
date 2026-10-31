@@ -1107,6 +1107,98 @@ describe('a contains key (issue 2852)', () => {
   });
 });
 
+const ITEMIZED = Object.freeze({
+  name: 'Itemized',
+  path: 'src/ui/svelte/components/Itemized.svelte',
+  version: 1,
+  props: {
+    options: { kind: 'data', required: true, itemContains: { ariaLabel: 'label' } },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Itemized' }),
+});
+
+describe('an itemContains key (issue 2856)', () => {
+  const mountOf = (ui, options) =>
+    ui.mount('Itemized', { target: new FakeTarget(), props: { options } });
+  const holds = (index, label, name) =>
+    `${PREFIX}"options[${index}].ariaLabel" must contain the text of "options[${index}].label" (${JSON.stringify(label)} is not in ${JSON.stringify(name)})`;
+
+  it('M22: refuses the first item whose non-blank name does not hold its label, naming it, on mount and update', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    const options = [
+      { label: 'Oak', ariaLabel: 'Oak, chosen by Mira' },
+      { label: 'Ash', ariaLabel: 'Ashen' },
+      { label: 'Yew', ariaLabel: 'Elm' },
+    ];
+    assert.throws(() => mountOf(ui, options), {
+      name: 'TypeError',
+      message: holds(1, 'Ash', 'Ashen'),
+    });
+    const handle = mountOf(ui, options.slice(0, 1));
+    assert.throws(() => handle.update({ options: [{ label: 'Oak tree', ariaLabel: 'Oak' }] }), {
+      message: holds(0, 'Oak tree', 'Oak'),
+    });
+  });
+
+  it('holds a numeric label as its digits', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    assert.doesNotThrow(() => mountOf(ui, [{ label: 25, ariaLabel: '25 per page' }]));
+    assert.throws(() => mountOf(ui, [{ label: 25, ariaLabel: 'Twenty-five' }]), {
+      message: holds(0, '25', 'Twenty-five'),
+    });
+  });
+
+  it('passes a name that is absent, blank or no string, an item that is no object, and a value that is no array', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    for (const ariaLabel of [undefined, '', '  ', 7, ['Elm']]) {
+      assert.doesNotThrow(() => mountOf(ui, [{ label: 'Oak', ariaLabel }]), String(ariaLabel));
+    }
+    assert.doesNotThrow(() => mountOf(ui, [null, 'Oak', 3]));
+    assert.doesNotThrow(() => mountOf(ui, { label: 'Oak', ariaLabel: 'Elm' }));
+  });
+
+  const itemizing = (spec) => ({ ...ITEMIZED, props: { options: spec } });
+  for (const [claim, spec, other] of [
+    ['a text key', { kind: 'text', itemContains: { ariaLabel: 'label' } }, '{"ariaLabel":"label"}'],
+    ['an empty object', { kind: 'data', itemContains: {} }, '{}'],
+    [
+      'a member paired with itself',
+      { kind: 'data', itemContains: { label: 'label' } },
+      '{"label":"label"}',
+    ],
+    [
+      'a partner that is no string',
+      { kind: 'data', itemContains: { ariaLabel: 1 } },
+      '{"ariaLabel":1}',
+    ],
+    ['a string', { kind: 'data', itemContains: 'label' }, 'label'],
+    ['null', { kind: 'data', itemContains: null }, 'null'],
+    ['an array', { kind: 'data', itemContains: ['label'] }, '["label"]'],
+  ]) {
+    it(`refuses at registration an itemContains of ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [itemizing(spec)], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Itemized "options" has an unknown itemContains "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+
+  it('leaves itemContains out of describe', () => {
+    const { ui } = seamWith({ table: [ITEMIZED] });
+    assert.deepEqual(ui.describe('Itemized').props.options, { kind: 'data', required: true });
+  });
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();

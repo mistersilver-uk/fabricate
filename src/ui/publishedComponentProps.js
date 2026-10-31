@@ -274,17 +274,35 @@ export function containsLabel(name, label) {
   );
 }
 
+/** M22's refusal of a non-blank string `name` that does not hold the string `text`. */
+function assertHolds(name, text, key, other) {
+  if (typeof name !== 'string' || typeof text !== 'string' || !name.trim()) return;
+  if (containsLabel(name, text)) return;
+  const tail = `(${JSON.stringify(text)} is not in ${JSON.stringify(name)})`;
+  throw refuse(`"${key}" must contain the text of "${other}" ${tail}`);
+}
+
+/** M22 over each item of `items`, an array: each member `pairs` names against its paired member. */
+function assertItemsHold(key, items, pairs) {
+  for (const [index, item] of items.entries()) {
+    for (const [member, other] of Object.entries(pairs)) {
+      const [name, shown] = [item?.[member], item?.[other]];
+      const label = typeof shown === 'number' ? String(shown) : shown;
+      assertHolds(name, label, `${key}[${index}].${member}`, `${key}[${index}].${other}`);
+    }
+  }
+}
+
 /**
  * M22 over a validated copy, after M9: a key stating `contains` whose non-blank string does not
- * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3).
+ * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3),
+ * and an array item's member an `itemContains` pairs with another of that item (issue 2856).
  */
 function assertContains(entry, copy) {
-  for (const [key, { contains }] of Object.entries(entry.props)) {
-    const [name, text] = [copy[key], copy[contains]];
-    if (contains === undefined || typeof name !== 'string' || typeof text !== 'string') continue;
-    if (name.trim() && !containsLabel(name, text)) {
-      const tail = `(${JSON.stringify(text)} is not in ${JSON.stringify(name)})`;
-      throw refuse(`"${key}" must contain the text of "${contains}" ${tail}`);
+  for (const [key, { contains, itemContains }] of Object.entries(entry.props)) {
+    if (contains !== undefined) assertHolds(copy[key], copy[contains], key, contains);
+    if (itemContains !== undefined && Array.isArray(copy[key])) {
+      assertItemsHold(key, copy[key], itemContains);
     }
   }
 }

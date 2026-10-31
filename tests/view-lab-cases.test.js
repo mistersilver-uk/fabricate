@@ -429,6 +429,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
+  'tests/view-lab/fixtures/PublishedSegmentedForms.svelte',
   'tests/view-lab/fixtures/PublishedPagination.svelte',
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
@@ -903,6 +904,9 @@ const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
 /** The button forms fixture's one control in a row, by the row's key. */
 const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form="${key}"] button`;
+/** The segmented forms fixture's track in a row, by the row's key. */
+const labSegmentedForm = (key) =>
+  `[data-lab-segmented-forms] > [data-lab-segmented-form="${key}"] .manager-segmented`;
 /** The forms fixture's published row in one section, by the section's key and its place, first by default. */
 const labListRowForm = (key, place = 1) =>
   `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:nth-child(${place}) .fabricate-list-row`;
@@ -1751,6 +1755,32 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-segmented-specimen': [
     {
       selector: labFilterSegment('owned'),
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+    },
+  ],
+  // The published segmented control's forms (issue 2856): the panel track's fill beside its
+  // own-surface twin's, each rung's height, and the keyboard-reached segment on the panel track.
+  'manager-published-segmented-forms-specimen': [
+    {
+      selector: labSegmentedForm('panel-compact'),
+      styles: 'height: 36px; background-color: var(--fab-bg-0)',
+    },
+    {
+      selector: labSegmentedForm('own-compact'),
+      styles: 'height: 36px; background-color: var(--fab-bg-1)',
+    },
+    { selector: labSegmentedForm('sized-compact'), styles: 'height: 34px' },
+    {
+      selector: labSegmentedForm('panel-inline'),
+      styles: 'height: 30px; background-color: var(--fab-bg-0)',
+    },
+    {
+      selector: labSegmentedForm('sized-panel-default'),
+      styles: 'height: 34px; background-color: var(--fab-bg-0)',
+    },
+    {
+      selector: `${labSegmentedForm('panel-names')} label.manager-segment:has(> input[value="ash"])`,
       styles:
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
     },
@@ -7554,6 +7584,40 @@ test('the button forms specimen case measures the rung each row of the button fo
     .map(Number);
   assert.deepEqual(measured, rungs, 'each row’s control is measured at the rung it mounts');
   assert.deepEqual(rungs, [24, 26, 20, 22], 'the four rungs issue 2853 adds');
+});
+
+test('the segmented forms specimen case measures the rows, surface and rung the segmented forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSegmentedForms.svelte'
+  );
+  for (const hook of [
+    'data-lab-segmented-forms',
+    'data-lab-segmented-form',
+    'data-lab-segmented-form-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keyed = (name) =>
+    [...walkNodes(instance.content)]
+      .filter((node) => node.type === 'Property' && node.key?.name === name)
+      .map((node) => node.value.value);
+  assert.deepEqual(keyed('size'), [34, 34], 'two rows at the 34px rung');
+  assert.deepEqual(keyed('surface'), ['panel', 'panel', 'panel', 'panel'], 'four on the panel');
+  const { controls } = getCaseById('manager-published-segmented-forms-specimen').expectLayout;
+  const rows = controls.map(
+    ({ selector }) => /data-lab-segmented-form="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(rows, [
+    'panel-compact',
+    'own-compact',
+    'sized-compact',
+    'panel-inline',
+    'sized-panel-default',
+    'panel-names',
+  ]);
 });
 
 test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {

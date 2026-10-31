@@ -80,7 +80,7 @@ const CONDITIONAL_KINDS = new Set(['data', 'text', 'callback']);
  * neither `required` nor `requiredWhen` itself, on a key of a conditional kind that states no
  * `required` (issue 2452).
  */
-function isSoundGuard(entry, key, spec) {
+function isSoundGuard(entry, spec, key) {
   const name = spec.requiredWhen;
   const guard = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
   return (
@@ -114,18 +114,38 @@ function isSoundContains(entry, spec) {
   );
 }
 
+/**
+ * Whether a key's `itemContains` is sound: on a `data` key, a plain object pairing each item
+ * member name with another member's name (issue 2856).
+ */
+function isSoundItemContains(entry, spec) {
+  const pairs = spec.itemContains;
+  const plain = pairs !== null && typeof pairs === 'object' && !Array.isArray(pairs);
+  const entries = plain ? Object.entries(pairs) : [];
+  return (
+    spec.kind === 'data' &&
+    entries.length > 0 &&
+    entries.every(([member, other]) => typeof other === 'string' && other !== member)
+  );
+}
+
+/** Each conditional member a prop may state, and the test that member must pass at registration. */
+const MEMBER_SOUNDNESS = Object.freeze([
+  ['requiredWhen', isSoundGuard],
+  ['contains', isSoundContains],
+  ['itemContains', isSoundItemContains],
+]);
+
 function assertKnownEntry(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
       throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown kind "${spec.kind}"`);
     }
-    if (spec.requiredWhen !== undefined && !isSoundGuard(entry, key, spec)) {
-      const other = String(spec.requiredWhen);
-      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown requiredWhen "${other}"`);
-    }
-    if (spec.contains !== undefined && !isSoundContains(entry, spec)) {
-      const other = String(spec.contains);
-      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown contains "${other}"`);
+    for (const [member, isSound] of MEMBER_SOUNDNESS) {
+      if (spec[member] === undefined || isSound(entry, spec, key)) continue;
+      const value = spec[member];
+      const other = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown ${member} "${other}"`);
     }
   }
   if (!Object.hasOwn(ROOTS, entry.root)) {

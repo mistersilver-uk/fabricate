@@ -824,9 +824,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
-    // The control mounted through the published seam, keyboard-chosen (issue 2644), and the three
-    // that mount it with and without a Fabricate root above its target (issue 2679).
+    // The control mounted through the published seam, keyboard-chosen (issue 2644), its forms
+    // (issue 2856), and the three that mount it with and without a Fabricate root (issue 2679).
     'manager-published-segmented-specimen',
+    'manager-published-segmented-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

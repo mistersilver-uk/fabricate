@@ -166,7 +166,7 @@ function assertRefused(overrides, tail) {
 }
 
 describe('the published SegmentedControl', () => {
-  it('describes the eight keys its manifest entry publishes, at the fabricate root', () => {
+  it('describes the ten keys its manifest entry publishes, at the fabricate root', () => {
     const described = ui().describe('SegmentedControl');
     assert.deepEqual(Object.keys(described.props), [
       'options',
@@ -177,6 +177,8 @@ describe('the published SegmentedControl', () => {
       'density',
       'tone',
       'shape',
+      'surface',
+      'size',
     ]);
     assert.deepEqual(described.props.onChange, { kind: 'callback', required: true });
     assert.equal(described.root, 'any');
