@@ -1,6 +1,6 @@
 /**
  * The module sheet and every component style against the published `IconButton` (issue 2601): the
- * 35 selectors that name its root class, which of them a published icon button can match, where
+ * 40 selectors that name its root class, which of them a published icon button can match, where
  * those sit and what they draw, the bare `button` rules it also takes, the `data-*` names they
  * read, and the classes its file spells on the root.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, reads no
@@ -45,7 +45,15 @@ import {
  */
 const ICON_BUTTON = Object.freeze({
   root: 'fabricate-icon-button',
-  writable: new Set(['is-primary', 'is-ghost', 'is-danger', 'is-size-24', 'is-size-26']),
+  writable: new Set([
+    'is-primary',
+    'is-ghost',
+    'is-danger',
+    'is-size-20',
+    'is-size-22',
+    'is-size-24',
+    'is-size-26',
+  ]),
   ancestors: new Set([
     'fabricate-pagination',
     'manager-vocabulary-row',
@@ -58,7 +66,7 @@ const ICON_BUTTON = Object.freeze({
   disables: true,
 });
 
-/** The twenty sheet rules that draw a published icon button, each with nothing above its root's compound. */
+/** The twenty-five sheet rules that draw a published icon button, each with nothing above its root's compound. */
 const ICON_BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost',
   'styles/fabricate-manager-library.css: .fabricate-icon-button.fabricate-icon-button.is-ghost:not(:disabled):hover',
@@ -77,6 +85,11 @@ const ICON_BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.is-size-24',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.is-size-26',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.fabricate-icon-button.is-size-20',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.fabricate-icon-button.is-size-22',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button:where(.is-size-20, .is-size-22)',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.is-size-20::before',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button.is-size-22::before',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button:focus',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button:focus-visible',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-icon-button.fabricate-icon-button i',
@@ -101,14 +114,14 @@ const shippedBareButtons = () =>
   );
 
 describe('the module sheet and every component style against the published IconButton', () => {
-  // The 35: the twenty family rules; eight on a class a Fabricate caller writes on the button, which
-  // no published key writes; and seven under a pinned ancestor, one of them in a component.
-  it('reaches a published icon button through its twenty family rules, of 35 that name its root', () => {
+  // The 40: the twenty-five family rules; eight on a class a Fabricate caller writes on the button,
+  // which no published key writes; and seven under a pinned ancestor, one of them in a component.
+  it('reaches a published icon button through its twenty-five family rules, of 40 that name its root', () => {
     const shipped = census();
     assert.deepEqual(writtenOf(reachingOf(shipped)), [...ICON_BUTTON_FAMILY_RULES].sort(byName));
-    assert.equal(shipped.length, 35, 'the census of every selector naming the root');
+    assert.equal(shipped.length, 40, 'the census of every selector naming the root');
     const inPartials = shipped.filter(({ written }) => written.startsWith('styles/')).length;
-    assert.equal(inPartials, 31, 'the partials were read');
+    assert.equal(inPartials, 36, 'the partials were read');
     assert.deepEqual(
       staleAncestors(ICON_BUTTON, shipped, publishedManagerClasses()),
       [],

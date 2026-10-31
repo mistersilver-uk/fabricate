@@ -803,6 +803,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-list-row-forms': () => import('./fixtures/PublishedListRowForms.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
+  // Issue 2853: buttons at the 24px and 26px rungs and icon buttons at the 20px and 22px rungs.
+  'published-button-forms': () => import('./fixtures/PublishedButtonForms.svelte'),
   // Issue 2601: a three-tab strip whose selection the companion's own update draws.
   'published-tabs': () => import('./fixtures/PublishedTabs.svelte'),
   // Issue 2601: a breakage choice of three cards whose choice the companion's own update draws.

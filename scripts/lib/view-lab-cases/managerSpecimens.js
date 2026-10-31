@@ -420,6 +420,15 @@ const ICON_BUTTON_KEYS = Object.freeze([
 /** Sized to the fixture's 360px ground and the height of its ten rows and the notes beneath. */
 const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
 
+/** The button forms fixture's ground, a row by its key, and the one control the row's target holds. */
+const BUTTON_FORMS = '[data-lab-button-forms]';
+const BUTTON_FORM = (key) => `${BUTTON_FORMS} > [data-lab-button-form="${key}"]`;
+const BUTTON_FORM_CONTROL = (key) => `${BUTTON_FORM(key)} button`;
+const BUTTON_FORM_KEYS = Object.freeze(['button-24', 'button-26', 'icon-20', 'icon-22']);
+
+/** Sized to the fixture's 360px ground and its rows. */
+const BUTTON_FORMS_WINDOW = Object.freeze({ width: 480, height: 320 });
+
 /**
  * The tabs fixture's ground, the strip's target and tablist, its first two tabs, Inputs and
  * Outputs, by place, and the companion's panel.
@@ -1569,6 +1578,47 @@ export const CASES = Object.freeze([
     position: ICON_BUTTONS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `IconButton.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-button-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — four controls in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each beside a caption the companion draws. Reading top to bottom: the neutral button Add tier at the 24px rung with a 6px corner, the neutral button Claim at the 26px rung with a 7px corner, each keeping the default rung’s inline padding; the neutral icon button Dismiss the entry, an xmark on a 20px square, and Credit a day to Mira, a plus on a 22px square, each at a 6px corner. No control is pressed or focused. The frame cannot show the 24px pointer target the two icon buttons reach past their box, which the rendered suite measures',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-button-forms' },
+    steps: [],
+    expectSelector: `${BUTTON_FORMS}:has(> [data-lab-button-form="button-24"] .fabricate-button) > [data-lab-button-form="icon-22"] .fabricate-icon-button`,
+    expectContained: [
+      ...BUTTON_FORM_KEYS.map((key) => ({ container: BUTTON_FORMS, target: BUTTON_FORM(key) })),
+      { container: '.window-content', target: BUTTON_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each rung's box and corner, and the default inline padding the button rungs keep.
+        {
+          selector: BUTTON_FORM_CONTROL('button-24'),
+          styles: 'height: 24px; border-top-left-radius: 6px; padding-left: 12px',
+        },
+        {
+          selector: BUTTON_FORM_CONTROL('button-26'),
+          styles: 'height: 26px; border-top-left-radius: 7px; padding-left: 12px',
+        },
+        {
+          selector: BUTTON_FORM_CONTROL('icon-20'),
+          styles: 'width: 20px; height: 20px; border-top-left-radius: 6px',
+        },
+        {
+          selector: BUTTON_FORM_CONTROL('icon-22'),
+          styles: 'width: 22px; height: 22px; border-top-left-radius: 6px',
+        },
+      ],
+    },
+    position: BUTTON_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Button.svelte` and `IconButton.svelte` are broad signals, each routed here by its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

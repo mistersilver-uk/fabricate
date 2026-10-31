@@ -323,12 +323,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches
   // only its neutral state, so the specimen that mounts it through the published seam (issue 2601)
-  // shows every role, the two compact sizes and the keyboard-focused ghost-danger. Then the three
-  // that mount it with and without a Fabricate root above its target (issue 2456).
+  // shows every role, the two compact sizes and the keyboard-focused ghost-danger, and the forms
+  // specimen its small rungs (issue 2853). Then the three that mount it with and without a
+  // Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+    'manager-published-button-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
@@ -764,14 +766,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-inspector-cant-enable',
   ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
-  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
-  // and the three that mount it with and without a Fabricate root above its target (issue 2456).
+  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452)
+  // and the forms specimen (issue 2853), and the three that mount it with and without a Fabricate
+  // root above its target (issue 2456).
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-button-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

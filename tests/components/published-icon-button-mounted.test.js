@@ -49,6 +49,8 @@ const ROLES = Object.freeze([
 /** Each published size and the class it writes beside the family root. */
 const SIZES = Object.freeze([
   ['', []],
+  ['20', ['is-size-20']],
+  ['22', ['is-size-22']],
   ['24', ['is-size-24']],
   ['26', ['is-size-26']],
 ]);

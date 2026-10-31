@@ -213,6 +213,8 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'button-danger': button({ role: 'danger', children: 'Delete', onclick: press }),
     'button-warning': button({ role: 'warning', children: 'Override', onclick: press }),
     'button-full-width': button({ fullWidth: true, children: 'Start batch', onclick: press }),
+    'button-size-24': button({ size: '24', children: 'Add tier', onclick: press }),
+    'button-size-26': button({ size: '26', children: 'Claim', onclick: press }),
     'button-size-28': button({ size: '28', children: 'Add choice', onclick: press }),
     'button-size-38': button({ size: '38', children: 'Register item', onclick: press }),
     'button-disabled': disabledButton({ disabled: true, children: 'Not yet', onclick: press }),
@@ -419,6 +421,18 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       role: 'ghost-danger',
       icon: 'fas fa-xmark',
       ariaLabel: 'Discard',
+      onclick: press,
+    }),
+    'icon-button-size-20': button({
+      size: '20',
+      icon: 'fas fa-xmark',
+      ariaLabel: 'Dismiss',
+      onclick: press,
+    }),
+    'icon-button-size-22': button({
+      size: '22',
+      icon: 'fas fa-plus',
+      ariaLabel: 'Credit',
       onclick: press,
     }),
     'icon-button-size-24': button({

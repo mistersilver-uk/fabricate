@@ -59,6 +59,7 @@ manager-published-list-row-aside-specimen
 manager-published-list-row-slots-specimen
 manager-published-list-row-forms-specimen
 manager-published-icon-buttons-specimen
+manager-published-button-forms-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
 manager-published-segmented-specimen

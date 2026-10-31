@@ -711,6 +711,7 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-leaves-specimen',
         'manager-published-controls-specimen',
         'manager-published-buttons-specimen',
+        'manager-published-button-forms-specimen',
         'published-standalone',
         'published-standalone-light',
         'published-standalone-in-window',
@@ -955,12 +956,13 @@ test('(a) a Callout change publishes its four frames, then the specimen that mou
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) an IconButton change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconButton.svelte';
   const frames = [
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+    'manager-published-button-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

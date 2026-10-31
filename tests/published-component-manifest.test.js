@@ -491,6 +491,8 @@ const BUTTON = Object.freeze({
     'is-dashed',
     'is-warning-action',
     'is-full-width',
+    'is-size-24',
+    'is-size-26',
     'is-size-28',
     'is-size-38',
   ]),
@@ -541,7 +543,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 25 sheet rules that draw a published button, none with a compound above its root. */
+/** The 27 sheet rules that draw a published button, none with a compound above its root. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -553,6 +555,8 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
   'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-38',
   'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-28',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-24',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-26',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',

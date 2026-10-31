@@ -2634,6 +2634,19 @@
   border-radius: 7px;
 }
 
+/* The 24px and 26px rungs (issue 2853): a dense row's adders and step buttons, each at its band's corner. Both clear the 24px pointer target (WCAG 2.2 §2.5.8) at their own box. */
+.fabricate-button.fabricate-button.fabricate-button.is-size-24 {
+  height: 24px;
+  min-height: 24px;
+  border-radius: 6px;
+}
+
+.fabricate-button.fabricate-button.fabricate-button.is-size-26 {
+  height: 26px;
+  min-height: 26px;
+  border-radius: 7px;
+}
+
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
 
 /* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; each `<Select>` rung states its own weight. */

@@ -216,7 +216,8 @@ Its info-family fill, border and ink MUST remain distinct from the single shared
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
-IconButton's opt-in rungs `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+IconButton's opt-in rungs `size="20"`, `size="22"`, `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+The `20` and `22` rungs (issue 2853) sit below the 24px pointer target floor (WCAG 2.2 §2.5.8), so each MUST widen its pointer target to 24 by 24 about its centre with an absolutely positioned `::before`, which moves no layout, and the keyboard ring stays on the drawn box.
 The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
@@ -898,6 +899,7 @@ The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the liter
 `Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 `Field`'s `size` names its text-like or number input's rung by its height, 26, 28, 30, 34 or 38 with 38 the default, each at its band's corner, and leaves the ladder's 44 out; its `face` draws that control in the serif or mono face of `ui-visual-style`'s type ladder, and its `type` of `'number'` draws a number input with no step buttons (issue 2848).
 `SearchField`'s `density` of `toolbar` or `inline` draws the default shell at `Select`'s rung of that name, 34 or 30, each at its band's corner; the published seam withholds `compact`, so the exception stays at its four ruled sites (issue 2849).
+`Button`'s `'24'` and `'26'` rungs draw a dense row's adders and step buttons, each at its band's corner (issue 2853); they are no touch-reachable control heights, and each is still its own 24px pointer target.
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 24, 26, 28, 30, 32, 34, 36, 38 or 44 with 26 the default.
 Its radius is the radius ladder's band for the rung: 6 at 22 and 24, 7 at 26 to 32, 9 at 34 to 38 and 11 at 44.
