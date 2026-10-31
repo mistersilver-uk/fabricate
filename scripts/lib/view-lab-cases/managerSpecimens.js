@@ -1314,15 +1314,18 @@ export const CASES = Object.freeze([
         // The default track's edge beside the thin track's, each 6px tall.
         {
           selector: STAGE_BARS_FORM_TRACK('states', 1),
-          styles: 'height: 6px; border-top-width: 1px; background-color: var(--fab-surface-raised)',
+          styles:
+            'height: 6px; border-top-style: solid; border-top-width: 1px; background-color: var(--fab-surface-raised)',
         },
         {
           selector: STAGE_BARS_FORM_TRACK('thin-states', 1),
-          styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+          styles:
+            'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
         },
         {
           selector: STAGE_BARS_FORM_TRACK('shares', 0),
-          styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+          styles:
+            'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
         },
         // A share of the current pooled stage, the whole 6px tall in its own tone.
         {
@@ -1331,7 +1334,7 @@ export const CASES = Object.freeze([
         },
         {
           selector: STAGE_BARS_FORM_TRACK('default-shares', 1),
-          styles: 'height: 6px; border-top-width: 1px',
+          styles: 'height: 6px; border-top-style: solid; border-top-width: 1px',
         },
       ],
     },
