@@ -10,6 +10,7 @@
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
   | `action` | `{ label, onClick?, description? }` | `null` | Rendered as one button when its `label` is a string with non-blank text and there is a function to call, its own `onClick` or else `onAction`; an already-localized `description` becomes the button's accessible description. |
   | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state, final for the mount, and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
+  | `assertive` | `true` | `false` | The published `role="alert"` (issue 2855): only `true` at the `danger` tone, read once at mount, so an update never swaps the role of a live node. |
 
   Callbacks:
   - `onAction(event)` — called on each press of the action button when `action.onClick` is not a
@@ -46,7 +47,7 @@
     host's `.app button` rule would otherwise set, for the same reason; the pair is held equal to
     the module ring by `tests/published-component-controls.test.js`.
 
-  Nine recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  Ten recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
   an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
@@ -55,9 +56,11 @@
   `onAction`, a top-level callback beside `action.onClick` (issue 2452); the action button's
   default role at every tone, where the danger specimen draws the danger role (issue 2452); and
   `onDismiss` (issue 2452), because a dismissal that removes a focused control without telling the
-  caller breaks the "Fabricate moves no focus" contract.
+  caller breaks the "Fabricate moves no focus" contract. The tenth is `assertive` (issue 2855).
 -->
 <script>
+  import { untrack } from 'svelte';
+
   let {
     tone = 'danger',
     title = '',
@@ -69,6 +72,7 @@
     dismissable = false,
     dismissLabel = '',
     blocking = false,
+    assertive = false,
     evidence = null,
     ...rest
   } = $props();
@@ -85,6 +89,9 @@
 
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'danger');
   const resolvedIcon = $derived(icon || DEFAULT_ICONS[resolvedTone]);
+
+  const alerting = untrack(() => assertive === true && resolvedTone === 'danger');
+  const interrupts = $derived(blocking || alerting);
 
   let dismissed = $state(false);
 
@@ -108,8 +115,8 @@
 {#if !dismissed}
   <div
     class="fab-notice is-{resolvedTone}"
-    role={blocking ? 'alert' : 'status'}
-    aria-live={blocking ? undefined : 'polite'}
+    role={interrupts ? 'alert' : 'status'}
+    aria-live={interrupts ? undefined : 'polite'}
     data-notice-tone={resolvedTone}
     {...rest}
   >

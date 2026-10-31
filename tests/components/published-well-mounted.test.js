@@ -133,6 +133,7 @@ describe('the published Well draws its well', () => {
       props: {
         label: { kind: 'data', required: false },
         children: { kind: 'slot', required: false },
+        tone: { kind: 'data', required: false },
       },
       rest: true,
       root: 'any',

@@ -2279,8 +2279,22 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
           (property) => property.startsWith('font') || property === 'line-height'
         )
       );
+      // The card head's title and note (issue 2854) are text the card draws, no control's floor.
+      const ownText = (rule) => /\.fab-card-(?:title|note)$/u.test(rule.selectorText);
       assert.deepEqual(
-        typed.map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
+        typed.filter(ownText).map((rule) => rule.selectorText),
+        root === '.fabricate-card'
+          ? [
+              '.fabricate-card .fab-card-heading > .fab-card-title',
+              '.fabricate-card .fab-card-heading > .fab-card-note',
+            ]
+          : [],
+        `\`${root}\` types only the head text it draws itself`
+      );
+      assert.deepEqual(
+        typed
+          .filter((rule) => !ownText(rule))
+          .map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
         [],
         `\`${root}\` declares type. Neither of these families owns a control, so neither gets a ` +
           'font floor: every control in the bar is the CALLER\'s, and flooring one here is the ' +

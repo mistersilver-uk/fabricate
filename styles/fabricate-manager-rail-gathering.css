@@ -492,6 +492,110 @@
   padding: 0;
 }
 
+/* The card's tones (issue 2854): one status ramp's edge on its soft fill, a status tone and not a restatement of the box. */
+.fabricate-card.fabricate-card.is-tone-warning {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-card.fabricate-card.is-tone-success {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-card.fabricate-card.is-tone-accent {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-card.fabricate-card.is-tone-info {
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+}
+
+/* Forced colours repaint every edge alike, so a toned card keeps a second edge inset in its padding. */
+@media (forced-colors: active) {
+  .fabricate-card.fabricate-card.is-tone-warning,
+  .fabricate-card.fabricate-card.is-tone-success,
+  .fabricate-card.fabricate-card.is-tone-accent,
+  .fabricate-card.fabricate-card.is-tone-info {
+    outline: 1px solid canvastext;
+    outline-offset: -4px;
+  }
+}
+
+/* The card's head (issue 2854), rooted at the card: a leading element beside a serif title over a muted note, and trailing controls that wrap beneath them once the two would fall under 8rem, and wrap among themselves rather than grow past the head. */
+.fabricate-card > .fab-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--fab-space-2) var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-card > .fab-card-head > .fab-card-identity {
+  display: flex;
+  flex: 1 1 8rem;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-card .fab-card-identity > .fab-card-leading {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-card > .fab-card-head > .fab-card-trailing {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.fabricate-card .fab-card-identity > .fab-card-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-card .fab-card-heading > .fab-card-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-card .fab-card-heading > .fab-card-note {
+  margin: var(--fab-space-2xs) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The muted ink falls under 4.5:1 on a tone's translucent fill, so a toned card's note takes the secondary ink. */
+.fabricate-card.fabricate-card.is-tone-warning .fab-card-note,
+.fabricate-card.fabricate-card.is-tone-success .fab-card-note,
+.fabricate-card.fabricate-card.is-tone-accent .fab-card-note,
+.fabricate-card.fabricate-card.is-tone-info .fab-card-note {
+  color: var(--fab-text-secondary);
+}
+
 .fabricate-manager .manager-fact-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

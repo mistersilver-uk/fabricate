@@ -357,6 +357,25 @@ const WELL_CONTENT = `${WELL} [data-lab-well-content]`;
 /** Sized to the fixture's 320px ground and the height of its one card. */
 const WELL_WINDOW = Object.freeze({ width: 440, height: 320 });
 
+/** The card tones fixture's ground, one section's card by its key, and a part of that card's head. */
+const CARD_TONES = '[data-lab-card-tones]';
+const CARD_TONE = (key) => `${CARD_TONES} > [data-lab-card-tone="${key}"] .fabricate-card`;
+const CARD_TONE_PART = (key, part) => `${CARD_TONE(key)} > .fab-card-head ${part}`;
+const CARD_TONE_KEYS = Object.freeze(['warning', 'success', 'accent', 'info']);
+
+/** Sized to the fixture's 320px ground and its seven cards, measured at 832px in Chromium. */
+const CARD_TONES_WINDOW = Object.freeze({ width: 440, height: 960 });
+
+/** The callout actions fixture's ground, one section's root by its key, and its actions host. */
+const CALLOUT_ACTIONS_GROUND = '[data-lab-callout-actions]';
+const CALLOUT_ACTION = (key, root) =>
+  `${CALLOUT_ACTIONS_GROUND} > [data-lab-callout-action="${key}"] ${root}`;
+const CALLOUT_ACTION_HOST = (key) =>
+  `${CALLOUT_ACTION(key, '.manager-callout')} > .manager-callout-actions`;
+
+/** Sized to the fixture's 320px ground, its three notes and its two notices, about 480px. */
+const CALLOUT_ACTIONS_WINDOW = Object.freeze({ width: 440, height: 600 });
+
 /** The callout fixture's ground, one section's published note by its key, and its actions host. */
 const CALLOUT_GROUND = '[data-lab-callout-ground]';
 const CALLOUT = (key) => `${CALLOUT_GROUND} > [data-lab-callout="${key}"] .manager-callout`;
@@ -1315,6 +1334,108 @@ export const CASES = Object.freeze([
     position: WELL_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Well.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-card-tones-specimen',
+    label:
+      'Specimen, mounted through the published seam — seven cards 8px apart in a 320px column on the --fab-bg-1 ground, each headed as InspectorCard publishes: a 34px Medallion tile in the leading slot beside a serif 15px title over an 11px note, and a published 28px Manage button in the trailing slot at the far edge, above the body line Two crafters assigned. Reading top to bottom: the untoned baseline, Activity limits, on the --fab-bg-2 fill inside the --fab-border edge with its note in the muted ink; then Over the limit on the warning fill inside the warning edge, its Manage button holding keyboard focus after one right-arrow press in it, so the 2px accent ring is drawn beside the tone edge; Ready to finish on the success fill; Chosen route on the accent fill; Check due on the info fill, each toned note in the secondary ink and each tile in its tone, every 296px card keeping its Manage button on the title’s row; a 180px warning card whose Manage button has dropped beneath its tile and title, at the far edge; and Standing rules, an untoned card holding an accent well, the on panel, with the line Catch up missed ticks: on. The frame draws inside the manager window and is the evidence for it alone; the second edge under forced colours, the head’s refusals and the slots kept across an update are the rendered and mounted suites’, and the contrast on the four grounds is the contrast measurement’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own controls in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-card-tones' },
+    steps: [{ selector: CARD_TONE_PART('warning', '.fabricate-button'), press: 'ArrowRight' }],
+    // Every section's card the fixture's effect drew, the warning card's button focused, and the well.
+    expectSelector: `${CARD_TONES}:has(> [data-lab-card-tone="info"] .fabricate-card.is-tone-info .fab-card-leading .fab-medallion):has(> [data-lab-card-tone="narrow"] .fabricate-card.is-tone-warning .fab-card-trailing .fabricate-button):has(> [data-lab-card-tone="warning"] .fab-card-trailing .fabricate-button:focus) > [data-lab-card-tone="well"] .fabricate-card .fab-well.is-tone-accent`,
+    expectContained: [
+      ...['plain', ...CARD_TONE_KEYS, 'narrow', 'well'].map((key) => ({
+        container: CARD_TONES,
+        target: CARD_TONE(key),
+      })),
+      { container: '.window-content', target: CARD_TONES },
+    ],
+    expectLayout: {
+      controls: [
+        // The untoned card's fill and edge, its title's face and its note's muted ink; each tone's
+        // fill, edge and the secondary note; the focused button's ring; and the accent well.
+        {
+          selector: CARD_TONE('plain'),
+          styles: 'background-color: var(--fab-bg-2); border-top-color: var(--fab-border)',
+        },
+        {
+          selector: CARD_TONE_PART('plain', '.fab-card-title'),
+          styles: 'font-size: 15px; font-weight: 600; color: var(--fab-text); margin-top: 0px',
+        },
+        {
+          selector: CARD_TONE_PART('plain', '.fab-card-note'),
+          styles: 'font-size: 11px; color: var(--fab-text-muted)',
+        },
+        ...CARD_TONE_KEYS.flatMap((tone) => [
+          {
+            selector: CARD_TONE(tone),
+            styles: `background-color: var(--fab-${tone}-soft); border-top-color: var(--fab-${tone}-border)`,
+          },
+          {
+            selector: CARD_TONE_PART(tone, '.fab-card-note'),
+            styles: 'color: var(--fab-text-secondary)',
+          },
+        ]),
+        {
+          selector: `${CARD_TONE_PART('warning', '.fabricate-button')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 2px; outline-color: var(--fab-accent)',
+        },
+        {
+          selector: `${CARD_TONE('well')} .fab-well`,
+          styles:
+            'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
+        },
+      ],
+    },
+    position: CARD_TONES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `InspectorCard.svelte` and `Well.svelte` are broad signals, routed here by their overrides.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-callout-actions-specimen',
+    label:
+      'Specimen, mounted through the published seam — three standing notes and two notices 8px apart in a 320px column on the --fab-bg-1 ground. Reading top to bottom: Begin an activity, an accent note at actionsPlacement below, its sentence beside its glyph and beneath them, across the strip’s whole content box, a full-width primary Begin activity button; At your limit, the same at the warning tone in a 180px column, the button still full width under the wrapped sentence; Standing rules, a neutral note at the default inline placement, its Read button on the sentence’s row at the far edge; then two danger notices, Something went wrong over The Downtime Studio could not be drawn, the first mounted assertive as role alert and the second the polite status, drawn alike. The frame draws inside the manager window and is the evidence for it alone; the announcement role at each tone and across an update is the mounted suite’s, and the stacked geometry at 320 and 180px the rendered suite’s',
+    // Beyond the smoke: a companion mounts each through `api.ui` and draws its own control in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-callout-actions' },
+    steps: [],
+    // Both stacked notes' buttons, the inline note's, and the alert beside the polite notice.
+    expectSelector: `${CALLOUT_ACTIONS_GROUND}:has(> [data-lab-callout-action="cta"] .manager-callout.is-actions-below .fabricate-button.is-full-width):has(> [data-lab-callout-action="narrow"] .manager-callout.is-actions-below .fabricate-button.is-full-width):has(> [data-lab-callout-action="inline"] .manager-callout:not(.is-actions-below) .fabricate-button):has(> [data-lab-callout-action="status"] .fab-notice[role="status"]) > [data-lab-callout-action="fault"] .fab-notice[role="alert"]`,
+    expectContained: [
+      ...['cta', 'narrow', 'inline'].map((key) => ({
+        container: CALLOUT_ACTIONS_GROUND,
+        target: CALLOUT_ACTION(key, '.manager-callout'),
+      })),
+      ...['fault', 'status'].map((key) => ({
+        container: CALLOUT_ACTIONS_GROUND,
+        target: CALLOUT_ACTION(key, '.fab-notice'),
+      })),
+      { container: '.window-content', target: CALLOUT_ACTIONS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // Each stacked host's column, the inline host's row, and the two notices' one face.
+        ...['cta', 'narrow'].map((key) => ({
+          selector: CALLOUT_ACTION_HOST(key),
+          styles: 'flex-direction: column; align-items: stretch',
+        })),
+        { selector: CALLOUT_ACTION_HOST('inline'), styles: 'flex-direction: row' },
+        ...['fault', 'status'].map((key) => ({
+          selector: CALLOUT_ACTION(key, '.fab-notice'),
+          styles:
+            'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+        })),
+      ],
+    },
+    position: CALLOUT_ACTIONS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Callout.svelte` and `Notice.svelte` are broad signals, routed here by their overrides.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
