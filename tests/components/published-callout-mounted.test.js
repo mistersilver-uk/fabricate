@@ -134,6 +134,7 @@ describe('the published Callout draws its note', () => {
         icon: optional,
         items: optional,
         actions: { kind: 'slot', required: false },
+        actionsPlacement: optional,
       },
       rest: true,
       root: 'any',

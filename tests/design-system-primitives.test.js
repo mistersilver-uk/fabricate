@@ -946,7 +946,7 @@ test('(a) a Well change publishes its three frames, then the two specimens that 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Callout change publishes its four frames, then the specimen that mounts it through the seam', () => {
+test('(a) a Callout change publishes its four frames, then the two specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/Callout.svelte';
   const frames = [
     'manager-tool-parity-04-requirements-1280x720',
@@ -954,6 +954,7 @@ test('(a) a Callout change publishes its four frames, then the specimen that mou
     'manager-recipe-edit-results-failure-policy-never-present',
     'manager-essence-edit-unscoped-on-craft',
     'manager-published-callout-specimen',
+    'manager-published-callout-actions-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });
@@ -1131,7 +1132,7 @@ test('(a) an ActionMenu change publishes its six frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
+test('(a) a Notice change publishes the six specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
     'player-inventory-bulk-report',
@@ -1140,6 +1141,7 @@ test('(a) a Notice change publishes the five specimens that mount it, after the 
     'manager-published-buttons-specimen',
     'manager-published-notice-dismiss-focus',
     'manager-published-notice-dismissed',
+    'manager-published-callout-actions-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });

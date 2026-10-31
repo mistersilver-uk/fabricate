@@ -794,6 +794,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-well': () => import('./fixtures/PublishedWell.svelte'),
   // Issue 2854: cards at each published tone under the head they publish, and an accent well, by the same seam.
   'published-card-tones': () => import('./fixtures/PublishedCardTones.svelte'),
+  // Issue 2855: notes whose actions stack beneath the body, and a notice mounted assertive, by the same seam.
+  'published-callout-actions': () => import('./fixtures/PublishedCalloutActions.svelte'),
   // Issue 2601: six standing notes, one per tone, one holding a published button in its actions.
   'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
   // Issue 2793: a button row and a read-only row, each aside holding a companion's element.

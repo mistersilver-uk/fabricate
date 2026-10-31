@@ -419,6 +419,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCardTones.svelte',
+  'tests/view-lab/fixtures/PublishedCalloutActions.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
   'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
@@ -891,6 +892,9 @@ const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 const labCardTone = (key) =>
   `[data-lab-card-tones] > [data-lab-card-tone="${key}"] .fabricate-card`;
 const labCardHead = (key, part) => `${labCardTone(key)} > .fab-card-head ${part}`;
+/** One section's root of the callout actions fixture, by the section's key. */
+const labCalloutAction = (key, root) =>
+  `[data-lab-callout-actions] > [data-lab-callout-action="${key}"] ${root}`;
 /** The list row fixture's aside host in one section's published row, by the section's key. */
 const labListRowAside = (key) =>
   `[data-lab-list-row-ground] > [data-lab-list-row="${key}"] .fabricate-list-row > .fabricate-list-row-aside`;
@@ -1476,6 +1480,23 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles:
         'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
     },
+  ],
+  // The published callout's actions placement and notice's assertive (issue 2855): each stacked
+  // host's column, the inline host's row, and the two danger notices drawn alike.
+  'manager-published-callout-actions-specimen': [
+    ...['cta', 'narrow'].map((key) => ({
+      selector: `${labCalloutAction(key, '.manager-callout')} > .manager-callout-actions`,
+      styles: 'flex-direction: column; align-items: stretch',
+    })),
+    {
+      selector: `${labCalloutAction('inline', '.manager-callout')} > .manager-callout-actions`,
+      styles: 'flex-direction: row',
+    },
+    ...['fault', 'status'].map((key) => ({
+      selector: labCalloutAction(key, '.fab-notice'),
+      styles:
+        'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+    })),
   ],
   // The published callout (issue 2601): the paragraph root's strip, ink and fill, the info, accent,
   // warning and success notes' tone inks and fills, the items' spacing, and the actions host and
@@ -7298,6 +7319,37 @@ test('the card tones specimen case measures the tone each section of the card to
     [...new Set(tones.map(([, tone]) => tone).filter(Boolean))].sort(byCodePoint),
     ['accent', 'info', 'success', 'warning'],
     'every published tone'
+  );
+});
+
+test('the callout actions specimen case measures the placement each section of the fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedCalloutActions.svelte'
+  );
+  for (const hook of ['data-lab-callout-actions', 'data-lab-callout-action']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const notes = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id.name === 'NOTES'
+  );
+  const placements = notes.init.arguments[0].elements.map((row) => [
+    row.elements[0].value,
+    row.elements[2].value === 'below' ? 'column' : 'row',
+  ]);
+  const measured = getCaseById('manager-published-callout-actions-specimen')
+    .expectLayout.controls.filter(({ selector }) => selector.endsWith('.manager-callout-actions'))
+    .map(({ selector, styles }) => [
+      /data-lab-callout-action="(\w+)"/u.exec(selector)[1],
+      /flex-direction: (\w+)/u.exec(styles)[1],
+    ]);
+  assert.deepEqual(measured, placements, 'each note’s host is measured at the placement it mounts');
+  assert.deepEqual(
+    [...new Set(placements.map(([, axis]) => axis))].sort(byCodePoint),
+    ['column', 'row'],
+    'both placements'
   );
 });
 

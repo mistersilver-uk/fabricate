@@ -2747,6 +2747,7 @@ Grouped, navigable validation output is NOT a notice: it is the validation surfa
 
 UNTIL THE SHARED REGION SHIPS, A NOTICE RENDERS STANDALONE AT ITS OWN SITE, and stating that interim is what keeps this requirement honest about the tree it governs.
 A standalone notice satisfies the ANNOUNCEMENT clause through its OWN role — `role="alert"` when blocking, `role="status"` with `aria-live="polite"` otherwise — because a live-region role is recognised on insertion and a notice inserted together with its text has no later update to announce.
+The published `Notice`'s `assertive` (issue 2855) is the companion's blocking form: `role="alert"` at the `danger` tone alone, fixed at mount so no update swaps a live node's role, and the companion that mounts it owes the arbitration clause for its own page.
 It does NOT satisfy the ARBITRATION clause, so a screen rendering standalone notices MUST NOT put two blocking notices on the page at once, and the arbitration stays the region's to enforce when it lands.
 
 A BANNER'S CURRENT ROLE DECIDES ITS PRIMITIVE, which is the routing rule a conversion needs and the one thing the pair of components did not state.

@@ -3531,6 +3531,7 @@ describe('the module sheet and every component style against the published Notic
           'dismissable',
           'dismissLabel',
           'onDismiss',
+          'assertive',
         ],
         'any',
       ],

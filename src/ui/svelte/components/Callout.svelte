@@ -11,7 +11,9 @@
   meant to make the hazard stand out. At `accent` the ink is `--fab-accent-text`, not `--fab-accent`,
   which measures 4.48:1 in `ironblood-forge` and fails AA. `title`, `text`, `icon`, an `actions`
   snippet drawn inside the strip so a note and the control answering it are one object, and an
-  extra `class` are the rest; `text` may be omitted when `items` carry the body. `items`
+  extra `class` are the rest; `text` may be omitted when `items` carry the body. `actionsPlacement`
+  (`'inline'` by default, or `'below'`, issue 2855) stacks the actions in a full-width column
+  beneath the glyph and body; any other value draws `'inline'`. `items`
   (`[{ icon, lead, text }]`) lists glyph-led points under the body, each glyph inked as the leading
   one; every field of an item is optional and renders only when non-empty, and a member that is not
   an object is skipped.
@@ -31,6 +33,7 @@
     text = '',
     icon = '',
     actions = undefined,
+    actionsPlacement = 'inline',
     items = [],
     class: extraClass = '',
     ...rest
@@ -68,6 +71,7 @@
   class:is-warning={resolvedTone === 'warning'}
   class:is-success={resolvedTone === 'success'}
   class:is-danger={resolvedTone === 'danger'}
+  class:is-actions-below={actionsPlacement === 'below'}
   data-callout-tone={resolvedTone}
   {...rest}
 >
@@ -177,6 +181,17 @@
     display: inline-flex;
     align-items: center;
     gap: var(--fab-space-2);
+  }
+
+  /* Below (issue 2855): the actions wrap onto their own row, a column as wide as the strip. */
+  .manager-callout.is-actions-below {
+    flex-wrap: wrap;
+  }
+
+  .manager-callout.is-actions-below > .manager-callout-actions {
+    flex: 1 1 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   /* The body stays `--fab-text-muted` at every tone, as the specimen has it. */

@@ -691,7 +691,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers. Then the
-  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452).
+  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452)
+  // and its assertive fault panel (issue 2855).
   'src/ui/svelte/components/Notice.svelte': Object.freeze([
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
@@ -699,6 +700,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-buttons-specimen',
     'manager-published-notice-dismiss-focus',
     'manager-published-notice-dismissed',
+    'manager-published-callout-actions-specimen',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.
@@ -709,7 +711,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing
-  // files, and the specimen that mounts it through the published seam (issue 2601).
+  // files, and the specimens that mount it through the published seam (issues 2601 and 2855).
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
@@ -717,6 +719,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The `items` form, which only the essence On craft primer draws (issue 1521).
     'manager-essence-edit-unscoped-on-craft',
     'manager-published-callout-specimen',
+    'manager-published-callout-actions-specimen',
   ]),
   // The fact row at `rule` density: the essence catalogue's world-default cards and the tool entry's
   // effective-rules rail (issue 1521).

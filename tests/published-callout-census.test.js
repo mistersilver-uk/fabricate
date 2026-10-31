@@ -29,12 +29,20 @@ import {
 } from './helpers/publishedComponentGate.js';
 
 /**
- * The published note's root: the tone classes `tone` writes beside it, `is-accent` among them, and
+ * The published note's root: the tone classes `tone` writes beside it, `is-accent` among them, the
+ * class `actionsPlacement` writes (issue 2855), and
  * the two classes under which a Fabricate rule lays a note out, no extension target sitting in one.
  */
 const CALLOUT = Object.freeze({
   root: 'manager-callout',
-  writable: new Set(['is-info', 'is-accent', 'is-warning', 'is-success', 'is-danger']),
+  writable: new Set([
+    'is-info',
+    'is-accent',
+    'is-warning',
+    'is-success',
+    'is-danger',
+    'is-actions-below',
+  ]),
   ancestors: new Set(['manager-component-entry-duplicate', 'manager-tool-requirements-card']),
   drawsChildren: true,
 });
@@ -86,7 +94,7 @@ describe('the module sheet and every component style against the published Callo
     );
     assert.deepEqual(
       [Object.keys(entryNamed('Callout').props), entryNamed('Callout').root],
-      [['tone', 'title', 'text', 'icon', 'items', 'actions'], 'any'],
+      [['tone', 'title', 'text', 'icon', 'items', 'actions', 'actionsPlacement'], 'any'],
       'a published class or another root reopens the census'
     );
   });

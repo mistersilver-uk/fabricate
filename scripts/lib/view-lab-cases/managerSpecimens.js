@@ -366,6 +366,16 @@ const CARD_TONE_KEYS = Object.freeze(['warning', 'success', 'accent', 'info']);
 /** Sized to the fixture's 320px ground and its seven cards, measured at 832px in Chromium. */
 const CARD_TONES_WINDOW = Object.freeze({ width: 440, height: 960 });
 
+/** The callout actions fixture's ground, one section's root by its key, and its actions host. */
+const CALLOUT_ACTIONS_GROUND = '[data-lab-callout-actions]';
+const CALLOUT_ACTION = (key, root) =>
+  `${CALLOUT_ACTIONS_GROUND} > [data-lab-callout-action="${key}"] ${root}`;
+const CALLOUT_ACTION_HOST = (key) =>
+  `${CALLOUT_ACTION(key, '.manager-callout')} > .manager-callout-actions`;
+
+/** Sized to the fixture's 320px ground, its three notes and its two notices, about 480px. */
+const CALLOUT_ACTIONS_WINDOW = Object.freeze({ width: 440, height: 600 });
+
 /** The callout fixture's ground, one section's published note by its key, and its actions host. */
 const CALLOUT_GROUND = '[data-lab-callout-ground]';
 const CALLOUT = (key) => `${CALLOUT_GROUND} > [data-lab-callout="${key}"] .manager-callout`;
@@ -1384,6 +1394,48 @@ export const CASES = Object.freeze([
     position: CARD_TONES_WINDOW,
     kinds: ['manager', 'specimen'],
     // `InspectorCard.svelte` and `Well.svelte` are broad signals, routed here by their overrides.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-callout-actions-specimen',
+    label:
+      'Specimen, mounted through the published seam — three standing notes and two notices 8px apart in a 320px column on the --fab-bg-1 ground. Reading top to bottom: Begin an activity, an accent note at actionsPlacement below, its sentence beside its glyph and beneath them, across the strip’s whole content box, a full-width primary Begin activity button; At your limit, the same at the warning tone in a 180px column, the button still full width under the wrapped sentence; Standing rules, a neutral note at the default inline placement, its Read button on the sentence’s row at the far edge; then two danger notices, Something went wrong over The Downtime Studio could not be drawn, the first mounted assertive as role alert and the second the polite status, drawn alike. The frame draws inside the manager window and is the evidence for it alone; the announcement role at each tone and across an update is the mounted suite’s, and the stacked geometry at 320 and 180px the rendered suite’s',
+    // Beyond the smoke: a companion mounts each through `api.ui` and draws its own control in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-callout-actions' },
+    steps: [],
+    // Both stacked notes' buttons, the inline note's, and the alert beside the polite notice.
+    expectSelector: `${CALLOUT_ACTIONS_GROUND}:has(> [data-lab-callout-action="cta"] .manager-callout.is-actions-below .fabricate-button.is-full-width):has(> [data-lab-callout-action="narrow"] .manager-callout.is-actions-below .fabricate-button.is-full-width):has(> [data-lab-callout-action="inline"] .manager-callout:not(.is-actions-below) .fabricate-button):has(> [data-lab-callout-action="status"] .fab-notice[role="status"]) > [data-lab-callout-action="fault"] .fab-notice[role="alert"]`,
+    expectContained: [
+      ...['cta', 'narrow', 'inline'].map((key) => ({
+        container: CALLOUT_ACTIONS_GROUND,
+        target: CALLOUT_ACTION(key, '.manager-callout'),
+      })),
+      ...['fault', 'status'].map((key) => ({
+        container: CALLOUT_ACTIONS_GROUND,
+        target: CALLOUT_ACTION(key, '.fab-notice'),
+      })),
+      { container: '.window-content', target: CALLOUT_ACTIONS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // Each stacked host's column, the inline host's row, and the two notices' one face.
+        ...['cta', 'narrow'].map((key) => ({
+          selector: CALLOUT_ACTION_HOST(key),
+          styles: 'flex-direction: column; align-items: stretch',
+        })),
+        { selector: CALLOUT_ACTION_HOST('inline'), styles: 'flex-direction: row' },
+        ...['fault', 'status'].map((key) => ({
+          selector: CALLOUT_ACTION(key, '.fab-notice'),
+          styles:
+            'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+        })),
+      ],
+    },
+    position: CALLOUT_ACTIONS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Callout.svelte` and `Notice.svelte` are broad signals, routed here by their overrides.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
