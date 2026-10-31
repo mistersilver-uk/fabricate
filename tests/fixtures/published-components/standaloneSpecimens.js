@@ -339,6 +339,27 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption">`,
       reach: reach('input', 'input', { inert: true }),
     },
+    // Issue 2848: each rung under the 38 default, with each face, the number type and the error.
+    'field-size-26-number': {
+      props: { as: 'div', children: true, size: 26, face: 'mono', type: 'number' },
+      slot: `${CAPTION}<input type="number" value="12" aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-size-28-serif': {
+      props: { as: 'div', children: true, size: 28, face: 'serif' },
+      slot: `${CAPTION}<input type="text" value="Moonlit Glade" aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-size-30-invalid': {
+      props: { as: 'div', children: true, size: 30, invalid: true },
+      slot: `${CAPTION}<input type="text" value="1d20 +" aria-invalid="true" aria-labelledby="standalone-field-caption" aria-describedby="standalone-field-error"><small id="standalone-field-error" style="color: var(--fab-danger-text)">Finish the formula.</small>`,
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-size-34': {
+      props: { as: 'div', children: true, size: 34 },
+      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
+    },
   }),
   Well: Object.freeze({
     'well-labelled': { props: { label: 'Chosen reagents', children: true }, reach: UNREACHABLE },

@@ -300,8 +300,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame,
   // plus the captions issue 2532's kicker reaches, two scoped captions it must leave alone, the
-  // specimen that mounts it through the published seam (issue 2601), and the three that mount it
-  // with and without a Fabricate root above its target (issue 2679).
+  // specimens that mount it through the published seam (issues 2601 and 2848), and the three that
+  // mount it with and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
@@ -316,6 +316,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-roll-prompt-basic',
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
+    'manager-published-field-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

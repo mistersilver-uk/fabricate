@@ -903,7 +903,7 @@ test('(a) a StageBars change publishes its two run frames, then the specimen tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Field change publishes its twelve frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Field.svelte';
   const frames = [
     'manager-gathering-task-editor-normal',
@@ -919,6 +919,7 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
     'player-crafting-roll-prompt-basic',
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
+    'manager-published-field-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

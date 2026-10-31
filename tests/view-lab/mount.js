@@ -786,6 +786,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
   // Issue 2601: a field whose content slot holds a companion's caption, input and hint, by the same seam.
   'published-field': () => import('./fixtures/PublishedField.svelte'),
+  // Issue 2848: fields at the published rungs, faces, number type and error state, by the same seam.
+  'published-field-forms': () => import('./fixtures/PublishedFieldForms.svelte'),
   // Issue 2601: a well in a card, its content slot holding one element of a companion's, by the same seam.
   'published-well': () => import('./fixtures/PublishedWell.svelte'),
   // Issue 2601: six standing notes, one per tone, one holding a published button in its actions.

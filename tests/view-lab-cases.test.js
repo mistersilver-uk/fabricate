@@ -415,6 +415,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
+  'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
@@ -875,6 +876,9 @@ const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${k
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
 /** The one section of the field fixture. */
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
+/** The forms fixture's companion input in one section, by the section's key. */
+const labFieldForm = (key) =>
+  `[data-lab-field-forms] > [data-lab-field-form="${key}"] .fabricate-field input`;
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 /** The list row fixture's aside host in one section's published row, by the section's key. */
@@ -1374,6 +1378,25 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_FIELD} .fabricate-field input`, styles: 'height: 38px; border-radius: 9px' },
     {
       selector: `${LAB_FIELD} .fabricate-field input:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
+    },
+  ],
+  // The published field's forms (issue 2848): each section's input at its rung and corner, the
+  // number input drawn as a text field with no step buttons, and the focused error input's ring.
+  'manager-published-field-forms-specimen': [
+    ...[
+      ['name', 34, 9],
+      ['formula', 30, 7],
+      ['uses', 28, 7],
+      ['tag', 26, 7],
+      ['bonus', 30, 7],
+    ].map(([key, height, corner]) => ({
+      selector: labFieldForm(key),
+      styles: `height: ${height}px; border-radius: ${corner}px`,
+    })),
+    { selector: labFieldForm('uses'), styles: 'appearance: textfield' },
+    {
+      selector: `${labFieldForm('bonus')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
   ],
@@ -7075,6 +7098,30 @@ test('the field specimen case types into the input the field fixture draws in a 
   assert.ok(
     expectSelector.includes('[data-lab-value="Moonlit tonic"]'),
     'the frame is taken only once the companion recorded the edit'
+  );
+});
+
+test('the field forms specimen case measures the rung each section of the forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedFieldForms.svelte'
+  );
+  for (const hook of ['data-lab-field-forms', 'data-lab-field-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rungs = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'size')
+    .map((node) => node.value.value);
+  const measured = getCaseById('manager-published-field-forms-specimen')
+    .expectLayout.controls.filter(({ styles }) => styles.startsWith('height: '))
+    .map(({ styles }) => Number.parseFloat(/height: (\d+)px/u.exec(styles)[1]));
+  assert.deepEqual(measured, rungs, 'each section’s input is measured at the rung it mounts');
+  assert.deepEqual(
+    [...new Set(rungs)].sort((left, right) => left - right),
+    [26, 28, 30, 34],
+    'the four rungs Premium draws'
   );
 });
 

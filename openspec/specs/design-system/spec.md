@@ -896,6 +896,7 @@ The two gathering typeaheads that drew the compact box by hand before issue 1782
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
 The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 `Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
+`Field`'s `size` names its text-like or number input's rung by its height, 26, 28, 30, 34 or 38 with 38 the default, each at its band's corner, and leaves the ladder's 44 out; its `face` draws that control in the serif or mono face of `ui-visual-style`'s type ladder, and its `type` of `'number'` draws a number input with no step buttons (issue 2848).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 24, 26, 28, 30, 32, 34, 36, 38 or 44 with 26 the default.
 Its radius is the radius ladder's band for the rung: 6 at 22 and 24, 7 at 26 to 32, 9 at 34 to 38 and 11 at 44.
@@ -1112,7 +1113,7 @@ The expression field (`RollDataExpressionInput`) draws no box, so the faces of i
 Its rest face is `Field`'s box, the recipe row's amount box, or the manager's free-text baseline.
 Its focus-visible ring is the module's inset text-field ring, drawn by the module's baseline rule for a text input (`styles/fabricate-base.css`), which `Field` restates for a bare host, and never by this component.
 Its disabled face is the manager baseline's `:disabled` rule, so a host outside a manager root owes one.
-Its invalid face is the caller's own rule on `[aria-invalid='true']`, since neither `Field`'s box nor the manager's baseline draws one.
+Its invalid face is the caller's own rule on `[aria-invalid='true']`, since the manager's baseline draws none and `Field`'s box draws one only under its `invalid` and the control's own `aria-invalid` (issue 2848).
 No text input draws a hover face.
 It declares `disabled`, which disables its input and every token together and leaves its reading drawn, and it takes the invalid state as `aria-invalid` on its rest spread.
 A host MUST stack the input and its row in a column that states the gap between them, as `Field` does at 6px, and MUST host the field outside a `<label>` when it passes `tokens` or `resolve`, because a label would take every token, the reading and the status text into the field's name.

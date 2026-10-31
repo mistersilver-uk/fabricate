@@ -124,7 +124,14 @@ describe('the published Field draws its column', () => {
   it('is described as its pin', () => {
     assert.deepEqual(ui().describe('Field'), {
       version: 1,
-      props: { as: { kind: 'data', required: true }, children: { kind: 'slot', required: false } },
+      props: {
+        as: { kind: 'data', required: true },
+        children: { kind: 'slot', required: false },
+        size: { kind: 'data', required: false },
+        face: { kind: 'data', required: false },
+        type: { kind: 'data', required: false },
+        invalid: { kind: 'data', required: false },
+      },
       rest: true,
       root: 'any',
       overlays: false,

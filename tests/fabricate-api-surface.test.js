@@ -574,7 +574,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       Field: {
         version: 1,
-        props: { as: required, children: slot },
+        props: {
+          as: required,
+          children: slot,
+          size: optional,
+          face: optional,
+          type: optional,
+          invalid: optional,
+        },
         rest: true,
         root: 'any',
         overlays: false,

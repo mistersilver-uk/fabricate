@@ -346,6 +346,10 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     props: Object.freeze({
       as: Object.freeze({ kind: 'data', required: true }),
       children: Object.freeze({ kind: 'slot' }),
+      size: Object.freeze({ kind: 'data' }),
+      face: Object.freeze({ kind: 'data' }),
+      type: Object.freeze({ kind: 'data' }),
+      invalid: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
