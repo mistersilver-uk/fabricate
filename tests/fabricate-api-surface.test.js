@@ -197,7 +197,22 @@ function documentedComponentSections() {
  * states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652', '2656', '2784', '2775'].flatMap((issue) => {
+  const groups = [
+    '2448',
+    '2451',
+    '2452',
+    '2453',
+    '2454',
+    '2455',
+    '2601',
+    '2644',
+    '2646',
+    '2647',
+    '2652',
+    '2656',
+    '2784',
+    '2775',
+  ].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -490,6 +505,9 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onclick: { kind: 'callback', required: true },
           'aria-expanded': { kind: 'aria', required: false },
           'aria-describedby': { kind: 'aria', required: false },
+          ariaLabel: optional,
+          tooltip: optional,
+          pressed: optional,
         },
         rest: true,
         root: 'any',
@@ -528,6 +546,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           decrementLabel: required,
           incrementLabel: required,
           onChange: { kind: 'callback', required: true },
+          decrementTooltip: optional,
+          incrementTooltip: optional,
         },
         rest: false,
         root: 'any',
@@ -795,7 +815,10 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);
-    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
+    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end)
+      .trimEnd()
+      .split('\n')
+      .slice(2);
     assert.deepEqual(
       rows,
       ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
@@ -898,7 +921,11 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       return text.slice(start, end);
     };
     const specified = between(SPECIFIED, '\n### Interactive components\n', '\n### ');
-    const documented = between(DOCUMENTED, '\n### Ownership and theme\n', '\n## Data Persistence\n');
+    const documented = between(
+      DOCUMENTED,
+      '\n### Ownership and theme\n',
+      '\n## Data Persistence\n'
+    );
     const tokens = [...new Set(specified.match(/`[^`]+`/gu))];
     assert.ok(tokens.length > 15, 'the spec states its interactive rule in backticked values');
     // The docs write a root bare, as their components table does, where the spec quotes it.
@@ -1022,7 +1049,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           [],
           `${where} is where a companion learns the names it reserves`
         );
-        assert.equal(prose.includes('`data-locked`'), tooltip === true, `${where}: data-locked`);
+        // A group may name `data-locked` beside a key's own tooltip (issue 2852); it states the
+        // refusal exactly where the entry reserves the name.
+        const refused = prose.includes('`data-locked` is refused');
+        assert.equal(refused, tooltip === true, `${where}: data-locked`);
+        if (tooltip !== true) {
+          const reserved = prose.split('\n').filter((line) => line.includes('`data-locked`'));
+          assert.deepEqual(
+            reserved.filter((line) => /is reserved on/u.test(line)),
+            [],
+            `${where} names data-locked beside no M13 tail`
+          );
+        }
       }
     }
   });
@@ -1166,7 +1204,11 @@ describe('the real facade routes each public member to its collaborator', () => 
       (builder.recipeManager ?? builder._recipeManager).resolveToolStates(null, [], []);
     assert.deepEqual(built.slice(0, 2).map(consulted), [station, station]);
     assert.deepEqual(built.slice(2).map(consulted), [null, null]);
-    assert.equal(built[2], facade._getCraftingListingBuilder(), 'no station keeps the cached builder');
+    assert.equal(
+      built[2],
+      facade._getCraftingListingBuilder(),
+      'no station keeps the cached builder'
+    );
     assert.equal(built[3], facade._getRunJournalBuilder());
     assert.notEqual(built[0], built[2]);
     assert.equal(facade.recipeManager, recipeManager);
@@ -1354,7 +1396,11 @@ test('the Journal composition emitter survives socket serialization with its opt
 // The GM's reply emits `{ recipients }` behind the authority's claim, which no ledger-free test reaches.
 defineStructureContract(
   'the composition emitter forwards its options bag',
-  { file: 'src/bootstrap/journalOperations.js', fn: 'createJournalCommandsForFabricate', property: 'emit' },
+  {
+    file: 'src/bootstrap/journalOperations.js',
+    fn: 'createJournalCommandsForFabricate',
+    property: 'emit',
+  },
   { callsWith: [['emit', 'options']] }
 );
 

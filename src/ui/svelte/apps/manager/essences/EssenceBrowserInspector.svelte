@@ -409,7 +409,7 @@
       <Button
         role="danger"
         fullWidth
-        aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
+        ariaLabel={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
           name: essence.name,
         })}
         aria-describedby={deleteNote ? deleteNoteId : undefined}

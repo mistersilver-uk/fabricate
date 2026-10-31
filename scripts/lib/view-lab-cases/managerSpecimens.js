@@ -424,10 +424,32 @@ const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
 const BUTTON_FORMS = '[data-lab-button-forms]';
 const BUTTON_FORM = (key) => `${BUTTON_FORMS} > [data-lab-button-form="${key}"]`;
 const BUTTON_FORM_CONTROL = (key) => `${BUTTON_FORM(key)} button`;
-const BUTTON_FORM_KEYS = Object.freeze(['button-24', 'button-26', 'icon-20', 'icon-22']);
+const BUTTON_FORM_KEYS = Object.freeze([
+  'button-24',
+  'button-26',
+  'icon-20',
+  'icon-22',
+  'info',
+  'pressed',
+  'tooltip',
+  'unpressed',
+  'pressed-ghost',
+  'pressed-disabled',
+  'stepper',
+]);
+const INFO_FACE =
+  'color: var(--fab-info-text); border-top-color: var(--fab-info-border); background-color: var(--fab-info-soft)';
+const PRESSED_FACE =
+  'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)';
+const NEUTRAL_FACE =
+  'color: var(--fab-text); border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)';
+const PRESSED_HOVER_FACE =
+  'border-top-color: var(--fab-accent-hover); background-color: var(--fab-accent-hover)';
+const PRESSED_DISABLED_FACE =
+  'opacity: 0.62; border-top-color: var(--fab-accent); background-color: var(--fab-accent)';
 
 /** Sized to the fixture's 360px ground and its rows. */
-const BUTTON_FORMS_WINDOW = Object.freeze({ width: 480, height: 320 });
+const BUTTON_FORMS_WINDOW = Object.freeze({ width: 480, height: 640 });
 
 /**
  * The tabs fixture's ground, the strip's target and tablist, its first two tabs, Inputs and
@@ -1583,13 +1605,18 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-button-forms-specimen',
     label:
-      'Specimen, mounted through the published seam — four controls in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each beside a caption the companion draws. Reading top to bottom: the neutral button Add tier at the 24px rung with a 6px corner, the neutral button Claim at the 26px rung with a 7px corner, each keeping the default rung’s inline padding; the neutral icon button Dismiss the entry, an xmark on a 20px square, and Credit a day to Mira, a plus on a 22px square, each at a 6px corner. No control is pressed or focused. The frame cannot show the 24px pointer target the two icon buttons reach past their box, which the rendered suite measures',
-    // Beyond the smoke: a companion mounts each through `api.ui`.
+      'Specimen, mounted through the published seam — eleven controls in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each beside a caption the companion draws, after two steps: a click on the pressed ghost Show the reward, the pointer still resting on it, and Tab from the pressed +7 button, which put keyboard focus on Rewind, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face. Reading top to bottom: the neutral button Add tier at the 24px rung with a 6px corner, the neutral button Claim at the 26px rung with a 7px corner, each keeping the default rung’s inline padding; the neutral icon button Dismiss the entry, an xmark on a 20px square, and Credit a day to Mira, a plus on a 22px square, each at a 6px corner; Roll Wits in the info role, its info ink on the soft info fill inside the info edge; +7, pressed, a solid accent tile in the ink drawn on it; the focused Rewind; +7 again, not pressed, on the neutral face; the pressed ghost under the pointer, its tile in the accent’s hover colour; the pressed toggle disabled, its tile kept under the disabled dimming; and a stepper at 3 whose minus and plus carry tooltips. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the frame cannot show the 24px pointer target the two icon buttons reach past their box, which the rendered suite measures, nor the names, aria-pressed and hover text, which the mounted suites read',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-button-forms' },
-    steps: [],
-    expectSelector: `${BUTTON_FORMS}:has(> [data-lab-button-form="button-24"] .fabricate-button) > [data-lab-button-form="icon-22"] .fabricate-icon-button`,
+    steps: [
+      { selector: BUTTON_FORM_CONTROL('pressed-ghost') },
+      { selector: BUTTON_FORM_CONTROL('pressed'), press: 'Tab' },
+    ],
+    // The stepper mounted last, the pressed toggle's state, and the tooltip the keyboard focus
+    // opened through the facade on the Rewind button.
+    expectSelector: `${BUTTON_FORMS}:has(> [data-lab-button-form="stepper"] [data-stepper-increment][data-tooltip-text]):has(> [data-lab-button-form="pressed"] button[aria-pressed="true"]) > [data-lab-button-form="tooltip"] button[aria-describedby="tooltip"]:focus-visible`,
     expectContained: [
       ...BUTTON_FORM_KEYS.map((key) => ({ container: BUTTON_FORMS, target: BUTTON_FORM(key) })),
       { container: '.window-content', target: BUTTON_FORMS },
@@ -1613,12 +1640,25 @@ export const CASES = Object.freeze([
           selector: BUTTON_FORM_CONTROL('icon-22'),
           styles: 'width: 22px; height: 22px; border-top-left-radius: 6px',
         },
+        // The info face, the pressed face at rest, beside its unpressed self, under the pointer on
+        // a ghost and disabled, and the focused hint button's ring.
+        { selector: BUTTON_FORM_CONTROL('info'), styles: INFO_FACE },
+        { selector: BUTTON_FORM_CONTROL('pressed'), styles: PRESSED_FACE },
+        { selector: BUTTON_FORM_CONTROL('unpressed'), styles: NEUTRAL_FACE },
+        // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
+        { selector: BUTTON_FORM_CONTROL('pressed-ghost'), styles: PRESSED_HOVER_FACE },
+        { selector: BUTTON_FORM_CONTROL('pressed-disabled'), styles: PRESSED_DISABLED_FACE },
+        {
+          selector: `${BUTTON_FORM_CONTROL('tooltip')}:focus-visible`,
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+        },
       ],
     },
     position: BUTTON_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
-    // `Button.svelte` and `IconButton.svelte` are broad signals, each routed here by its
-    // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    // `Button.svelte`, `IconButton.svelte` and `Stepper.svelte` are broad signals, each routed
+    // here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

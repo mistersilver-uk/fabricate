@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; issue #2850 publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; issue #2851 publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; issue #2848 publishes `Field`'s `size`, `face`, `type` and `invalid`; issue #2849 publishes `SearchField`'s `density` and `countLabel`; issue #2853 publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones.
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; issue #2850 publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; issue #2851 publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; issue #2848 publishes `Field`'s `size`, `face`, `type` and `invalid`; issue #2849 publishes `SearchField`'s `density` and `countLabel`; issue #2853 publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; issue #2852 publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips.
 
 ### The descriptor
 
@@ -412,12 +412,14 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, contains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
+`contains` names a `text` key of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22, issue 2852); `describe` does not state it, and giving an existing key `contains` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
-`tooltip` is `true` on an entry whose `restOn` is `'control'` where Fabricate writes a Foundry tooltip attribute on that control, and is otherwise absent; it reserves `data-locked` beside the names `restOn` reserves, and `describe` does not state it.
+`tooltip` is `true` on an entry whose `restOn` is `'control'` where Fabricate writes a Foundry tooltip attribute on that control in every mount, and is otherwise absent; it reserves `data-locked` beside the names `restOn` reserves, and `describe` does not state it.
+Where only a key writes one, as `Button`'s `tooltip` (issue 2852), the entry states no `tooltip`, so it reserves nothing more, and the component writes no tooltip on a control that carries a `data-locked` rest key.
 The names an entry reserves through `restOn` and `tooltip` are fixed for its `version`; reserving another, by giving an entry `tooltip` among other ways, is a narrowing.
 `standaloneRoot` is `true` on an entry whose `root` is `'any'` that Fabricate draws under the standalone style root, as The required ancestor root states, and is otherwise absent; `describe` does not state it.
 `overlays` is `true` where the component opens an overlay, and is otherwise absent; `describe` answers it on every entry as a boolean.
@@ -466,7 +468,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Modal`'s `width`, a free CSS length, is not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
+- `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a native `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `placeholder`, `format`, `stops` and `nullLabel` (issue 2787) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `SearchField`'s `icon` and `onChange` are not published at version 1; publishing one later is additive.
@@ -504,6 +506,7 @@ A Fabricate that predates the `Medallion` values draws the tile as unset, one th
 - `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign` (issue 2850) were added to its entry at `version` 1 as `data` keys, with the mark rungs `28` and `34`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a value outside each key's set draws its default, so adding a value later is additive too.
 - `ListRow`'s `current` and `busy` (issue 2851) were added to its entry at `version` 1 as `data` keys, and its `selected` draws the face without `onOpen`: an added optional key is additive, a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, and one that predates them draws no face for a `selected` without `onOpen` and refuses nothing for it.
 - `Button`'s `size` took `'24'` and `'26'`, and `IconButton`'s `size` took `'20'` and `'22'` (issue 2853), at `version` 1: a widened value set is additive, so neither entry's `version` changed, and a Fabricate that predates a rung draws the default rung for it and refuses nothing, which `describe` cannot show.
+- `Button`'s `ariaLabel`, `tooltip` and `pressed`, its `role` value `info`, and `Stepper`'s `decrementTooltip` and `incrementTooltip` (issue 2852) were added at `version` 1: an added optional key or value is additive, so neither entry's `version` changed; a Fabricate that predates a key refuses it, with `"<key>" is not a data attribute` on `Button` and `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`, and one that predates `info` draws `neutral` and refuses nothing.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -514,6 +517,7 @@ A lazy entry mounts, draws and behaves, its focus and keyboard behaviour include
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `standaloneRoot` that is neither absent nor `true` with an `Error` ending `<name> has an unknown standaloneRoot "<value>"`, and one on a `root` other than `'any'` with one ending `<name> states standaloneRoot on the root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
+It refuses a `contains` that is not a string naming a `text` key of the entry, or that sits on a key that is not `data`, with an `Error` ending `<name> "<key>" has an unknown contains "<other>"`.
 It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
 It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an unknown lazy "<value>"`, a lazy entry its runtime binds to no loader or to a component with one ending `<name> is lazy, so its runtime binds a loader and no component`, and an entry that is not lazy bound to a loader with one ending `<name> is not lazy, so its runtime binds no loader`.
 - Before Fabricate's runtime registers, `load` resolves for eager names and rejects a published lazy name with the M1 `Error`, as `mount` throws it there; a name that is not published is still M3.
@@ -735,7 +739,7 @@ The element it names holds text the companion also draws visibly; Fabricate does
 Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, names or describes nothing, and keeping it unique is the companion's.
 In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything the companion appended to `body` stays behind.
 - In Foundry 13 and 14 the tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
-A tooltip on an ancestor leaves the control alone, so this reaches a published control only when the companion shows one on it itself, with `game.tooltip.activate` or a Tour step that selects it, or on `IconButton`, whose own tooltip opens on its button under the pointer and keyboard focus alike, as its group states.
+A tooltip on an ancestor leaves the control alone, so this reaches a published control only when the companion shows one on it itself, with `game.tooltip.activate` or a Tour step that selects it, or on `IconButton`, whose own tooltip opens on its button under the pointer and keyboard focus alike, as its group states, and on a `Button` or `Stepper` button given a tooltip key, as each group states.
 The companion restores the key once the tooltip has closed, which it can see when `game.tooltip.element` is no longer the control or after calling `game.tooltip.deactivate()` itself: an `update` that omits the key, an `await` of anything once that `update` has returned (`await Promise.resolve()` is enough), and an `update` that passes it again.
 Without the `await` between them Fabricate may draw the two as the second alone, which writes nothing, and a restore made while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
@@ -744,6 +748,7 @@ Where the entry's rest keys land on the control itself, `data-cursor` is refused
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
+  A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` (issue 2852) show that hint the same way, under the pointer and keyboard focus alike, as each group states.
   The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so does the name a `ListRow` button holds.
   A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
@@ -1032,19 +1037,42 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`Button`.**
   - It is the design system's button: a labelled native `<button>` that is pressed to do one thing.
-  - `children` is required and is the label, final display text, and the button's whole accessible name.
+  - `children` is required and is the label, final display text, and the button's accessible name unless `ariaLabel` replaces it.
     The button hugs its label on one line while it has the room.
     Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
     A label of white space alone draws a button with no name, so the companion never passes one.
   - `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
-    The label stays the button's whole name, so the glyph never replaces it: a glyph-only button is `IconButton`.
+    The glyph never joins or replaces the name: a glyph-only button is `IconButton`.
+  - `ariaLabel` is optional final display text that replaces the label as the button's accessible name, for a label too short to say its verb, as a visible "+7" named "Credit +7 days to Mira".
+    A screen reader announces `ariaLabel` in place of the label, which is still drawn.
+    `ariaLabel` must contain the label's words as one run of whole words, so a speech-input user who says the words they see presses the button (WCAG 2.2 success criterion 2.5.3).
+    Fabricate compares the two after NFKC normalisation and case folding, reads each as its words and symbols in order, splitting words with `Intl.Segmenter` so a word inside unspaced text stands alone, and drops punctuation and spacing, so "Save…" is in "Save the recipe", "Craft (3)" in "Craft 3 recipes" and "保存" in "レシピを保存".
+    A symbol is never read as a word and a word never matches part of another, so "+7" is in "Credit +7 days to Mira" and not in "Credit seven days to Mira", "Credit 7 days to Mira" or "Credit +70 days to Mira", and "Edit" is not in "Credit the tier".
+    Where the runtime has no `Intl.Segmenter`, Fabricate splits words at spacing alone, so a label inside unspaced text is refused there.
+    A `mount` or `update` whose non-blank `ariaLabel` does not contain it is refused with `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")` (M22), and an `update` leaves the earlier props drawn, so the companion passes a matching `ariaLabel` in the `update` that changes `children`.
+    The companion builds `ariaLabel` by inserting the label string itself, as `format('… {label} …', { label: children })` with a format of its own, so it contains the label by construction, and puts the label first where the language allows, because a translation that rewords or reorders the label's words makes `mount` throw M22.
+    An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the component itself compares nothing, so the check is the seam's.
+  - `tooltip` is optional final display text, a hint the label does not say, as "Rewinds the clock by one day"; a `tooltip` that is not a string, or is blank, writes none.
+    Fabricate writes it as `data-tooltip-text` on the button, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the button.
+    Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the `IconButton` group states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of the companion's above `target`, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
+    While it is open Foundry sets `aria-describedby` to `tooltip` on the button, so a screen reader may read the hint as the button's description, and a companion that also passes `aria-describedby` restores it as Interactive components states.
+    A button whose rest keys include `data-locked` writes and opens no tooltip, because Foundry pins a copy of any tooltip it opens on such an element and the closes above never reach that copy.
+  - `pressed` is `true`, `false` or absent, and makes the button a toggle: Fabricate writes `aria-pressed` with that value, so a screen reader announces a toggle button that is pressed or not pressed, and absence writes no attribute, so the button is no toggle.
+    `true` draws the pressed face whatever the visual role, at rest and under the pointer: a solid accent tile, its label in the ink drawn on the accent.
+    The pressed face differs from the keyboard ring by more than an outline, being a filled tile where the ring is an outline 2px clear of the button; against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette its label clears 4.5:1, its edge 3:1, and its fill 3:1 against the unpressed face of every role but `primary`, whose success fill it matches in lightness, so a pressed `primary` differs by hue alone.
+    Beside `disabled` the button keeps the pressed tile under the disabled face's dimming, so a disabled toggle still shows its state, and under forced colours the pressed face is drawn in the reader's Highlight behind HighlightText, and in GrayText while disabled, so it stays distinct from a button that is not pressed.
+    A toggle is `neutral` or `ghost`: with any other role the pressed face replaces that role's own face, so its verb colour is lost.
+    Fabricate coerces nothing, so a value other than `true` or `false`, the string `'true'` among them, writes no `aria-pressed` and draws no face.
+    The button changes nothing itself: a press reports through `onclick`, and the button shows the new state when the companion's `update` passes it.
+    The label is the same in both states, because the attribute says which holds, and names what is shown while it is pressed, as "Show the reward", never "Hide the reward".
+    A button whose press shows and hides a region is a disclosure, so it passes `aria-expanded` and not `pressed`.
   - `size` is `''`, `'24'`, `'26'`, `'28'` or `'38'`, a string, and defaults to `''`: `''` draws the default rung, and `'24'`, `'26'`, `'28'` and `'38'` the 24px, 26px, 28px and 38px rungs of the design system's height scale; what it draws for any other value, a number included, is private.
     Every rung is at least 24px tall, so the button is its own 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8); a height between two rungs, as 27px, is no rung, and the companion passes the nearer one, `'26'`.
   - `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
     The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
-  - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
+  - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger`, `warning` or `info`, and defaults to `neutral`.
     It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-    Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; and `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
+    Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing; and `info` the verb that reads, rolls or reveals and writes no record, as a roll.
     A verb that both destroys and cautions is `danger`.
     A `dashed` label starts with its verb, as "Add tier", because no plus glyph is drawn.
     A visual role is drawn and never announced: it reaches no assistive technology, so the label says the verb.
@@ -1054,7 +1082,7 @@ Each group states the accepted values of every key that entry publishes.
     In a block `target` a `dashed` button hugs its label too, as every native button does, so only `fullWidth: true` spans `target`.
   - `disabled` is `true` or `false`.
     `true` draws the button as unavailable whatever the visual role, takes the button out of the tab order and stops every press, so `onclick` is not called.
-    It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button, and it opens no tooltip, so nothing at the button can say why.
+    It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button and is shown no tooltip, so nothing at the button can say why.
     A verb the user is refused for a reason stays enabled, and its press answers with the reason, in a `Notice` or a notification of the companion's.
     The unavailable label is not held to the contrast floor.
     The companion never passes `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work passes `busy`, which leaves the button enabled.
@@ -1099,12 +1127,13 @@ Each group states the accepted values of every key that entry publishes.
     The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
     The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: the companion keeps the button enabled and answers the press with the reason, or states the reason in the surrounding text.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
-    The button therefore opens no tooltip and keeps its own cursor, so a hint goes in the label or in text beside the button, where a keyboard user reads it too.
+    The button therefore opens no tooltip but its `tooltip` and keeps its own cursor, so a hint goes in `tooltip`, which keyboard focus opens too, or in text beside the button.
     A hint in text beside the button is tied to it with `aria-describedby`.
   - The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
     On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
   - `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: the companion passes a verb phrase.
+    `info` draws one under 3:1 in six of the seven palettes, and its label, `--fab-info-text` on `--fab-info-soft`, clears 4.5:1 on the four grounds at rest and under the pointer, as the pressed face's label, `--fab-on-accent` on `--fab-accent`, does.
 - **`StatusToggle`.**
   - It is the design system's switch (`<Toggle>` in the library), drawn as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off.
     By default it exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology; `semantics` makes it a switch.
@@ -1153,10 +1182,13 @@ Each group states the accepted values of every key that entry publishes.
     A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
   - `ariaLabel` is required and is the input's name, final display text naming the quantity, as "Days to credit".
     `decrementLabel` and `incrementLabel` are required and name the two buttons from the same words: "Decrease days to credit", "Increase days to credit".
-    The buttons' faces are a minus and a plus glyph alone, and no tooltip shows either name.
+    The buttons' faces are a minus and a plus glyph alone, and no tooltip shows either name but the one `decrementTooltip` or `incrementTooltip` passes.
     The companion draws the quantity's name as visible text beside the stepper, and `ariaLabel` contains those words.
     A name of white space alone leaves the control with no name, so the companion never passes one.
     To return focus to a stepper the companion focuses its input, `target.querySelector('input')`.
+  - `decrementTooltip` and `incrementTooltip` are optional final display text, each its button's tooltip, a hint that differs from the button's name, as "One day fewer" beside the name "Decrease days to credit"; one that is not a string, or is blank, writes none.
+    While one is open Foundry sets `aria-describedby` to `tooltip` on that button, so a screen reader may read it as the button's description, and a tooltip that repeats the name is read twice; neither replaces its button's name.
+    Fabricate writes each as its button's `data-tooltip-text`, which Foundry's own hover listener shows as plain text after a delay, and opens it under keyboard focus, only under `:focus-visible`, through `game.tooltip`, closing it on blur, a press, Escape, `destroy` and an `update` that changes that button's tooltip or disables it, through `disabled` or a bound, as the `IconButton` group states; Escape is not stopped, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
   - `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
     `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
     A `min`, `max` or `step` outside this is outside the contract, and what is drawn for it is private.
@@ -2037,7 +2069,7 @@ A dropped `aria-label` is release-noted.
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
 Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam calls `flushSync` only as the value resync: before an `on<Key>Change` delivery and once after it when the delivery changed the value, inside the user's event, never inside an effect or flush, and not once the mount has ended.
 - `mount` and `mountMany` throw only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
-- `mountMany` throws M1 to M20 where `mount` throws them for the same name and an item, except that a target a stale mount has not left empty is M6; it throws M5 also for a target that two items name, and M21 where its `items` is not an array.
+- `mountMany` throws M1 to M20 and M22 where `mount` throws them for the same name and an item, except that a target a stale mount has not left empty is M6; it throws M5 also for a target that two items name, and M21 where its `items` is not an array.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 | | Condition | Message tail |
@@ -2063,6 +2095,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M19 | The entry is lazy and its code is not loaded: `load` never requested it, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
 | M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
 | M21 | `mountMany`'s `items` is not an array, by `Array.isArray`; checked after M3 and M19, and before any item | `items must be an array` |
+| M22 | A `data` key stating `contains` holds a non-blank string that does not contain the words and symbols of the `text` key it names as one run of whole words, compared after NFKC normalisation and case folding with punctuation and spacing dropped (`Button`'s `ariaLabel` and `children`); checked after M9 | `"<key>" must contain the text of "<other>" ("<text>" is not in "<name>")` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
@@ -2072,7 +2105,7 @@ Otherwise `mount` destroys the stale entry first, then checks that the target is
 
 ### Updating and destroying
 
-- **`update(props)` is validated with M7 to M15, M17 and M20 and is atomic**: when it throws, the previous props stay rendered.
+- **`update(props)` is validated with M7 to M15, M17, M20 and M22 and is atomic**: when it throws, the previous props stay rendered.
 - `update` replaces the props and never merges them, except that an omitted or `undefined` `value` key keeps its current value; any other omitted key reads `undefined` and the component's default applies, and nothing remounts.
 - `update` returns `true` once accepted, with the DOM reflecting it after the next flush, or at once under the value resync, and `false` after `destroy` or a fault.
 - `update` writes the host's props under Fabricate's `untrack`, so a call from inside a `$derived` on Fabricate's own runtime is not an unsafe mutation.
@@ -2116,7 +2149,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states, a native `title` where its own group states one, as `IconPicker`'s trigger and `StageBars`' captions do, and a `SegmentedControl` option's `data-tooltip-text`, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the ones the `IconButton`, `Button` and `Stepper` groups state, a native `title` where its own group states one, as `IconPicker`'s trigger and `StageBars`' captions do, and a `SegmentedControl` option's `data-tooltip-text`, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -2226,6 +2259,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the button carries `aria-expanded="false"`, and after the update `aria-expanded="true"` on the same element
 - **AND** a mount that passes `aria-pressed` throws M13, and nothing is rendered
 - **AND** a mount that omits `aria-expanded` draws no such attribute
+
+#### Scenario: A published button with a name, a hint and a pressed state
+
+- **WHEN** a companion mounts `Button` with `children: '+7'`, `ariaLabel: 'Credit +7 days to Mira'`, `tooltip: 'Rewinds the clock by one day'` and `pressed: false`
+- **THEN** the button draws "+7", carries `ariaLabel` as its `aria-label`, `tooltip` as its `data-tooltip-text` and `aria-pressed="false"`, and a keyboard focus opens the hint through `game.tooltip`
+- **AND** an `update` that passes `pressed: true` writes `aria-pressed="true"` and draws the pressed face, one whose `ariaLabel` does not contain "+7" throws M22 and leaves the earlier props drawn, and one that passes `role: 'info'` draws the info face
+
+#### Scenario: A published stepper with step tooltips
+
+- **WHEN** a companion mounts `Stepper` with `decrementTooltip: 'One day fewer'` and `incrementTooltip: 'One day more'`
+- **THEN** each button carries its tooltip as `data-tooltip-text` beside its unchanged name, and a keyboard focus on it opens that tooltip through `game.tooltip`
+- **AND** blur, a press, Escape, `destroy` and an `update` that disables the focused button close it
 
 #### Scenario: A published switch
 

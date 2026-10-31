@@ -1580,6 +1580,38 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: labButtonForm('icon-22'),
       styles: 'width: 22px; height: 22px; border-top-left-radius: 6px',
     },
+    // The info role's face, the pressed toggle's at rest, beside its unpressed self, hovered on a
+    // ghost and disabled, and the focused hint button's ring (issue 2852).
+    {
+      selector: labButtonForm('info'),
+      styles:
+        'color: var(--fab-info-text); border-top-color: var(--fab-info-border); background-color: var(--fab-info-soft)',
+    },
+    {
+      selector: labButtonForm('pressed'),
+      styles:
+        'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+    },
+    {
+      selector: labButtonForm('unpressed'),
+      styles:
+        'color: var(--fab-text); border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+    },
+    {
+      selector: labButtonForm('pressed-ghost'),
+      styles:
+        'border-top-color: var(--fab-accent-hover); background-color: var(--fab-accent-hover)',
+    },
+    {
+      selector: labButtonForm('pressed-disabled'),
+      styles:
+        'opacity: 0.62; border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+    },
+    {
+      selector: `${labButtonForm('tooltip')}:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
   ],
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled
   // face, the keyboard-focused ghost-danger's ring and face, and the pressed disclosure's hover.
@@ -7387,9 +7419,10 @@ test('the button forms specimen case measures the rung each row of the button fo
   const rungs = [...walkNodes(instance.content)]
     .filter((node) => node.type === 'Property' && node.key?.name === 'size')
     .map((node) => Number(node.value.value));
-  const measured = getCaseById('manager-published-button-forms-specimen').expectLayout.controls.map(
-    ({ styles }) => Number(/(?:^|; )height: (\d+)px/u.exec(styles)[1])
-  );
+  const measured = getCaseById('manager-published-button-forms-specimen')
+    .expectLayout.controls.map(({ styles }) => /(?:^|; )height: (\d+)px/u.exec(styles)?.[1])
+    .filter(Boolean)
+    .map(Number);
   assert.deepEqual(measured, rungs, 'each row’s control is measured at the rung it mounts');
   assert.deepEqual(rungs, [24, 26, 20, 22], 'the four rungs issue 2853 adds');
 });

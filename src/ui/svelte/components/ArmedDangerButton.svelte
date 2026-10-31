@@ -108,7 +108,7 @@
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
-  aria-label={consequence}
+  ariaLabel={consequence}
   aria-describedby={ariaDescribedBy || undefined}
   title={showTitle ? consequence : undefined}
   onclick={handleClick}

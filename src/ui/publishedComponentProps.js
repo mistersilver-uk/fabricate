@@ -243,10 +243,56 @@ function assertRequired(entry, copy) {
   }
 }
 
+const WORDS =
+  typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'word' })
+    : null;
+
 /**
- * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. A `data`
- * value in it lacks the members `STRIPPED_ITEM_MEMBERS` names, and the caller's own object is never
- * changed. Each key is configurable, so the seam can drop an absent callback key from it.
+ * `text` as a listener hears it, for M22: NFKC normalised and case folded, then its words and
+ * symbols in order, each a run of letters, marks and digits or one symbol; punctuation and spacing
+ * are dropped. Words are split by `Intl.Segmenter`, so a word inside unspaced CJK text stands
+ * alone; a runtime without it splits on spacing, so such a label is refused rather than passed.
+ */
+export function spokenTokens(text) {
+  const folded = text.normalize('NFKC').toLowerCase();
+  const pieces = WORDS
+    ? Array.from(WORDS.segment(folded), ({ segment }) => segment)
+    : folded.split(/\s+/u);
+  return pieces.flatMap((piece) => piece.match(/[\p{L}\p{M}\p{N}]+|\p{S}/gu) ?? []);
+}
+
+/** Whether `name`'s tokens hold `label`'s as one contiguous run of whole tokens. */
+export function containsLabel(name, label) {
+  const [heard, shown] = [spokenTokens(name), spokenTokens(label)];
+  return (
+    heard.some(
+      (_, start) =>
+        start + shown.length <= heard.length &&
+        shown.every((token, offset) => heard[start + offset] === token)
+    ) || shown.length === 0
+  );
+}
+
+/**
+ * M22 over a validated copy, after M9: a key stating `contains` whose non-blank string does not
+ * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3).
+ */
+function assertContains(entry, copy) {
+  for (const [key, { contains }] of Object.entries(entry.props)) {
+    const [name, text] = [copy[key], copy[contains]];
+    if (contains === undefined || typeof name !== 'string' || typeof text !== 'string') continue;
+    if (name.trim() && !containsLabel(name, text)) {
+      const tail = `(${JSON.stringify(text)} is not in ${JSON.stringify(name)})`;
+      throw refuse(`"${key}" must contain the text of "${contains}" ${tail}`);
+    }
+  }
+}
+
+/**
+ * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9 and M22.
+ * A `data` value in it lacks the members `STRIPPED_ITEM_MEMBERS` names, and the caller's own object
+ * is never changed. Each key is configurable, so the seam can drop an absent callback key from it.
  */
 export function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
@@ -261,5 +307,6 @@ export function copyProps(entry, props) {
     Object.defineProperty(copy, key, own);
   }
   assertRequired(entry, copy);
+  assertContains(entry, copy);
   return copy;
 }

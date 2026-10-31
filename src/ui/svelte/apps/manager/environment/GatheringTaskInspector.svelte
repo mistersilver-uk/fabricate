@@ -237,7 +237,7 @@
           </div>
           <div class="manager-drop-editor-actions">
             <Button
-              aria-label={text(
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
                 'Duplicate'
               )}
@@ -253,7 +253,7 @@
             </Button>
             <Button
               role="danger"
-              aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}
+              ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}
               onclick={() => onDeleteDrop(selectedDrop.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>

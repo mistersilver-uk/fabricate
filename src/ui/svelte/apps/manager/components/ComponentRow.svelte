@@ -144,7 +144,7 @@
       <Button
         class="manager-component-row-open"
         data-component-edit={component?.id}
-        aria-label={editNamedLabel}
+        ariaLabel={editNamedLabel}
         title={editNamedLabel}
         onclick={() => onEdit(component?.id)}
       >
@@ -156,7 +156,7 @@
         role="primary"
         class="manager-component-row-add"
         data-component-ghost-add={component?.id}
-        aria-label={addNamedLabel}
+        ariaLabel={addNamedLabel}
         title={addNamedLabel}
         onclick={() => onAdd(component?.id)}
       >

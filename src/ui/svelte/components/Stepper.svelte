@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
@@ -9,6 +10,7 @@
   | `value` | number \| `null` \| `undefined` \| `''` | `null` | `null` rather than `0` deliberately: `$props()` fallbacks fire on `undefined`, so a `0` default would resolve before `allowUnset` was consulted and render `0` for a field its caller left unset. |
   | `min` / `max` / `step` | numbers \| `null` | `null` / `null` / `1` | Inclusive clamp bounds, where `null` disables that bound, and the increment the −/+ buttons apply. |
   | `ariaLabel` / `decrementLabel` / `incrementLabel` | localized strings | `''` | The input's accessible name — never a wrapping `<label>`, see the invariants — and the adjuncts'. This leaf localizes nothing itself. |
+  | `decrementTooltip` / `incrementTooltip` | localized strings | `''` | Each adjunct's `data-tooltip-text`, opened on keyboard focus through the `APP_TOOLTIPS` facade as `IconButton`'s is (issue 2852); a blank string writes none. |
   | `disabled` | boolean | `false` | Disables the whole control. |
   | `allowUnset` | boolean | `false` | The field's domain admits absence. Use it only where `null` genuinely persists — a field that merely LOOKS blank for zero keeps the default and shows `0`. |
   | `placeholder` / `fill` | string / boolean | `''` / `false` | `placeholder` shows while the input is empty and WINS over `inputProps.placeholder`; `fill` sets `width: 100%`, so it stretches correctly only inside a slot that already has an intrinsic width, and is mutually exclusive with `orientation="vertical"`. |
@@ -42,7 +44,7 @@
     until stepped; `tests/components/stepper-formatted-mounted.test.js`.
 -->
 <script>
-  import { tick } from 'svelte';
+  import { getContext, onDestroy, tick } from 'svelte';
 
   let {
     value = null,
@@ -52,6 +54,8 @@
     ariaLabel = '',
     decrementLabel = '',
     incrementLabel = '',
+    decrementTooltip = '',
+    incrementTooltip = '',
     disabled = false,
     allowUnset = false,
     placeholder = '',
@@ -234,6 +238,36 @@
     if (next !== undefined) emitFormatted(next, input);
   }
 
+  // The `APP_TOOLTIPS` facade, by its registry key (`util/appLocalizer.js`).
+  const tooltips = getContext(Symbol.for('fabricate.appTooltips'));
+  const tipOf = (direction) => {
+    const raw = direction < 0 ? decrementTooltip : incrementTooltip;
+    return typeof raw === 'string' && raw.trim() !== '' ? raw : '';
+  };
+  const offOf = (direction) => disabled || (direction < 0 ? decrementBlocked : incrementBlocked);
+  // The adjunct whose focus tooltip is open, its direction and text; no markup reads it.
+  let tipped = null;
+  const closeTip = (button = tipped?.button) => {
+    tipped = null;
+    if (button) tooltips?.hide(button);
+  };
+  function openTip(event, direction) {
+    const hint = tipOf(direction);
+    if (!hint || !event.currentTarget.matches(':focus-visible')) return;
+    tipped = { button: event.currentTarget, direction, text: hint };
+    tooltips?.show(tipped.button, hint);
+  }
+  // Both are read before the test, so an update that renames or disables the open one closes it.
+  $effect(() => {
+    const [down, up] = [
+      [tipOf(-1), offOf(-1)],
+      [tipOf(1), offOf(1)],
+    ];
+    const [text, off] = tipped?.direction < 0 ? down : up;
+    if (tipped && (text !== tipped.text || off)) closeTip();
+  });
+  onDestroy(() => closeTip());
+
   function stepAdjunct(direction) {
     if (isFormatted) emitFormatted(formattedStep(committedFrom, direction), null);
     else commit(stepFrom + direction * step);
@@ -287,8 +321,15 @@
     data-keyboard-focus="true"
     data-stepper-decrement
     aria-label={decrementLabel || undefined}
+    data-tooltip-text={tipOf(-1) || undefined}
     disabled={disabled || decrementBlocked}
-    onclick={() => stepAdjunct(-1)}
+    onclick={(event) => {
+      closeTip(event.currentTarget);
+      stepAdjunct(-1);
+    }}
+    onfocus={(event) => openTip(event, -1)}
+    onblur={(event) => closeTip(event.currentTarget)}
+    onkeydown={(event) => event.key === 'Escape' && closeTip(event.currentTarget)}
   >
     <i class="fas {decrementIcon}" aria-hidden="true"></i>
   </button>
@@ -301,8 +342,15 @@
     data-keyboard-focus="true"
     data-stepper-increment
     aria-label={incrementLabel || undefined}
+    data-tooltip-text={tipOf(1) || undefined}
     disabled={disabled || incrementBlocked}
-    onclick={() => stepAdjunct(1)}
+    onclick={(event) => {
+      closeTip(event.currentTarget);
+      stepAdjunct(1);
+    }}
+    onfocus={(event) => openTip(event, 1)}
+    onblur={(event) => closeTip(event.currentTarget)}
+    onkeydown={(event) => event.key === 'Escape' && closeTip(event.currentTarget)}
   >
     <i class="fas {incrementIcon}" aria-hidden="true"></i>
   </button>

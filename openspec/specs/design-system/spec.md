@@ -1085,6 +1085,10 @@ A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY p
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 `Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
+`Button`'s `pressed` (issue 2852) declares the toggle's pressed state: `true` or `false` writes `aria-pressed` and `true` adds `is-pressed`, a solid accent tile in `--fab-on-accent` ink, which outranks every role at rest and under the pointer, and any other value writes neither, so a caller's own `aria-pressed` through rest keeps the face it draws.
+The pressed face MUST differ from the keyboard ring by more than an outline, MUST stay distinct under `forced-colors: active`, and MUST stay visible beside `disabled`; its label clears 4.5:1, its edge 3:1 on the four grounds and its fill 3:1 against every unpressed role but `primary`'s in every palette, and `tests/components/button-pressed-rendered.test.js` measures each in Chromium.
+A toggle is `neutral` or `ghost`, because with any other role the pressed face replaces that role's own face and its verb colour.
+Its `info` role, `is-info-action`, is the info family's soft face for a verb that writes no record.
 `ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
 A disabled `ArmedDangerButton` MUST draw `Button`'s disabled face whether or not it is armed; the armed fill MUST paint only an enabled control, and an armed control's hover ink MUST reach 4.5:1 against the fill it hovers on.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
@@ -1311,6 +1315,7 @@ It opens that tooltip through the `APP_TOOLTIPS` context's facade, `{ show(eleme
 Blur, a click and Escape MUST each close the button's own tooltip and never another element's, and so MUST unmounting the button and an update that changes the text it shows or disables it.
 No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` suppresses the primitive's own tooltip, on hover and focus alike, rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
 `tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
+A `Button` given `tooltip` and a `Stepper` adjunct given `decrementTooltip` or `incrementTooltip` (issue 2852) MUST write and open its hint the same way, through the same facade, which each reads by the registry key `Symbol.for('fabricate.appTooltips')` that `APP_TOOLTIPS` names; a `Button` carrying a caller's own tooltip attribute, `title` or `data-locked` writes none.
 
 #### Scenario: A user Tabs to an icon button
 

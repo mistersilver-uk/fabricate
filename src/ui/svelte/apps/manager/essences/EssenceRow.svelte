@@ -276,11 +276,9 @@
     <Button
       class="manager-essence-edit is-labelled"
       data-essence-edit={essence.id}
-      aria-label={format(
-        'FABRICATE.Admin.Manager.Essence.EditRulesNamed',
-        'Edit rules for {name}',
-        { name: essence.name }
-      )}
+      ariaLabel={format('FABRICATE.Admin.Manager.Essence.EditRulesNamed', 'Edit rules for {name}', {
+        name: essence.name,
+      })}
       onclick={(event) => {
         event.stopPropagation();
         onEdit(essence.id);

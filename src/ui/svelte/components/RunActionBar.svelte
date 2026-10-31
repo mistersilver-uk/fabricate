@@ -107,7 +107,7 @@
         icon={resume.icon || 'fas fa-play'}
         class="fab-run-action-control is-resume"
         data-run-action="resume"
-        aria-label={resume.ariaLabel || undefined}
+        ariaLabel={resume.ariaLabel || undefined}
         title={resume.title || undefined}
         disabled={busy || resume.disabled === true}
         onclick={onResume}
@@ -119,7 +119,7 @@
         icon={pause.icon || 'fas fa-pause'}
         class="fab-run-action-control"
         data-run-action="pause"
-        aria-label={pause.ariaLabel || undefined}
+        ariaLabel={pause.ariaLabel || undefined}
         title={pause.reason || pause.title || undefined}
         disabled={!pauseEnabled}
         onclick={onPause}

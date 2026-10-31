@@ -997,7 +997,7 @@
               type="submit"
               class="manager-add-button"
               data-gathering-vocabulary-add={vocabulary.kind}
-              aria-label={vocabularyAddLabel()}
+              ariaLabel={vocabularyAddLabel()}
               title={vocabularyAddLabel()}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>

@@ -199,7 +199,7 @@
                     'Open this component in {system}',
                     { system: row.systemName }
                   )}
-                aria-label={openRulesAria(row) ||
+                ariaLabel={openRulesAria(row) ||
                   phrase(
                     'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
                     'Open this component in {system}',
@@ -236,7 +236,7 @@
               role="dashed"
               class="manager-component-entry-system-add"
               data-scoped-membership-add
-              aria-label={addAria(row) ||
+              ariaLabel={addAria(row) ||
                 phrase(
                   'FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystemAria',
                   'Add {entity} to {system}',

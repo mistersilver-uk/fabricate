@@ -275,7 +275,7 @@
       type="submit"
       class="manager-add-button"
       data-gathering-condition-add={kind}
-      aria-label={conditionAddLabel(kind)}
+      ariaLabel={conditionAddLabel(kind)}
       title={conditionAddLabel(kind)}
     >
       <i class="fas fa-plus" aria-hidden="true"></i>

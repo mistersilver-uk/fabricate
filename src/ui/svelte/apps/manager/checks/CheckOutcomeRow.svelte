@@ -176,7 +176,7 @@
     role="danger"
     class="manager-checks-tier-remove"
     data-remove-outcome
-    aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome', 'Remove outcome')}
+    ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome', 'Remove outcome')}
     onclick={onRemove}
   >
     <i class="fas fa-trash" aria-hidden="true"></i>

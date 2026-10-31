@@ -865,13 +865,14 @@ function assertBroadSignalFrames(file, frames) {
   }
 }
 
-test('(a) a Stepper change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Stepper change publishes its two frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Stepper.svelte';
   const frames = [
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
+    'manager-published-button-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

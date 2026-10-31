@@ -419,7 +419,7 @@ test("the View button's name is a translatable key, in a shared namespace, resol
   // reads. One producer routes at eleven sites, and this is the one place a default name for
   // every surface that renders this primitive can be installed.
   assert.equal(
-    expressionAttribute(button, 'aria-label', source)?.replaceAll(/\s+/gu, ' '),
+    expressionAttribute(button, 'ariaLabel', source)?.replaceAll(/\s+/gu, ' '),
     'localize(VIEW_NAMED_LABEL, { action: localize(rowVerb(row)), subject: row.title, })',
     "the row action must name itself by its row's title, AND by the verb it visibly renders. " +
       '`action` is fed from the same expression as the visible child on purpose: hard-coding ' +

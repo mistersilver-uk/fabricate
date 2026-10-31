@@ -8,9 +8,10 @@ export const APP_LOCALIZER = Symbol('fabricate.appLocalizer');
 /**
  * The context holding the tooltip facade `{ show(element, text), hide(element), owns(element) }`
  * a root hands its tree, so `IconButton` opens a focus tooltip without reading `game`; a tree
- * mounted with none opens none (issue 2601).
+ * mounted with none opens none (issue 2601). A registry key, which `Button` and `Stepper` read by
+ * name (issue 2852).
  */
-export const APP_TOOLTIPS = Symbol('fabricate.appTooltips');
+export const APP_TOOLTIPS = Symbol.for('fabricate.appTooltips');
 
 /**
  * Svelte's `mount` for a Fabricate root: each tree carries `localize`, and `tooltips` when given,

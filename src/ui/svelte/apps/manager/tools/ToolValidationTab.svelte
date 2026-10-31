@@ -175,7 +175,7 @@
 {#snippet worldToolAction()}
   <Button
     data-tool-identity-route={String(tool?.id ?? '')}
-    aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
+    ariaLabel={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
     onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
     ><i class="fas fa-globe" aria-hidden="true"></i><span
       >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span

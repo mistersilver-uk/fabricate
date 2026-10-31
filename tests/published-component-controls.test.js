@@ -1002,15 +1002,22 @@ function namePartFault(part, control, strict, guard = null) {
   const specOf = (local) => entry.props[published.get(local)];
   if (part.type === 'Text') return LITERAL;
   if (part.type === 'RenderTag') {
-    const { callee } =
-      part.expression.type === 'ChainExpression' ? part.expression.expression : part.expression;
+    const callee = renderCallee(part);
     if (specOf(callee?.name)?.kind !== 'text') return UNPUBLISHED_NAME;
     return specOf(callee.name).required === true ? null : OPTIONAL_NAME;
   }
   if (part.type !== 'ExpressionTag') return UNPUBLISHED_NAME;
   const { fault, keys } = dataNameOf(part.expression, control);
   if (fault) return fault;
-  const isRequired = (key) => entry.props[key].required === true;
+  // A `contains` key replaces a required text key's name, which names the control while it is
+  // absent (issue 2852), so it counts as required where the control's content renders that key.
+  const rendersText = (key) =>
+    contentParts(control.node).some(
+      (child) => child.type === 'RenderTag' && published.get(renderCallee(child)?.name) === key
+    );
+  const fallsBack = ({ contains }) =>
+    entry.props[contains]?.required === true && rendersText(contains);
+  const isRequired = (key) => entry.props[key].required === true || fallsBack(entry.props[key]);
   if (strict) return keys.every(isRequired) ? null : OPTIONAL_DATA_NAME;
   const held = (key) => key === guard || isRequired(key) || entry.props[key].requiredWhen === guard;
   return guard === null || keys.every(held) ? null : UNGUARDED_NAME;
@@ -1030,13 +1037,25 @@ function isHiddenGlyph(child) {
   return Boolean(hidden) && [hidden.value].flat().every((part) => part?.data === 'true');
 }
 
-/** A control's name parts: its `aria-label`'s, or else its content's, less any hidden glyph. */
-function nameParts(node) {
-  const label = attributeOf(node, 'aria-label');
-  if (label) return [label.value === true ? { type: 'Text' } : label.value].flat();
+/** A render tag's callee, through a `?.()` call. */
+function renderCallee(tag) {
+  const call =
+    tag.expression.type === 'ChainExpression' ? tag.expression.expression : tag.expression;
+  return call.callee;
+}
+
+/** A control's content, less blank text and any hidden glyph. */
+function contentParts(node) {
   return node.fragment.nodes.filter(
     (child) => (child.type !== 'Text' || child.data.trim() !== '') && !isHiddenGlyph(child)
   );
+}
+
+/** A control's name parts: its `aria-label`'s, or else its content's. */
+function nameParts(node) {
+  const label = attributeOf(node, 'aria-label');
+  if (label) return [label.value === true ? { type: 'Text' } : label.value].flat();
+  return contentParts(node);
 }
 
 /**

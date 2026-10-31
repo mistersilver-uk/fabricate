@@ -128,8 +128,11 @@ function snippetTriggerName(site) {
       if (found || (node.type !== 'RegularElement' && node.type !== 'Component')) return;
       const attributes = node.attributes ?? [];
       if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
+      // `Button` and `IconButton` take their name as `ariaLabel` and write it (issue 2852).
+      const named = node.type === 'Component' && ['Button', 'IconButton'].includes(node.name);
+      const naming = named ? ['aria-label', 'ariaLabel'] : ['aria-label'];
       const label = attributes.find(
-        (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
+        (attribute) => attribute.type === 'Attribute' && naming.includes(attribute.name)
       );
       if (label) found = snippet.slice(label.start, label.end);
     }

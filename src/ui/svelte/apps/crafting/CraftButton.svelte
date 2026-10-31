@@ -37,7 +37,7 @@
   disabled={refused}
   {busy}
   title={accessibleLabel}
-  aria-label={accessibleLabel}
+  ariaLabel={accessibleLabel}
   onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}
 >
   {#if busy}

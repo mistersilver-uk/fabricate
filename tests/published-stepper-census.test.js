@@ -342,6 +342,8 @@ describe('the module sheet and every component style against the published Stepp
           'decrementLabel',
           'incrementLabel',
           'onChange',
+          'decrementTooltip',
+          'incrementTooltip',
         ],
         'fabricate',
       ],

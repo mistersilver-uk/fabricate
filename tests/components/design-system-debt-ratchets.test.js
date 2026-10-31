@@ -1375,6 +1375,24 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
+    ".fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover",
+    'var(--fab-info-soft)',
+    'the info verb keeps its own fill',
+  ],
+  [
+    MODULE_SHEET,
+    ".fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
+    'var(--fab-accent-hover)',
+    'a pressed toggle deepens in the accent tile it fills',
+  ],
+  [
+    MODULE_SHEET,
+    ".fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled), .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
+    'highlight',
+    'under forced colours a pressed toggle is the reader’s Highlight at rest and under the pointer',
+  ],
+  [
+    MODULE_SHEET,
     '.fabricate-pill-select .manager-availability-remove:hover, .fabricate-pill-select .manager-availability-remove:focus-visible, .fabricate-manager .manager-danger-tag-remove:hover, .fabricate-manager .manager-danger-tag-remove:focus-visible',
     'var(--fab-danger-soft)',
     'a destructive verb hovers in the danger family it acts in',

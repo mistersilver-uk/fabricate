@@ -7,6 +7,7 @@
  * `published-component-callbacks.test.js`'s, and the real Svelte runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
@@ -973,6 +974,137 @@ describe('a requiredWhen key', () => {
       );
     });
   }
+});
+
+const LABELLED = Object.freeze({
+  name: 'Labelled',
+  path: 'src/ui/svelte/components/Labelled.svelte',
+  version: 1,
+  props: {
+    children: { kind: 'text', required: true },
+    ariaLabel: { kind: 'data', contains: 'children' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Labelled' }),
+});
+
+describe('a contains key (issue 2852)', () => {
+  const mountOf = (ui, props) => ui.mount('Labelled', { target: new FakeTarget(), props });
+
+  const holds = (label, name) =>
+    `${PREFIX}"ariaLabel" must contain the text of "children" (${JSON.stringify(label)} is not in ${JSON.stringify(name)})`;
+
+  it('M22: refuses a non-blank string that does not hold the named text, naming both, on mount and update', () => {
+    const { ui } = seamWith({ table: [LABELLED] });
+    const name = 'Credit seven days to Mira';
+    assert.throws(() => mountOf(ui, { children: '+7', ariaLabel: name }), {
+      name: 'TypeError',
+      message: holds('+7', name),
+    });
+    const handle = mountOf(ui, { children: '+7', ariaLabel: 'Credit +7 days to Mira' });
+    assert.throws(() => handle.update({ children: '+8', ariaLabel: 'Credit +7 days to Mira' }), {
+      message: holds('+8', 'Credit +7 days to Mira'),
+    });
+  });
+
+  // Whole words and symbols, in order, NFKC-folded; punctuation is never a word (issue 2852).
+  for (const [label, name] of [
+    ['Roll Wits', 'roll  WITS for Mira'],
+    ['Save…', 'Save the recipe'],
+    ['Craft (3)', 'Craft 3 recipes'],
+    ['r\u{E9}sum\u{E9}', 'Open the re\u{301}sume\u{301}'],
+    ['保存', 'レシピを保存'],
+    ['+7', 'Credit +7 days to Mira'],
+  ]) {
+    it(`takes ${JSON.stringify(label)} inside ${JSON.stringify(name)}`, () => {
+      const { ui } = seamWith({ table: [LABELLED] });
+      assert.doesNotThrow(() => mountOf(ui, { children: label, ariaLabel: name }));
+    });
+  }
+
+  for (const [label, name] of [
+    ['+7', 'Credit seven days to Mira'],
+    ['+7', 'Credit +70 days to Mira'],
+    ['+7', 'Credit 7 days to Mira'],
+    ['Edit', 'Credit the tier'],
+    ['Add', 'Address book'],
+    ['Roll Wits', 'Wits roll'],
+  ]) {
+    it(`refuses ${JSON.stringify(label)} against ${JSON.stringify(name)}, which holds no whole run of it (M22)`, () => {
+      const { ui } = seamWith({ table: [LABELLED] });
+      assert.throws(() => mountOf(ui, { children: label, ariaLabel: name }), {
+        message: holds(label, name),
+      });
+    });
+  }
+
+  it('passes a name that is absent, blank or no string, which writes no name', () => {
+    const { ui } = seamWith({ table: [LABELLED] });
+    for (const ariaLabel of [undefined, '', '  ', 7, ['Roll Wits']]) {
+      assert.doesNotThrow(
+        () => mountOf(ui, { children: 'Roll Wits', ariaLabel }),
+        String(ariaLabel)
+      );
+    }
+  });
+
+  it('splits on spacing alone where the runtime has no Intl.Segmenter, refusing a label inside unspaced text', () => {
+    const url = new URL('../src/ui/publishedComponentProps.js', import.meta.url).href;
+    const script =
+      'delete Intl.Segmenter;' +
+      `const { containsLabel } = await import(${JSON.stringify(url)});` +
+      "process.stdout.write(JSON.stringify([containsLabel('レシピを保存', '保存'), containsLabel('Credit +7 days', '+7')]));";
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout), [false, true]);
+  });
+
+  it('refuses a missing text key (M9) before it compares a name', () => {
+    const { ui } = seamWith({ table: [LABELLED] });
+    assert.throws(
+      () => mountOf(ui, { ariaLabel: 'Credit +7 days' }),
+      refusal('Labelled requires a non-empty "children"')
+    );
+  });
+
+  const containing = (spec, extra = {}) => ({
+    ...LABELLED,
+    props: { ...LABELLED.props, ...extra, ariaLabel: spec },
+  });
+  for (const [claim, entry, other] of [
+    ['a key the entry does not publish', containing({ kind: 'data', contains: 'nope' }), 'nope'],
+    ['an inherited name', containing({ kind: 'data', contains: 'toString' }), 'toString'],
+    ['a value that is no string', containing({ kind: 'data', contains: 1 }), '1'],
+    [
+      'a data key',
+      containing({ kind: 'data', contains: 'hint' }, { hint: { kind: 'data' } }),
+      'hint',
+    ],
+    ['a key that is no data key', containing({ kind: 'aria', contains: 'children' }), 'children'],
+  ]) {
+    it(`refuses at registration a contains naming ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Labelled "ariaLabel" has an unknown contains "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+
+  it('leaves contains out of describe', () => {
+    const { ui } = seamWith({ table: [LABELLED] });
+    assert.deepEqual(ui.describe('Labelled').props.ariaLabel, { kind: 'data', required: false });
+  });
 });
 
 describe('a live mount', () => {
