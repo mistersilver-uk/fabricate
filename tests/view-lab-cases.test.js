@@ -1775,15 +1775,18 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-published-stage-bars-forms-specimen': [
     {
       selector: labStageBarsForm('states', 1),
-      styles: 'height: 6px; border-top-width: 1px; background-color: var(--fab-surface-raised)',
+      styles:
+        'height: 6px; border-top-style: solid; border-top-width: 1px; background-color: var(--fab-surface-raised)',
     },
     {
       selector: labStageBarsForm('thin-states', 1),
-      styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+      styles:
+        'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
     },
     {
       selector: labStageBarsForm('shares', 0),
-      styles: 'height: 6px; border-top-width: 0px; background-color: var(--fab-bg-3)',
+      styles:
+        'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
     },
     {
       selector: `${labStageBarsForm('shares', 1)} .fab-fill-bar-share:first-child`,
@@ -1791,7 +1794,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     },
     {
       selector: labStageBarsForm('default-shares', 1),
-      styles: 'height: 6px; border-top-width: 1px',
+      styles: 'height: 6px; border-top-style: solid; border-top-width: 1px',
     },
   ],
   // The published fill bar's neutral band (issue 2863): each reading's ink, by sign with no band,
