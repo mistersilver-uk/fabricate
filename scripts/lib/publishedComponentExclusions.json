@@ -49,10 +49,6 @@
       "reason": "part-of:src/ui/svelte/components/SearchablePopover.svelte: the portaled panel SearchablePopover draws, which takes the popover's state as props."
     },
     {
-      "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
-      "reason": "no-consumer: a selection box for gate lists and row headers; a companion's binary control is StatusToggle."
-    },
-    {
       "path": "src/ui/svelte/components/StageCard.svelte",
       "reason": "domain-coupled: its stage, facts, io and presentation props are Fabricate run records."
     },

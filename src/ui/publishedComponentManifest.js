@@ -618,4 +618,27 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'any',
     standaloneRoot: true,
   }),
+  Object.freeze({
+    name: 'SelectionCheckbox',
+    path: 'src/ui/svelte/components/SelectionCheckbox.svelte',
+    version: 1,
+    props: Object.freeze({
+      checked: Object.freeze({ kind: 'data', required: true }),
+      indeterminate: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      density: Object.freeze({ kind: 'data' }),
+      label: Object.freeze({
+        kind: 'text',
+        required: true,
+        waivedBy: Object.freeze(['ariaLabel']),
+      }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'label' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      'aria-describedby': Object.freeze({ kind: 'aria' }),
+    }),
+    rest: true,
+    root: 'any',
+    standaloneRoot: true,
+    restOn: 'control',
+  }),
 ]);

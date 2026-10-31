@@ -1,7 +1,7 @@
 /**
  * The standalone specimen's wiring (issues 2456, 2679, 2680), which `PublishedStandalone.svelte`
  * lays out and mounts, and `tests/components/published-standalone-root-mounted.test.js` runs the
- * View Lab cases against: the seventeen entries that state `standaloneRoot`, each mounted into a
+ * View Lab cases against: the eighteen entries that state `standaloneRoot`, each mounted into a
  * target by key (the switch and the card in more than one state), the `Well` in the
  * `InspectorCard`'s slot, the `Field`'s slot holding a caption, input and hint, and a closed
  * `Modal` that a published `Button`, the opener, opens through `update`. Every word is a
@@ -12,7 +12,7 @@
 // prettier-ignore
 export const COLUMNS = Object.freeze([
   Object.freeze(['button', 'icon-button', 'toggle', 'toggle-switch', 'toggle-card', 'card', 'field', 'search']),
-  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off']),
+  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off', 'checkbox']),
   Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal', 'toggle-card-bare', 'toggle-card-long']),
 ]);
 
@@ -159,6 +159,10 @@ export function mountStandaloneSpecimen({ mount, targets }) {
         semantics: 'switch',
         onToggle: noop,
       },
+    }),
+    mount('SelectionCheckbox', {
+      target: targets.checkbox,
+      props: { checked: true, label: 'Award the recipe’s ingredients first', onChange: noop },
     }),
     card,
     field,

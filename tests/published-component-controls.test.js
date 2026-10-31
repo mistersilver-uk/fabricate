@@ -196,6 +196,8 @@ const FOCUSABLE_REACH = Object.freeze({
   },
   // Drawn only when `as`, which the entry does not publish, is `'checkbox'`.
   'src/ui/svelte/components/StatusToggle.svelte: input': null,
+  // In the `control` snippet, which both wrapper forms render; `decorative` is not published.
+  'src/ui/svelte/components/SelectionCheckbox.svelte: input': 'always',
   // In snippets both branches of `{#if isVertical}` render, which reach reads as unguarded.
   'src/ui/svelte/components/Stepper.svelte: button[data-stepper-decrement]': 'always',
   'src/ui/svelte/components/Stepper.svelte: button[data-stepper-increment]': 'always',
@@ -303,6 +305,14 @@ const OWN_NAMES = Object.freeze({
     keys: ['options'],
     heldBy:
       'tests/components/published-radio-card-group-mounted.test.js: the published RadioCardGroup names',
+  },
+  // A required text key that `ariaLabel` waives, through the input's wrapping `<label>`.
+  'src/ui/svelte/components/SelectionCheckbox.svelte: input': {
+    entry: 'SelectionCheckbox',
+    vocabulary:
+      'The input is named by `label`, the text its wrapping `<label>` draws, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).',
+    heldBy:
+      'tests/components/published-selection-checkbox-mounted.test.js: the published SelectionCheckbox names',
   },
   // Each option's `label`, which the entry's group states is required, through the radio's
   // wrapping `<label>`.
@@ -468,6 +478,13 @@ const ENTRY_EVENTS = Object.freeze({
       tag: 'input',
       heldBy:
         'tests/components/published-segmented-control-mounted.test.js: the keyboard on the published SegmentedControl',
+    },
+  },
+  SelectionCheckbox: {
+    onchange: {
+      tag: 'input',
+      heldBy:
+        'tests/components/published-selection-checkbox-mounted.test.js: a press on the published SelectionCheckbox',
     },
   },
 });
@@ -1261,6 +1278,20 @@ const SCOPED_RINGS = Object.freeze({
           '.fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-input:focus-visible',
         ].join(',\n  '),
         declarations: [['outline-offset', '-1px']],
+      },
+    ],
+  },
+  'src/ui/svelte/components/SelectionCheckbox.svelte': {
+    statedBy:
+      'The `SelectionCheckbox` box keeps its own ring, the 2px accent at a 2px offset drawn on the box around its visually hidden input.',
+    rules: [
+      {
+        selector:
+          '.fab-selection-checkbox:has(.fab-selection-input:focus-visible) .fab-selection-check',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '2px'],
+        ],
       },
     ],
   },

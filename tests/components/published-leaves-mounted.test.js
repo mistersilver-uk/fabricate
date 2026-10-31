@@ -466,6 +466,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('button').getAttribute('aria-pressed'),
     drawn: ['false', 'true'],
   },
+  {
+    name: 'SelectionCheckbox',
+    under: 'fabricate',
+    root: '.fab-selection-checkbox',
+    props: { checked: false, label: 'Spent', onChange() {} },
+    next: { checked: true, label: 'Spent', onChange() {} },
+    read: (root) => String(root.querySelector('input').checked),
+    drawn: ['false', 'true'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -646,6 +655,11 @@ describe('a key a leaf does not publish', () => {
       'class',
       'data-x',
     ].map((key) => ['ToggleCard', key, 'is not a prop of ToggleCard']),
+    ...['decorative', 'wrapper', 'input', 'class', 'value', 'name'].map((key) => [
+      'SelectionCheckbox',
+      key,
+      'is not a data attribute',
+    ]),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

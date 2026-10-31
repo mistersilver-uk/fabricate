@@ -62,7 +62,13 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const THEME = 'data-fabricate-theme';
 const PALETTES = Object.freeze(['fabricate', 'foundry-native']);
 const HOSTS = Object.freeze(['window', 'bare']);
-const WIDENED = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.standaloneRoot === true);
+/** The widened entries another file measures, by name, which keeps this one inside its timeout. */
+const MEASURED_ELSEWHERE = Object.freeze({
+  SelectionCheckbox: 'tests/components/published-standalone-root-rendered-checkbox.test.js',
+});
+const WIDENED = PUBLISHED_COMPONENT_MANIFEST.filter(
+  (entry) => entry.standaloneRoot === true && !Object.hasOwn(MEASURED_ELSEWHERE, entry.name)
+);
 /** The components with a `<style>` in the widened entries' import closures, by path. */
 const SCOPED_PATHS = [...new Set(WIDENED.flatMap(({ path }) => [...importClosure(path, SHIPPED)]))]
   .filter((path) => isComponent(path) && Boolean(componentAstOf(path).css))
@@ -334,6 +340,13 @@ describe('the standalone specimen table', () => {
       Object.keys(STANDALONE_SPECIMENS).sort(byName),
       WIDENED.map(({ name }) => name).sort(byName)
     );
+  });
+
+  it('leaves each entry it does not measure to a file that does', () => {
+    for (const [name, file] of Object.entries(MEASURED_ELSEWHERE)) {
+      assert.ok(entryNamed(name)?.standaloneRoot, `${name} is a widened entry`);
+      assert.match(readFileSync(resolve(repoRoot, file), 'utf8'), new RegExp(`'${name}'`, 'u'));
+    }
   });
 
   it('draws every value of each vocabulary key the entries publish, compared or declared', () => {

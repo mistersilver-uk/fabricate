@@ -374,6 +374,7 @@ const ARIA_KEY_SUITES = Object.freeze({
   Button: 'tests/components/published-button-mounted.test.js',
   StatusToggle: 'tests/components/published-toggle-mounted.test.js',
   IconButton: 'tests/components/published-icon-button-mounted.test.js',
+  SelectionCheckbox: 'tests/components/published-selection-checkbox-mounted.test.js',
 });
 
 /**
@@ -1397,7 +1398,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty-one focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges thirty-two focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1429,6 +1430,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: input',
       'src/ui/svelte/components/SearchField.svelte: input',
       'src/ui/svelte/components/SegmentedControl.svelte: input',
+      'src/ui/svelte/components/SelectionCheckbox.svelte: input',
       'src/ui/svelte/components/StatusToggle.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: button',
@@ -1490,6 +1492,7 @@ describe('each entry matches its component declaration', () => {
         'Modal.onClose: 0',
         'ListRow.onOpen: 0',
         'ToggleCard.onToggle: 0',
+        'SelectionCheckbox.onChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -1504,6 +1507,7 @@ describe('each entry matches its component declaration', () => {
         'StatusToggle.aria-labelledby',
         'StatusToggle.aria-describedby',
         'IconButton.aria-expanded',
+        'SelectionCheckbox.aria-describedby',
       ],
       'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
     );
@@ -3392,6 +3396,7 @@ describe('the module sheet and every component style against the published Inspe
         'Modal',
         'ListRow',
         'ToggleCard',
+        'SelectionCheckbox',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );

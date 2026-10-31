@@ -160,6 +160,29 @@ Issue 2856 adds `surface`, `size` and an option's `ariaLabel` to the published k
 - **THEN** each segment's `title` is its `label`
 - **AND** the clipped label stays its accessible name
 
+### Requirement: The selection checkbox is the one checkbox, labelled where its caller asks
+
+`SelectionCheckbox` (`components/SelectionCheckbox.svelte`) is the shipped implementation of the library's `<Checkbox>` entry and the one checkbox primitive: a Svelte surface that draws a checkbox's box, a companion's through `game.fabricate.api.ui` included, MUST draw it through this component rather than a second one, and `StatusToggle`'s `checkbox` host is a switch drawn on a native checkbox, not a box (issue 2836).
+A native checkbox in a Foundry dialog or menu written as an HTML string falls outside that rule, as the three in `ui/managerServices.js`, `bootstrap/socketRouter.js` and `config/playerCharacterTypesMenu.js` do.
+Its `label` snippet draws visible text after the box inside its `label` wrapper, wrapping on 16px lines, 18px beside the 22px box, with the box centred on its first line; the `contents` and decorative forms ignore it, and a caller that passes none draws the markup that shipped before.
+In the `label` wrapper an enabled empty box raises its edge to `--fab-text-muted` under the pointer, and a disabled box is drawn at half opacity.
+The `SelectionCheckbox` box keeps its own ring, the 2px accent at a 2px offset drawn on the box around its visually hidden input.
+A press reports the state it asks for through `onChange` and puts the input back on the `checked` and `indeterminate` its caller passed, so the input never states a state the box does not draw, and the caller's next props draw the change.
+Under forced colours an unticked box MUST draw no glyph, because the forced text colour would otherwise ink the tick its default paint draws clear, and a ticked or mixed box MUST fill with `Highlight` and ink its glyph `HighlightText`; a disabled box, keyed on its disabled input so the `contents` form takes it too, draws its edge in `GrayText` and fills with it when ticked or mixed, undimmed; the glyph opts out of forced colours' backplate, which would paint it as a block; and the ring keeps the forced text colour.
+Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the unticked edge MUST clear 3:1 against the compact box's ground and the larger boxes' fill, the ticked and mixed accent edge 3:1 against the ground, the tick on the accent fill and the dash on the soft fill 3:1, and the label, `--fab-text-secondary`, and the disabled label, `--fab-text-muted`, 4.5:1; `tests/components/selection-checkbox-contrast.test.js` holds them.
+`BulkStagingInset`'s `check` rows draw their decorative box through it, so that box's empty edge is `--fab-control-outline` rather than the `--fab-border-strong` it drew by hand, which measured 1.64 to 2.21:1 (issue 2836).
+
+#### Scenario: A labelled checkbox
+
+- **WHEN** a caller passes `label` beside the default `label` wrapper
+- **THEN** the label draws after the box inside the wrapper, which is the pointer target, and names the input
+- **AND** a caller that passes no label draws the wrapper, the input and the box alone
+
+#### Scenario: A checkbox under forced colours
+
+- **WHEN** forced colours are active
+- **THEN** an unticked box draws its edge and no glyph, and a ticked or mixed one fills with `Highlight`
+
 ### Requirement: A list's arrangement switch renders through ViewToggle
 
 A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
