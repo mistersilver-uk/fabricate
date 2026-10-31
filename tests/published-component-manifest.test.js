@@ -452,9 +452,11 @@ const CHIP = Object.freeze({
   ancestors: CHIP_LAYOUT_ANCESTORS,
   drawsChildren: 'caller',
 });
+/** The tone classes `tone` writes beside the card's root (issue 2854). */
+const CARD_TONES = Object.freeze(['warning', 'success', 'accent', 'info']);
 const CARD = Object.freeze({
   root: 'fabricate-card',
-  writable: new Set(),
+  writable: new Set(CARD_TONES.map((tone) => `is-tone-${tone}`)),
   ancestors: new Set(['manager-checks-rail', 'manager-inspector']),
   drawsChildren: true,
 });
@@ -749,11 +751,30 @@ const keptOff = ({ written, above, bearers }, kept, pinned, spelled) => {
   );
 };
 
-/** The card's own two family rules, which draw all of it under a Fabricate window. */
-const CARD_FAMILY_RULES = Object.freeze([
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-card.fabricate-card',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-card.fabricate-card',
-]);
+/** The card sheet's own rules, as the census writes them. */
+const CARD_SHEET = (selector) => `styles/fabricate-manager-rail-gathering.css: ${selector}`;
+const CARD_TONED = (tone) => `.fabricate-card.fabricate-card.is-tone-${tone}`;
+/**
+ * The card's own family rules, which draw all of it under a Fabricate window: its two base rules,
+ * then each tone's edge and fill and its forced-colours edge, the head's seven rules and each
+ * tone's note ink (issue 2854).
+ */
+const CARD_FAMILY_RULES = Object.freeze(
+  [
+    '.fabricate-card.fabricate-card',
+    '.fabricate-card.fabricate-card',
+    ...CARD_TONES.map(CARD_TONED),
+    ...CARD_TONES.map(CARD_TONED),
+    '.fabricate-card > .fab-card-head',
+    '.fabricate-card > .fab-card-head > .fab-card-identity',
+    '.fabricate-card .fab-card-identity > .fab-card-leading',
+    '.fabricate-card > .fab-card-head > .fab-card-trailing',
+    '.fabricate-card .fab-card-identity > .fab-card-heading',
+    '.fabricate-card .fab-card-heading > .fab-card-title',
+    '.fabricate-card .fab-card-heading > .fab-card-note',
+    ...CARD_TONES.map((tone) => `${CARD_TONED(tone)} .fab-card-note`),
+  ].map(CARD_SHEET)
+);
 /** The component rules a card matches only through a `data-*` hook Fabricate writes. */
 const CARD_DATA_HOOK_RULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte: .fabricate-card[data-crafting-modifier-catalogue]',
@@ -1499,8 +1520,17 @@ describe('each entry matches its component declaration', () => {
     assert.equal(card.standaloneRoot, true, 'the card is drawn under the standalone style root');
     assert.deepEqual(
       sheetReach({ ...card, standaloneRoot: undefined }, sheet),
-      ['src/ui/svelte/components/InspectorCard.svelte: fabricate-card'],
-      'the class the sheet draws the card by is what refuses it the any root without that root'
+      [
+        'fab-card-head',
+        'fab-card-heading',
+        'fab-card-identity',
+        'fab-card-leading',
+        'fab-card-note',
+        'fab-card-title',
+        'fab-card-trailing',
+        'fabricate-card',
+      ].map((name) => `src/ui/svelte/components/InspectorCard.svelte: ${name}`),
+      'the classes the sheet draws the card and its head by are what refuse it the any root without that root'
     );
   });
 
@@ -3292,11 +3322,15 @@ describe('the module sheet and every component style against the published Inspe
   // Issue 2315 retired seven caller rules that restated or wrapped the card and added its `flush`
   // rule, so the census InspectorCard was published on, 23, became 17; issue 2467 deleted the
   // modifier card's two option-gap selectors, so it is 15.
-  it('names the card root in 15 selectors: its two family rules, two data-hook rules, and eleven no published card can match', () => {
+  it('names the card root in 34 selectors: its 21 family rules, two data-hook rules, and eleven no published card can match', () => {
     assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
     const selectors = shippedCensus(CARD, 'InspectorCard');
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
-    assert.equal(selectors.length, 15, 'the census at issue 2467');
+    assert.equal(
+      selectors.length,
+      34,
+      'the census at issue 2467, and the tones and head of issue 2854'
+    );
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(
         ({ root, standaloneRoot }) => root !== 'any' || standaloneRoot === true
@@ -3325,7 +3359,7 @@ describe('the module sheet and every component style against the published Inspe
     );
     assert.deepEqual(
       publishedShapeOf('InspectorCard'),
-      [['children'], 'fabricate'],
+      [['children', 'tone', 'title', 'note', 'leading', 'trailing'], 'fabricate'],
       'a published key that writes a class, or a wider root, reopens cannotMatchPublished'
     );
   });

@@ -982,7 +982,9 @@ It joins a rule to a same-selector twin elsewhere in the same file, so a family 
 
 `InspectorCard` (the library's `<Card>`) draws the specimen's box from the module sheet: radius 11, padding `--fab-space-4`, 1px `--fab-border`, `--fab-bg-2`.
 Its one variant, `flush`, emits `is-flush` and draws padding 0 for a card whose head and body inset themselves.
-A caller rule places a card (margin, flex or grid placement, gap, position) and never restates its padding, fill, radius or border; a status tone (`border-color` and a `--fab-*-soft` fill from one status ramp) is not a restatement.
+Its `tone`, `warning`, `success`, `accent` or `info`, emits `is-tone-<tone>` and draws that ramp's `-border` edge on its `-soft` fill, with a second edge inset under forced colours; its head is drawn only for a `title`, a serif level-3 heading over an optional `note` between `leading` and `trailing` snippets, whose trailing one wraps beneath the leading one and the heading in a narrow card (issue 2854).
+No in-app caller passes the tone or the head; they serve the published seam.
+A caller rule places a card (margin, flex or grid placement, gap, position) and never restates its padding, fill, radius or border; a status tone (`border-color` and a `--fab-*-soft` fill from one status ramp) is not a restatement, and nor are the card's own four tone rules, whose ramps take `accent` too.
 A card never contains a card.
 
 #### Scenario: A caller rule restates the card's box
@@ -3016,6 +3018,7 @@ A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/compo
 Its geometry is fixed — a 1px `--fab-border` frame, radius 9 and `--fab-space-3` padding on `--fab-bg-1` — and it takes no radius, padding or fill prop, because a well a caller could re-shape would be the drift the pair exists to end.
 On a modal body (the shared `Modal`), which is itself `--fab-bg-1`, the well takes the next background level, `--fab-bg-2`, by a rule `Well.svelte` scopes to the modal, so its fill and hairline stay distinct from the body.
 An optional `label` draws a kicker at its head and names the well as a group; it renders a plain element, never a section, and its rest spread lands last so a caller's role, name and hooks win.
+Its `tone` takes the card's four ramps and draws them as the card does, outranking the modal fill, with its label in `--fab-text-secondary`, because the kicker's muted ink falls under 4.5:1 on a toned fill; it is a status tint and not a re-shaping, and no in-app caller passes it (issue 2854).
 The Checks Studio's titled option groups and the roll prompt's additional-dice control draw their frame through it.
 
 #### Scenario: A Studio option group and the prompt's additional-dice control share one frame

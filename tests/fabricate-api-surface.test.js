@@ -453,7 +453,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       InspectorCard: {
         version: 1,
-        props: { children: slot },
+        props: {
+          children: slot,
+          tone: optional,
+          title: { kind: 'text', required: false },
+          note: { kind: 'text', required: false },
+          leading: slot,
+          trailing: slot,
+        },
         rest: true,
         root: 'any',
         overlays: false,
@@ -610,7 +617,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       Well: {
         version: 1,
-        props: { label: optional, children: slot },
+        props: { label: optional, children: slot, tone: optional },
         rest: true,
         root: 'any',
         overlays: false,

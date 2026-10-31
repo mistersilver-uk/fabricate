@@ -41,8 +41,11 @@ const SHEET = 'styles/fabricate.css';
 const ROOT = 'fabricate-card';
 const BASE = `.${ROOT}.${ROOT}`;
 const FLUSH = `${BASE}.is-flush`;
+/** The published `tone`'s four rules (issue 2854), whose ramps take `accent` beside the status ramps. */
+const TONED = ['warning', 'success', 'accent', 'info'].map((tone) => `${BASE}.is-tone-${tone}`);
 const BOX = /^(?:padding|background|border)(?:-|$)/u;
 const STATUS_RAMPS = new Set(['success', 'danger', 'warning', 'info']);
+const TONED_RAMPS = new Set([...STATUS_RAMPS, 'accent']);
 const TRAVEL = 'src/ui/svelte/apps/manager/world/TravelInspector.svelte';
 const CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 
@@ -116,16 +119,16 @@ const namesCard = (compound) =>
   compoundClasses(compound).some((name) => CARD_CLASSES.has(name)) ||
   [...compound.matchAll(/\[(data-[\w-]+)/gu)].some(([, hook]) => CARD_HOOKS.has(hook));
 
-/** Border colour and a soft fill from one status ramp: a tone, which is not a restatement. */
-function isStatusTone(box) {
-  const ramps = [...box].map(([property, value]) => {
+/** Border colour and a soft fill from one of `ramps`: a tone, which is not a restatement. */
+function isStatusTone(box, ramps = STATUS_RAMPS) {
+  const read = [...box].map(([property, value]) => {
     if (property === 'border-color') return value.match(/^var\(--fab-([a-z]+)-border\)$/u)?.[1];
     if (property === 'background' || property === 'background-color') {
       return value.match(/^var\(--fab-([a-z]+)-soft\)$/u)?.[1];
     }
     return undefined;
   });
-  return ramps.every((ramp) => STATUS_RAMPS.has(ramp)) && new Set(ramps).size === 1;
+  return read.every((ramp) => ramps.has(ramp)) && new Set(read).size === 1;
 }
 
 /** Every caller rule in `styles` whose subject is a card and that restates the card's box. */
@@ -134,10 +137,11 @@ function restatements(styles) {
     rulesIn(css).flatMap((rule) => {
       const box = boxOf(rule);
       if (box.size === 0 || isStatusTone(box)) return [];
+      const published = file === SHEET && isStatusTone(box, TONED_RAMPS) ? TONED : [];
       return splitSelectorList(rule.selector)
         .filter((raw) => file === SHEET || (file.endsWith('.svelte') && subjectIsGlobal(raw)))
         .map(unwrapGlobal)
-        .filter((selector) => !(file === SHEET && [BASE, FLUSH].includes(selector)))
+        .filter((selector) => !(file === SHEET && [BASE, FLUSH, ...published].includes(selector)))
         .filter((selector) => namesCard(compoundsOf(selector).at(-1)))
         .map((selector) => `${file}: ${selector}`);
     })
@@ -166,6 +170,35 @@ test('no caller rule restates the card’s box outside a status tone', () => {
   assert.ok(CARD_CLASSES.size > 20, `${CARD_CLASSES.size} card classes read`);
   assert.ok(CARD_HOOKS.size > 20, `${CARD_HOOKS.size} card hooks read`);
   assert.deepEqual(restatements(corpus), []);
+});
+
+test('each published tone draws its own ramp’s edge on its soft fill, and nothing else of the box', () => {
+  const rules = rulesIn(corpus[SHEET]);
+  for (const [index, tone] of ['warning', 'success', 'accent', 'info'].entries()) {
+    assert.deepEqual(
+      [...boxRule(rules, TONED[index])],
+      [
+        ['border-color', `var(--fab-${tone}-border)`],
+        ['background', `var(--fab-${tone}-soft)`],
+      ],
+      TONED[index]
+    );
+  }
+  assert.deepEqual(
+    restatements({ [SHEET]: `${TONED[2]} { border-color: var(--fab-accent-border) }` }),
+    [],
+    'a published tone rule takes the accent ramp'
+  );
+  assert.deepEqual(
+    restatements({ [SHEET]: `${TONED[2]} { padding: 0 }` }),
+    [`${SHEET}: ${TONED[2]}`],
+    'and nothing else of the box'
+  );
+  assert.deepEqual(
+    restatements({ [SHEET]: `${BASE}.is-tone-danger { border-color: var(--fab-accent-border) }` }),
+    [`${SHEET}: ${BASE}.is-tone-danger`],
+    'an unpublished tone rule is not'
+  );
 });
 
 test('the census refuses a restatement at any specificity, and admits a tone and a scoped rule', () => {

@@ -204,6 +204,21 @@ const modal = (props, slots) => ({
 export const STANDALONE_SPECIMENS = Object.freeze({
   InspectorCard: Object.freeze({
     'card-filled': { props: { children: true }, reach: UNREACHABLE },
+    // Issue 2854: each published tone under the head it publishes.
+    ...Object.fromEntries(
+      [
+        ['warning', 'Over the limit'],
+        ['success', 'Ready to finish'],
+        ['accent', 'Chosen route'],
+        ['info', 'Check due'],
+      ].map(([tone, title]) => [
+        `card-tone-${tone}`,
+        {
+          props: { tone, title, note: 'Two crafters assigned.', children: true },
+          reach: UNREACHABLE,
+        },
+      ])
+    ),
   }),
   Button: Object.freeze({
     'button-neutral': button({ role: 'neutral', children: 'Clear filters', onclick: press }),
@@ -397,6 +412,13 @@ export const STANDALONE_SPECIMENS = Object.freeze({
   Well: Object.freeze({
     'well-labelled': { props: { label: 'Chosen reagents', children: true }, reach: UNREACHABLE },
     'well-unlabelled': { props: { children: true }, reach: UNREACHABLE },
+    // Issue 2854: each published tone.
+    ...Object.fromEntries(
+      ['warning', 'success', 'accent', 'info'].map((tone) => [
+        `well-tone-${tone}`,
+        { props: { tone, children: true }, reach: UNREACHABLE },
+      ])
+    ),
   }),
   IconButton: Object.freeze({
     'icon-button-neutral': button({ icon: 'fas fa-gear', ariaLabel: 'Settings', onclick: press }),

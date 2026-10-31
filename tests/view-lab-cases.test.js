@@ -418,6 +418,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
+  'tests/view-lab/fixtures/PublishedCardTones.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
   'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
@@ -886,6 +887,10 @@ const labFieldForm = (key) =>
   `[data-lab-field-forms] > [data-lab-field-form="${key}"] .fabricate-field input`;
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
+/** One section's card of the card tones fixture, by the section's key, and a part of its head. */
+const labCardTone = (key) =>
+  `[data-lab-card-tones] > [data-lab-card-tone="${key}"] .fabricate-card`;
+const labCardHead = (key, part) => `${labCardTone(key)} > .fab-card-head ${part}`;
 /** The list row fixture's aside host in one section's published row, by the section's key. */
 const labListRowAside = (key) =>
   `[data-lab-list-row-ground] > [data-lab-list-row="${key}"] .fabricate-list-row > .fabricate-list-row-aside`;
@@ -1436,6 +1441,41 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_WELL} > div:not(.fab-well-label)`, styles: 'display: contents' },
     { selector: `${LAB_WELL} > div:not(.fab-well-label) > div`, styles: 'display: contents' },
     { selector: `${LAB_WELL} [data-lab-well-content]`, styles: 'display: flex; row-gap: 8px' },
+  ],
+  // The published card tones and head (issue 2854): the untoned card's fill, edge, title and muted
+  // note; each tone's fill, edge and secondary note; the focused button's ring; and the accent well.
+  'manager-published-card-tones-specimen': [
+    {
+      selector: labCardTone('plain'),
+      styles: 'background-color: var(--fab-bg-2); border-top-color: var(--fab-border)',
+    },
+    {
+      selector: labCardHead('plain', '.fab-card-title'),
+      styles: 'font-size: 15px; font-weight: 600; color: var(--fab-text); margin-top: 0px',
+    },
+    {
+      selector: labCardHead('plain', '.fab-card-note'),
+      styles: 'font-size: 11px; color: var(--fab-text-muted)',
+    },
+    ...['warning', 'success', 'accent', 'info'].flatMap((tone) => [
+      {
+        selector: labCardTone(tone),
+        styles: `background-color: var(--fab-${tone}-soft); border-top-color: var(--fab-${tone}-border)`,
+      },
+      {
+        selector: labCardHead(tone, '.fab-card-note'),
+        styles: 'color: var(--fab-text-secondary)',
+      },
+    ]),
+    {
+      selector: `${labCardHead('warning', '.fabricate-button')}:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-color: var(--fab-accent)',
+    },
+    {
+      selector: `${labCardTone('well')} .fab-well`,
+      styles:
+        'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
+    },
   ],
   // The published callout (issue 2601): the paragraph root's strip, ink and fill, the info, accent,
   // warning and success notes' tone inks and fills, the items' spacing, and the actions host and
@@ -7221,6 +7261,43 @@ test('the field forms specimen case measures the rung each section of the forms 
     [...new Set(rungs)].sort((left, right) => left - right),
     [26, 28, 30, 34],
     'the four rungs Premium draws'
+  );
+});
+
+test('the card tones specimen case measures the tone each section of the card tones fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedCardTones.svelte'
+  );
+  for (const hook of ['data-lab-card-tones', 'data-lab-card-tone']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const cards = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id.name === 'CARDS'
+  );
+  const tones = cards.init.arguments[0].elements.map((row) => [
+    row.elements[0].value,
+    row.elements[1].value,
+  ]);
+  const measured = getCaseById('manager-published-card-tones-specimen')
+    .expectLayout.controls.filter(
+      ({ styles }) => /-soft\)/u.test(styles) && !/fab-well/u.test(styles)
+    )
+    .map(({ selector, styles }) => [
+      /data-lab-card-tone="(\w+)"/u.exec(selector)[1],
+      /--fab-(\w+)-soft/u.exec(styles)[1],
+    ]);
+  assert.deepEqual(
+    measured.filter(([key]) => key !== 'well'),
+    tones.filter(([key, tone]) => tone !== '' && key !== 'narrow'),
+    'each toned section is measured at the tone it mounts'
+  );
+  assert.deepEqual(
+    [...new Set(tones.map(([, tone]) => tone).filter(Boolean))].sort(byCodePoint),
+    ['accent', 'info', 'success', 'warning'],
+    'every published tone'
   );
 });
 

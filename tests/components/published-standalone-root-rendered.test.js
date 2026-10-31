@@ -70,19 +70,31 @@ const SCOPED_PATHS = [...new Set(WIDENED.flatMap(({ path }) => [...importClosure
 const SCOPED = SCOPED_PATHS.map((path) => basename(path, '.svelte'));
 /** A scoped component no published key draws, with the key that would: none of its elements is drawn. */
 const UNDRAWN_SCOPED = Object.freeze({});
+/** The toned cards and wells of issue 2854, which draw nothing focusable either. */
+const TONES = ['warning', 'success', 'accent', 'info'];
+const TONED_CARDS = TONES.map((tone) => `card-tone-${tone}`);
+const TONED_WELLS = TONES.map((tone) => `well-tone-${tone}`);
 /** The specimens in which Tab from the sentinel reaches nothing. */
 const UNREACHED = Object.freeze([
   'card-filled',
+  ...TONED_CARDS,
   'button-disabled',
   'stepper-disabled',
   'well-labelled',
   'well-unlabelled',
+  ...TONED_WELLS,
   'icon-button-disabled',
   'cards-disabled',
   'pagination-persistent-single',
 ]);
 /** The specimens no pointer is moved over, and those whose hover target need not change. */
-const UNHOVERED = Object.freeze(['card-filled', 'well-labelled', 'well-unlabelled']);
+const UNHOVERED = Object.freeze([
+  'card-filled',
+  ...TONED_CARDS,
+  'well-labelled',
+  'well-unlabelled',
+  ...TONED_WELLS,
+]);
 const INERT = Object.freeze([
   'button-disabled',
   'button-busy',

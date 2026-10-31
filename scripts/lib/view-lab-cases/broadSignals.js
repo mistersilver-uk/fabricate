@@ -369,8 +369,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-in-window',
   ]),
   // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
-  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card. Then the three
-  // specimens that mount it with and without a Fabricate root above its target (issue 2456).
+  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card. Then the
+  // specimen of its published tones and head (issue 2854), and the three specimens that mount it
+  // with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
@@ -379,6 +380,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-world-travel-realms-normal',
     'manager-world-travel-map-normal',
     'manager-world-travel-map-empty',
+    'manager-published-card-tones-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
@@ -747,14 +749,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
-  // the roll prompt's additional-dice control, and the specimen that mounts it through the
-  // published seam (issue 2601), and the three that mount it with and without a Fabricate root
+  // the roll prompt's additional-dice control, the specimens that mount it through the published
+  // seam (issues 2601 and 2854), and the three that mount it with and without a Fabricate root
   // above its target (issue 2456).
   'src/ui/svelte/components/Well.svelte': Object.freeze([
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
     'manager-published-well-specimen',
+    'manager-published-card-tones-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

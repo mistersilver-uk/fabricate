@@ -191,6 +191,11 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     version: 1,
     props: Object.freeze({
       children: Object.freeze({ kind: 'slot' }),
+      tone: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({ kind: 'text' }),
+      note: Object.freeze({ kind: 'text' }),
+      leading: Object.freeze({ kind: 'slot', element: 'span' }),
+      trailing: Object.freeze({ kind: 'slot', element: 'span' }),
     }),
     rest: true,
     root: 'any',
@@ -370,6 +375,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     props: Object.freeze({
       label: Object.freeze({ kind: 'data' }),
       children: Object.freeze({ kind: 'slot' }),
+      tone: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
