@@ -1275,14 +1275,15 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-stage-bars-forms-specimen',
     label:
-      "Specimen, mounted through the published seam — four unnumbered stage groups in a 360px column on --fab-bg-2, each between a heading and a reading the companion draws, the second stage current in each. Reading top to bottom: Default track, three equal bars, Gather full in the success tone, Smelt a little under half full in the accent and Forge empty, each track 6px with a 1px edge on the raised surface, for comparison; Thin track, the same three stages on borderless --fab-bg-3 tracks, each fill the track's whole 6px; Shrine project, on the thin track at the tight 2px gap, three bars two, three and one parts wide, Survey full, split ember, azure and verdant three, two and one parts, Build three fifths full, split ember and azure evenly, in place of the accent, and Dedicate empty; then the same project on the default track. The frame cannot show forced colours, under which each thin track keeps a 1px edge, which the rendered suite measures",
+      "Specimen, mounted through the published seam — four unnumbered stage groups in a 360px column on --fab-bg-2, each between a heading and a reading the companion draws, the second stage current in each. Reading top to bottom: Default track, three equal bars, Gather full in the success tone, Smelt a little under half full in the accent and Forge empty, each track 6px with a 1px edge on the raised surface, for comparison; Thin track, the same three stages on borderless --fab-bg-3 tracks, each fill the track's whole 6px; Shrine project, on the thin track at the tight 2px gap, three bars two, three and one parts wide, Survey full, split ember, azure and verdant three, two and one parts, Build three fifths full, split ember and azure evenly, in place of the accent, and Dedicate, ahead of the current stage but begun early, half full, split verdant and rose evenly, in place of the neutral; then the same project on the default track. No bar takes focus. The frame cannot show forced colours, under which each thin track keeps a 1px edge, which the rendered suite measures, nor the hover tooltip Survey's and Build's bars carry from their title, which the mounted suite reads",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-stage-bars-forms' },
     steps: [],
-    // The thin row's current stage in its state paint, and the pooled current stage drawn as shares.
-    expectSelector: `${STAGE_BARS_FORMS}:has(> [data-lab-stage-bars-form="thin-states"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin[data-fill-bar-tone="accent"]) > [data-lab-stage-bars-form="shares"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin .fab-fill-bar-share:nth-child(2)`,
+    // The thin row's current stage in its state paint, the pooled current stage's title, and that
+    // stage drawn as shares.
+    expectSelector: `${STAGE_BARS_FORMS}:has(> [data-lab-stage-bars-form="shares"] [role="progressbar"][data-tooltip-text="Build: 6 of 10 days"]):has(> [data-lab-stage-bars-form="thin-states"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin[data-fill-bar-tone="accent"]) > [data-lab-stage-bars-form="shares"] [data-stage-bars-stage="1"] .fab-fill-bar.is-thin .fab-fill-bar-share:nth-child(2)`,
     expectContained: [
       ...STAGE_BARS_FORM_KEYS.map((key) => ({
         container: STAGE_BARS_FORMS,

@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `stages` | `{ name?, label?, valueText?, value, weight?, shares? }[]` | `[]` | `value` is the stage's fill, 0–100, and the bar announces it as a whole number, truncated, so an unfinished stage never reads 100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. `valueText`, final text, is the bar's `aria-valuetext` in place of its percentage when it is a non-empty string. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. `weight` is the stage's share of the row: a finite number above zero, else 1, and the bars are `weight / Σweight` wide, so a list that names none, or no valid one, draws equal bars. `shares` is forwarded to the stage's `FillBar` as its `shares` (issue 2837): two or more draw the stage's fill in their own tones in place of its state's, and fewer draw the state's. |
+  | `stages` | `{ name?, label?, valueText?, value, weight?, shares?, title? }[]` | `[]` | `value` is the stage's fill, 0–100, and the bar announces it as a whole number, truncated, so an unfinished stage never reads 100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. `valueText`, final text, is the bar's `aria-valuetext` in place of its percentage when it is a non-empty string. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. `weight` is the stage's share of the row: a finite number above zero, else 1, and the bars are `weight / Σweight` wide, so a list that names none, or no valid one, draws equal bars. `shares` is forwarded to the stage's `FillBar` as its `shares` (issue 2837): two or more draw the stage's fill in their own tones in place of its state's, and fewer draw the state's. `title`, final text, is the bar's `data-tooltip-text`, Foundry's plain-text tooltip on pointer hover, where it is a non-blank string, numbered or not; it is a hint, and the bar takes no focus (issue 2857). |
   | `gap` | `'default'` \| `'tight'` | `'default'` | `'tight'` draws the 2px gap between bars where `default` draws 6px; any other value reads `'default'`. |
   | `track` | `'default'` \| `'thin'` | `'default'` | `'thin'` draws each bar's track as `FillBar`'s thin one, borderless on `--fab-bg-3`, at this row's own 6px, so the fill is the whole 6px; it keeps a 1px edge under forced colours. Any other value reads `'default'` (issue 2837). |
   | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills and carries `aria-current="step"`. A finished bar reads success and the rest neutral. |
@@ -58,6 +58,11 @@
     return typeof reading === 'string' && reading ? reading : undefined;
   }
 
+  function hintOf(stage) {
+    const hint = stage?.title;
+    return typeof hint === 'string' && hint.trim() ? hint : undefined;
+  }
+
   function nameOf(stage) {
     const label = stage?.label || stage?.name;
     if (label) return { label };
@@ -90,6 +95,7 @@
         aria-valuemax="100"
         aria-valuenow={Math.floor(percentOf(stage))}
         aria-valuetext={readingOf(stage)}
+        data-tooltip-text={hintOf(stage)}
       >
         <FillBar
           value={percentOf(stage)}

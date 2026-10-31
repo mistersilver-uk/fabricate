@@ -952,7 +952,7 @@ const REPEATS_CONTROLS = [
   },
   { selector: `${REPEATS} > i.fa-ellipsis`, styles: 'font-size: 11px' },
 ];
-const NON_VERB_CONTROLS = Object.freeze({
+const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
     ...toolbarSelects('[data-recipe-category-filter]'),
@@ -1903,6 +1903,16 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
+});
+// And each theme variant of a case above, which measures the same controls under another palette
+// (issue 2837), keyed by its own id.
+const NON_VERB_CONTROLS = Object.freeze({
+  ...BASE_NON_VERB_CONTROLS,
+  ...Object.fromEntries(
+    VIEW_LAB_CASES.filter(({ baseCaseId }) =>
+      Object.hasOwn(BASE_NON_VERB_CONTROLS, baseCaseId ?? '')
+    ).map(({ id, baseCaseId }) => [id, BASE_NON_VERB_CONTROLS[baseCaseId]])
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -7682,6 +7692,12 @@ test('the stage bars forms specimen case measures the rows the stage bars forms 
     ['thin', 'thin'],
     'two rows on the thin track beside two on the default'
   );
+  const titles = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'title')
+    .map((node) => node.value.value);
+  const { expectSelector } = getCaseById('manager-published-stage-bars-forms-specimen');
+  assert.deepEqual(titles, ['Survey: 6 of 6 days', 'Build: 6 of 10 days'], 'two titled stages');
+  assert.ok(expectSelector.includes(`[data-tooltip-text="${titles[1]}"]`), 'the case waits on one');
   const { controls } = getCaseById('manager-published-stage-bars-forms-specimen').expectLayout;
   const measured = controls.map(
     ({ selector }) => /data-lab-stage-bars-form="([\w-]+)"/u.exec(selector)[1]

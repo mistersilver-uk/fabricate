@@ -8,7 +8,9 @@
 
   `states` is the default track, for comparison; `thin-states` the same three stages on the thin
   track; `shares` a pooled project on the thin track at the tight gap, its finished and current
-  stages split among three contributors; `default-shares` the same on the default track. The
+  stages split among contributors, its last stage, not current, begun early and split too, and
+  each of its first two stages carrying a hover `title` (issue 2857); `default-shares` the same on
+  the default track. The
   ground is one 360px column on `--fab-bg-2`. A case addresses the ground by
   `data-lab-stage-bars-forms` and each row by its `data-lab-stage-bars-form` key.
 -->
@@ -23,6 +25,7 @@
   const POOLED = Object.freeze([
     {
       label: 'Survey, done',
+      title: 'Survey: 6 of 6 days',
       value: 100,
       weight: 2,
       shares: [
@@ -33,6 +36,7 @@
     },
     {
       label: 'Build, current',
+      title: 'Build: 6 of 10 days',
       value: 60,
       weight: 3,
       shares: [
@@ -40,7 +44,15 @@
         { weight: 1, tone: 'azure' },
       ],
     },
-    { label: 'Dedicate, ahead', value: 0, weight: 1 },
+    {
+      label: 'Dedicate, ahead, begun early',
+      value: 50,
+      weight: 1,
+      shares: [
+        { weight: 1, tone: 'verdant' },
+        { weight: 1, tone: 'rose' },
+      ],
+    },
   ]);
 
   /** Each row's key in fixture order, its heading, its reading and the props the companion passes. */
@@ -55,13 +67,13 @@
     [
       'shares',
       'Shrine project',
-      'Survey done; Build current at 60%: Asha 3 days, Bram 3 days',
+      'Survey done; Build current at 60%; Dedicate begun early at 50%',
       { stages: POOLED, track: 'thin', gap: 'tight' },
     ],
     [
       'default-shares',
       'Shrine project, default track',
-      'Survey done; Build current at 60%: Asha 3 days, Bram 3 days',
+      'Survey done; Build current at 60%; Dedicate begun early at 50%',
       { stages: POOLED },
     ],
   ]);

@@ -3,7 +3,8 @@
  * runtime, through a fresh seam registered with the adapter's own table: two or more shares draw
  * a stage's fill in their own tones in place of its state's paint, fewer draw the state's, a
  * share's raw `color` never reaches the bar, `thin` draws each bar's track as `FillBar`'s thin
- * one and any other `track` the default, and an `update` rewrites and removes both.
+ * one and any other `track` the default, and an `update` rewrites and removes both. A stage's
+ * `title` (issue 2857) is its bar's `data-tooltip-text`, numbered or not, on no focusable element.
  * Limit: happy-dom lays nothing out, so the drawn heights, edges, widths and colours are
  * `stage-bars-forms-rendered.test.js`'s.
  */
@@ -254,4 +255,83 @@ describe('the published StageBars, track', () => {
       bars.handle.destroy();
     });
   }
+});
+
+describe('the published StageBars, a stage’s title (issue 2857)', () => {
+  const tooltips = (group) =>
+    [...group.querySelectorAll('[role="progressbar"]')].map((bar) =>
+      bar.getAttribute('data-tooltip-text')
+    );
+
+  for (const numbered of [false, true]) {
+    it(`writes each title as its bar’s data-tooltip-text, numbered ${numbered}`, async () => {
+      const bars = await mountStages({
+        numbered,
+        stages: [
+          { label: 'Smelt', value: 60, title: 'Smelt: 3 of 5 days' },
+          { label: 'Forge', value: 0, title: 'Forge: <b>not</b> begun' },
+          { label: 'Temper', value: 0 },
+        ],
+      });
+      assert.deepEqual(tooltips(bars.group()), [
+        'Smelt: 3 of 5 days',
+        'Forge: <b>not</b> begun',
+        null,
+      ]);
+      assert.equal(bars.group().querySelector('b'), null, 'a title is never read as markup');
+      for (const tip of bars.group().querySelectorAll('[data-tooltip-text]')) {
+        assert.equal(tip.getAttribute('role'), 'progressbar', 'only a bar carries it');
+        assert.equal(tip.hasAttribute('tabindex'), false, 'and the bar takes no focus');
+        assert.equal(tip.hasAttribute('data-tooltip'), false);
+        assert.equal(tip.hasAttribute('title'), false);
+      }
+      bars.handle.destroy();
+    });
+  }
+
+  it('keeps a numbered caption’s own title, its name, beside the bar’s', async () => {
+    const bars = await mountStages({
+      stages: [{ name: 'Smelt', value: 60, title: '3 of 5 days' }],
+    });
+    const caption = bars.group().querySelector('.fab-stage-bars-caption');
+    assert.equal(caption.getAttribute('title'), 'Smelt');
+    assert.equal(caption.hasAttribute('data-tooltip-text'), false);
+    assert.deepEqual(tooltips(bars.group()), ['3 of 5 days']);
+    bars.handle.destroy();
+  });
+
+  for (const title of ['', ' '.repeat(3), 3, true, null, ['Smelt'], { text: 'Smelt' }]) {
+    it(`writes no tooltip for ${JSON.stringify(title)}`, async () => {
+      const bars = await mountStages({ stages: [{ label: 'Smelt', value: 60, title }] });
+      assert.deepEqual(tooltips(bars.group()), [null]);
+      bars.handle.destroy();
+    });
+  }
+
+  it('rewrites the title on update, and an update without it removes it from the same bar', async () => {
+    const bars = await mountStages({ stages: [{ label: 'Smelt', value: 60, title: 'Day 3' }] });
+    const bar = bars.group().querySelector('[role="progressbar"]');
+    bars.handle.update({
+      ariaLabel: 'Run',
+      stages: [{ label: 'Smelt', value: 80, title: 'Day 4' }],
+    });
+    await settle();
+    assert.equal(bar.getAttribute('data-tooltip-text'), 'Day 4');
+    bars.handle.update({ ariaLabel: 'Run', stages: [{ label: 'Smelt', value: 80 }] });
+    await settle();
+    assert.ok(bars.group().querySelector('[role="progressbar"]') === bar, 'the same bar');
+    assert.equal(bar.hasAttribute('data-tooltip-text'), false);
+    bars.handle.destroy();
+  });
+
+  it('keeps the bar’s name and reading whatever its title says', async () => {
+    const bars = await mountStages({
+      stages: [{ label: 'Smelt', value: 60, valueText: '60%, stage 1 of 1', title: 'Hint' }],
+    });
+    const bar = bars.group().querySelector('[role="progressbar"]');
+    assert.equal(bar.getAttribute('aria-label'), 'Smelt');
+    assert.equal(bar.getAttribute('aria-valuetext'), '60%, stage 1 of 1');
+    assert.equal(bar.hasAttribute('aria-describedby'), false, 'Fabricate writes no description');
+    bars.handle.destroy();
+  });
 });
