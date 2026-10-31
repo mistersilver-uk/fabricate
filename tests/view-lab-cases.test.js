@@ -438,6 +438,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
   'tests/view-lab/fixtures/PublishedModal.svelte',
+  'tests/view-lab/fixtures/PublishedModalScrim.svelte',
   'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
   'tests/view-lab/fixtures/publishedStandaloneSpecimen.js',
@@ -998,6 +999,24 @@ const LAB_COMPANION_FACES = [
   {
     selector: labCompanionForm('icon-plain', LAB_COMPANION_GLYPH),
     styles: 'color: var(--fab-accent)',
+  },
+];
+/** The scrim fixture's element under `selector` in a pane, by the pane's `scrim`. */
+const labModalScrim = (scrim, selector) =>
+  `[data-lab-modal-scrims] > [data-lab-modal-scrim="${scrim}"] ${selector}`;
+/** The scrim's paint and placement, and each dialog's edge, dimmed and not. */
+const MODAL_SCRIM_CONTROLS = [
+  {
+    selector: labModalScrim('dim', '[data-manager-modal-scrim]'),
+    styles: 'position: fixed; background-color: var(--fab-overlay-dark-78)',
+  },
+  {
+    selector: labModalScrim('dim', '.fabricate-modal'),
+    styles: 'border-top-style: solid; border-top-width: 1px',
+  },
+  {
+    selector: labModalScrim('none', '.fabricate-modal'),
+    styles: 'border-top-style: solid; border-top-width: 1px',
   },
 ];
 /** The chip forms fixture's chip in a row, by the row's key. */
@@ -2053,6 +2072,11 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
+  // The published dialog's scrim (issue 2859), in the default palette and both variants.
+  'manager-published-modal-scrim-specimen': MODAL_SCRIM_CONTROLS,
+  'manager-published-modal-scrim-specimen-foundry-native': MODAL_SCRIM_CONTROLS,
+  'manager-published-modal-scrim-specimen-hearth-herb': MODAL_SCRIM_CONTROLS,
+  'manager-published-modal-scrim-specimen-mythwright': MODAL_SCRIM_CONTROLS,
 });
 // And each theme variant of a case above, which measures the same controls under another palette
 // (issue 2837), keyed by its own id.
@@ -7901,6 +7925,34 @@ test('the fill bar bands specimen case measures each row the fill bar bands fixt
     ({ selector }) => /data-lab-fill-bar-band="([\w-]+)"/u.exec(selector)[1]
   );
   assert.deepEqual(measured, keys, 'each row the fixture mounts is measured, in order');
+});
+
+test('the modal scrim specimen case measures the two panes the scrim fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedModalScrim.svelte'
+  );
+  for (const hook of ['data-lab-modal-scrims', 'data-lab-modal-scrim']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const declared = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id?.name === 'SCRIMS'
+  );
+  const scrims = declared.init.arguments[0].elements.map((element) => element.value);
+  assert.deepEqual(scrims, ['none', 'dim'], 'a pane without a scrim beside the dimmed one');
+  const { controls } = getCaseById('manager-published-modal-scrim-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-modal-scrim="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(measured, ['dim', 'dim', 'none']);
+  assert.deepEqual(
+    ['foundry-native', 'hearth-herb', 'mythwright'].map(
+      (theme) => getCaseById(`manager-published-modal-scrim-specimen-${theme}`)?.theme
+    ),
+    ['foundry-native', 'hearth-herb', 'mythwright']
+  );
 });
 
 test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {

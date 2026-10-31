@@ -746,6 +746,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The dialog mounted through the published seam: open, and closed from its close glyph (issue 2656).
     'manager-published-modal-specimen',
     'manager-published-modal-close',
+    // Two open dialogs over busy panes, without a scrim and with the dim one (issue 2859).
+    'manager-published-modal-scrim-specimen',
     // The one that opens it with no Fabricate root above its target, on the standalone layer
     // (issue 2680).
     'published-standalone-modal-open',

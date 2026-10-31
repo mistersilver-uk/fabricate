@@ -32,6 +32,8 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/dropRateTier.js',
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/util/modalFocus.js',
+  'src/ui/svelte/actions/scrim.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',

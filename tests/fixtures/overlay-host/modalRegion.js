@@ -3,7 +3,8 @@
  * that region as its `overlayHost`, as `ui.mount('Modal', { target, overlayHost })` does (issue 2818).
  * `kind` is the containing block the region makes for fixed content: `plain` makes none,
  * `contain` is `contain: layout`, `container` is `container-type: inline-size`, as the Manager's
- * root sets, and `transform` is a `transform`.
+ * root sets, `transform` is a `transform`, and `scroll` is `contain: layout` on a region that
+ * scrolls a tall column of its own (issue 2859).
  */
 import { mount, unmount } from 'svelte';
 
@@ -14,6 +15,7 @@ const REGION_STYLES = Object.freeze({
   contain: { contain: 'layout' },
   container: { containerType: 'inline-size' },
   transform: { transform: 'translateZ(0)' },
+  scroll: { contain: 'layout', overflow: 'auto' },
 });
 
 /** A layer of the companion's own, below the dialog's `z-index`, covering the whole region. */
@@ -41,6 +43,12 @@ export function hostInRegion(scroller, mountPoint, kind) {
     ...REGION_STYLES[kind],
   });
   region.append(companionLayer(), mountPoint);
+  if (kind === 'scroll') {
+    const column = document.createElement('div');
+    column.dataset.regionColumn = '';
+    column.style.height = '1200px';
+    region.append(column);
+  }
   scroller.append(region);
   openOverlayChain({
     target: mountPoint,

@@ -560,6 +560,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       trapFocus: Object.freeze({ kind: 'data' }),
       initialFocus: Object.freeze({ kind: 'data' }),
       footerLayout: Object.freeze({ kind: 'data' }),
+      scrim: Object.freeze({ kind: 'data' }),
       onClose: Object.freeze({ kind: 'callback', required: true }),
       body: Object.freeze({ kind: 'slot' }),
       footer: Object.freeze({ kind: 'slot' }),

@@ -20,6 +20,7 @@
   | `icon` | Font Awesome classes | `''` | A decorative glyph before the title, inked `--fab-accent-text`; `''` draws none (issue 2818). |
   | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | Widths 500px, 560px and 620px, still clamped to the viewport; a value outside the set draws `md`, and a caller's `width` outranks it. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
+  | `scrim` | `'none'` \| `'dim'` | `'none'` | `dim` draws a fixed scrim just before the dialog in its host, over what the dialog is centred in; any other value draws none (issue 2859). |
 
   Invariants (issue 2658):
   - Body and footer are drawn once, inside the one `svelte:element` that is a `<form>` when
@@ -37,7 +38,8 @@
   - A panel a control inside the dialog opened, or a panel opened from such a panel, counts as
     inside it wherever it is portaled, by `overlaysOpenedFrom` in `util/overlayHost.js`: a press
     there dismisses nothing, and its Escape is left to the panel, judged from the same record. A
-    `Modal` mounted inside the dialog counts so too, being acquired from where it was mounted.
+    `Modal` mounted inside the dialog counts so too, being acquired from where it was mounted, and
+    so does the scrim drawn just before it.
   - The dialog is drawn only while the element it was mounted in is in its document, so one in a
     slot an `update` detaches closes with it, calling nothing, and is drawn again as the slot
     returns (issue 2678).
@@ -46,8 +48,8 @@
     every mode (issue 2661).
   - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
   - Published through `game.fabricate.api.ui` with `open`, `title`, `subtitle`, `closeLabel`,
-    `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `onClose`, `body` and
-    `footer` only (`ui-extension-points`' issue 2656 group): a published dialog moves focus only
+    `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `scrim`, `onClose`, `body`
+    and `footer` only (`ui-extension-points`' issue 2656 group): a published dialog moves focus only
     with `trapFocus` and states no inline style, and an Escape a companion's slot content does not
     keep stops at it; `tests/components/published-modal-mounted.test.js`.
 
@@ -62,7 +64,9 @@
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
+  import { holdScroll, precede } from '../actions/scrim.js';
   import IconButton from './IconButton.svelte';
+  import { focusables, isPage, markedTarget, restoreFocus } from '../util/modalFocus.js';
   import {
     acquireOverlayHost,
     heldBy,
@@ -88,6 +92,7 @@
     icon = '',
     size = 'md',
     onSubmit = undefined,
+    scrim = 'none',
   } = $props();
 
   // The widths `size` names beyond the default; `md` is the stylesheet's own 560px.
@@ -96,10 +101,8 @@
     Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
   );
   const dialogClass = $derived(['fabricate-modal', sizeClass]);
-
-  const FOCUSABLE =
-    'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
-    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  // A closed set compared as given, so `'dim '`, `true` or `1` draws none.
+  const dimmed = $derived(scrim === 'dim');
 
   // The dialog element, to tell a key inside it from one outside it.
   let dialog = $state(null);
@@ -149,9 +152,13 @@
     return event.composedPath?.()[0] ?? event.target;
   }
 
-  // True when `origin` is in a panel that counts as inside `container`; see Invariants.
+  // True when `origin` is in a panel that counts as inside `container`, or on the scrim just before
+  // one; see Invariants.
   function inPanelOpenedFrom(container, origin) {
-    return overlaysOpenedFrom(container).some((panel) => heldBy(panel, origin));
+    const scrim = origin?.closest?.('[data-manager-modal-scrim]');
+    return overlaysOpenedFrom(container).some(
+      (panel) => heldBy(panel, origin) || scrim?.nextElementSibling === panel
+    );
   }
 
   // True when `origin` sits in an expanded control that `container` holds, looking through open
@@ -212,38 +219,6 @@
     requestClose();
   }
 
-  function focusables(node) {
-    return [...node.querySelectorAll(FOCUSABLE)].filter((element) => !element.closest('[inert]'));
-  }
-
-  // The page itself is no opener, nor a place focus stays inside a trapped dialog.
-  function isPage(element) {
-    const doc = element?.ownerDocument;
-    return !element || element === doc?.body || element === doc?.documentElement;
-  }
-
-  function restoreFocus(opener, host) {
-    if (!isPage(opener) && opener.isConnected && !opener.disabled) {
-      opener.focus?.();
-      return;
-    }
-    if (!host?.isConnected) return;
-    if (!host.hasAttribute('tabindex')) host.tabIndex = -1;
-    host.focus?.();
-  }
-
-  // The first focusable at or inside an element whose `data-initial-focus` is `initialFocus`, in
-  // document order; compared as text, so a value is never read as a selector.
-  function markedTarget(node, inside) {
-    if (!initialFocus) return null;
-    for (const marked of node.querySelectorAll('[data-initial-focus]')) {
-      if (marked.getAttribute('data-initial-focus') !== initialFocus) continue;
-      const found = inside.find((element) => marked.contains(element));
-      if (found) return found;
-    }
-    return null;
-  }
-
   function modalFocus(node, enabled) {
     if (!enabled) return {};
     const opener = node.ownerDocument.activeElement;
@@ -251,7 +226,7 @@
     const view = node.ownerDocument.defaultView;
     const inside = focusables(node);
     const first =
-      markedTarget(node, inside) ||
+      markedTarget(node, inside, initialFocus) ||
       (initialFocusSelector && node.querySelector(initialFocusSelector)) ||
       inside[0];
     first?.focus?.();
@@ -322,6 +297,12 @@
     event.preventDefault();
     onSubmit(event);
   }
+
+  // A press on the scrim keeps focus where it is; `closeOnOutsideClick` alone decides whether it
+  // closes, as for any press outside the dialog.
+  function holdFocus(event) {
+    event.preventDefault();
+  }
 </script>
 
 {#if open}
@@ -386,6 +367,16 @@
       </svelte:element>
     </div>
   {/if}
+  {#if attached && dimmed}
+    <div
+      class="manager-modal-scrim"
+      aria-hidden="true"
+      data-manager-modal-scrim
+      use:precede={dialog}
+      use:holdScroll
+      onmousedown={holdFocus}
+    ></div>
+  {/if}
 {/if}
 
 <style>
@@ -409,6 +400,14 @@
     border: 1px solid var(--fab-border-strong);
     border-radius: 11px;
     box-shadow: var(--fab-shadow-lg);
+  }
+
+  /* Under the dialog at its `z-index`, by document order; no fade, so reduced motion changes nothing. */
+  .manager-modal-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--fab-overlay-dark-78);
   }
 
   .fabricate-modal.is-size-sm {

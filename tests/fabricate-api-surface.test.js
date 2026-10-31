@@ -770,6 +770,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           trapFocus: optional,
           initialFocus: optional,
           footerLayout: optional,
+          scrim: optional,
           onClose: { kind: 'callback', required: true },
           body: slot,
           footer: slot,
