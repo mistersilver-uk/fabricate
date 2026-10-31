@@ -782,10 +782,14 @@ Each is measurably weaker than the last in every theme, and the ORDER is the inv
 So the ordering quantity is composited CONTRAST and never an alpha or a channel — an alpha comparison ties three of the four in `mythwright`.
 A caller routes by MEANING and never by matching a tone name to a token name: `muted` inks with `--fab-text-disabled` and `neutral` with `--fab-text-muted`, so only `subtle` and `secondary` are spelled like the token they use.
 `secondary` is the rank that already carries the compliant surface named above.
-`--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
+`--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`, and on `--fab-surface-raised` over `--fab-bg-1`.
+On `--fab-danger-soft` over `--fab-bg-2` it falls short in four palettes, at 4.32:1 in `fabricate`, 4.40:1 in `hearth-herb`, 4.45:1 in `starglass-arcana` and 4.30:1 in `foundry-native`, and `--fab-text-secondary` clears 4.5:1 on that fill over all four grounds (issue 2841).
+So a published component's text on its own danger fill MUST NOT ink `--fab-text-muted`, except the `Callout` body and the `Notice` detail, which their specimens keep muted and whose shortfall there is that one: a recorded exception that issue #2876 owns.
+`text-muted-ground-contrast` ledgers every fill naming `--fab-danger-soft` in a published component's own scoped block with the inks drawn on it, and classifies every rule inking `--fab-text-muted` in a ledgered file, or in a component it imports, as a pinned body, a part a ledgered rule re-inks on the fill, or a part off the fill; it does not see content a companion draws in a slot.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
 A component's small text MUST take the first of `--fab-text-muted` and `--fab-text-secondary` that clears 4.5:1 on every flattened ground it is drawn on, in all seven themes (issue 2257 D13).
+The `Callout` body and the `Notice` detail on the danger fill over `--fab-bg-2` are a recorded exception to that rule, until issue #2876 resolves them.
 `EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
 `tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
@@ -836,8 +840,13 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 #### Scenario: A palette edit drops the muted ink under its floor
 
-- **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its five named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
+- **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its seven named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
 - **THEN** `text-muted-ground-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A published component inks muted text on its danger fill
+
+- **WHEN** a published component's scoped block paints a fill naming `--fab-danger-soft` on a selector the ledger does not name, inks a ledgered part `--fab-text-muted` outside the two pinned bodies, or, in a ledgered file or a component it imports, inks a rule `--fab-text-muted` the ledger does not classify
+- **THEN** `text-muted-ground-contrast` fails and names the selector
 
 #### Scenario: A palette edit drops the switch's off knob under its floor
 
@@ -1025,6 +1034,7 @@ The 8px and 9px rungs are read from that companion's measured scales; a new rung
 `StatBox` MUST take a `layout` that is `'default'` or `'start'`, defaulting to `'default'`, the centred serif figure over its label that every in-app caller draws.
 `'start'` draws the label first and the figure beneath it, both start-aligned, with the figure in the monospace face at 14px and weight 500, the heaviest weight the shipped mono face has; any other value draws `'default'`.
 `StatBox` MUST take an optional `note`, text, drawn after the figure and label in either layout at 10px, wrapping at the box's width and never clipped, in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
+In the `danger` tone the label MUST ink `--fab-text-secondary` in place of the `Kicker`'s muted ink, which falls under 4.5:1 on the danger fill over `--fab-bg-2` (issue 2841).
 The DOM order MUST be the visual order: figure then label at `'default'`, label then figure at `'start'`, and the note last in both.
 The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
 Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
@@ -1050,6 +1060,7 @@ No in-app caller passes `layout` or `note`: the axis exists for the published `S
 
 - **WHEN** a note is drawn in the `danger` tone on any page ground
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
+- **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
 
 ### Requirement: Field-sized empty states match their associated controls
 

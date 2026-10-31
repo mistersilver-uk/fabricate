@@ -2242,7 +2242,7 @@ In a histogram the bars are hidden from assistive technology and each row is rea
 `layout` is `default` or `start`, a string, and defaults to `default`: `default` draws the centred serif figure over its label, and `start` draws the label over a start-aligned monospace figure.
 Any other value draws `default`.
 `note` is optional text, final display text, drawn after the figure and label in either layout, wrapping at the box's width and never clipped; an empty `note` draws nothing.
-In the `danger` tone the note takes the danger ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2`.
+In the `danger` tone the note takes the danger ink and the label the secondary ink, because the muted ink falls under 4.5:1 on the danger fill over `--fab-bg-2` in four palettes; ink small text of your own on a danger fill `--fab-text-secondary` for the same reason.
 A Fabricate that predates `layout` or `note` refuses it with `"<key>" is not a data attribute`, and `describe('StatBox').props` shows whether the running one publishes it; adding either is additive, and the entry stays at `version` 1.
 The `tone` `success` is additive at `version` 1: a Fabricate that predates it draws the figure in the `default` ink, and refuses nothing.
 The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger`, `info` or `success` tone means.

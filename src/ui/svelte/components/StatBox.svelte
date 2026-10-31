@@ -9,7 +9,7 @@
   | `label` / `icon` | already-localized string / Font Awesome classes | `''` | The micro-label, rendered as a `Kicker`, and an optional leading glyph inside the value line. |
   | `layout` | `'default'` \| `'start'` | `'default'` | `default` is the centred serif figure over its label. `start` is the label over a start-aligned mono figure. A CLOSED set: any other value draws `default`. |
   | `note` | already-localized string | `''` | An optional line after the figure and label, in the muted ink, or the danger ink in the `danger` tone, whose fill leaves the muted ink under 4.5:1 on `--fab-bg-2`. Empty draws nothing. |
-  | `tone` | `'default'` \| `'info'` \| `'success'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. `success` has no in-app caller and serves the published seam (issue 2847). An unknown tone falls back to `default`. |
+  | `tone` | `'default'` \| `'info'` \| `'success'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph, and inks the label secondary, because the muted ink falls under 4.5:1 on that fill over `--fab-bg-2` (issue 2841). `success` has no in-app caller and serves the published seam (issue 2847). An unknown tone falls back to `default`. |
   | `valueDataAttr` / `labelDataAttr` | attribute names | `''` | Hooks on the value element and the label. Attribute-only, carrying no behaviour. |
 
   Reading order:
@@ -171,6 +171,10 @@
   .fab-stat-box.is-danger {
     border-color: var(--fab-danger-border);
     background: var(--fab-danger-soft);
+  }
+
+  .fab-stat-box.is-danger > :global(.fab-kicker) {
+    color: var(--fab-text-secondary);
   }
 
   .fab-stat-box.is-danger .fab-stat-box-value,
