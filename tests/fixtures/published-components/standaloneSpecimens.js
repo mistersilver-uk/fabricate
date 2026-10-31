@@ -521,6 +521,8 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'segmented-compact': chosenSegment({ density: 'compact' }),
     'segmented-field': chosenSegment({ density: 'field' }),
     'segmented-inline': chosenSegment({ density: 'inline' }),
+    'segmented-panel': chosenSegment({ density: 'compact', surface: 'panel' }),
+    'segmented-sized': chosenSegment({ density: 'compact', size: 34, tone: 'info' }),
     'segmented-accent': chosenSegment({ tone: 'accent' }),
     'segmented-accent-soft': chosenSegment({ tone: 'accent-soft' }),
     'segmented-info': chosenSegment({ tone: 'info' }),

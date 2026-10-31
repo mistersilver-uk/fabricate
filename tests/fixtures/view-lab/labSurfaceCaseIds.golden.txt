@@ -65,6 +65,8 @@ manager-published-button-forms-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
 manager-published-segmented-specimen
+manager-published-segmented-forms-specimen
+manager-published-chip-forms-specimen
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen

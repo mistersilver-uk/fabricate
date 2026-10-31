@@ -403,7 +403,10 @@ const JS_ARIA_READERS = Object.freeze({
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
 });
 
-/** The classes `tone`, `density`, `emphasis`, `mono`, `struck` and `truncate` can write beside the root class, private values included. */
+/**
+ * The classes `tone`, `density`, `emphasis`, `mono`, `struck`, `truncate` and the icon-only form
+ * `ariaLabel` draws (issue 2858) can write beside the root class, private values included.
+ */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
   'is-warning',
@@ -428,9 +431,11 @@ const PUBLISHED_CHIP_CLASSES = new Set([
   'is-lit',
   'is-bare',
   'is-solid',
+  'is-dashed',
   'is-mono',
   'is-struck',
   'is-truncated',
+  'is-icon-only',
 ]);
 /** The manager layout classes a sheet rule reaches a chip under; no extension target sits in one. */
 const CHIP_LAYOUT_ANCESTORS = new Set([
@@ -3280,7 +3285,17 @@ describe('the module sheet against the published Chip', () => {
     assert.equal(selectors.length, 15, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
-      ['tone', 'density', 'emphasis', 'icon', 'mono', 'struck', 'truncate', 'children'],
+      [
+        'tone',
+        'density',
+        'emphasis',
+        'icon',
+        'mono',
+        'struck',
+        'truncate',
+        'children',
+        'ariaLabel',
+      ],
       'a published key that draws a classed child reopens cannotMatchPublished'
     );
   });

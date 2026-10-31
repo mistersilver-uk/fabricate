@@ -95,7 +95,12 @@ describe('the published SearchField density', () => {
   }
 
   it('withholds only values of a published data key', () => {
-    assert.deepEqual(WITHHELD_VALUES, ['SearchField.density.compact']);
+    assert.deepEqual(WITHHELD_VALUES, [
+      'SearchField.density.compact',
+      ...['active', 'disabled', 'negative', 'muted', 'tag', 'secondary', 'subtle'].map(
+        (tone) => `Chip.tone.${tone}`
+      ),
+    ]);
     for (const withheld of WITHHELD_VALUES) {
       const [name, key] = withheld.split('.');
       const entry = PUBLISHED_COMPONENT_MANIFEST.find((candidate) => candidate.name === name);

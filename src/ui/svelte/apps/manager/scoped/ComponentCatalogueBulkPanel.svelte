@@ -668,7 +668,7 @@
           data-world-component-bulk-tag-chip={tag}
           data-world-component-bulk-tag-state={stagedTags[tag] || 'unchanged'}
           aria-pressed={Boolean(stagedTags[tag])}
-          aria-label={tagAria(tag)}
+          ariaLabel={tagAria(tag)}
           onclick={() => cycleTag(tag)}>{tag}</Chip
         >
       {/each}
@@ -712,13 +712,9 @@
             icon={essence?.icon ?? ''}
             data-world-component-bulk-essence-chip={id}
             data-world-component-bulk-essence-chip-state={value > 0 ? 'set' : 'strip'}
-            aria-label={phrase(
-              'FABRICATE.Admin.Manager.BulkEdit.EssenceUnstage',
-              'Unstage {name}',
-              {
-                name: essence?.name ?? id,
-              }
-            )}
+            ariaLabel={phrase('FABRICATE.Admin.Manager.BulkEdit.EssenceUnstage', 'Unstage {name}', {
+              name: essence?.name ?? id,
+            })}
             disabled={inert}
             onclick={() => stageEssence(id, null)}
             >{essence?.name ?? id}

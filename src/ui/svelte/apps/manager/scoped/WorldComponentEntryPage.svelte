@@ -799,7 +799,7 @@
                         emphasis={worldTags.includes(tag) ? 'lit' : ''}
                         data-scoped-entry-tag={tag}
                         aria-pressed={worldTags.includes(tag)}
-                        aria-label={phrase(
+                        ariaLabel={phrase(
                           worldTags.includes(tag)
                             ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.TagClear'
                             : 'FABRICATE.Admin.Manager.Scoped.Component.Entry.TagApply',
@@ -831,7 +831,7 @@
                           'Remove the world tag {tag} (not in the world vocabulary)',
                           { tag }
                         )}
-                        aria-label={phrase(
+                        ariaLabel={phrase(
                           'FABRICATE.Admin.Manager.Scoped.Component.Entry.TagClearUnauthored',
                           'Remove the world tag {tag} (not in the world vocabulary)',
                           { tag }

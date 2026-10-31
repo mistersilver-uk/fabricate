@@ -370,7 +370,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; issue #2850 publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; issue #2851 publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; issue #2848 publishes `Field`'s `size`, `face`, `type` and `invalid`; issue #2849 publishes `SearchField`'s `density` and `countLabel`; issue #2853 publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; issue #2852 publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; issue #2854 publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; issue #2855 publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`.
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2775 publishes `ToggleCard` and `StatusToggle`'s `semantics`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`, which completes the widening that is part of phase 2 (issue #2427); issue #2774 publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; issue #2850 publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; issue #2851 publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; issue #2848 publishes `Field`'s `size`, `face`, `type` and `invalid`; issue #2849 publishes `SearchField`'s `density` and `countLabel`; issue #2853 publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; issue #2852 publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; issue #2854 publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; issue #2855 publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; issue #2856 publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; issue #2858 publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis.
 
 ### The descriptor
 
@@ -412,10 +412,12 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, contains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, waivedBy?, contains?, itemContains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
+`waivedBy` lists other `data` keys of the same entry, none `required`, on a `required` `text` or `data` key, which may then be absent or `''` while every key it lists holds a non-blank string (M9, issue 2858), as `Chip`'s `children` lists `icon` and `ariaLabel`; `describe` does not state it and still reports the key `required`, and giving an existing key `waivedBy` is a widening.
 `contains` names a `text` key of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22, issue 2852); `describe` does not state it, and giving an existing key `contains` is a narrowing.
+`itemContains` pairs member names of a `data` key's array items as `{ <member>: <other member> }`, each item's non-blank string `<member>` having to contain the words of its `<other member>`, a string or a number held as its digits, as one whole run (M22, issue 2856), as `SegmentedControl`'s `options` pairs `ariaLabel` with `label`; `describe` does not state it, and giving an existing key `itemContains` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 `tooltip` is `true` on an entry whose `restOn` is `'control'` where Fabricate writes a Foundry tooltip attribute on that control in every mount, and is otherwise absent; it reserves `data-locked` beside the names `restOn` reserves, and `describe` does not state it.
@@ -906,19 +908,31 @@ Each group states the accepted values of every key that entry publishes.
     `accent` is colour alone and says nothing.
   - It clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or a light fill over `--fab-bg-2`, so the companion draws it on those four grounds.
 - **`Chip`.**
-  - `children` is required and is the chip's label, final display text.
+  - `children` is required and is the chip's label, final display text, except in the icon-only chip `ariaLabel` describes.
   - `tone` is `positive`, `warning`, `danger`, `info`, `neutral` or `accent`; absent, the chip is drawn in the default ink.
     This is `InfoStrip`'s badge set.
+    The seam withholds every other tone the component draws, `muted` and `subtle` among them, so such a `tone` draws as none, as an unknown value does; a Fabricate that predates this draws them as its private tones.
     `neutral` is the recessive tone and clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface` only.
   - `density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
     At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: the companion keeps a `list` label short or sets `truncate`.
     At `default` a long label wraps inside the chip.
-  - `emphasis` is `outlined`, `bare` or `solid`; absent, the chip is drawn in its tone's own fill.
-    It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, and `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one.
+  - `emphasis` is `outlined`, `bare`, `solid` or `dashed`; absent, the chip is drawn in its tone's own fill.
+    It is a second axis beside `tone`: `outlined` keeps the tone's edge and ink on `--fab-bg-1`, `bare` draws no edge and a smaller glyph, `solid` draws an opaque ground for a chip read over artwork, in the tone's colour where the tone has one, and `dashed` dashes the tone's edge, for a locked or provisional chip.
+    `dashed` is drawn and never announced, and the edge stays dashed under forced colors, so the label or `ariaLabel` says the state, as a lock glyph beside `Locked until the harvest` does.
+    On the default tone the dashed edge is `--fab-border`, 1.46 to 1.78:1 against the four grounds across the palettes, so it is decoration; and `struck` dashes the edge too, so an icon-only `struck` chip and an icon-only `dashed` one look alike.
     The figures stated for `neutral` hold for a chip with no `emphasis`; the companion measures the combination it draws.
     What the chip draws for a value outside the set is private; today that is the default chip.
   - `icon` is optional Font Awesome classes for a leading glyph, hidden from assistive technology; absent, no glyph is drawn.
     The glyph is never the chip's name, so a chip whose meaning rests on it carries that meaning in its label.
+  - `ariaLabel` is optional final display text, the chip's accessible name; a blank string or any other value draws no name.
+    Beside a label the label is hidden from assistive technology and `ariaLabel` is drawn beside it as visually hidden text, so the chip keeps no role and a reader hears the name once, as inline text, with no image role; so a companion never puts a control or other interactive content in a named chip's label.
+    The name must contain the label's words as one run of whole words, as `Button`'s `ariaLabel` must, and a `mount` or `update` whose non-blank `ariaLabel` does not contain `children` is refused with `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")` (M22); the companion uses it for a short label whose meaning needs more words, as `3` named `3 days waiting`.
+    With `icon` and `ariaLabel` both non-blank, `children` may be absent, `''` or white space alone, which draws the icon-only chip: the glyph alone on a square, 20px at `default` and 15px at `list`, `role="img"` under `ariaLabel` with the glyph hidden from assistive technology, and `ariaLabel` written as its `data-tooltip-text`, which Foundry shows on pointer hover only; a rest `data-tooltip-text` the companion passes replaces that.
+    An empty `children` with neither key is M9, `Chip requires a non-empty "children"`, as before, and with one of them is M9's waiver fault, `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys draws as before.
+    The icon-only chip is no control: it takes no focus and offers no target, so the 24px pointer-target floor (WCAG 2.2 success criterion 2.5.8) does not apply, and its tooltip opens on pointer hover only, so a keyboard or touch user never sees it: the companion states the state in visible text in the row or detail the chip sits in, never in the glyph and its tooltip alone.
+    Its glyph clears 3:1 against its fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` under every published `tone` and none, in every palette, with no `emphasis`, `dashed` or `bare`, which share that paint, and on the `outlined` and `solid` grounds; its tone is colour alone, drawn alike under forced colors: the companion passes a glyph that differs for each state, as a check, a cross and a question mark, and says the state in `ariaLabel`.
+    In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored; Playwright's accessibility snapshot reads them as `img "<name>"` and as the name's text; no screen reader was tested.
+    `describe('Chip').props.children` stays `{ kind: 'text', required: true }`, and a `describe` that names `ariaLabel` is from a Fabricate that draws the icon-only chip and `dashed`: one that predates them refuses `ariaLabel` (M13) and an empty `children` (M9), and draws `dashed` as the default chip, so a companion reads `describe('Chip').props.ariaLabel` before it passes any of them; adding them is additive, and the entry stays at `version` 1.
   - `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
   - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
     It is drawn and never announced, so the label says the state.
@@ -927,7 +941,7 @@ Each group states the accepted values of every key that entry publishes.
     A reader who needs the clipped text passes the full label as `data-tooltip-text`, which opens on pointer hover only, so it never carries what the label does not.
     The chip ends at the width `target` has, so a `target` that is a flex item of the companion's row needs `min-width: 0` and a `flex-shrink` above 0, or the row overflows instead of the label ending in an ellipsis.
   - Fabricate coerces none of `mono`, `struck` and `truncate` to a boolean, so only `true` and `false` are in the contract: the string `'false'` draws the class.
-  - It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
+  - It is a statement, never a control: it takes no focus, and but for the icon-only chip it has no role and its label, or its `ariaLabel` in the label's place, is read as inline text.
     `tone` is colour alone, so the label says the state.
     A label changed through `update` is not announced; a live region is the companion's.
 - **`Rail`.**
@@ -1612,9 +1626,15 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`SegmentedControl`.**
   - It is the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
-  - `options` is required and is an array of `{ value, label, title, icon, variant, disabled }` items.
+  - `options` is required and is an array of `{ value, label, ariaLabel, title, icon, variant, disabled }` items.
     `value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
     `label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so the companion never passes one.
+    `ariaLabel` is optional final display text, the option's accessible name in place of `label`, for state the segment shows by its look alone, such as who chose it; the radio states its own checked state, so the companion leaves that out.
+    Fabricate writes a non-blank string as the radio's `aria-label`, and writes none for a blank string or any other value, so `label` names the radio.
+    It must contain `label`'s words as one run of whole words, as `Button`'s `ariaLabel` must contain its label, so a speech-input user who says the words they see reaches the option (WCAG 2.2 success criterion 2.5.3); a numeric `label` is held as its digits.
+    A `mount` or `update` holding an option whose non-blank `ariaLabel` does not contain it is refused with `"options[<index>].ariaLabel" must contain the text of "options[<index>].label" ("<label>" is not in "<name>")` (M22), naming the first such option, and an `update` leaves the earlier props drawn.
+    The companion builds it by inserting the label string itself, as `format('{label}, chosen by {name}', { label, name })` with a format of its own, and puts the label first where the language allows.
+    Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
     `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
     It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
     It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
@@ -1623,6 +1643,7 @@ Each group states the accepted values of every key that entry publishes.
     `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
     An item's other members are private, and a companion passes none; a function in one is M10.
+    Among them `count` and `badge` draw a tally beside the label that an `ariaLabel`, as the radio's name, leaves out; publishing either later holds `ariaLabel` to containing it too, or adds it to the name.
   - `value` is the `value` of the selected option and defaults to `''`.
     It is compared with `===`, so `'10'` selects no option whose `value` is `10`, and a `value` that names no option leaves no segment selected.
   - `onChange` is a required callback, called with one argument, the `value` of the option a press or a key reaches; a press on the selected segment calls nothing, because a checked radio fires no `change`.
@@ -1637,11 +1658,15 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
     An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
   - `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
+  - `surface` is `'default'` or `'panel'` and defaults to `'default'`: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, under every `density`, `tone` and `size`, and changes no segment, height or ring; the `'pill'` shape draws no track fill, so `'panel'` draws nothing there; any other value, `'Panel'`, `true` and `'false'` among them, draws the default track.
+  - `size` is `34` or `'34'`, a number or its string, and defaults to none: `34` draws the track 34px tall, its border included, and stretches each segment to fill it inside the density's padding, so the control lines up with a 34px `Field` or `Button` beside it; any other value, `35` and `'34px'` among them, draws the density's own height.
+    Without `size` the `'inline'` density draws a 30px track and `'compact'` and `'field'` a 36px one, and the `'default'` density's height follows the type size and is private; the `'pill'` shape drops the track's padding, so it draws `'inline'` at 26px and `'compact'` and `'field'` at 28px, and `size: 34` still draws 34px there.
   - Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
     A Fabricate that predates them draws a `'compact'` or `'field'` `density` as it does now, without having promised it, and ignores a `title`, and `describe` names the same props before and after, so a companion that relies on either requires the Fabricate release that publishes them.
   - Naming `tone`, `shape` and an option's `variant` is additive, and `SegmentedControl`'s `version` stays 1: before them `tone` and `shape` were refused as rest keys (M13) and `variant` was private.
     A Fabricate that predates them refuses `tone` and `shape`, and `describe` names them only once the running Fabricate publishes them, so a companion that passes either reads `describe('SegmentedControl')` first.
     A `describe` that names `tone` is from a Fabricate that keeps a `variant`'s tint in an accent track.
+  - Naming `surface`, `size` and an option's `ariaLabel` is additive, and `SegmentedControl`'s `version` stays 1: a Fabricate that predates them refuses `surface` and `size` as rest keys (M13), and names each radio by its `label` whatever its option's `ariaLabel`, so a companion that passes any of the three reads `describe('SegmentedControl').props.surface` first.
   - The radios share one name Fabricate makes unique to the mount, so two controls never uncheck each other.
   - Fabricate handles and stops no key: the platform moves focus and the check to the next or previous enabled radio on the arrow keys, wrapping, and Space checks the focused radio, each check calling `onChange`.
     Focus moves only among one control's radios and never out of `target`.
@@ -1660,7 +1685,10 @@ Each group states the accepted values of every key that entry publishes.
     With `tone` `'accent'` or `'info'` the ring is not guaranteed against the solid fill of a neighbouring selected segment, which it falls short of in every palette.
     On a `'compact'` or `'field'` track the ring reaches the track's inner edge and no further, so it is drawn over the track's `--fab-bg-1` fill alone.
     The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
-- **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member, `variant`, `density`, `tone` or `shape` value, and how Fabricate draws a segmented control in its own rows, pager and editors.
+    On the `'panel'` track the idle ink, at rest and under the pointer, and the selected segment's ink on its fill, under no `tone` and each published `tone` and `variant`, clear 4.5:1 in every palette, and the ring clears 3:1 on the track; the track is opaque, so this holds on any of the four grounds, but on `--fab-bg-0` it draws no step below its ground, so the companion mounts it on one of the other three.
+    The selected segment's edge, drawn over its own fill, measures 2.09 to 2.86:1 against the `'panel'` track, its fill 1.23 to 1.38:1, and its `--fab-text` ink 1.89 to 2.79:1 against the idle segments' `--fab-text-muted`, across the seven palettes.
+    Under forced colors the segments' edges, fills and inks are all system colours, so weight alone (600 against 500) carries the selected state, as on the default track; a forced-colors selected treatment is a follow-up (issue #2872).
+- **Private:** `SegmentedControl`'s track and segment figures beyond the heights its group states, each rung's type size, its colours beyond what its group states, what it draws for a private option member, `variant`, `density`, `tone` or `shape` value, and how Fabricate draws a segmented control in its own rows, pager and editors.
 
 ### The issue 2646 components
 
@@ -2025,7 +2053,7 @@ The _publishable subset_ is the candidates that pass the static rules below.
 The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
 A _stripped member_ is a per-item member of a published `data` key that `STRIPPED_ITEM_MEMBERS` in `src/ui/publishedComponentProps.js` names.
 An _allowed member_ is a per-item member of a published `data` key that `ALLOWED_ITEM_MEMBERS` in the same file names, and the seam passes only those.
-A _withheld value_ is a value of a published `data` key that `WITHHELD_VALUES` in the same file names, as `<Entry>.<key>.<value>`: its component draws it for Fabricate's own callers alone, and the seam passes `undefined` in its place, so the key draws its default (issue 2849).
+A _withheld value_ is a value of a published `data` key that `WITHHELD_VALUES` in the same file names, as `<Entry>.<key>.<value>`: its component draws it for Fabricate's own callers alone, and the seam passes `undefined` in its place, so the key draws its default (issue 2849), as `Chip`'s tones beyond its group's six are (issue 2858).
 
 - **A candidate is publishable when it passes every static rule.**
   - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
@@ -2121,7 +2149,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent, or `''` where the key is not a `callback`; or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy; with several, the first key in manifest order | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy` |
+| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string; or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy; with several, the first key in manifest order; where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
@@ -2134,7 +2162,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M19 | The entry is lazy and its code is not loaded: `load` never requested it, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
 | M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
 | M21 | `mountMany`'s `items` is not an array, by `Array.isArray`; checked after M3 and M19, and before any item | `items must be an array` |
-| M22 | A `data` key stating `contains` holds a non-blank string that does not contain the words and symbols of the `text` key it names as one run of whole words, compared after NFKC normalisation and case folding with punctuation and spacing dropped (`Button`'s `ariaLabel` and `children`); checked after M9 | `"<key>" must contain the text of "<other>" ("<text>" is not in "<name>")` |
+| M22 | A `data` key stating `contains` holds a non-blank string that does not contain the words and symbols of the `text` key it names as one run of whole words, compared after NFKC normalisation and case folding with punctuation and spacing dropped (`Button`'s `ariaLabel` and `children`), or an item of a `data` key stating `itemContains` holds such a member that does not contain its paired member (`SegmentedControl`'s option `ariaLabel` and `label`), `<key>` and `<other>` then naming the item as `options[<index>].ariaLabel` and `options[<index>].label`, the first such item first; checked after M9 | `"<key>" must contain the text of "<other>" ("<text>" is not in "<name>")` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
@@ -2221,6 +2249,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Meter` with `label: 'Pooled days'`, `value: 7`, `max: 12`, `valueText: '7 of 12 days: yours 3, others 4'` and `segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }]`
 - **THEN** the fill spans 58% of the track as an accent segment of 3 and a neutral segment of 4, with no gap between them
 - **AND** `aria-valuenow` is `7`, `aria-valuetext` is the companion's text, and the segments add nothing to what is announced
+
+#### Scenario: A published icon-only chip
+
+- **WHEN** a companion mounts `Chip` with `icon: 'fas fa-hourglass-half'`, `ariaLabel: 'Waiting on your roll'`, `tone: 'warning'` and no `children`
+- **THEN** the chip draws the glyph alone on a 20px square, hidden from assistive technology, as `role="img"` named "Waiting on your roll", with that name as its `data-tooltip-text`, and takes no focus
+- **AND** a mount that drops `ariaLabel` throws M9 naming `ariaLabel`, one that passes `children: '3'` beside an `ariaLabel` without "3" throws M22, and one that passes `emphasis: 'dashed'` dashes the chip's edge
 
 #### Scenario: Text content
 
@@ -2412,6 +2446,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
 - **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and not as its radio's name
+- **AND** a mount that passes `surface: 'panel'` fills the track with `--fab-bg-0`, one that passes `size: 34` draws a 34px track, and an option whose `ariaLabel` contains its `label` names its radio, while one whose `ariaLabel` does not throws M22
 - **AND** a mount that passes `groupName` throws M13
 - **AND** a mount that omits `ariaLabel` throws M9
 

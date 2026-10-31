@@ -118,7 +118,7 @@
     title={hasDuration
       ? `${triggerLabel} — ${text('FABRICATE.Admin.Manager.Recipe.DurationClearHint', 'Right-click to clear')}`
       : triggerLabel}
-    aria-label={triggerLabel}
+    ariaLabel={triggerLabel}
     onclick={toggle}
     oncontextmenu={clearDuration}
   >

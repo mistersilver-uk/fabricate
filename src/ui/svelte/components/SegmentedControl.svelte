@@ -5,10 +5,12 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `options` | `[{ value, label, title?, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `title` is a plain-text hint, already localized, drawn as the segment's Foundry tooltip (`data-tooltip-text`) under the pointer only and never as the radio's accessible name, which stays the label. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
+  | `options` | `[{ value, label, ariaLabel?, title?, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. A non-blank `ariaLabel` replaces the label as the radio's accessible name, and the published seam holds it to containing the label. `title` is a plain-text hint, already localized, drawn as the segment's Foundry tooltip (`data-tooltip-text`) under the pointer only and never as the radio's accessible name, which stays the label. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (empty falls back to a name unique to the mount) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'`/`'info'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart; `info` is the solid fill of the info family, as `accent` is of the accent one. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
+  | `surface` | `'default'` \| `'panel'` | `'default'` | the ground the track is inset into: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, on every density; the `pill` shape and the `tag` tone draw no track fill, so it draws nothing there. |
+  | `size` | `34` \| `'34'` | `''` | the track's height rung, as a number or its string: `34` pins the track at 34px, its segments filling it inside the density's padding; any other value, and the `tag` tone, keep the density's own height (issue 2856). |
 
   Callbacks:
   - `onChange(value)` — the chosen option's `value`. When it returns, or throws, each radio is
@@ -33,6 +35,8 @@
     // `inline` (30px) and `field` (34px) lift it to those rungs for a row of taller siblings.
     tone = '',
     shape = '',
+    surface = 'default',
+    size = '',
     class: extraClass = '',
     ...rest
   } = $props();
@@ -57,7 +61,14 @@
     }
   }
 
-  const hintOf = ({ title }) => (typeof title === 'string' && title.trim() ? title : undefined);
+  // Keyed by the rung's string, so `34` and `'34'` both draw it, as `Field`'s `size` does.
+  const SIZE_CLASSES = Object.freeze({ 34: ' is-size-34' });
+  const sizeClass = $derived(
+    ['number', 'string'].includes(typeof size) && Object.hasOwn(SIZE_CLASSES, String(size))
+      ? SIZE_CLASSES[size]
+      : ''
+  );
+  const textOf = (value) => (typeof value === 'string' && value.trim() ? value : undefined);
 
   // Class list for one segment; the variant tint applies to the ACTIVE segment only.
   function segmentClass(option) {
@@ -68,14 +79,14 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${density === 'inline' ? ' is-inline' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${tone === 'info' ? ' is-info' : ''}${shape === 'pill' ? ' is-pill' : ''}${extraClasses}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${density === 'inline' ? ' is-inline' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${tone === 'info' ? ' is-info' : ''}${shape === 'pill' ? ' is-pill' : ''}${surface === 'panel' ? ' is-panel' : ''}${sizeClass}${extraClasses}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...rest}
   bind:this={track}
 >
   {#each options as option, i (option.value)}
-    {@const hint = hintOf(option)}
+    {@const hint = textOf(option.title)}
     <!-- A native `title` only in icon-only and without a hint; a hint is `data-tooltip-text`. -->
     <label
       class={segmentClass(option)}
@@ -89,6 +100,7 @@
         name={groupName || `fabricate-segmented-${uid}`}
         value={option.value}
         checked={option.value === value}
+        aria-label={textOf(option.ariaLabel)}
         disabled={option.disabled === true}
         data-validation-target={option.validationTarget || undefined}
         onchange={() => select(option.value)}
@@ -129,9 +141,11 @@
     flex: 1 1 0;
   }
 
-  /* COMPACT density, declared BEFORE `.is-active` so the active tile's weight still wins at equal
-     specificity. */
-  .manager-segmented.is-compact {
+  /* COMPACT and FIELD densities, declared BEFORE `.is-active` so the active tile's weight still wins
+     at equal specificity. FIELD is a third density rather than a rule written from the Difficulty
+     card, because those four properties are the primitive's to state. */
+  .manager-segmented.is-compact,
+  .manager-segmented.is-field {
     gap: var(--fab-space-1);
     padding: var(--fab-space-1);
     border-radius: 9px;
@@ -146,21 +160,6 @@
     font-size: 10.5px;
   }
 
-  /* `:not(.is-active)` is load-bearing: (0,3,0) against `.is-active`'s (0,2,0). */
-  .manager-segmented.is-compact .manager-segment:not(.is-active) {
-    color: var(--fab-text-muted);
-    font-weight: 500;
-  }
-
-  /* FIELD density: a third density rather than a rule written from the Difficulty card, because
-     those four properties are the primitive's to state. */
-  .manager-segmented.is-field {
-    gap: var(--fab-space-1);
-    padding: var(--fab-space-1);
-    border-radius: 9px;
-    background: var(--fab-bg-1);
-  }
-
   .manager-segmented.is-field .manager-segment {
     flex: 1 1 0;
     height: 26px;
@@ -169,8 +168,10 @@
     font-size: 10.5px;
   }
 
-  /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
-  .manager-segmented.is-field .manager-segment:not(.is-active) {
+  /* `:not(.is-active)` is load-bearing: (0,3,0) against `.is-active`'s (0,2,0). */
+  .manager-segmented.is-compact .manager-segment:not(.is-active),
+  .manager-segmented.is-field .manager-segment:not(.is-active),
+  .manager-segmented.is-inline .manager-segment:not(.is-active) {
     color: var(--fab-text-muted);
     font-weight: 500;
   }
@@ -195,12 +196,6 @@
     padding: 0 var(--fab-space-2);
     border-radius: 6px;
     font-size: 10px;
-  }
-
-  /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
-  .manager-segmented.is-inline .manager-segment:not(.is-active) {
-    color: var(--fab-text-muted);
-    font-weight: 500;
   }
 
   /* TAG tone. `overflow: hidden` is why no segment restates a corner radius and why the track
@@ -290,7 +285,9 @@
 
   /* The label is CLIPPED, never removed: the `<label>` IS the radio's accessible name. It restates
      `.visually-hidden` because a scoped block cannot see a global class, and stamping that class
-     into the markup would fire it for labelled consumers too. */
+     into the markup would fire it for labelled consumers too. The radio is hidden the same way
+     and stays focusable: the label segment is the visible control, the radio the keyboard's. */
+  .manager-segment-input,
   .manager-segmented.is-icon-only .manager-segment-label {
     position: absolute;
     width: 1px;
@@ -321,6 +318,22 @@
   /* Every segment at 600: a pill run says which is chosen with the pill's own face, not weight. */
   .manager-segmented.is-pill .manager-segment:not(.is-active) {
     font-weight: 600;
+  }
+
+  /* PANEL surface, one step below a `--fab-bg-1` panel; (0,3,0) clears every density's fill. */
+  .manager-segmented.is-panel:not(.is-pill, .is-tag) {
+    background: var(--fab-bg-0);
+  }
+
+  /* The 34px rung owns the track's height, as the tag tone's do; (0,3,0) clears each density's. */
+  .manager-segmented.is-size-34:not(.is-tag) {
+    box-sizing: border-box;
+    height: 34px;
+  }
+
+  .manager-segmented.is-size-34:not(.is-tag) .manager-segment {
+    height: auto;
+    align-self: stretch;
   }
 
   /* ACCENT tone: colour only, written after the `is-compact` block it composes with. */
@@ -475,20 +488,6 @@
   .manager-segment.is-disabled {
     opacity: 0.5;
     cursor: default;
-  }
-
-  /* Visually hidden but focusable: the label segment is the visible control, the radio stays in
-     the a11y and keyboard tree. */
-  .manager-segment-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
   }
 
   /* `:has(:focus-visible)`, not `:focus-within`, so a mouse click does not leave a persistent

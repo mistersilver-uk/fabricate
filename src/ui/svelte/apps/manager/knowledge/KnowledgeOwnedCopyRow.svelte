@@ -166,7 +166,7 @@
               icon="fas fa-triangle-exclamation"
               data-knowledge-match-tier={copy.matchTier}
               title={duplicateMatchHint()}
-              aria-label={duplicateMatchHint()}
+              ariaLabel={duplicateMatchHint()}
             >
               <span>{matchTierLabel(copy.matchTier)}</span>
             </Chip>

@@ -610,7 +610,7 @@
           icon={TAG_ICONS[tagState(tag)]}
           data-component-bulk-tag-chip={tag}
           data-component-bulk-tag-chip-state={tagState(tag)}
-          aria-label={tagActionLabel(tag)}
+          ariaLabel={tagActionLabel(tag)}
           disabled={inert}
           onclick={() => cycleTag(tag)}>{tag}</Chip
         >
@@ -684,7 +684,7 @@
           type="button"
           tone={essencesStaged ? 'warning' : 'neutral'}
           data-component-bulk-essences-staged={essencesStaged}
-          aria-label={essencesStaged
+          ariaLabel={essencesStaged
             ? text(
                 `${KEY}.EssencesStagedChipAction`,
                 'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.'
@@ -770,7 +770,7 @@
           type="button"
           tone={difficultyStaged ? 'warning' : 'neutral'}
           data-component-bulk-difficulty-staged={difficultyStaged}
-          aria-label={difficultyStaged
+          ariaLabel={difficultyStaged
             ? text(
                 `${KEY}.ProgressiveDcStagedChipAction`,
                 'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.'

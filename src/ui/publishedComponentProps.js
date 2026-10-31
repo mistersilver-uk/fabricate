@@ -180,9 +180,14 @@ export function onlyMembers(value, allowed) {
 /**
  * The values the seam withholds from a published `data` key, each as `<Entry>.<key>.<value>`: the
  * component draws them for Fabricate's own callers alone, so the seam passes `undefined` in their
- * place and the key draws its default (issue 2849).
+ * place and the key draws its default (issue 2849); `Chip`'s unpublished tones too (issue 2858).
  */
-export const WITHHELD_VALUES = Object.freeze(['SearchField.density.compact']);
+export const WITHHELD_VALUES = Object.freeze([
+  'SearchField.density.compact',
+  ...['active', 'disabled', 'negative', 'muted', 'tag', 'secondary', 'subtle'].map(
+    (tone) => `Chip.tone.${tone}`
+  ),
+]);
 const WITHHELD = new Set(WITHHELD_VALUES);
 
 /**
@@ -228,14 +233,41 @@ function kindOf(entry, key) {
   return Object.hasOwn(changeKeys(entry), key) ? 'callback' : null;
 }
 
+const isNonBlank = (value) => typeof value === 'string' && value.trim() !== '';
+
 /**
- * M9 over a validated copy, in manifest order: a `required` key absent or `''`, or a `requiredWhen`
- * one so while the data key it names is truthy (issue 2452).
+ * M9 for an empty `required` key, waived where it states `waivedBy` and each key that names holds
+ * a non-blank string (issue 2858); where only some do, the fault names the first that does not.
+ */
+function assertRequiredKey(entry, key, waivedBy, copy) {
+  const missing = (waivedBy ?? []).filter((name) => !isNonBlank(copy[name]));
+  if (waivedBy !== undefined && missing.length === 0) return;
+  if (waivedBy === undefined || missing.length === waivedBy.length) {
+    throw refuse(`${entry.name} requires a non-empty "${key}"`);
+  }
+  throw refuse(`${entry.name} requires a non-blank "${missing[0]}" when "${key}" is empty`);
+}
+
+/** Whether a `waivedBy` key holds a blank string beside every key it lists non-blank. */
+const isBlankWaived = ({ waivedBy }, value, copy) =>
+  waivedBy !== undefined &&
+  typeof value === 'string' &&
+  !isNonBlank(value) &&
+  waivedBy.every((name) => isNonBlank(copy[name]));
+
+/**
+ * M9 over a validated copy, in manifest order: a `required` key absent or `''`, unless waived, or
+ * a `requiredWhen` one so while the data key it names is truthy (issue 2452). A waived key holding
+ * a blank string is dropped from the copy, so the component draws its waived form (issue 2858).
  */
 function assertRequired(entry, copy) {
   for (const [key, spec] of Object.entries(entry.props)) {
+    if (isBlankWaived(spec, copy[key], copy)) copy[key] = undefined;
     if (copy[key] !== undefined && copy[key] !== '') continue;
-    if (spec.required === true) throw refuse(`${entry.name} requires a non-empty "${key}"`);
+    if (spec.required === true) {
+      assertRequiredKey(entry, key, spec.waivedBy, copy);
+      continue;
+    }
     const guard = spec.requiredWhen;
     if (guard !== undefined && copy[guard]) {
       throw refuse(`${entry.name} requires a non-empty "${key}" when "${guard}" is truthy`);
@@ -274,17 +306,35 @@ export function containsLabel(name, label) {
   );
 }
 
+/** M22's refusal of a non-blank string `name` that does not hold the string `text`. */
+function assertHolds(name, text, key, other) {
+  if (typeof name !== 'string' || typeof text !== 'string' || !name.trim()) return;
+  if (containsLabel(name, text)) return;
+  const tail = `(${JSON.stringify(text)} is not in ${JSON.stringify(name)})`;
+  throw refuse(`"${key}" must contain the text of "${other}" ${tail}`);
+}
+
+/** M22 over each item of `items`, an array: each member `pairs` names against its paired member. */
+function assertItemsHold(key, items, pairs) {
+  for (const [index, item] of items.entries()) {
+    for (const [member, other] of Object.entries(pairs)) {
+      const [name, shown] = [item?.[member], item?.[other]];
+      const label = typeof shown === 'number' ? String(shown) : shown;
+      assertHolds(name, label, `${key}[${index}].${member}`, `${key}[${index}].${other}`);
+    }
+  }
+}
+
 /**
  * M22 over a validated copy, after M9: a key stating `contains` whose non-blank string does not
- * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3).
+ * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3),
+ * and an array item's member an `itemContains` pairs with another of that item (issue 2856).
  */
 function assertContains(entry, copy) {
-  for (const [key, { contains }] of Object.entries(entry.props)) {
-    const [name, text] = [copy[key], copy[contains]];
-    if (contains === undefined || typeof name !== 'string' || typeof text !== 'string') continue;
-    if (name.trim() && !containsLabel(name, text)) {
-      const tail = `(${JSON.stringify(text)} is not in ${JSON.stringify(name)})`;
-      throw refuse(`"${key}" must contain the text of "${contains}" ${tail}`);
+  for (const [key, { contains, itemContains }] of Object.entries(entry.props)) {
+    if (contains !== undefined) assertHolds(copy[key], copy[contains], key, contains);
+    if (itemContains !== undefined && Array.isArray(copy[key])) {
+      assertItemsHold(key, copy[key], itemContains);
     }
   }
 }

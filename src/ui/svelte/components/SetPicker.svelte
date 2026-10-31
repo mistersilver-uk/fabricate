@@ -231,7 +231,7 @@
           data-set-picker-more=""
           aria-haspopup="dialog"
           aria-expanded={open}
-          aria-label={localizeOr('FABRICATE.Common.SetPicker.MoreName', 'and {count} more', {
+          ariaLabel={localizeOr('FABRICATE.Common.SetPicker.MoreName', 'and {count} more', {
             count: hiddenCount,
           })}
           onpointerdown={holdPanelOpen}
