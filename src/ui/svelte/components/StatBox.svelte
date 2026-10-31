@@ -9,7 +9,7 @@
   | `label` / `icon` | already-localized string / Font Awesome classes | `''` | The micro-label, rendered as a `Kicker`, and an optional leading glyph inside the value line. |
   | `layout` | `'default'` \| `'start'` | `'default'` | `default` is the centred serif figure over its label. `start` is the label over a start-aligned mono figure. A CLOSED set: any other value draws `default`. |
   | `note` | already-localized string | `''` | An optional line after the figure and label, in the muted ink, or the danger ink in the `danger` tone, whose fill leaves the muted ink under 4.5:1 on `--fab-bg-2`. Empty draws nothing. |
-  | `tone` | `'default'` \| `'info'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. An unknown tone falls back to `default`. |
+  | `tone` | `'default'` \| `'info'` \| `'success'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. `success` has no in-app caller and serves the published seam (issue 2847). An unknown tone falls back to `default`. |
   | `valueDataAttr` / `labelDataAttr` | attribute names | `''` | Hooks on the value element and the label. Attribute-only, carrying no behaviour. |
 
   Reading order:
@@ -55,7 +55,7 @@
     ...rest
   } = $props();
 
-  const TONES = new Set(['default', 'info', 'danger']);
+  const TONES = new Set(['default', 'info', 'success', 'danger']);
 
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'default');
   const labelFirst = $derived(layout === 'start');
@@ -79,6 +79,7 @@
 <div
   class="fab-stat-box"
   class:is-info={resolvedTone === 'info'}
+  class:is-success={resolvedTone === 'success'}
   class:is-danger={resolvedTone === 'danger'}
   class:is-start={labelFirst}
   data-stat-tone={resolvedTone}
@@ -161,6 +162,10 @@
 
   .fab-stat-box.is-info .fab-stat-box-value {
     color: var(--fab-info-text);
+  }
+
+  .fab-stat-box.is-success .fab-stat-box-value {
+    color: var(--fab-success-text);
   }
 
   .fab-stat-box.is-danger {

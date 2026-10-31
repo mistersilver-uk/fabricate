@@ -1,7 +1,8 @@
 /**
- * `Medallion`'s `tone: accent` and `ink: neutral`: what each paints, the precedence of `ink` over
- * `tone` over `tint` on the glyph, and a value outside the accepted set drawing byte-identical to
- * unset (ui-extension-points spec, "Medallion").
+ * `Medallion`'s `tone: accent` and `ink: neutral`, and the `warning` and `info` tones and inks
+ * (issue 2847): what each paints, the precedence of `ink` over `tone` over `tint` on the glyph,
+ * and a value outside the accepted set drawing byte-identical to unset (ui-extension-points spec,
+ * "Medallion").
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -34,6 +35,12 @@ const TOKENS = `*, *::before, *::after { box-sizing: border-box; }
   --fab-accent-text: rgb(16, 17, 18);
   --fab-text-secondary: rgb(19, 20, 21);
   --fab-tag-rose: rgb(22, 23, 24);
+  --fab-warning-border: rgb(30, 31, 32);
+  --fab-warning-soft: rgb(33, 34, 35);
+  --fab-warning-text: rgb(36, 37, 38);
+  --fab-info-border: rgb(40, 41, 42);
+  --fab-info-soft: rgb(43, 44, 45);
+  --fab-info-text: rgb(46, 47, 48);
 }`;
 const ACCENT_TEXT = 'rgb(16, 17, 18)';
 const SECONDARY = 'rgb(19, 20, 21)';
@@ -52,7 +59,17 @@ describe('Medallion (mounted) — tone accent and ink neutral', () => {
     const unset = await tileOf({});
     const rendered = unset.outerHTML;
     assert.deepEqual(ownClasses(unset), ['fab-medallion', 'is-corner-7']);
-    for (const props of [{ tone: '' }, { ink: '' }, { tone: 'bogus' }, { ink: 'bogus' }]) {
+    const outside = [
+      { tone: '' },
+      { ink: '' },
+      { tone: 'bogus' },
+      { ink: 'bogus' },
+      { tone: 'Warning' },
+      { ink: ' info' },
+      { tone: 'neutral' },
+      { ink: 'accent' },
+    ];
+    for (const props of outside) {
       const tile = await tileOf(props);
       assert.equal(tile.outerHTML, rendered, JSON.stringify(props));
     }
@@ -88,10 +105,45 @@ describe('Medallion (mounted) — tone accent and ink neutral', () => {
     });
   });
 
+  /** Each added family's tokens in `TOKENS`: edge, ground, then its `-text` ink. */
+  const ADDED = Object.freeze({
+    warning: ['rgb(30, 31, 32)', 'rgb(33, 34, 35)', 'rgb(36, 37, 38)'],
+    info: ['rgb(40, 41, 42)', 'rgb(43, 44, 45)', 'rgb(46, 47, 48)'],
+  });
+
+  for (const [family, [edge, ground, ink]] of Object.entries(ADDED)) {
+    it(`paints tone ${family} on the edge, ground and glyph in its family's tokens`, async () => {
+      await underSheet(TOKENS, async () => {
+        const tile = await tileOf({ tone: family });
+        assert.deepEqual(ownClasses(tile), ['fab-medallion', 'is-corner-7', `is-tone-${family}`]);
+        const face = getComputedStyle(tile);
+        assert.equal(face.borderTopColor, edge);
+        assert.equal(face.backgroundColor, ground);
+        assert.equal(glyphColour(tile), ink);
+      });
+    });
+
+    it(`inks the glyph alone in --fab-${family}-text for ink ${family}`, async () => {
+      await underSheet(TOKENS, async () => {
+        const tile = await tileOf({ ink: family });
+        assert.deepEqual(ownClasses(tile), ['fab-medallion', 'is-corner-7', `is-ink-${family}`]);
+        assert.equal(getComputedStyle(tile).borderTopColor, 'rgb(2, 2, 2)');
+        assert.equal(getComputedStyle(tile).backgroundColor, 'rgb(3, 3, 3)');
+        assert.equal(glyphColour(tile), ink);
+      });
+    });
+  }
+
   const PRECEDENCE = [
     ['ink outranks tone on the glyph', { tone: 'accent', ink: 'neutral' }, SECONDARY],
     ['tone outranks tint', { tint: 'rose', tone: 'accent' }, ACCENT_TEXT],
     ['ink outranks tint', { tint: 'rose', ink: 'neutral' }, SECONDARY],
+    ['an added tone outranks tint', { tint: 'rose', tone: 'info' }, ADDED.info[2]],
+    // The verdant tint rule ties a tone's specificity, so only source order lets the tone win.
+    ['an added tone outranks the verdant tint', { tint: 'verdant', tone: 'info' }, ADDED.info[2]],
+    ['an added ink outranks an added tone', { tone: 'warning', ink: 'info' }, ADDED.info[2]],
+    ['an older ink outranks an added tone', { tone: 'info', ink: 'neutral' }, SECONDARY],
+    ['an added ink outranks an older tone', { tone: 'accent', ink: 'warning' }, ADDED.warning[2]],
   ];
   for (const [claim, props, colour] of PRECEDENCE) {
     it(claim, async () => {

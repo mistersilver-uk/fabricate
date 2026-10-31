@@ -12,8 +12,8 @@
   | `alt` | string | `''` | Image alt text, passed EXPLICITLY wherever `art` is set; the contract is that the decision was TAKEN. `medallion-art-contract.test.js` reds on an art-bearing call site that names no `alt`, and on one reaching for the deprecated alias to escape it. |
   | `tint` | bare `--fab-tag-*` key | `''` | Recolours the GLYPH and nothing else. Unset is byte-identical to the shipped render, because the glyph reads the token through a `var()` fallback. |
   | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
-  | `tone` | `''` \| `'success'` \| `'danger'` \| `'accent'` | `''` | Paints the edge, ground and glyph in that family's `-border`, `-soft` and `-text` tokens, as the library's toned `<IconChip>` specimens do; a rolled die face reads qualified or cancelled by it, and `accent` marks a chosen option's chip. It outranks `tint`, and `variant` `'glyph-chip'` draws no edge. Anything else resolves to `''`. |
-  | `ink` | `''` \| `'success'` \| `'danger'` \| `'neutral'` | `''` | Inks the GLYPH alone on the unchanged slate ground: a family's `-text` token, as the Checks simulator's result-card icon reads success or failure, or `--fab-text-secondary` for `neutral`. It outranks `tint`, and it outranks `tone` on the glyph. Anything else resolves to `''`. |
+  | `tone` | `''` \| `'success'` \| `'danger'` \| `'accent'` \| `'warning'` \| `'info'` | `''` | Paints the edge, ground and glyph in that family's `-border`, `-soft` and `-text` tokens, as the library's toned `<IconChip>` specimens do; a rolled die face reads qualified or cancelled by it, and `accent` marks a chosen option's chip. `warning` and `info` have no in-app caller and serve the published seam (issue 2847). It outranks `tint`, and `variant` `'glyph-chip'` draws no edge. Anything else resolves to `''`. |
+  | `ink` | `''` \| `'success'` \| `'danger'` \| `'neutral'` \| `'warning'` \| `'info'` | `''` | Inks the GLYPH alone on the unchanged slate ground: a family's `-text` token, as the Checks simulator's result-card icon reads success or failure, or `--fab-text-secondary` for `neutral`. It outranks `tint`, and it outranks `tone` on the glyph. Anything else resolves to `''`. |
 
   Invariants:
   - FLAT BY CONTRACT: the surface is `--fab-bg-3`, or a `tone`'s flat `-soft` token, never a gradient
@@ -39,8 +39,11 @@
     ink = '',
   } = $props();
 
-  const safeTone = $derived(['success', 'danger', 'accent'].includes(tone) ? tone : '');
-  const safeInk = $derived(['success', 'danger', 'neutral'].includes(ink) ? ink : '');
+  const TONES = ['success', 'danger', 'accent', 'warning', 'info'];
+  const INKS = ['success', 'danger', 'neutral', 'warning', 'info'];
+
+  const safeTone = $derived(TONES.includes(tone) ? tone : '');
+  const safeInk = $derived(INKS.includes(ink) ? ink : '');
 
   const isGlyphChip = $derived(String(variant ?? '') === 'glyph-chip');
 
@@ -75,9 +78,13 @@
   class:is-tone-success={safeTone === 'success'}
   class:is-tone-danger={safeTone === 'danger'}
   class:is-tone-accent={safeTone === 'accent'}
+  class:is-tone-warning={safeTone === 'warning'}
+  class:is-tone-info={safeTone === 'info'}
   class:is-ink-success={safeInk === 'success'}
   class:is-ink-danger={safeInk === 'danger'}
   class:is-ink-neutral={safeInk === 'neutral'}
+  class:is-ink-warning={safeInk === 'warning'}
+  class:is-ink-info={safeInk === 'info'}
   data-medallion={artPath ? 'image' : 'glyph'}
   data-medallion-tint={safeTint || undefined}
   style={boxStyle}
@@ -143,6 +150,18 @@
     background: var(--fab-accent-soft);
   }
 
+  .fab-medallion.is-tone-warning {
+    border-color: var(--fab-warning-border);
+    color: var(--fab-warning-text);
+    background: var(--fab-warning-soft);
+  }
+
+  .fab-medallion.is-tone-info {
+    border-color: var(--fab-info-border);
+    color: var(--fab-info-text);
+    background: var(--fab-info-soft);
+  }
+
   .fab-medallion.is-ink-success {
     color: var(--fab-success-text);
   }
@@ -153,6 +172,14 @@
 
   .fab-medallion.is-ink-neutral {
     color: var(--fab-text-secondary);
+  }
+
+  .fab-medallion.is-ink-warning {
+    color: var(--fab-warning-text);
+  }
+
+  .fab-medallion.is-ink-info {
+    color: var(--fab-info-text);
   }
 
   .fab-medallion-img {
