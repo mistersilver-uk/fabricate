@@ -477,9 +477,9 @@ const NOTICE = Object.freeze({
 });
 
 /**
- * The published `Button`: the classes `role`, `fullWidth` and `size` write beside its root, which
- * `Button.svelte` is held to, and the classes under which a sheet rule redraws a button, no
- * extension target sitting in one. `disables` says a published key writes `disabled`, so
+ * The published `Button`: the classes `role`, `fullWidth`, `size` and `pressed` write beside its
+ * root, which `Button.svelte` is held to, and the classes under which a sheet rule redraws a button,
+ * no extension target sitting in one. `disables` says a published key writes `disabled`, so
  * `:disabled` keeps no selector off the button.
  */
 const BUTTON = Object.freeze({
@@ -490,7 +490,11 @@ const BUTTON = Object.freeze({
     'is-danger',
     'is-dashed',
     'is-warning-action',
+    'is-info-action',
+    'is-pressed',
     'is-full-width',
+    'is-size-24',
+    'is-size-26',
     'is-size-28',
     'is-size-38',
   ]),
@@ -541,7 +545,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 25 sheet rules that draw a published button, none with a compound above its root. */
+/** The 35 sheet rules that draw a published button, none with a compound above its root. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -553,6 +557,8 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
   'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-38',
   'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-28',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-24',
+  'styles/fabricate-manager-tool-library-knowledge-components.css: .fabricate-button.fabricate-button.fabricate-button.is-size-26',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
@@ -568,6 +574,15 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button i',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled',
+  // The forced-colours block repaints the same three in the reader's palette.
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled',
 ]);
 /** The rule no published button can match, which fails closed: an anchor's, since `tag` is unpublished. */
 const BUTTON_UNMATCHED_RULES = Object.freeze([
@@ -677,6 +692,18 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   ],
   [
     "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
     BUTTON_FACE,
   ],
   [
@@ -807,6 +834,12 @@ const OVERSTATED_TOOLTIP =
   'tooltip is stated and no control rest lands on carries a Foundry tooltip';
 /** The attributes Foundry's hover listener reads a tooltip from. */
 const FOUNDRY_TOOLTIP = /^data-tooltip(?:-text|-html)?$/;
+/**
+ * The entries whose control carries a Foundry tooltip only when a published key asks for one, by
+ * path, and that key: such an entry states no `tooltip`, because reserving `data-locked` would
+ * narrow it, and its component draws no tooltip beside a `data-locked` rest key (issue 2852).
+ */
+const KEYED_TOOLTIPS = Object.freeze({ 'src/ui/svelte/components/Button.svelte': 'tooltip' });
 
 /**
  * The entries whose rest lands on more than one element, by path, each drawn while every prop of
@@ -918,7 +951,9 @@ function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS,
   if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
   const lands = controls.length > 0;
   const stated = entry.restOn === 'control';
-  const tipped = controls.some(({ written }) => written.some((name) => FOUNDRY_TOOLTIP.test(name)));
+  const keyed = Object.hasOwn(entry.props ?? {}, KEYED_TOOLTIPS[entry.path] ?? '');
+  const tipped =
+    !keyed && controls.some(({ written }) => written.some((name) => FOUNDRY_TOOLTIP.test(name)));
   return [
     ...shape,
     ...(restReads(ast) > every.length || handed.length > 0 ? [UNFOLLOWED_REST] : []),
@@ -3522,7 +3557,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 27 selectors: 25 that draw it, one it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 37 selectors: 35 that draw it, one it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -3554,6 +3589,9 @@ describe('the module sheet and every component style against the published Butto
           'onclick',
           'aria-expanded',
           'aria-describedby',
+          'ariaLabel',
+          'tooltip',
+          'pressed',
         ],
         'fabricate',
       ],
@@ -3561,7 +3599,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 26 readings of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 29 readings of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(

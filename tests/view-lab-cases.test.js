@@ -423,6 +423,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
   'tests/view-lab/fixtures/PublishedListRowForms.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
+  'tests/view-lab/fixtures/PublishedButtonForms.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
@@ -891,6 +892,8 @@ const labListRowAside = (key) =>
 /** The slots fixture's host for one slot in one section's published row, by the section's key. */
 const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
+/** The button forms fixture's one control in a row, by the row's key. */
+const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form="${key}"] button`;
 /** The forms fixture's published row in one section, by the section's key and its place, first by default. */
 const labListRowForm = (key, place = 1) =>
   `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:nth-child(${place}) .fabricate-list-row`;
@@ -1556,6 +1559,58 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labListRowForm('reward')} > .fabricate-list-row-open`,
       styles: 'cursor: progress',
+    },
+  ],
+  // The published button's and icon button's small rungs (issue 2853): each box and corner, and
+  // the default inline padding the button rungs keep.
+  'manager-published-button-forms-specimen': [
+    {
+      selector: labButtonForm('button-24'),
+      styles: 'height: 24px; border-top-left-radius: 6px; padding-left: 12px',
+    },
+    {
+      selector: labButtonForm('button-26'),
+      styles: 'height: 26px; border-top-left-radius: 7px; padding-left: 12px',
+    },
+    {
+      selector: labButtonForm('icon-20'),
+      styles: 'width: 20px; height: 20px; border-top-left-radius: 6px',
+    },
+    {
+      selector: labButtonForm('icon-22'),
+      styles: 'width: 22px; height: 22px; border-top-left-radius: 6px',
+    },
+    // The info role's face, the pressed toggle's at rest, beside its unpressed self, hovered on a
+    // ghost and disabled, and the focused hint button's ring (issue 2852).
+    {
+      selector: labButtonForm('info'),
+      styles:
+        'color: var(--fab-info-text); border-top-color: var(--fab-info-border); background-color: var(--fab-info-soft)',
+    },
+    {
+      selector: labButtonForm('pressed'),
+      styles:
+        'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+    },
+    {
+      selector: labButtonForm('unpressed'),
+      styles:
+        'color: var(--fab-text); border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+    },
+    {
+      selector: labButtonForm('pressed-ghost'),
+      styles:
+        'border-top-color: var(--fab-accent-hover); background-color: var(--fab-accent-hover)',
+    },
+    {
+      selector: labButtonForm('pressed-disabled'),
+      styles:
+        'opacity: 0.62; border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+    },
+    {
+      selector: `${labButtonForm('tooltip')}:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
     },
   ],
   // The published icon button (issue 2601): each role's face and each rung's square, the disabled
@@ -7349,6 +7404,27 @@ test('the list row forms specimen case measures the mark rung each section of th
     .map(({ styles }) => Number.parseFloat(/width: (\d+)px/u.exec(styles)[1]));
   assert.deepEqual(measured, rungs, 'each section’s mark is measured at the rung it mounts');
   assert.deepEqual(rungs, [26, 28, 30, 30, 34], 'the four rungs Premium draws, and a board');
+});
+
+test('the button forms specimen case measures the rung each row of the button forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedButtonForms.svelte'
+  );
+  for (const hook of ['data-lab-button-forms', 'data-lab-button-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rungs = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'size')
+    .map((node) => Number(node.value.value));
+  const measured = getCaseById('manager-published-button-forms-specimen')
+    .expectLayout.controls.map(({ styles }) => /(?:^|; )height: (\d+)px/u.exec(styles)?.[1])
+    .filter(Boolean)
+    .map(Number);
+  assert.deepEqual(measured, rungs, 'each row’s control is measured at the rung it mounts');
+  assert.deepEqual(rungs, [24, 26, 20, 22], 'the four rungs issue 2853 adds');
 });
 
 test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {

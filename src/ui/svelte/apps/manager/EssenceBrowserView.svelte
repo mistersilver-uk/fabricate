@@ -417,7 +417,7 @@
         />
         <Button
           data-essence-sort-direction={ui.sortDirection}
-          aria-label={text(
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Essence.ToggleSortDirection',
             'Toggle sort direction'
           )}

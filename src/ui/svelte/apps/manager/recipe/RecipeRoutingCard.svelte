@@ -224,7 +224,7 @@
   <Button
     role="ghost"
     data-routing-gap-action
-    aria-label={row.action}
+    ariaLabel={row.action}
     {disabled}
     onclick={() => onOpenChecks()}
   >

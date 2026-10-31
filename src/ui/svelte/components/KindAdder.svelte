@@ -49,7 +49,7 @@
           role="dashed"
           {size}
           data-recipe-add={triggerHook}
-          aria-label={ariaLabel || undefined}
+          ariaLabel={ariaLabel || undefined}
           {...attributes}
         >
           <span>{label}</span>
@@ -62,7 +62,7 @@
       role="dashed"
       {size}
       data-recipe-add={triggerHook}
-      aria-label={ariaLabel || undefined}
+      ariaLabel={ariaLabel || undefined}
       onclick={() => onAdd(kinds[0] ?? 'component')}
     >
       <span>{label}</span>

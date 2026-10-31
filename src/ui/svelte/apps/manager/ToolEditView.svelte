@@ -250,7 +250,7 @@
             role="ghost"
             size="38"
             data-tool-editor-world-tool={String(tool?.id ?? '')}
-            aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
             onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
             disabled={saving}
             ><i class="fas fa-globe" aria-hidden="true"></i><span
@@ -264,7 +264,7 @@
           role="ghost"
           size="38"
           data-tool-editor-back
-          aria-label={text(
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
             'Back to the Tool Rules list'
           )}
@@ -282,7 +282,7 @@
           role="primary"
           size="38"
           data-tool-editor-save
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
           onclick={onSave}
           disabled={!dirty || !validation.valid || saving}
           title={validation.valid

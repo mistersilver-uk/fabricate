@@ -8,7 +8,7 @@
   | `ariaLabel` | pre-localized string | `''` | REQUIRED; see the invariants. Dropped when empty rather than emitted blank. |
   | `icon` | Font Awesome class string | `''` | The glyph, drawn as a hidden `<i>`; empty draws none. |
   | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'ghost-danger'` | `'neutral'` | A closed subset of `Button`'s verb roles plus the ghost-danger compound; an unrecognised value renders neutral. Never an ARIA role. |
-  | `size` | `''` \| `'24'` \| `'26'` | `''` | The rung, named as a string as `Button`'s is: `''` is 34, `'26'` the banded Modal's close; an unrecognised value draws 34. |
+  | `size` | `''` \| `'20'` \| `'22'` \| `'24'` \| `'26'` | `''` | The rung, named as a string as `Button`'s is: `''` is 34, `'26'` the banded Modal's close; `'20'` and `'22'` widen their pointer target to 24px (issue 2853); an unrecognised value draws 34. |
   | `tooltip` | pre-localized string | `ariaLabel` | The plain-text name shown on hover and keyboard focus; `''` shows none. |
   | `disabled` | boolean | `false` | Forwarded to the `<button>`. |
   | `onclick` | function | no-op | Forwarded, so a call site keeps its `event.stopPropagation()`. |
@@ -69,7 +69,12 @@
     'ghost-danger': 'is-ghost is-danger',
   };
 
-  const SIZE_CLASSES = { 24: 'is-size-24', 26: 'is-size-26' };
+  const SIZE_CLASSES = {
+    20: 'is-size-20',
+    22: 'is-size-22',
+    24: 'is-size-24',
+    26: 'is-size-26',
+  };
 
   const tooltips = getContext(APP_TOOLTIPS);
 

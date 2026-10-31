@@ -717,6 +717,58 @@
   opacity: 0.7;
 }
 
+/* The `info` role's treatment (issue 2852): a verb that reads or rolls rather than writes, in the info family. */
+.fabricate-button.fabricate-button.is-info-action:not(:disabled) {
+  border-color: var(--fab-info-border);
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover {
+  border-color: var(--fab-info);
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+/* The pressed face (issue 2852): `pressed: true` writes `is-pressed` beside `aria-pressed`, so a caller's hand-written `aria-pressed` keeps the face it drew. It is a solid accent tile in the ink drawn on the accent, so it differs from the keyboard ring, an outline 2px clear of the edge, by a fill that clears 3:1 against the unpressed face and every ground a button is mounted on. At (0,6,0) at rest and (0,7,0) under the pointer it outranks every role's face whatever the import order, so a pressed toggle loses its role's own colours. */
+.fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled) {
+  border-color: var(--fab-accent);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+.fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover {
+  border-color: var(--fab-accent-hover);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent-hover);
+}
+
+/* A disabled toggle keeps its tile under the disabled face's opacity, so its state still shows. */
+.fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled {
+  border-color: var(--fab-accent);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+/* Forced colours: the reader's palette paints the pressed face, Highlight behind HighlightText, and GrayText while disabled, opting out of the browser's repaint so pressed and not pressed stay distinct, as the switch does (issue 2492). */
+@media (forced-colors: active) {
+  .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled),
+  .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover {
+    forced-color-adjust: none;
+    border-color: highlight;
+    color: highlighttext;
+    background: highlight;
+  }
+
+  .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled {
+    forced-color-adjust: none;
+    border-color: graytext;
+    color: canvas;
+    background: graytext;
+    opacity: 1;
+  }
+}
+
 .fabricate-icon-button.fabricate-icon-button {
   width: 34px;
   height: 34px;
@@ -747,6 +799,49 @@
   padding: 0;
   flex: 0 0 26px;
   border-radius: 7px;
+}
+
+/* The 20px and 22px rungs (issue 2853): a log's dismiss and a dense grid's credit cells. Each is drawn below the 24px pointer target (WCAG 2.2 §2.5.8), so its `::before` widens the target to 24px about the same centre without moving layout. The rung outranks every role's own geometry at (0,4,0), so no import order decides it. */
+.fabricate-icon-button.fabricate-icon-button.fabricate-icon-button.is-size-20 {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  flex: 0 0 20px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+}
+
+.fabricate-icon-button.fabricate-icon-button.fabricate-icon-button.is-size-22 {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  flex: 0 0 22px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+}
+
+/* The `::before`'s containing block, at the namespace's lowest specificity, (0,1,0), so a caller's own positioning wins. */
+.fabricate-icon-button:where(.is-size-20, .is-size-22) {
+  position: relative;
+}
+
+/* Each inset is measured from the padding box, inside the 1px edge every role draws. */
+.fabricate-icon-button.fabricate-icon-button.is-size-20::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+}
+
+.fabricate-icon-button.fabricate-icon-button.is-size-22::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange

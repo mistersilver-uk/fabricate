@@ -206,7 +206,7 @@
               <Button
                 role="ghost"
                 class="manager-recipe-val-view"
-                aria-label={localize(VIEW_NAMED_LABEL, {
+                ariaLabel={localize(VIEW_NAMED_LABEL, {
                   action: localize(rowVerb(row)),
                   subject: row.title,
                 })}

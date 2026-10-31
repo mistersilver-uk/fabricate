@@ -184,7 +184,7 @@
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
-        aria-label={expendTitle(copy)}
+        ariaLabel={expendTitle(copy)}
         onclick={() => onExpend(copy.itemId)}
       >
         <!-- NOT `fa-fire-flame-curved`: that is the uses chip's glyph, one element away. -->

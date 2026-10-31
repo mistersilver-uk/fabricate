@@ -91,8 +91,11 @@ const authoredClasses = (node) => [...node.classList].filter((name) => !name.sta
 
 describe('the published Button, size, icon, busy and type', () => {
   for (const [size, classes] of [
+    ['24', ['is-size-24']],
+    ['26', ['is-size-26']],
     ['28', ['is-size-28']],
     ['38', ['is-size-38']],
+    ['27', []],
     ['40', []],
   ]) {
     it(`writes size ${JSON.stringify(size)} as ${classes.join('') || 'no size class'}, and replaces it on update`, async () => {

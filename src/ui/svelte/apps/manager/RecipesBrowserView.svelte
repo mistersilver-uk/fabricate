@@ -479,7 +479,7 @@
         <Button
           class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
-          aria-label={text(
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Recipe.ToggleSortDirection',
             'Toggle sort direction'
           )}

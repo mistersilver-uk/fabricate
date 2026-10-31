@@ -216,7 +216,8 @@ Its info-family fill, border and ink MUST remain distinct from the single shared
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
-IconButton's opt-in rungs `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+IconButton's opt-in rungs `size="20"`, `size="22"`, `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+The `20` and `22` rungs (issue 2853) sit below the 24px pointer target floor (WCAG 2.2 §2.5.8), so each MUST widen its pointer target to 24 by 24 about its centre with an absolutely positioned `::before`, which moves no layout, and the keyboard ring stays on the drawn box.
 The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
@@ -898,6 +899,7 @@ The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the liter
 `Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 `Field`'s `size` names its text-like or number input's rung by its height, 26, 28, 30, 34 or 38 with 38 the default, each at its band's corner, and leaves the ladder's 44 out; its `face` draws that control in the serif or mono face of `ui-visual-style`'s type ladder, and its `type` of `'number'` draws a number input with no step buttons (issue 2848).
 `SearchField`'s `density` of `toolbar` or `inline` draws the default shell at `Select`'s rung of that name, 34 or 30, each at its band's corner; the published seam withholds `compact`, so the exception stays at its four ruled sites (issue 2849).
+`Button`'s `'24'` and `'26'` rungs draw a dense row's adders and step buttons, each at its band's corner (issue 2853); they are no touch-reachable control heights, and each is still its own 24px pointer target.
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 24, 26, 28, 30, 32, 34, 36, 38 or 44 with 26 the default.
 Its radius is the radius ladder's band for the rung: 6 at 22 and 24, 7 at 26 to 32, 9 at 34 to 38 and 11 at 44.
@@ -1083,6 +1085,10 @@ A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY p
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 `Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
+`Button`'s `pressed` (issue 2852) declares the toggle's pressed state: `true` or `false` writes `aria-pressed` and `true` adds `is-pressed`, a solid accent tile in `--fab-on-accent` ink, which outranks every role at rest and under the pointer, and any other value writes neither, so a caller's own `aria-pressed` through rest keeps the face it draws.
+The pressed face MUST differ from the keyboard ring by more than an outline, MUST stay distinct under `forced-colors: active`, and MUST stay visible beside `disabled`; its label clears 4.5:1, its edge 3:1 on the four grounds and its fill 3:1 against every unpressed role but `primary`'s in every palette, and `tests/components/button-pressed-rendered.test.js` measures each in Chromium.
+A toggle is `neutral` or `ghost`, because with any other role the pressed face replaces that role's own face and its verb colour.
+Its `info` role, `is-info-action`, is the info family's soft face for a verb that writes no record.
 `ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
 A disabled `ArmedDangerButton` MUST draw `Button`'s disabled face whether or not it is armed; the armed fill MUST paint only an enabled control, and an armed control's hover ink MUST reach 4.5:1 against the fill it hovers on.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
@@ -1309,6 +1315,7 @@ It opens that tooltip through the `APP_TOOLTIPS` context's facade, `{ show(eleme
 Blur, a click and Escape MUST each close the button's own tooltip and never another element's, and so MUST unmounting the button and an update that changes the text it shows or disables it.
 No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` suppresses the primitive's own tooltip, on hover and focus alike, rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
 `tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
+A `Button` given `tooltip` and a `Stepper` adjunct given `decrementTooltip` or `incrementTooltip` (issue 2852) MUST write and open its hint the same way, through the same facade, which each reads by the registry key `Symbol.for('fabricate.appTooltips')` that `APP_TOOLTIPS` names; a `Button` carrying a caller's own tooltip attribute, `title` or `data-locked` writes none.
 
 #### Scenario: A user Tabs to an icon button
 

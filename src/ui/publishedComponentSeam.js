@@ -103,6 +103,17 @@ function standaloneRootFault({ name, root, standaloneRoot }) {
   return root === 'any' ? null : `${name} states standaloneRoot on the root "${root}"`;
 }
 
+/** Whether a key's `contains` is sound: on a `data` key, naming a `text` key (issue 2852). */
+function isSoundContains(entry, spec) {
+  const name = spec.contains;
+  return (
+    spec.kind === 'data' &&
+    typeof name === 'string' &&
+    Object.hasOwn(entry.props, name) &&
+    entry.props[name].kind === 'text'
+  );
+}
+
 function assertKnownEntry(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
@@ -111,6 +122,10 @@ function assertKnownEntry(entry) {
     if (spec.requiredWhen !== undefined && !isSoundGuard(entry, key, spec)) {
       const other = String(spec.requiredWhen);
       throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown requiredWhen "${other}"`);
+    }
+    if (spec.contains !== undefined && !isSoundContains(entry, spec)) {
+      const other = String(spec.contains);
+      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown contains "${other}"`);
     }
   }
   if (!Object.hasOwn(ROOTS, entry.root)) {

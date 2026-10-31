@@ -663,7 +663,7 @@
         <Button
           class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
-          aria-label={text(
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Component.SortDirection',
             'Toggle sort direction'
           )}

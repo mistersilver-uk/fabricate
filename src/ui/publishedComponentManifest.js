@@ -3,9 +3,10 @@
  * frozen `{ name, path, version, props, rest, root, restOn?, tooltip?, overlays?, lazy?,
  * standaloneRoot? }`,
  * appended and never interleaved, and a breaking change to one bumps its own `version` (issue
- * 2426). A prop is `{ kind, required?, requiredWhen?, element?, args? }`, its kind `'data' |
- * 'text' | 'slot' | 'callback' | 'aria'`:
- * `requiredWhen` names the `data` key while which it is required (issue 2452), a `text` key takes
+ * 2426). A prop is `{ kind, required?, requiredWhen?, contains?, element?, args? }`, its kind
+ * `'data' | 'text' | 'slot' | 'callback' | 'aria'`:
+ * `requiredWhen` names the `data` key while which it is required (issue 2452), `contains` the
+ * `text` key whose text a `data` key's non-empty string must hold (issue 2852), a `text` key takes
  * a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says
  * `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
  * `'manager'` (issue 2451). A `callback` key takes a function, called with its first `args`
@@ -246,6 +247,9 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       onclick: Object.freeze({ kind: 'callback', required: true }),
       'aria-expanded': Object.freeze({ kind: 'aria' }),
       'aria-describedby': Object.freeze({ kind: 'aria' }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'children' }),
+      tooltip: Object.freeze({ kind: 'data' }),
+      pressed: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
@@ -290,6 +294,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       decrementLabel: Object.freeze({ kind: 'data', required: true }),
       incrementLabel: Object.freeze({ kind: 'data', required: true }),
       onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      decrementTooltip: Object.freeze({ kind: 'data' }),
+      incrementTooltip: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',
