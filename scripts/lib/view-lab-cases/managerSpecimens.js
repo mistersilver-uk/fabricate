@@ -526,6 +526,28 @@ const SEGMENTED_FORM_KEYS = Object.freeze([
 /** Sized to the fixture's 400px ground and its six rows. */
 const SEGMENTED_FORMS_WINDOW = Object.freeze({ width: 520, height: 370 });
 
+/** The chip forms fixture's ground, a row by its key, and the one chip the row's target holds. */
+const CHIP_FORMS = '[data-lab-chip-forms]';
+const CHIP_FORM = (key) => `${CHIP_FORMS} > [data-lab-chip-form="${key}"]`;
+const CHIP_FORM_CHIP = (key) => `${CHIP_FORM(key)} .manager-chip`;
+const CHIP_FORM_KEYS = Object.freeze([
+  'glyph-positive',
+  'glyph-warning',
+  'glyph-info',
+  'glyph-neutral',
+  'glyph-danger',
+  'glyph-accent',
+  'glyph-default',
+  'glyph-list',
+  'named',
+  'dashed',
+  'glyph-dashed',
+  'plain',
+]);
+
+/** Sized to the fixture's 360px ground and its twelve rows. */
+const CHIP_FORMS_WINDOW = Object.freeze({ width: 480, height: 440 });
+
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
 const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
@@ -1975,6 +1997,35 @@ export const CASES = Object.freeze([
     position: SEGMENTED_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `SegmentedControl.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-chip-forms-specimen',
+    label:
+      "Specimen, mounted through the published seam — twelve chips in a 360px column on the window's --fab-bg-1 ground, 6px apart, each beside a caption the companion draws. Reading top to bottom: the icon-only chip, a glyph alone on a 20px square named by its ariaLabel, under the positive tone with a check, the warning tone with a warning triangle, the info tone with a question mark, the neutral tone with a dash, the danger tone with a cross, the accent tone with a star and no tone with an hourglass, then the positive check on the 15px list square; a chip labelled 3 in the info tone, named 3 days waiting; a locked chip, a lock glyph beside Locked until the harvest, in the dashed emphasis, its edge dashed, then the icon-only lock dashed, then the same locked chip with no emphasis, its edge solid, for comparison. No chip takes focus. The frame cannot show the names or the hover tooltip each icon-only chip carries, which the mounted and rendered suites read",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-chip-forms' },
+    steps: [],
+    expectSelector: `${CHIP_FORMS}:has(> [data-lab-chip-form="glyph-positive"] .manager-chip.is-icon-only) > [data-lab-chip-form="plain"] .manager-chip`,
+    expectContained: [
+      ...CHIP_FORM_KEYS.map((key) => ({ container: CHIP_FORMS, target: CHIP_FORM(key) })),
+      { container: '.window-content', target: CHIP_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each square's side, and the dashed edge beside its undashed twin.
+        { selector: CHIP_FORM_CHIP('glyph-positive'), styles: 'width: 20px; height: 20px' },
+        { selector: CHIP_FORM_CHIP('glyph-list'), styles: 'width: 15px; height: 15px' },
+        { selector: CHIP_FORM_CHIP('dashed'), styles: 'border-top-style: dashed' },
+        { selector: CHIP_FORM_CHIP('glyph-dashed'), styles: 'border-top-style: dashed' },
+        { selector: CHIP_FORM_CHIP('plain'), styles: 'border-top-style: solid' },
+      ],
+    },
+    position: CHIP_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Chip.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

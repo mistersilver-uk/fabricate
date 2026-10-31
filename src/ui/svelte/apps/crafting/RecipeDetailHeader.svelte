@@ -116,7 +116,7 @@
             tone="danger"
             icon={descriptor.icon}
             data-crafting-status={status}
-            aria-label={statusLabel}
+            ariaLabel={statusLabel}
             title={statusLabel}
           />
         </span>

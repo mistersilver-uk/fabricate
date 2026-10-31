@@ -3,8 +3,9 @@
  * frozen `{ name, path, version, props, rest, root, restOn?, tooltip?, overlays?, lazy?,
  * standaloneRoot? }`,
  * appended and never interleaved, and a breaking change to one bumps its own `version` (issue
- * 2426). A prop is `{ kind, required?, requiredWhen?, contains?, itemContains?, element?, args? }`,
- * its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`:
+ * 2426). A prop is `{ kind, required?, requiredWhen?, waivedBy?, contains?, itemContains?, element?,
+ * args? }`, its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`: `waivedBy` lists the `data`
+ * keys whose non-blank strings together let a `required` key be empty (issue 2858),
  * `requiredWhen` names the `data` key while which it is required (issue 2452), `contains` the
  * `text` key whose text a `data` key's non-empty string must hold (issue 2852), `itemContains`
  * the same of a `data` array's item members, as `{ <member>: <member it holds> }` (issue 2856),
@@ -169,7 +170,12 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       mono: Object.freeze({ kind: 'data' }),
       struck: Object.freeze({ kind: 'data' }),
       truncate: Object.freeze({ kind: 'data' }),
-      children: Object.freeze({ kind: 'text', required: true }),
+      children: Object.freeze({
+        kind: 'text',
+        required: true,
+        waivedBy: Object.freeze(['icon', 'ariaLabel']),
+      }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'children' }),
     }),
     rest: true,
     root: 'any',

@@ -129,11 +129,34 @@ function isSoundItemContains(entry, spec) {
   );
 }
 
+/**
+ * Whether a key's `waivedBy` is sound: on a `required` `text` or `data` key, distinct names of other
+ * `data` keys of the entry, none itself `required` (issue 2858).
+ */
+function isSoundWaiver(entry, spec, key) {
+  const names = spec.waivedBy;
+  const waives = (name) =>
+    typeof name === 'string' &&
+    name !== key &&
+    Object.hasOwn(entry.props, name) &&
+    entry.props[name].kind === 'data' &&
+    entry.props[name].required !== true;
+  return (
+    spec.required === true &&
+    (spec.kind === 'text' || spec.kind === 'data') &&
+    Array.isArray(names) &&
+    names.length > 0 &&
+    new Set(names).size === names.length &&
+    names.every(waives)
+  );
+}
+
 /** Each conditional member a prop may state, and the test that member must pass at registration. */
 const MEMBER_SOUNDNESS = Object.freeze([
   ['requiredWhen', isSoundGuard],
   ['contains', isSoundContains],
   ['itemContains', isSoundItemContains],
+  ['waivedBy', isSoundWaiver],
 ]);
 
 function assertKnownEntry(entry) {

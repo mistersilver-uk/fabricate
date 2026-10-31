@@ -697,6 +697,7 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
       ['player-crafting-simple'],
       [
         'manager-published-leaves-specimen',
+        'manager-published-chip-forms-specimen',
         'manager-recipes-narrow-status-row',
         'manager-recipes-inspector-cant-enable',
       ],

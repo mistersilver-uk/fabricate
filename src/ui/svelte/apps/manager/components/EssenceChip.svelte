@@ -56,7 +56,7 @@
   {icon}
   class={['fab-essence-chip', extraClass].filter(Boolean).join(' ')}
   title={accessibleName}
-  aria-label={accessibleName}
+  ariaLabel={accessibleName}
   data-essence-chip={id}
   {...rest}
   >{#if showName}<span class="fab-essence-chip-name">{name}</span>{/if}{#if count !== null}<span

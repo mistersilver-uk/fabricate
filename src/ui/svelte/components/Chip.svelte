@@ -7,10 +7,11 @@
   | --- | --- | --- | --- |
   | `tag` | `'span'` \| `'li'` \| `'button'` \| `'div'` | `'span'` | The rendered element. A chip inside a `role="list"` must be an `li`; a clickable chip must be a real `button`. |
   | `tone` | `active`, `positive`, `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`, `secondary`, `subtle`, `tag` | `''` | Colour ONLY, never size. A CLOSED set: an unrecognised value is DROPPED rather than emitted as an unstyled `is-*`, so a typo shows as the default chip. See the invariants for how a caller picks one. |
-  | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` \| `'solid'` | `''` | A second axis: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The four are alternatives, not a composition, and the set is closed the same way. `solid` is the opaque ground for a chip read over artwork. |
+  | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` \| `'solid'` \| `'dashed'` | `''` | A second axis: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The five are alternatives, not a composition, and the set is closed the same way. `solid` is the opaque ground for a chip read over artwork; `dashed` dashes the tone's edge for a locked or provisional state its text or name must also say (issue 2858). |
   | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` \| `'header'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
   | `mono` / `struck` / `icon` | booleans / Font Awesome classes | `false` / `false` / `''` | Numerals in the mono face with `tabular-nums`, so columns of counts, DCs and quantities line up; the MUTED VARIANT, a value switched off in the scope being read, composing with every tone, which owns the ink; and a leading glyph. |
   | `swatch` / `tint` | bare `--fab-tag-*` keys | `''` | A leading colour DOT (the chip is ABOUT a colour) and an ink for the WHOLE chip (the chip IS that colour). Both are validated to a bare key before interpolation into a `style` attribute, both ride `--fab-chip-color`, and the tint wins when both are set. |
+  | `ariaLabel` | pre-localized string | `''` | A non-blank name: a `button` or `a` host's `aria-label`, and an `iconOnly` chip's beside `role="img"` on any other host but `li`. With an `icon` and no label the chip is its glyph alone, as `iconOnly` draws it, and also carries the name as its `data-tooltip-text`, before the rest spread so a caller's own wins; an `iconOnly` caller owns its own tooltip. On any other host the label is `aria-hidden` and the name is drawn beside it as visually hidden text, so never put a control in such a chip's children. A removable chip ignores it (issue 2858). |
   | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line, keeps the glyph and the start of the label and ends in an ellipsis; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
   | `removable` / `removeLabel` / `onRemove` | boolean / string / function | `false` / `undefined` / `null` | The chip is a MEMBERSHIP TOKEN in an editable set rather than a state the GM can only read; see the invariants for the three shapes `removable` refuses. |
   | `disabled` / `class` | boolean / class string | `false` / `''` | The chip and its remove control go inert together, written before the rest spread so a call site that passed it through the spread is unaffected; and an EXTRA class, for a caller that also needs layout context from the global sheet. |
@@ -42,6 +43,7 @@
     truncate = false,
     density = 'default',
     iconOnly = false,
+    ariaLabel = '',
     removable = false,
     removeLabel = undefined,
     onRemove = null,
@@ -80,13 +82,29 @@
     'subtle',
   ]);
 
-  const EMPHASES = new Set(['outlined', 'lit', 'bare', 'solid']);
+  const EMPHASES = new Set(['outlined', 'lit', 'bare', 'solid', 'dashed']);
 
   const INTERACTIVE_TAGS = new Set(['button', 'a']);
 
-  const iconOnlyRole = $derived(iconOnly && !INTERACTIVE_TAGS.has(tag) ? 'img' : undefined);
-
   const removeControl = $derived(resolveRemoveControl(removable, tag, removeLabel, onRemove));
+
+  const isText = (value) => typeof value === 'string' && value.trim() !== '';
+  const named = $derived(isText(ariaLabel) && !removeControl);
+  const waived = $derived(named && isText(icon) && !children);
+  const glyphOnly = $derived(iconOnly || waived);
+  const operable = $derived(INTERACTIVE_TAGS.has(tag));
+  // `role="img"` would replace an `li`'s list item role, so a named one speaks its name instead.
+  const imaged = $derived(glyphOnly && !operable && !(named && tag === 'li'));
+  const spoken = $derived(named && !imaged && !operable);
+  // An empty object when unnamed, so every other chip's attributes keep their order.
+  const naming = $derived(
+    named
+      ? {
+          'aria-label': spoken ? undefined : ariaLabel,
+          'data-tooltip-text': waived ? ariaLabel : undefined,
+        }
+      : {}
+  );
 
   function resolveRemoveControl(on, host, label, handler) {
     if (!on) return false;
@@ -149,7 +167,7 @@
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
       density === 'header' ? 'is-header' : '',
-      iconOnly ? 'is-icon-only' : '',
+      glyphOnly ? 'is-icon-only' : '',
       removeControl ? 'is-removable' : '',
       presentation === 'clock' ? 'is-clock' : '',
       extraClass,
@@ -165,7 +183,8 @@
   class={classes}
   style={swatchStyle}
   data-chip-tint={safeTint || undefined}
-  role={iconOnlyRole}
+  role={imaged ? 'img' : undefined}
+  {...naming}
   disabled={disabled || undefined}
   {...rest}
   >{#if safeSwatch}<span
@@ -182,7 +201,11 @@
       {disabled}
       aria-label={removeLabel || undefined}
       onclick={remove}><i class="fas fa-xmark" aria-hidden="true"></i></button
-    >{:else if truncate}<span class="manager-chip-label">{@render children?.()}</span
+    >{:else if spoken}{#if children}<span
+        class={truncate ? 'manager-chip-label' : 'manager-chip-spoken'}
+        aria-hidden="true">{@render children()}</span
+      >{/if}<span class="manager-chip-name">{ariaLabel}</span>{:else if truncate && !glyphOnly}<span
+      class="manager-chip-label">{@render children?.()}</span
     >{:else}{@render children?.()}{/if}</svelte:element
 >
 
@@ -426,6 +449,24 @@
     min-height: 20px;
   }
 
+  /* A spoken chip's hidden label lays its content out as the chip's own, as an unnamed chip does. */
+  .manager-chip-spoken {
+    display: contents;
+  }
+
+  /* A named chip's spoken name, restating `.visually-hidden`, which needs a Fabricate root. */
+  .manager-chip-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .manager-chip-swatch {
     flex: 0 0 auto;
     width: 8px;
@@ -511,6 +552,10 @@
 
   .manager-chip.is-bare {
     border: 0;
+  }
+
+  .manager-chip.is-dashed {
+    border-style: dashed;
   }
 
   .manager-chip.is-bare i:not(.fa-circle) {

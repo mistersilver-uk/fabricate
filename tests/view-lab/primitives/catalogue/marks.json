@@ -226,7 +226,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "emphasis — four alternatives, not a composition",
+    "cap": "emphasis — five alternatives, not a composition",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -237,7 +237,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "emphasis — four alternatives, not a composition",
+    "cap": "emphasis — five alternatives, not a composition",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -248,7 +248,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "emphasis — four alternatives, not a composition",
+    "cap": "emphasis — five alternatives, not a composition",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -260,7 +260,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "emphasis — four alternatives, not a composition",
+    "cap": "emphasis — five alternatives, not a composition",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -281,7 +281,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "emphasis — four alternatives, not a composition",
+    "cap": "emphasis — five alternatives, not a composition",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -298,6 +298,18 @@
         "text": "2"
       }
     ]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — five alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "neutral",
+      "emphasis": "dashed",
+      "icon": "fas fa-lock"
+    },
+    "content": ["Locked until the harvest"]
   },
   {
     "spec": "<Chip>",

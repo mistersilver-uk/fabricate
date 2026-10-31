@@ -430,6 +430,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
   'tests/view-lab/fixtures/PublishedSegmentedForms.svelte',
+  'tests/view-lab/fixtures/PublishedChipForms.svelte',
   'tests/view-lab/fixtures/PublishedPagination.svelte',
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
@@ -904,6 +905,8 @@ const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
 /** The button forms fixture's one control in a row, by the row's key. */
 const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form="${key}"] button`;
+/** The chip forms fixture's chip in a row, by the row's key. */
+const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
 const labSegmentedForm = (key) =>
   `[data-lab-segmented-forms] > [data-lab-segmented-form="${key}"] .manager-segmented`;
@@ -1758,6 +1761,15 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles:
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
     },
+  ],
+  // The published chip's forms (issue 2858): each square's side, and the dashed edge beside its
+  // undashed twin.
+  'manager-published-chip-forms-specimen': [
+    { selector: labChipForm('glyph-positive'), styles: 'width: 20px; height: 20px' },
+    { selector: labChipForm('glyph-list'), styles: 'width: 15px; height: 15px' },
+    { selector: labChipForm('dashed'), styles: 'border-top-style: dashed' },
+    { selector: labChipForm('glyph-dashed'), styles: 'border-top-style: dashed' },
+    { selector: labChipForm('plain'), styles: 'border-top-style: solid' },
   ],
   // The published segmented control's forms (issue 2856): the panel track's fill beside its
   // own-surface twin's, each rung's height, and the keyboard-reached segment on the panel track.
@@ -7618,6 +7630,35 @@ test('the segmented forms specimen case measures the rows, surface and rung the 
     'sized-panel-default',
     'panel-names',
   ]);
+});
+
+test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedChipForms.svelte'
+  );
+  for (const hook of ['data-lab-chip-forms', 'data-lab-chip-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value)
+    .filter((value) => typeof value === 'string' && /^[a-z-]+$/u.test(value));
+  const { controls } = getCaseById('manager-published-chip-forms-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-chip-form="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(
+    measured.filter((key) => !keys.includes(key)),
+    [],
+    'each measured row is one the fixture mounts'
+  );
+  const emphases = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'emphasis')
+    .map((node) => node.value.value);
+  assert.deepEqual(emphases, ['dashed', 'dashed'], 'two dashed rows beside the undashed twin');
 });
 
 test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {

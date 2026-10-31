@@ -1199,6 +1199,123 @@ describe('an itemContains key (issue 2856)', () => {
   });
 });
 
+const WAIVED = Object.freeze({
+  name: 'Waived',
+  path: 'src/ui/svelte/components/Waived.svelte',
+  version: 1,
+  props: {
+    children: { kind: 'text', required: true, waivedBy: ['icon', 'ariaLabel'] },
+    icon: { kind: 'data' },
+    ariaLabel: { kind: 'data' },
+    note: { kind: 'data' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Waived' }),
+});
+
+describe('a waivedBy key (issue 2858)', () => {
+  const mountOf = (ui, props) => ui.mount('Waived', { target: new FakeTarget(), props });
+  const GLYPH = { icon: 'fas fa-lock', ariaLabel: 'Locked' };
+
+  it('takes an absent or empty key while every key its waivedBy lists holds a non-blank string', () => {
+    const { ui } = seamWith({ table: [WAIVED] });
+    for (const children of [undefined, '']) {
+      assert.doesNotThrow(() => mountOf(ui, { ...GLYPH, children }), String(children));
+    }
+  });
+
+  for (const [claim, props, message] of [
+    ['none of them', {}, 'Waived requires a non-empty "children"'],
+    [
+      'one of them',
+      { icon: 'fas fa-lock' },
+      'Waived requires a non-blank "ariaLabel" when "children" is empty',
+    ],
+    [
+      'the other',
+      { ariaLabel: 'Locked' },
+      'Waived requires a non-blank "icon" when "children" is empty',
+    ],
+    [
+      'a blank one',
+      { icon: '\t', ariaLabel: 'Locked' },
+      'Waived requires a non-blank "icon" when "children" is empty',
+    ],
+    [
+      'one that is no string',
+      { icon: 'fas fa-lock', ariaLabel: ['Locked'] },
+      'Waived requires a non-blank "ariaLabel" when "children" is empty',
+    ],
+  ]) {
+    it(`M9: refuses the empty key beside ${claim}, naming the first missing one, on mount and update`, () => {
+      const { ui } = seamWith({ table: [WAIVED] });
+      assert.throws(() => mountOf(ui, props), refusal(message));
+      const handle = mountOf(ui, { children: 'Locked' });
+      assert.throws(() => handle.update(props), refusal(message));
+    });
+  }
+
+  it('still reports the key required and states no waivedBy in describe', () => {
+    const { ui } = seamWith({ table: [WAIVED] });
+    assert.deepEqual(ui.describe('Waived').props.children, { kind: 'text', required: true });
+  });
+
+  const waiving = (spec, extra = {}) => ({
+    ...WAIVED,
+    props: { ...WAIVED.props, ...extra, children: spec },
+  });
+  for (const [claim, entry, other] of [
+    ['a key that is not required', waiving({ kind: 'text', waivedBy: ['icon'] }), '["icon"]'],
+    [
+      'a callback key',
+      waiving({ kind: 'callback', required: true, waivedBy: ['icon'] }),
+      '["icon"]',
+    ],
+    ['an empty list', waiving({ kind: 'text', required: true, waivedBy: [] }), '[]'],
+    [
+      'a name twice',
+      waiving({ kind: 'text', required: true, waivedBy: ['icon', 'icon'] }),
+      '["icon","icon"]',
+    ],
+    [
+      'an unpublished key',
+      waiving({ kind: 'text', required: true, waivedBy: ['nope'] }),
+      '["nope"]',
+    ],
+    ['itself', waiving({ kind: 'text', required: true, waivedBy: ['children'] }), '["children"]'],
+    [
+      'a text key',
+      waiving({ kind: 'text', required: true, waivedBy: ['label'] }, { label: { kind: 'text' } }),
+      '["label"]',
+    ],
+    [
+      'a required key',
+      waiving(
+        { kind: 'text', required: true, waivedBy: ['note'] },
+        { note: { kind: 'data', required: true } }
+      ),
+      '["note"]',
+    ],
+    ['a string', waiving({ kind: 'text', required: true, waivedBy: 'icon' }), 'icon'],
+  ]) {
+    it(`refuses at registration a waivedBy on ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Waived "children" has an unknown waivedBy "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();

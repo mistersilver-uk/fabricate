@@ -402,7 +402,8 @@ describe('KnowledgeView mounted behaviour', () => {
     const chip = ambiguous.querySelector('[data-knowledge-match-tier="duplicate"]');
     assert.ok(chip, 'the low-confidence tier the auto-learn gate refuses earns a chip');
     assert.match(chip.getAttribute('title'), /auto-learn refuses/i);
-    assert.equal(chip.getAttribute('aria-label'), chip.getAttribute('title'));
+    // Spoken beside the hidden label, not an `aria-label` on a bare span (issue 2858).
+    assert.equal(chip.querySelector('.manager-chip-name').textContent, chip.getAttribute('title'));
   });
 
   it('raises the party-pool ordering warning only when the hazard is real', async () => {

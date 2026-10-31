@@ -206,7 +206,7 @@
         icon="fas fa-xmark"
         mono
         data-scoped-entry-alias={alias}
-        aria-label={phrase(
+        ariaLabel={phrase(
           'FABRICATE.Admin.Manager.Scoped.Component.AliasRemove',
           'Stop matching {uuid}',
           { uuid: alias }

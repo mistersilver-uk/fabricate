@@ -439,6 +439,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           struck: optional,
           truncate: optional,
           children: requiredText,
+          ariaLabel: optional,
         },
         rest: true,
         root: 'any',

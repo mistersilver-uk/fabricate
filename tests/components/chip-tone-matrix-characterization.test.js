@@ -645,23 +645,24 @@ describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
     );
   });
 
-  it('declares exactly four emphases, and they are the four the specimen publishes', () => {
+  it('declares exactly five emphases, and they are the five the specimen publishes', () => {
     const emphases = declaredSetLiteral('EMPHASES');
 
     assert.equal(
       emphases.length,
-      4,
-      'the chip declares a different number of emphases than the four it ships. An exact count ' +
-        "rather than a ceiling, for the density clause's reason: a fifth value reds here, and " +
+      5,
+      'the chip declares a different number of emphases than the five it ships. An exact count ' +
+        "rather than a ceiling, for the density clause's reason: a sixth value reds here, and " +
         'so does an `EMPHASES.has(…)` refactor that drops the count. A face a pixel from a ' +
         `shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
     );
 
     assert.deepEqual(
       emphases,
-      ['outlined', 'lit', 'bare', 'solid'],
-      'the four shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
-        'the ink), `bare` (no edge at all) and `solid` (an opaque ground), in this order'
+      ['outlined', 'lit', 'bare', 'solid', 'dashed'],
+      'the five shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
+        'the ink), `bare` (no edge at all), `solid` (an opaque ground) and `dashed` (a dashed ' +
+        'edge, issue 2858), in this order'
     );
   });
 });
