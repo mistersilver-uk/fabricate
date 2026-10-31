@@ -11,6 +11,7 @@
   | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
   | `shares` | `{ weight, tone?, color? }[]` | `[]` | Two or more draw the fill as abutting shares, left to right in every writing direction, each `weight / Σweight` of it and painted as `tone` and `color`; fewer draw the single fill. A `weight` that is not a finite number above zero reads 0, a numeric string included, and shares that all read 0 draw nothing. A `null` entry reads as `{}`, and a `shares` that is not an array draws the single fill. No share takes a minimum width. Stacked, the track carries no `data-fill-bar-tone` and `tone`/`color` are not read. The published form is `{ weight, tone? }`; a member other than those is private. |
   | `origin` | `'start'` \| `'center'` | `'start'` | `'center'` reads `value` as -100–100, clamped, and grows the fill from the track's midpoint: right in `--fab-success-text` above zero, left in `--fab-danger-text` below it, and a fill of no width at zero. It is left to right in every writing direction, as `shares` are, and `tone`, `color` and `shares` are not read; the track carries no `data-fill-bar-tone`. Any other `origin` reads `'start'`. |
+  | `neutralBand` | number, 0 or more | `0` | Read while `origin` is `'center'` alone: a reading no further from zero than it, its edge included, draws in the `neutral` ink, so zero is always neutral; beyond it the fill draws by sign. Anything but a finite number of zero or more reads 0, which draws by sign alone. Above 0 the root takes `has-neutral-band`, and under forced colours the fill draws solid beyond the band and hollow within it (issue 2863). |
   | `density` / `class` | `'default'` \| `'compact'` \| `'thin'` / class string | `'default'` / `''` | An 8px, 6px or 4px track height, and an extra class appended to the primitive's own. `thin` also drops the track's border and paints it `--fab-bg-3`, so the fill is the whole 4px. |
 
   Rest spread:
@@ -29,6 +30,7 @@
     color = '',
     shares = [],
     origin = 'start',
+    neutralBand = 0,
     density = 'default',
     class: extraClass = '',
     ...rest
@@ -60,6 +62,9 @@
     return Math.min(100, Math.max(-100, numeric));
   });
   const reach = $derived(Math.abs(signed) / 2);
+  const band = $derived(Number.isFinite(neutralBand) && neutralBand >= 0 ? neutralBand : 0);
+  const banded = $derived(centred && band > 0);
+  const within = $derived(Math.abs(signed) <= band);
   const resolvedTone = $derived(TONES.includes(tone) ? tone : 'neutral');
 
   // `Array.from`, not `map`, so a hole in a sparse array reads as `{}` too, as a `null` entry does.
@@ -77,12 +82,18 @@
   class={['fab-fill-bar', extraClass]}
   class:is-sm={density === 'compact'}
   class:is-thin={density === 'thin'}
+  class:has-neutral-band={banded}
   data-fill-bar-tone={centred || stacked ? undefined : resolvedTone}
   {...rest}
 >
   {#if centred}
     <span
-      class={['fab-fill-bar-fill', signed > 0 && 'is-positive', signed < 0 && 'is-negative']}
+      class={[
+        'fab-fill-bar-fill',
+        signed > 0 && !within && 'is-positive',
+        signed < 0 && !within && 'is-negative',
+        banded && within && 'is-within-band',
+      ]}
       style={`left: ${signed < 0 ? 50 - reach : 50}%; width: ${reach}%;`}
     ></span>
   {:else if stacked}
@@ -147,6 +158,33 @@
 
   .fab-fill-bar-fill.is-negative {
     background: var(--fab-danger-text);
+  }
+
+  .fab-fill-bar-fill.is-within-band {
+    background: var(--fab-text-subtle);
+  }
+
+  /* Forced colours repaint every fill to the ground, so a banded bar paints its own: the band is
+     told by shape, solid beyond it and a hollow ring within it, and the sign by side. A fill under
+     about 3px has no room for the ring, so there only its width tells it from one beyond the
+     band. A thin banded track keeps an edge outside its box, an outline rather than a border, so
+     its extent and midpoint stay readable and its 4px fill keeps room for the ring. */
+  @media (forced-colors: active) {
+    .fab-fill-bar.has-neutral-band.is-thin {
+      outline: 1px solid canvastext;
+    }
+
+    .fab-fill-bar.has-neutral-band > .fab-fill-bar-fill:is(.is-positive, .is-negative) {
+      forced-color-adjust: none;
+      background: canvastext;
+    }
+
+    .fab-fill-bar.has-neutral-band > .fab-fill-bar-fill.is-within-band {
+      forced-color-adjust: none;
+      background: canvas;
+      outline: 1px solid canvastext;
+      outline-offset: -1px;
+    }
   }
 
   .fab-fill-bar-fill.is-success,

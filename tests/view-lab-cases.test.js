@@ -416,6 +416,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedStageBarsForms.svelte',
+  'tests/view-lab/fixtures/PublishedFillBarBands.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
@@ -909,6 +910,9 @@ const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form=
 /** The stage bars forms fixture's track of one stage in a row, by the row's key and the stage. */
 const labStageBarsForm = (key, stage) =>
   `[data-lab-stage-bars-forms] > [data-lab-stage-bars-form="${key}"] [data-stage-bars-stage="${stage}"] .fab-fill-bar`;
+/** The fill bar bands fixture's one fill in a row, by the row's key. */
+const labFillBarBand = (key) =>
+  `[data-lab-fill-bar-bands] > [data-lab-fill-bar-band="${key}"] .fab-fill-bar-fill`;
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
@@ -1788,6 +1792,27 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: labStageBarsForm('default-shares', 1),
       styles: 'height: 6px; border-top-width: 1px',
+    },
+  ],
+  // The published fill bar's neutral band (issue 2863): each reading's ink, by sign with no band,
+  // neutral inside it, its edge included, and by sign beyond it, on either track.
+  'manager-published-fill-bar-bands-specimen': [
+    { selector: labFillBarBand('unbanded'), styles: 'background-color: var(--fab-success-text)' },
+    { selector: labFillBarBand('within'), styles: 'background-color: var(--fab-text-subtle)' },
+    { selector: labFillBarBand('edge'), styles: 'background-color: var(--fab-text-subtle)' },
+    { selector: labFillBarBand('beyond'), styles: 'background-color: var(--fab-success-text)' },
+    { selector: labFillBarBand('below'), styles: 'background-color: var(--fab-danger-text)' },
+    {
+      selector: labFillBarBand('thin-unbanded'),
+      styles: 'height: 4px; background-color: var(--fab-success-text)',
+    },
+    {
+      selector: labFillBarBand('thin-within'),
+      styles: 'height: 4px; background-color: var(--fab-text-subtle)',
+    },
+    {
+      selector: labFillBarBand('thin-beyond'),
+      styles: 'height: 4px; background-color: var(--fab-danger-text)',
     },
   ],
   // The published chip's forms (issue 2858): each square's side, and the dashed edge beside its
@@ -7703,6 +7728,34 @@ test('the stage bars forms specimen case measures the rows the stage bars forms 
     ({ selector }) => /data-lab-stage-bars-form="([\w-]+)"/u.exec(selector)[1]
   );
   assert.deepEqual(measured, ['states', 'thin-states', 'shares', 'shares', 'default-shares']);
+});
+
+test('the fill bar bands specimen case measures each row the fill bar bands fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedFillBarBands.svelte'
+  );
+  for (const hook of ['data-lab-fill-bar-bands', 'data-lab-fill-bar-band']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value);
+  const bands = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'neutralBand')
+    .map((node) => node.value.value);
+  assert.deepEqual(
+    bands,
+    [20, 20, 20, 20, 20, 20],
+    'six rows at a band of 20 beside two with none'
+  );
+  const { controls } = getCaseById('manager-published-fill-bar-bands-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-fill-bar-band="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(measured, keys, 'each row the fixture mounts is measured, in order');
 });
 
 test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {

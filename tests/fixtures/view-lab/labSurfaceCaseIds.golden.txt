@@ -52,6 +52,7 @@ manager-published-select-specimen
 manager-published-select-layer
 manager-published-stage-bars-specimen
 manager-published-stage-bars-forms-specimen
+manager-published-fill-bar-bands-specimen
 manager-published-field-specimen
 manager-published-field-forms-specimen
 manager-published-well-specimen

@@ -788,6 +788,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
   // Issue 2837: a stage's shares and the thin track, beside the default track.
   'published-stage-bars-forms': () => import('./fixtures/PublishedStageBarsForms.svelte'),
+  // Issue 2863: a centred fill bar's neutral band, beside a bar with none.
+  'published-fill-bar-bands': () => import('./fixtures/PublishedFillBarBands.svelte'),
   // Issue 2601: a field whose content slot holds a companion's caption, input and hint, by the same seam.
   'published-field': () => import('./fixtures/PublishedField.svelte'),
   // Issue 2848: fields at the published rungs, faces, number type and error state, by the same seam.

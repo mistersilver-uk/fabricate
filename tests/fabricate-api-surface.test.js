@@ -374,6 +374,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           color: optional,
           shares: optional,
           origin: optional,
+          neutralBand: optional,
           density: optional,
         },
         rest: true,

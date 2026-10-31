@@ -335,6 +335,24 @@ const STAGE_BARS_FORM_KEYS = Object.freeze(['states', 'thin-states', 'shares', '
 /** Sized to the fixture's 360px ground and its four rows. */
 const STAGE_BARS_FORMS_WINDOW = Object.freeze({ width: 480, height: 360 });
 
+/** The fill bar bands fixture's ground, a row by its key, and the one fill a row's bar draws. */
+const FILL_BAR_BANDS = '[data-lab-fill-bar-bands]';
+const FILL_BAR_BAND = (key) => `${FILL_BAR_BANDS} > [data-lab-fill-bar-band="${key}"]`;
+const FILL_BAR_BAND_FILL = (key) => `${FILL_BAR_BAND(key)} .fab-fill-bar-fill`;
+const FILL_BAR_BAND_KEYS = Object.freeze([
+  'unbanded',
+  'within',
+  'edge',
+  'beyond',
+  'below',
+  'thin-unbanded',
+  'thin-within',
+  'thin-beyond',
+]);
+
+/** Sized to the fixture's 320px ground and its eight rows. */
+const FILL_BAR_BANDS_WINDOW = Object.freeze({ width: 440, height: 320 });
+
 /** The field fixture's ground, and its one section's companion input and caption span. */
 const FIELD_GROUND = '[data-lab-field-ground]';
 const FIELD_SECTION = `${FIELD_GROUND} > [data-lab-field="name"]`;
@@ -1319,7 +1337,72 @@ export const CASES = Object.freeze([
     },
     position: STAGE_BARS_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
+    // The palettes where the thin track and the state paints read weakest (issue 2837).
+    themeVariants: ['foundry-native', 'hearth-herb'],
     // `StageBars.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-fill-bar-bands-specimen',
+    label:
+      "Specimen, mounted through the published seam — eight centred fill bars in a 320px column on --fab-bg-2, 8px apart, each beside the reading the companion prints. Reading top to bottom: +10 with no band, a short fill right of the midpoint in the pale success ink, for comparison; then at a band of 20: +10, the same short fill in the neutral --fab-text-subtle ink; -20, at the band's edge, a fill left of the midpoint, neutral; +21, just beyond it, right of the midpoint in the success ink; -45, left of the midpoint in the pale danger ink; then on the 4px borderless --fab-bg-3 track, +10 with no band in the success ink, for comparison, +10 neutral at the band of 20 and -60 in the danger ink. No bar takes focus or announces anything. The frame cannot show forced colours, under which a banded fill is solid beyond the band and a hollow ring within it and a thin banded track keeps an edge, which the rendered suite measures",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-fill-bar-bands' },
+    steps: [],
+    // The unbanded comparison drawn by sign, and the in-band reading drawn neutral.
+    expectSelector: `${FILL_BAR_BANDS}:has(> [data-lab-fill-bar-band="unbanded"] .fab-fill-bar:not(.has-neutral-band) .fab-fill-bar-fill.is-positive) > [data-lab-fill-bar-band="within"] .fab-fill-bar.has-neutral-band .fab-fill-bar-fill.is-within-band`,
+    expectContained: [
+      ...FILL_BAR_BAND_KEYS.map((key) => ({
+        container: FILL_BAR_BANDS,
+        target: `${FILL_BAR_BAND(key)} .fab-fill-bar`,
+      })),
+      { container: '.window-content', target: FILL_BAR_BANDS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each reading's ink: by sign with no band, neutral inside it, its edge included, and by
+        // sign beyond it, on either track.
+        {
+          selector: FILL_BAR_BAND_FILL('unbanded'),
+          styles: 'background-color: var(--fab-success-text)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('within'),
+          styles: 'background-color: var(--fab-text-subtle)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('edge'),
+          styles: 'background-color: var(--fab-text-subtle)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('beyond'),
+          styles: 'background-color: var(--fab-success-text)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('below'),
+          styles: 'background-color: var(--fab-danger-text)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('thin-unbanded'),
+          styles: 'height: 4px; background-color: var(--fab-success-text)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('thin-within'),
+          styles: 'height: 4px; background-color: var(--fab-text-subtle)',
+        },
+        {
+          selector: FILL_BAR_BAND_FILL('thin-beyond'),
+          styles: 'height: 4px; background-color: var(--fab-danger-text)',
+        },
+      ],
+    },
+    position: FILL_BAR_BANDS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // The palettes where the neutral ink reads weakest against the thin track (issue 2863).
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `FillBar.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

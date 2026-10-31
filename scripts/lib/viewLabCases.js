@@ -257,12 +257,13 @@ export function labQueryFor(viewCase) {
 
 /**
  * The surface a case photographs — the screen you can navigate to, as distinct from the state you
- * can drive that screen into.
+ * can drive that screen into. A case with no screen of its own, such as a specimen, is its own
+ * surface, and its palette variants share its key: a palette is not a surface (issue 2837).
  */
 export function labSurfaceKey(viewCase) {
   const surface = canvasSurfaceOf(viewCase);
   const theme = viewCase.query?.colorScheme ?? DEFAULT_COLOR_SCHEME;
-  return `${viewCase.app}|${surface || viewCase.id}|${theme}`;
+  return `${viewCase.app}|${surface || viewCase.baseCaseId || viewCase.id}|${theme}`;
 }
 
 /** The route-or-tab half of the surface key, per window family. */
