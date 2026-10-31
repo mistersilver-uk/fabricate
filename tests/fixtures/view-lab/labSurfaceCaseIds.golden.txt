@@ -47,10 +47,12 @@ manager-published-notice-dismissed
 manager-published-steppers-specimen
 manager-published-steppers-button-focus
 manager-published-search-specimen
+manager-published-search-forms-specimen
 manager-published-select-specimen
 manager-published-select-layer
 manager-published-stage-bars-specimen
 manager-published-field-specimen
+manager-published-field-forms-specimen
 manager-published-well-specimen
 manager-published-callout-specimen
 manager-published-list-row-aside-specimen

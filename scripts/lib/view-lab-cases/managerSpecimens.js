@@ -279,6 +279,15 @@ const SEARCH_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground and the height of its three fields. */
 const SEARCH_WINDOW = Object.freeze({ width: 480, height: 360 });
 
+/** The search forms fixture's ground, a part of one section's field by its key, and each section's density, height and corner. */
+const SEARCH_FORMS = '[data-lab-search-forms]';
+const SEARCH_FORM = (key, part) => `${SEARCH_FORMS} > [data-lab-search-form="${key}"] ${part}`;
+const SEARCH_FORM_RUNGS = Object.freeze([
+  ['default', 38, 9],
+  ['toolbar', 34, 9],
+  ['inline', 30, 7],
+]);
+
 /** The select fixture's ground, one of its sections by key, and a part of that section's select. */
 const SELECT_GROUND = '[data-lab-select-ground]';
 const SELECT_SECTION = (key) => `[data-lab-select="${key}"]`;
@@ -324,6 +333,21 @@ const FIELD_CAPTION = `${FIELD_SECTION} #lab-published-field-caption`;
 
 /** Sized to the fixture's 320px ground and the height of its one field. */
 const FIELD_WINDOW = Object.freeze({ width: 440, height: 240 });
+
+/** The forms fixture's ground, one section's companion input by its key, and each section's rung and corner. */
+const FIELD_FORMS = '[data-lab-field-forms]';
+const FIELD_FORM_INPUT = (key) =>
+  `${FIELD_FORMS} > [data-lab-field-form="${key}"] .fabricate-field input`;
+const FIELD_FORM_RUNGS = Object.freeze([
+  ['name', 34, 9],
+  ['formula', 30, 7],
+  ['uses', 28, 7],
+  ['tag', 26, 7],
+  ['bonus', 30, 7],
+]);
+
+/** Sized to the fixture's 320px ground and the height of its five fields, about 365px, with room to spare. */
+const FIELD_FORMS_WINDOW = Object.freeze({ width: 440, height: 460 });
 
 /** The well fixture's ground, the published well inside its card, and the companion's element. */
 const WELL_GROUND = '[data-lab-well-ground]';
@@ -1026,6 +1050,42 @@ export const CASES = Object.freeze([
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
+    id: 'manager-published-search-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — three search fields at the densities SearchField publishes, each beneath the text that names it, in a 320px column on the --fab-bg-1 ground. Reading top to bottom: Search recipes, the 38px shell at radius 9 holding tonic with 12 found at its trailing edge; Search components, the 34px toolbar shell at radius 9 holding iron with 3 chosen; and Search tags, the 30px inline shell at radius 7 holding ore with 1 found. Each count sits on one line inside the shell’s inset in the muted ink, after the query and its glyph. The frame draws inside the manager window and is the evidence for it alone; the lit border at each rung, a long count and the polite announcement are the rendered and mounted suites’',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-search-forms' },
+    steps: [],
+    // Each section's count the fixture's effect drew, the inline rung's last.
+    expectSelector: `${SEARCH_FORMS}:has(> [data-lab-search-form="default"] .fabricate-search > .fabricate-search-count):has(> [data-lab-search-form="toolbar"] .fabricate-search.is-density-toolbar > .fabricate-search-count) > [data-lab-search-form="inline"] .fabricate-search.is-density-inline > .fabricate-search-count[role="status"]`,
+    expectContained: [
+      ...SEARCH_FORM_RUNGS.map(([key]) => ({
+        container: SEARCH_FORMS,
+        target: SEARCH_FORM(key, '.fabricate-search'),
+      })),
+      { container: '.window-content', target: SEARCH_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each section's shell at its rung and corner, and its count's muted ink on one line.
+        ...SEARCH_FORM_RUNGS.map(([key, height, corner]) => ({
+          selector: SEARCH_FORM(key, '.fabricate-search'),
+          styles: `height: ${height}px; border-radius: ${corner}px`,
+        })),
+        ...SEARCH_FORM_RUNGS.map(([key]) => ({
+          selector: SEARCH_FORM(key, '.fabricate-search-count'),
+          styles: 'color: var(--fab-text-muted); white-space: nowrap',
+        })),
+      ],
+    },
+    position: SEARCH_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SearchField.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
     id: 'manager-published-select-specimen',
     label:
       'Specimen, mounted through the published seam — two selects, each beneath the text that names it, after one step: a press on Rows per page, which opened its list inside the ground the companion passed as its overlay host. The list reads 10, ticked and filled as the chosen row, then 25 and All, drawn over the ground below the trigger, clipped by nothing and ending above Sort recipes by, which stays closed, uncovered and showing its placeholder. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
@@ -1146,6 +1206,44 @@ export const CASES = Object.freeze([
       ],
     },
     position: FIELD_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Field.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-field-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — five fields at the forms Field publishes, in a 320px column on the --fab-bg-1 ground, each a caption over the companion’s own input. Reading top to bottom: Activity name, a 34px input at radius 9 holding Moonlit Glade in the serif face; Check formula, a 30px input at radius 7 holding 1d20 + 4 in the mono face; Uses, a 28px number input at radius 7 holding 3 in the mono face with no step buttons beside it; Tag, a 26px input at radius 7 holding Iron in the column’s face; and Bonus, a 30px input at radius 7 holding 1d20 + on the translucent danger fill, holding keyboard focus after one step that presses the right arrow in it, so the 1px accent ring is drawn inset over its danger edge, with the message Finish the formula beneath it in the danger text ink after a decorative warning glyph. The frame draws inside the manager window and is the evidence for it alone; the error state’s colours, the focus ring at each rung and the step buttons’ absence are the rendered suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-field-forms' },
+    steps: [{ selector: FIELD_FORM_INPUT('bonus'), press: 'ArrowRight' }],
+    // Every section's input the fixture's effect drew, the error one described by its message and focused.
+    expectSelector: `${FIELD_FORMS}:has(> [data-lab-field-form="name"] .fabricate-field.is-size-34.is-face-serif input):has(> [data-lab-field-form="uses"] .fabricate-field.is-type-number input[type="number"]):has(> [data-lab-field-form="tag"] .fabricate-field.is-size-26 input) > [data-lab-field-form="bonus"] .fabricate-field.is-invalid input[aria-invalid="true"][aria-describedby]:focus`,
+    expectContained: [
+      ...FIELD_FORM_RUNGS.map(([key]) => ({
+        container: FIELD_FORMS,
+        target: FIELD_FORM_INPUT(key),
+      })),
+      { container: '.window-content', target: FIELD_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each section's input at its rung and corner, the number input's want of step buttons, and the ring.
+        ...FIELD_FORM_RUNGS.map(([key, height, corner]) => ({
+          selector: FIELD_FORM_INPUT(key),
+          styles: `height: ${height}px; border-radius: ${corner}px`,
+        })),
+        { selector: FIELD_FORM_INPUT('uses'), styles: 'appearance: textfield' },
+        // The focused error input's inset ring, drawn over its danger edge.
+        {
+          selector: `${FIELD_FORM_INPUT('bonus')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
+        },
+      ],
+    },
+    position: FIELD_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Field.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

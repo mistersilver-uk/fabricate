@@ -412,9 +412,11 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
+  'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
+  'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedListRows.svelte',
@@ -871,10 +873,16 @@ const DISMISSAL = (tone) =>
 const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
 /** A part of one published search field of the search fixture, by its section's key. */
 const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
+/** A part of the search forms fixture's field in one section, by the section's key. */
+const labSearchForm = (key, part) =>
+  `[data-lab-search-forms] > [data-lab-search-form="${key}"] ${part}`;
 /** A part of one published select of the select fixture, by its section's key. */
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
 /** The one section of the field fixture. */
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
+/** The forms fixture's companion input in one section, by the section's key. */
+const labFieldForm = (key) =>
+  `[data-lab-field-forms] > [data-lab-field-form="${key}"] .fabricate-field input`;
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 /** The list row fixture's aside host in one section's published row, by the section's key. */
@@ -1350,6 +1358,22 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'border-color: var(--fab-accent)',
     },
   ],
+  // The published search field's densities and count (issue 2849): each shell at its rung and corner,
+  // and each count in the muted ink on one line.
+  'manager-published-search-forms-specimen': [
+    ...[
+      ['default', 38, 9],
+      ['toolbar', 34, 9],
+      ['inline', 30, 7],
+    ].map(([key, height, corner]) => ({
+      selector: labSearchForm(key, '.fabricate-search'),
+      styles: `height: ${height}px; border-radius: ${corner}px`,
+    })),
+    ...['default', 'toolbar', 'inline'].map((key) => ({
+      selector: labSearchForm(key, '.fabricate-search-count'),
+      styles: 'color: var(--fab-text-muted); white-space: nowrap',
+    })),
+  ],
   // The published selects (issue 2454): each rung's declared corner, and the panel's own, in the
   // overlay host the companion passed and on the standalone layer.
   'manager-published-select-specimen': [
@@ -1374,6 +1398,25 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_FIELD} .fabricate-field input`, styles: 'height: 38px; border-radius: 9px' },
     {
       selector: `${LAB_FIELD} .fabricate-field input:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
+    },
+  ],
+  // The published field's forms (issue 2848): each section's input at its rung and corner, the
+  // number input drawn as a text field with no step buttons, and the focused error input's ring.
+  'manager-published-field-forms-specimen': [
+    ...[
+      ['name', 34, 9],
+      ['formula', 30, 7],
+      ['uses', 28, 7],
+      ['tag', 26, 7],
+      ['bonus', 30, 7],
+    ].map(([key, height, corner]) => ({
+      selector: labFieldForm(key),
+      styles: `height: ${height}px; border-radius: ${corner}px`,
+    })),
+    { selector: labFieldForm('uses'), styles: 'appearance: textfield' },
+    {
+      selector: `${labFieldForm('bonus')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
   ],
@@ -7075,6 +7118,54 @@ test('the field specimen case types into the input the field fixture draws in a 
   assert.ok(
     expectSelector.includes('[data-lab-value="Moonlit tonic"]'),
     'the frame is taken only once the companion recorded the edit'
+  );
+});
+
+test('the search forms specimen case measures the density each section of the search forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSearchForms.svelte'
+  );
+  for (const hook of ['data-lab-search-forms', 'data-lab-search-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const densities = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'density')
+    .map((node) => node.value.value);
+  const measured = getCaseById('manager-published-search-forms-specimen')
+    .expectLayout.controls.filter(({ styles }) => styles.startsWith('height: '))
+    .map(({ selector }) => /data-lab-search-form="(\w+)"/u.exec(selector)[1]);
+  assert.deepEqual(
+    measured,
+    densities,
+    'each section’s shell is measured at the density it mounts'
+  );
+  assert.deepEqual(densities, ['default', 'toolbar', 'inline'], 'every published density');
+});
+
+test('the field forms specimen case measures the rung each section of the forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedFieldForms.svelte'
+  );
+  for (const hook of ['data-lab-field-forms', 'data-lab-field-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rungs = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'size')
+    .map((node) => node.value.value);
+  const measured = getCaseById('manager-published-field-forms-specimen')
+    .expectLayout.controls.filter(({ styles }) => styles.startsWith('height: '))
+    .map(({ styles }) => Number.parseFloat(/height: (\d+)px/u.exec(styles)[1]));
+  assert.deepEqual(measured, rungs, 'each section’s input is measured at the rung it mounts');
+  assert.deepEqual(
+    [...new Set(rungs)].sort((left, right) => left - right),
+    [26, 28, 30, 34],
+    'the four rungs Premium draws'
   );
 });
 

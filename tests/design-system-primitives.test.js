@@ -769,6 +769,8 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
     'manager-tool-parity-01-library-1280x720',
     // The compact form, which the 38px shell must leave pixel-identical.
     'world-component-entry-systems',
+    // The specimen of the published sizes and count (issue 2849).
+    'manager-published-search-forms-specimen',
   ]) {
     assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
   }
@@ -903,7 +905,7 @@ test('(a) a StageBars change publishes its two run frames, then the specimen tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Field change publishes its twelve frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Field.svelte';
   const frames = [
     'manager-gathering-task-editor-normal',
@@ -919,6 +921,7 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
     'player-crafting-roll-prompt-basic',
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
+    'manager-published-field-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

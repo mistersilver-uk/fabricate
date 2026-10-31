@@ -22,12 +22,12 @@ import {
 import { SHIPPED, byName, gatedRoot } from './helpers/publishedComponentGate.js';
 
 /**
- * The published field's root: no published key writes a class on it, and the classes under which
- * a rule redraws a search field of Fabricate's own, the caption form's wrapper among them.
+ * The published field's root: the classes its `density` writes on it (issue 2849), and the classes
+ * under which a rule redraws a search field of Fabricate's own, the caption form's wrapper among them.
  */
 const SEARCH = Object.freeze({
   root: 'fabricate-search',
-  writable: new Set(),
+  writable: new Set(['is-density-toolbar', 'is-density-inline']),
   ancestors: new Set([
     'fabricate-search-field',
     'manager-access-roster',
@@ -43,7 +43,7 @@ const SEARCH = Object.freeze({
   drawsChildren: true,
 });
 
-/** The ten rules that draw a published field, the last inside the Manager's own container query. */
+/** The fourteen rules that draw a published field, the last inside the Manager's own container query. */
 const SEARCH_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-search input',
   'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search',
@@ -53,6 +53,10 @@ const SEARCH_FAMILY_RULES = Object.freeze([
   'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact) input:not(:focus-visible)::placeholder',
   'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact):focus-within',
   'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact) input:focus-visible',
+  'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact).is-density-toolbar',
+  'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact).is-density-inline',
+  'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact) > .fabricate-search-count',
+  'styles/fabricate-list-primitives.css: .fabricate-search.fabricate-search:not(.is-compact) > .fabricate-search-count:empty',
   'styles/fabricate-list-primitives.css: .fabricate-search input:focus',
   'styles/fabricate-manager-responsive.css: .fabricate-search.fabricate-search',
 ]);
@@ -89,10 +93,10 @@ function compactOnly(complex) {
 const reachingOf = (census) => census.filter(({ safe, complex }) => !safe && !compactOnly(complex));
 
 describe('the module sheet and every component style against the published SearchField', () => {
-  // Of the selectors that name the root, the ten family rules and the hook rule reach a published
-  // field; three compact rules need `is-compact` only through `:where()`; the rest sit on a class no
-  // published key writes or under a pinned ancestor. The census size is not pinned: a sheet edit moves it.
-  it('reaches a published field through its ten family rules and one hook rule, of those that name its root', () => {
+  // Of the selectors that name the root, the fourteen family rules and the hook rule reach a
+  // published field; three compact rules need `is-compact` only through `:where()`; the rest sit on
+  // a class no published key writes or under a pinned ancestor. The census size is not pinned.
+  it('reaches a published field through its fourteen family rules and one hook rule, of those that name its root', () => {
     const census = shippedCensus(SEARCH, 'SearchField');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -111,8 +115,8 @@ describe('the module sheet and every component style against the published Searc
     const entry = entryNamed('SearchField');
     assert.deepEqual(
       [Object.keys(entry.props), gatedRoot(entry)],
-      [['value', 'placeholder', 'ariaLabel'], 'fabricate'],
-      'a published density, label, class or wider root reopens the census'
+      [['value', 'placeholder', 'ariaLabel', 'density', 'countLabel'], 'fabricate'],
+      'a published label, class or wider root, or a density the seam does not withhold compact from, reopens the census'
     );
   });
 
@@ -157,6 +161,7 @@ describe('the search census, synthetic', () => {
     '.fabricate-manager .manager-unpinned-row .fabricate-search',
     '.fabricate-search:where(.is-compact, :hover) input',
     '.fabricate-search:not(.is-compact)',
+    '.fabricate-search.is-density-inline',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published field`, () => {
       assert.deepEqual(reachingIn(selector), [`sheet.css: ${selector}`]);

@@ -3700,3 +3700,56 @@
   outline-offset: -1px;
 }
 
+/* Field's published rungs (issue 2848): the control-height ladder below the 38 default, each at its radius band; `min-height: 0` lifts the element-typed chrome's 34px floor. */
+.fabricate-field.fabricate-field.is-size-26 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
+  height: 26px;
+  min-height: 0;
+  border-radius: 7px;
+}
+
+.fabricate-field.fabricate-field.is-size-28 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
+  height: 28px;
+  min-height: 0;
+  border-radius: 7px;
+}
+
+.fabricate-field.fabricate-field.is-size-30 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
+  height: 30px;
+  min-height: 0;
+  border-radius: 7px;
+}
+
+.fabricate-field.fabricate-field.is-size-34 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
+  height: 34px;
+  min-height: 0;
+}
+
+.fabricate-field.fabricate-field.is-face-serif input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']),
+.fabricate-field.fabricate-field.is-face-serif textarea {
+  font-family: var(--fab-font-serif);
+}
+
+.fabricate-field.fabricate-field.is-face-mono input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']),
+.fabricate-field.fabricate-field.is-face-mono textarea {
+  font-family: var(--fab-font-mono);
+}
+
+/* The button-less numeric form: the native step buttons are hidden, and the arrow keys still step. */
+.fabricate-field.fabricate-field.is-type-number input[type='number'] {
+  appearance: textfield;
+}
+
+.fabricate-field.fabricate-field.is-type-number input[type='number']::-webkit-outer-spin-button,
+.fabricate-field.fabricate-field.is-type-number input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* The error state, the select trigger's danger edge and fill, on a control that also says so; the keyboard ring is drawn over the edge. */
+.fabricate-field.fabricate-field.is-invalid input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[aria-invalid='true'],
+.fabricate-field.fabricate-field.is-invalid textarea[aria-invalid='true'] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+

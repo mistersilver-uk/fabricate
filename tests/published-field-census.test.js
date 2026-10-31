@@ -32,12 +32,19 @@ import {
 } from './helpers/publishedComponentGate.js';
 
 /**
- * The published field's root: no published key writes a class on it, and the classes under which
- * a rule redraws a field of Fabricate's own or the control inside it.
+ * The published field's root: the classes its `size`, `face`, `type` and `invalid` write on it
+ * (issue 2848), and the classes under which a rule redraws a field of Fabricate's own or the
+ * control inside it.
  */
+const FORM_CLASSES = Object.freeze({
+  size: ['is-size-26', 'is-size-28', 'is-size-30', 'is-size-34'],
+  face: ['is-face-serif', 'is-face-mono'],
+  type: ['is-type-number'],
+  invalid: ['is-invalid'],
+});
 const FIELD = Object.freeze({
   root: 'fabricate-field',
-  writable: new Set(),
+  writable: new Set(Object.values(FORM_CLASSES).flat()),
   ancestors: new Set([
     'manager-checks-rail',
     'fabricate-rule-row',
@@ -88,6 +95,24 @@ const FIELD_SLOT_CHROME = Object.freeze([
   'styles/fabricate-manager-recipe-editor.css: .fabricate-field.fabricate-field small',
 ]);
 
+/** The thirteen rules the four form keys' classes draw on a control in the slot (issue 2848). */
+const NUMBER = ".fabricate-field.fabricate-field.is-type-number input[type='number']";
+const FIELD_FORM_CHROME = Object.freeze([
+  ...FORM_CLASSES.size.map(
+    (rung) => `${LIBRARY}: .fabricate-field.fabricate-field.${rung} input${TEXT_LIKE_EXCLUSION}`
+  ),
+  ...FORM_CLASSES.face.flatMap((face) => [
+    `${LIBRARY}: .fabricate-field.fabricate-field.${face} input${TEXT_LIKE_EXCLUSION}`,
+    `${LIBRARY}: .fabricate-field.fabricate-field.${face} textarea`,
+  ]),
+  // The error state needs the control's own `aria-invalid` as well as the key.
+  `${LIBRARY}: .fabricate-field.fabricate-field.is-invalid input${TEXT_LIKE_EXCLUSION}[aria-invalid='true']`,
+  `${LIBRARY}: .fabricate-field.fabricate-field.is-invalid textarea[aria-invalid='true']`,
+  ...['', '::-webkit-outer-spin-button', '::-webkit-inner-spin-button'].map(
+    (part) => `${LIBRARY}: ${NUMBER}${part}`
+  ),
+]);
+
 const writtenOf = (census) =>
   census.map(({ written }) => written.replaceAll(/\s+/g, ' ')).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
@@ -95,18 +120,18 @@ const ringOf = (rows, written) =>
   rows.filter((row) => row.written === written).map(({ rule }) => declarationsOf(rule));
 
 describe('the module sheet and every component style against the published Field', () => {
-  // The 47: the two family rules and the seventeen slot-chrome rules; fifteen caller rules under a
-  // pinned ancestor, four of them in components; and thirteen on a class no published key writes,
-  // ten of them in components.
-  it('reaches a published field through its two family rules and seventeen slot-chrome rules, of 47 that name its root', () => {
+  // The 60: the two family rules, the seventeen slot-chrome rules and the thirteen form rules;
+  // fifteen caller rules under a pinned ancestor, four of them in components; and thirteen on a
+  // class no published key writes, ten of them in components.
+  it('reaches a published field through its two family rules, seventeen slot-chrome rules and thirteen form rules, of 60 that name its root', () => {
     const census = shippedCensus(FIELD, 'Field');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
-      [...FIELD_FAMILY_RULES, ...FIELD_SLOT_CHROME].sort(byName)
+      [...FIELD_FAMILY_RULES, ...FIELD_SLOT_CHROME, ...FIELD_FORM_CHROME].sort(byName)
     );
-    assert.equal(census.length, 47, 'the census of every selector naming the root');
+    assert.equal(census.length, 60, 'the census of every selector naming the root');
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
-    assert.equal(inPartials, 33, 'the partials were read');
+    assert.equal(inPartials, 46, 'the partials were read');
     assert.deepEqual(
       staleAncestors(FIELD, census, publishedManagerClasses()),
       [],
@@ -114,7 +139,7 @@ describe('the module sheet and every component style against the published Field
     );
     assert.deepEqual(
       [Object.keys(entryNamed('Field').props), gatedRoot(entryNamed('Field'))],
-      [['as', 'children'], 'fabricate'],
+      [['as', 'children', 'size', 'face', 'type', 'invalid'], 'fabricate'],
       'a published class, caption, label host or wider root reopens the census'
     );
   });
@@ -172,8 +197,8 @@ describe('the module sheet and every component style against the published Field
       )
     );
     assert.deepEqual(
-      [...new Set(tokens)].filter((token) => onRoot.has(token)),
-      [FIELD.root, ...FIELD.writable],
+      [...new Set(tokens)].filter((token) => onRoot.has(token)).sort(byName),
+      [FIELD.root, ...FIELD.writable].sort(byName),
       'a class the file spells that a rule names on the root is writable'
     );
   });
@@ -211,6 +236,8 @@ describe('the field census, synthetic', () => {
     '.fabricate-field[data-x]',
     '.fabricate-manager .manager-unpinned-row .fabricate-field',
     '.fabricate-field > span',
+    '.fabricate-field.is-size-26 input',
+    '.fabricate-field.is-invalid textarea',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published field`, () => {
       assert.deepEqual(reachingIn(selector), [`sheet.css: ${selector}`]);
