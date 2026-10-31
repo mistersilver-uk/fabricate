@@ -422,12 +422,7 @@ describe('the published ListRow, disabled', () => {
 
 describe('what the published ListRow refuses', () => {
   for (const key of [
-    'density',
-    'layout',
-    'markSize',
-    'truncateName',
     'inset',
-    'detailAlign',
     'bodyBasis',
     'openProps',
     'nameClass',

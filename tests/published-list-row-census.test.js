@@ -1,5 +1,5 @@
 /**
- * The module sheet and every component style against the published `ListRow` (issue 2784): the 44
+ * The module sheet and every component style against the published `ListRow` (issue 2784): the 48
  * selectors that name its root, which of them a published row can match, where those sit and what
  * they draw, the bare `button` rules its whole-row button also takes, and the focus mark that
  * button draws in place of the module ring: an accent ring 2px wide inset 2px on the overlay that
@@ -37,19 +37,31 @@ import { propertiesOf, shortfalls, themePalettes } from './helpers/themePaletteC
 const SHEET = 'styles/fabricate-list-primitives.css';
 
 /**
- * The published row's root: the classes `tone`, `muted`, `onOpen` and the requested slots write
- * beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
+ * The published row's root: the classes `tone`, `muted`, `onOpen`, the requested slots, `density`,
+ * `layout`, `truncateName` and `detailAlign` (issue 2850), and a read-only `selected` and `busy`
+ * (issue 2851) write beside it, no ancestor a Fabricate rule redraws a row under, and the slot wrappers its file
  * spells that no published key draws.
  */
 const LIST_ROW = Object.freeze({
   root: 'fabricate-list-row',
-  writable: new Set(['is-positive', 'is-danger', 'is-muted', 'is-form']),
+  writable: new Set([
+    'is-positive',
+    'is-danger',
+    'is-muted',
+    'is-form',
+    'is-default',
+    'is-card',
+    'is-truncated',
+    'is-detail-end',
+    'is-selected-face',
+    'is-busy',
+  ]),
   ancestors: new Set(),
   drawsChildren: true,
   undrawn: new Set(['fabricate-list-row-children']),
 });
 
-/** The 29 rules that draw a published row, every one in its sheet. */
+/** The 45 rules that draw a published row, every one in its sheet. */
 const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row',
   '.fabricate-list-row .fabricate-list-row-name',
@@ -78,20 +90,46 @@ const LIST_ROW_FAMILY = Object.freeze([
   ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
-  ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
+  ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'], [aria-disabled='true']))",
   '.fabricate-list-row:has(> .fabricate-list-row-open:disabled)',
+  // The density, layout and truncation rules (issue 2850).
+  '.fabricate-list-row.is-default',
+  '.fabricate-list-row.is-default > button.fabricate-list-row-open::after',
+  '.fabricate-list-row.is-card',
+  '.fabricate-list-row.is-card > .fabricate-list-row-open',
+  '.fabricate-list-row.is-card > .fabricate-list-row-open > .fabricate-list-row-body',
+  '.fabricate-list-row.is-card > button.fabricate-list-row-open::after',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-name',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-detail',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-detail',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-head > .fabricate-list-row-name',
+  '.fabricate-list-row.is-truncated .fabricate-list-row-badges',
+  '.fabricate-list-row.is-truncated.is-detail-end .fabricate-list-row-detail',
+  // The read-only selected face and the busy button (issue 2851).
+  '.fabricate-list-row.is-selected-face',
+  '.fabricate-list-row.is-danger.is-selected-face',
+  '.fabricate-list-row.is-selected-face:not(.is-danger)',
+  '.fabricate-list-row.is-busy > .fabricate-list-row-open:enabled',
 ]);
 
 /** The rule that strips the module ring from the row's button, and the one that rings its overlay. */
 const STRIP = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible`;
 const RING = `${SHEET}: .fabricate-list-row > .fabricate-list-row-open:focus-visible::after`;
-/** The grounds a published row paints beneath its ring, each over the row's own opaque fill, top first. */
+/**
+ * The grounds beneath a published row's ring, top first: its own opaque fill, a card's included,
+ * and each translucent state fill, which replaces that fill, over each ground a row is mounted on.
+ */
 const ROW_GROUNDS = Object.freeze([
   ['--fab-bg-1'],
-  ['--fab-surface-active', '--fab-bg-1'],
-  ['--fab-surface-raised', '--fab-bg-1'],
-  ['--fab-success-soft', '--fab-bg-1'],
-  ['--fab-danger-soft', '--fab-bg-1'],
+  ['--fab-bg-2'],
+  ...[
+    '--fab-surface-active',
+    '--fab-surface-raised',
+    '--fab-success-soft',
+    '--fab-danger-soft',
+  ].flatMap((wash) =>
+    ['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2'].map((ground) => [wash, ground])
+  ),
 ]);
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
@@ -103,9 +141,9 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published ListRow', () => {
-  it('reaches a published row through 29 of the 44 selectors that name its root', () => {
+  it('reaches a published row through 45 of the 48 selectors that name its root', () => {
     const shipped = census();
-    assert.equal(shipped.length, 44, 'the census of every selector naming the root');
+    assert.equal(shipped.length, 48, 'the census of every selector naming the root');
     assert.deepEqual(writtenOf(reachingOf(shipped)), inSheet(LIST_ROW_FAMILY));
     assert.deepEqual(
       staleAncestors(LIST_ROW, shipped, publishedManagerClasses()),
@@ -133,11 +171,18 @@ describe('the module sheet and every component style against the published ListR
           'badges',
           'meta',
           'trailing',
+          'markSize',
+          'density',
+          'layout',
+          'truncateName',
+          'detailAlign',
+          'current',
+          'busy',
         ],
         'fabricate',
         true,
       ],
-      'a published density, layout, truncateName, slot, openProps, class or wider root reopens the census'
+      'a published inset, bodyBasis, children, openProps, class or wider root reopens the census'
     );
   });
 
@@ -159,8 +204,12 @@ describe('the module sheet and every component style against the published ListR
           `${SHEET}: .fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])`,
           { 'box-shadow': 'inset 0 0 0 1px var(--fab-accent-border)' },
         ],
+        [
+          `${SHEET}: .fabricate-list-row.is-danger.is-selected-face`,
+          { 'box-shadow': 'inset 0 0 0 1px var(--fab-accent-border)' },
+        ],
       ].sort(([a], [b]) => byName(a, b)),
-      'the button reset, the strip, the overlay ring and the selected danger row’s edge'
+      'the button reset, the strip, the overlay ring and the selected danger row’s edge, pressed or read-only'
     );
   });
 
@@ -194,8 +243,8 @@ describe('the list row census, synthetic', () => {
   const reachingIn = (css) => writtenOf(reachingOf(syntheticCensus(LIST_ROW, css)));
 
   for (const selector of [
-    '.fabricate-list-row.is-card',
-    '.fabricate-list-row.is-truncated .fabricate-list-row-name',
+    '.fabricate-list-row.is-row-inset',
+    '.fabricate-list-row.is-body-fill .fabricate-list-row-body',
     '.fabricate-list-row .fabricate-list-row-children',
   ]) {
     it(`admits ${selector}, which a published row cannot take`, () => {
@@ -210,6 +259,8 @@ describe('the list row census, synthetic', () => {
     '.fabricate-list-row[data-x]',
     '.fabricate-list-row .fabricate-list-row-aside',
     '.fabricate-list-row .fabricate-list-row-badges',
+    '.fabricate-list-row.is-card',
+    '.fabricate-list-row.is-truncated .fabricate-list-row-name',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published row`, () => {
       assert.deepEqual(reachingIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);

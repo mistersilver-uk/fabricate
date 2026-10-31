@@ -7,11 +7,19 @@
      figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
      `data-list-row` wins. One root holds every form; `aside` has one render tag, `leading`, `badges`
      and `meta` sit in `content`, which one of three exclusive branches renders, and `trailing` has
-     a wrapped tag and a bare one, so the published seam can fill each (issues 2793 and 2843). -->
+     a wrapped tag and a bare one, so the published seam can fill each (issues 2793 and 2843).
+     `markSize` is a rung of Medallion's art ladder, drawn by a literal tag each (issue 2850).
+     Without `onOpen`, `selected` draws the face alone; `current` and `busy` write their ARIA on the
+     button, else on the root, and `busy` swaps the mark or `leading` for a spinner (issue 2851). -->
 <script>
   import Medallion from './Medallion.svelte';
 
-  const MARK_SIZES = new Set([22, 26, 30, 38]);
+  const MARK_SIZES = new Set([22, 26, 28, 30, 34, 38]);
+  const CURRENT_TOKENS = new Map([
+    [true, 'true'],
+    ['step', 'step'],
+  ]);
+  const SPINNER = 'fas fa-spinner fa-spin';
   // The control's own attributes: an `openProps` key naming one, or any click handler, is
   // dropped, so the row's win.
   const OWNED_KEYS = new Set([
@@ -24,6 +32,9 @@
     'onclick',
     'class',
     'aria-describedby',
+    'aria-current',
+    'aria-busy',
+    'aria-disabled',
   ]);
 
   let {
@@ -43,6 +54,8 @@
     detailAlign = 'start',
     bodyBasis = 'auto',
     selected = undefined,
+    current = undefined,
+    busy = false,
     disabled = false,
     onOpen = null,
     openProps = null,
@@ -79,6 +92,8 @@
       'is-detail-end': detailAlign === 'end',
       'is-body-fill': bodyBasis === 'fill' && form,
       'is-danger': tone === 'danger',
+      'is-selected-face': selected === true && !onOpen,
+      'is-busy': Boolean(busy),
     },
   ]);
   const mark = $derived(MARK_SIZES.has(markSize) ? markSize : 22);
@@ -100,6 +115,11 @@
     )
   );
   const pressed = $derived(selected == null ? undefined : String(selected === true));
+  const currentToken = $derived(CURRENT_TOKENS.get(current));
+  const busyToken = $derived(busy ? 'true' : undefined);
+  const markArt = $derived(busy ? '' : art);
+  const markIcon = $derived(busy ? SPINNER : icon);
+  const markTint = $derived(busy ? '' : tint);
 
   $effect(() => {
     if (MARK_SIZES.has(markSize)) return;
@@ -110,16 +130,18 @@
   });
 
   function open(event) {
-    if (!disabled) onOpen?.(event);
+    if (!disabled && !busy) onOpen?.(event);
   }
 </script>
 
 {#snippet content(form)}
-  {#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>
-  {:else if mark === 38}<Medallion {art} {icon} {tint} alt="" size={38} />
-  {:else if mark === 30}<Medallion {art} {icon} {tint} alt="" size={30} />
-  {:else if mark === 26}<Medallion {art} {icon} {tint} alt="" size={26} />
-  {:else}<Medallion {art} {icon} {tint} alt="" size={22} />{/if}
+  {#if leading && !busy}<span class="fabricate-list-row-leading">{@render leading()}</span>
+  {:else if mark === 38}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={38} />
+  {:else if mark === 34}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={34} />
+  {:else if mark === 30}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={30} />
+  {:else if mark === 28}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={28} />
+  {:else if mark === 26}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={26} />
+  {:else}<Medallion art={markArt} icon={markIcon} tint={markTint} alt="" size={22} />{/if}
   {#if form}
     <span class="fabricate-list-row-body">
       <span class="fabricate-list-row-head">
@@ -141,7 +163,13 @@
   {#if quantity != null}<span class="fabricate-list-row-quantity">{quantity}</span>{/if}
 {/snippet}
 
-<div class={rowClass} {...rest} data-list-row={isDefault ? 'default' : 'dense'}>
+<div
+  class={rowClass}
+  aria-current={onOpen ? undefined : currentToken}
+  aria-busy={onOpen ? undefined : busyToken}
+  {...rest}
+  data-list-row={isDefault ? 'default' : 'dense'}
+>
   {#if onOpen}
     <button
       {...passed}
@@ -149,6 +177,9 @@
       aria-describedby={describedBy}
       type="button"
       aria-pressed={pressed}
+      aria-current={currentToken}
+      aria-busy={busyToken}
+      aria-disabled={busy && !disabled ? 'true' : undefined}
       {disabled}
       data-keyboard-focus="true"
       onclick={open}>{@render content(true)}</button

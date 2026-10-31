@@ -41,16 +41,18 @@ The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detai
 The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
 The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
 ListRow MAY also draw a selectable form, at `density` dense or default and `layout` row or card.
+Its `markSize` is a rung of the art ladder, 22, 26, 28, 30, 34 or 38, drawn by a literal Medallion size each, and any other value draws the 22px mark.
 With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
+Without `onOpen`, a `selected` of true MUST draw the selected face on the row's own box and inset and write no `aria-pressed`; `current` writes `aria-current` and `busy` writes `aria-busy` and draws a spinning glyph in place of the mark, on the button with `onOpen` and on the root without it, and a busy button keeps its focus and refuses a press (issue 2851).
 The button is named by any `leading` text, then the item's name, then each state the row shows only visually.
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
 `<BrowseCard>` is merged into ListRow's `layout="card"`, which a browse card MUST render through.
-A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
+A ListRow given none of the selectable form's props MUST draw the dense output unchanged; a read-only `selected`, `current` or `busy` adds only its face, attribute or glyph to it.
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
 ListRow is shipped; a browse list's loading and error forms are `ListState`'s, not the row's (issue 2548).
-`ListRow` is published through `game.fabricate.api.ui` (issue 2784) with only `name`, `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled` and `onOpen`, which the seam calls with no argument, the `aside` content slot (issue 2793) and the `leading`, `badges`, `meta` and `trailing` content slots (issue 2843), as its group in `ui-extension-points` states.
+`ListRow` is published through `game.fabricate.api.ui` (issue 2784) with only `name`, `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled` and `onOpen`, which the seam calls with no argument, the `aside` content slot (issue 2793), the `leading`, `badges`, `meta` and `trailing` content slots (issue 2843), `markSize`, `density`, `layout`, `truncateName` and `detailAlign` (issue 2850), and `current` and `busy` (issue 2851), as its group in `ui-extension-points` states.
 ListRow draws every form in one root and its `aside` by one render tag, so the seam's `aside` element is never moved while it is requested; `leading`, `badges` and `meta` move with `onOpen` and `trailing` with the selectable form, as that group states.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 

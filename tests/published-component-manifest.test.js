@@ -585,10 +585,10 @@ const SELECT_TRIGGER_REASON = Object.freeze({
   reason:
     'the published Select publishes no disabled or readonly, so its trigger takes no aria-disabled',
 });
-/** Why a rule on a `ListRow` row reads the `aria-pressed` its own `selected` writes (issue 2784). */
+/** Why a rule on a `ListRow` row reads the `aria-pressed` and `aria-disabled` its `selected` and `busy` write (issues 2784 and 2851). */
 const LIST_ROW_FACE_REASON = Object.freeze({
   reason:
-    "the rule draws the published ListRow's own selected or hover face, which `selected` drives as its group states",
+    "the rule draws the published ListRow's own selected or hover face, which `selected` and `busy` drive as its group states",
 });
 const SELECT_OPTION_REASON = Object.freeze({
   reason:
@@ -620,7 +620,7 @@ const ARIA_KEY_SELECTORS = Object.freeze([
     LIST_ROW_FACE_REASON,
   ],
   [
-    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'], [aria-disabled='true']))",
     LIST_ROW_FACE_REASON,
   ],
   [
@@ -646,6 +646,10 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   [
     "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
     BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'], [aria-disabled='true']))",
+    LIST_ROW_FACE_REASON,
   ],
   [
     "styles/fabricate-manager-recipe-editor.css: .fabricate-select .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled)",
@@ -1997,8 +2001,8 @@ describe('each entry matches its component declaration', () => {
     ],
     [
       'its leading guard dropped',
-      '{#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>',
-      '{#if mark}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      '{#if leading && !busy}<span class="fabricate-list-row-leading">{@render leading()}</span>',
+      '{#if mark && !busy}<span class="fabricate-list-row-leading">{@render leading()}</span>',
       `leading ${UNGUARDED}`,
     ],
     [
@@ -3557,7 +3561,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 25 selectors of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 26 readings of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(

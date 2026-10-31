@@ -577,7 +577,7 @@ describe('ListRow selectable form (issue 1778)', () => {
       warned.push(String(message));
     };
     try {
-      for (const markSize of [22, 26, 30, 38, 34]) {
+      for (const markSize of [22, 26, 28, 30, 34, 38, 36]) {
         const target = await harness.mount({ name: 'Mark', onOpen: () => {}, markSize });
         widths.push(target.querySelector('.fab-medallion').style.width);
         harness.remount();
@@ -585,7 +585,7 @@ describe('ListRow selectable form (issue 1778)', () => {
     } finally {
       console.warn = warn;
     }
-    assert.deepEqual(widths, ['22px', '26px', '30px', '38px', '22px']);
+    assert.deepEqual(widths, ['22px', '26px', '28px', '30px', '34px', '38px', '22px']);
     assert.equal(warned.length, 1, warned.join(' | '));
     assert.match(warned[0], /markSize/);
   });
