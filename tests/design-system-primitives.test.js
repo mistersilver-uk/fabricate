@@ -769,6 +769,8 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
     'manager-tool-parity-01-library-1280x720',
     // The compact form, which the 38px shell must leave pixel-identical.
     'world-component-entry-systems',
+    // The specimen of the published sizes and count (issue 2849).
+    'manager-published-search-forms-specimen',
   ]) {
     assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
   }

@@ -303,6 +303,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       value: Object.freeze({ kind: 'value', initial: '' }),
       placeholder: Object.freeze({ kind: 'data' }),
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      density: Object.freeze({ kind: 'data' }),
+      countLabel: Object.freeze({ kind: 'text' }),
     }),
     rest: true,
     root: 'any',

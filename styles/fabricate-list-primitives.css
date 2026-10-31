@@ -131,6 +131,33 @@
   outline: none;
 }
 
+/* SearchField's published densities (issue 2849): the default shell at `Select`'s `toolbar` and `inline` heights, each at its radius band. */
+.fabricate-search.fabricate-search:not(.is-compact).is-density-toolbar {
+  height: 34px;
+}
+
+.fabricate-search.fabricate-search:not(.is-compact).is-density-inline {
+  height: 30px;
+  border-radius: 7px;
+}
+
+/* The trailing count, in the placeholder's muted ink, which clears 4.5:1 on the soft shell; past half the shell it ends in an ellipsis, while its region still holds the whole text. */
+.fabricate-search.fabricate-search:not(.is-compact) > .fabricate-search-count {
+  flex: none;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The empty region stays in the tree, so a first count is announced, and gives back the gap before it. */
+.fabricate-search.fabricate-search:not(.is-compact) > .fabricate-search-count:empty {
+  margin-inline-start: calc(-1 * var(--fab-space-2));
+}
+
 /* THE COMPACT EXCEPTION'S BOX, unchanged from the shipped pill: `:where()` keeps it at the (0,2,1) the base rule had. */
 .fabricate-search.fabricate-search:where(.is-compact) input {
   width: 100%;

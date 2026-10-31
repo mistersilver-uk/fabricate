@@ -31,8 +31,17 @@ const FIELD = 'src/ui/svelte/components/SearchField.svelte';
 
 /** The properties that size or box the field. */
 const BOX = /^(?:height|min-height|border(?:-[\w-]+)?|background(?:-[\w-]+)?)$/;
-/** The classes a family rule may name; any other class makes a rule a site's. */
-const FAMILY_CLASSES = new Set(['fabricate-search', 'fabricate-search-field', 'is-compact']);
+/**
+ * The classes a family rule may name, the published densities' among them (issue 2849); any other
+ * class makes a rule a site's.
+ */
+const FAMILY_CLASSES = new Set([
+  'fabricate-search',
+  'fabricate-search-field',
+  'is-compact',
+  'is-density-toolbar',
+  'is-density-inline',
+]);
 
 // ratchet-exempt(source-pin): issue 1782's geometry gate is a stylesheet scan; this reads the call sites' classes and the scoped blocks to scan, and asserts nothing about how either is written
 const sources = collectWorkingTreeSources(['src'], ['.svelte']);

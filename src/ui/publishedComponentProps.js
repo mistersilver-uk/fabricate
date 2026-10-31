@@ -178,11 +178,20 @@ export function onlyMembers(value, allowed) {
 }
 
 /**
+ * The values the seam withholds from a published `data` key, each as `<Entry>.<key>.<value>`: the
+ * component draws them for Fabricate's own callers alone, so the seam passes `undefined` in their
+ * place and the key draws its default (issue 2849).
+ */
+export const WITHHELD_VALUES = Object.freeze(['SearchField.density.compact']);
+const WITHHELD = new Set(WITHHELD_VALUES);
+
+/**
  * The validated copy of one `data` value, less the per-item members `STRIPPED_ITEM_MEMBERS` names
- * and holding only those `ALLOWED_ITEM_MEMBERS` names.
+ * and holding only those `ALLOWED_ITEM_MEMBERS` names, or `undefined` for a withheld value.
  */
 function strippedCopy(entry, key, value) {
   const id = `${entry.name}.${key}`;
+  if (typeof value === 'string' && WITHHELD.has(`${id}.${value}`)) return;
   const kept = (STRIPPED_PATHS.get(id) ?? []).reduce(
     (copy, { path }) => withoutMember(copy, path),
     value

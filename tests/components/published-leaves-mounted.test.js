@@ -577,7 +577,7 @@ describe('a key a leaf does not publish', () => {
     ['Stepper', 'inputProps', 'is not a prop of Stepper'],
     ['SearchField', 'label', 'is not a data attribute'],
     ['SearchField', 'ariaLabelledBy', 'is not a data attribute'],
-    ['SearchField', 'density', 'is not a data attribute'],
+    ['SearchField', 'size', 'is not a data attribute'],
     ['SearchField', 'icon', 'is not a data attribute'],
     ['SearchField', 'onChange', 'is not a data attribute'],
     ['SearchField', 'inputProps', 'is not a data attribute'],

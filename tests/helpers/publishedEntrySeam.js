@@ -20,7 +20,10 @@ import {
 } from './publishedComponentModules.js';
 import { createMountedComponentHarness } from './svelte-component-harness.js';
 
-/** The suite's `ui()` and `mountEntry(name, props)`, which returns `{ target, handle }`. */
+/**
+ * The suite's `ui()`, `freshTarget()`, an empty target the hooks remove, and
+ * `mountEntry(name, props)`, which returns `{ target, handle }`.
+ */
 export function publishedEntrySeam(tmpPrefix) {
   const harness = createMountedComponentHarness({
     repoRoot: resolve(import.meta.dirname, '../..'),
@@ -74,10 +77,12 @@ export function publishedEntrySeam(tmpPrefix) {
       },
     });
 
+  const freshTarget = () => fabricateTarget(targets);
+
   function mountEntry(name, props) {
-    const target = fabricateTarget(targets);
+    const target = freshTarget();
     return { target, handle: ui().mount(name, { target, props }) };
   }
 
-  return { ui, mountEntry };
+  return { ui, freshTarget, mountEntry };
 }

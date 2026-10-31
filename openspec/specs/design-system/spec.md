@@ -891,12 +891,13 @@ A theme foundation read only by a companion module is declared and exempted the 
 
 Control height MUST be one of 26, 28, 30, 34, 38, or 44 for a control a spec marks touch-reachable.
 The values 32, 36 and 40 are RETIRED as CONTROL heights and MUST NOT be reintroduced as such.
-The search field is 38 at radius 9 on every non-compact site, the journal included (maintainer ruling 2, 2026-09-19), and it carries the one named EXCEPTION to the retired 32: `SearchField`'s `density="compact"` at its four ruled sites, recorded as an exception and never as a rung, so the 26 / 28 / 30 / 34 / 38 / 44 ladder stays closed.
+The search field is 38 at radius 9 on every non-compact site of Fabricate's own, the journal included (maintainer ruling 2, 2026-09-19), and it carries the one named EXCEPTION to the retired 32: `SearchField`'s `density="compact"` at its four ruled sites, recorded as an exception and never as a rung, so the 26 / 28 / 30 / 34 / 38 / 44 ladder stays closed.
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
 The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 `Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 `Field`'s `size` names its text-like or number input's rung by its height, 26, 28, 30, 34 or 38 with 38 the default, each at its band's corner, and leaves the ladder's 44 out; its `face` draws that control in the serif or mono face of `ui-visual-style`'s type ladder, and its `type` of `'number'` draws a number input with no step buttons (issue 2848).
+`SearchField`'s `density` of `toolbar` or `inline` draws the default shell at `Select`'s rung of that name, 34 or 30, each at its band's corner; the published seam withholds `compact`, so the exception stays at its four ruled sites (issue 2849).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 24, 26, 28, 30, 32, 34, 36, 38 or 44 with 26 the default.
 Its radius is the radius ladder's band for the rung: 6 at 22 and 24, 7 at 26 to 32, 9 at 34 to 38 and 11 at 44.

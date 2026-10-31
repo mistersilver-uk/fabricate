@@ -412,6 +412,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
+  'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
@@ -872,6 +873,9 @@ const DISMISSAL = (tone) =>
 const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
 /** A part of one published search field of the search fixture, by its section's key. */
 const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
+/** A part of the search forms fixture's field in one section, by the section's key. */
+const labSearchForm = (key, part) =>
+  `[data-lab-search-forms] > [data-lab-search-form="${key}"] ${part}`;
 /** A part of one published select of the select fixture, by its section's key. */
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
 /** The one section of the field fixture. */
@@ -1353,6 +1357,22 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
       styles: 'border-color: var(--fab-accent)',
     },
+  ],
+  // The published search field's densities and count (issue 2849): each shell at its rung and corner,
+  // and each count in the muted ink on one line.
+  'manager-published-search-forms-specimen': [
+    ...[
+      ['default', 38, 9],
+      ['toolbar', 34, 9],
+      ['inline', 30, 7],
+    ].map(([key, height, corner]) => ({
+      selector: labSearchForm(key, '.fabricate-search'),
+      styles: `height: ${height}px; border-radius: ${corner}px`,
+    })),
+    ...['default', 'toolbar', 'inline'].map((key) => ({
+      selector: labSearchForm(key, '.fabricate-search-count'),
+      styles: 'color: var(--fab-text-muted); white-space: nowrap',
+    })),
   ],
   // The published selects (issue 2454): each rung's declared corner, and the panel's own, in the
   // overlay host the companion passed and on the standalone layer.
@@ -7099,6 +7119,30 @@ test('the field specimen case types into the input the field fixture draws in a 
     expectSelector.includes('[data-lab-value="Moonlit tonic"]'),
     'the frame is taken only once the companion recorded the edit'
   );
+});
+
+test('the search forms specimen case measures the density each section of the search forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSearchForms.svelte'
+  );
+  for (const hook of ['data-lab-search-forms', 'data-lab-search-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const densities = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'density')
+    .map((node) => node.value.value);
+  const measured = getCaseById('manager-published-search-forms-specimen')
+    .expectLayout.controls.filter(({ styles }) => styles.startsWith('height: '))
+    .map(({ selector }) => /data-lab-search-form="(\w+)"/u.exec(selector)[1]);
+  assert.deepEqual(
+    measured,
+    densities,
+    'each section’s shell is measured at the density it mounts'
+  );
+  assert.deepEqual(densities, ['default', 'toolbar', 'inline'], 'every published density');
 });
 
 test('the field forms specimen case measures the rung each section of the forms fixture mounts', () => {

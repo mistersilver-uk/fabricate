@@ -279,6 +279,15 @@ const SEARCH_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground and the height of its three fields. */
 const SEARCH_WINDOW = Object.freeze({ width: 480, height: 360 });
 
+/** The search forms fixture's ground, a part of one section's field by its key, and each section's density, height and corner. */
+const SEARCH_FORMS = '[data-lab-search-forms]';
+const SEARCH_FORM = (key, part) => `${SEARCH_FORMS} > [data-lab-search-form="${key}"] ${part}`;
+const SEARCH_FORM_RUNGS = Object.freeze([
+  ['default', 38, 9],
+  ['toolbar', 34, 9],
+  ['inline', 30, 7],
+]);
+
 /** The select fixture's ground, one of its sections by key, and a part of that section's select. */
 const SELECT_GROUND = '[data-lab-select-ground]';
 const SELECT_SECTION = (key) => `[data-lab-select="${key}"]`;
@@ -1033,6 +1042,42 @@ export const CASES = Object.freeze([
           selector: `${LAB_SEARCH('transform', '.fabricate-search')}:focus-within`,
           styles: 'border-color: var(--fab-accent)',
         },
+      ],
+    },
+    position: SEARCH_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SearchField.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-search-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — three search fields at the densities SearchField publishes, each beneath the text that names it, in a 320px column on the --fab-bg-1 ground. Reading top to bottom: Search recipes, the 38px shell at radius 9 holding tonic with 12 found at its trailing edge; Search components, the 34px toolbar shell at radius 9 holding iron with 3 chosen; and Search tags, the 30px inline shell at radius 7 holding ore with 1 found. Each count sits on one line inside the shell’s inset in the muted ink, after the query and its glyph. The frame draws inside the manager window and is the evidence for it alone; the lit border at each rung, a long count and the polite announcement are the rendered and mounted suites’',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-search-forms' },
+    steps: [],
+    // Each section's count the fixture's effect drew, the inline rung's last.
+    expectSelector: `${SEARCH_FORMS}:has(> [data-lab-search-form="default"] .fabricate-search > .fabricate-search-count):has(> [data-lab-search-form="toolbar"] .fabricate-search.is-density-toolbar > .fabricate-search-count) > [data-lab-search-form="inline"] .fabricate-search.is-density-inline > .fabricate-search-count[role="status"]`,
+    expectContained: [
+      ...SEARCH_FORM_RUNGS.map(([key]) => ({
+        container: SEARCH_FORMS,
+        target: SEARCH_FORM(key, '.fabricate-search'),
+      })),
+      { container: '.window-content', target: SEARCH_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each section's shell at its rung and corner, and its count's muted ink on one line.
+        ...SEARCH_FORM_RUNGS.map(([key, height, corner]) => ({
+          selector: SEARCH_FORM(key, '.fabricate-search'),
+          styles: `height: ${height}px; border-radius: ${corner}px`,
+        })),
+        ...SEARCH_FORM_RUNGS.map(([key]) => ({
+          selector: SEARCH_FORM(key, '.fabricate-search-count'),
+          styles: 'color: var(--fab-text-muted); white-space: nowrap',
+        })),
       ],
     },
     position: SEARCH_WINDOW,

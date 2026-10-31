@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { createRawSnippet } from 'svelte';
+
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -187,6 +189,18 @@ describe('SearchField', () => {
     const input = root.querySelector('input');
     assert.equal(input.getAttribute('type'), 'search');
     assert.equal(input.value, 'ore');
+  });
+
+  it('with `label` and a count, names the input by the caption alone, so the count never joins the name', async () => {
+    const countLabel = createRawSnippet(() => ({ render: () => '<span>12 found</span>' }));
+    const root = await harness.mount({ label: 'Search recipes', countLabel });
+    const input = root.querySelector('input');
+    const caption = root.querySelector('.fabricate-search-caption');
+    assert.ok(caption.id, 'the caption carries an id');
+    assert.equal(input.getAttribute('aria-labelledby'), caption.id);
+    assert.equal(caption.textContent, 'Search recipes');
+    assert.equal(root.querySelector('.fabricate-search-count').textContent, '12 found');
+    assert.ok(!caption.contains(root.querySelector('.fabricate-search-count')));
   });
 
   it('puts `is-compact` on the shell in both forms', async () => {

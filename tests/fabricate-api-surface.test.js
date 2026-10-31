@@ -540,6 +540,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onValueChange: { kind: 'callback', required: false },
           placeholder: optional,
           ariaLabel: required,
+          density: optional,
+          countLabel: { kind: 'text', required: false },
         },
         rest: true,
         root: 'any',

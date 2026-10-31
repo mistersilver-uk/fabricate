@@ -11,7 +11,8 @@
   | `onChange(next, event)` | function | `undefined` | Called after `value` is updated. |
   | `placeholder` | localized string | `undefined` | The hint inside the empty field. |
   | `label` / `ariaLabel` / `ariaLabelledBy` | localized string / string / id list | `''` | EXACTLY ONE names the input; see the invariants. |
-  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` emits `is-compact`. |
+  | `density` | `'default'` \| `'compact'` \| `'toolbar'` \| `'inline'` | `'default'` | `compact` emits `is-compact`; `toolbar` and `inline` draw the default shell at `Select`'s 34 and 30 rungs (issue 2849), and the seam withholds `compact`. |
+  | `countLabel` | snippet | `undefined` | Trailing text after the input, as "12 found", in a polite `role="status"` region, cut with an ellipsis past half the shell. |
   | `icon` | Font Awesome class | `'fas fa-search'` | The glyph before the input. |
   | `class` | class string | `''` | Appended to the root's own class. |
   | `inputProps` | attribute object | `undefined` | Attributes and handlers for the input, which the rest spread cannot reach. |
@@ -28,6 +29,10 @@
   - It never submits its form: Enter in the input, outside IME composition, cancels the implicit
     submission of the form the input is in (issue 2453).
   - It writes no scoped `<style>`: `styles/fabricate.css` owns the `fabricate-search` family.
+  - The count's region is always drawn, empty and gapless without `countLabel`, so a count that
+    first appears is written into a live region; its text changes in place. With `label` and a
+    count the input is named by the caption's id, so the count never joins its name. Under
+    `compact` the region is a bare inline count after the input, which no caller draws.
 -->
 <script>
   import Field from './Field.svelte';
@@ -40,14 +45,31 @@
     ariaLabel = '',
     ariaLabelledBy = '',
     density = 'default',
+    countLabel = undefined,
     icon = 'fas fa-search',
     class: extraClass = '',
     inputProps = undefined,
     ...rest
   } = $props();
 
+  const uid = $props.id();
+  const captionId = `${uid}-caption`;
+
+  const DENSITY_CLASSES = Object.freeze({
+    compact: 'is-compact',
+    toolbar: 'is-density-toolbar',
+    inline: 'is-density-inline',
+  });
+
   const classes = $derived(
-    ['fabricate-search', density === 'compact' ? 'is-compact' : ''].filter(Boolean).join(' ')
+    [
+      'fabricate-search',
+      typeof density === 'string' && Object.hasOwn(DENSITY_CLASSES, density)
+        ? DENSITY_CLASSES[density]
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
   );
   const fieldClasses = $derived(['fabricate-search-field', extraClass].filter(Boolean).join(' '));
 
@@ -90,16 +112,19 @@
     {value}
     {placeholder}
     aria-label={label ? undefined : ariaLabel || undefined}
-    aria-labelledby={label ? undefined : ariaLabelledBy || undefined}
+    aria-labelledby={label ? (countLabel ? captionId : undefined) : ariaLabelledBy || undefined}
     oninput={handleInput}
     onkeydown={handleKeydown}
   />
+  <span class="fabricate-search-count" role="status"
+    >{#if countLabel}{@render countLabel()}{/if}</span
+  >
 {/snippet}
 
 {#if label}
   <!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
   <Field as="label" class={fieldClasses} {...rest}>
-    <span class="fabricate-search-caption">{label}</span>
+    <span class="fabricate-search-caption" id={countLabel ? captionId : undefined}>{label}</span>
     <span class={classes}>{@render control()}</span>
   </Field>
 {:else}

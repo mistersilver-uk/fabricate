@@ -295,6 +295,36 @@ export const STANDALONE_SPECIMENS = Object.freeze({
         inert: true,
       }),
     },
+    // Issue 2849: the toolbar rung holding a count, the inline rung, and the withheld compact.
+    'search-compact-withheld': {
+      props: { placeholder: 'Any tag', ariaLabel: 'Search tags', density: 'compact' },
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
+    },
+    'search-toolbar-count': {
+      props: {
+        value: 'iron',
+        ariaLabel: 'Search components',
+        density: 'toolbar',
+        countLabel: '12 found',
+      },
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
+    },
+    'search-inline': {
+      props: { placeholder: 'Any tag', ariaLabel: 'Search tags', density: 'inline' },
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
+    },
   }),
   Select: Object.freeze({
     'select-form-chosen': closedSelect({ value: 'forge' }),

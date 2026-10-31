@@ -345,8 +345,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
   // Tools library card, the compact form in the task editor and the entry systems card, the
-  // specimen that mounts it through the published seam (issue 2453), and the three that mount it
-  // with and without a Fabricate root above its target (issue 2679).
+  // specimens that mount it through the published seam (issues 2453 and 2849), and the three that
+  // mount it with and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
@@ -359,6 +359,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
     'manager-published-search-specimen',
+    'manager-published-search-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
