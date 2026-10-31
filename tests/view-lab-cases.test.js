@@ -917,6 +917,89 @@ const labFillBarBand = (key) =>
 /** A part of the companion forms fixture's row by its key. */
 const labCompanionForm = (key, part) =>
   `[data-lab-companion-forms] > [data-lab-companion-form="${key}"] ${part}`;
+const LAB_COMPANION_GLYPH = '.essence-icon-picker-trigger .essence-icon-picker-preview';
+const LAB_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 2px';
+/** What every companion forms frame measures, as the case file states it. */
+const LAB_COMPANION_FACES = [
+  {
+    selector: labCompanionForm('stat-progress', '.fab-stat-box-slot'),
+    styles: 'display: grid; row-gap: 4px; margin-top: 4px',
+  },
+  {
+    selector: labCompanionForm('stat-progress', '.fab-fill-bar'),
+    styles: 'height: 4px; background-color: var(--fab-bg-3)',
+  },
+  {
+    selector: labCompanionForm('stat-complete', '.fab-stat-box-value'),
+    styles: 'color: var(--fab-success-text)',
+  },
+  {
+    selector: labCompanionForm('stat-centred', '.fab-stat-box-slot'),
+    styles: 'display: grid; margin-top: 8px',
+  },
+  {
+    selector: labCompanionForm('stat-danger', '.fab-stat-box > .fab-kicker'),
+    styles: 'color: var(--fab-text-secondary)',
+  },
+  {
+    selector: labCompanionForm('stepper-dense', '.fab-stepper'),
+    styles: 'height: 26px; padding-top: 0px',
+  },
+  {
+    selector: labCompanionForm('stepper-dense', '[data-stepper-decrement]'),
+    styles: 'width: 24px; height: 24px',
+  },
+  {
+    selector: labCompanionForm('stepper-default', '.fab-stepper'),
+    styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('button-ghost', 'button'),
+    styles: 'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0)',
+  },
+  {
+    selector: labCompanionForm('button-accent', 'button'),
+    styles:
+      'color: var(--fab-accent-text); border-top-color: var(--fab-accent); background-color: rgba(0, 0, 0, 0)',
+  },
+  {
+    selector: labCompanionForm('button-accent-disabled', 'button'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: labCompanionForm('button-accent-busy', 'button'),
+    styles: 'opacity: 0.7; color: var(--fab-accent-text)',
+  },
+  {
+    selector: labCompanionForm('button-urgent', 'button'),
+    styles:
+      'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+  },
+  {
+    selector: labCompanionForm('button-urgent-disabled', 'button'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: labCompanionForm('button-urgent-busy', 'button'),
+    styles: 'opacity: 0.7; background-color: var(--fab-accent)',
+  },
+  {
+    selector: labCompanionForm('hazard-urgent', 'button'),
+    styles: 'color: var(--fab-on-accent); background-color: var(--fab-accent)',
+  },
+  {
+    selector: labCompanionForm('hazard-pressed', 'button'),
+    styles: 'color: var(--fab-on-accent); background-color: var(--fab-accent)',
+  },
+  ...['ember', 'mauve', 'slate'].map((tint) => ({
+    selector: labCompanionForm(`icon-${tint}`, LAB_COMPANION_GLYPH),
+    styles: `color: var(--fab-tag-${tint})`,
+  })),
+  {
+    selector: labCompanionForm('icon-plain', LAB_COMPANION_GLYPH),
+    styles: 'color: var(--fab-accent)',
+  },
+];
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
@@ -960,6 +1043,39 @@ const REPEATS_CONTROLS = [
   },
   { selector: `${REPEATS} > i.fa-ellipsis`, styles: 'font-size: 11px' },
 ];
+/** The companion forms specimens' controls (issue 2841): every frame's faces, then its focus and hover. */
+const LAB_COMPANION_CASES = {
+  'manager-published-companion-forms-specimen': [
+    ...LAB_COMPANION_FACES,
+    {
+      selector: labCompanionForm('stepper-dense', '[data-stepper-increment]:focus-visible'),
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: -1px',
+    },
+    {
+      selector: labCompanionForm('button-urgent-hover', 'button'),
+      styles:
+        'border-top-color: var(--fab-accent-hover); background-color: var(--fab-accent-hover)',
+    },
+  ],
+  'manager-published-companion-forms-accent-focus': [
+    ...LAB_COMPANION_FACES,
+    {
+      selector: labCompanionForm('button-accent-hover', 'button'),
+      styles: 'border-top-color: var(--fab-accent); background-color: var(--fab-accent-soft)',
+    },
+    {
+      selector: labCompanionForm('button-accent', 'button:focus-visible'),
+      styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
+    },
+  ],
+  'manager-published-companion-forms-urgent-focus': [
+    ...LAB_COMPANION_FACES,
+    {
+      selector: labCompanionForm('button-urgent', 'button:focus-visible'),
+      styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
+    },
+  ],
+};
 const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -1928,44 +2044,8 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
-  // The published stat box's content band (issue 2841): its grid and space at each layout, the
-  // thin track it holds, and the success figure.
-  'manager-published-companion-forms-specimen': [
-    {
-      selector: labCompanionForm('stat-progress', '.fab-stat-box-slot'),
-      styles: 'display: grid; row-gap: 4px; margin-top: 4px',
-    },
-    {
-      selector: labCompanionForm('stat-progress', '.fab-fill-bar'),
-      styles: 'height: 4px; background-color: var(--fab-bg-3)',
-    },
-    {
-      selector: labCompanionForm('stat-complete', '.fab-stat-box-value'),
-      styles: 'color: var(--fab-success-text)',
-    },
-    {
-      selector: labCompanionForm('stat-centred', '.fab-stat-box-slot'),
-      styles: 'display: grid; margin-top: 8px',
-    },
-    // The published stepper's dense rung (issue 2841): its box and cell, the focused plus's ring,
-    // and the default rung beside it.
-    {
-      selector: labCompanionForm('stepper-dense', '.fab-stepper'),
-      styles: 'height: 26px; padding-top: 0px',
-    },
-    {
-      selector: labCompanionForm('stepper-dense', '[data-stepper-decrement]'),
-      styles: 'width: 24px; height: 24px',
-    },
-    {
-      selector: labCompanionForm('stepper-dense', '[data-stepper-increment]:focus-visible'),
-      styles: 'outline-style: solid; outline-width: 2px; outline-offset: -1px',
-    },
-    {
-      selector: labCompanionForm('stepper-default', '.fab-stepper'),
-      styles: 'height: 28px; padding-top: 2px',
-    },
-  ],
+  // The companion forms specimens (issue 2841); their palette variants measure the same controls.
+  ...LAB_COMPANION_CASES,
   // The opener focus returned to after a close: its ring, by its shape.
   'manager-published-modal-close': [
     {

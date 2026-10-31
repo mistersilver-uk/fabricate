@@ -251,16 +251,41 @@ export function placementFaults(reaching, shape, hooks) {
     });
 }
 
+/** The system colours a forced-colours ring may name. */
+const SYSTEM_RING_COLOURS = new Set(['canvastext', 'highlight', 'buttontext']);
+
+/** Whether a reaching row is a ring that names one system colour inside an at-rule. */
+export const isSystemRing = ({ rule, within, complex }) => {
+  const declared = declarationsOf(rule);
+  return (
+    carries(complex, 'focus-visible') &&
+    new Set(within).has('@media') &&
+    declared.length === 1 &&
+    declared[0][0] === 'outline-color' &&
+    SYSTEM_RING_COLOURS.has(declared[0][1].toLowerCase())
+  );
+};
+
 /**
  * Clauses 2 and 3 of the reaching set: exactly one selector carries `:focus-visible` and declares
  * exactly the module ring and `shape.ringExtras`, each `[property, value]`, exactly one carries
  * `:focus` and is the strip, and no other declares `all`, `box-shadow` or a property whose name
- * starts `outline`.
+ * starts `outline`. A selector `shape.forcedRings` pins, as written, may instead name the ring's
+ * colour in one system colour under an `@media`, for a face that opts out of forced colours.
  */
-export function ringFaults(reaching, { ringExtras = [] } = {}, ring = moduleRing()) {
-  const marks = reaching.filter(({ complex }) => carries(complex, 'focus-visible'));
+export function ringFaults(
+  reaching,
+  { ringExtras = [], forcedRings = [] } = {},
+  ring = moduleRing()
+) {
+  const forced = reaching.filter((row) => forcedRings.includes(row.written) && isSystemRing(row));
+  const marks = reaching.filter(
+    (row) => carries(row.complex, 'focus-visible') && !forced.includes(row)
+  );
   const strips = reaching.filter(({ complex }) => carries(complex, 'focus'));
-  const others = reaching.filter((row) => !marks.includes(row) && !strips.includes(row));
+  const others = reaching.filter(
+    (row) => !marks.includes(row) && !strips.includes(row) && !forced.includes(row)
+  );
   const drawn = [['outline', ring.outline], ['outline-offset', ring.offset], ...ringExtras];
   return [
     ...(marks.length === 1 ? [] : [`${marks.length} reaching selectors carry :focus-visible`]),

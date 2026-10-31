@@ -13,6 +13,7 @@
   | `ariaLabel` / `listLabel` / `searchLabel` | resolved strings | `''` | The trigger's name and tooltip, the list's and its dialog's name, and the query field's name. |
   | `searchPlaceholder` | resolved string | `''` | The query field's hint text, which is not its name. |
   | `noMatchesText` | resolved string | `''` | The line the list draws when a query matches no glyph. |
+  | `tint` | one of `TINTS` | `''` | Recolours the trigger's glyph alone in that `--fab-tag-*` colour (issue 2841); any other value tints nothing. |
 
   Invariants:
   - Under an app localizer context the trigger's `aria-describedby` names the chosen glyph, and
@@ -53,6 +54,23 @@
   } from '../util/essenceIcons.js';
   import { MANAGER_SCROLLER_SELECTOR } from '../util/overlayBounds.js';
 
+  /** `Avatar`'s tint keys, the published `tint` set. */
+  const TINTS = new Set([
+    'sage',
+    'mist',
+    'lavender',
+    'rose',
+    'peach',
+    'butter',
+    'aqua',
+    'mauve',
+    'ember',
+    'verdant',
+    'azure',
+    'bone',
+    'slate',
+  ]);
+
   let {
     value = DEFAULT_ESSENCE_ICON,
     disabled = false,
@@ -61,6 +79,7 @@
     searchLabel = '',
     searchPlaceholder = '',
     noMatchesText = '',
+    tint = '',
     iconOnly = false,
     triggerClass = '',
     triggerStyle = '',
@@ -83,6 +102,7 @@
         option.aliases?.includes(selectedOption.iconName)
     )?.iconClass ?? selectedOption.iconClass
   );
+  const tintKey = $derived(TINTS.has(tint) ? tint : '');
   const uid = $props.id();
   const choiceId = `${uid}-choice`;
   const describesChoice = $derived(Boolean(localize) && Boolean(getEssenceIconName(value)));
@@ -198,7 +218,12 @@
       data-keyboard-focus="true"
       {...attributes}
     >
-      <span class="essence-icon-picker-preview" aria-hidden="true">
+      <span
+        class="essence-icon-picker-preview"
+        aria-hidden="true"
+        class:is-tinted={Boolean(tintKey)}
+        style:--fab-icon-picker-tint={tintKey ? `var(--fab-tag-${tintKey})` : undefined}
+      >
         <i class={selectedOption.iconClass}></i>
       </span>
       {#if !iconOnly}

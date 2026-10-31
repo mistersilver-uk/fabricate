@@ -4,7 +4,7 @@
  * under a Fabricate window root: the name that replaces the label and the refusal of one that does
  * not hold it (M22), the hint written as Foundry's plain tooltip text and opened under keyboard
  * focus through the runtime's facade, the `aria-pressed` each value writes and the face `true`
- * draws, and the role's class.
+ * draws, and the role's class; and the `accent` and `urgent` roles' classes (issue 2841).
  * Limit: happy-dom does not tell a keyboard focus from a pointer one, so each focus clause answers
  * `:focus-visible` on the button.
  */
@@ -268,11 +268,31 @@ describe('the published Button, pressed and info', () => {
     const { handle, update, button } = mountButton({ role: 'info' });
     await settle();
     assert.deepEqual(authoredClasses(button()), ['fabricate-button', 'is-info-action']);
-    assert.equal(update({ role: 'accent' }), true);
+    assert.equal(update({ role: 'success' }), true);
     await settle();
     assert.deepEqual(authoredClasses(button()), ['fabricate-button'], 'a role outside the set');
     handle.destroy();
   });
+
+  for (const [role, roleClass] of [
+    ['accent', 'is-accent-action'],
+    ['urgent', 'is-urgent-action'],
+  ]) {
+    it(`writes the ${role} role’s class (issue 2841), and an update replaces it`, async () => {
+      const { handle, update, button } = mountButton({ role });
+      await settle();
+      assert.deepEqual(authoredClasses(button()), ['fabricate-button', roleClass]);
+      assert.equal(update({ role: 'info' }), true);
+      await settle();
+      assert.deepEqual(authoredClasses(button()), ['fabricate-button', 'is-info-action']);
+      for (const outside of [role.toUpperCase(), ` ${role}`, `${role}-action`]) {
+        assert.equal(update({ role: outside }), true);
+        await settle();
+        assert.deepEqual(authoredClasses(button()), ['fabricate-button'], outside);
+      }
+      handle.destroy();
+    });
+  }
 
   it('describes the three keys as optional data', () => {
     const { props } = ui().describe('Button');

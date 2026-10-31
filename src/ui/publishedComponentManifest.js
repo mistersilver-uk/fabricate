@@ -523,6 +523,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       searchLabel: Object.freeze({ kind: 'data', required: true }),
       searchPlaceholder: Object.freeze({ kind: 'data' }),
       noMatchesText: Object.freeze({ kind: 'data', required: true }),
+      tint: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',

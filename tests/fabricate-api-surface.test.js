@@ -739,6 +739,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           searchLabel: required,
           searchPlaceholder: optional,
           noMatchesText: required,
+          tint: optional,
         },
         rest: false,
         root: 'any',

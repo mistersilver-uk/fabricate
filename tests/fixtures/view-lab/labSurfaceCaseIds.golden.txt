@@ -70,6 +70,8 @@ manager-published-segmented-specimen
 manager-published-segmented-forms-specimen
 manager-published-chip-forms-specimen
 manager-published-companion-forms-specimen
+manager-published-companion-forms-accent-focus
+manager-published-companion-forms-urgent-focus
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen

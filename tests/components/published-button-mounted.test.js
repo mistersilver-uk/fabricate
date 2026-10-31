@@ -153,7 +153,7 @@ describe('the published Button', () => {
   }
 
   it('writes no role class for a role outside its set, and is-full-width for fullWidth alone', async () => {
-    const unknown = mountButton({ role: 'accent' });
+    const unknown = mountButton({ role: 'success' });
     const wide = mountButton({ role: 'primary', fullWidth: true });
     await settle();
     assert.deepEqual(authoredClasses(unknown.button()), FAMILY);
