@@ -977,6 +977,7 @@ const oneLine = (selector) => selector.replaceAll(/\s+/gu, ' ').trim();
  */
 const FLOATING_SURFACES = Object.freeze([
   ['src/ui/svelte/components/Modal.svelte', '.fabricate-modal', 'a dialog over the window'],
+  ['src/ui/svelte/components/Popover.svelte', '.fabricate-popover', 'a popover over its anchor'],
   [
     MODULE_SHEET,
     '.fabricate-typeahead-list.fabricate-typeahead-list',

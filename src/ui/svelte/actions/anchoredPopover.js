@@ -86,6 +86,9 @@ function resolveBounds(bounds, hostRect, anchor) {
   };
 }
 
+// The caller's `opener`, an element or a resolver re-read on every pass, or `null`.
+const openerOf = ({ opener }) => (typeof opener === 'function' ? opener() : opener) ?? null;
+
 function panelStyle(layout, { applyWidth, maxHeightCap }) {
   const parts = [];
 
@@ -120,6 +123,8 @@ function panelStyle(layout, { applyWidth, maxHeightCap }) {
 // change while the panel is open must re-measure it; no shipped caller's can.
 // `applyWidth: false` is for a panel that sizes to its content, where writing a width fixes the box;
 // `ignoreScrollWithin` drops events from inside the panel, which move neither it nor its trigger.
+// `opener`, an element or a resolver, is where the host is acquired from in place of the trigger,
+// for a panel measured against an anchor outside the mount that opened it (issue 2861).
 // Every listener binds to the panel's own document and window; a panel whose document has no window
 // binds none and is treated as closed. `layout` is called with that window as a sixth argument.
 // ratchet-exempt(file-size): a throwing layout must release what the first sync took (issue 2671)
@@ -234,7 +239,7 @@ export function anchoredPopover(node, params = {}) {
   }
 
   function portalToHost() {
-    host = acquireOverlayHost(node, anchorElement(), { component: options.component });
+    host = acquireOverlayHost(node, openerOf(options) ?? anchorElement(), options);
     if (portalHandle) portalHandle.update(host);
     else portalHandle = portal(node, host);
   }

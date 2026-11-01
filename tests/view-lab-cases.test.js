@@ -411,6 +411,8 @@ const labHarnessSource = [
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
+  'tests/view-lab/fixtures/PublishedPopover.svelte',
+  'tests/view-lab/fixtures/publishedPopoverSpecimen.js',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
@@ -1199,6 +1201,23 @@ const TYPEAHEAD_SPECIMEN_CONTROLS = [
     selector:
       '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list .fabricate-typeahead-option-tick',
     styles: 'color: var(--fab-accent)',
+  },
+];
+/** The popover fixture's panel by its ability, and the controls its case measures (issue 2861). */
+const labPopover = (label) =>
+  `[data-lab-popover-ground] .fabricate-popover[aria-label="Adjust ${label}"]`;
+const POPOVER_PANEL_EDGE =
+  'border-top-style: solid; border-top-width: 1px; border-top-left-radius: 11px';
+const POPOVER_CONTROLS = [
+  { selector: labPopover('Strength'), styles: POPOVER_PANEL_EDGE },
+  { selector: labPopover('Wisdom'), styles: POPOVER_PANEL_EDGE },
+  {
+    selector: `${labPopover('Wisdom')} [data-lab-popover-delta="wisdom5"] button`,
+    styles: 'height: 24px',
+  },
+  {
+    selector: `${labPopover('Wisdom')} [data-lab-popover-delta="wisdom2"] button`,
+    styles: 'height: 24px',
   },
 ];
 const BASE_NON_VERB_CONTROLS = Object.freeze({
@@ -2202,6 +2221,8 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'height: 38px; border-radius: 9px; border-top-color: var(--fab-accent)',
     },
   ],
+  // The published popover's two nudges (issue 2861); their palette variants measure the same controls.
+  'manager-published-popover-specimen': POPOVER_CONTROLS,
   // The opener focus returned to after a close: its ring, by its shape.
   'manager-published-modal-close': [
     {
@@ -7053,9 +7074,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'SelectionCheckbox',
   'Disclosure',
   'Typeahead',
+  'Popover',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox, Disclosure and Typeahead and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox, Disclosure, Typeahead and Popover and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -10000,7 +10022,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 24, 'the fixture lays twenty-four targets in its columns');
+  assert.equal(columns.flat().length, 25, 'the fixture lays twenty-five targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',

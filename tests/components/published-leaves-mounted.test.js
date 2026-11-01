@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { deferredLoader } from '../helpers/publishedComponentFakes.js';
 import {
@@ -85,15 +86,24 @@ function mountLeaf(name, props) {
   return { target, handle: ui().mount(name, { target, props }) };
 }
 
+/** The anchor the popover leaf names, a companion's button kept in the document for the file. */
+const LEAF_ANCHOR = 'leaf-popover-anchor';
+let leafAnchor;
+
 before(async () => {
   await harness.setup();
+  leafAnchor = Object.assign(document.createElement('button'), { id: LEAF_ANCHOR });
+  document.body.append(leafAnchor);
   const { publishedComponentRuntime: runtime, COMPONENTS: components } =
     await harness.loadRuneModule(PUBLISHED_ADAPTER);
   const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
   seamParts = { createPublishedComponents, runtime, components, loaders: harnessLoaders(harness) };
 });
 
-after(() => harness.teardown());
+after(() => {
+  leafAnchor?.remove();
+  return harness.teardown();
+});
 
 beforeEach(async () => {
   reports = [];
@@ -493,6 +503,19 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('input').getAttribute('aria-label'),
     drawn: ['Find a reward', 'Find a tool'],
   },
+  {
+    name: 'Popover',
+    under: 'fabricate',
+    root: '.fabricate-popover-origin',
+    props: { open: true, anchorId: LEAF_ANCHOR, title: 'Strength', onClose() {} },
+    next: { open: true, anchorId: LEAF_ANCHOR, title: 'Wisdom', onClose() {} },
+    // The panel is drawn at the flush that finds the anchor, after `mount` returns.
+    read: (root) => {
+      flushSync();
+      return root.ownerDocument.querySelector(`#${LEAF_ANCHOR}-popover`).textContent.trim();
+    },
+    drawn: ['Strength', 'Wisdom'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -681,6 +704,11 @@ describe('a key a leaf does not publish', () => {
     ...['source', 'itemLabel', 'onChoose', 'listProps', 'optionDataAttr', 'class', 'data-x'].map(
       (key) => ['Typeahead', key, 'is not a prop of Typeahead']
     ),
+    ...['trapFocus', 'initialFocus', 'width', 'offset', 'class', 'data-x'].map((key) => [
+      'Popover',
+      key,
+      'is not a prop of Popover',
+    ]),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

@@ -403,6 +403,8 @@ const JS_ARIA_READERS = Object.freeze({
     "on Fabricate's own validation targets",
   'src/ui/svelte/components/Modal.svelte: closest([aria-expanded="true"])':
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
+  'src/ui/svelte/actions/popoverFocus.js: closest([aria-expanded="true"])':
+    "a control a companion draws in a published Popover's slot keeps Escape while it is expanded, as Popover's group states",
 });
 
 /**
@@ -1428,7 +1430,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty-four focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, the Typeahead row, and the probe button and two inputs', () => {
+  it('judges thirty-six focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Popover panel and its body, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, the Typeahead row, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1451,6 +1453,8 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Modal.svelte: div',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/Popover.svelte: div',
+      'src/ui/svelte/components/Popover.svelte: div',
       'src/ui/svelte/components/RadioCardGroup.svelte: input',
       'src/ui/svelte/components/SearchablePopover.svelte: button',
       'src/ui/svelte/components/SearchablePopover.svelte: button',
@@ -1528,6 +1532,7 @@ describe('each entry matches its component declaration', () => {
         'Disclosure.onToggle: 1',
         'Typeahead.onChange: 1',
         'Typeahead.onFreeText: 1',
+        'Popover.onClose: 0',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3434,6 +3439,7 @@ describe('the module sheet and every component style against the published Inspe
         'SelectionCheckbox',
         'Disclosure',
         'Typeahead',
+        'Popover',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );

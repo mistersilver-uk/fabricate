@@ -994,6 +994,15 @@
       "why": "Issue 2862 builds the library's `<Disclosure>`, the card that opens in place: one heading holding one `aria-expanded` button, its head, over a body kept in the page while closed, rooted at `fabricate-disclosure` in the module sheet. ONE caller, `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter; the premium companion's faction card draws it through `game.fabricate.api.ui`, its head holding a chip, a bar, text and a run of holdings that `Button`'s text-only label cannot carry, so it is below the two-importer membership bar on the `TierTrack` precedent. It is not `<RowDisclosure>`, the chevron beside a row's content, nor `CollapsibleGroupHeader`, which draws a folder and a count of its own: it is the whole-header shape the ordered-row requirement names, which `RuleRow`, `GatheringRealmsTab`, `CharacterPrerequisitesCard` and `InventoryBookDetail` still hand-roll, and moving them onto it is a follow-up that would make it a member. Its library specimen reads `shipped`, and its broad-signal override names its specimen mounted through the seam."
     },
     {
+      "path": "src/ui/svelte/components/Popover.svelte",
+      "library": "<Popover>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/publishedComponents.svelte.js"
+      ],
+      "why": "Issue 2861 builds the anchored popover: a non-modal `role=\"dialog\"` named by `ariaLabel` or its `title`, holding a caller's controls in its `body`, placed under or over an anchor the caller names by id and flipped to the side with room through the `anchoredPopover` action, which takes an `opener` for it so the host is acquired from the popover's own mount. ONE caller, `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter; the premium companion's standing nudge draws it through `game.fabricate.api.ui`, so it is below the two-importer membership bar on the `TierTrack` precedent. `<SearchPopover>` is the near entry and rules itself out: its panel is a listbox of options, and this one's content is arbitrary controls. The manager's duration editor (`apps/manager/recipe/RecipeDurationEditor.svelte`) is the in-app surface that draws the same shape by hand and the candidate second caller. Its library specimen reads `shipped`, and its broad-signal override names its specimen mounted through the seam."
+    },
+    {
       "path": "src/ui/svelte/components/PickerRowNameField.svelte",
       "library": null,
       "evidence": "broad",

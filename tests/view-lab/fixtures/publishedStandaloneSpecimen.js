@@ -1,11 +1,11 @@
 /**
  * The standalone specimen's wiring (issues 2456, 2679, 2680), which `PublishedStandalone.svelte`
  * lays out and mounts, and `tests/components/published-standalone-root-mounted.test.js` runs the
- * View Lab cases against: the twenty entries that state `standaloneRoot`, each mounted into a
+ * View Lab cases against: the twenty-one entries that state `standaloneRoot`, each mounted into a
  * target by key (the switch and the card in more than one state), the `Well` in the
- * `InspectorCard`'s slot, the `Field`'s slot holding a caption, input and hint, and a closed
- * `Modal` that a published `Button`, the opener, opens through `update`. Every word is a
- * companion's final text, so none is localized.
+ * `InspectorCard`'s slot, the `Field`'s slot holding a caption, input and hint, a closed `Modal`
+ * that a published `Button`, the opener, opens through `update`, and a closed `Popover`. Every
+ * word is a companion's final text, so none is localized.
  */
 
 /** The fixture's three columns of target keys, top to bottom, one column to a line. */
@@ -13,7 +13,7 @@
 export const COLUMNS = Object.freeze([
   Object.freeze(['button', 'icon-button', 'toggle', 'toggle-switch', 'toggle-card', 'card', 'field', 'search']),
   Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off', 'checkbox', 'disclosure', 'typeahead']),
-  Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal', 'toggle-card-bare', 'toggle-card-long']),
+  Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal', 'toggle-card-bare', 'toggle-card-long', 'popover']),
 ]);
 
 const DIALOG = Object.freeze({
@@ -94,6 +94,14 @@ export function mountStandaloneSpecimen({ mount, targets }) {
   const handles = [
     disclosure,
     dialog,
+    mount('Popover', {
+      target: targets.popover,
+      props: {
+        anchorId: 'lab-standalone-popover-anchor',
+        ariaLabel: 'Adjust the batch',
+        onClose: noop,
+      },
+    }),
     mount('Button', {
       target: targets.opener,
       props: {

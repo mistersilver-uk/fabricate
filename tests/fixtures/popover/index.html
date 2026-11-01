@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Published Popover — placement, hosts and focus</title>
+    <!--
+      Served by `tests/components/popover-rendered.test.js` from a Vite dev server, so `mount.js`
+      can mount the real `Popover` through the real published seam. The two rules below are the
+      fixture's Foundry stand-ins, as `tests/fixtures/overlay-host/index.html` states them: core's
+      border-box reset and its positioned `.application` window.
+    -->
+    <link rel="stylesheet" href="/@popover-styles/fabricate.css" />
+    <style data-fixture-chrome>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0b0a13;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+
+      .application {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #17161f;
+        border: 1px solid #3b3a48;
+      }
+
+      .application > .window-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .fixture-scroller {
+        position: relative;
+        height: 100%;
+        overflow: auto;
+      }
+
+      [data-fixture-anchor] {
+        position: absolute;
+        width: 96px;
+        height: 32px;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <button type="button" data-fixture-open-detached>Detach</button>
+    <script type="module" src="/tests/fixtures/popover/mount.js"></script>
+  </body>
+</html>

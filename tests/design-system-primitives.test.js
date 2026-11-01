@@ -175,6 +175,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/PickerRowNameField.svelte',
   'src/ui/svelte/components/PickerRowRangeCell.svelte',
   'src/ui/svelte/components/PickerRowRewardBody.svelte',
+  // Issue 2861: the anchored popover, on its specimen mounted through the seam.
+  'src/ui/svelte/components/Popover.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   // Issue 1782: the inspector rail section, on a frame of each of its three inspectors.
   'src/ui/svelte/components/Rail.svelte',

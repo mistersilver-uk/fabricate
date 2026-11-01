@@ -86,6 +86,7 @@ manager-published-modal-scrim-specimen
 manager-published-typeahead-specimen
 manager-published-typeahead-no-match
 manager-published-typeahead-free-text
+manager-published-popover-specimen
 published-standalone
 published-standalone-light
 published-standalone-select-open

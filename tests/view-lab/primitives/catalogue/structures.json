@@ -135,6 +135,97 @@
     "note": "The panel’s three recipe verbs in its foot, the content above it as plain text. The aside’s two tokens ride the root’s `style`, because the lab’s slot is not a `.manager-inspector`; the slot is not a scroller, so the foot stands under the content."
   },
   {
+    "spec": "<Popover>",
+    "draws": ".stage.b0 > div",
+    "path": "src/ui/svelte/components/Popover.svelte",
+    "fixture": "PopoverOpen",
+    "slot": {
+      "width": 420,
+      "height": 300
+    },
+    "undrawn": {
+      "Adjust Strength": "the dialog’s accessible name; the drawing draws its heading"
+    },
+    "props": {
+      "open": true,
+      "anchorId": "lab-popover-anchor",
+      "ariaLabel": "Adjust Strength"
+    },
+    "data": {
+      "anchorLabel": "Strength 14",
+      "heading": "Strength"
+    },
+    "snippets": {
+      "body": [
+        {
+          "tag": "span",
+          "attrs": {
+            "style": "display:flex;align-items:center;width:240px;height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--fab-border);font-size:12px;background:var(--fab-bg-0);color:var(--fab-text)"
+          },
+          "text": "14"
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "style": "display:flex;gap:4px"
+          },
+          "children": [
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "−5"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "−2"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "−1"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "+1"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "+2"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "display:inline-flex;align-items:center;height:24px;padding:0 12px;border-radius:6px;border:1px solid var(--fab-border);font-size:11.52px;font-weight:700;background:var(--fab-surface-soft);color:var(--fab-text-secondary)"
+              },
+              "text": "+5"
+            }
+          ]
+        },
+        {
+          "tag": "span",
+          "attrs": {
+            "style": "display:flex;align-items:center;width:240px;height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--fab-border);font-size:12px;background:var(--fab-bg-0);color:var(--fab-text-subtle)"
+          },
+          "text": "Reason"
+        }
+      ]
+    },
+    "note": "The shipped Button stands as the anchor the drawing draws, carrying the id the row’s `anchorId` names, and the popover opens 6px beneath it at its start edge. A boxed slot, because the panel is portalled to the window: 420 by 300 holds the anchor and the panel below it unflipped. The body’s value and reason fields and its six delta buttons are the caller’s own content, drawn as the drawing draws them."
+  },
+  {
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
     "path": "src/ui/svelte/components/Modal.svelte",

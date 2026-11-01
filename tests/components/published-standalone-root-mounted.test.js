@@ -96,6 +96,7 @@ const WIDENED = Object.freeze({
     onSelect() {},
   },
   Modal: { open: true, title: 'Rename the reagent', closeLabel: 'Close', onClose() {} },
+  Popover: { anchorId: 'standalone-popover-anchor', ariaLabel: 'Adjust Strength', onClose() {} },
   ToggleCard: { title: 'Spend when this stage begins', on: false, onToggle() {} },
   SelectionCheckbox: { checked: false, label: 'Spent', onChange() {} },
   Disclosure: { head: true, body: true, onToggle() {} },
