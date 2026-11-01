@@ -43,6 +43,13 @@ const FAMILY_CLASSES = new Set([
   'is-density-inline',
 ]);
 
+/**
+ * The published typeahead's error face (issue 2860): a sheet rule that is a family rule but for
+ * these classes on its root compound, `is-invalid` among them, may set only a fill or an edge colour.
+ */
+const ERROR_FACE_CLASSES = new Set(['fabricate-typeahead', 'is-invalid']);
+const ERROR_FACE_BOX = /^(?:background(?:-[\w-]+)?|border(?:-[\w-]+)?-color)$/;
+
 // ratchet-exempt(source-pin): issue 1782's geometry gate is a stylesheet scan; this reads the call sites' classes and the scoped blocks to scan, and asserts nothing about how either is written
 const sources = collectWorkingTreeSources(['src'], ['.svelte']);
 
@@ -168,6 +175,17 @@ function isFamily(file, compounds, at) {
   );
 }
 
+/** Whether a rule is the error face: a family rule once its root drops `ERROR_FACE_CLASSES`. */
+function isErrorFace(file, compounds, at) {
+  if (!compounds[at].classes.includes('is-invalid')) return false;
+  const stripped = compounds.map((compound, index) =>
+    index === at
+      ? { ...compound, classes: compound.classes.filter((name) => !ERROR_FACE_CLASSES.has(name)) }
+      : compound
+  );
+  return isFamily(file, stripped, at);
+}
+
 /** Every selector in the corpus that reaches a search field or its input. */
 function reachingSelectors(files) {
   const found = [];
@@ -184,6 +202,7 @@ function reachingSelectors(files) {
           compounds,
           at,
           family: isFamily(file, compounds, at),
+          errorFace: isErrorFace(file, compounds, at),
           compact: compounds[at].compact,
           boxes: boxes.map(({ property }) => property),
         });
@@ -231,9 +250,7 @@ describe('no rule outside the search family re-sizes or re-boxes the field', () 
   });
 
   it('finds no height, min-height, border or background outside the family, except compact', () => {
-    const offenders = REACHING.filter(
-      (entry) => !entry.family && entry.boxes.length > 0 && !entry.compact
-    ).map((entry) => `${entry.file}: ${entry.selector} { ${entry.boxes.join(', ')} }`);
+    const offenders = boxOffenders(REACHING);
     assert.deepEqual(
       offenders,
       [],
@@ -242,6 +259,45 @@ describe('no rule outside the search family re-sizes or re-boxes the field', () 
         `field's height or box puts one search back off the specimen:\n  ${offenders.join('\n  ')}`
     );
   });
+});
+
+/** The rules that size or box the field outside the family, the error face's colours aside. */
+function boxOffenders(reaching) {
+  return reaching
+    .filter((entry) => !entry.family && !entry.compact)
+    .map((entry) => ({
+      ...entry,
+      boxes: entry.errorFace
+        ? entry.boxes.filter((property) => !ERROR_FACE_BOX.test(property))
+        : entry.boxes,
+    }))
+    .filter((entry) => entry.boxes.length > 0)
+    .map((entry) => `${entry.file}: ${entry.selector} { ${entry.boxes.join(', ')} }`);
+}
+
+describe('the error face admission, synthetic (issue 2860)', () => {
+  const offendersIn = (css) => boxOffenders(reachingSelectors({ [SHEET]: css }));
+
+  it('admits the error face’s fill and edge colour', () => {
+    assert.deepEqual(
+      offendersIn(
+        '.fabricate-search.fabricate-typeahead.is-invalid:not(.is-compact) { background: red; border-color: red; }'
+      ),
+      []
+    );
+  });
+
+  for (const [selector, declaration] of [
+    ['.fabricate-typeahead', 'height: 44px'],
+    ['.fabricate-search.is-invalid', 'min-height: 44px'],
+    ['.fabricate-search.fabricate-typeahead.is-invalid', 'border-width: 2px'],
+    ['.fabricate-typeahead.is-invalid', 'height: 44px'],
+    ['.manager-row .fabricate-search.is-invalid', 'background: red'],
+  ]) {
+    it(`still refuses ${selector} { ${declaration} }`, () => {
+      assert.equal(offendersIn(`${selector} { ${declaration}; }`).length, 1);
+    });
+  }
 });
 
 /** Host markup built from a selector's ancestor compounds, around the field's own markup. */

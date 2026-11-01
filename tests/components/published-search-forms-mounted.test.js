@@ -97,6 +97,7 @@ describe('the published SearchField density', () => {
   it('withholds only values of a published data key', () => {
     assert.deepEqual(WITHHELD_VALUES, [
       'SearchField.density.compact',
+      'Typeahead.density.compact',
       ...['active', 'disabled', 'negative', 'muted', 'tag', 'secondary', 'subtle'].map(
         (tone) => `Chip.tone.${tone}`
       ),

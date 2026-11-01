@@ -1942,9 +1942,16 @@ Being a non-member exempts it from the PICKER and from nothing else.
 Its suggestion list is a floating surface, so it is portalled to the nearest application root and positioned through the `anchoredPopover` action, directly beneath its field, sharing the field's left edge, at least as wide as the field, and flipped above it only where the root has no room below.
 A suggestion list positioned inside its own row is clipped by that row's scrolling ancestor and lengthens the ancestor's scroll area instead of floating over the page, and five shipped lists did exactly that before issue 2157.
 Its input is the HOLDER of the listbox contract above: DOM focus never leaves it, the holder's key map moves an active option it names through `aria-activedescendant`, and each suggestion is a `role="option"` row with `tabindex="-1"`.
-The list is open only while the input holds focus and its query is non-empty.
+The list is open only while the input holds focus and its query is non-empty, and a choice closes it until the query is edited (issue 2860).
+Each edit of the query leaves no option active, so a query typed again never brings an active option back, and `Enter` at the query a choice was made at commits nothing more.
 `Escape` empties the query from the holder rather than from the document, because an empty query is the only closed state this widget has.
 `Enter` commits the active option, and with none active it commits nothing unless the call site's own requirement names what it commits.
+Its data form is the one `game.fabricate.api.ui` publishes (issue 2860): it takes its rows as `options` of `{ value, label, icon?, detail? }` in place of `source`, `itemLabel`, `itemIcon` and `onChoose`, reports a choice through `onChange` with the row's own `value`, and marks the row matching `value` with a tick and `aria-checked`, leaving `aria-selected` to the active option.
+With no option active, `Enter` in the data form commits the trimmed query through `onFreeText` only where `allowFree` asks, and `error` draws `Select`'s invalid face on its field with the message beneath it, named by `aria-describedby`, the list then opening below the message.
+In the data form `Escape` first closes a shown list and keeps the query, and empties the query only once nothing is shown; a key Safari reports with `keyCode` 229 counts as composing; the current option also takes `Select`'s chosen fill; and the list closes when the field leaves its document.
+The data form always draws a polite status region beside its field and writes its no-match line into it when the line shows, so the line is announced in a region that already exists; the panel's own line is then not a second region.
+Under forced colours its active option's ring is the system highlight, so the active option stays apart from the current option's tick by shape.
+Every rule the data form adds hangs on a class only the data form writes, so Fabricate's own typeaheads draw and behave as before.
 - An ACTION MENU is not a picker.
 `role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
 It is a SET MEMBER in its own right rather than merely a non-member, and the requirement below states what it owns.

@@ -1989,7 +1989,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no component published before it has the root `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; [issue #2784](https://github.com/mistersilver-uk/fabricate/issues/2784) publishes `ListRow` at the root `fabricate`; [issue #2793](https://github.com/mistersilver-uk/fabricate/issues/2793) publishes `ListRow`'s `aside`; [issue #2843](https://github.com/mistersilver-uk/fabricate/issues/2843) publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; [issue #2850](https://github.com/mistersilver-uk/fabricate/issues/2850) publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; [issue #2851](https://github.com/mistersilver-uk/fabricate/issues/2851) publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; [issue #2848](https://github.com/mistersilver-uk/fabricate/issues/2848) publishes `Field`'s `size`, `face`, `type` and `invalid`; [issue #2849](https://github.com/mistersilver-uk/fabricate/issues/2849) publishes `SearchField`'s `density` and `countLabel`; [issue #2853](https://github.com/mistersilver-uk/fabricate/issues/2853) publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; [issue #2852](https://github.com/mistersilver-uk/fabricate/issues/2852) publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; [issue #2854](https://github.com/mistersilver-uk/fabricate/issues/2854) publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; [issue #2855](https://github.com/mistersilver-uk/fabricate/issues/2855) publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; [issue #2856](https://github.com/mistersilver-uk/fabricate/issues/2856) publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; [issue #2858](https://github.com/mistersilver-uk/fabricate/issues/2858) publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis; [issue #2837](https://github.com/mistersilver-uk/fabricate/issues/2837) publishes `StageBars`' `track` and a stage's `shares`; [issue #2857](https://github.com/mistersilver-uk/fabricate/issues/2857) publishes a `StageBars` stage's `title`; [issue #2863](https://github.com/mistersilver-uk/fabricate/issues/2863) publishes `FillBar`'s `neutralBand`; [issue #2841](https://github.com/mistersilver-uk/fabricate/issues/2841) publishes `StatBox`'s `children` slot, `Stepper`'s dense `size`, `Button`'s `accent` and `urgent` roles and `IconPicker`'s `tint`; [issue #2859](https://github.com/mistersilver-uk/fabricate/issues/2859) publishes `Modal`'s `scrim`; [issue #2836](https://github.com/mistersilver-uk/fabricate/issues/2836) publishes `SelectionCheckbox`; [issue #2862](https://github.com/mistersilver-uk/fabricate/issues/2862) publishes `Disclosure`.
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no component published before it has the root `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; [issue #2784](https://github.com/mistersilver-uk/fabricate/issues/2784) publishes `ListRow` at the root `fabricate`; [issue #2793](https://github.com/mistersilver-uk/fabricate/issues/2793) publishes `ListRow`'s `aside`; [issue #2843](https://github.com/mistersilver-uk/fabricate/issues/2843) publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; [issue #2850](https://github.com/mistersilver-uk/fabricate/issues/2850) publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; [issue #2851](https://github.com/mistersilver-uk/fabricate/issues/2851) publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; [issue #2848](https://github.com/mistersilver-uk/fabricate/issues/2848) publishes `Field`'s `size`, `face`, `type` and `invalid`; [issue #2849](https://github.com/mistersilver-uk/fabricate/issues/2849) publishes `SearchField`'s `density` and `countLabel`; [issue #2853](https://github.com/mistersilver-uk/fabricate/issues/2853) publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; [issue #2852](https://github.com/mistersilver-uk/fabricate/issues/2852) publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; [issue #2854](https://github.com/mistersilver-uk/fabricate/issues/2854) publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; [issue #2855](https://github.com/mistersilver-uk/fabricate/issues/2855) publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; [issue #2856](https://github.com/mistersilver-uk/fabricate/issues/2856) publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; [issue #2858](https://github.com/mistersilver-uk/fabricate/issues/2858) publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis; [issue #2837](https://github.com/mistersilver-uk/fabricate/issues/2837) publishes `StageBars`' `track` and a stage's `shares`; [issue #2857](https://github.com/mistersilver-uk/fabricate/issues/2857) publishes a `StageBars` stage's `title`; [issue #2863](https://github.com/mistersilver-uk/fabricate/issues/2863) publishes `FillBar`'s `neutralBand`; [issue #2841](https://github.com/mistersilver-uk/fabricate/issues/2841) publishes `StatBox`'s `children` slot, `Stepper`'s dense `size`, `Button`'s `accent` and `urgent` roles and `IconPicker`'s `tint`; [issue #2859](https://github.com/mistersilver-uk/fabricate/issues/2859) publishes `Modal`'s `scrim`; [issue #2836](https://github.com/mistersilver-uk/fabricate/issues/2836) publishes `SelectionCheckbox`; [issue #2862](https://github.com/mistersilver-uk/fabricate/issues/2862) publishes `Disclosure`; [issue #2860](https://github.com/mistersilver-uk/fabricate/issues/2860) publishes `Typeahead`.
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2074,13 +2074,14 @@ The published components, in publication order:
 | `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria) | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
+| `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox` and `Disclosure` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -4398,6 +4399,127 @@ card.slot('body').append(renderFactionDetails(faction));
 // `chip.destroy()`, `standing.destroy()` and `card.destroy()` when the panel goes away.
 ```
 
+### Typeahead
+
+`Typeahead` draws the design system's typeahead: a search field whose list of suggestions the query drives, for one choice from a set too long to step through, which commits as it is made, and optionally for text of your own when nothing matches.
+It is an editable combobox: the input holds focus throughout and names the active row, and the list is an overlay.
+For a short set the user should see whole, use [`Select`](#select): an empty query lists nothing here, and the field never shows the current value's label, so draw your current value beside it.
+A list shown on focus before any typing is a named follow-up, `openOnEmpty`, and not part of version 1.
+The input is the only focusable element Fabricate draws in `target`, so to return focus to the typeahead, focus `target.querySelector('input')`.
+`options` is required and lists the rows the current query yields, in drawn order, each `{ value, label, icon?, detail? }`: `value` is a string or a number, `label` is required final display text, `icon` is optional Font Awesome classes for a glyph drawn before the label and hidden from assistive technology, and `detail` is optional final display text drawn as a second line under the label; a row's accessible name is its label followed by its detail.
+Fabricate filters nothing: you hand the list the rows your own search yields for the query you hold, in your own order and number, so cap a long result yourself; Fabricate draws every row it is given inside the list's scroll.
+An item whose `value` is not a string or a number, or whose `label` is not a non-blank string, is not drawn; an `icon` or a `detail` that is not a non-blank string draws nothing.
+Two items that share a `value` are both drawn, both carry the current tick, and each reports that value, so keep values unique.
+An `options` that is not an array is a contained fault reported under `Typeahead`, which empties `target` and reports to `onFault`; an empty array lists no row.
+A member other than `value`, `label`, `icon` and `detail` is private.
+`query` is the text in the field, a string, and is `''` when absent.
+A `query` that is not a string is outside the contract, and what is drawn for it is private.
+It is a `value` prop: the field changes it itself as the user types, and an `update` that omits it keeps the current query, so you need not pass the query back on every `update`.
+`onQueryChange` is called with two strings, `(next, previous)`, each time an edit of the user's changes the query: a keystroke, a paste or a cut, a clear the browser makes from the field's cancel button, and Escape while nothing is shown, which reports `''`.
+It is not called by `mount`, `update`, a choice or Enter.
+Answer it with an `update` that passes the `options` the new query yields, in the same handler and before any `await`, so the list never shows rows for an older query.
+`value` is your current value, optional: the row whose `value` is `value`, matched by `===`, carries a tick at its end and `aria-checked="true"`.
+While `value` is a string or a number every other row carries `aria-checked="false"`, and while it is absent or `null` no row carries `aria-checked` and none is ticked.
+The current row also takes `Select`'s chosen fill beside its tick.
+Some screen readers say "not checked" on every other row while `value` is set; how a screen reader reads `aria-checked` on an option is its own.
+A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
+`onChange` is a required callback, called with one argument, the chosen row's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses a row by pointer or by Enter on the active row, the current row included.
+It is not called by `mount`, `update`, typing, opening or closing the list, Escape, Tab, a press outside the list or Enter with no row active.
+The typeahead changes nothing itself on a choice: the query and `value` stay as they were, and you pass what you keep through `update`, as `query: ''` to empty the field after a choice.
+A choice closes the list until the query is edited again, and Enter at that query then commits nothing more.
+`ariaLabel` is required and names the input and its list, final display text naming what is searched, as "Find a reward".
+The typeahead draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the field with no name.
+`placeholder` is optional final display text shown while the field is empty, and is not the field's name.
+`emptyLabel` is optional final display text, as "Nothing matches.", that the list shows as one quiet line in place of rows while the input holds focus on a non-blank query and `options` draws no row; absent or `''`, the list closes instead.
+Fabricate always draws a hidden polite status region, an element with `role="status"`, beside the field inside `target`, empty while the line is not shown, and writes the line into it when the line is shown and empties it when a row is listed again, so a screen reader is expected to announce the line once; the list's own line is not a second region.
+That region is the second element with `role="status"` in `target`; the first is the field's own count region, which `countLabel` writes.
+How a screen reader treats a live region is the screen reader's, and Fabricate announces no count of rows of its own, so put any count in `countLabel`.
+`countLabel` is optional final display text drawn after the input inside the field, as "4 more, keep typing", in the field's own polite status region, as [`SearchField`](#searchfield)'s `countLabel` draws it; `''` or absence draws none.
+Use it to say how many rows a capped result leaves out, and keep it short, because past half the field it is cut.
+`allowFree` is `true` or `false`, and defaults to `false`: while it is truthy, Enter pressed outside an IME composition with no row active reports the query through `onFreeText`, unless the query is blank, and takes the key whatever the query; Enter on an active row still chooses the row.
+Fabricate coerces nothing, so the string `'false'` turns it on, and only `true` and `false` are in the contract.
+`onFreeText` is a callback, required while `allowFree` is truthy, called with one argument, the query with its leading and trailing white space removed, as your user's own text when no row is wanted.
+It is not called by a press, by Enter on an active row, by Enter on a blank query or inside a composition, or while `allowFree` is falsy.
+It changes nothing itself either: empty the field with `query: ''` in an `update` when you take the text, as the worked example does.
+`density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: the field's shell at the heights [`SearchField`](#searchfield)'s `density` draws, 38px at radius 9, 34px at radius 9 and 30px at radius 7; any other value, `'compact'` included, draws `'default'`.
+`error` is optional final display text: while it is a non-blank string the field takes the error face, `Select`'s danger edge on the `--fab-danger-soft` fill, its input states `aria-invalid="true"`, and the text is drawn beneath the field in the `--fab-danger-text` ink and is the input's description through `aria-describedby`; absent, `''`, white space alone or not a string, none of them is drawn.
+While the input holds focus, the field's lit border is drawn in place of the danger edge, and the fill and the message stay.
+The danger edge falls short of 3:1 against the grounds below, and forced colours remove the fill, so the message carries the error, and say what to do in it.
+While an error shows, the list opens below the message, so it never covers it.
+The message makes the field taller, so draw a field that can show an error at the `'default'` `density`, in a place that need not stay one height.
+A Fabricate that predates `Typeahead` does not list it in `components`, `describe('Typeahead')` answers `null`, and `mount` refuses it with `"Typeahead" is not published`, so draw your own field there.
+
+- The list is open only while the input holds focus, the query is not blank and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
+- ArrowDown and ArrowUp move the active row and wrap at each end, ArrowDown from no active row to the first and ArrowUp to the last; each edit of the query leaves no row active, so a query typed again never brings a row back.
+- The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
+- Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
+- Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.
+- Escape while the list or its empty line is shown closes it and keeps the text; Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`; either stops its propagation, so no listener above `target` hears it, a DialogV2's own included; Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+- Tab and Shift+Tab move focus as the browser does and close the list without a choice, and your listener above `target` hears the Tab.
+- No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
+- A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
+- Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, as [`SearchField`](#searchfield) does.
+
+The input is a `role="combobox"` with `aria-autocomplete="list"`, `aria-expanded` and, while rows are listed, `aria-controls`; the list is a `listbox` named by `ariaLabel`, and each row an `option`.
+The line `emptyLabel` draws is shown in the overlay with no listbox.
+The list is the component's overlay, so `describe('Typeahead').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
+Pass an `overlayHost` inside the same Fabricate window, or none, so the list takes that window's palette; in your own window or dialog pass none, and the list opens on the standalone layer.
+The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
+Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
+The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
+It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal, and this is tracked as a follow-up.
+A row is at least 28px tall, so each is a 24px target.
+`Typeahead` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Typeahead`.
+Its field is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog; it fills the width of `target`, so give `target` `display: flex`.
+The keyboard mark is [`SearchField`](#searchfield)'s: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own.
+A row's label and detail and the empty line clear 4.5:1 on the list, on a row under the pointer and on the current row's fill in every palette, and the active row's ring and the tick clear 3:1 there; the list paints its own opaque ground, so what it opens over changes none of those.
+On the error fill, the query and the placeholder clear 4.5:1, and the lit border 3:1, over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and the message's ink clears 4.5:1 on those grounds; none of them is stated over `--fab-bg-3`.
+Under forced colours the active row's ring is drawn in the system highlight colour and the current row keeps its tick in the text colour, so the two stay apart by shape, and the current row's fill, which forced colours remove, is never the only carrier; colour is never the only carrier of either.
+An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced, and an `update` while the list is open redraws it in place; `destroy` removes the input and closes the list, so where the input holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its sizes beyond the field's height and corner, its glyph, tick and colours beyond what this section states, and what it draws for a member or value outside its contract are private.
+`source`, `itemLabel`, `itemIcon`, `onChoose`, `label`, `ariaLabelledBy`, `icon`, `inputProps`, `listClass`, `listProps`, `listMaxHeight`, `optionClass`, `optionHeight` and `optionDataAttr` are not published at version 1, so a `class` or any of those is refused with `"<key>" is not a prop of Typeahead`.
+
+A worked typeahead follows: a reward picked from your own catalogue, or named in free text, which your own row then shows.
+
+```javascript
+// After `load(['Typeahead'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the typeahead describes none: draw your own field there.
+if (!fabUi?.describe?.('Typeahead')) return;
+
+// Your text above `target`, in the same Fabricate window: <span>Find a reward</span>.
+target.style.display = 'flex';
+let query = '';
+const props = () => ({
+  ariaLabel: 'Find a reward', // The words your text draws.
+  placeholder: 'Search the catalogue',
+  options: acmeCatalogue.search(query, 8).map((item) => ({
+    value: item.id,
+    label: item.name,
+    icon: 'fa-solid fa-gem',
+    detail: item.category,
+  })),
+  value: acmeReward.id ?? null,
+  emptyLabel: 'Nothing in the catalogue matches. Press Enter to use what you typed.',
+  allowFree: true,
+  onQueryChange: (next) => {
+    query = next;
+    typeahead.update(props()); // The rows for the new query, before any `await`.
+  },
+  onChange: (id) => {
+    acmeReward.choose(id); // Your own state first.
+    query = '';
+    typeahead.update({ ...props(), query }); // Empties the field without `onQueryChange`.
+  },
+  onFreeText: (text) => {
+    acmeReward.name(text);
+    query = '';
+    typeahead.update({ ...props(), query });
+  },
+});
+const typeahead = fabUi.mount('Typeahead', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -4579,7 +4701,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox` and `Disclosure` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -4679,6 +4801,7 @@ A component whose `describe(name).overlays` is `true` opens an overlay: a panel 
 `IconPicker` is the second: its list and its query field are the overlay, and its section states what they draw.
 `ActionMenu` is the third: its menu is the overlay, and its section states what it draws.
 `Modal` is the fourth: its dialog is the overlay, and its section states what it draws.
+`Typeahead` is the fifth: its suggestion list is the overlay, and its section states what the list draws.
 `mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
@@ -4688,7 +4811,7 @@ Each time an overlay opens, Fabricate picks where to draw it, from `target`'s ow
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
-A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s and `Modal`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
+A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
 Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
@@ -4697,11 +4820,13 @@ That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker` or `ActionMenu` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
+An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; mount it in a dialog that is not modal.
+This is tracked as a follow-up.
+An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.
 `destroy` and a fault close every open overlay and remove its panel, its element and a standalone layer nothing else uses.
-The panel of a component with an overlay, a [`Select`](#select), an [`IconPicker`](#iconpicker) or an [`ActionMenu`](#actionmenu), also closes when its `target` is disconnected while your mount is live, as when an `update` of the component whose content slot holds your mount detaches the slot.
+The panel of a component with an overlay, a [`Select`](#select), an [`IconPicker`](#iconpicker), an [`ActionMenu`](#actionmenu) or a [`Typeahead`](#typeahead), also closes when its `target` is disconnected while your mount is live, as when an `update` of the component whose content slot holds your mount detaches the slot.
 Its panel and its element are removed, focus is not moved, so focus left in the panel goes to the page, and the component calls no callback.
 A `target` that is removed and inserted again within one run of script keeps its panel open.
 A panel stays watched in the document it opened in, so after a Foundry 14 move a detach in the new window does not close it.
@@ -4733,7 +4858,7 @@ A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is 
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
 Every component published at version 1 states `any`, so `fabricate` and `manager` are values `describe` may return for a later component, and no mount you make today is refused for a missing Fabricate ancestor.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the nineteen components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twenty components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -4812,8 +4937,8 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox` and `Disclosure` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
-The panel `Select`, `IconPicker`, `ActionMenu` or `Modal` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+The panel `Select`, `IconPicker`, `ActionMenu`, `Modal` or `Typeahead` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.

@@ -1,7 +1,8 @@
 // The typeahead combobox's holder contract, written once (issue 2157). The input holds DOM focus
 // and drives a portalled suggestion list, per `openspec/specs/design-system/spec.md` under "A
 // picker announces the panel it opens": the list is open only while the field holds focus and its
-// query is non-empty, a new query starts with no active option, and Escape empties the query.
+// query is non-empty, each edit leaves no option active, a choice closes the list until the query
+// changes, and Escape empties the query, or with `escapeCloses` first closes an open list.
 // A call site spreads `field`, `list` and `option(index)` onto its own markup and applies
 // `typeaheadPanel` with `panel`; it writes no handler of its own. Every config value that can
 // change is a thunk read at call time.
@@ -30,6 +31,8 @@ class TypeaheadCombobox {
   #focused = $state(false);
   // The query a press elsewhere dismissed the list at, so typing a different one reopens it.
   #dismissedAt = $state(null);
+  // The query a choice was made at, at which Enter commits nothing more until the query changes.
+  #chosenAt = null;
   #cursor = $state({ query: '', index: -1 });
 
   #query = $derived(String(this.#config.query() ?? '').trim());
@@ -123,6 +126,8 @@ class TypeaheadCombobox {
 
   #onInput = (event) => {
     this.#hold(event);
+    this.#cursor = { query: '', index: -1 };
+    this.#chosenAt = null;
     this.#config.setQuery(event.currentTarget.value);
   };
 
@@ -132,8 +137,15 @@ class TypeaheadCombobox {
 
   #choose(index) {
     this.#cursor = { query: '', index: -1 };
+    this.#dismissedAt = this.#query;
+    this.#chosenAt = this.#query;
     this.#config.onChoose(index);
   }
+
+  /** Closes the list until the query changes, as a press elsewhere does. */
+  close = () => {
+    this.#dismiss();
+  };
 
   #moveTo(index) {
     this.#cursor = { query: this.#query, index };
@@ -155,23 +167,42 @@ class TypeaheadCombobox {
     event.preventDefault();
   }
 
-  #onKeydown = (event) => {
-    if (event.isComposing) return;
-    if (event.key === 'Escape') {
-      if (String(this.#config.query() ?? '') === '') return;
+  // Safari reports a key that commits an IME composition with `keyCode` 229 and no `isComposing`.
+  #composing(event) {
+    return event.isComposing || (this.#config.processKeyComposes && event.keyCode === 229);
+  }
+
+  #onEscape(event) {
+    const shown = this.#listed || (this.#open && Boolean(this.#config.hasNote));
+    const closes = this.#config.escapeCloses && shown;
+    if (!closes && String(this.#config.query() ?? '') === '') return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.#cursor = { query: '', index: -1 };
+    if (closes) this.#dismiss();
+    else this.#config.setQuery('');
+  }
+
+  // A field whose `onEnterUnchosen` answers `false` has not taken that Enter, so it passes on.
+  #onEnterUnchosen(event) {
+    if (this.#chosenAt !== null && this.#chosenAt === this.#query) {
       event.preventDefault();
-      event.stopPropagation();
-      this.#config.setQuery('');
+      return;
+    }
+    if (this.#config.onEnterUnchosen() !== false) event.preventDefault();
+  }
+
+  #onKeydown = (event) => {
+    if (this.#composing(event)) return;
+    if (event.key === 'Escape') {
+      this.#onEscape(event);
       return;
     }
     if (this.#listed) {
       this.#onListKey(event);
       return;
     }
-    if (event.key === 'Enter' && this.#config.onEnterUnchosen) {
-      event.preventDefault();
-      this.#config.onEnterUnchosen();
-    }
+    if (event.key === 'Enter' && this.#config.onEnterUnchosen) this.#onEnterUnchosen(event);
   };
 }
 
@@ -184,8 +215,13 @@ class TypeaheadCombobox {
  * @param {() => number} config.count how many suggestions the query yields
  * @param {(value: string) => void} config.setQuery writes the caller's query; Escape writes ''
  * @param {(index: number) => void} config.onChoose commits one suggestion
- * @param {() => void} [config.onEnterUnchosen] what Enter commits with no option active; a field
- *   that supplies it consumes every Enter, open or not
+ * @param {() => (boolean | void)} [config.onEnterUnchosen] what Enter commits with no option
+ *   active; a field that supplies it consumes every Enter, open or not, but one it answers `false`
+ *   while the list is closed
+ * @param {boolean} [config.escapeCloses] Escape closes a shown list and keeps the query, and
+ *   empties it only while none is shown
+ * @param {boolean} [config.hasNote] the caller shows a note while the query lists nothing
+ * @param {boolean} [config.processKeyComposes] a `keyCode` 229 key counts as composing
  * @param {number} [config.maxHeightCap] the panel's height bound
  * @param {{pitch: number, gap: number, chrome: number}} [config.rows] floors that bound to rows
  */

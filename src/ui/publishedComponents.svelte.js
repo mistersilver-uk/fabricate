@@ -43,6 +43,7 @@ import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
 import ToggleCard from './svelte/components/ToggleCard.svelte';
+import Typeahead from './svelte/components/Typeahead.svelte';
 import Well from './svelte/components/Well.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 import { APP_TOOLTIPS } from './svelte/util/appLocalizer.js';
@@ -84,6 +85,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/ToggleCard.svelte': ToggleCard,
   'src/ui/svelte/components/SelectionCheckbox.svelte': SelectionCheckbox,
   'src/ui/svelte/components/Disclosure.svelte': Disclosure,
+  'src/ui/svelte/components/Typeahead.svelte': Typeahead,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

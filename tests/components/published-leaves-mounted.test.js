@@ -484,6 +484,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('button').getAttribute('aria-expanded'),
     drawn: ['false', 'true'],
   },
+  {
+    name: 'Typeahead',
+    under: 'fabricate',
+    root: '.fabricate-typeahead-control',
+    props: { options: [], ariaLabel: 'Find a reward', onChange() {} },
+    next: { options: [], ariaLabel: 'Find a tool', onChange() {} },
+    read: (root) => root.querySelector('input').getAttribute('aria-label'),
+    drawn: ['Find a reward', 'Find a tool'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -669,6 +678,9 @@ describe('a key a leaf does not publish', () => {
       key,
       'is not a data attribute',
     ]),
+    ...['source', 'itemLabel', 'onChoose', 'listProps', 'optionDataAttr', 'class', 'data-x'].map(
+      (key) => ['Typeahead', key, 'is not a prop of Typeahead']
+    ),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

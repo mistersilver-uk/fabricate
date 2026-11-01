@@ -207,7 +207,9 @@
   line-height: 1.5;
 }
 
-.fabricate-select-error {
+/* The published typeahead's error message shares the select's (issue 2860). */
+.fabricate-select-error,
+.fabricate-typeahead-error {
   color: var(--fab-danger-text);
   font-size: 10.5px;
   font-weight: 400;

@@ -85,12 +85,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-drops-ranked-narrow',
     'player-crafting-results-choice-group',
   ]),
-  // The typeahead (issue 1782): the limits tab's two 38px fields, and each site's open list.
+  // The typeahead (issue 1782): the limits tab's two 38px fields, and each site's open list; then
+  // the specimens that mount it through the published seam (issue 2860).
   'src/ui/svelte/components/Typeahead.svelte': Object.freeze([
     'manager-recipe-item-limits',
     'manager-recipe-item-limits-suggestions',
     'manager-gathering-task-component-tag-suggestions',
     'manager-gathering-task-drop-modifier-suggestions',
+    'manager-published-typeahead-specimen',
+    'manager-published-typeahead-no-match',
+    'manager-published-typeahead-free-text',
   ]),
   // The list and grid switch (issue 2412): the essence browser in each arrangement.
   'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([

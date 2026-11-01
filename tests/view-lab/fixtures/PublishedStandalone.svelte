@@ -1,5 +1,5 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issues 2456, 2679, 2680). It mounts the nineteen
+  A View Lab specimen, not a Fabricate surface (issues 2456, 2679, 2680). It mounts the twenty
   entries that state `standaloneRoot` through the page-session seam `game.fabricate.api.ui` binds,
   as a companion does, with the wiring `publishedStandaloneSpecimen.js` states.
   `tests/view-lab/mount.js` mounts it for `?specimen=published-standalone` only.
@@ -13,11 +13,11 @@
   content shows are the root's, and an open panel is drawn on the standalone layer. The first
   column holds the five issue 2456 widened, the switch and card states, the field and the search
   field; the second the stepper, segmented control, option cards, tabs, pager, an off card, a
-  ticked checkbox and an open disclosure; the third the select, icon picker, action menu, opener,
-  dialog and two more cards. A case
+  ticked checkbox, an open disclosure and an empty typeahead; the third the select, icon picker,
+  action menu, opener, dialog and two more cards. A case
   addresses the ground by `data-lab-standalone-ground`, a column by `data-lab-standalone-column`
   and each target by its `data-lab-standalone-target` key; the button, icon button, switch, search
-  field, stepper, action menu and opener targets are `display: flex`, as their groups ask of a
+  field, stepper, typeahead, action menu and opener targets are `display: flex`, as their groups ask of a
   companion; the rest are blocks.
 -->
 <script>
@@ -32,6 +32,7 @@
     'toggle-switch',
     'search',
     'stepper',
+    'typeahead',
     'menu',
     'opener',
   ]);

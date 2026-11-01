@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>The published Typeahead through the real seam</title>
+    <!--
+      Served by `tests/components/typeahead-published-rendered.test.js` from a Vite dev server, so
+      `mount.js` mounts `Typeahead` through a fresh seam registered with the adapter's own runtime,
+      and the list it opens is placed, hit-tested and painted by Chromium.
+    -->
+    <link rel="stylesheet" href="/node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #0b0a13;
+        font-family: Arial, sans-serif;
+      }
+
+      /* Foundry core's window, transcribed: positioned, clipped, its box written inline. */
+      .application {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #3b3a48;
+        background: #17161f;
+      }
+
+      .application > .window-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0;
+      }
+
+      /* A clipping, isolating ancestor of the field inside the window, which the list escapes. */
+      .fixture-clip {
+        overflow: hidden;
+        isolation: isolate;
+        contain: paint;
+        height: 60px;
+      }
+
+      .fixture-target {
+        display: flex;
+      }
+
+      iframe {
+        position: absolute;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/tests/fixtures/published-typeahead/mount.js"></script>
+  </body>
+</html>

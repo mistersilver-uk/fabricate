@@ -83,6 +83,9 @@ manager-published-action-menu-choice
 manager-published-modal-specimen
 manager-published-modal-close
 manager-published-modal-scrim-specimen
+manager-published-typeahead-specimen
+manager-published-typeahead-no-match
+manager-published-typeahead-free-text
 published-standalone
 published-standalone-light
 published-standalone-select-open
