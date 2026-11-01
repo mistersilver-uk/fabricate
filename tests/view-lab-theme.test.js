@@ -38,6 +38,9 @@ const VARIANTS = Object.freeze({
       ])
     )
   ),
+  // Issue 2860: the published typeahead's open list, on Foundry's own palette and a light one.
+  'manager-published-typeahead-specimen-foundry-native': 'manager-published-typeahead-specimen',
+  'manager-published-typeahead-specimen-hearth-herb': 'manager-published-typeahead-specimen',
   // Issues 2837 and 2863: the published thin tracks and neutral band on the palettes where their
   // inks and track read weakest.
   'manager-published-fill-bar-bands-specimen-foundry-native':

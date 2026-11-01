@@ -246,6 +246,82 @@
   text-align: center;
 }
 
+/* THE DATA FORM (issue 2860), the one the seam publishes: every rule below hangs on a class only the data form writes. The column holds the field, then its error line; its status region is clipped. */
+.fabricate-typeahead-control {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+/* The error state, `Select`'s danger fill, and its danger edge while the input does not hold focus, so the lit border still marks focus; the placeholder takes the secondary ink, which clears 4.5:1 on that fill. */
+.fabricate-search.fabricate-search.fabricate-typeahead.is-invalid:not(.is-compact) {
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-search.fabricate-search.fabricate-typeahead.is-invalid:not(.is-compact, :focus-within) {
+  border-color: var(--fab-danger-border);
+}
+
+.fabricate-search.fabricate-search.fabricate-typeahead.is-invalid:not(.is-compact) input:not(:focus-visible)::placeholder {
+  color: var(--fab-text-secondary);
+}
+
+/* An option: an optional glyph, the label over an optional detail, both wrapping, and the current option's tick at the trailing edge; its type is `Select`'s option label, stated here because the list is drawn in whatever host the seam picks, and its height, face and transition undo Foundry core's `button` rule, so a two-line row grows to hold its lines. */
+.fabricate-typeahead-option.fabricate-typeahead-option.fabricate-typeahead-option-rich {
+  grid-template-columns: minmax(0, 1fr) auto;
+  height: auto;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: none;
+}
+
+/* The current option takes `Select`'s chosen fill beside its tick, which stays its shape under forced colours. */
+.fabricate-typeahead-option.fabricate-typeahead-option.fabricate-typeahead-option-rich.is-current {
+  background: var(--fab-surface-active);
+}
+
+.fabricate-typeahead-option.fabricate-typeahead-option.fabricate-typeahead-option-rich.has-icon {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+}
+
+.fabricate-typeahead-option-lines {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The detail takes the secondary ink, which clears 4.5:1 under the hover fill, where the muted ink does not. */
+.fabricate-typeahead-option-detail {
+  color: var(--fab-text-secondary);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.fabricate-typeahead-option-tick {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  height: 1.4em;
+  color: var(--fab-accent);
+  font-size: 11px;
+}
+
+/* The data form's note takes the muted ink, which clears 4.5:1 on the panel. */
+.fabricate-typeahead-list.is-data-form .fabricate-typeahead-note {
+  color: var(--fab-text-muted);
+}
+
+/* Under forced colours the cursor's ring is the system highlight, so it stays apart from the tick. */
+@media (forced-colors: active) {
+  .fabricate-typeahead-option.fabricate-typeahead-option.fabricate-typeahead-option-rich[aria-selected='true'] {
+    outline-color: Highlight;
+  }
+}
+
 .fabricate-manager .manager-selected-tag-row {
   display: flex;
   align-items: center;

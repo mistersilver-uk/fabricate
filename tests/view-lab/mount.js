@@ -838,9 +838,11 @@ const LAB_SPECIMENS = Object.freeze({
   'published-action-menu': () => import('./fixtures/PublishedActionMenu.svelte'),
   // Issue 2656: a reagent's rename dialog, opened and closed by the companion's own updates.
   'published-modal': () => import('./fixtures/PublishedModal.svelte'),
+  // Issue 2860: five typeaheads, the rest forms beside the one a case opens.
+  'published-typeahead': () => import('./fixtures/PublishedTypeahead.svelte'),
   // Issue 2859: two open dialogs over busy panes, without a scrim and with the dim one.
   'published-modal-scrim': () => import('./fixtures/PublishedModalScrim.svelte'),
-  // Issues 2456, 2679, 2680, 2775, 2836 and 2862: the nineteen entries that state a standalone
+  // Issues 2456, 2679, 2680, 2775, 2836, 2862 and 2860: the twenty entries that state a standalone
   // style root, in targets with no Fabricate root and under one.
   'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),
 });

@@ -102,6 +102,21 @@ async function typeaheadWarningsDuring(run) {
   return seen.filter((message) => message.includes('Typeahead'));
 }
 
+describe('Typeahead mounted as the Primitive Lab mounts it', () => {
+  it('draws its field, with neither source nor options, and lists nothing on a query', async () => {
+    const root = await harness.mount({
+      ariaLabel: 'Search recipes',
+      placeholder: 'Search recipes…',
+    });
+    const input = root.querySelector('input[type="search"]');
+    assert.ok(Boolean(input), 'the field is drawn');
+    assert.equal(input.getAttribute('placeholder'), 'Search recipes…');
+    type(input, 'brew');
+    focus(input);
+    assert.ok(!root.querySelector('[role="listbox"]'), 'no row is listed');
+  });
+});
+
 describe('Typeahead keeps the typeahead holder contract', () => {
   it('is a combobox naming its active option by aria-activedescendant, whose options never take focus', async () => {
     const { root, input } = await mountTypeahead();

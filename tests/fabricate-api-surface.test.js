@@ -193,8 +193,8 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775, 2836 and 2862 headings, by name and in the
- * order the spec states them.
+ * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775, 2836, 2862 and 2860 headings, by name and in
+ * the order the spec states them.
  */
 function specifiedComponentGroups() {
   const groups = [
@@ -214,6 +214,7 @@ function specifiedComponentGroups() {
     '2775',
     '2836',
     '2862',
+    '2860',
   ].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
@@ -315,6 +316,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'ToggleCard',
       'SelectionCheckbox',
       'Disclosure',
+      'Typeahead',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -857,6 +859,27 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: true,
         root: 'any',
         overlays: false,
+      },
+      Typeahead: {
+        version: 1,
+        props: {
+          options: required,
+          query: { kind: 'value', required: false },
+          onQueryChange: { kind: 'callback', required: false },
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          placeholder: optional,
+          emptyLabel: optional,
+          allowFree: optional,
+          onFreeText: { kind: 'callback', required: false, requiredWhen: 'allowFree' },
+          density: optional,
+          error: optional,
+          countLabel: { kind: 'text', required: false },
+        },
+        rest: false,
+        root: 'any',
+        overlays: true,
       },
     });
     assert.deepEqual(

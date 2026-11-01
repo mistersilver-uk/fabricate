@@ -1252,6 +1252,12 @@ const UNPUBLISHED_REST = Object.freeze({
     landsOn: 'Field',
     heldBy: 'tests/components/published-select-mounted.test.js: the published Select refuses',
   },
+  // The source form's field, under `source`, which the entry does not publish (issue 2860).
+  'src/ui/svelte/components/Typeahead.svelte': {
+    landsOn: 'SearchField',
+    heldBy:
+      'tests/components/published-typeahead-mounted.test.js: the published Typeahead describes and refuses',
+  },
 });
 
 /** Whether a drawn closure of one of `entries` draws `node` of `file` (issue 2454). */
@@ -1358,7 +1364,10 @@ describe('a lazy entry, whose code load fetches (issue 2455)', () => {
 
 describe('each entry matches its component declaration', () => {
   it('keeps a declared rest unpublished only where it lands on a tag no published key draws', () => {
-    assert.deepEqual(Object.keys(UNPUBLISHED_REST), ['src/ui/svelte/components/Select.svelte']);
+    assert.deepEqual(Object.keys(UNPUBLISHED_REST), [
+      'src/ui/svelte/components/Select.svelte',
+      'src/ui/svelte/components/Typeahead.svelte',
+    ]);
     for (const [path, { landsOn, heldBy }] of Object.entries(UNPUBLISHED_REST)) {
       const entry = PUBLISHED_COMPONENT_MANIFEST.find((candidate) => candidate.path === path);
       assert.equal(entry.rest, false, `${entry.name} publishes no rest`);
@@ -1419,7 +1428,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty-three focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges thirty-four focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, the Typeahead row, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1459,6 +1468,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Stepper.svelte: button',
       'src/ui/svelte/components/Stepper.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: input',
+      'src/ui/svelte/components/Typeahead.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: input',
@@ -1516,6 +1526,8 @@ describe('each entry matches its component declaration', () => {
         'ToggleCard.onToggle: 0',
         'SelectionCheckbox.onChange: 1',
         'Disclosure.onToggle: 1',
+        'Typeahead.onChange: 1',
+        'Typeahead.onFreeText: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3421,6 +3433,7 @@ describe('the module sheet and every component style against the published Inspe
         'ToggleCard',
         'SelectionCheckbox',
         'Disclosure',
+        'Typeahead',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );

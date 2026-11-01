@@ -228,13 +228,18 @@ const RULED_COMPACT_SITES = Object.freeze([
 ]);
 
 test('only the ruled sites take the compact density, each as a literal (issue 1782)', () => {
-  const forward = field.callSites.find((site) => site.file === TYPEAHEAD_PATH);
-  assert.equal(forward?.attribute('density'), '{density}', 'the typeahead forwards its own');
+  // The typeahead's two fields, its function form's and its data form's (issue 2860).
+  const forwards = field.callSites.filter((site) => site.file === TYPEAHEAD_PATH);
+  assert.deepEqual(
+    forwards.map((site) => site.attribute('density')),
+    ['{density}', '{density}'],
+    'the typeahead forwards its own, in each of its two forms'
+  );
   const declared = [
     ...field.callSites.map((site) => ['SearchField', site]),
     ...componentCallSites('Typeahead').map((site) => ['Typeahead', site]),
   ]
-    .filter(([, site]) => site !== forward && site.attribute('density'))
+    .filter(([, site]) => !new Set(forwards).has(site) && site.attribute('density'))
     .map(([tag, site]) => ({ name: `${tag} ${site.file}`, density: site.attribute('density') }));
   const unread = declared
     .filter(({ density }) => !/^density="(?:compact|default)"$/.test(density))

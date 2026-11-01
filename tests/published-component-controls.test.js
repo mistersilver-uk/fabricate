@@ -206,6 +206,8 @@ const FOCUSABLE_REACH = Object.freeze({
   // The number field and the formatted mode's text field are the two branches of one guard, on `format`.
   'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="number"]': 'format',
   'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': 'format',
+  // One row for each of `options` (issue 2860).
+  'src/ui/svelte/components/Typeahead.svelte: button': 'options',
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
@@ -287,6 +289,13 @@ const OWN_NAMES = Object.freeze({
     heldBy:
       'tests/components/published-disclosure-rendered.test.js: the published Disclosure names',
   },
+  // Each option's `label`, which the entry's group states is required, in the row's own text; the
+  // row's other form, Fabricate's own `itemLabel`, is drawn only without `options`, which it requires.
+  'src/ui/svelte/components/Typeahead.svelte: button': {
+    entry: 'Typeahead',
+    keys: ['options'],
+    heldBy: 'tests/components/published-typeahead-mounted.test.js: the published Typeahead names',
+  },
   // `name`, which the entry requires, drawn in a span of the button's own content.
   'src/ui/svelte/components/ListRow.svelte: button': {
     entry: 'ListRow',
@@ -353,6 +362,12 @@ const NESTED_NAMES = Object.freeze({
       heldBy: 'tests/components/published-modal-mounted.test.js: the published Modal names',
     },
   },
+  Typeahead: {
+    'src/ui/svelte/components/SearchField.svelte: input': {
+      keys: ['ariaLabel'],
+      heldBy: 'tests/components/published-typeahead-mounted.test.js: the published Typeahead names',
+    },
+  },
   ToggleCard: {
     'src/ui/svelte/components/StatusToggle.svelte: button': {
       keys: ['title'],
@@ -413,6 +428,23 @@ const FORWARDED_CALLBACKS = Object.freeze({
       as: 'onclick',
       heldBy:
         'tests/components/published-toggle-card-mounted.test.js: a press on the published ToggleCard',
+    },
+  },
+  // Handed to the holder's config, whose option click and field keydown call them (issue 2860).
+  Typeahead: {
+    onChange: {
+      by: 'choose',
+      as: 'onChoose',
+      into: { name: 'createTypeaheadCombobox', from: '../util/typeaheadCombobox.svelte.js' },
+      heldBy:
+        'tests/components/published-typeahead-mounted.test.js: a choice in the published Typeahead',
+    },
+    onFreeText: {
+      by: 'commitFree',
+      as: 'onEnterUnchosen',
+      into: { name: 'createTypeaheadCombobox', from: '../util/typeaheadCombobox.svelte.js' },
+      heldBy:
+        'tests/components/published-typeahead-mounted.test.js: free text in the published Typeahead',
     },
   },
   Pagination: {
@@ -693,14 +725,53 @@ function isListenerSite(node, ancestors, actions) {
 }
 
 /**
- * Where one reference to a `by` function sits: a call inside a `listeners` function
- * (`'listener'`), the whole value of a child component's `as` attribute (`'handed'`), or else
- * `'other'`.
+ * The local name the instance script binds by importing `into.name` from `into.from`, or `null`
+ * (issue 2860): a holder factory is known by its import, never by a bare name.
  */
-function byFunctionSite(node, ancestors, as, listening) {
+function importedLocal(ast, into) {
+  for (const statement of ast.instance?.content.body ?? []) {
+    if (statement.type !== 'ImportDeclaration' || statement.source.value !== into?.from) continue;
+    const specifier = statement.specifiers.find(
+      ({ type, imported }) => type === 'ImportSpecifier' && imported?.name === into.name
+    );
+    if (specifier) return specifier.local.name;
+  }
+  return null;
+}
+
+/**
+ * Whether a reference is the whole value of the plain `as` member of an object literal handed to
+ * a call of `local`, the holder factory's imported binding; a getter never is (issue 2860).
+ */
+function isHandedInto(node, ancestors, as, local) {
+  const [call, object, property] = ancestors.slice(-3);
+  return (
+    local !== null &&
+    property?.type === 'Property' &&
+    property.kind === 'init' &&
+    !property.computed &&
+    (property.key?.name ?? property.key?.value) === as &&
+    property.value === node &&
+    object?.type === 'ObjectExpression' &&
+    call?.type === 'CallExpression' &&
+    call.callee?.type === 'Identifier' &&
+    call.callee.name === local &&
+    call.arguments.includes(object)
+  );
+}
+
+/**
+ * Where one reference to a `by` function sits: a call inside a `listeners` function
+ * (`'listener'`), the whole value of a child component's `as` attribute, or with `into` the `as`
+ * member of the holder config `into` takes (`'handed'`), or else `'other'`.
+ */
+function byFunctionSite(node, ancestors, as, listening, intoLocal) {
   const parent = ancestors.at(-1);
   const called = parent?.type === 'CallExpression' && parent.callee === node;
   if (called && listening.some((listener) => ancestors.includes(listener))) return 'listener';
+  if (intoLocal !== undefined) {
+    return isHandedInto(node, ancestors, as, intoLocal) ? 'handed' : 'other';
+  }
   const [component, attribute, tag] = ancestors.slice(-3);
   const passed = component?.type === 'Component' && attribute?.name === as && tag === parent;
   return passed ? 'handed' : 'other';
@@ -723,12 +794,13 @@ function callsAny(fn, names) {
  * nor a call inside a function `listeners` lists, one handed to no child, and a reference to a
  * `listeners` function that `isListenerSite` does not admit.
  */
-function forwardedFaults(ast, key, local, { by, as, listeners = [] }) {
+function forwardedFaults(ast, key, local, { by, as, into, listeners = [] }) {
   const listed = [by].flat();
   const functions = scriptFunctions(ast);
   const holders = listed.map((name) => functions.get(name)).filter(Boolean);
   const listening = listeners.map((name) => functions.get(name)).filter(Boolean);
   const actions = actionFunctions(ast, functions);
+  const intoLocal = into ? importedLocal(ast, into) : undefined;
   const faults = new Set();
   for (const name of listeners) {
     if (!callsAny(functions.get(name), listed)) {
@@ -758,7 +830,7 @@ function forwardedFaults(ast, key, local, { by, as, listeners = [] }) {
           faults.add(`${node.name} is referenced but as an action's listener`);
         }
       } else if (handed.has(node.name)) {
-        const site = byFunctionSite(node, ancestors, as, listening);
+        const site = byFunctionSite(node, ancestors, as, listening, intoLocal);
         if (site === 'handed') handed.set(node.name, handed.get(node.name) + 1);
         if (site === 'other') faults.add(`${node.name} is referenced but as a child's ${as}`);
       }
@@ -823,14 +895,69 @@ function writeSites(ast, local, extra) {
   return sites;
 }
 
+/**
+ * The value keys an entry writes through a holder rather than in its own handlers, by entry then
+ * key (issue 2860): `bound` the published child whose prop the key is bound to, which writes it
+ * from its own events alone, and `by` the script function handed as the `as` member of the
+ * config `into` takes, the only other writer, beside the mounted clause that types and clears it.
+ */
+const WRITTEN_THROUGH = Object.freeze({
+  Typeahead: {
+    query: {
+      bound: { component: 'SearchField', as: 'value' },
+      by: 'writeQuery',
+      into: { name: 'createTypeaheadCombobox', from: '../util/typeaheadCombobox.svelte.js' },
+      as: 'setQuery',
+      heldBy: 'tests/components/published-typeahead-mounted.test.js: the published Typeahead query',
+    },
+  },
+});
+
+/** Whether every reference to the function `by` is handed as the `as` member of `into`'s config. */
+function handedOnlyInto(ast, { by, into, as }) {
+  const local = importedLocal(ast, into);
+  const sites = [];
+  for (const root of [ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== by) return;
+      const parent = ancestors.at(-1);
+      if (parent?.id === node || (parent?.type === 'MemberExpression' && parent.property === node))
+        return;
+      sites.push(isHandedInto(node, ancestors, as, local));
+    });
+  }
+  return sites.length > 0 && sites.every(Boolean);
+}
+
+/** Where each write of `local` sits under a `WRITTEN_THROUGH` pin: `'event'` where the pin admits it. */
+function throughWriteSites(ast, local, pin) {
+  const holder = handedOnlyInto(ast, pin) ? scriptFunctions(ast).get(pin.by) : undefined;
+  const sites = [];
+  for (const root of [ast.module, ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== local || !isWrite(node, ancestors)) return;
+      const [component, directive] = ancestors.slice(-2);
+      const bound =
+        directive?.type === 'BindDirective' &&
+        directive.name === pin.bound.as &&
+        component?.type === 'Component' &&
+        component.name === pin.bound.component;
+      sites.push(bound || (holder && ancestors.includes(holder)) ? 'event' : 'other');
+    });
+  }
+  return sites;
+}
+
 /** What each `value` key of an entry breaks: written outside an event handler. */
-function valueWriteFaults(entry, ast, events = ENTRY_EVENTS) {
+function valueWriteFaults(entry, ast, events = ENTRY_EVENTS, through = WRITTEN_THROUGH) {
   const values = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'value');
-  return values.flatMap(({ key, local }) =>
-    writeSites(ast, local, events[entry.name]).includes('other')
-      ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`]
-      : []
-  );
+  return values.flatMap(({ key, local }) => {
+    const pin = through[entry.name]?.[key];
+    const sites = pin
+      ? throughWriteSites(ast, local, pin)
+      : writeSites(ast, local, events[entry.name]);
+    return sites.includes('other') ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`] : [];
+  });
 }
 
 /**
@@ -1576,7 +1703,7 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual(unheldClauses(held), []);
   });
 
-  it('names a describe block of its mounted suite in each name, nested name, forwarded callback and entry event pin', () => {
+  it('names a describe block of its mounted suite in each name, nested name, forwarded callback, written-through value and entry event pin', () => {
     const held = [
       ...[...flatPins(CLOSURE_NAMES), ...flatPins(OWN_NAMES)].map(({ pin }) => pin.heldBy),
       ...Object.values(NESTED_NAMES).flatMap((rows) =>
@@ -1586,6 +1713,9 @@ describe('each published entry that draws a control', () => {
         Object.values(events).map(({ heldBy }) => heldBy)
       ),
       ...Object.values(FORWARDED_CALLBACKS).flatMap((keys) =>
+        Object.values(keys).map(({ heldBy }) => heldBy)
+      ),
+      ...Object.values(WRITTEN_THROUGH).flatMap((keys) =>
         Object.values(keys).map(({ heldBy }) => heldBy)
       ),
     ];
@@ -2677,6 +2807,90 @@ describe('the written-from-an-event clause', () => {
       assert.deepEqual(faultsOf(declared, markup), WRITTEN);
     });
   }
+});
+
+describe('a value key written through a holder, and a callback handed into one (issue 2860)', () => {
+  const PIN = {
+    bound: { component: 'C', as: 'value' },
+    by: 'write',
+    into: { name: 'holder', from: './h.js' },
+    as: 'setQuery',
+  };
+  const SCRIPT =
+    "import C from './C.svelte'; import { holder } from './h.js';" +
+    " let { query = $bindable(''), onPick } = $props();" +
+    ' function write(next) { query = next; } function pick(index) { onPick(index); }';
+  const astOf = (script, markup) =>
+    templateOf('Through.svelte', `<script>${SCRIPT} ${script}</script>${markup}`).ast;
+  const writes = (script, markup, pin = PIN) =>
+    valueWriteFaults(
+      { name: 'E', props: { query: { kind: 'value', initial: '' } } },
+      astOf(script, markup),
+      {},
+      { E: { query: pin } }
+    );
+  const picks = (script, markup, source = SCRIPT) =>
+    eventFaults(
+      { name: 'E', props: { onPick: { kind: 'callback', required: true } } },
+      templateOf('Through.svelte', `<script>${source} ${script}</script>${markup}`).ast,
+      { E: { onPick: { by: 'pick', as: 'onChoose', into: { name: 'holder', from: './h.js' } } } }
+    );
+  const HOLDER = 'const combo = holder({ setQuery: write, onChoose: pick });';
+  const WRITTEN = [`query ${WRITTEN_OUTSIDE_AN_EVENT}`];
+
+  it('passes a bind to the pinned child and a write in the function handed to the holder', () => {
+    assert.deepEqual(writes(HOLDER, '<C bind:value={query} />'), []);
+    assert.deepEqual(picks(HOLDER, ''), []);
+  });
+
+  for (const [claim, script, source] of [
+    ['a getter returning it', 'const combo = holder({ get onChoose() { return pick; } });', SCRIPT],
+    [
+      'a getter that calls it and returns nothing of it',
+      'const combo = holder({ get onChoose() { pick(0); return null; } });',
+      SCRIPT,
+    ],
+    [
+      'a factory of that name not imported',
+      'const combo = holder({ onChoose: pick });',
+      SCRIPT.replace(
+        "import { holder } from './h.js';",
+        'function holder(config) { return config; }'
+      ),
+    ],
+    [
+      'a factory of that name imported from another module',
+      'const combo = holder({ onChoose: pick });',
+      SCRIPT.replace("'./h.js'", "'./other.js'"),
+    ],
+  ]) {
+    it(`fails closed on a callback handed through ${claim}`, () => {
+      assert.ok(picks(script, '', source).includes('pick is handed to no child as onChoose'));
+    });
+  }
+
+  for (const [claim, script, markup] of [
+    ['a bind to another child', HOLDER, '<D bind:value={query} />'],
+    ['a bind to another prop of the child', HOLDER, '<C bind:other={query} />'],
+    ['a bind on an element', HOLDER, '<input bind:value={query} />'],
+    ['the writer also called from an $effect', `${HOLDER} $effect(() => write('x'));`, ''],
+    ['the writer handed under another member', 'const combo = holder({ other: write });', ''],
+    ['the writer handed to another call', 'const combo = other({ setQuery: write });', ''],
+    ['a write outside the writer', `${HOLDER} $effect(() => { query = 'x'; });`, ''],
+  ]) {
+    it(`fails closed on ${claim}`, () => {
+      assert.deepEqual(writes(script, markup), WRITTEN);
+    });
+  }
+
+  it('fails closed on a writer the holder never takes, and a callback handed elsewhere', () => {
+    assert.deepEqual(writes('', ''), WRITTEN);
+    assert.deepEqual(writes(`${HOLDER} const kept = write;`, ''), WRITTEN);
+    assert.deepEqual(picks('const combo = holder({ onOther: pick });', ''), [
+      "pick is referenced but as a child's onChoose",
+      'pick is handed to no child as onChoose',
+    ]);
+  });
 });
 
 describe('a control drawn in a closure child, and a callback handed to one (issue 2454)', () => {

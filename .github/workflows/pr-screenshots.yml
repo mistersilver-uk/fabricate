@@ -392,7 +392,8 @@ jobs:
             tests/components/world-component-entry-frame-rendered.test.js \
             tests/components/kicker-face-rendered.test.js \
             tests/components/published-standalone-root-rendered.test.js \
-            tests/components/published-standalone-root-rendered-disclosure.test.js
+            tests/components/published-standalone-root-rendered-disclosure.test.js \
+            tests/components/published-standalone-root-rendered-typeahead.test.js
 
   # Runs only when every shard and the chrome verification succeeded: a failure there fails the
   # run unpublished, as a failed render always has.

@@ -31,6 +31,7 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/theme.js',
   'src/ui/svelte/util/dropRateTier.js',
   'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/modalFocus.js',
   'src/ui/svelte/actions/scrim.js',
@@ -50,7 +51,10 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/watchFocusable.js',
 ]);
 
-export const PUBLISHED_RUNE_MODULES = Object.freeze(['src/ui/publishedComponents.svelte.js']);
+export const PUBLISHED_RUNE_MODULES = Object.freeze([
+  'src/ui/publishedComponents.svelte.js',
+  'src/ui/svelte/util/typeaheadCombobox.svelte.js',
+]);
 
 export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/published/PublishedComponentHost.svelte',
@@ -91,6 +95,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/Disclosure.svelte',
+  'src/ui/svelte/components/Typeahead.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

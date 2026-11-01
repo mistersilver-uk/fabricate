@@ -410,6 +410,7 @@ const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
+  'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
@@ -1165,6 +1166,41 @@ const CHECKBOX_CONTROLS = Object.freeze([
       'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-control-outline)',
   },
 ]);
+// The published typeahead (issue 2860): two rungs, the error face and its message, the open list's
+// edge, the cursor's ring and the tick's ink, measured under each palette its case draws in.
+const TYPEAHEAD_SPECIMEN_CONTROLS = [
+  {
+    selector: '[data-lab-typeahead-ground] [data-lab-typeahead="scope"] .fabricate-search',
+    styles: 'height: 34px; border-radius: 9px',
+  },
+  {
+    selector: '[data-lab-typeahead-ground] [data-lab-typeahead="rule"] .fabricate-search',
+    styles: 'height: 30px; border-radius: 7px',
+  },
+  {
+    selector: '[data-lab-typeahead-ground] [data-lab-typeahead="bonus"] .fabricate-search',
+    styles:
+      'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-danger-border); background-color: var(--fab-danger-soft)',
+  },
+  {
+    selector: '[data-lab-typeahead-ground] [data-lab-typeahead="bonus"] .fabricate-typeahead-error',
+    styles: 'color: var(--fab-danger-text)',
+  },
+  {
+    selector: '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list',
+    styles: 'border-top-style: solid; border-top-width: 1px; border-radius: 6px',
+  },
+  {
+    selector:
+      '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list [aria-selected="true"]',
+    styles: 'outline-style: solid; outline-width: 2px; outline-offset: -2px',
+  },
+  {
+    selector:
+      '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list .fabricate-typeahead-option-tick',
+    styles: 'color: var(--fab-accent)',
+  },
+];
 const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -2151,6 +2187,21 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       [...CHECKBOX_CONTROLS],
     ])
   ),
+  'manager-published-typeahead-specimen': TYPEAHEAD_SPECIMEN_CONTROLS,
+  // The no-match note's ink, and the field lit while it keeps the free text.
+  'manager-published-typeahead-no-match': [
+    {
+      selector:
+        '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list .fabricate-typeahead-note',
+      styles: 'color: var(--fab-text-muted)',
+    },
+  ],
+  'manager-published-typeahead-free-text': [
+    {
+      selector: '[data-lab-typeahead-ground] [data-lab-typeahead="free"] .fabricate-search',
+      styles: 'height: 38px; border-radius: 9px; border-top-color: var(--fab-accent)',
+    },
+  ],
   // The opener focus returned to after a close: its ring, by its shape.
   'manager-published-modal-close': [
     {
@@ -7001,9 +7052,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'ToggleCard',
   'SelectionCheckbox',
   'Disclosure',
+  'Typeahead',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox and Disclosure and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox, Disclosure and Typeahead and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -9948,7 +10000,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 23, 'the fixture lays twenty-three targets in its columns');
+  assert.equal(columns.flat().length, 24, 'the fixture lays twenty-four targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',

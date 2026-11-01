@@ -207,10 +207,12 @@ export function onlyMembersAt(value, path, allowed) {
 /**
  * The values the seam withholds from a published `data` key, each as `<Entry>.<key>.<value>`: the
  * component draws them for Fabricate's own callers alone, so the seam passes `undefined` in their
- * place and the key draws its default (issue 2849); `Chip`'s unpublished tones too (issue 2858).
+ * place and the key draws its default (issue 2849); `Chip`'s unpublished tones too (issue 2858),
+ * and `Typeahead`'s compact density (issue 2860).
  */
 export const WITHHELD_VALUES = Object.freeze([
   'SearchField.density.compact',
+  'Typeahead.density.compact',
   ...['active', 'disabled', 'negative', 'muted', 'tag', 'secondary', 'subtle'].map(
     (tone) => `Chip.tone.${tone}`
   ),
