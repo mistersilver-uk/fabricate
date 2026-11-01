@@ -67,6 +67,7 @@ const MEASURED_ELSEWHERE = Object.freeze({
   SelectionCheckbox: 'tests/components/published-standalone-root-rendered-checkbox.test.js',
   Disclosure: 'tests/components/published-standalone-root-rendered-disclosure.test.js',
   Typeahead: 'tests/components/published-standalone-root-rendered-typeahead.test.js',
+  Popover: 'tests/components/published-standalone-root-rendered-popover.test.js',
 });
 const WIDENED = PUBLISHED_COMPONENT_MANIFEST.filter(
   (entry) => entry.standaloneRoot === true && !Object.hasOwn(MEASURED_ELSEWHERE, entry.name)

@@ -1912,6 +1912,42 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="delta ok"><b>The subtitle inks <code>--fab-text-muted</code> (issue 2670).</b> The specimen&rsquo;s <code>--fab-text-subtle</code> measures 3.34&ndash;3.78:1 on <code>--fab-bg-2</code> in six palettes at 10.5px, under the 4.5:1 floor, and the spec already inks small text muted for the same reason (issue 2178); the size, weight and 1px gap are unchanged.</div>
   </div>
 
+  <div class="spec" data-status="shipped" data-status-Popover="shipped">
+    <div class="spec-head"><h4>&lt;Popover&gt;</h4><span class="st st-shipped">shipped</span><p class="why">A small non-modal dialog anchored to an element the caller owns, holding the caller&rsquo;s own controls: a nudge under a grid cell, a value and the reason for it. The published adapter draws it for a companion; no in-app surface draws it yet.</p></div>
+    <div class="stage b0">
+      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">
+        <button class="k-btn" style="height:44px;padding:0 16px;border-radius:8px;background:var(--fab-bg-1);color:var(--fab-text)">Strength 14</button>
+        <div style="display:flex;flex-direction:column;width:max-content;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);overflow:hidden">
+          <div style="padding:12px 12px 0;font-family:var(--fab-font-serif);font-size:13px;font-weight:600;color:var(--fab-text)">Strength</div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
+            <div class="k-field inline" style="width:240px">14</div>
+            <div style="display:flex;gap:4px"><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">&minus;5</button><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">&minus;2</button><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">&minus;1</button><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">+1</button><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">+2</button><button class="k-btn" style="height:24px;min-height:24px;border-radius:6px">+5</button></div>
+            <div class="k-field inline" style="width:240px"><span class="ph">Reason</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div><h5>Canonical spec</h5><ul>
+        <li><b>panel</b> radius 11, the floating surface&rsquo;s rung &middot; <code>--fab-bg-0</code>, as the picker panel &middot; 1px <code>--fab-border-strong</code> &middot; <code>--fab-shadow-lg</code> &middot; as wide as its content, at most <code>min(360px, 100% &minus; 16px)</code> of its host</li>
+        <li><b>title</b> a 13px serif heading at 600, padded 12/12/0; <b>body</b> a column padded 12, its children 8 apart, which scrolls when the panel is capped</li>
+        <li><b>placement</b> 6px from the anchor, on the stated side while the content fits there or that side has the more room, else the other; its start or end edge on the anchor&rsquo;s, clamped 8px inside its host; its height capped to the room on the side it takes</li>
+        <li>Portals into the host the overlay chain picks for a published mount, at the popover family&rsquo;s stacking level, above a <code>&lt;Modal&gt;</code>; it is repositioned on scroll, resize and a document change, and hidden while its anchor is scrolled out of view</li>
+        <li>The panel is <code>role="dialog"</code>, not modal, named by <b>ariaLabel</b> or else its <b>title</b>; it is a <code>tabindex="-1"</code> focus target that draws no ring. Focus enters it as it first opens, Tab on the anchor enters it, Tab and Shift+Tab wrap inside it until Escape leaves it, and focus that was inside it as it closes returns to the anchor; its body is focus&rsquo;s fallback and a Tab stop while it overflows with no control, ringed inside its edge</li>
+        <li>Dismissal: an Escape in the panel or on the anchor, judged as the key goes down, and with <b>closeOnOutsideClick</b>, the default, a press outside it, call <b>onClose</b>; a press on the anchor, or in a panel a control inside it opened, is not outside. It never animates. Under forced colours its edge is the system text colour</li>
+      </ul></div>
+      <div><h5>Svelte API</h5><ul>
+        <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>Popover.svelte</code>&rsquo;s <code>$props()</code> at issue 2861.</li>
+        <li><b>open</b> &mdash; only <code>true</code> draws it; the caller owns it and closes it from <b>onClose</b></li>
+        <li><b>anchorId</b> &mdash; the anchor&rsquo;s <code>id</code>, looked up in the popover&rsquo;s own document; the panel takes <code>&lt;anchorId&gt;-popover</code> as its id</li>
+        <li><b>placement</b> bottom-start | bottom-end | top-start | top-end = bottom-start</li>
+        <li><b>title</b> snippet &middot; <b>ariaLabel</b> = ''</li>
+        <li><b>closeOnOutsideClick</b> = true &middot; <b>onClose</b> = no-op &middot; <b>body</b> snippet</li>
+      </ul></div>
+    </div>
+    <div class="delta">It is distinct from <code>&lt;SearchPopover&gt;</code>, a listbox picker whose rows are options: this holds arbitrary controls. Both position through the one <code>anchoredPopover</code> action.<span class="cite"><b>Popover.svelte</b> (issue 2861)</span></div>
+  </div>
+
   <div class="spec" data-status="shipped" data-status-DataTable="shipped">
     <div class="spec-head"><h4>&lt;DataTable&gt;</h4><span class="st st-shipped">shipped</span><p class="why">A headed table for records read in columns rather than scanned as rows. Two surfaces draw it: the gathering task editor&rsquo;s drop rules, paged, searchable and selectable, and the crafting detail&rsquo;s essence, tool and output groups, bounded and unpaged. The outcome-tier table is not one of them: it is a ladder, routed to <code>&lt;OutcomeLadder&gt;</code> below, and the journal&rsquo;s run history is a paged list.</p></div>
     <div class="stage col">

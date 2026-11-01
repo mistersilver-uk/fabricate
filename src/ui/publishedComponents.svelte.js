@@ -32,6 +32,7 @@ import Meter from './svelte/components/Meter.svelte';
 import Modal from './svelte/components/Modal.svelte';
 import Notice from './svelte/components/Notice.svelte';
 import Pagination from './svelte/components/Pagination.svelte';
+import Popover from './svelte/components/Popover.svelte';
 import RadioCardGroup from './svelte/components/RadioCardGroup.svelte';
 import SearchField from './svelte/components/SearchField.svelte';
 import SegmentedControl from './svelte/components/SegmentedControl.svelte';
@@ -86,6 +87,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/SelectionCheckbox.svelte': SelectionCheckbox,
   'src/ui/svelte/components/Disclosure.svelte': Disclosure,
   'src/ui/svelte/components/Typeahead.svelte': Typeahead,
+  'src/ui/svelte/components/Popover.svelte': Popover,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

@@ -840,10 +840,12 @@ const LAB_SPECIMENS = Object.freeze({
   'published-modal': () => import('./fixtures/PublishedModal.svelte'),
   // Issue 2860: five typeaheads, the rest forms beside the one a case opens.
   'published-typeahead': () => import('./fixtures/PublishedTypeahead.svelte'),
+  // Issue 2861: two nudges on a companion's ability grid, one below its cell and one flipped above.
+  'published-popover': () => import('./fixtures/PublishedPopover.svelte'),
   // Issue 2859: two open dialogs over busy panes, without a scrim and with the dim one.
   'published-modal-scrim': () => import('./fixtures/PublishedModalScrim.svelte'),
-  // Issues 2456, 2679, 2680, 2775, 2836, 2862 and 2860: the twenty entries that state a standalone
-  // style root, in targets with no Fabricate root and under one.
+  // Issues 2456, 2679, 2680, 2775, 2836, 2862, 2860 and 2861: the twenty-one entries that state a
+  // standalone style root, in targets with no Fabricate root and under one.
   'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),
 });
 // view-lab-region:end

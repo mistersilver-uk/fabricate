@@ -68,6 +68,9 @@ manager-published-typeahead-specimen-foundry-native
 manager-published-typeahead-specimen-hearth-herb
 manager-published-typeahead-no-match
 manager-published-typeahead-free-text
+manager-published-popover-specimen
+manager-published-popover-specimen-foundry-native
+manager-published-popover-specimen-hearth-herb
 published-standalone
 published-standalone-light
 published-standalone-select-open

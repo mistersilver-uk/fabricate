@@ -279,8 +279,9 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
 `NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
-`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 50 naming headings declare 80 distinct names.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 51 naming headings declare 81 distinct names.
 Issue 2548 added `<ListState>`, born shipped, to the `<ListRow>` heading.
+Issue 2861 added `<Popover>`, born shipped, under a heading of its own.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -333,7 +334,7 @@ Every specimen in `openspec/specs/design-system/library.html` and every row of t
 An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
-The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 49 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 51 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the per-file deferral exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.

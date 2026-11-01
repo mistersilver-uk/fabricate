@@ -128,6 +128,7 @@ describe('an entry drawn under the standalone style root', () => {
     'SelectionCheckbox',
     'Disclosure',
     'Typeahead',
+    'Popover',
   ];
 
   it('describes the entry without standaloneRoot, which only its group states', () => {

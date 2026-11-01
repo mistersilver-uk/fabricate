@@ -145,6 +145,10 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
   // The dialog element, a `tabindex="-1"` target drawn while `open` (issue 2661).
   'src/ui/svelte/components/Modal.svelte: div[data-manager-modal]': 'open',
+  // The panel, a `tabindex="-1"` target drawn while `open` and its anchor is present (issue 2861).
+  'src/ui/svelte/components/Popover.svelte: div': 'open',
+  // Its body, focus's fallback and a Tab stop only while it overflows with no control in it.
+  'src/ui/svelte/components/Popover.svelte: div[data-popover-body]': 'body',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // One radio for each item of `options`.
@@ -296,6 +300,19 @@ const OWN_NAMES = Object.freeze({
     keys: ['options'],
     heldBy: 'tests/components/published-typeahead-mounted.test.js: the published Typeahead names',
   },
+  // `ariaLabel`, or else the `title` heading it points at, the required key `ariaLabel` waives.
+  'src/ui/svelte/components/Popover.svelte: div': {
+    entry: 'Popover',
+    keys: ['title', 'ariaLabel'],
+    heldBy: 'tests/components/published-popover-mounted.test.js: the published Popover names',
+  },
+  // The body, focus's fallback, whose content is the companion's own, as its group states.
+  'src/ui/svelte/components/Popover.svelte: div[data-popover-body]': {
+    entry: 'Popover',
+    vocabulary:
+      "The body takes no name of its own: where it takes focus, a reader meets the companion's own content in it.",
+    heldBy: 'tests/components/published-popover-mounted.test.js: the published Popover names',
+  },
   // `name`, which the entry requires, drawn in a span of the button's own content.
   'src/ui/svelte/components/ListRow.svelte: button': {
     entry: 'ListRow',
@@ -395,7 +412,8 @@ const NESTED_NAMES = Object.freeze({
  * does not follow into the child: the script function, or the list of them, that calls the key,
  * the child's prop each is passed as, and the mounted clause that operates the child by pointer
  * and by key. A `listeners` list names the script functions that may also call one of those
- * functions, each handed only to an action, as `forwardedFaults` states.
+ * functions, each handed only to an action, as `forwardedFaults` states; a pin with no `as` hands
+ * its function to no child, and its listeners alone call it (issue 2861).
  */
 const FORWARDED_CALLBACKS = Object.freeze({
   Select: {
@@ -420,6 +438,14 @@ const FORWARDED_CALLBACKS = Object.freeze({
       as: 'onclick',
       listeners: ['dismissFromOutside', 'handleKeydown'],
       heldBy: 'tests/components/published-modal-mounted.test.js: closing the published Modal',
+    },
+  },
+  Popover: {
+    // The outside-press and Escape listeners its actions are handed call `requestClose`.
+    onClose: {
+      by: 'requestClose',
+      listeners: ['dismissFromOutside', 'closeOnEscape'],
+      heldBy: 'tests/components/published-popover-mounted.test.js: closing the published Popover',
     },
   },
   ToggleCard: {
@@ -810,6 +836,7 @@ function forwardedFaults(ast, key, local, { by, as, into, listeners = [] }) {
     }
   }
   const handed = new Map(listed.map((name) => [name, 0]));
+  const heard = new Set();
   for (const root of [ast.instance, ast.fragment]) {
     walkWithAncestors(root, (node, ancestors) => {
       if (node.type !== 'Identifier') return;
@@ -826,9 +853,8 @@ function forwardedFaults(ast, key, local, { by, as, into, listeners = [] }) {
       }
       if (parent?.id === node) return;
       if (listeners.includes(node.name)) {
-        if (!isListenerSite(node, ancestors, actions)) {
-          faults.add(`${node.name} is referenced but as an action's listener`);
-        }
+        if (isListenerSite(node, ancestors, actions)) heard.add(node.name);
+        else faults.add(`${node.name} is referenced but as an action's listener`);
       } else if (handed.has(node.name)) {
         const site = byFunctionSite(node, ancestors, as, listening, intoLocal);
         if (site === 'handed') handed.set(node.name, handed.get(node.name) + 1);
@@ -837,7 +863,11 @@ function forwardedFaults(ast, key, local, { by, as, into, listeners = [] }) {
     });
   }
   for (const [name, count] of handed) {
-    if (count === 0) faults.add(`${name} is handed to no child as ${as}`);
+    if (count === 0 && as) faults.add(`${name} is handed to no child as ${as}`);
+  }
+  // With no child to hand it to, a listener is the only way the key is reached, so each must be.
+  for (const name of as ? [] : listeners) {
+    if (!heard.has(name)) faults.add(`${name} is listed as a listener but no action is handed it`);
   }
   return [...faults];
 }
@@ -1335,7 +1365,16 @@ function closureNameFaults({ id, entry }, pin, lines = specLines()) {
         : [`${id} is named by a vocabulary and names no mounted clause in heldBy`]),
     ];
   }
+  // A required key the pin lists with every key that waives it, each waiver a name that must hold
+  // the key's own words (`contains`): one of them always names the control.
+  const jointly = pin.keys.flatMap((key) => {
+    const { required, waivedBy = [] } = entry.props[key] ?? {};
+    const names = (name) => pin.keys.includes(name) && entry.props[name]?.contains === key;
+    const held = required === true && waivedBy.length > 0 && waivedBy.every(names);
+    return held ? [key, ...waivedBy] : [];
+  });
   return pin.keys
+    .filter((key) => !jointly.includes(key))
     .filter((key) => entry.props[key]?.kind !== 'data' || entry.props[key].required !== true)
     .map((key) => `${id} is named by ${key}, which ${entry.name} does not require as data`);
 }
@@ -3210,6 +3249,28 @@ describe('a callback reached through an action’s listeners (issue 2656)', () =
     );
   });
 
+  it('names a listener no action is handed as a fault, where the pin hands the by function to no child (issue 2861)', () => {
+    const childless = { by: 'shut', listeners: ['outside', 'keys'] };
+    const ast = (markup) =>
+      templateOf(
+        E,
+        `<script>let { onShut } = $props(); function shut() { onShut(); } function outside() { shut(); } function keys(event) { if (event.key === 'Escape') shut(); }</script>${markup}`
+      ).ast;
+    const faultsOf = (markup) =>
+      eventFaults(
+        { name: 'E', props: { onShut: { kind: 'callback', required: true } } },
+        ast(markup),
+        { E: { onShut: childless } }
+      );
+    assert.deepEqual(
+      faultsOf('<div use:dismiss={{ onDismiss: outside }} use:k={{ on: keys }}></div>'),
+      []
+    );
+    assert.deepEqual(faultsOf('<div use:dismiss={{ onDismiss: outside }}></div>'), [
+      'keys is listed as a listener but no action is handed it',
+    ]);
+  });
+
   it('names a call of the by function outside the listed functions as a fault', () => {
     assert.deepEqual(
       forwardedOf(
@@ -3601,6 +3662,27 @@ describe('a control two published entries reach (issue 2647)', () => {
     const unheld = { entry: 'E', vocabulary: 'Rows are named by their glyph.' };
     assert.deepEqual(closureNameFaults(control, unheld, GROUPS), [
       `${CHILD_PRESS} is named by a vocabulary and names no mounted clause in heldBy`,
+    ]);
+  });
+
+  it('passes a keys pin naming a required key with every name that waives it, and faults one that omits a waiver or lists a waiver that is no name (issue 2861)', () => {
+    const waivedAs = (props) => ({ ...control, entry: { name: 'E', props } });
+    const pin = (keys) => ({ entry: 'E', keys, heldBy: 'a mounted clause' });
+    const labelled = waivedAs({
+      title: { kind: 'text', required: true, waivedBy: ['ariaLabel'] },
+      ariaLabel: { kind: 'data', contains: 'title' },
+    });
+    assert.deepEqual(closureNameFaults(labelled, pin(['title', 'ariaLabel'])), []);
+    assert.deepEqual(closureNameFaults(labelled, pin(['title'])), [
+      `${CHILD_PRESS} is named by title, which E does not require as data`,
+    ]);
+    const glyph = waivedAs({
+      title: { kind: 'text', required: true, waivedBy: ['icon'] },
+      icon: { kind: 'data' },
+    });
+    assert.deepEqual(closureNameFaults(glyph, pin(['title', 'icon'])), [
+      `${CHILD_PRESS} is named by title, which E does not require as data`,
+      `${CHILD_PRESS} is named by icon, which E does not require as data`,
     ]);
   });
 });

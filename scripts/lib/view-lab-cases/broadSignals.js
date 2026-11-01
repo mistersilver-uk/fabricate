@@ -767,6 +767,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // (issue 2680).
     'published-standalone-modal-open',
   ]),
+  // The anchored popover (issue 2861): two nudges mounted through the published seam, one flipped.
+  'src/ui/svelte/components/Popover.svelte': Object.freeze(['manager-published-popover-specimen']),
   // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
   // inspector's two groups and the recipe-item editor's preview rail.
   'src/ui/svelte/components/Rail.svelte': Object.freeze([

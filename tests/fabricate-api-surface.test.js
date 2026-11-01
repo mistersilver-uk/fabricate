@@ -215,6 +215,7 @@ function specifiedComponentGroups() {
     '2836',
     '2862',
     '2860',
+    '2861',
   ].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
@@ -317,6 +318,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'SelectionCheckbox',
       'Disclosure',
       'Typeahead',
+      'Popover',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -876,6 +878,22 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           density: optional,
           error: optional,
           countLabel: { kind: 'text', required: false },
+        },
+        rest: false,
+        root: 'any',
+        overlays: true,
+      },
+      Popover: {
+        version: 1,
+        props: {
+          open: optional,
+          anchorId: required,
+          placement: optional,
+          title: requiredText,
+          ariaLabel: optional,
+          closeOnOutsideClick: optional,
+          onClose: { kind: 'callback', required: true },
+          body: slot,
         },
         rest: false,
         root: 'any',

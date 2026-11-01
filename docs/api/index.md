@@ -1989,7 +1989,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no component published before it has the root `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; [issue #2784](https://github.com/mistersilver-uk/fabricate/issues/2784) publishes `ListRow` at the root `fabricate`; [issue #2793](https://github.com/mistersilver-uk/fabricate/issues/2793) publishes `ListRow`'s `aside`; [issue #2843](https://github.com/mistersilver-uk/fabricate/issues/2843) publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; [issue #2850](https://github.com/mistersilver-uk/fabricate/issues/2850) publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; [issue #2851](https://github.com/mistersilver-uk/fabricate/issues/2851) publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; [issue #2848](https://github.com/mistersilver-uk/fabricate/issues/2848) publishes `Field`'s `size`, `face`, `type` and `invalid`; [issue #2849](https://github.com/mistersilver-uk/fabricate/issues/2849) publishes `SearchField`'s `density` and `countLabel`; [issue #2853](https://github.com/mistersilver-uk/fabricate/issues/2853) publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; [issue #2852](https://github.com/mistersilver-uk/fabricate/issues/2852) publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; [issue #2854](https://github.com/mistersilver-uk/fabricate/issues/2854) publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; [issue #2855](https://github.com/mistersilver-uk/fabricate/issues/2855) publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; [issue #2856](https://github.com/mistersilver-uk/fabricate/issues/2856) publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; [issue #2858](https://github.com/mistersilver-uk/fabricate/issues/2858) publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis; [issue #2837](https://github.com/mistersilver-uk/fabricate/issues/2837) publishes `StageBars`' `track` and a stage's `shares`; [issue #2857](https://github.com/mistersilver-uk/fabricate/issues/2857) publishes a `StageBars` stage's `title`; [issue #2863](https://github.com/mistersilver-uk/fabricate/issues/2863) publishes `FillBar`'s `neutralBand`; [issue #2841](https://github.com/mistersilver-uk/fabricate/issues/2841) publishes `StatBox`'s `children` slot, `Stepper`'s dense `size`, `Button`'s `accent` and `urgent` roles and `IconPicker`'s `tint`; [issue #2859](https://github.com/mistersilver-uk/fabricate/issues/2859) publishes `Modal`'s `scrim`; [issue #2836](https://github.com/mistersilver-uk/fabricate/issues/2836) publishes `SelectionCheckbox`; [issue #2862](https://github.com/mistersilver-uk/fabricate/issues/2862) publishes `Disclosure`; [issue #2860](https://github.com/mistersilver-uk/fabricate/issues/2860) publishes `Typeahead`.
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; [issue #2656](https://github.com/mistersilver-uk/fabricate/issues/2656) publishes `Modal`; [issue #2456](https://github.com/mistersilver-uk/fabricate/issues/2456) publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `any`; [issue #2679](https://github.com/mistersilver-uk/fabricate/issues/2679) widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; [issue #2680](https://github.com/mistersilver-uk/fabricate/issues/2680) widens the four overlay components, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no component published before it has the root `fabricate`, which completes the widening that is part of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427); [issue #2774](https://github.com/mistersilver-uk/fabricate/issues/2774) publishes `SegmentedControl`'s `tone` and `shape` and an option's `variant`; [issue #2784](https://github.com/mistersilver-uk/fabricate/issues/2784) publishes `ListRow` at the root `fabricate`; [issue #2793](https://github.com/mistersilver-uk/fabricate/issues/2793) publishes `ListRow`'s `aside`; [issue #2843](https://github.com/mistersilver-uk/fabricate/issues/2843) publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; [issue #2850](https://github.com/mistersilver-uk/fabricate/issues/2850) publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; [issue #2851](https://github.com/mistersilver-uk/fabricate/issues/2851) publishes `ListRow`'s `current` and `busy` and draws `selected` without `onOpen`; [issue #2848](https://github.com/mistersilver-uk/fabricate/issues/2848) publishes `Field`'s `size`, `face`, `type` and `invalid`; [issue #2849](https://github.com/mistersilver-uk/fabricate/issues/2849) publishes `SearchField`'s `density` and `countLabel`; [issue #2853](https://github.com/mistersilver-uk/fabricate/issues/2853) publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; [issue #2852](https://github.com/mistersilver-uk/fabricate/issues/2852) publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; [issue #2854](https://github.com/mistersilver-uk/fabricate/issues/2854) publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; [issue #2855](https://github.com/mistersilver-uk/fabricate/issues/2855) publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; [issue #2856](https://github.com/mistersilver-uk/fabricate/issues/2856) publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; [issue #2858](https://github.com/mistersilver-uk/fabricate/issues/2858) publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis; [issue #2837](https://github.com/mistersilver-uk/fabricate/issues/2837) publishes `StageBars`' `track` and a stage's `shares`; [issue #2857](https://github.com/mistersilver-uk/fabricate/issues/2857) publishes a `StageBars` stage's `title`; [issue #2863](https://github.com/mistersilver-uk/fabricate/issues/2863) publishes `FillBar`'s `neutralBand`; [issue #2841](https://github.com/mistersilver-uk/fabricate/issues/2841) publishes `StatBox`'s `children` slot, `Stepper`'s dense `size`, `Button`'s `accent` and `urgent` roles and `IconPicker`'s `tint`; [issue #2859](https://github.com/mistersilver-uk/fabricate/issues/2859) publishes `Modal`'s `scrim`; [issue #2836](https://github.com/mistersilver-uk/fabricate/issues/2836) publishes `SelectionCheckbox`; [issue #2862](https://github.com/mistersilver-uk/fabricate/issues/2862) publishes `Disclosure`; [issue #2860](https://github.com/mistersilver-uk/fabricate/issues/2860) publishes `Typeahead`; [issue #2861](https://github.com/mistersilver-uk/fabricate/issues/2861) publishes `Popover`.
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2075,13 +2075,14 @@ The published components, in publication order:
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria) | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
 | `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
+| `Popover` | 1 | `any` | `open`, `anchorId` (required), `placement`, `title` (text, required), `ariaLabel`, `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -4520,6 +4521,118 @@ const props = () => ({
 const typeahead = fabUi.mount('Typeahead', { target, props: props() });
 ```
 
+### Popover
+
+`Popover` draws the design system's anchored popover (`<Popover>` in the design-system library): a small non-modal dialog drawn in an overlay beside an anchor element you own, holding your own controls in its content slot, as a value field, delta buttons and a reason field under a grid cell.
+It is for an edit the user makes and leaves with Escape or an outside press; for a step the user finishes or dismisses before going on, mount a [`Modal`](#modal).
+It draws nothing focusable inside `target`, which holds one hidden element of Fabricate's, inside the standalone style root where one is written, which is private.
+Mount one `Popover` per anchor.
+`open` is `true` to draw the panel; absence, `false` and any other value, `'true'` and `1` included, draw none, and you open and close it only through `update`.
+An `update` replaces every prop, so pass the popover's other props with `open` on each one, `anchorId` and `onClose` among them.
+An `update` that closes it detaches the `body` slot element with its contents intact, and one that opens it attaches the same element again, so the content-slot rules on detaching apply on every close and open.
+`anchorId` is required: the `id` of your anchor element, as the grid cell the popover belongs to, looked up in the document that holds the popover's `target`, never in Fabricate's own document, so in a Foundry 14 detached window it is looked up there.
+The panel is drawn only while the id names a connected element with a layout box: while it names none, or its element is removed or `display: none`, the panel is not drawn and no callback is called, and it is drawn again against the element that then carries the id.
+While `target` is disconnected, as when an `update` of another component whose content slot holds it detaches the slot, the panel is not drawn and no callback is called, and it is drawn again once `target` is attached.
+A value that is not a string names no anchor, and the first element carrying the id is the anchor, so give it an id unique in its document.
+Fabricate writes nothing on the anchor: state `aria-haspopup="dialog"` and `aria-expanded` there yourself, `"false"` before the first open, and point its `aria-controls` at the panel if you wish.
+The panel's `id` is `anchorId` followed by `-popover` and its heading's is `anchorId` followed by `-popover-title`, so give no other element either id.
+`placement` is `'bottom-start'`, `'bottom-end'`, `'top-start'` or `'top-end'` and defaults to `'bottom-start'`: the side the panel is tried on first, under or over the anchor and 6px from it, and the anchor edge its own lines up with, the start edge being the left; a value outside the set draws `'bottom-start'`.
+The panel takes the stated side while its content fits between the anchor and 8px short of its host's edge, or while that side has the more room, else the other side, so it flips at either edge of its host.
+Its edges are clamped 8px inside its host, its height is capped to the room on the side it takes, and its body scrolls inside it once the cap is reached; where neither side has 48px, it keeps its own height, up to its host's less 16px, and overlaps the anchor.
+It is as wide as its content, at most 360px and at most its host's width less 16px.
+It is placed again when its document scrolls, when its window resizes, when an `update` changes `placement`, when the panel or the anchor changes size, and once per animation frame after its document changes, as when a reflow or a Foundry window's move shifts the anchor.
+While the anchor lies wholly outside its window's viewport or outside an ancestor that clips its overflow, as when its scroller scrolls it away, the panel is hidden, stays open and calls nothing, and it shows again when the anchor returns.
+`title` is optional final display text drawn as the panel's level-3 heading, a level you cannot change, and the dialog's name where no `ariaLabel` is passed.
+One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` and no `ariaLabel`, is refused with `Popover requires a non-empty "title"`.
+`ariaLabel` is optional final display text that names the dialog in place of the heading; beside a `title` it must hold the title's words, in order and as whole words, or the mount is refused, so the spoken name starts from what is shown.
+Never pass a name of white space alone, which leaves the panel with no name.
+`body` is a content slot whose element is a `<div>`, drawn below the heading in a padded column the panel spaces by `gap`, which scrolls when the panel's height is capped.
+Fill the slot before you open the popover, or in the same task, because focus moves into the panel a microtask after it is drawn.
+The body takes focus where the slot holds no control, and while it overflows with no control in it, it is also a Tab stop, so the keyboard scrolls it with the arrow keys, Page Up, Page Down, Home and End; it then draws the window's accent ring 2px wide inside its own edge.
+The body takes no name of its own: where it takes focus, a reader meets your own content in it.
+`closeOnOutsideClick` is `true` or `false` and defaults to `true`; only `false` turns it off, and any other value, `'false'` included, keeps the default.
+With `true`, a pointer press anywhere in the document outside the panel calls `onClose` as its `mousedown` fires, whichever button it is.
+A press on the anchor is not an outside press, so your own handler on the anchor decides, as by closing the popover it opened; toggle it on `click`, never on `mousedown` or `pointerdown`.
+A panel counts as inside the popover from when it opens until it closes, wherever it is drawn, when a control inside the popover opened it, as the list of a [`Select`](#select) you mount in the `body` slot, so a press there calls nothing and the panel takes it as its own section states.
+With `false`, no press outside the panel calls `onClose`, which suits a nudge with a text field a stray press must not discard; the panel then stays drawn above a Foundry window dragged over its anchor, until Escape closes it.
+`onClose` is a required callback, called with no argument, when the user asks to close the popover: Escape pressed while focus is in the panel or on the anchor and, as `closeOnOutsideClick` states, a press outside it.
+It is not called by `mount`, `update`, `destroy`, a press inside the panel or the anchor going.
+Fabricate does not close the popover itself: it stays open until your `update` passes an `open` other than `true` or you call `destroy`.
+
+Focus and keys:
+
+- Focus moves into the panel as it is first drawn in an open, onto its first control, else onto its body, else onto the panel itself, which holds Foundry's keybindings off and draws no focus ring.
+- When the panel is drawn again in the same open, as when its anchor returns, focus moves in only while it is on the page, so a control the user has focused since stays focused.
+- Tab on the anchor moves focus into the panel, Tab from its last control moves focus to its first and Shift+Tab from its first to its last, so the keyboard stays in the panel until Escape, which always leaves it, from the panel or the anchor.
+- The panel is not announced as modal, and the page behind it still takes pointer input.
+- When the panel closes while focus is inside it, Fabricate moves focus to the anchor a frame later, if focus is then on the page and the anchor is connected; a press outside that is not on the anchor or in a panel opened from inside moves focus where the press puts it, so it is left there.
+- Escape pressed while focus is in the panel or on the anchor is judged as the key goes down, before any control can stop it: it calls `onClose`, prevents its default and stops there, so no listener of yours inside the panel hears it, Foundry's dismiss keybinding closes no window and a `Modal` the popover is drawn from stays open.
+- Escape pressed on an element inside the panel whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element, as an open `Select` list's is, so the next Escape closes the popover; Escape pressed while focus is elsewhere calls nothing.
+
+The panel is the component's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens, so `target`'s overflow does not clip it.
+It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
+A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog (issue 2884).
+It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
+Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
+The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls you draw inside carry their own edges.
+`Popover` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Popover`.
+Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or a dialog that is not modal, on the standalone layer there.
+An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach your controls in its slot.
+Whether a screen reader announces the panel as a dialog, and by which name, as it takes focus is the reader's; Fabricate's suites read Chromium's accessibility tree only.
+Its padding, gap, corner and type figures, its colours and placement beyond what this section states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks are private.
+A Fabricate that predates the popover publishes no `Popover`: `describe('Popover')` returns `null` and `mount('Popover', …)` is refused with `"Popover" is not published`.
+
+A worked nudge follows: adjusting a score from its cell in a grid of your own, inside a Fabricate window or your own sheet.
+
+```javascript
+// After `load(['Popover', 'Stepper'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the popover describes none: draw your own there.
+if (fabUi?.describe?.('Popover')?.overlays !== true) return;
+
+// `cell` is your button for the score, carrying an id unique in its document.
+cell.id = 'acme-score-strength';
+cell.setAttribute('aria-haspopup', 'dialog');
+cell.setAttribute('aria-expanded', 'false');
+let isOpen = false;
+const props = () => ({
+  open: isOpen,
+  anchorId: cell.id,
+  title: game.i18n.localize('ACME.Strength'),
+  body: true,
+  onClose: () => setOpen(false),
+});
+const nudge = fabUi.mount('Popover', { target, props: props() });
+
+// The published Stepper inside, a typed field with 24px-or-larger step buttons, appended before
+// the popover first opens.
+const field = document.createElement('div');
+nudge.slot('body').append(field);
+let score = 14;
+const stepperProps = () => ({
+  value: score,
+  min: 1,
+  max: 20,
+  ariaLabel: game.i18n.localize('ACME.Strength'),
+  decrementLabel: game.i18n.localize('ACME.Lower'),
+  incrementLabel: game.i18n.localize('ACME.Raise'),
+  onChange: (next) => {
+    score = next;
+    stepper.update(stepperProps());
+  },
+});
+const stepper = fabUi.mount('Stepper', { target: field, props: stepperProps() });
+
+function setOpen(next) {
+  isOpen = next;
+  cell.setAttribute('aria-expanded', String(isOpen));
+  nudge.update(props());
+}
+
+// A press on the cell is not an outside press, so the cell's own click toggles the popover.
+cell.addEventListener('click', () => setOpen(!isOpen));
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -4701,7 +4814,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -4802,6 +4915,7 @@ A component whose `describe(name).overlays` is `true` opens an overlay: a panel 
 `ActionMenu` is the third: its menu is the overlay, and its section states what it draws.
 `Modal` is the fourth: its dialog is the overlay, and its section states what it draws.
 `Typeahead` is the fifth: its suggestion list is the overlay, and its section states what the list draws.
+`Popover` is the sixth: its panel is the overlay, and its section states what it draws.
 `mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
@@ -4812,6 +4926,8 @@ Each time an overlay opens, Fabricate picks where to draw it, from `target`'s ow
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
+`Popover` accepts a host anywhere in `target`'s document, and its section states what one outside every Fabricate window changes.
+A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog (issue 2884).
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
 Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
@@ -4858,7 +4974,7 @@ A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is 
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
 Every component published at version 1 states `any`, so `fabricate` and `manager` are values `describe` may return for a later component, and no mount you make today is refused for a missing Fabricate ancestor.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twenty components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twenty-one components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -4937,8 +5053,8 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure` and `Typeahead` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
-The panel `Select`, `IconPicker`, `ActionMenu`, `Modal` or `Typeahead` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+The panel `Select`, `IconPicker`, `ActionMenu`, `Modal`, `Typeahead` or `Popover` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.
 That element is the standalone style root.
@@ -4978,7 +5094,7 @@ What it gives you and what it leaves to you:
 - A document sheet disables every control in its form when the document is not editable, so mount after `super._onRender`.
 - A component is drawn under the standalone style root only where its admission test holds.
   That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws with the same props in the player window, at rest, under keyboard focus, under the pointer and under reduced motion.
-  For `Select`, `IconPicker`, `ActionMenu` and `Modal` it compares the open list, menu or dialog too, on the standalone layer against the player window's.
+  For `Select`, `IconPicker`, `ActionMenu`, `Modal` and `Popover` it compares the open list, menu, dialog or panel too, on the standalone layer against the player window's.
   A panel on the layer draws in a Fabricate window's typeface and at Foundry's application size, as a panel in the player window does, and not in the size Foundry's `<body>` states.
   Its line height is inherited from the page body, as in a Foundry window, and its ink is Fabricate's.
   The test page sets one typeface on its body so both arms compare like with like.

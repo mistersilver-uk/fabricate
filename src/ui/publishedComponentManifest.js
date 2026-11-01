@@ -680,4 +680,27 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     standaloneRoot: true,
     overlays: true,
   }),
+  Object.freeze({
+    name: 'Popover',
+    path: 'src/ui/svelte/components/Popover.svelte',
+    version: 1,
+    props: Object.freeze({
+      open: Object.freeze({ kind: 'data' }),
+      anchorId: Object.freeze({ kind: 'data', required: true }),
+      placement: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({
+        kind: 'text',
+        required: true,
+        waivedBy: Object.freeze(['ariaLabel']),
+      }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'title' }),
+      closeOnOutsideClick: Object.freeze({ kind: 'data' }),
+      onClose: Object.freeze({ kind: 'callback', required: true }),
+      body: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: false,
+    root: 'any',
+    standaloneRoot: true,
+    overlays: true,
+  }),
 ]);
