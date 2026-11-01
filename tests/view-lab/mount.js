@@ -823,6 +823,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-segmented-forms': () => import('./fixtures/PublishedSegmentedForms.svelte'),
   // Issue 2858: the icon-only chip under each published tone, a named chip and the dashed emphasis.
   'published-chip-forms': () => import('./fixtures/PublishedChipForms.svelte'),
+  // Issue 2836: the selection checkbox's states, densities, a wrapping label and a keyboard press.
+  'published-selection-checkbox': () => import('./fixtures/PublishedSelectionCheckbox.svelte'),
   // Issue 2841: a progress tile whose stat box holds a thin fill bar in its content slot.
   'published-companion-forms': () => import('./fixtures/PublishedCompanionForms.svelte'),
   // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.

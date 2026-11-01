@@ -53,6 +53,13 @@ const VARIANTS = Object.freeze({
   'manager-published-modal-scrim-specimen-foundry-native': 'manager-published-modal-scrim-specimen',
   'manager-published-modal-scrim-specimen-hearth-herb': 'manager-published-modal-scrim-specimen',
   'manager-published-modal-scrim-specimen-mythwright': 'manager-published-modal-scrim-specimen',
+  // Issue 2836: the published checkbox's edges and fills on three more palettes.
+  'manager-published-selection-checkbox-specimen-foundry-native':
+    'manager-published-selection-checkbox-specimen',
+  'manager-published-selection-checkbox-specimen-hearth-herb':
+    'manager-published-selection-checkbox-specimen',
+  'manager-published-selection-checkbox-specimen-ironblood-forge':
+    'manager-published-selection-checkbox-specimen',
   'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':
     'manager-tool-prerequisites-selected-1280x720',
@@ -83,7 +90,10 @@ test('the palette variants reuse their base case under the palette their id name
     const variant = getCaseById(id);
     const base = getCaseById(baseId);
     assert.equal(variant.theme, id.slice(baseId.length + 1));
-    assert.ok(['hearth-herb', 'foundry-native', 'mythwright'].includes(variant.theme), id);
+    assert.ok(
+      ['hearth-herb', 'foundry-native', 'mythwright', 'ironblood-forge'].includes(variant.theme),
+      id
+    );
     assert.equal(variant.baseCaseId, baseId);
     assert.ok(!base.theme, `${baseId} must keep the default palette`);
     // The same definition, not a copy of it.

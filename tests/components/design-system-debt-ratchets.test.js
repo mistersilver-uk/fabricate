@@ -1442,15 +1442,24 @@ const STATE_TINTS = Object.freeze([
     `var(--fab-${fill})`,
     `the staged ${verb} face, pressed: the reference’s staged pair (proto:5601-5604)`,
   ]),
-  ...[
-    [`${MANAGER}/BulkStagingInset.svelte`, ':global(.fab-bulk-inset .fab-bulk-inset-box.is-on)'],
-    [`${COMPONENTS}/SelectionCheckbox.svelte`, '.fab-selection-check.is-checked'],
-  ].map(([file, selector]) => [
-    file,
-    selector,
+  [
+    `${COMPONENTS}/SelectionCheckbox.svelte`,
+    '.fab-selection-check.is-checked',
     'var(--fab-accent)',
     'the ticked box, `.k-cb.on i` (library.html:181)',
-  ]),
+  ],
+  [
+    `${COMPONENTS}/SelectionCheckbox.svelte`,
+    '.fab-selection-check:is(.is-sm, .is-md, .is-lg):is(.is-checked, .is-indeterminate)',
+    'highlight',
+    'under forced colours a ticked or mixed box is the reader’s Highlight (issue 2836)',
+  ],
+  [
+    `${COMPONENTS}/SelectionCheckbox.svelte`,
+    '.fab-selection-input:disabled + .fab-selection-check:is(.is-sm, .is-md, .is-lg):is(.is-checked, .is-indeterminate)',
+    'graytext',
+    'under forced colours a disabled ticked or mixed box is GrayText, its glyph still drawn (issue 2836)',
+  ],
   [
     `${COMPONENTS}/LogList.svelte`,
     '.fab-log-list-entry.is-open:not(.is-selected):hover',

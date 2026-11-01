@@ -32,6 +32,7 @@
 -->
 <script>
   import Medallion from '../../components/Medallion.svelte';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { localizeOr } from '../../util/localizeOr.js';
 
@@ -176,9 +177,7 @@
             {#if kind === 'check'}
               <!-- DECORATIVE: the row is the control and `aria-pressed` states the value; the box
                    paints it where the reference paints it (`proto:5273`). -->
-              <span class="fab-bulk-inset-box" class:is-on={row.state !== 'off'} aria-hidden="true">
-                {#if row.state !== 'off'}<i class="fas fa-check"></i>{/if}
-              </span>
+              <SelectionCheckbox decorative density="compact" checked={row.state !== 'off'} />
             {:else}
               <i class={glyphOf(row.state)} aria-hidden="true"></i>
             {/if}
@@ -400,24 +399,6 @@
     color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 0.68rem;
-  }
-
-  :global(.fab-bulk-inset .fab-bulk-inset-box) {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 6px;
-    color: var(--fab-on-accent);
-    font-size: 0.5rem;
-  }
-
-  :global(.fab-bulk-inset .fab-bulk-inset-box.is-on) {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent);
   }
 
   /* THE STEPPER ROW (`proto:1203`, `proto:5627`): `5px 9px` around a 22px tile and a 22px

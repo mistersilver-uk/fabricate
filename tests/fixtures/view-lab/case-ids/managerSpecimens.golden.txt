@@ -44,6 +44,10 @@ manager-published-companion-forms-accent-focus-hearth-herb
 manager-published-companion-forms-urgent-focus
 manager-published-companion-forms-urgent-focus-foundry-native
 manager-published-companion-forms-urgent-focus-hearth-herb
+manager-published-selection-checkbox-specimen
+manager-published-selection-checkbox-specimen-foundry-native
+manager-published-selection-checkbox-specimen-hearth-herb
+manager-published-selection-checkbox-specimen-ironblood-forge
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen

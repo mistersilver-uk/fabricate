@@ -35,6 +35,7 @@ import RadioCardGroup from './svelte/components/RadioCardGroup.svelte';
 import SearchField from './svelte/components/SearchField.svelte';
 import SegmentedControl from './svelte/components/SegmentedControl.svelte';
 import Select from './svelte/components/Select.svelte';
+import SelectionCheckbox from './svelte/components/SelectionCheckbox.svelte';
 import StageBars from './svelte/components/StageBars.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
@@ -80,6 +81,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Modal.svelte': Modal,
   'src/ui/svelte/components/ListRow.svelte': ListRow,
   'src/ui/svelte/components/ToggleCard.svelte': ToggleCard,
+  'src/ui/svelte/components/SelectionCheckbox.svelte': SelectionCheckbox,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

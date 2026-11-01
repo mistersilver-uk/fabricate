@@ -2201,11 +2201,11 @@ describe('world Component Catalogue (issue 1371)', () => {
         assert.ok(systemRows.length > 1, 'NON-VACUITY: the systems inset has rows');
         for (const row of systemRows) {
           assert.ok(
-            Boolean(row.querySelector('.fab-bulk-inset-box')),
+            Boolean(row.querySelector('.fab-selection-check')),
             '`proto:5273` draws a 15px box at the row`s leading edge, not a glyph'
           );
           assert.ok(
-            !row.querySelector('.fab-bulk-inset-box').classList.contains('is-on'),
+            !row.querySelector('.fab-selection-check').classList.contains('is-checked'),
             'and an unstaged row`s box is empty'
           );
         }
@@ -2215,18 +2215,18 @@ describe('world Component Catalogue (issue 1371)', () => {
         systemRows[0].click();
         await drain();
         assert.ok(
-          systemRows[0].querySelector('.fab-bulk-inset-box').classList.contains('is-on'),
+          systemRows[0].querySelector('.fab-selection-check').classList.contains('is-checked'),
           'a staged row`s box is filled and carries the check'
         );
         assert.ok(
-          Boolean(systemRows[0].querySelector(':scope .fab-bulk-inset-box i.fa-check')),
+          Boolean(systemRows[0].querySelector(':scope .fab-selection-check i.fa-check')),
           'with the check glyph inside it'
         );
         const categoryRow = target.querySelector(
           ':scope [data-bulk-inset="category"] [data-world-component-bulk-option]'
         );
         assert.ok(
-          !categoryRow.querySelector('.fab-bulk-inset-box') &&
+          !categoryRow.querySelector('.fab-selection-check') &&
             Boolean(categoryRow.querySelector('i')),
           'the category rows keep the reference`s circle glyph (`proto:5296`); only the systems rows are boxes'
         );

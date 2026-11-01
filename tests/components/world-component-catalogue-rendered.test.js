@@ -306,7 +306,7 @@ function measureBulkGeometry() {
     systemRow: box(
       '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
     ),
-    systemBox: box('[data-bulk-inset="systems"] .fab-bulk-inset-box'),
+    systemBox: box('[data-bulk-inset="systems"] .fab-selection-check'),
     categoryRow: box(
       '[data-bulk-inset="category"] [data-world-component-bulk-option]'
     ),

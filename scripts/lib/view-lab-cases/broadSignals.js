@@ -272,9 +272,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-light',
     'published-standalone-in-window',
   ]),
-  // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
+  // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames,
+  // and the forms the published seam draws (issue 2836).
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
     'manager-tool-prerequisites-selected-1280x720',
+    'manager-published-selection-checkbox-specimen',
   ]),
   // The app's one art tile (issue 1506), which is the change that earned it an entry.
   'src/ui/svelte/components/Medallion.svelte': Object.freeze([

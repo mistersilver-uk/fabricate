@@ -11,7 +11,8 @@
   | `decorative` | boolean | `false` | Draws the box ALONE, `aria-hidden` and with no input, for a host element that already carries the checked state itself: a multi-select picker row announces it with `aria-selected`, and an input inside that row would nest one control in another. `wrapper`, `ariaLabel`, `onChange` and the rest spread do nothing in this form. |
   | `wrapper` | `'label'` \| `'contents'` | `'label'` | `label` renders a `<label>` around the input and box, for a host whose action group would otherwise leave the visible box with no label association and no click target. `contents` renders the two as bare siblings, for a host whose OWN root is a `<label>` — nesting labels is invalid HTML and an ambiguous click target. |
   | `ariaLabel` / `element` | already-localized string / bindable | `''` / `null` | The accessible name — this is an import-free leaf — and the real input, exposed so a host can manage focus, since it is visually hidden and cannot be reached by query without reaching through this component's internals. |
-  | `onChange(checked)` | function | no-op | The input's new checked state. |
+  | `label` | snippet | `undefined` | Visible text drawn after the box inside the `label` wrapper, wrapping beside it, which names the input; `contents` and `decorative` ignore it (issue 2836). |
+  | `onChange(checked)` | function | no-op | The state a press asks for; the input keeps showing `checked` until the caller passes the new one. |
 
   Rest spread:
   - `{...rest}` lands on the INPUT, because the input is what a caller clicks and what a test drives.
@@ -23,6 +24,8 @@
   - THE INDETERMINATE GLYPH IS A MINUS, mirroring the tri-state page box: "some of these", not "none
     of these". A box that is BOTH checked and indeterminate reads as indeterminate, which is what
     the DOM property does too.
+  - Under forced colours an unticked box draws no glyph and a ticked or mixed one fills with
+    Highlight — pinned by `tests/components/selection-checkbox-rendered.test.js`.
 -->
 <script>
   let {
@@ -33,21 +36,36 @@
     wrapper = 'label',
     decorative = false,
     ariaLabel = '',
+    label = undefined,
     onChange = () => {},
     input = $bindable(null),
     ...rest
   } = $props();
 
-  const SIZE_CLASSES = Object.freeze({ compact: 'is-sm', default: 'is-md', comfortable: 'is-lg' });
+  const DENSITY_CLASSES = Object.freeze({
+    compact: 'is-sm',
+    default: 'is-md',
+    comfortable: 'is-lg',
+  });
   const sizeClass = $derived(
-    Object.hasOwn(SIZE_CLASSES, density) ? SIZE_CLASSES[density] : 'is-md'
+    Object.hasOwn(DENSITY_CLASSES, density) ? DENSITY_CLASSES[density] : 'is-md'
   );
 
-  const glyph = $derived(indeterminate ? 'fas fa-minus' : 'fas fa-check');
+  const mixed = $derived(indeterminate === true);
+  const glyph = $derived(mixed ? 'fas fa-minus' : 'fas fa-check');
 
   $effect(() => {
-    if (input) input.indeterminate = indeterminate === true;
+    if (input) input.indeterminate = mixed;
   });
+
+  /** Reports the asked-for state and puts the input back on the props until they change. */
+  function report(event) {
+    const control = event.currentTarget;
+    const next = control.checked;
+    control.checked = checked;
+    control.indeterminate = mixed;
+    onChange(next);
+  }
 </script>
 
 {#snippet control()}
@@ -58,7 +76,7 @@
     {checked}
     {disabled}
     aria-label={ariaLabel || undefined}
-    onchange={(event) => onChange(event.currentTarget.checked)}
+    onchange={report}
     {...rest}
   />
   {@render box()}
@@ -68,7 +86,7 @@
   <span
     class="fab-selection-check {sizeClass}"
     class:is-checked={checked}
-    class:is-indeterminate={indeterminate}
+    class:is-indeterminate={mixed}
     aria-hidden="true"><i class={glyph}></i></span
   >
 {/snippet}
@@ -78,7 +96,10 @@
 {:else if wrapper === 'contents'}
   {@render control()}
 {:else}
-  <label class="fab-selection-checkbox" class:is-disabled={disabled}>{@render control()}</label>
+  <label class="fab-selection-checkbox" class:is-disabled={disabled} class:has-label={label}
+    >{@render control()}{#if label}<span class="fab-selection-label">{@render label()}</span
+      >{/if}</label
+  >
 {/if}
 
 <style>
@@ -174,5 +195,86 @@
   .fab-selection-checkbox:has(.fab-selection-input:focus-visible) .fab-selection-check {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  /* The labelled form: a 16px line, the box centred on the first, which the larger boxes reach by
+     padding the label down; a quieter edge raises under the pointer, and a disabled box dims. */
+  .fab-selection-checkbox.has-label {
+    align-items: flex-start;
+    gap: var(--fab-space-2);
+    max-width: 100%;
+  }
+
+  .fab-selection-label {
+    min-width: 0;
+    color: var(--fab-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 16px;
+    overflow-wrap: break-word;
+  }
+
+  .fab-selection-checkbox:has(> .is-md) .fab-selection-label {
+    padding-block-start: var(--fab-space-2xs);
+  }
+
+  .fab-selection-checkbox:has(> .is-lg) .fab-selection-label {
+    padding-block-start: var(--fab-space-2xs);
+    line-height: 18px;
+  }
+
+  .fab-selection-checkbox:not(.is-disabled):hover
+    .fab-selection-check:not(.is-checked, .is-indeterminate) {
+    border-color: var(--fab-text-muted);
+  }
+
+  .fab-selection-checkbox.is-disabled .fab-selection-check {
+    opacity: 0.5;
+  }
+
+  .fab-selection-checkbox.is-disabled .fab-selection-label {
+    color: var(--fab-text-muted);
+  }
+
+  /* Forced colours: the reader's system colours paint the box, so a clear tick would show as ink.
+     An unticked box hides its glyph, and a ticked or mixed one takes Highlight, written one class
+     above the size and state rules it replaces; the glyph opts out of the forced backplate, which
+     would paint it as a block. The ring keeps the forced CanvasText, and a disabled box GrayText,
+     undimmed, keyed on the input so every form with one takes it. */
+  @media (forced-colors: active) {
+    .fab-selection-check > i {
+      forced-color-adjust: none;
+    }
+
+    .fab-selection-check:not(.is-checked, .is-indeterminate) > i {
+      visibility: hidden;
+    }
+
+    .fab-selection-check:is(.is-sm, .is-md, .is-lg):is(.is-checked, .is-indeterminate) {
+      border-color: highlight;
+      background-color: highlight;
+    }
+
+    .fab-selection-check:is(.is-checked, .is-indeterminate) > i {
+      color: highlighttext;
+    }
+
+    .fab-selection-input:disabled + .fab-selection-check {
+      border-color: graytext;
+      opacity: 1;
+    }
+
+    .fab-selection-input:disabled
+      + .fab-selection-check:is(.is-sm, .is-md, .is-lg):is(.is-checked, .is-indeterminate) {
+      background-color: graytext;
+    }
+
+    .fab-selection-input:disabled + .fab-selection-check:is(.is-checked, .is-indeterminate) > i {
+      color: canvas;
+    }
+
+    .fab-selection-checkbox.is-disabled .fab-selection-label {
+      color: graytext;
+    }
   }
 </style>

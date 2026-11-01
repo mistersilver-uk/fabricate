@@ -88,6 +88,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Modal.svelte',
   'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

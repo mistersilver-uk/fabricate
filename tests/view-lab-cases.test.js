@@ -409,6 +409,7 @@ const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
+  'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
@@ -1095,6 +1096,37 @@ const LAB_COMPANION_CASES = {
     },
   ],
 };
+const labCheckbox = (key, part = 'check') =>
+  `${key.startsWith('deep-') ? '[data-lab-selection-checkboxes-deep]' : '[data-lab-selection-checkboxes]'} > [data-lab-selection-checkbox="${key}"] .fab-selection-${part}`;
+/** The published selection checkbox's specimen (issue 2836), alike on each of its palettes. */
+const CHECKBOX_CONTROLS = Object.freeze([
+  {
+    selector: labCheckbox('unchecked'),
+    styles:
+      'width: 20px; height: 20px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-control-outline)',
+  },
+  {
+    selector: labCheckbox('compact-off'),
+    styles:
+      'width: 16px; height: 16px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-control-outline)',
+  },
+  { selector: labCheckbox('checked'), styles: 'background-color: var(--fab-accent)' },
+  { selector: labCheckbox('comfortable-off'), styles: 'width: 22px; height: 22px' },
+  {
+    selector: labCheckbox('focused'),
+    styles:
+      'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+  },
+  { selector: labCheckbox('disabled-on'), styles: 'opacity: 0.5' },
+  { selector: labCheckbox('unchecked', 'label'), styles: 'color: var(--fab-text-secondary)' },
+  { selector: labCheckbox('disabled-off', 'label'), styles: 'color: var(--fab-text-muted)' },
+  { selector: '[data-lab-selection-checkboxes-deep]', styles: 'background-color: var(--fab-bg-2)' },
+  {
+    selector: labCheckbox('deep-compact-off'),
+    styles:
+      'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-control-outline)',
+  },
+]);
 const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -2065,6 +2097,14 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
   ],
   // The companion forms specimens (issue 2841); their palette variants measure the same controls.
   ...LAB_COMPANION_CASES,
+  // The published selection checkbox (issue 2836): each box's side, the unticked edge, the ticked
+  // fill, the keyboard ring and the two label inks, on each palette.
+  ...Object.fromEntries(
+    ['', '-foundry-native', '-hearth-herb', '-ironblood-forge'].map((variant) => [
+      `manager-published-selection-checkbox-specimen${variant}`,
+      [...CHECKBOX_CONTROLS],
+    ])
+  ),
   // The opener focus returned to after a close: its ring, by its shape.
   'manager-published-modal-close': [
     {
@@ -6907,9 +6947,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'ActionMenu',
   'Modal',
   'ToggleCard',
+  'SelectionCheckbox',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal and ToggleCard and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard and SelectionCheckbox and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -7925,6 +7966,62 @@ test('the fill bar bands specimen case measures each row the fill bar bands fixt
     ({ selector }) => /data-lab-fill-bar-band="([\w-]+)"/u.exec(selector)[1]
   );
   assert.deepEqual(measured, keys, 'each row the fixture mounts is measured, in order');
+});
+
+test('the selection checkbox specimen case measures and presses rows the fixture mounts through the seam, on each palette', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte'
+  );
+  for (const hook of [
+    'data-lab-selection-checkboxes',
+    'data-lab-selection-checkboxes-deep',
+    'data-lab-selection-checkbox',
+    'data-lab-selection-checkbox-checked',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.arguments.length === 1
+    ),
+    'the pressed row draws its new state through the companion’s own update'
+  );
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value)
+    .filter((value) => typeof value === 'string' && /^[a-z-]+$/u.test(value));
+  const rowOf = (selector) => /data-lab-selection-checkbox="([\w-]+)"/u.exec(selector)?.[1];
+  for (const id of [
+    'manager-published-selection-checkbox-specimen',
+    'manager-published-selection-checkbox-specimen-foundry-native',
+    'manager-published-selection-checkbox-specimen-hearth-herb',
+    'manager-published-selection-checkbox-specimen-ironblood-forge',
+  ]) {
+    const { steps, expectLayout, theme } = getCaseById(id);
+    assert.deepEqual(
+      expectLayout.controls
+        .map(({ selector }) => rowOf(selector))
+        .filter((key) => key !== undefined && !keys.includes(key)),
+      [],
+      `${id}: each measured row is one the fixture mounts`
+    );
+    assert.deepEqual(
+      steps.map((step) => [rowOf(step.selector), step.press]),
+      [
+        ['pressed', 'Space'],
+        ['pressed', 'Tab'],
+      ],
+      `${id}: Space on the pressed row's input, then Tab to the next, unticked`
+    );
+    assert.equal(theme, id.endsWith('-specimen') ? undefined : id.split('-specimen-', 2)[1]);
+  }
 });
 
 test('the modal scrim specimen case measures the two panes the scrim fixture mounts', () => {
@@ -9733,7 +9830,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 21, 'the fixture lays twenty-one targets in its columns');
+  assert.equal(columns.flat().length, 22, 'the fixture lays twenty-two targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',
