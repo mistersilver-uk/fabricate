@@ -73,6 +73,7 @@ manager-published-companion-forms-specimen
 manager-published-companion-forms-accent-focus
 manager-published-companion-forms-urgent-focus
 manager-published-selection-checkbox-specimen
+manager-published-disclosure-specimen
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen

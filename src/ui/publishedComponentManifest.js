@@ -641,4 +641,20 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     standaloneRoot: true,
     restOn: 'control',
   }),
+  Object.freeze({
+    name: 'Disclosure',
+    path: 'src/ui/svelte/components/Disclosure.svelte',
+    version: 1,
+    props: Object.freeze({
+      open: Object.freeze({ kind: 'data' }),
+      onToggle: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      level: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      head: Object.freeze({ kind: 'slot', element: 'span' }),
+      body: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'any',
+    standaloneRoot: true,
+  }),
 ]);

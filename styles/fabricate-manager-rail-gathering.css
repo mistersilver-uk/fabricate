@@ -596,6 +596,130 @@
   color: var(--fab-text-secondary);
 }
 
+/* The disclosure card (issue 2862), rooted at the class `Disclosure.svelte` writes: the base card's box around one heading holding the head button, over a body the `hidden` attribute hides. The doubled root clears core's element rules for headings and buttons. */
+.fabricate-disclosure.fabricate-disclosure {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
+}
+
+.fabricate-disclosure.fabricate-disclosure > .fabricate-disclosure-heading {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-3);
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 38px;
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+
+  /* Core tweens every property of a button over 0.5s; the head draws its hover and ring in the frame they begin. */
+  transition: none;
+}
+
+.fabricate-disclosure.fabricate-disclosure.is-open .fabricate-disclosure-head {
+  border-radius: 9px 9px 0 0;
+}
+
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head:not([aria-disabled='true']):hover {
+  background: var(--fab-surface-raised);
+}
+
+/* The keyboard ring is drawn 2px inside the card's edge, so no clipping ancestor takes its arms. */
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The chevron is two borders of a turned square, not a glyph, so it needs no icon font and forced colours keep it: down while closed, up while open, turning at once, so nothing moves under either motion setting. */
+.fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-chevron {
+  flex: none;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  margin: 0 var(--fab-space-1);
+  border-style: solid;
+  border-width: 0 2px 2px 0;
+  border-color: var(--fab-text-muted);
+
+  /* Lifted or lowered by 2px, so the turned square's point sits on the head's centre line. */
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.fabricate-disclosure.fabricate-disclosure.is-open .fabricate-disclosure-chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.fabricate-disclosure.fabricate-disclosure > .fabricate-disclosure-body {
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-disclosure.fabricate-disclosure > .fabricate-disclosure-body[hidden] {
+  display: none;
+}
+
+/* Forced colours: the chevron is inked ButtonText, as the head's text is, and GrayText while disabled at full opacity, and the ring is Highlight, so the state reads by shape and the ring stays apart from the edge. */
+@media (forced-colors: active) {
+  .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-chevron {
+    forced-color-adjust: none;
+    border-color: buttontext;
+  }
+
+  .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true'] > .fabricate-disclosure-chevron {
+    border-color: graytext;
+  }
+
+  .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true'] {
+    color: graytext;
+    opacity: 1;
+  }
+
+  .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head:focus-visible {
+    outline-color: highlight;
+  }
+}
+
 .fabricate-manager .manager-fact-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

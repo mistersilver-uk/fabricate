@@ -173,6 +173,13 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
     heldBy: "tests/components/published-callout-mounted.test.js: Callout's host element",
   },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
+  // The heading around the head; a `level` outside 2 to 6 draws an `h3`.
+  'src/ui/svelte/components/Disclosure.svelte: svelte:element': {
+    tags: ['h2', 'h3', 'h4', 'h5', 'h6'],
+    keys: ['level'],
+    heldBy:
+      "tests/components/published-disclosure-mounted.test.js: the published Disclosure's heading element",
+  },
   // An `as` outside the three hosts draws a `div`, and no host is focusable; `SearchField` passes
   // the literal `as="label"`, and `field-source-contract` requires a literal `as` on every `<Field>`.
   'src/ui/svelte/components/Field.svelte: svelte:element': {

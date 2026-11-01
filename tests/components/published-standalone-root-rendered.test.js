@@ -65,6 +65,7 @@ const HOSTS = Object.freeze(['window', 'bare']);
 /** The widened entries another file measures, by name, which keeps this one inside its timeout. */
 const MEASURED_ELSEWHERE = Object.freeze({
   SelectionCheckbox: 'tests/components/published-standalone-root-rendered-checkbox.test.js',
+  Disclosure: 'tests/components/published-standalone-root-rendered-disclosure.test.js',
 });
 const WIDENED = PUBLISHED_COMPONENT_MANIFEST.filter(
   (entry) => entry.standaloneRoot === true && !Object.hasOwn(MEASURED_ELSEWHERE, entry.name)
@@ -343,9 +344,29 @@ describe('the standalone specimen table', () => {
   });
 
   it('leaves each entry it does not measure to a file that does', () => {
+    const SAME = 'computes the same styles, pseudo elements and border box in both hosts';
+    const titleOf = (node) =>
+      node.type === 'TemplateLiteral' ? node.quasis[0].value.cooked : String(node.value ?? '');
     for (const [name, file] of Object.entries(MEASURED_ELSEWHERE)) {
       assert.ok(entryNamed(name)?.standaloneRoot, `${name} is a widened entry`);
-      assert.match(readFileSync(resolve(repoRoot, file), 'utf8'), new RegExp(`'${name}'`, 'u'));
+      const nodes = [...walkNodes(SHIPPED.module(file).ast)];
+      assert.ok(
+        nodes.some((node) => node.type === 'Literal' && node.value === name),
+        `${file} names ${name}`
+      );
+      assert.ok(
+        nodes.some(
+          (node) => node.type === 'ImportSpecifier' && node.imported?.name === 'STANDALONE_COMPARED'
+        ),
+        `${file} compares the shared property list`
+      );
+      const titles = nodes
+        .filter((node) => node.type === 'CallExpression' && node.callee?.name === 'it')
+        .map((node) => titleOf(node.arguments[0]));
+      assert.ok(
+        titles.some((title) => title.startsWith(SAME)),
+        `${file} holds the per-state host comparison`
+      );
     }
   });
 

@@ -138,6 +138,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/ListRow.svelte: button': 'onOpen',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
+  // The head, which no guard hides (issue 2862).
+  'src/ui/svelte/components/Disclosure.svelte: button': 'always',
   // One tab button for each item of `tabs`.
   'src/ui/svelte/components/EditorTabs.svelte: button': 'tabs',
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
@@ -276,6 +278,14 @@ const OWN_NAMES = Object.freeze({
     keys: ['ariaLabel'],
     heldBy:
       'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
+  },
+  // The companion's own text in `head`, a slot the button's content renders (issue 2862).
+  'src/ui/svelte/components/Disclosure.svelte: button': {
+    entry: 'Disclosure',
+    vocabulary:
+      "The button's accessible name is the text the companion draws in `head`, in the order it is drawn, and Fabricate adds none.",
+    heldBy:
+      'tests/components/published-disclosure-rendered.test.js: the published Disclosure names',
   },
   // `name`, which the entry requires, drawn in a span of the button's own content.
   'src/ui/svelte/components/ListRow.svelte: button': {

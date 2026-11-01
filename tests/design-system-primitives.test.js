@@ -123,6 +123,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/DataTable.svelte',
   // Issue 2006: the die tiles, a primitive ARRIVING, on the simulator's two rolled count frames.
   'src/ui/svelte/components/DiceTiles.svelte',
+  // Issue 2862: the disclosure card, a primitive arriving, on its published specimen and the
+  // standalone frames.
+  'src/ui/svelte/components/Disclosure.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EmptyState.svelte',

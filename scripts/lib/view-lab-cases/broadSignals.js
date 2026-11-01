@@ -528,6 +528,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-normal',
     'manager-recipe-edit-results-failure-optin',
   ]),
+  // The disclosure card (issue 2862), which no in-app frame draws: the specimen that mounts it
+  // through the published seam, and the three that mount it with and without a Fabricate root
+  // above its target.
+  'src/ui/svelte/components/Disclosure.svelte': Object.freeze([
+    'manager-published-disclosure-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ]),
   // A third entry as of issue 1458, and it is a third mode rather than a third instance.
   'src/ui/svelte/components/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',

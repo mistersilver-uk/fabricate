@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Disclosure — the published card on the real runtime</title>
+    <!--
+      Served by `tests/components/published-disclosure-behaviour-rendered.test.js` from a Vite dev
+      server, so `mount.js` mounts the REAL `Disclosure` through the real published seam (issue
+      2862): what a key press calls and where focus goes when an update changes the card are what
+      its script does at runtime, which static markup cannot show.
+    -->
+    <link rel="stylesheet" href="/@disclosure-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="./mount.js"></script>
+  </body>
+</html>

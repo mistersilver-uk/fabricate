@@ -233,6 +233,28 @@ A tier's valence restates what its name already says and is never the only carri
 - **WHEN** `currentIndex` is `-1`, in either direction
 - **THEN** no tier reads reached and none is current
 
+### Requirement: A card whose whole head opens its body renders through Disclosure
+
+`Disclosure` (issue 2862) is the shared primitive for a card whose whole head is the one control that opens and closes its body, the library's `<Disclosure>`.
+Its head MUST be one `<button type="button">` carrying `aria-expanded` and an `aria-controls` that names the body, inside a heading of level 2 to 6, level 3 by default, so the head is named by its own content and reached by heading navigation.
+The head's content MUST hold nothing focusable, because a control inside a button cannot be reached or pressed on its own; the component refuses one by throwing to the nearest boundary, which for a published mount is a fault.
+The body MUST stay in the DOM while closed, under the `hidden` attribute, so what it holds keeps its state, and it leaves the tab order and the accessibility tree with it; it is no region landmark, because a page of many cards would otherwise carry a landmark for each.
+The open state is the caller's: a press reports the state asked for and draws nothing until the caller passes it.
+Its disabled head MUST be `aria-disabled="true"`, never natively disabled, so a head that holds focus keeps it and keeps its Tab stop, and a press there asks for nothing.
+Open and closed MUST differ by the chevron's direction and never by colour alone, the chevron turning at once, so nothing moves under either motion setting, and drawn in system colours under forced colours, and the head's keyboard ring is the window's 2px accent ring drawn inside the card's edge, apart from its 1px edge.
+Its box is the card's, radius 11 and a 1px `--fab-border` edge on `--fab-bg-2`, and its head is at least 38px tall.
+Its one importer is the published-component seam's runtime adapter, through which the premium companion's faction card draws it, so it is recorded as a non-member on the `TierTrack` precedent; the in-app whole-header rows that "An ordered row opens in place to its editing body" names still draw their own header, and moving one onto it is a later change.
+
+#### Scenario: A closed card keeps what its body holds
+
+- **WHEN** a companion types into a field in an open `Disclosure`'s body and then passes `open: false` and `open: true` again
+- **THEN** the body is hidden and shown again around the same field, which still holds the typed value
+
+#### Scenario: A focusable element in the head is refused
+
+- **WHEN** a companion draws a `<button>` inside a published `Disclosure`'s `head` slot
+- **THEN** the mount faults, its `onFault` is told with a `TypeError` naming the `button`, and `target` is left empty
+
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
 WorldClockChip MUST compose Chip's opt-in `presentation="clock"` around one baseline-aligned line of icon, label and value, centred inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
@@ -257,7 +279,7 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
 `NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
-`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 49 naming headings declare 79 distinct names.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 50 naming headings declare 80 distinct names.
 Issue 2548 added `<ListState>`, born shipped, to the `<ListRow>` heading.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
@@ -597,6 +619,7 @@ The register records the DECISION; the gate proves the ROOTING.
 Conflating the two would make an unmeasured row look like a passing proof, which is worse than either artefact alone.
 The two do meet at one place, and that place is asserted: a row whose family THIS PROGRAMME re-rooted carries `shared` and has an entry in that gate, so neither half can land without the other.
 Issue 2424 adds `TierTrack`, rooted at `fab-tier-track`; it portals nothing, and its row badges keep `Chip`'s own family.
+Issue 2862 adds `Disclosure`, rooted at `fabricate-disclosure` in the module sheet; it portals nothing, and its heading, head, content, chevron and body classes sit beneath that root.
 
 One measured instance was declined rather than shipped: relocating `Chip`'s `list` and `inspector` densities to caller context, because it would size a shared primitive's own geometry from an area scope; the densities stay in the primitive's own scoped block.
 

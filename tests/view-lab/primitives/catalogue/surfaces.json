@@ -250,5 +250,36 @@
       "label": "Show the ingredients for Steel Ingot",
       "side": "leading"
     }
+  },
+  {
+    "spec": "<Disclosure>",
+    "cap": "disclosure card — closed, the head one button",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/Disclosure.svelte",
+    "fixture": "DisclosureCard",
+    "note": "The shipped card in place of its drawing, closed, its head the companion's name and reading.",
+    "props": {},
+    "data": {
+      "headName": "Ironwrights’ Guild",
+      "bodyText": "Holds the forges on the east quay."
+    },
+    "undrawn": {
+      "Holds the forges on the east quay.": "the closed card's body, kept hidden in the page, which the drawing does not show"
+    }
+  },
+  {
+    "spec": "<Disclosure>",
+    "cap": "disclosure card — open, its body under a rule",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/Disclosure.svelte",
+    "fixture": "DisclosureCard",
+    "note": "The same card open, its body shown under the rule.",
+    "props": {
+      "open": true
+    },
+    "data": {
+      "headName": "Saltmarsh Wardens",
+      "bodyText": "Keep the causeway open at low tide."
+    }
   }
 ]

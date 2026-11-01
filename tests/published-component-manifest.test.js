@@ -628,6 +628,11 @@ const LIST_ROW_FACE_REASON = Object.freeze({
   reason:
     "the rule draws the published ListRow's own selected or hover face, which `selected` and `busy` drive as its group states",
 });
+/** Why a rule on a `Disclosure` head reads the `aria-disabled` its `disabled` key writes (issue 2862). */
+const DISCLOSURE_HEAD_REASON = Object.freeze({
+  reason:
+    "the rule draws the published Disclosure's own disabled face, which `disabled` writes as its group states, and the entry takes no aria key",
+});
 const SELECT_OPTION_REASON = Object.freeze({
   reason:
     "the published Select's options are { value, label } by contract, so no in-contract row takes aria-disabled",
@@ -700,6 +705,22 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   [
     "styles/fabricate-manager-recipe-editor.css: .fabricate-select .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible",
     SELECT_TRIGGER_REASON,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head:not([aria-disabled='true']):hover",
+    DISCLOSURE_HEAD_REASON,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true']",
+    DISCLOSURE_HEAD_REASON,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true'] > .fabricate-disclosure-chevron",
+    DISCLOSURE_HEAD_REASON,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-disclosure.fabricate-disclosure .fabricate-disclosure-head[aria-disabled='true']",
+    DISCLOSURE_HEAD_REASON,
   ],
   [
     "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover",
@@ -1398,7 +1419,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty-two focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges thirty-three focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1413,6 +1434,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/ActionMenu.svelte: div',
       'src/ui/svelte/components/Button.svelte: svelte:element',
       'src/ui/svelte/components/Chip.svelte: button',
+      'src/ui/svelte/components/Disclosure.svelte: button',
       'src/ui/svelte/components/EditorTabs.svelte: button',
       'src/ui/svelte/components/IconButton.svelte: button',
       'src/ui/svelte/components/IconPicker.svelte: button',
@@ -1493,6 +1515,7 @@ describe('each entry matches its component declaration', () => {
         'ListRow.onOpen: 0',
         'ToggleCard.onToggle: 0',
         'SelectionCheckbox.onChange: 1',
+        'Disclosure.onToggle: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3397,6 +3420,7 @@ describe('the module sheet and every component style against the published Inspe
         'ListRow',
         'ToggleCard',
         'SelectionCheckbox',
+        'Disclosure',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );
@@ -3677,7 +3701,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 31 readings of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 35 readings of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(

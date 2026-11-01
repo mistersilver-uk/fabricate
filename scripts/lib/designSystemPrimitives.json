@@ -985,6 +985,15 @@
       "why": "Issue 2424 builds the specified tier track: an ordered list named by its required `ariaLabel`, drawn as a `row` of badges through `Chip` or as a `column` ladder, with the current tier marked by `aria-current` and every other tier by hidden reached or ahead text. ONE caller, `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter, which binds the manifest `path` (the manifest itself imports nothing); the premium companion's player faction ladder draws it through `game.fabricate.api.ui`, so it is below the two-importer membership bar on the `LogList`, `StageNav` and `XrefList` precedent. Its library specimen reads `shipped`, and its broad-signal override names its specimen mounted through the seam."
     },
     {
+      "path": "src/ui/svelte/components/Disclosure.svelte",
+      "library": "<Disclosure>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/publishedComponents.svelte.js"
+      ],
+      "why": "Issue 2862 builds the library's `<Disclosure>`, the card that opens in place: one heading holding one `aria-expanded` button, its head, over a body kept in the page while closed, rooted at `fabricate-disclosure` in the module sheet. ONE caller, `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter; the premium companion's faction card draws it through `game.fabricate.api.ui`, its head holding a chip, a bar, text and a run of holdings that `Button`'s text-only label cannot carry, so it is below the two-importer membership bar on the `TierTrack` precedent. It is not `<RowDisclosure>`, the chevron beside a row's content, nor `CollapsibleGroupHeader`, which draws a folder and a count of its own: it is the whole-header shape the ordered-row requirement names, which `RuleRow`, `GatheringRealmsTab`, `CharacterPrerequisitesCard` and `InventoryBookDetail` still hand-roll, and moving them onto it is a follow-up that would make it a member. Its library specimen reads `shipped`, and its broad-signal override names its specimen mounted through the seam."
+    },
+    {
       "path": "src/ui/svelte/components/PickerRowNameField.svelte",
       "library": null,
       "evidence": "broad",
