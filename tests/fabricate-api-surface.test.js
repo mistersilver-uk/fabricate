@@ -193,8 +193,8 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775 and 2836 headings, by name and in the order
- * the spec states them.
+ * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775, 2836 and 2862 headings, by name and in the
+ * order the spec states them.
  */
 function specifiedComponentGroups() {
   const groups = [
@@ -213,6 +213,7 @@ function specifiedComponentGroups() {
     '2784',
     '2775',
     '2836',
+    '2862',
   ].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
@@ -313,6 +314,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'ListRow',
       'ToggleCard',
       'SelectionCheckbox',
+      'Disclosure',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -837,6 +839,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: optional,
           onChange: { kind: 'callback', required: true },
           'aria-describedby': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'any',
+        overlays: false,
+      },
+      Disclosure: {
+        version: 1,
+        props: {
+          open: optional,
+          onToggle: { kind: 'callback', required: true },
+          level: optional,
+          disabled: optional,
+          head: slot,
+          body: slot,
         },
         rest: true,
         root: 'any',

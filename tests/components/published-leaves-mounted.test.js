@@ -475,6 +475,15 @@ const LEAVES = Object.freeze([
     read: (root) => String(root.querySelector('input').checked),
     drawn: ['false', 'true'],
   },
+  {
+    name: 'Disclosure',
+    under: 'fabricate',
+    root: '.fabricate-disclosure',
+    props: { open: false, onToggle() {} },
+    next: { open: true, onToggle() {} },
+    read: (root) => root.querySelector('button').getAttribute('aria-expanded'),
+    drawn: ['false', 'true'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;

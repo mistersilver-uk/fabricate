@@ -738,6 +738,24 @@ const CHECKBOX_KEYS = Object.freeze([
 /** Sized to the fixture's two columns and the first one's seventeen rows. */
 const CHECKBOXES_WINDOW = Object.freeze({ width: 740, height: 640 });
 
+/** The disclosure fixture's ground, a row by its key, and the card, head, chevron and body it draws. */
+const DISCLOSURES = '[data-lab-disclosures]';
+const DISCLOSURE_ROW = (key) => `${DISCLOSURES} > [data-lab-disclosure="${key}"]`;
+const DISCLOSURE_PART = (key, part) => `${DISCLOSURE_ROW(key)} .fabricate-disclosure-${part}`;
+const DISCLOSURE_KEYS = Object.freeze([
+  'closed',
+  'open',
+  'pressed',
+  'focused',
+  'disabled',
+  'disabled-open',
+  'faction',
+  'baseline',
+]);
+
+/** Sized to the fixture's 420px ground and its eight rows. */
+const DISCLOSURES_WINDOW = Object.freeze({ width: 540, height: 720 });
+
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
 const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
@@ -803,9 +821,9 @@ const FABRICATE_WINDOW = '.fabricate.fabricate-app';
  * What each target draws, column by column: the controls and the toggle cards' switches, the
  * companion's line in the card's well, its input in the field's slot and the search input; then the
  * stepper's input, the chosen segment, the chosen card, the selected tab, the pager's page-size
- * control, a card's switch and a ticked checkbox's box; then the select's, the icon picker's and the action menu's
- * triggers, the opener, the closed dialog's `null`, which draws nothing in its target, and two
- * more cards' switches.
+ * control, a card's switch, a ticked checkbox's box and an open disclosure's head; then the
+ * select's, the icon picker's and the action menu's triggers, the opener, the closed dialog's
+ * `null`, which draws nothing in its target, and two more cards' switches.
  */
 const STANDALONE_DRAWN = Object.freeze([
   Object.freeze({
@@ -826,6 +844,7 @@ const STANDALONE_DRAWN = Object.freeze([
     pager: '.fabricate-pagination [data-pagination-size]',
     'toggle-card-off': '.fabricate-toggle-card .manager-status-toggle-track',
     checkbox: '.fab-selection-checkbox .fab-selection-check.is-checked',
+    disclosure: '.fabricate-disclosure.is-open .fabricate-disclosure-head',
   }),
   Object.freeze({
     select: '.fabricate-select .fabricate-select-trigger',
@@ -2531,6 +2550,71 @@ export const CASES = Object.freeze([
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
+    id: 'manager-published-disclosure-specimen',
+    label:
+      "Specimen, mounted through the published seam — eight cards in a 420px column on the window's --fab-bg-1 ground, 8px apart, each a published Disclosure whose head and body the companion fills, after two steps: a click on the closed Lantern Society card, whose callback passed open true in its own update, so its body shows Trades in oil, wick and rumour under a 1px rule and its chevron points up, the pointer still resting on its head's raised fill; and Tab from that head, which put keyboard focus on the closed Copper Circle head, so it carries the accent keyboard ring, 2px wide and drawn 2px inside the card's edge. Reading top to bottom: Ironwrights' Guild closed, a bordered card on --fab-bg-2 with an 11px corner and its chevron pointing down; Saltmarsh Wardens open, its body Keep the causeway open at low tide; the pressed Lantern Society; the focused Copper Circle; Ashen Choir disabled and closed, and Tidewright Compact disabled and open, each at 62% opacity with its chevron still pointing its way; a faction card open at heading level 4, whose head holds a published positive Chip Honoured, the name and figure Ironwrights' Guild +42, a published centred FillBar at +42 and a run of three holdings in the muted ink, over a body holding Standing note and a published Field whose text input reads Owes us two favours; and as a baseline Fabricate's own InspectorCard mounted directly, titled Card baseline. The frame cannot show the headings, the expanded states or the names the accessibility tree reports, nor the chevron's turn or its stilling under reduced motion, which the rendered suite reads",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-disclosure' },
+    steps: [
+      { selector: DISCLOSURE_PART('pressed', 'head') },
+      { selector: DISCLOSURE_PART('pressed', 'head'), press: 'Tab' },
+    ],
+    // The pressed card opened by the companion's own update, under the fixture's echo of the state,
+    // which only `onToggle` writes, and the next card's head holding keyboard focus.
+    expectSelector: `${DISCLOSURES}:has(> [data-lab-disclosure="pressed"][data-lab-disclosure-open="true"] .fabricate-disclosure.is-open) > [data-lab-disclosure="focused"] .fabricate-disclosure-head:focus-visible`,
+    expectContained: [
+      ...DISCLOSURE_KEYS.map((key) => ({ container: DISCLOSURES, target: DISCLOSURE_ROW(key) })),
+      { container: '.window-content', target: DISCLOSURES },
+    ],
+    expectLayout: {
+      controls: [
+        // The card's box beside its baseline, the head's floor, the hovered fill, the keyboard
+        // ring, the dimmed disabled head, the chevron's ink, the open body's rule and the closed
+        // body hidden.
+        {
+          selector: `${DISCLOSURE_ROW('closed')} .fabricate-disclosure`,
+          styles:
+            'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+        },
+        {
+          selector: `${DISCLOSURE_ROW('baseline')} .fabricate-card`,
+          styles:
+            'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+        },
+        { selector: DISCLOSURE_PART('closed', 'head'), styles: 'min-height: 38px' },
+        {
+          selector: DISCLOSURE_PART('pressed', 'head'),
+          styles: 'background-color: var(--fab-surface-raised)',
+        },
+        {
+          selector: DISCLOSURE_PART('focused', 'head'),
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: -2px; outline-color: var(--fab-accent)',
+        },
+        { selector: DISCLOSURE_PART('disabled', 'head'), styles: 'opacity: 0.62' },
+        {
+          selector: DISCLOSURE_PART('closed', 'chevron'),
+          styles:
+            'border-right-style: solid; border-right-width: 2px; border-right-color: var(--fab-text-muted)',
+        },
+        {
+          selector: DISCLOSURE_PART('open', 'body'),
+          styles:
+            'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border)',
+        },
+        { selector: DISCLOSURE_PART('closed', 'body'), styles: 'display: none' },
+      ],
+    },
+    position: DISCLOSURES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // The card's edge, chevron and ring against its own fill are judged on two more palettes.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `Disclosure.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
     id: 'manager-published-pagination-specimen',
     label:
       "Specimen, mounted through the published seam — a reagent pager on a 600px column of the --fab-bg-2 ground, 60 records at 25 a page on page 2 of 3, its sizes 10, 25 and 50 with 25 selected, at the default density on its own --fab-bg-1 bar, after one step: Enter pressed on the Next arrow, so Fabricate called onPageChange, whose update drew the last page. So the summary reads 51–60 of 60 reagents and the page label Page 3 of 3, Next is disabled, and focus rests on the Previous arrow, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and arrow, and which has opened Foundry's tooltip for its name, Previous reagents page, on the keyboard focus Fabricate moved to it (the lab records the tooltip as aria-describedby and draws none)",
@@ -2839,21 +2923,21 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone',
     label:
-      'Specimen, mounted through the published seam — the eighteen entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it, in three 360px columns on a --fab-bg-1 ground the companion paints, because the style root paints none: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, a StatusToggle off that announces as a switch, a ToggleCard titled Spend when this stage begins with its second line and a hammer glyph, its switch on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column, a ToggleCard with its switch off, and a SelectionCheckbox labelled Award the recipe’s ingredients first, ticked; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target, then a ToggleCard with no glyph and a ToggleCard whose long title wraps, with one unspaced run of it breaking at the card’s edge. The seam wrote one style root in each of the twenty-one targets, the closed dialog’s empty, and none for the well in the card or the field’s content; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the rendered suite’s',
+      'Specimen, mounted through the published seam — the nineteen entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it, in three 360px columns on a --fab-bg-1 ground the companion paints, because the style root paints none: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, a StatusToggle off that announces as a switch, a ToggleCard titled Spend when this stage begins with its second line and a hammer glyph, its switch on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column, a ToggleCard with its switch off, a SelectionCheckbox labelled Award the recipe’s ingredients first, ticked, and a Disclosure titled Ironwrights’ Guild, open on its line Holds the forges on the east quay; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target, then a ToggleCard with no glyph and a ToggleCard whose long title wraps, with one unspaced run of it breaking at the card’s edge. The seam wrote one style root in each of the twenty-three targets, the closed dialog’s empty, and none for the well in the card or the field’s content; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the rendered suite’s',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with no Fabricate root.
     query: { specimen: 'published-standalone' },
   }),
   standaloneCase({
     id: 'published-standalone-light',
     label:
-      'Specimen, mounted through the published seam — the same eighteen entries and three columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot read in that ink on the dark ground, and the card descriptions and the pager’s summary on their own fills',
+      'Specimen, mounted through the published seam — the same nineteen entries and three columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot read in that ink on the dark ground, and the card descriptions and the pager’s summary on their own fills',
     // Beyond the smoke: Foundry’s light theme is a condition the smoke never walks.
     query: { specimen: 'published-standalone', colorScheme: 'light' },
   }),
   standaloneCase({
     id: 'published-standalone-select-open',
     label:
-      'Specimen, mounted through the published seam — the same eighteen entries in the classless companion frame, after one step: a press on the Method select at the top of the third column, whose target has no Fabricate root, so its trigger is drawn under the style root and its list opened on the standalone layer over the window. The list reads Forge, ticked and filled as the chosen row, then Brew and By hand, below the trigger; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
+      'Specimen, mounted through the published seam — the same nineteen entries in the classless companion frame, after one step: a press on the Method select at the top of the third column, whose target has no Fabricate root, so its trigger is drawn under the style root and its list opened on the standalone layer over the window. The list reads Forge, ticked and filled as the chosen row, then Brew and By hand, below the trigger; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
     // Beyond the smoke: a companion opens a select it mounted through `api.ui`.
     query: { specimen: 'published-standalone' },
     steps: [{ selector: `${STANDALONE_TARGET('select')} .fabricate-select-trigger` }],
@@ -2864,7 +2948,7 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone-icon-picker-open',
     label:
-      'Specimen, mounted through the published seam — the same eighteen entries in the classless companion frame, after one step: Enter pressed on the Tonic icon picker in the third column, whose target has no Fabricate root, so its list opened on the standalone layer over the window with focus in its query field, which shows the accent border and the placeholder hidden while it holds focus. The flask row is pinned first and selected, above the vocabulary’s first glyphs; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
+      'Specimen, mounted through the published seam — the same nineteen entries in the classless companion frame, after one step: Enter pressed on the Tonic icon picker in the third column, whose target has no Fabricate root, so its list opened on the standalone layer over the window with focus in its query field, which shows the accent border and the placeholder hidden while it holds focus. The flask row is pinned first and selected, above the vocabulary’s first glyphs; the frame is the evidence that the layer draws it, and the measured equality with the player window’s list is the rendered suite’s',
     // Beyond the smoke: a companion opens an icon picker it mounted through `api.ui`.
     query: { specimen: 'published-standalone' },
     steps: [
@@ -2880,7 +2964,7 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone-action-menu-open',
     label:
-      'Specimen, mounted through the published seam — the same eighteen entries in the classless companion frame, after one step: Enter pressed on the Tonic actions trigger in the third column, whose target has no Fabricate root, so its menu opened on the standalone layer over the window, lined up with the trigger’s start edge, with focus on Duplicate tonic, which takes the raised fill and the 1px accent ring inside its edge. Archive tonic is dimmed and Delete tonic is in the danger ink; the frame is the evidence that the layer draws the menu where it was measured, and the measured equality with the player window’s menu is the rendered suite’s',
+      'Specimen, mounted through the published seam — the same nineteen entries in the classless companion frame, after one step: Enter pressed on the Tonic actions trigger in the third column, whose target has no Fabricate root, so its menu opened on the standalone layer over the window, lined up with the trigger’s start edge, with focus on Duplicate tonic, which takes the raised fill and the 1px accent ring inside its edge. Archive tonic is dimmed and Delete tonic is in the danger ink; the frame is the evidence that the layer draws the menu where it was measured, and the measured equality with the player window’s menu is the rendered suite’s',
     // Beyond the smoke: a companion opens an action menu it mounted through `api.ui`.
     query: { specimen: 'published-standalone' },
     steps: [{ selector: `${STANDALONE_TARGET('menu')} .fabricate-icon-button`, press: 'Enter' }],
@@ -2891,7 +2975,7 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone-modal-open',
     label:
-      'Specimen, mounted through the published seam — the same eighteen entries in the classless companion frame, after one step: a press on the companion’s Rename the tonic opener, a published Button whose callback passed open true to the Modal mounted closed below it, whose target has no Fabricate root, so its dialog opened on the standalone layer, centred in the viewport above the window. The dialog’s header band reads Rename the tonic over Shown to every player beside its close glyph, and its body the companion’s line Choose the name the whole table will read; the frame is the evidence that the layer draws it, and the measured equality with the player window’s dialog is the rendered suite’s',
+      'Specimen, mounted through the published seam — the same nineteen entries in the classless companion frame, after one step: a press on the companion’s Rename the tonic opener, a published Button whose callback passed open true to the Modal mounted closed below it, whose target has no Fabricate root, so its dialog opened on the standalone layer, centred in the viewport above the window. The dialog’s header band reads Rename the tonic over Shown to every player beside its close glyph, and its body the companion’s line Choose the name the whole table will read; the frame is the evidence that the layer draws it, and the measured equality with the player window’s dialog is the rendered suite’s',
     // Beyond the smoke: a companion opens a dialog it mounted through `api.ui`.
     query: { specimen: 'published-standalone' },
     steps: [{ selector: `${STANDALONE_TARGET('opener')} .fabricate-button` }],
@@ -2902,7 +2986,7 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'published-standalone-in-window',
     label:
-      'Specimen, mounted through the published seam — the eighteen entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it, in three 360px columns on a --fab-bg-1 ground: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, a StatusToggle off that announces as a switch, a ToggleCard titled Spend when this stage begins with its second line and a hammer glyph, its switch on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column, a ToggleCard with its switch off, and a SelectionCheckbox labelled Award the recipe’s ingredients first, ticked; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target, then a ToggleCard with no glyph and a ToggleCard whose long title wraps, with one unspaced run of it breaking at the card’s edge. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
+      'Specimen, mounted through the published seam — the nineteen entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it, in three 360px columns on a --fab-bg-1 ground: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, a StatusToggle off that announces as a switch, a ToggleCard titled Spend when this stage begins with its second line and a hammer glyph, its switch on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column, a ToggleCard with its switch off, a SelectionCheckbox labelled Award the recipe’s ingredients first, ticked, and a Disclosure titled Ironwrights’ Guild, open on its line Holds the forges on the east quay; in the third, the Method Select showing Forge, the Tonic icon IconPicker showing the flask, the Tonic actions ActionMenu trigger, the companion’s Rename the tonic opener, a published Button, and the Rename the tonic Modal, drawn closed, which draws nothing in its target, then a ToggleCard with no glyph and a ToggleCard whose long title wraps, with one unspaced run of it breaking at the card’s edge. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with a Fabricate root.
     reaches: 'beyond',
     smokeLabels: [],

@@ -48,6 +48,9 @@ manager-published-selection-checkbox-specimen
 manager-published-selection-checkbox-specimen-foundry-native
 manager-published-selection-checkbox-specimen-hearth-herb
 manager-published-selection-checkbox-specimen-ironblood-forge
+manager-published-disclosure-specimen
+manager-published-disclosure-specimen-foundry-native
+manager-published-disclosure-specimen-hearth-herb
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen

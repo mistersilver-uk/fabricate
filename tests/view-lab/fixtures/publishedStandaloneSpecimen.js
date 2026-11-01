@@ -1,7 +1,7 @@
 /**
  * The standalone specimen's wiring (issues 2456, 2679, 2680), which `PublishedStandalone.svelte`
  * lays out and mounts, and `tests/components/published-standalone-root-mounted.test.js` runs the
- * View Lab cases against: the eighteen entries that state `standaloneRoot`, each mounted into a
+ * View Lab cases against: the nineteen entries that state `standaloneRoot`, each mounted into a
  * target by key (the switch and the card in more than one state), the `Well` in the
  * `InspectorCard`'s slot, the `Field`'s slot holding a caption, input and hint, and a closed
  * `Modal` that a published `Button`, the opener, opens through `update`. Every word is a
@@ -12,7 +12,7 @@
 // prettier-ignore
 export const COLUMNS = Object.freeze([
   Object.freeze(['button', 'icon-button', 'toggle', 'toggle-switch', 'toggle-card', 'card', 'field', 'search']),
-  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off', 'checkbox']),
+  Object.freeze(['stepper', 'segmented', 'cards', 'tabs', 'pager', 'toggle-card-off', 'checkbox', 'disclosure']),
   Object.freeze(['select', 'icon-picker', 'menu', 'opener', 'modal', 'toggle-card-bare', 'toggle-card-long']),
 ]);
 
@@ -80,10 +80,19 @@ export function mountStandaloneSpecimen({ mount, targets }) {
     onClose: () => dialog.update(dialogProps(false)),
   });
   const dialog = mount('Modal', { target: targets.modal, props: dialogProps(false) });
+  const disclosure = mount('Disclosure', {
+    target: targets.disclosure,
+    props: { open: true, head: true, body: true, onToggle: noop },
+  });
+  disclosure.slot('head').append('Ironwrights’ Guild');
+  const note = drawn(disclosure.slot('body'), 'p', 'Holds the forges on the east quay.');
+  note.style.margin = '0';
+  disclosure.slot('body').append(note);
   dialog
     .slot('body')
     .append(drawn(dialog.slot('body'), 'p', 'Choose the name the whole table will read.'));
   const handles = [
+    disclosure,
     dialog,
     mount('Button', {
       target: targets.opener,

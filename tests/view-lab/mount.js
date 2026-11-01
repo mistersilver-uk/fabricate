@@ -825,6 +825,9 @@ const LAB_SPECIMENS = Object.freeze({
   'published-chip-forms': () => import('./fixtures/PublishedChipForms.svelte'),
   // Issue 2836: the selection checkbox's states, densities, a wrapping label and a keyboard press.
   'published-selection-checkbox': () => import('./fixtures/PublishedSelectionCheckbox.svelte'),
+  // Issue 2862: disclosure cards at rest, open, pressed open, focused and disabled, and a faction
+  // card whose head holds a published chip and bar.
+  'published-disclosure': () => import('./fixtures/PublishedDisclosure.svelte'),
   // Issue 2841: a progress tile whose stat box holds a thin fill bar in its content slot.
   'published-companion-forms': () => import('./fixtures/PublishedCompanionForms.svelte'),
   // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.
@@ -837,8 +840,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-modal': () => import('./fixtures/PublishedModal.svelte'),
   // Issue 2859: two open dialogs over busy panes, without a scrim and with the dim one.
   'published-modal-scrim': () => import('./fixtures/PublishedModalScrim.svelte'),
-  // Issues 2456, 2679 and 2680: the sixteen entries that state a standalone style root, in
-  // targets with no Fabricate root and under one.
+  // Issues 2456, 2679, 2680, 2775, 2836 and 2862: the nineteen entries that state a standalone
+  // style root, in targets with no Fabricate root and under one.
   'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),
 });
 // view-lab-region:end

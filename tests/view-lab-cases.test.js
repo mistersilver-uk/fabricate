@@ -435,6 +435,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
   'tests/view-lab/fixtures/PublishedSegmentedForms.svelte',
   'tests/view-lab/fixtures/PublishedChipForms.svelte',
+  'tests/view-lab/fixtures/PublishedDisclosure.svelte',
   'tests/view-lab/fixtures/PublishedPagination.svelte',
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
@@ -1022,6 +1023,43 @@ const MODAL_SCRIM_CONTROLS = [
 ];
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
+/** The disclosure fixture's row by its key, and a part of the card it draws there. */
+const labDisclosure = (key, part = '') =>
+  `[data-lab-disclosures] > [data-lab-disclosure="${key}"] .fabricate-disclosure${part && `-${part}`}`;
+/** The published disclosure's specimen (issue 2862), alike on each of its palettes. */
+const DISCLOSURE_CONTROLS = Object.freeze([
+  {
+    selector: labDisclosure('closed'),
+    styles:
+      'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+  },
+  {
+    selector: '[data-lab-disclosures] > [data-lab-disclosure="baseline"] .fabricate-card',
+    styles:
+      'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-top-left-radius: 11px; background-color: var(--fab-bg-2)',
+  },
+  { selector: labDisclosure('closed', 'head'), styles: 'min-height: 38px' },
+  {
+    selector: labDisclosure('pressed', 'head'),
+    styles: 'background-color: var(--fab-surface-raised)',
+  },
+  {
+    selector: labDisclosure('focused', 'head'),
+    styles:
+      'outline-style: solid; outline-width: 2px; outline-offset: -2px; outline-color: var(--fab-accent)',
+  },
+  { selector: labDisclosure('disabled', 'head'), styles: 'opacity: 0.62' },
+  {
+    selector: labDisclosure('closed', 'chevron'),
+    styles:
+      'border-right-style: solid; border-right-width: 2px; border-right-color: var(--fab-text-muted)',
+  },
+  {
+    selector: labDisclosure('open', 'body'),
+    styles: 'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border)',
+  },
+  { selector: labDisclosure('closed', 'body'), styles: 'display: none' },
+]);
 /** The segmented forms fixture's track in a row, by the row's key. */
 const labSegmentedForm = (key) =>
   `[data-lab-segmented-forms] > [data-lab-segmented-form="${key}"] .manager-segmented`;
@@ -1989,6 +2027,14 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'height: 4px; background-color: var(--fab-danger-text)',
     },
   ],
+  // The published disclosure (issue 2862): the card's box beside its baseline, the head's floor,
+  // hover fill and ring, the dimmed disabled head, the chevron and both bodies, on each palette.
+  ...Object.fromEntries(
+    ['', '-foundry-native', '-hearth-herb'].map((variant) => [
+      `manager-published-disclosure-specimen${variant}`,
+      [...DISCLOSURE_CONTROLS],
+    ])
+  ),
   // The published chip's forms (issue 2858): each square's side, and the dashed edge beside its
   // undashed twin.
   'manager-published-chip-forms-specimen': [
@@ -5165,16 +5211,22 @@ test('surface coverage holds exactly one publishable case per surface, and misse
   }
 });
 
-test('the surface key falls back to the case id when a case declares neither route nor tab', () => {
-  // Unreachable from the registry today — every manager case declares `expectView` and every player
-  // case a `query.tab`, both separately gated above — so the fallback is asserted against synthetic
-  // cases rather than left to a future one to discover.
+test('the surface key falls back to the base case, then the case id, when a case declares neither route nor tab', () => {
+  // A specimen declares no `expectView` or `query.tab`, so its palette variants key on their
+  // `baseCaseId` and share its surface; a case with neither keys on its own id, asserted against
+  // synthetic cases rather than left to a future one to discover.
   const app = VIEW_LAB_CASES[0].app;
   const first = labSurfaceKey({ app, id: 'lab-surface-probe-one' });
   const second = labSurfaceKey({ app, id: 'lab-surface-probe-two' });
+  const variant = labSurfaceKey({
+    app,
+    id: 'lab-surface-probe-one-x',
+    baseCaseId: 'lab-surface-probe-one',
+  });
 
   assert.notEqual(first, second, 'two unclassifiable cases must not share one surface');
   assert.match(first, /lab-surface-probe-one/, 'the fallback keys on the case id');
+  assert.equal(variant, first, 'a palette variant keys on its base case');
   // And it does not silently key on `undefined`, which is the shape the collapse would take.
   assert.doesNotMatch(first, /undefined/);
 });
@@ -6948,9 +7000,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Modal',
   'ToggleCard',
   'SelectionCheckbox',
+  'Disclosure',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard and SelectionCheckbox and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox and Disclosure and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -8079,6 +8132,71 @@ test('the chip forms specimen case measures the rows the chip forms fixture moun
     .filter((node) => node.type === 'Property' && node.key?.name === 'emphasis')
     .map((node) => node.value.value);
   assert.deepEqual(emphases, ['dashed', 'dashed'], 'two dashed rows beside the undashed twin');
+});
+
+test('the disclosure specimen case measures and presses rows the fixture mounts through the seam, on each palette', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedDisclosure.svelte'
+  );
+  for (const hook of ['data-lab-disclosures', 'data-lab-disclosure', 'data-lab-disclosure-open']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  for (const name of ['Disclosure', 'Chip', 'FillBar', 'Field']) {
+    assert.ok(
+      holds(
+        instance,
+        (node) =>
+          node.type === 'CallExpression' &&
+          node.callee?.name === 'mount' &&
+          node.arguments[0]?.value === name
+      ),
+      `the fixture mounts ${name} through the seam`
+    );
+  }
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.arguments.length === 1
+    ),
+    'the pressed card draws its new state through the companion’s own update'
+  );
+  const keys = [
+    ...[...walkNodes(instance.content)]
+      .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+      .map((node) => node.elements[0].value)
+      .filter((value) => typeof value === 'string' && /^[a-z-]+$/u.test(value)),
+    'baseline',
+  ];
+  const rowOf = (selector) => /data-lab-disclosure="([\w-]+)"/u.exec(selector)?.[1];
+  for (const id of [
+    'manager-published-disclosure-specimen',
+    'manager-published-disclosure-specimen-foundry-native',
+    'manager-published-disclosure-specimen-hearth-herb',
+  ]) {
+    const { steps, expectLayout, theme } = getCaseById(id);
+    assert.deepEqual(
+      expectLayout.controls
+        .map(({ selector }) => rowOf(selector))
+        .filter((key) => !keys.includes(key)),
+      [],
+      `${id}: each measured row is one the fixture mounts`
+    );
+    assert.deepEqual(
+      steps.map((step) => [rowOf(step.selector), step.press]),
+      [
+        ['pressed', undefined],
+        ['pressed', 'Tab'],
+      ],
+      `${id}: a click on the pressed card's head, then Tab to the next, closed`
+    );
+    assert.equal(theme, id.endsWith('-specimen') ? undefined : id.split('-specimen-', 2)[1]);
+  }
 });
 
 test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {
@@ -9830,7 +9948,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 22, 'the fixture lays twenty-two targets in its columns');
+  assert.equal(columns.flat().length, 23, 'the fixture lays twenty-three targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',

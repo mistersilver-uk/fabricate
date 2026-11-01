@@ -53,6 +53,9 @@ const VARIANTS = Object.freeze({
   'manager-published-modal-scrim-specimen-foundry-native': 'manager-published-modal-scrim-specimen',
   'manager-published-modal-scrim-specimen-hearth-herb': 'manager-published-modal-scrim-specimen',
   'manager-published-modal-scrim-specimen-mythwright': 'manager-published-modal-scrim-specimen',
+  // Issue 2862: the published disclosure's edge, chevron and ring on two more palettes.
+  'manager-published-disclosure-specimen-foundry-native': 'manager-published-disclosure-specimen',
+  'manager-published-disclosure-specimen-hearth-herb': 'manager-published-disclosure-specimen',
   // Issue 2836: the published checkbox's edges and fills on three more palettes.
   'manager-published-selection-checkbox-specimen-foundry-native':
     'manager-published-selection-checkbox-specimen',
