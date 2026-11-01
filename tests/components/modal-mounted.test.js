@@ -26,6 +26,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/modalFocus.js',
+    'src/ui/svelte/actions/scrim.js',
     OVERLAY_HOST_PATH,
   ],
   compiledModules: [

@@ -30,6 +30,8 @@ const dialog = createComponentScopeHarness({
   rawExtras: [
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/modalFocus.js',
+    'src/ui/svelte/actions/scrim.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
   compiledExtras: ['src/ui/svelte/components/Modal.svelte'],

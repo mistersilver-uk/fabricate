@@ -744,6 +744,15 @@ const MODAL_DONE = `${MODAL_GROUND} [data-lab-modal-footer] button`;
 /** Wider and taller than the 560px dialog, which is sized from the viewport and clipped past it. */
 const MODAL_WINDOW = Object.freeze({ width: 720, height: 560 });
 
+/** The scrim fixture's ground, a pane by its `scrim`, and that pane's dialog and scrim. */
+const MODAL_SCRIMS = '[data-lab-modal-scrims]';
+const MODAL_SCRIM_PANE = (scrim) => `${MODAL_SCRIMS} > [data-lab-modal-scrim="${scrim}"]`;
+const MODAL_SCRIM_DIALOG = (scrim) => `${MODAL_SCRIM_PANE(scrim)} .fabricate-modal`;
+const MODAL_SCRIM_LAYER = (scrim) => `${MODAL_SCRIM_PANE(scrim)} [data-manager-modal-scrim]`;
+
+/** Sized to the fixture's 704px ground and its two 320px panes. */
+const MODAL_SCRIM_WINDOW = Object.freeze({ width: 760, height: 740 });
+
 /**
  * The standalone fixture's ground, its three columns, one target by key, the style root the seam
  * writes in it, and the player window's root.
@@ -2686,6 +2695,48 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-modal-scrim-specimen',
+    label:
+      "Specimen, mounted through the published seam — two open Add a contributor dialogs, each 500px wide with a user-plus glyph, the Forge the guild hall bell subtitle, a body paragraph and a primary Add contributor button in its footer, each centred over a busy 680px by 320px pane of the companion's own on --fab-bg-1, a Guild projects header band on --fab-bg-2 and eight member rows alternating --fab-bg-0 and --fab-bg-2, the dialog covering the middle of each row it crosses and leaving about 90px of the row showing either side of it, which is the dialog's overlay host and, by contain: layout, the box it is centred in. The top pane passes scrim 'none', for comparison: its rows show at full strength around the dialog. The bottom pane passes scrim 'dim': a --fab-overlay-dark-78 scrim covers that pane alone, its rows dimmed around the dialog, and the dialog, drawn above it, keeps its own colours and its 1px edge. No control takes focus, and the scrim has no state of its own to show. The frame cannot show that the scrim takes the pointer or that it is hidden from assistive technology, which the rendered and mounted suites read",
+    // Beyond the smoke: a companion mounts both through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-modal-scrim' },
+    steps: [],
+    // Both dialogs drawn in their panes, the scrim just before the dimmed one and none in the other.
+    expectSelector: `${MODAL_SCRIMS}:has(> [data-lab-modal-scrim="none"] .fabricate-modal):not(:has(> [data-lab-modal-scrim="none"] [data-manager-modal-scrim])) > [data-lab-modal-scrim="dim"] [data-manager-modal-scrim] + .fabricate-modal`,
+    expectCenterHit: MODAL_SCRIM_DIALOG('dim'),
+    expectContained: [
+      { container: MODAL_SCRIM_PANE('none'), target: MODAL_SCRIM_DIALOG('none') },
+      { container: MODAL_SCRIM_PANE('dim'), target: MODAL_SCRIM_DIALOG('dim') },
+      { container: '.window-content', target: MODAL_SCRIMS },
+    ],
+    expectLayout: {
+      controls: [
+        // The scrim's paint and placement, and each dialog's edge, dimmed and not.
+        {
+          selector: MODAL_SCRIM_LAYER('dim'),
+          styles: 'position: fixed; background-color: var(--fab-overlay-dark-78)',
+        },
+        {
+          selector: MODAL_SCRIM_DIALOG('dim'),
+          styles: 'border-top-style: solid; border-top-width: 1px',
+        },
+        {
+          selector: MODAL_SCRIM_DIALOG('none'),
+          styles: 'border-top-style: solid; border-top-width: 1px',
+        },
+      ],
+    },
+    position: MODAL_SCRIM_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+    // foundry-native, where the dim brings a --fab-bg-2 ground nearest the dialog's surface;
+    // hearth-herb, a second palette; mythwright, the one whose overlay is not its --fab-bg-0.
+    themeVariants: ['foundry-native', 'hearth-herb', 'mythwright'],
   }),
   standaloneCase({
     id: 'published-standalone',

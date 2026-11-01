@@ -48,6 +48,11 @@ const VARIANTS = Object.freeze({
     'manager-published-stage-bars-forms-specimen',
   'manager-published-stage-bars-forms-specimen-hearth-herb':
     'manager-published-stage-bars-forms-specimen',
+  // Issue 2859: the published dialog's scrim, on the palette whose dim brings a --fab-bg-2 ground
+  // nearest the dialog's surface, on a second, and on the one whose overlay is not its --fab-bg-0.
+  'manager-published-modal-scrim-specimen-foundry-native': 'manager-published-modal-scrim-specimen',
+  'manager-published-modal-scrim-specimen-hearth-herb': 'manager-published-modal-scrim-specimen',
+  'manager-published-modal-scrim-specimen-mythwright': 'manager-published-modal-scrim-specimen',
   'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':
     'manager-tool-prerequisites-selected-1280x720',
@@ -78,7 +83,7 @@ test('the palette variants reuse their base case under the palette their id name
     const variant = getCaseById(id);
     const base = getCaseById(baseId);
     assert.equal(variant.theme, id.slice(baseId.length + 1));
-    assert.ok(['hearth-herb', 'foundry-native'].includes(variant.theme), id);
+    assert.ok(['hearth-herb', 'foundry-native', 'mythwright'].includes(variant.theme), id);
     assert.equal(variant.baseCaseId, baseId);
     assert.ok(!base.theme, `${baseId} must keep the default palette`);
     // The same definition, not a copy of it.

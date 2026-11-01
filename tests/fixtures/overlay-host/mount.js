@@ -11,8 +11,10 @@ import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopov
 import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
 import AnchoredPopoverHost from './AnchoredPopoverHost.svelte';
+import ClosingModal from './ClosingModal.svelte';
 import ModalPickerHost from './ModalPickerHost.svelte';
 import { hostInRegion } from './modalRegion.js';
+import { stageScrim } from './modalScrim.js';
 import TintAnchoredHost from './TintAnchoredHost.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -155,8 +157,9 @@ function actorBarStore() {
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
 
 /**
- * The shared dialog (issue 2661), trapping focus under `?trap=1`; `<body data-modal-closes>`
- * counts `onClose`.
+ * The shared dialog (issue 2661), trapping focus under `?trap=1`, dimmed under `?scrim=dim` and
+ * deaf to an outside press under `?outside=off` (issue 2859); `<body data-modal-closes>` counts
+ * `onClose`.
  *
  * @returns {object} The Modal's props.
  */
@@ -169,6 +172,8 @@ function modalProps() {
     trapFocus: params.get('trap') === '1',
     icon: params.get('icon') ?? undefined,
     size: params.get('size') ?? undefined,
+    scrim: params.get('scrim') ?? undefined,
+    closeOnOutsideClick: params.get('outside') !== 'off',
     onClose: () => {
       document.body.dataset.modalCloses = String(Number(document.body.dataset.modalCloses) + 1);
     },
@@ -260,12 +265,15 @@ const COMPONENTS = {
 
 // `?region=plain|contain|transform` hosts the dialog in a companion's region (issue 2818).
 if (params.get('region')) hostInRegion(target, mountPoint, params.get('region'));
+if (componentKind === 'modal') stageScrim(params, target, mountPoint);
 
 // `?layer=<name>` measures the product cascade rather than the flat sheet.
 if (params.get('layer')) await loadSheetInLayer(params.get('layer'));
 
 const [Component, props] = COMPONENTS[componentKind] ?? COMPONENTS.popover;
-mount(Component, { target: mountPoint, props });
+// `?closes=1` closes the dialog from its own `onClose`, as a companion does (issue 2859).
+const closing = componentKind === 'modal' && params.get('closes') === '1';
+mount(closing ? ClosingModal : Component, { target: mountPoint, props });
 
 // The page's next tab stop after the frame, where a Tab a panel leaves unhandled lands.
 if (componentKind === 'modal-picker') {

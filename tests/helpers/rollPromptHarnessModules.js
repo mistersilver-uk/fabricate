@@ -9,6 +9,8 @@ export const ROLL_PROMPT_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/util/modalFocus.js',
+  'src/ui/svelte/actions/scrim.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/overlayBounds.js',
