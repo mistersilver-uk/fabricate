@@ -29,6 +29,16 @@ const VARIANTS = Object.freeze({
   'manager-gathering-biome-colour-popover-cursor-selected-hearth-herb':
     'manager-gathering-biome-colour-popover-cursor-selected',
   'manager-gathering-task-editor-normal-hearth-herb': 'manager-gathering-task-editor-normal',
+  // Issues 2837 and 2863: the published thin tracks and neutral band on the palettes where their
+  // inks and track read weakest.
+  'manager-published-fill-bar-bands-specimen-foundry-native':
+    'manager-published-fill-bar-bands-specimen',
+  'manager-published-fill-bar-bands-specimen-hearth-herb':
+    'manager-published-fill-bar-bands-specimen',
+  'manager-published-stage-bars-forms-specimen-foundry-native':
+    'manager-published-stage-bars-forms-specimen',
+  'manager-published-stage-bars-forms-specimen-hearth-herb':
+    'manager-published-stage-bars-forms-specimen',
   'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':
     'manager-tool-prerequisites-selected-1280x720',
@@ -48,7 +58,7 @@ afterEach(() => {
   teardownDOM();
 });
 
-test('the hearth-herb variants reuse their base case under another palette', () => {
+test('the palette variants reuse their base case under the palette their id names', () => {
   assert.deepEqual(
     themedCases()
       .map((viewCase) => viewCase.id)
@@ -58,7 +68,8 @@ test('the hearth-herb variants reuse their base case under another palette', () 
   for (const [id, baseId] of Object.entries(VARIANTS)) {
     const variant = getCaseById(id);
     const base = getCaseById(baseId);
-    assert.equal(variant.theme, 'hearth-herb');
+    assert.equal(variant.theme, id.slice(baseId.length + 1));
+    assert.ok(['hearth-herb', 'foundry-native'].includes(variant.theme), id);
     assert.equal(variant.baseCaseId, baseId);
     assert.ok(!base.theme, `${baseId} must keep the default palette`);
     // The same definition, not a copy of it.

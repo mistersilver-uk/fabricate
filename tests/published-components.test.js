@@ -14,6 +14,7 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 import {
   ALLOWED_ITEM_MEMBERS,
   onlyMembers,
+  onlyMembersAt,
   withoutMember,
 } from '../src/ui/publishedComponentProps.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
@@ -2038,6 +2039,15 @@ const STRIP_TABLE = Object.freeze([
     component: Object.freeze({ role: 'Meter' }),
   },
   {
+    name: 'StageBars',
+    path: 'src/ui/svelte/components/StageBars.svelte',
+    version: 1,
+    props: { stages: { kind: 'data' }, ariaLabel: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'StageBars' }),
+  },
+  {
     name: 'Ticker',
     path: 'src/ui/svelte/components/Ticker.svelte',
     version: 1,
@@ -2146,6 +2156,47 @@ describe('a per-item member the seam strips', () => {
     const item = Object.create({ tone: 'ember' });
     item.weight = 1;
     assert.deepEqual(onlyMembers([item], ['weight', 'tone']), [{ weight: 1 }]);
+  });
+
+  it('keeps only the allowed members of the items a nested member holds, and every other member whole', () => {
+    const stages = [
+      { name: 'A', value: 1, id: 'a', shares: [{ weight: 1, tone: 'ember', color: 'red' }, null] },
+      { name: 'B', shares: { weight: 2, color: 'blue' } },
+      { name: 'C', shares: 'ember' },
+      null,
+      7,
+    ];
+    assert.deepEqual(onlyMembersAt(stages, ['shares'], ['weight', 'tone']), [
+      { name: 'A', value: 1, id: 'a', shares: [{ weight: 1, tone: 'ember' }, null] },
+      { name: 'B', shares: { weight: 2 } },
+      { name: 'C', shares: 'ember' },
+      null,
+      7,
+    ]);
+    assert.equal(stages[0].shares[0].color, 'red', 'the value it was given is unchanged');
+    assert.deepEqual(onlyMembersAt([{ weight: 1, color: 'red' }], [], ['weight']), [{ weight: 1 }]);
+  });
+
+  it('keeps only weight and tone in each share of a StageBars stage, on mount and on update', () => {
+    const { ui, mounts } = stripping();
+    const stages = (color) => [
+      {
+        name: 'A',
+        value: 50,
+        label: 'L',
+        shares: [{ weight: 1, tone: 'ember', color }, { weight: 2 }],
+      },
+    ];
+    const handle = ui.mount('StageBars', {
+      target: target(),
+      props: { ariaLabel: 'Run', stages: stages('red') },
+    });
+    const kept = [
+      { name: 'A', value: 50, label: 'L', shares: [{ weight: 1, tone: 'ember' }, { weight: 2 }] },
+    ];
+    assert.deepEqual(mounts[0].props.initial.stages, kept);
+    assert.equal(handle.update({ ariaLabel: 'Run', stages: stages('blue') }), true);
+    assert.deepEqual(mounts[0].instance.updates[0].stages, kept);
   });
 
   it('names, in every ALLOWED_ITEM_MEMBERS row, a published data key of a published entry', () => {

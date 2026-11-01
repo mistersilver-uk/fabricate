@@ -898,12 +898,13 @@ test('(a) a Select change publishes its four frames, then the two specimens that
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a StageBars change publishes its two run frames, then the specimen that mounts it through the seam', () => {
+test('(a) a StageBars change publishes its two run frames, then the two specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/StageBars.svelte';
   const frames = [
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
     'manager-published-stage-bars-specimen',
+    'manager-published-stage-bars-forms-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });

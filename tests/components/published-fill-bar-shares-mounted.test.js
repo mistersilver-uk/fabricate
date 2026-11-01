@@ -347,6 +347,19 @@ describe('the published FillBar, shares', () => {
     bar.handle.destroy();
   });
 
+  it('reads a hole in a sparse shares array as {}, as a null entry, and draws the rest', async () => {
+    const shares = Object.assign([], {
+      1: { weight: 1, tone: 'ember' },
+      2: { weight: 1, tone: 'azure' },
+    });
+    assert.equal(0 in shares, false, 'the array holds a hole');
+    const bar = mountBar({ value: 60, shares });
+    await settle();
+    assert.deepEqual(tonesOf(bar.shares()), ['is-success', 'is-ember', 'is-azure']);
+    assert.deepEqual(growsOf(bar.shares()), [0, 50, 50]);
+    bar.handle.destroy();
+  });
+
   it('refuses a function in shares, as it does anywhere in a data value', () => {
     const target = companionTarget(targets);
     assert.throws(

@@ -415,6 +415,8 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
+  'tests/view-lab/fixtures/PublishedStageBarsForms.svelte',
+  'tests/view-lab/fixtures/PublishedFillBarBands.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedFieldForms.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
@@ -905,6 +907,12 @@ const labListRowSlot = (key, slot) =>
   `[data-lab-list-row-slots] > [data-lab-list-row="${key}"] .fabricate-list-row .fabricate-list-row-${slot}`;
 /** The button forms fixture's one control in a row, by the row's key. */
 const labButtonForm = (key) => `[data-lab-button-forms] > [data-lab-button-form="${key}"] button`;
+/** The stage bars forms fixture's track of one stage in a row, by the row's key and the stage. */
+const labStageBarsForm = (key, stage) =>
+  `[data-lab-stage-bars-forms] > [data-lab-stage-bars-form="${key}"] [data-stage-bars-stage="${stage}"] .fab-fill-bar`;
+/** The fill bar bands fixture's one fill in a row, by the row's key. */
+const labFillBarBand = (key) =>
+  `[data-lab-fill-bar-bands] > [data-lab-fill-bar-band="${key}"] .fab-fill-bar-fill`;
 /** The chip forms fixture's chip in a row, by the row's key. */
 const labChipForm = (key) => `[data-lab-chip-forms] > [data-lab-chip-form="${key}"] .manager-chip`;
 /** The segmented forms fixture's track in a row, by the row's key. */
@@ -948,7 +956,7 @@ const REPEATS_CONTROLS = [
   },
   { selector: `${REPEATS} > i.fa-ellipsis`, styles: 'font-size: 11px' },
 ];
-const NON_VERB_CONTROLS = Object.freeze({
+const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
     ...toolbarSelects('[data-recipe-category-filter]'),
@@ -1762,6 +1770,54 @@ const NON_VERB_CONTROLS = Object.freeze({
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
     },
   ],
+  // The published stage bars' forms (issue 2837): the default track's edge beside the thin
+  // track's, each 6px, and a pooled stage's share the whole 6px in its own tone.
+  'manager-published-stage-bars-forms-specimen': [
+    {
+      selector: labStageBarsForm('states', 1),
+      styles:
+        'height: 6px; border-top-style: solid; border-top-width: 1px; background-color: var(--fab-surface-raised)',
+    },
+    {
+      selector: labStageBarsForm('thin-states', 1),
+      styles:
+        'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
+    },
+    {
+      selector: labStageBarsForm('shares', 0),
+      styles:
+        'height: 6px; border-top-style: none; border-top-width: 0px; background-color: var(--fab-bg-3)',
+    },
+    {
+      selector: `${labStageBarsForm('shares', 1)} .fab-fill-bar-share:first-child`,
+      styles: 'height: 6px; background-color: var(--fab-tag-ember)',
+    },
+    {
+      selector: labStageBarsForm('default-shares', 1),
+      styles: 'height: 6px; border-top-style: solid; border-top-width: 1px',
+    },
+  ],
+  // The published fill bar's neutral band (issue 2863): each reading's ink, by sign with no band,
+  // neutral inside it, its edge included, and by sign beyond it, on either track.
+  'manager-published-fill-bar-bands-specimen': [
+    { selector: labFillBarBand('unbanded'), styles: 'background-color: var(--fab-success-text)' },
+    { selector: labFillBarBand('within'), styles: 'background-color: var(--fab-text-subtle)' },
+    { selector: labFillBarBand('edge'), styles: 'background-color: var(--fab-text-subtle)' },
+    { selector: labFillBarBand('beyond'), styles: 'background-color: var(--fab-success-text)' },
+    { selector: labFillBarBand('below'), styles: 'background-color: var(--fab-danger-text)' },
+    {
+      selector: labFillBarBand('thin-unbanded'),
+      styles: 'height: 4px; background-color: var(--fab-success-text)',
+    },
+    {
+      selector: labFillBarBand('thin-within'),
+      styles: 'height: 4px; background-color: var(--fab-text-subtle)',
+    },
+    {
+      selector: labFillBarBand('thin-beyond'),
+      styles: 'height: 4px; background-color: var(--fab-danger-text)',
+    },
+  ],
   // The published chip's forms (issue 2858): each square's side, and the dashed edge beside its
   // undashed twin.
   'manager-published-chip-forms-specimen': [
@@ -1875,6 +1931,16 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
+});
+// And each theme variant of a case above, which measures the same controls under another palette
+// (issue 2837), keyed by its own id.
+const NON_VERB_CONTROLS = Object.freeze({
+  ...BASE_NON_VERB_CONTROLS,
+  ...Object.fromEntries(
+    VIEW_LAB_CASES.filter(({ baseCaseId }) =>
+      Object.hasOwn(BASE_NON_VERB_CONTROLS, baseCaseId ?? '')
+    ).map(({ id, baseCaseId }) => [id, BASE_NON_VERB_CONTROLS[baseCaseId]])
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -7630,6 +7696,69 @@ test('the segmented forms specimen case measures the rows, surface and rung the 
     'sized-panel-default',
     'panel-names',
   ]);
+});
+
+test('the stage bars forms specimen case measures the rows the stage bars forms fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedStageBarsForms.svelte'
+  );
+  for (const hook of ['data-lab-stage-bars-forms', 'data-lab-stage-bars-form']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value);
+  assert.deepEqual(keys, ['states', 'thin-states', 'shares', 'default-shares']);
+  const tracks = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'track')
+    .map((node) => node.value.value);
+  assert.deepEqual(
+    tracks,
+    ['thin', 'thin'],
+    'two rows on the thin track beside two on the default'
+  );
+  const titles = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'title')
+    .map((node) => node.value.value);
+  const { expectSelector } = getCaseById('manager-published-stage-bars-forms-specimen');
+  assert.deepEqual(titles, ['Survey: 6 of 6 days', 'Build: 6 of 10 days'], 'two titled stages');
+  assert.ok(expectSelector.includes(`[data-tooltip-text="${titles[1]}"]`), 'the case waits on one');
+  const { controls } = getCaseById('manager-published-stage-bars-forms-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-stage-bars-form="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(measured, ['states', 'thin-states', 'shares', 'shares', 'default-shares']);
+});
+
+test('the fill bar bands specimen case measures each row the fill bar bands fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedFillBarBands.svelte'
+  );
+  for (const hook of ['data-lab-fill-bar-bands', 'data-lab-fill-bar-band']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value);
+  const bands = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'Property' && node.key?.name === 'neutralBand')
+    .map((node) => node.value.value);
+  assert.deepEqual(
+    bands,
+    [20, 20, 20, 20, 20, 20],
+    'six rows at a band of 20 beside two with none'
+  );
+  const { controls } = getCaseById('manager-published-fill-bar-bands-specimen').expectLayout;
+  const measured = controls.map(
+    ({ selector }) => /data-lab-fill-bar-band="([\w-]+)"/u.exec(selector)[1]
+  );
+  assert.deepEqual(measured, keys, 'each row the fixture mounts is measured, in order');
 });
 
 test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {

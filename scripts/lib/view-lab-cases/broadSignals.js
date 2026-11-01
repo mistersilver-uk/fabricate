@@ -114,11 +114,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-finished-cancelled',
   ]),
   // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's,
-  // then its specimen mounted through the published seam (issue 2455).
+  // then its specimens mounted through the published seam (issues 2455 and 2837).
   'src/ui/svelte/components/StageBars.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
     'manager-published-stage-bars-specimen',
+    'manager-published-stage-bars-forms-specimen',
   ]),
   // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage.
   'src/ui/svelte/components/Meter.svelte': Object.freeze([
@@ -145,12 +146,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-crafting-tier-step',
     'manager-checks-v3-count-triggers',
   ]),
-  // No app caller since issue 1644: one frame per instrument over the leaf (stage, meter, band).
+  // No app caller since issue 1644: one frame per instrument over the leaf (stage, meter, band),
+  // then the leaves specimen and the centred bar's neutral band (issue 2863).
   'src/ui/svelte/components/FillBar.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'player-crafting-essence-pool',
     'player-gathering-task-ready',
     'manager-published-leaves-specimen',
+    'manager-published-fill-bar-bands-specimen',
   ]),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
