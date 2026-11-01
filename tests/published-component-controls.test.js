@@ -1222,7 +1222,7 @@ const INLINE_STYLE = 'states an inline style under a root that supplies the ring
 const SCOPED_RINGS = Object.freeze({
   'src/ui/svelte/components/Stepper.svelte': {
     statedBy:
-      "The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.",
+      "The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable, and at the dense `size` `26` each sits at offset -1px, straddling the part's edge inside the stepper's outer edge (issue 2841).",
     rules: [
       {
         selector:
@@ -1254,6 +1254,13 @@ const SCOPED_RINGS = Object.freeze({
           ['outline', '2px solid var(--fab-accent)'],
           ['outline-offset', '1px'],
         ],
+      },
+      {
+        selector: [
+          '.fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible',
+          '.fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-input:focus-visible',
+        ].join(',\n  '),
+        declarations: [['outline-offset', '-1px']],
       },
     ],
   },

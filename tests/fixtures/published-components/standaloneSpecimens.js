@@ -228,6 +228,8 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'button-danger': button({ role: 'danger', children: 'Delete', onclick: press }),
     'button-warning': button({ role: 'warning', children: 'Override', onclick: press }),
     'button-info': button({ role: 'info', children: 'Roll Wits', onclick: press }),
+    'button-accent': button({ role: 'accent', children: 'Advance', onclick: press }),
+    'button-urgent': button({ role: 'urgent', children: 'Advance', onclick: press }),
     'button-full-width': button({ fullWidth: true, children: 'Start batch', onclick: press }),
     'button-size-24': button({ size: '24', children: 'Add tier', onclick: press }),
     'button-size-26': button({ size: '26', children: 'Claim', onclick: press }),
@@ -268,6 +270,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'stepper-fill': { props: stepper({ fill: true }), reach: reach('[data-stepper-decrement]') },
     'stepper-comfortable': {
       props: stepper({ density: 'comfortable' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
+    'stepper-dense': {
+      props: stepper({ size: 26 }),
       reach: reach('[data-stepper-decrement]'),
     },
     'stepper-unset': {

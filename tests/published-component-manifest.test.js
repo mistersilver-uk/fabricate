@@ -95,6 +95,7 @@ import {
   compoundsOf,
   dataHooksOf,
   entryNamed,
+  isSystemRing,
   ownFilesOf,
   placementFaults,
   publishedManagerClasses,
@@ -498,6 +499,8 @@ const BUTTON = Object.freeze({
     'is-dashed',
     'is-warning-action',
     'is-info-action',
+    'is-accent-action',
+    'is-urgent-action',
     'is-pressed',
     'is-full-width',
     'is-size-24',
@@ -536,6 +539,11 @@ const BUTTON = Object.freeze({
   ]),
   drawsChildren: 'caller',
   disables: true,
+  // The pressed face opts out of forced colours, so its ring names CanvasText there (issue 2841).
+  forcedRings: Object.freeze([
+    'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:focus-visible',
+    'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:focus-visible',
+  ]),
 });
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
@@ -552,7 +560,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 35 sheet rules that draw a published button, none with a compound above its root. */
+/** The 41 sheet rules that draw a published button, none with a compound above its root. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -583,13 +591,20 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled)',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-accent-action:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-accent-action:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled)',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled',
-  // The forced-colours block repaints the same three in the reader's palette.
+  // The forced-colours block repaints the same three in the reader's palette, and names the ring
+  // of a pressed or urgent button CanvasText.
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled)',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:focus-visible',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:focus-visible',
 ]);
 /** The rule no published button can match, which fails closed: an anchor's, since `tag` is unpublished. */
 const BUTTON_UNMATCHED_RULES = Object.freeze([
@@ -703,6 +718,14 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   ],
   [
     "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-info-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-accent-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled, [aria-disabled='true']):hover",
     BUTTON_FACE,
   ],
   [
@@ -3649,7 +3672,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 29 readings of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 31 readings of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(
@@ -3753,6 +3776,12 @@ describe('the module sheet and every component style against the published Butto
     const reaching = reachingOf(shippedCensus(BUTTON, 'Button'));
     assert.deepEqual(placementFaults(reaching, BUTTON, BUTTON_DATA_HOOK_RULES), []);
     assert.deepEqual(ringFaults(reaching, BUTTON), []);
+    const written = reaching.filter(isSystemRing).map((row) => row.written);
+    assert.deepEqual(
+      [...BUTTON.forcedRings],
+      written,
+      'each pinned forced-colours ring is written, naming one system colour, and no other is'
+    );
   });
 
   it('holds the classes the census calls writable to the classes Button.svelte spells and a sheet rule names on the button', () => {
@@ -3882,6 +3911,26 @@ describe('the module sheet and every component style against the published Butto
     const reaching = reachingOf(buttonCensus(`${family} ${css}`));
     return [...placementFaults(reaching, BUTTON, [HOOK]), ...ringFaults(reaching, BUTTON)];
   };
+
+  it('admits a pinned forced-colours ring naming one system colour, and no other', () => {
+    const PINNED = 'sheet.css: .fabricate-button.is-pressed:focus-visible';
+    const forced = { ...BUTTON, forcedRings: [PINNED] };
+    const ringOf = (css, shape = forced) =>
+      ringFaults(reachingOf(buttonCensus(`${FAMILY} ${css}`)), shape);
+    const at = (declaration) =>
+      `@media (forced-colors: active) { .fabricate-button.is-pressed:focus-visible { ${declaration} } }`;
+    const SECOND = [
+      '2 reaching selectors carry :focus-visible',
+      `${PINNED} does not declare exactly the module ring`,
+    ];
+    assert.deepEqual(ringOf(at('outline-color: canvastext;')), []);
+    assert.deepEqual(ringOf(at('outline-color: CanvasText;')), []);
+    assert.deepEqual(ringOf(at('outline-color: var(--fab-accent);')), SECOND, 'a theme colour');
+    assert.deepEqual(ringOf(at('outline-color: canvastext; outline-width: 0;')), SECOND, 'more');
+    const bare = '.fabricate-button.is-pressed:focus-visible { outline-color: canvastext }';
+    assert.deepEqual(ringOf(bare), SECOND, 'outside an at-rule');
+    assert.deepEqual(ringOf(at('outline-color: canvastext;'), BUTTON), SECOND, 'unpinned');
+  });
 
   it('admits beside the module ring exactly the ring extras a shape names, and no other declaration', () => {
     const extras = { ...BUTTON, ringExtras: [['box-shadow', 'none']] };

@@ -29,6 +29,15 @@ const VARIANTS = Object.freeze({
   'manager-gathering-biome-colour-popover-cursor-selected-hearth-herb':
     'manager-gathering-biome-colour-popover-cursor-selected',
   'manager-gathering-task-editor-normal-hearth-herb': 'manager-gathering-task-editor-normal',
+  // Issue 2841: the companion forms specimens, where muted ink and two tints fall short.
+  ...Object.fromEntries(
+    ['specimen', 'accent-focus', 'urgent-focus'].flatMap((form) =>
+      ['foundry-native', 'hearth-herb'].map((theme) => [
+        `manager-published-companion-forms-${form}-${theme}`,
+        `manager-published-companion-forms-${form}`,
+      ])
+    )
+  ),
   // Issues 2837 and 2863: the published thin tracks and neutral band on the palettes where their
   // inks and track read weakest.
   'manager-published-fill-bar-bands-specimen-foundry-native':
@@ -63,7 +72,7 @@ test('the palette variants reuse their base case under the palette their id name
     themedCases()
       .map((viewCase) => viewCase.id)
       .sort((left, right) => left.localeCompare(right)),
-    Object.keys(VARIANTS)
+    Object.keys(VARIANTS).sort((left, right) => left.localeCompare(right))
   );
   for (const [id, baseId] of Object.entries(VARIANTS)) {
     const variant = getCaseById(id);

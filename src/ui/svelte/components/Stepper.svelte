@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks -->
+<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks; the dense rung's rules (issue 2841) override the scoped default-rung outset, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
@@ -16,6 +16,7 @@
   | `placeholder` / `fill` | string / boolean | `''` / `false` | `placeholder` shows while the input is empty and WINS over `inputProps.placeholder`; `fill` sets `width: 100%`, so it stretches correctly only inside a slot that already has an intrinsic width, and is mutually exclusive with `orientation="vertical"`. |
   | `orientation` | `'horizontal'` \| `'vertical'` | `'horizontal'` | An ORDER, not a second control: the two branches render the same three snippets in a different sequence, and draw a different pair of icons. |
   | `density` | `'default'` \| `'comfortable'` | `'default'` | `comfortable` raises EVERY target — the typeable input included — to at least 24x24 for WCAG 2.2 §2.5.8. |
+  | `size` | `26` \| `'26'` | `''` | The dense 26px rung of a horizontal stepper (issue 2841): no inner padding, so each 24px target is its own cell; it outranks `density` and pins `fill`'s height at 26. Anything else draws the default. |
   | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
   | `formatValue` / `parseValue` | functions \| `null` | `null` | Both together opt into the FORMATTED mode below; without them the `type="number"` path and its commit-on-input are unchanged. `parseValue(text)` returns a finite number, `null` for the null endpoint, or anything else for invalid text. |
   | `format` | `'signed'` \| `'unlimited'` | `''` | A built-in formatter, the published way into the FORMATTED mode; `formatValue` and `parseValue` win where both are given, and any other value leaves the `type="number"` path. `signed` draws a leading `+` on positives; `unlimited` draws `0` as `nullLabel` and reports `0` rather than `null`. Typing `nullLabel` selects the endpoint. |
@@ -62,6 +63,7 @@
     fill = false,
     orientation = 'horizontal',
     density = 'default',
+    size = '',
     inputProps = {},
     formatValue = null,
     parseValue = null,
@@ -72,7 +74,8 @@
   } = $props();
 
   const isVertical = $derived(orientation === 'vertical');
-  const isComfortable = $derived(density === 'comfortable');
+  const isDense = $derived(['number', 'string'].includes(typeof size) && String(size) === '26');
+  const isComfortable = $derived(density === 'comfortable' && !isDense);
 
   function clamp(candidate) {
     let next = candidate;
@@ -361,6 +364,7 @@
   class:is-disabled={disabled}
   class:is-vertical={isVertical}
   class:is-comfortable={isComfortable}
+  class:is-size-26={isDense}
   class:is-fill={fill}
   style:--fab-stepper-endpoint-ch={hasEndpoint ? Array.from(nullLabel).length : undefined}
 >
@@ -411,6 +415,17 @@
     height: 30px;
     font-size: 1.05rem;
     font-weight: 500;
+  }
+
+  /* The dense rung: the 24px targets fill the row with no inner padding and no outset to give back. */
+  .fab-stepper.is-size-26:not(.is-vertical) {
+    --fab-stepper-fill-height: 26px;
+    padding: 0;
+  }
+
+  .fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct,
+  .fab-stepper.is-size-26:not(.is-vertical):not(.is-fill) .fab-stepper-input {
+    margin: 0;
   }
 
   .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
@@ -544,5 +559,11 @@
   .fab-stepper-adjunct:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
+  }
+
+  /* At the dense rung a part's cell meets the stepper's edge, so its ring straddles that edge. */
+  .fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible,
+  .fab-stepper.is-size-26:not(.is-vertical):not(.is-comfortable) .fab-stepper-input:focus-visible {
+    outline-offset: -1px;
   }
 </style>

@@ -576,6 +576,134 @@ const CHIP_FORM_KEYS = Object.freeze([
 /** Sized to the fixture's 360px ground and its twelve rows. */
 const CHIP_FORMS_WINDOW = Object.freeze({ width: 480, height: 440 });
 
+/** The companion forms fixture's ground, a row by its key, and a part of the row's mount. */
+const COMPANION_FORMS = '[data-lab-companion-forms]';
+const COMPANION_FORM = (key) => `${COMPANION_FORMS} > [data-lab-companion-form="${key}"]`;
+const COMPANION_FORM_PART = (key, part) => `${COMPANION_FORM(key)} ${part}`;
+const COMPANION_FORM_KEYS = Object.freeze([
+  'stat-progress',
+  'stat-complete',
+  'stat-centred',
+  'stat-danger',
+  'stat-plain',
+  'stepper-dense',
+  'stepper-default',
+  'button-ghost',
+  'button-accent',
+  'button-accent-hover',
+  'button-accent-disabled',
+  'button-accent-busy',
+  'button-urgent',
+  'button-urgent-hover',
+  'button-urgent-disabled',
+  'button-urgent-busy',
+  'hazard-urgent',
+  'hazard-pressed',
+  'icon-ember',
+  'icon-mauve',
+  'icon-slate',
+  'icon-plain',
+]);
+const COMPANION_GLYPH = '.essence-icon-picker-trigger .essence-icon-picker-preview';
+const COMPANION_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 2px';
+
+/**
+ * What every companion forms frame measures: the stat band and its track, the success figure and
+ * the danger label; the dense and default steppers; each role's face at rest, disabled and busy
+ * beside the ghost baseline; the urgent and pressed tiles of the negative specimen; and each tint.
+ */
+const COMPANION_FORM_FACES = Object.freeze([
+  {
+    selector: COMPANION_FORM_PART('stat-progress', '.fab-stat-box-slot'),
+    styles: 'display: grid; row-gap: 4px; margin-top: 4px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stat-progress', '.fab-fill-bar'),
+    styles: 'height: 4px; background-color: var(--fab-bg-3)',
+  },
+  {
+    selector: COMPANION_FORM_PART('stat-complete', '.fab-stat-box-value'),
+    styles: 'color: var(--fab-success-text)',
+  },
+  {
+    selector: COMPANION_FORM_PART('stat-centred', '.fab-stat-box-slot'),
+    styles: 'display: grid; margin-top: 8px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stat-danger', '.fab-stat-box > .fab-kicker'),
+    styles: 'color: var(--fab-text-secondary)',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-dense', '.fab-stepper'),
+    styles: 'height: 26px; padding-top: 0px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-dense', '[data-stepper-decrement]'),
+    styles: 'width: 24px; height: 24px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-default', '.fab-stepper'),
+    styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-ghost', 'button'),
+    styles: 'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-accent', 'button'),
+    styles:
+      'color: var(--fab-accent-text); border-top-color: var(--fab-accent); background-color: rgba(0, 0, 0, 0)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-accent-disabled', 'button'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-accent-busy', 'button'),
+    styles: 'opacity: 0.7; color: var(--fab-accent-text)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-urgent', 'button'),
+    styles:
+      'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-urgent-disabled', 'button'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: COMPANION_FORM_PART('button-urgent-busy', 'button'),
+    styles: 'opacity: 0.7; background-color: var(--fab-accent)',
+  },
+  {
+    selector: COMPANION_FORM_PART('hazard-urgent', 'button'),
+    styles: 'color: var(--fab-on-accent); background-color: var(--fab-accent)',
+  },
+  {
+    selector: COMPANION_FORM_PART('hazard-pressed', 'button'),
+    styles: 'color: var(--fab-on-accent); background-color: var(--fab-accent)',
+  },
+  {
+    selector: COMPANION_FORM_PART('icon-ember', COMPANION_GLYPH),
+    styles: 'color: var(--fab-tag-ember)',
+  },
+  {
+    selector: COMPANION_FORM_PART('icon-mauve', COMPANION_GLYPH),
+    styles: 'color: var(--fab-tag-mauve)',
+  },
+  {
+    selector: COMPANION_FORM_PART('icon-slate', COMPANION_GLYPH),
+    styles: 'color: var(--fab-tag-slate)',
+  },
+  {
+    selector: COMPANION_FORM_PART('icon-plain', COMPANION_GLYPH),
+    styles: 'color: var(--fab-accent)',
+  },
+]);
+
+/** Sized to the fixture's two 340px columns and their rows. */
+const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 760 });
+
 /** The pagination fixture's ground and target for one pager, by the key both name. */
 const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
 const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
@@ -2172,6 +2300,127 @@ export const CASES = Object.freeze([
     position: CHIP_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Chip.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-companion-forms-specimen',
+    label:
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second urgent Advance, the pointer still resting on it, its tile deepened to the accent's hover colour, and Tab from the dense stepper's input, so its plus carries the 2px accent ring straddling the button's edge inside the stepper's own. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-companion-forms' },
+    steps: [
+      { selector: COMPANION_FORM_PART('button-urgent-hover', 'button') },
+      { selector: COMPANION_FORM_PART('stepper-dense', 'input'), press: 'Tab' },
+    ],
+    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin):has(> [data-lab-companion-form="hazard-pressed"] button[aria-pressed="true"]):has(> [data-lab-companion-form="stepper-dense"] [data-stepper-increment]:focus-visible) > [data-lab-companion-form="icon-plain"] .essence-icon-picker-preview`,
+    expectContained: [
+      ...COMPANION_FORM_KEYS.map((key) => ({
+        container: COMPANION_FORMS,
+        target: COMPANION_FORM(key),
+      })),
+      { container: '.window-content', target: COMPANION_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        ...COMPANION_FORM_FACES,
+        // The focused plus's ring, and the urgent tile still under the pointer; the lab emulates
+        // reduced motion, so the read is not mid-fade.
+        {
+          selector: COMPANION_FORM_PART('stepper-dense', '[data-stepper-increment]:focus-visible'),
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: -1px',
+        },
+        {
+          selector: COMPANION_FORM_PART('button-urgent-hover', 'button'),
+          styles:
+            'border-top-color: var(--fab-accent-hover); background-color: var(--fab-accent-hover)',
+        },
+      ],
+    },
+    position: COMPANION_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // Judged on the palettes where the muted ink and two tints fall short on the danger fill.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `StatBox.svelte`, `Stepper.svelte`, `Button.svelte` and `IconPicker.svelte` are broad signals,
+    // each routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-companion-forms-accent-focus',
+    label:
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second accent Advance, the pointer still resting on it, filled in the soft accent, and Tab from the ghost Advance, so the first accent Advance carries the 2px accent keyboard ring 2px clear of its edge. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-companion-forms' },
+    steps: [
+      { selector: COMPANION_FORM_PART('button-accent-hover', 'button') },
+      { selector: COMPANION_FORM_PART('button-ghost', 'button'), press: 'Tab' },
+    ],
+    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin):has(> [data-lab-companion-form="hazard-pressed"] button[aria-pressed="true"]):has(> [data-lab-companion-form="button-accent"] button:focus-visible) > [data-lab-companion-form="icon-plain"] .essence-icon-picker-preview`,
+    expectContained: [
+      ...COMPANION_FORM_KEYS.map((key) => ({
+        container: COMPANION_FORMS,
+        target: COMPANION_FORM(key),
+      })),
+      { container: '.window-content', target: COMPANION_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        ...COMPANION_FORM_FACES,
+        // The accent verb under the pointer, and the first accent verb's keyboard ring.
+        {
+          selector: COMPANION_FORM_PART('button-accent-hover', 'button'),
+          styles: 'border-top-color: var(--fab-accent); background-color: var(--fab-accent-soft)',
+        },
+        {
+          selector: COMPANION_FORM_PART('button-accent', 'button:focus-visible'),
+          styles: `${COMPANION_RING}; outline-color: var(--fab-accent)`,
+        },
+      ],
+    },
+    position: COMPANION_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // Judged on the palettes where the muted ink and two tints fall short on the danger fill.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `StatBox.svelte`, `Stepper.svelte`, `Button.svelte` and `IconPicker.svelte` are broad signals,
+    // each routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-companion-forms-urgent-focus',
+    label:
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After one step, Tab from the busy accent Advance, so the first urgent Advance carries the 2px accent keyboard ring 2px clear of its tile, a strip of the card's ground between ring and tile. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-companion-forms' },
+    steps: [{ selector: COMPANION_FORM_PART('button-accent-busy', 'button'), press: 'Tab' }],
+    expectSelector: `${COMPANION_FORMS}:has(> [data-lab-companion-form="stat-progress"] .fab-stat-box-slot .fab-fill-bar.is-thin):has(> [data-lab-companion-form="hazard-pressed"] button[aria-pressed="true"]):has(> [data-lab-companion-form="button-urgent"] button:focus-visible) > [data-lab-companion-form="icon-plain"] .essence-icon-picker-preview`,
+    expectContained: [
+      ...COMPANION_FORM_KEYS.map((key) => ({
+        container: COMPANION_FORMS,
+        target: COMPANION_FORM(key),
+      })),
+      { container: '.window-content', target: COMPANION_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        ...COMPANION_FORM_FACES,
+        // The urgent verb's keyboard ring, clear of its tile.
+        {
+          selector: COMPANION_FORM_PART('button-urgent', 'button:focus-visible'),
+          styles: `${COMPANION_RING}; outline-color: var(--fab-accent)`,
+        },
+      ],
+    },
+    position: COMPANION_FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // Judged on the palettes where the muted ink and two tints fall short on the danger fill.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `StatBox.svelte`, `Stepper.svelte`, `Button.svelte` and `IconPicker.svelte` are broad signals,
+    // each routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

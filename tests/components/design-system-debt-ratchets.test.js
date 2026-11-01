@@ -1381,6 +1381,18 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
+    ".fabricate-button.fabricate-button.is-accent-action:not(:disabled, [aria-disabled='true']):hover",
+    'var(--fab-accent-soft)',
+    'the outlined accent verb fills in the family it inks in',
+  ],
+  [
+    MODULE_SHEET,
+    ".fabricate-button.fabricate-button.is-urgent-action:not(:disabled, [aria-disabled='true']):hover",
+    'var(--fab-accent-hover)',
+    'the urgent verb deepens in the accent tile it fills',
+  ],
+  [
+    MODULE_SHEET,
     ".fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-accent-hover)',
     'a pressed toggle deepens in the accent tile it fills',

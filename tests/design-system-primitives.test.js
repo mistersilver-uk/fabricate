@@ -713,6 +713,9 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-controls-specimen',
         'manager-published-buttons-specimen',
         'manager-published-button-forms-specimen',
+        'manager-published-companion-forms-specimen',
+        'manager-published-companion-forms-accent-focus',
+        'manager-published-companion-forms-urgent-focus',
         'published-standalone',
         'published-standalone-light',
         'published-standalone-in-window',
@@ -866,7 +869,7 @@ function assertBroadSignalFrames(file, frames) {
   }
 }
 
-test('(a) a Stepper change publishes its two frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Stepper change publishes its two frames, then the four specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Stepper.svelte';
   const frames = [
     'manager-gathering-economy-actors',
@@ -874,6 +877,7 @@ test('(a) a Stepper change publishes its two frames, then the three specimens th
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
     'manager-published-button-forms-specimen',
+    'manager-published-companion-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
@@ -1087,12 +1091,13 @@ test('(a) a Pagination change publishes its four frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconPicker change publishes its frame, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) an IconPicker change publishes its frame, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconPicker.svelte';
   const frames = [
     'manager-system-edit-lists',
     'manager-published-icon-picker-specimen',
     'manager-published-icon-picker-choice',
+    'manager-published-companion-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-icon-picker-open',

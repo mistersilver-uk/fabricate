@@ -247,6 +247,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The picker mounted through the published seam: the list open, and a keyboard choice (issue 2647).
     'manager-published-icon-picker-specimen',
     'manager-published-icon-picker-choice',
+    // Its published tint, in the companion forms specimen (issue 2841).
+    'manager-published-companion-forms-specimen',
     // The four that mount it with and without a Fabricate root above its target, one with its list
     // open on the standalone layer (issue 2680).
     'published-standalone',
@@ -257,14 +259,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
   // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
   // specimens that mount it through the published seam (issue 2452) and the forms specimen (issue
-  // 2852), and the three that mount it with and without a Fabricate root above its target (issue
-  // 2679).
+  // 2852), the companion forms specimen's dense rung (issue 2841), and the three that mount it with
+  // and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/Stepper.svelte': Object.freeze([
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
     'manager-published-button-forms-specimen',
+    'manager-published-companion-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
@@ -687,11 +690,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-item-overview',
     'manager-published-leaves-specimen',
   ]),
-  // The at-a-glance figure (issue 1505).
+  // The at-a-glance figure (issue 1505), then the specimen of its content slot (issue 2841).
   'src/ui/svelte/components/StatBox.svelte': Object.freeze([
     'player-crafting-essence-shopping',
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
+    'manager-published-companion-forms-specimen',
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers. Then the
   // specimens that mount it through the published seam, its dismissal's two among them (issue 2452)
@@ -779,9 +783,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-inspector-cant-enable',
   ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
-  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452)
-  // and the forms specimen (issue 2853), and the three that mount it with and without a Fabricate
-  // root above its target (issue 2456).
+  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
+  // the forms specimen (issue 2853) and the companion forms specimens' roles (issue 2841), and the
+  // three that mount it with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
@@ -789,6 +793,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
     'manager-published-button-forms-specimen',
+    'manager-published-companion-forms-specimen',
+    'manager-published-companion-forms-accent-focus',
+    'manager-published-companion-forms-urgent-focus',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

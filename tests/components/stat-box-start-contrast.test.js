@@ -3,6 +3,7 @@
  * uses, and each clears its floor in all seven themes on every ground the box can sit on: its own
  * `--fab-bg-1` fill, and the translucent danger fill over each page ground a companion draws on.
  * Issue 2847: the `success` figure inks `--fab-success-text` and clears 4.5:1 on that fill.
+ * Issue 2841: the `danger` tone inks its `Kicker` label secondary, where the muted ink falls short.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -78,6 +79,19 @@ for (const tone of ['info', 'success']) {
     assert.deepEqual(shortfalls(themes, ink, [fillOf('.fab-stat-box')]), []);
   });
 }
+
+test('the danger label inks secondary over the Kicker’s muted ink, clearing 4.5:1 where muted does not', () => {
+  const kicker = 'src/ui/svelte/components/Kicker.svelte';
+  const muted = declaredToken(rulesIn(corpus[kicker]), '.fab-kicker', 'color', kicker);
+  const label = declaredToken(rules, '.fab-stat-box.is-danger > :global(.fab-kicker)', 'color');
+  assert.deepEqual([muted, label], ['--fab-text-muted', '--fab-text-secondary']);
+  const danger = GROUNDS.filter(({ tone }) => tone === 'danger');
+  for (const { name, stack } of danger) {
+    assert.deepEqual(shortfalls(themes, label, stack), [], name);
+  }
+  const overBg2 = danger.find(({ name }) => name.endsWith('--fab-bg-2')).stack;
+  assert.equal(shortfalls(themes, muted, overBg2).length, 4, 'muted over --fab-bg-2');
+});
 
 test('the start layout restates no ink, so the figure keeps the tone it is measured at', () => {
   const start = rules.filter((entry) => entry.selector.includes('.is-start'));

@@ -107,3 +107,12 @@ export const PANE_GROUNDS = Object.freeze(['--fab-bg-1', '--fab-bg-2', '--fab-su
 /** `declaredToken` over the rules of `file` in a style `corpus`, as `(file, selector, property)`. */
 export const tokenReader = (corpus) => (file, selector, property) =>
   declaredToken(rulesIn(corpus[file]), selector, property, file);
+
+/** The bare keys of the `--fab-tag-*` tokens every one of `themes` declares, in declaration order. */
+export function tagTintKeys(themes) {
+  const [first, ...rest] = [...themes.values()].map((tokens) =>
+    [...tokens.keys()].filter((name) => name.startsWith('--fab-tag-'))
+  );
+  for (const other of rest) assert.deepEqual(other, first, 'every palette declares one tag set');
+  return first.map((name) => name.slice('--fab-tag-'.length));
+}

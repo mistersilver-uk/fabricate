@@ -2531,6 +2531,11 @@
   background: var(--fab-overlay-dark-16);
 }
 
+/* A published `tint` recolours the trigger's glyph alone, in the `--fab-tag-*` colour it names (issue 2841). */
+.fabricate-icon-picker .essence-icon-picker-preview.is-tinted {
+  color: var(--fab-icon-picker-tint, var(--fab-accent));
+}
+
 .fabricate-source-picker .essence-source-selector-shell {
   position: relative;
   min-width: 0;

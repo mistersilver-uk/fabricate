@@ -782,10 +782,14 @@ Each is measurably weaker than the last in every theme, and the ORDER is the inv
 So the ordering quantity is composited CONTRAST and never an alpha or a channel — an alpha comparison ties three of the four in `mythwright`.
 A caller routes by MEANING and never by matching a tone name to a token name: `muted` inks with `--fab-text-disabled` and `neutral` with `--fab-text-muted`, so only `subtle` and `secondary` are spelled like the token they use.
 `secondary` is the rank that already carries the compliant surface named above.
-`--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
+`--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`, and on `--fab-surface-raised` over `--fab-bg-1`.
+On `--fab-danger-soft` over `--fab-bg-2` it falls short in four palettes, at 4.32:1 in `fabricate`, 4.40:1 in `hearth-herb`, 4.45:1 in `starglass-arcana` and 4.30:1 in `foundry-native`, and `--fab-text-secondary` clears 4.5:1 on that fill over all four grounds (issue 2841).
+So a published component's text on its own danger fill MUST NOT ink `--fab-text-muted`, except the `Callout` body and the `Notice` detail, which their specimens keep muted and whose shortfall there is that one: a recorded exception that issue #2876 owns.
+`text-muted-ground-contrast` ledgers every fill naming `--fab-danger-soft` in a published component's own scoped block with the inks drawn on it, and classifies every rule inking `--fab-text-muted` in a ledgered file, or in a component it imports, as a pinned body, a part a ledgered rule re-inks on the fill, or a part off the fill; it does not see content a companion draws in a slot.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
 A component's small text MUST take the first of `--fab-text-muted` and `--fab-text-secondary` that clears 4.5:1 on every flattened ground it is drawn on, in all seven themes (issue 2257 D13).
+The `Callout` body and the `Notice` detail on the danger fill over `--fab-bg-2` are a recorded exception to that rule, until issue #2876 resolves them.
 `EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
 `tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
@@ -836,8 +840,13 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 #### Scenario: A palette edit drops the muted ink under its floor
 
-- **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its five named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
+- **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its seven named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
 - **THEN** `text-muted-ground-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A published component inks muted text on its danger fill
+
+- **WHEN** a published component's scoped block paints a fill naming `--fab-danger-soft` on a selector the ledger does not name, inks a ledgered part `--fab-text-muted` outside the two pinned bodies, or, in a ledgered file or a component it imports, inks a rule `--fab-text-muted` the ledger does not classify
+- **THEN** `text-muted-ground-contrast` fails and names the selector
 
 #### Scenario: A palette edit drops the switch's off knob under its floor
 
@@ -1025,10 +1034,14 @@ The 8px and 9px rungs are read from that companion's measured scales; a new rung
 `StatBox` MUST take a `layout` that is `'default'` or `'start'`, defaulting to `'default'`, the centred serif figure over its label that every in-app caller draws.
 `'start'` draws the label first and the figure beneath it, both start-aligned, with the figure in the monospace face at 14px and weight 500, the heaviest weight the shipped mono face has; any other value draws `'default'`.
 `StatBox` MUST take an optional `note`, text, drawn after the figure and label in either layout at 10px, wrapping at the box's width and never clipped, in `--fab-text-muted`, or `--fab-danger-text` in the `danger` tone; an empty `note` draws nothing.
+In the `danger` tone the label MUST ink `--fab-text-secondary` in place of the `Kicker`'s muted ink, which falls under 4.5:1 on the danger fill over `--fab-bg-2` (issue 2841).
 The DOM order MUST be the visual order: figure then label at `'default'`, label then figure at `'start'`, and the note last in both.
 The box MUST NOT add a role, an accessible name or a heading, so a screen reader reads each piece once, as written, in that order.
 Both layouts and the note MUST use theme tokens only, and every ink MUST clear 4.5:1 on the box's own fill and on its danger fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
 No in-app caller passes `layout` or `note`: the axis exists for the published `StatBox`, whose companion draws label-first tiles with a note line in two places.
+`StatBox` MUST take an optional `children` snippet, drawn after the figure and label and before the note in either layout, in a band that is a one-column grid as wide as the box's content, spacing its children by `--fab-space-1`, `--fab-space-2` below the figure and label (issue 2841).
+Unset draws no band, so every in-app caller, none of which passes it, draws the same elements as before.
+The band adds no role and no name, so a `FillBar`, which has neither, drawn there as a progress tile's 4px track leaves the box read once, as written.
 
 #### Scenario: A caller passes neither key
 
@@ -1046,10 +1059,29 @@ No in-app caller passes `layout` or `note`: the axis exists for the published `S
 - **THEN** its text is read as the label, the figure, then the note
 - **AND** no element of the box carries a role, an `aria-label`, an `aria-labelledby` or a `title`
 
+#### Scenario: A progress tile draws its track in the band
+
+- **WHEN** a published stat box is mounted with `children` and a published `FillBar` at `density` `thin` in its slot
+- **THEN** the bar spans the box's content width, `--fab-space-2` below the figure and label, in either layout
+- **AND** the box's text is read as its layout's order with no name added
+
 #### Scenario: A note is inked
 
 - **WHEN** a note is drawn in the `danger` tone on any page ground
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
+- **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
+
+### Requirement: A stepper's dense rung keeps every pointer target at 24px
+
+`Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one (issue 2841).
+Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; the rung outranks `density` and pins `fill` at 26px.
+No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
+No in-app caller passes it: the rung exists for the published `Stepper`, whose companion draws a 26px quantity stepper inside a 38px row.
+
+#### Scenario: A dense stepper is pressed at its edge
+
+- **WHEN** a published stepper at `size` `26` is hit-tested at its decrement button's outermost pixel and at the pixel beyond it
+- **THEN** the pointer lands on the button, and then on the stepper's own edge
 
 ### Requirement: Field-sized empty states match their associated controls
 
@@ -1094,6 +1126,9 @@ An interactive primitive MUST declare rest, hover, focus-visible and disabled, a
 The pressed face MUST differ from the keyboard ring by more than an outline, MUST stay distinct under `forced-colors: active`, and MUST stay visible beside `disabled`; its label clears 4.5:1, its edge 3:1 on the four grounds and its fill 3:1 against every unpressed role but `primary`'s in every palette, and `tests/components/button-pressed-rendered.test.js` measures each in Chromium.
 A toggle is `neutral` or `ghost`, because with any other role the pressed face replaces that role's own face and its verb colour.
 Its `info` role, `is-info-action`, is the info family's soft face for a verb that writes no record.
+Its `accent` role, `is-accent-action`, is the outlined accent face for the forward verb, `--fab-accent-text` on no fill inside a `--fab-accent` edge that clears 3:1 on the four grounds, filled `--fab-accent-soft` under the pointer, and its `urgent` role, `is-urgent-action`, the solid accent tile for the one verb that is due now, the pressed face's colours at rest and under the pointer (issue 2841).
+A view MUST NOT show an `urgent` button and a pressed toggle together, and an `urgent` button MUST carry a glyph, because its urgency is otherwise colour alone; under `forced-colors: active` it is repainted as a plain button, and the keyboard ring of a focused `urgent` or pressed button MUST be a system colour, CanvasText, because the pressed face's opt-out from forcing reaches its outline too.
+Each draws its face only while enabled, so `disabled` draws the disabled face over either, and neither has an in-app caller; `tests/components/button-accent-urgent-rendered.test.js` measures both in Chromium.
 `ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
 A disabled `ArmedDangerButton` MUST draw `Button`'s disabled face whether or not it is armed; the armed fill MUST paint only an enabled control, and an armed control's hover ink MUST reach 4.5:1 against the fill it hovers on.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
@@ -1109,7 +1144,7 @@ The variant adds no glow and no second line: a field whose wrapper draws the box
 The `Field` family, the compact search field and the chance slider's percent half copy that variant rather than the outset ring — the default search field is a wrapper-drawn field, whose shell takes the full accent on `:focus-within` — and every input that is not text-like — a checkbox, a radio, a range, a colour, a file and the four button types — keeps the outset one.
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
-The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
+The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable, and at the dense `size` `26` each sits at offset -1px, straddling the part's edge inside the stepper's outer edge (issue 2841).
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
@@ -1884,6 +1919,7 @@ The bar runs the other way too, and moved out of the same directory in the same 
 `IconPicker`'s trigger, list and query-field names, its placeholder and its no-match line are the caller's whenever it passes `ariaLabel`, `listLabel`, `searchLabel`, `searchPlaceholder` and `noMatchesText`; a caller that passes none draws Fabricate's copy, localized by the app root's localizer, and a tree mounted without one draws its English and no placeholder.
 Its vocabulary follows the Foundry release Fabricate registers when its entry script loads, so the picker's closure reads no `game`, and it reads its list's measures from the window that holds the panel.
 `IconPicker` is published through `game.fabricate.api.ui` (issue 2647).
+Its `tint` (issue 2841) MUST be one of `Avatar`'s thirteen tint keys and MUST recolour the trigger's glyph alone, through `is-tinted` and the `--fab-tag-*` colour the key names, leaving its tile, name, caret and the list's rows as they are; any other value tints nothing, and no in-app caller passes it.
 Under an app localizer context, which a published mount does not carry, `IconPicker`'s trigger `aria-describedby` names the chosen glyph, on an icon-only trigger too, and names nothing while `value` holds no glyph; the trigger's own name stays `ariaLabel`, and a published mount keeps its name-only trigger (issue 2664).
 
 The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:

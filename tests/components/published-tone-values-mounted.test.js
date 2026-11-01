@@ -234,7 +234,15 @@ describe('the entries the added values widen', () => {
       'tone',
       'ink',
     ]);
-    assert.deepEqual(keys('StatBox'), ['value', 'label', 'icon', 'tone', 'layout', 'note']);
+    assert.deepEqual(keys('StatBox'), [
+      'value',
+      'label',
+      'icon',
+      'tone',
+      'layout',
+      'note',
+      'children',
+    ]);
     assert.ok(keys('Notice').includes('tone'));
   });
 });
