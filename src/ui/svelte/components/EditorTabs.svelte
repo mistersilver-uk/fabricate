@@ -110,6 +110,7 @@
 
   // Each map is keyed by tab id, so a spread below reads a script-level derived, never a call.
   const marksByTab = $derived(byTab(markList));
+  const countsByTab = $derived(byTab(itemCount));
   const buttonHooks = $derived(byTab((tab) => hook(tabDataAttr, tab)));
   const tooltipHooks = $derived(byTab((tab) => hook(tooltipDataAttr, tab)));
   const markHooks = $derived(
@@ -239,19 +240,12 @@
       : value === undefined || value === null
         ? []
         : [value];
-    return [
-      ...itemCount(tab),
-      ...values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable),
-    ];
+    return values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable);
   }
 
-  // The tab's own record count, named by its digits so the tab's name carries it once.
+  // The tab's own record count as its digits, or null; the tab's name carries it once.
   function itemCount({ count }) {
-    if (!Number.isInteger(count) || count < 0) return [];
-    const name = String(count);
-    return [
-      { vehicle: 'count', label: name, tone: 'neutral', name, suppressZero: false, hidden: true },
-    ];
+    return Number.isInteger(count) && count >= 0 ? String(count) : null;
   }
 
   function badgeTone(tone) {
@@ -308,12 +302,16 @@
     );
   }
 
-  // A named record count states what its numeral counts; every other named mark on the tab joins
-  // it, because the tab's own name replaces the content that would otherwise carry theirs.
+  // A tab's own count, or a named record count stating what its numeral counts; every other named
+  // mark on the tab joins it, because the tab's own name replaces the content that would carry theirs.
   function countName(tab) {
     const marks = marksByTab[tab.id];
-    if (!marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) return undefined;
-    const names = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
+    const own = countsByTab[tab.id];
+    if (own === null && !marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) {
+      return undefined;
+    }
+    const named = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
+    const names = own === null ? named : [own, ...named];
     return severityText(
       'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts',
       '{label}, {counts}',
@@ -330,9 +328,7 @@
   }
 
   function markAttributes(tab, mark) {
-    if (mark.vehicle === 'count') {
-      return { ...hook(countDataAttr, tab), ...(mark.hidden && { 'aria-hidden': 'true' }) };
-    }
+    if (mark.vehicle === 'count') return hook(countDataAttr, tab);
     if (mark.vehicle === 'dot') return hook(dotDataAttr, tab);
     const attributes = badgeDataAttr
       ? { [badgeDataAttr]: tab.id, 'data-badge-tone': mark.tone }
@@ -401,8 +397,11 @@
       <span>{tab.label}</span>{#if annotated && tab.tierGated}<i
           class="fas fa-lock manager-editor-tab-lock"
           aria-hidden="true"
-        ></i>{/if}
-      {#if marksByTab[tab.id].length > 0}
+        ></i>{/if}{#if countsByTab[tab.id] !== null}<span
+          class="manager-editor-tab-count"
+          aria-hidden="true">{countsByTab[tab.id]}</span
+        >{/if}
+      {#if badges}
         {#each marksByTab[tab.id] as mark, markIndex (`${tab.id}-${markIndex}`)}
           {#if mark.vehicle === 'count'}
             <span class="manager-editor-tab-count" {...markHooks[tab.id][markIndex]}
