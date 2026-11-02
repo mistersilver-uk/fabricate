@@ -2603,11 +2603,14 @@ A `dashed` label starts with its verb, as "Add tier", because no plus glyph is d
 Under forced colours an `urgent` button is repainted as a plain button, as an `accent` one is, and the keyboard ring of a focused `urgent` or pressed button is drawn in the reader's CanvasText.
 Either role is colour alone, so an `urgent` button always passes `icon`, a glyph that marks the work as due, and a label that says what is due, because the glyph is hidden from assistive technology; passing `urgent` in place of `accent` once the work is due changes only the face.
 `confirm` is outlined in the success family: no fill, its label in `--fab-success-text` inside a `--fab-success-strong` edge, filled in `--fab-success-soft` under the pointer, so it never reads as the solid `primary` it stands beside.
-`confirm` is told from `neutral` by colour alone, so a `confirm` button passes `icon`, a glyph that marks the confirmation, as `fas fa-check`, and a label that says what it confirms, because the glyph is hidden from assistive technology.
+The hover fill is a subtle cue, as faint as 1.12:1 against the ground it hovers on, and not the affordance, which is the edge and the glyph.
+`confirm` is told from `neutral` by an opaque edge and, where the palette allows, a green hue, so a `confirm` button passes `icon`, a glyph that marks the confirmation, as `fas fa-check`, and a label that says what it confirms, because the glyph is hidden from assistive technology.
 Under forced colours a `confirm` button is repainted as a plain button, as an `accent` one is, so its glyph and label carry it there.
 Its keyboard ring is the accent outline 2px clear of its edge, told from the edge by the strip of ground between them and not by colour, because in `mythwright` the accent and `--fab-success-strong` are one colour.
 A row of outlined card actions takes `neutral` for a plain verb that writes a record, `ghost` for a quiet verb that changes none, `warning` for its caution verb, `primary` for the verb that finishes the record, `accent` for its forward verb and `urgent` for that verb once it is due; `primary` and `urgent` are both solid tiles, so they never stand in one cluster.
 An action bar takes `primary` for its one commit and `confirm` for a confirming step beside it, and `confirm` never stands in for `primary`.
+A bar never carries `confirm` and `accent` together, because in `mythwright` their edges are one colour.
+A dialog's Confirm button that finishes the record is `primary`, not `confirm`.
 A Fabricate that predates the `accent` and `urgent` roles (issue 2841) draws `neutral` for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
 A Fabricate that predates the `confirm` role (issue 2890) draws `neutral` for it and refuses nothing, which `describe` cannot show; adding it is additive, and the entry stays at `version` 1.
 A visual role is drawn and never announced: it reaches no assistive technology, so the label says the verb.
@@ -2655,10 +2658,11 @@ The label of an enabled button clears the 4.5:1 small-text floor at rest in ever
 On `--fab-bg-3` every visual role but `primary` and `urgent` falls short of it in at least one palette.
 A tinted fill is `--fab-info-soft`, `--fab-accent-soft`, `--fab-success-soft`, `--fab-warning-soft` or `--fab-danger-soft` over one of the four grounds, as a tinted card of your own draws it, and each role is measured on all five over all four in every palette (issue 2898).
 There the label clears 4.5:1 at rest and under the pointer in `neutral`, `warning`, `info`, `accent`, `urgent` and `confirm`, the weakest `confirm`'s at 4.71:1 under the pointer.
-`primary`'s label clears it there at rest and, as on the grounds, not under the pointer in `foundry-native`; `danger`'s clears it at rest and under the pointer on all but `--fab-success-soft` and `--fab-warning-soft` over `--fab-bg-2` in `hearth-herb`.
+`primary`'s label clears it there at rest and, as on the grounds, not under the pointer in `foundry-native`; `danger`'s clears it at rest, and under the pointer on all but `--fab-success-soft` and `--fab-warning-soft` over `--fab-bg-2` in `hearth-herb`.
 `ghost` and `dashed` clear it there only under the pointer, because their resting label, the muted ink, falls short on each tinted fill in at least one palette.
 On a tinted fill the `urgent` tile and edge clear 3:1, the weakest at 3.67:1, as the `accent` edge does, and the `confirm` edge clears 3:1 on all but `--fab-accent-soft` over `--fab-bg-2` in `foundry-native`, at 2.96:1.
-At rest every other role draws neither an edge nor a tile that clears 3:1 against each tinted fill in at least one palette, so its label alone marks the button as a control there.
+For every other role, `accent`, `urgent` and `confirm` excluded, on each of the five tinted fills there is at least one palette and ground where, at rest, both its edge and its tile fall under 3:1, so its label alone marks the button as a control there.
+`accent` is excluded because its edge passes on every tinted fill, though its tile is 1.00:1, as it draws no fill.
 Mount a button on one of the four grounds or on a tinted fill over one of them, never on `--fab-bg-3`, and never mount a `ghost` or `dashed` button on a tinted fill.
 `urgent` says its work is due now, never that its verb leads the card, so a forward verb on a tinted card whose work is not yet due takes the outlined `accent`; Fabricate publishes no other solid forward verb.
 `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: pass a verb phrase.

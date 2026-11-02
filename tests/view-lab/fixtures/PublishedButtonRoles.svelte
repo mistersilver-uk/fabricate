@@ -3,7 +3,8 @@
   page-session seam `game.fabricate.api.ui` binds, as a companion does, each beside a caption of the
   companion's own: an action bar's `neutral` baseline, its `primary` commit and the `confirm` role
   at rest, for the pointer and the keyboard, disabled and busy; and five tinted cards, one per soft
-  fill, each holding an `accent`, an `urgent` and a `confirm` verb. Every word is a companion's
+  fill, each holding an `accent`, an `urgent` and a `confirm` verb as a face specimen, not a cluster
+  (a real cluster holds at most one `urgent`, and never an `accent` beside a `confirm`). Every word is a companion's
   final text, so none is localized. `tests/view-lab/mount.js` mounts it for
   `?specimen=published-button-roles` only.
 
@@ -72,7 +73,7 @@
         data-lab-button-tint={tint}
         style:background={`var(--fab-${tint}-soft)`}
       >
-        <span>On --fab-{tint}-soft</span>
+        <span>On --fab-{tint}-soft (face specimen, not a cluster)</span>
         {#each VERBS as [verb] (verb)}
           <div
             class="published-button-roles-target"

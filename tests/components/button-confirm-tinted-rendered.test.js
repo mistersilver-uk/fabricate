@@ -150,6 +150,7 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
     const found = [];
     const shortOnBg3 = new Set();
     let worst = { label: Infinity, edge: Infinity };
+    let weakestEdge = '';
     for (const theme of THEMES) {
       await setTheme(theme);
       await rest();
@@ -160,6 +161,7 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
       ]) {
         for (const ground of GROUNDS) {
           const read = readings(face, paint([token[ground]]));
+          if (read.edge < worst.edge) weakestEdge = `${theme} ${ground}`;
           worst = {
             label: Math.min(worst.label, read.label),
             edge: Math.min(worst.edge, read.edge),
@@ -174,10 +176,29 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
     t.diagnostic(`label under 4.5:1 on --fab-bg-3 in ${[...shortOnBg3].join(', ')}`);
     assert.deepEqual(found, []);
     assert.equal(worst.edge.toFixed(2), '3.94', 'the weakest edge, as the Button section states');
+    assert.equal(weakestEdge, 'foundry-native --fab-bg-2', 'where the weakest edge sits');
     assert.ok(
       shortOnBg3.size > 0,
       'as every role but primary and urgent, it falls short on --fab-bg-3'
     );
+    await setTheme('fabricate');
+  });
+
+  it('draws the accent and confirm edges as one colour in mythwright alone, where the accent is --fab-success-strong', async () => {
+    const one = [];
+    for (const theme of THEMES) {
+      await setTheme(theme);
+      await rest();
+      const token = await probesNow();
+      const [accent, confirm] = await Promise.all(['accent', 'confirm'].map(faceOf));
+      assert.equal(
+        token['--fab-accent'] === token['--fab-success-strong'],
+        accent.edge === confirm.edge,
+        theme
+      );
+      if (accent.edge === confirm.edge) one.push(theme);
+    }
+    assert.deepEqual(one, ['mythwright']);
     await setTheme('fabricate');
   });
 
@@ -208,12 +229,21 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
     await setTheme('fabricate');
   });
 
+  // An unknown role also draws neutral, so equality with neutral alone would pass without the role;
+  // the role's own face differs from neutral's outside forced colours (above), and this guards against
+  // a later `forced-color-adjust: none` on the confirm class, which would keep its success colours.
   for (const colorScheme of ['light', 'dark']) {
-    it(`is repainted as a plain button under forced colours in a ${colorScheme} scheme`, async () => {
+    it(`is repainted as a plain button under forced colours in a ${colorScheme} scheme, with no forced-color-adjust opt-out`, async () => {
       await rest();
       await tab.emulateMedia({ forcedColors: 'active', colorScheme });
       try {
         const [neutral, confirm] = await Promise.all(['neutral', 'confirm'].map(faceOf));
+        const adjust = await tab.evaluate(
+          () =>
+            getComputedStyle(document.querySelector('[data-case="confirm"] button'))
+              .forcedColorAdjust
+        );
+        assert.equal(adjust, 'auto');
         // The repaint keeps a fill's alpha, so a translucent neutral fill differs from an opaque one there alone.
         const opaque = (colour) =>
           colour.replace(/^rgba\((\d+), (\d+), (\d+), [\d.]+\)$/u, 'rgb($1, $2, $3)');
@@ -291,6 +321,13 @@ describe('every Button role on the tinted fills (issue 2898)', () => {
     }
   });
 
+  it('leaves confirm the weakest label of neutral, warning, info, accent, urgent and confirm on a tinted fill', () => {
+    for (const role of ['neutral', 'warning', 'info', 'accent', 'urgent']) {
+      assert.ok(floorOf(role, 'label') > floors.confirm.hover.label, role);
+    }
+    assert.equal(floorOf('confirm', 'label'), floors.confirm.hover.label);
+  });
+
   it('inks a clear primary label at rest, and under the pointer falls short in foundry-native alone', () => {
     assert.deepEqual(shortfalls.primary.rest.label, []);
     assert.equal(shortfalls.primary.hover.label.length, TINTS.length * GROUNDS.length);
@@ -343,6 +380,15 @@ describe('every Button role on the tinted fills (issue 2898)', () => {
     assert.equal(fixed(floors.confirm.hover.label), '4.71');
     assert.ok(floors.confirm.rest.label > floors.confirm.hover.label, 'the pointer is the weakest');
     assert.equal(fixed(floorOf('confirm', 'edge')), '2.96');
+    assert.equal(fixed(floorOf('accent', 'tile')), '1.00', 'the accent draws no fill');
+  });
+
+  it('draws the confirm hover fill as a subtle cue, never 3:1 against the tinted fill it hovers on, and as faint as 1.12:1', () => {
+    assert.equal(
+      shortfalls.confirm.hover.tile.length,
+      THEMES.length * TINTS.length * GROUNDS.length
+    );
+    assert.equal(fixed(floors.confirm.hover.tile), '1.12');
   });
 
   it('leaves every other role, at rest, with neither edge nor tile at 3:1 on each tinted fill in at least one palette', () => {
