@@ -132,7 +132,7 @@ describe('the roll prompt’s Select ring', () => {
 <body class="game"><div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"
  style="width:420px;padding:20px">
 <div class="fabricate-roll-prompt ${prompt.hashClass}"><div class="fabricate-field prompt-field mode-field">
-<span class="eyebrow">Roll mode</span><div class="fabricate-select"><button
+<span class="eyebrow">Roll mode</span><div class="fabricate-picker manager-travel-picker fabricate-select"><button
  class="fabricate-select-trigger fabricate-select-trigger-inline" aria-label="Roll mode">
 <span class="fabricate-select-value">Public</span></button></div></div></div></div></body></html>`;
   let browser;
