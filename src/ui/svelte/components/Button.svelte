@@ -15,6 +15,7 @@
   | `busy` | boolean | `false` | An action in flight: writes `aria-busy` and `aria-disabled`, never `disabled`, so focus and arm state survive, and swallows the press. `disabled` beside it still renders disabled. |
   | `pressed` | `true` \| `false` \| absent | `undefined` | A toggle's state: writes `aria-pressed`, and `true` the `is-pressed` face; any other value writes neither (issue 2852). |
   | `ariaLabel` / `tooltip` | pre-localized strings | `''` / `''` | The name that replaces the label, which the published seam holds to containing it, and hint text written as `data-tooltip-text` and opened on keyboard focus as `IconButton`'s is; a blank string writes neither. |
+  | `description` | pre-localized string | `''` | The accessible description, drawn hidden inside the button and named after the caller's own `aria-describedby`; held there against Foundry's tooltip, and a blank string writes none (issue 2895). |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
   | `element` / `children` | bindable / snippet | `null` / `undefined` | The rendered DOM node, since `bind:this` on a component yields the INSTANCE and a caller that must measure or focus the button has no other way to reach it; and the label, a snippet rather than a string because call sites wrap the label in their own spans. |
 
@@ -62,7 +63,8 @@
     focusable, has no implicit link role and does not activate on Enter; several anchor call sites
     take their `href` from caller data, so the empty case is reachable.
   - No scoped `<style>`: the anchor's `text-decoration: none` and the `is-full-width` rule live in
-    `styles/fabricate.css` even though this component emits their classes.
+    `styles/fabricate.css` even though this component emits their classes. The description's
+    `display: none` is inline, because a host reset that sets `display` beats the UA `[hidden]` rule.
 -->
 <script>
   import { getContext, onDestroy } from 'svelte';
@@ -81,6 +83,7 @@
     pressed = undefined,
     ariaLabel = '',
     tooltip = '',
+    description = '',
     disabled = false,
     onclick = () => {},
     onfocus = undefined,
@@ -91,6 +94,7 @@
     'data-tooltip-html': dataTooltipHtml = undefined,
     'data-tooltip-text': dataTooltipText = undefined,
     'data-locked': dataLocked = undefined,
+    'aria-describedby': describedByIds = undefined,
     element = $bindable(null),
     children = undefined,
     class: extraClass = '',
@@ -151,6 +155,18 @@
   );
 
   const isText = (value) => typeof value === 'string' && value.trim() !== '';
+
+  const descriptionId = $props.id();
+
+  const descriptionText = $derived(isText(description) ? description : '');
+
+  const describedBy = $derived(
+    descriptionText ? [describedByIds, descriptionId].filter(Boolean).join(' ') : describedByIds
+  );
+
+  $effect(() => {
+    if (descriptionText && element) return tooltips?.holdDescribedBy?.(element, () => describedBy);
+  });
 
   const pressedState = $derived(
     pressed === true || pressed === false ? String(pressed) : undefined
@@ -224,6 +240,7 @@
   aria-disabled={busy ? 'true' : undefined}
   aria-pressed={pressedState}
   aria-label={isText(ariaLabel) ? ariaLabel : undefined}
+  aria-describedby={describedBy}
   {title}
   data-tooltip={dataTooltip}
   data-tooltip-html={dataTooltipHtml}
@@ -239,5 +256,10 @@
     onkeydown?.(event);
     if (event.key === 'Escape') dismissTooltip();
   }}
-  >{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{@render children?.()}</svelte:element
+  >{#if icon}<i class={icon} aria-hidden="true"
+    ></i>{/if}{@render children?.()}{#if descriptionText}<span
+      id={descriptionId}
+      hidden
+      style:display="none">{descriptionText}</span
+    >{/if}</svelte:element
 >

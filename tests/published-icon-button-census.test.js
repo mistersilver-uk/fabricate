@@ -129,7 +129,19 @@ describe('the module sheet and every component style against the published IconB
     );
     assert.deepEqual(
       [Object.keys(entryNamed('IconButton').props), gatedRoot(entryNamed('IconButton'))],
-      [['icon', 'ariaLabel', 'role', 'size', 'disabled', 'onclick', 'aria-expanded'], 'fabricate'],
+      [
+        [
+          'icon',
+          'ariaLabel',
+          'role',
+          'size',
+          'disabled',
+          'onclick',
+          'aria-expanded',
+          'description',
+        ],
+        'fabricate',
+      ],
       'a published tooltip, class, child or wider root reopens the census'
     );
   });
