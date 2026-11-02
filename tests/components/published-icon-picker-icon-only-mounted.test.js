@@ -5,7 +5,8 @@
  * any other value draws the captioned trigger, nothing coerced; the captioned trigger's name and
  * title are `ariaLabel`, a comma and the caption it draws, unless `ariaLabel` already holds the
  * caption as whole words, so its name always holds its visible label, a stored glyph outside the
- * vocabulary included; an `update` recomposes the name on the same trigger.
+ * vocabulary included, and an `ariaLabel` the seam passes that is not a string is drawn as written;
+ * an `update` recomposes the name on the same trigger.
  * Limit: happy-dom computes no accessible name, so the name read here is the `aria-label`
  * Chromium's tree reads in `icon-picker-icon-only-rendered`.
  */
@@ -123,6 +124,14 @@ describe('the published IconPicker captioned trigger name', () => {
         `"${shown.caption}" is the caption it draws`
       );
       assert.equal(shown.describedBy, null, 'a published trigger describes nothing');
+      handle.destroy();
+    });
+  }
+
+  for (const ariaLabel of [42, true, {}, ['a']]) {
+    it(`renders an ariaLabel of ${JSON.stringify(ariaLabel)}, which the seam passes, without throwing`, async () => {
+      const { handle, trigger } = await mountPicker({ ariaLabel });
+      assert.equal(drawn(trigger()).name, `${String(ariaLabel)}, Flask`);
       handle.destroy();
     });
   }

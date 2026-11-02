@@ -23,8 +23,12 @@ function spokenTokens(text) {
   return pieces.flatMap((piece) => piece.match(/[\p{L}\p{M}\p{N}]+|\p{S}/gu) ?? []);
 }
 
-/** Whether `name`'s tokens hold `label`'s as one contiguous run of whole tokens. */
+/**
+ * Whether `name`'s tokens hold `label`'s as one contiguous run of whole tokens; a `name` or `label`
+ * that is not a string holds and is held by nothing.
+ */
 export function containsLabel(name, label) {
+  if (typeof name !== 'string' || typeof label !== 'string') return false;
   const [heard, shown] = [spokenTokens(name), spokenTokens(label)];
   return (
     heard.some(

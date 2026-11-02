@@ -160,7 +160,11 @@ describe('the published IconPicker icon-only trigger, rendered (issue 2905)', ()
       const rest = await paint(page, 'icon-only');
       assert.deepEqual(
         [rest.background, rest.tile, rest.glyph],
-        [(await paint(page, 'captioned')).background, '28pxx28px', rest.glyph]
+        [
+          (await paint(page, 'captioned')).background,
+          '28pxx28px',
+          (await paint(page, 'captioned')).glyph,
+        ]
       );
       assert.equal(await tabTo(page, 'icon-only'), true, 'keyboard focus');
       const focused = await paint(page, 'icon-only');
