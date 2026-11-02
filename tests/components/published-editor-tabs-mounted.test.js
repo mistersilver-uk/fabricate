@@ -366,8 +366,8 @@ describe('a tab’s count on the published EditorTabs', () => {
     ['a numeric string', '2'],
     ['a negative', -1],
     ['a fraction', 1.5],
-    ['NaN', Number.NaN],
-    ['Infinity', Number.POSITIVE_INFINITY],
+    ['NaN', NaN],
+    ['Infinity', Infinity],
     ['null', null],
     ['a boolean', true],
   ]) {
