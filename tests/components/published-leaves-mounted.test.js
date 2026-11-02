@@ -516,6 +516,15 @@ const LEAVES = Object.freeze([
     },
     drawn: ['Strength', 'Wisdom'],
   },
+  {
+    name: 'TintSwatches',
+    under: 'fabricate',
+    root: '.fabricate-tint-swatches',
+    props: { value: 'rose', ariaLabel: 'Activity colour', onChange() {} },
+    next: { value: 'aqua', ariaLabel: 'Activity colour', onChange() {} },
+    read: (root) => root.querySelector('[aria-checked="true"]').dataset.managerColorToken,
+    drawn: ['rose', 'aqua'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -706,6 +715,11 @@ describe('a key a leaf does not publish', () => {
       'Popover',
       key,
       'is not a prop of Popover',
+    ]),
+    ...['noneLabel', 'noneChecked', 'onClear', 'class', 'data-x'].map((key) => [
+      'TintSwatches',
+      key,
+      'is not a prop of TintSwatches',
     ]),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {

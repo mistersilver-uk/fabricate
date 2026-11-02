@@ -44,6 +44,12 @@ const UNREACHABLE = reach(null, null);
 const inertHover = (hover) => ({ ...reach(null, hover), inert: true });
 
 const button = (props) => ({ props, reach: reach('button') });
+
+/** A swatch strip's props, and its Tab stop beside an unchecked swatch to hover. */
+const swatches = (props, stop) => ({
+  props: { ariaLabel: 'Activity colour', onChange: press, ...props },
+  reach: reach(stop, '[role="radio"][aria-checked="false"]'),
+});
 const disabledButton = (props) => ({ props, reach: inertHover('button') });
 
 const card = (props) => ({
@@ -651,6 +657,19 @@ export const STANDALONE_SPECIMENS = Object.freeze({
         title:
           'Spend MoonpetalSilverleafEmberSaltVerdigrisAlloyCatalystResidueInfusion when this stage begins',
       })
+    ),
+  }),
+  // Issue 2901: the checked strip, the strip with none checked, and a subset with its own names.
+  TintSwatches: Object.freeze({
+    'tint-swatches-checked': swatches({ value: 'rose' }, '[aria-checked="true"]'),
+    'tint-swatches-unchecked': swatches({ value: '' }, '[data-manager-color-token="sage"]'),
+    'tint-swatches-subset': swatches(
+      {
+        value: 'butter',
+        tints: ['azure', 'rose', 'butter'],
+        labels: { azure: 'Sky', rose: 'Blush', butter: 'Straw' },
+      },
+      '[aria-checked="true"]'
     ),
   }),
 });
