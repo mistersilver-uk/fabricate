@@ -5,6 +5,7 @@
  * seam and its tests read it without Svelte.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
+import { containsLabel } from './labelInName.js';
 import { changeKeys, isValuePrimitive } from './publishedComponentValues.js';
 
 export const PREFIX = 'Fabricate | published components: ';
@@ -304,37 +305,6 @@ function assertRequired(entry, copy) {
       throw refuse(`${entry.name} requires a non-empty "${key}" when "${guard}" is truthy`);
     }
   }
-}
-
-const WORDS =
-  typeof Intl.Segmenter === 'function'
-    ? new Intl.Segmenter(undefined, { granularity: 'word' })
-    : null;
-
-/**
- * `text` as a listener hears it, for M22: NFKC normalised and case folded, then its words and
- * symbols in order, each a run of letters, marks and digits or one symbol; punctuation and spacing
- * are dropped. Words are split by `Intl.Segmenter`, so a word inside unspaced CJK text stands
- * alone; a runtime without it splits on spacing, so such a label is refused rather than passed.
- */
-export function spokenTokens(text) {
-  const folded = text.normalize('NFKC').toLowerCase();
-  const pieces = WORDS
-    ? Array.from(WORDS.segment(folded), ({ segment }) => segment)
-    : folded.split(/\s+/u);
-  return pieces.flatMap((piece) => piece.match(/[\p{L}\p{M}\p{N}]+|\p{S}/gu) ?? []);
-}
-
-/** Whether `name`'s tokens hold `label`'s as one contiguous run of whole tokens. */
-export function containsLabel(name, label) {
-  const [heard, shown] = [spokenTokens(name), spokenTokens(label)];
-  return (
-    heard.some(
-      (_, start) =>
-        start + shown.length <= heard.length &&
-        shown.every((token, offset) => heard[start + offset] === token)
-    ) || shown.length === 0
-  );
 }
 
 /** A value M22 compares a name with: a number by its digits, anything else as it is. */

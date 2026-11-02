@@ -40,6 +40,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/labelInName.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',

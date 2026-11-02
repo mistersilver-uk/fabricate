@@ -1055,7 +1055,7 @@ describe('a contains key (issue 2852)', () => {
   });
 
   it('splits on spacing alone where the runtime has no Intl.Segmenter, refusing a label inside unspaced text', () => {
-    const url = new URL('../src/ui/publishedComponentProps.js', import.meta.url).href;
+    const url = new URL('../src/ui/labelInName.js', import.meta.url).href;
     const script =
       'delete Intl.Segmenter;' +
       `const { containsLabel } = await import(${JSON.stringify(url)});` +

@@ -41,6 +41,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/labelInName.js',
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/util/essencePreviewRow.js',
