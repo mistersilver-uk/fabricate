@@ -4620,7 +4620,6 @@ Pass an `overlayHost` inside the same Fabricate window, or none, so the list tak
 The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
 Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
 The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal.
 A row is at least 28px tall, so each is a 24px target.
 `Typeahead` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Typeahead`.
 Its field is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog; it fills the width of `target`, so give `target` `display: flex`.
@@ -4723,12 +4722,12 @@ Focus and keys:
 
 The panel is the component's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens, so `target`'s overflow does not clip it.
 It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog.
+In a `<dialog>` opened with `showModal()` that holds the anchor or `target`, it is drawn in that dialog, as [Overlays](#overlays) states, so it is not inert there.
 It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
 Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
 The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls you draw inside carry their own edges.
 `Popover` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Popover`.
-Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or a dialog that is not modal, on the standalone layer there.
+Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, modal or not, on the standalone layer there.
 An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach your controls in its slot.
 Whether a screen reader announces the panel as a dialog, and by which name, as it takes focus is the reader's; Fabricate's suites read Chromium's accessibility tree only.
 Its padding, gap, corner and type figures, its colours and placement beyond what this section states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks are private.
@@ -5074,23 +5073,24 @@ A component whose `describe(name).overlays` is `true` opens an overlay: a panel 
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
 1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
-2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
-3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
+2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer, unless it lies outside the top-layer element step 3 names;
+3. else, where the element the panel is placed against or `target` is inside an element in the browser's top layer, a `<dialog>` opened with `showModal()` as a DialogV2 with `modal: true` is, a fullscreen element or an open `popover`, a standalone layer Fabricate keeps inside the nearest such element while any overlay is open on it, themed as the one below, so the panel is that element's descendant: it is drawn above the page with it, it is not inert, it takes the pointer and it is in the accessibility tree (issue 2884);
+4. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 `Popover` accepts a host anywhere in `target`'s document, and its section states what one outside every Fabricate window changes.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
-Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
+Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer on `<body>` bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it, and one in a panel on a layer inside a top-layer element bubbles through that element and its ancestors first, outside any `<form>` in it, so a listener of yours on your dialog element hears it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 Where its host is the standalone layer, that element states `pointer-events: auto` and a Fabricate window's typeface and size, `var(--font-body, var(--font-primary, sans-serif))` and `var(--font-size-14)`.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; mount it in a dialog that is not modal.
+An `overlayHost` you pass outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert, so in such a dialog pass one inside it, or none.
+In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless your own listener prevents that key.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.

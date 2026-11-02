@@ -21,6 +21,7 @@ const {
   registerOverlayChain,
   releaseOverlayHost,
   resetOverlayHostDiagnostics,
+  topLayerAbove,
   unregisterOverlayChain,
 } = await import('../../src/ui/svelte/util/overlayHost.js');
 
@@ -391,5 +392,76 @@ describe('acquireStandaloneOverlayLayer', () => {
     two.release();
     one.release();
     assert.ok(!document.querySelector(LAYER));
+  });
+});
+
+describe('a standalone layer in a top-layer element (issue 2884)', () => {
+  it('keeps one layer per parent, apart from the one on the body, removed with its last release', () => {
+    const dialog = element('dialog');
+    const onBody = acquireStandaloneOverlayLayer(document, {});
+    const one = acquireStandaloneOverlayLayer(
+      document,
+      { 'data-fabricate-theme': 'night' },
+      dialog
+    );
+    const two = acquireStandaloneOverlayLayer(document, {}, dialog);
+    assert.ok(
+      one.host === two.host && one.host.parentElement === dialog,
+      'one layer in the dialog'
+    );
+    assert.ok(one.host !== onBody.host, 'apart from the body’s');
+    assert.equal(one.host.getAttribute('data-fabricate-theme'), 'night');
+    assert.deepEqual([one.host.style.right, one.host.style.pointerEvents], ['0px', 'none']);
+    one.release();
+    two.release();
+    assert.ok(!dialog.querySelector(LAYER), 'gone with the last release');
+    assert.ok(onBody.host.isConnected, 'the body’s is untouched');
+    onBody.release();
+  });
+
+  it('measures that layer by its own box, which a transformed parent moves', () => {
+    const dialog = element('dialog');
+    const layer = acquireStandaloneOverlayLayer(document, {}, dialog);
+    layer.host.getBoundingClientRect = () => ({ left: 30, top: 40, width: 300, height: 200 });
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.deepEqual(overlayHostRect(container), { left: 30, top: 40, width: 300, height: 200 });
+    layer.release();
+  });
+
+  it('answers the nearest top-layer element above the first node with one, else null', () => {
+    const outer = element('dialog');
+    const inner = element('div', outer);
+    const plain = element();
+    const open = new Set([outer]);
+    const fake = (node) => {
+      node.closest = (selector) => {
+        assert.equal(selector, ':modal, :popover-open');
+        for (let at = node; at; at = at.parentElement) if (open.has(at)) return at;
+        return null;
+      };
+      return node;
+    };
+    assert.ok(topLayerAbove([undefined, fake(plain), fake(inner)]) === outer);
+    assert.ok(topLayerAbove([fake(element())]) === null);
+    assert.ok(topLayerAbove([]) === null);
+  });
+
+  it('hands the chain the measured anchor and the anchor the host is acquired from', () => {
+    const target = element();
+    const anchor = element('button', target);
+    const measured = element('button');
+    const seen = [];
+    const chain = standInChain(element());
+    const acquire = chain.acquire;
+    chain.acquire = (overlay, from) => {
+      seen.push(from);
+      return acquire(overlay, from);
+    };
+    registerOverlayChain(target, chain);
+    const overlay = element();
+    acquireOverlayHost(overlay, anchor, { anchor: measured });
+    assert.ok(seen[0][0] === measured && seen[0][1] === anchor);
+    releaseOverlayHost(overlay);
+    unregisterOverlayChain(target, chain);
   });
 });

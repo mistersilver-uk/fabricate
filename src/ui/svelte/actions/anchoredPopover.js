@@ -239,7 +239,8 @@ export function anchoredPopover(node, params = {}) {
   }
 
   function portalToHost() {
-    host = acquireOverlayHost(node, openerOf(options) ?? anchorElement(), options);
+    const anchor = anchorElement();
+    host = acquireOverlayHost(node, openerOf(options) ?? anchor, { ...options, anchor });
     if (portalHandle) portalHandle.update(host);
     else portalHandle = portal(node, host);
   }
