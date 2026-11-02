@@ -350,6 +350,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
       placeholder: Object.freeze({ kind: 'data' }),
       size: Object.freeze({ kind: 'data' }),
+      fill: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',
