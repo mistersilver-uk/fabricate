@@ -751,7 +751,7 @@ const BUTTON_ROLE_FACES = Object.freeze([
 ]);
 
 /** Sized to the fixture's two columns, the bar's six rows and the five tinted cards. */
-const BUTTON_ROLES_WINDOW = Object.freeze({ width: 920, height: 420 });
+const BUTTON_ROLES_WINDOW = Object.freeze({ width: 920, height: 520 });
 
 /** The selection checkbox fixture's two grounds, a row by its key, and the box and label it draws. */
 const CHECKBOXES = '[data-lab-selection-checkboxes]';
@@ -2628,7 +2628,7 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     query: { specimen: 'published-button-roles' },
     steps: [{ selector: BUTTON_ROLE_CONTROL('primary'), press: 'Tab' }],
-    expectSelector: `${BUTTON_ROLES}:has([data-lab-button-tint="danger"] [data-lab-button-verb="confirm"] button) ${BUTTON_ROLE_CONTROL('confirm')}:focus-visible`,
+    expectSelector: `${BUTTON_ROLES}:has([data-lab-button-tint="danger"] [data-lab-button-verb="confirm"] button) [data-lab-button-role="confirm"] button:focus-visible`,
     expectContained: [
       ...BUTTON_ROLE_KEYS.map((key) => ({ container: BUTTON_ROLES, target: BUTTON_ROLE(key) })),
       ...BUTTON_ROLE_TINTS.map((tint) => ({ container: BUTTON_ROLES, target: BUTTON_TINT(tint) })),
