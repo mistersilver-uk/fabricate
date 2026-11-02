@@ -3,9 +3,10 @@
  * published control draws, 2px wide and 2px clear in the accent, beside the accent edge it already
  * took, at all three sizes and in the read-only and invalid shapes, in all seven palettes. The ring
  * reaches 4px past the trigger, so a container with 4px of padding shows it whole and one with
- * 2px cuts it. A pointer press draws none, and forced colours keep a ring in the reader's text
- * colour. The ring's contrast against the four grounds and the trigger's own fills is read off the
- * sheet, because a frame shows one palette only.
+ * 2px of padding clips all of it, because the ring starts 2px out. A pointer press draws none, and
+ * forced colours keep a ring in a system colour apart from the ground. The ring's contrast against
+ * the four grounds and each rung's and the invalid shape's own fill is read off the sheet, because
+ * a frame shows one palette only.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -13,6 +14,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { defineAccentRingContrast } from '../helpers/accentRingContrast.js';
 import { pixelAt } from '../helpers/pagePixels.js';
 import {
   PUBLISHED_ADAPTER,
@@ -27,7 +29,7 @@ import {
 import { renderedPageHead } from '../helpers/renderedPageHead.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
+import { declaredToken } from '../helpers/themePaletteContrast.js';
 
 const harness = createMountedComponentHarness({
   repoRoot: resolve(import.meta.dirname, '../..'),
@@ -54,11 +56,14 @@ const THEMES = Object.freeze([
   'foundry-native',
   'sovereign',
 ]);
+const SHEET = 'styles/fabricate.css';
 const GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']);
-const FILLS = Object.freeze({
-  form: '--fab-surface-soft',
-  inline: '--fab-bg-2',
-  toolbar: '--fab-bg-1',
+/** The selector of each fill the trigger paints: a rung's own, and the invalid shape's. */
+const FILL_RULES = Object.freeze({
+  form: '.fabricate-select .fabricate-select-trigger-form',
+  inline: '.fabricate-select .fabricate-select-trigger-inline',
+  toolbar: '.fabricate-select .fabricate-select-trigger-toolbar',
+  invalid: ".fabricate-select-trigger[aria-invalid='true']",
 });
 
 let browser;
@@ -198,7 +203,7 @@ describe('the published Select trigger in Chromium', () => {
     assert.equal((await ringOf('form')).outline[0], 'none');
   });
 
-  it('shows the whole ring inside 4px of padding and loses its outer half inside 2px', async () => {
+  it('shows the whole ring inside 4px of padding and none of it inside 2px', async () => {
     const accent = (await resolved('color', 'var(--fab-accent)')).match(/\d+/gu).map(Number);
     await keyFocusOn(CLIPPED(4));
     for (const [side, value] of Object.entries(await ringPixels(CLIPPED(4)))) {
@@ -207,7 +212,7 @@ describe('the published Select trigger in Chromium', () => {
     await keyFocusOn(CLIPPED(2));
     const cut = await ringPixels(CLIPPED(2));
     for (const [side, value] of Object.entries(cut)) {
-      assert.notDeepEqual(value, accent, `${side}: 2px of padding cuts the ring’s outer half`);
+      assert.notDeepEqual(value, accent, `${side}: 2px of padding clips the whole ring`);
     }
   });
 
@@ -231,19 +236,12 @@ describe('the published Select trigger in Chromium', () => {
 });
 
 describe('the Select trigger ring’s contrast, read off the sheet', () => {
-  const themes = themePalettes(rulesIn(collectStyleCorpus()['styles/fabricate.css']));
+  const selectRules = rulesIn(collectStyleCorpus()[SHEET]);
+  const fills = Object.values(FILL_RULES).map((selector) =>
+    declaredToken(selectRules, selector, 'background', SHEET)
+  );
 
-  for (const ground of GROUNDS) {
-    it(`clears 3:1 against ${ground} in every palette`, () => {
-      assert.deepEqual(shortfalls(themes, '--fab-accent', [ground], 3), []);
-    });
-  }
-
-  for (const [size, fill] of Object.entries(FILLS)) {
-    for (const ground of GROUNDS) {
-      it(`clears 3:1 against the ${size} trigger’s ${fill} over ${ground} in every palette`, () => {
-        assert.deepEqual(shortfalls(themes, '--fab-accent', [fill, ground], 3), []);
-      });
-    }
-  }
+  defineAccentRingContrast('.fabricate-select .fabricate-select-trigger:focus-visible', {
+    stacks: [...new Set(fills)].flatMap((fill) => GROUNDS.map((ground) => [fill, ground])),
+  });
 });
