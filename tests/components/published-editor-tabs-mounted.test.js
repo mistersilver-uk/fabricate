@@ -370,6 +370,7 @@ describe('a tab’s count on the published EditorTabs', () => {
     ['Infinity', Infinity],
     ['null', null],
     ['a boolean', true],
+    ['a count above Number.MAX_SAFE_INTEGER', 1e21],
   ]) {
     it(`draws no count and adds nothing to the name for ${claim}, and refuses nothing`, async () => {
       const { handle, tabs } = mountStrip({ tabs: withCounts(value) });
@@ -653,6 +654,11 @@ describe('what the published EditorTabs refuses', () => {
     [
       'a function in a tab (M10)',
       { tabs: [{ id: 'inputs', label: () => 'Inputs' }] },
+      '"tabs" must not hold a function',
+    ],
+    [
+      'a function in a tab’s count (M10)',
+      { tabs: [{ id: 'inputs', label: 'Inputs', count: () => 2 }] },
       '"tabs" must not hold a function',
     ],
   ]) {

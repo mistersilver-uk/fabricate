@@ -3522,8 +3522,8 @@ Each `label` is required and is final display text, the tab's visible text and i
 Each `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 Each `count` is optional and is a whole number of 0 or more, as `2`, drawn after the label as the strip's record count, a small muted numeral in the mono face, on the selected tab as on any other.
 A tab with a `count` is named its label, a comma, a space and the count's digits, as "Factions, 2", and the numeral itself is hidden from assistive technology, so the count is read once; Fabricate adds no word, so the name reads alike in every language.
-A `count` of 0 is drawn and named, so omit `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped.
-A `count` that is not a whole number of 0 or more, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
+A `count` of 0 is drawn and named, so omit `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped, up to `Number.MAX_SAFE_INTEGER`, above which a count draws nothing.
+A `count` that is not a whole number from 0 to `Number.MAX_SAFE_INTEGER`, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
 The numeral's muted ink clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, on a selected, an unselected and a hovered tab alike; under forced colours it is drawn in the system text colour, and it never marks the selection.
 An item's other members are private and Fabricate draws nothing from them; a function in one is refused.
 Naming `count` is additive, and `EditorTabs`' `version` stays 1: before it `count` was a private member that drew nothing.

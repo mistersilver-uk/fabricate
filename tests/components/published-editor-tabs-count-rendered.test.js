@@ -186,6 +186,7 @@ describe('a published tab’s count under forced colours', () => {
               }
             : null,
           weight: style.fontWeight,
+          ink: style.color,
           underline: style.borderBottomColor,
           canvas: getComputedStyle(tab.closest('.fabricate')).backgroundColor,
         };
@@ -195,7 +196,8 @@ describe('a published tab’s count under forced colours', () => {
       await read('journal'),
       await read('notes'),
     ];
-    for (const { mark, canvas } of [selected, unselected]) {
+    for (const { mark, ink, canvas } of [selected, unselected]) {
+      assert.equal(mark.ink, ink, 'the numeral takes the tab’s own system ink');
       assert.ok(mark.width > 0, 'the numeral has a box');
       assert.equal(mark.visibility, 'visible');
       assert.ok(contrast(spaced(mark.ink), spaced(canvas)) >= 4.5, 'system ink on the canvas');

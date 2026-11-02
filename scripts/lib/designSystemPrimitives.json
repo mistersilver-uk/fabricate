@@ -240,7 +240,7 @@
       "why": [
         "The editor tab strip, a real tablist with arrow-key selection whose tabs carry a record count or an issue badge.",
         "`library.html`'s `<TabBar>` specifies it, and the manager's editors and the player application's detail tabs render it, so it is shared.",
-        "Issue 2896 publishes a tab item's `count`, a whole number of 0 or more drawn as the record-count vehicle, hidden from assistive technology and naming the tab `<label>, <count>`, the one mark the published strip draws."
+        "Issue 2896 publishes a tab item's `count`, a whole number from 0 to `Number.MAX_SAFE_INTEGER` drawn as the record-count vehicle, hidden from assistive technology and naming the tab `<label>, <count>`, the one mark the published strip draws."
       ]
     },
     {

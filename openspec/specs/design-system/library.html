@@ -5395,7 +5395,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>Svelte API</h5>
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>EditorTabs.svelte</code>&rsquo;s <code>$props()</code>, with seventeen importers; the issue badge is <code>Chip</code> at <code>density="inspector"</code> with <code>mono</code>.</li>
-          <li><b>tabs</b> {id, icon, label, count?}[] &middot; <b>activeTab &middot; onSelect</b> <span class="req">required</span> &mdash; a tab&rsquo;s own <b>count</b>, a whole number of 0 or more, draws the record count above after the label, ahead of any <b>badges</b> mark, hidden from assistive technology, and names the tab &ldquo;Factions, 2&rdquo;: zero is drawn, a large count in full, and any other value draws nothing.
+          <li><b>tabs</b> {id, icon, label, count?}[] &middot; <b>activeTab &middot; onSelect</b> <span class="req">required</span> &mdash; a tab&rsquo;s own <b>count</b>, a whole number from 0 to <code>Number.MAX_SAFE_INTEGER</code>, draws the record count above after the label, ahead of any <b>badges</b> mark, hidden from assistive technology, and names the tab &ldquo;Factions, 2&rdquo;: zero is drawn, a large count in full, and any other value draws nothing.
             It is the one mark the published strip draws (issue 2896)</li>
           <li><b>badges</b> per tab id, one mark or an array of them; a mark is a plain value or {<b>vehicle</b> count | issue | dot = issue, <b>label</b>, <b>tone</b>, <b>name</b> <span class="req">required for dot</span>, <b>suppressZero</b> = true}</li>
           <li><b>idStem</b> builds both ids &middot; <b>buttonIdStem &middot; panelIdStem</b> override either half</li>
