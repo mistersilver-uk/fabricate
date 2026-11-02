@@ -58,7 +58,7 @@
     },
     {
       "path": "src/ui/svelte/components/TintPicker.svelte",
-      "reason": "pending:#2791: its onChange is called from the strip's own buttons and handed to SearchablePopover as onSelect, a shape no forwarded-callback pin admits, so publishing the strip waits on splitting it from the popover."
+      "reason": "no-consumer: the manager's tint popover and free-hex entry, whose onChange SearchablePopover calls as onSelect; a companion draws its swatch strip through the published TintSwatches."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",

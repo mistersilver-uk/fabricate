@@ -161,17 +161,24 @@
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: transparent;
+    position: relative;
     box-shadow: none;
     cursor: pointer;
     transition: none;
   }
 
-  .fabricate-tint-swatch:hover {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
+  /* Hover is the outset 2px accent ring 1px clear of the edge, drawn as a border so the window's
+     focus ring stays the only outline a published swatch states. */
+  .fabricate-tint-swatch:hover::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border: 2px solid var(--fab-accent);
+    border-radius: 10px;
+    pointer-events: none;
   }
 
-  /* The picker's inset cursor, after the hover rule so a focused swatch under the pointer keeps it. */
+  /* The picker's inset cursor (issue 2416), inside the hover ring, so a swatch shows both at once. */
   .fabricate-tint-swatch:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: -2px;

@@ -2081,13 +2081,14 @@ The published components, in publication order:
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
 | `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
 | `Popover` | 1 | `any` | `open`, `anchorId` (required), `placement`, `title` (text, required), `ariaLabel`, `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot) | no |
+| `TintSwatches` | 1 | `any` | `value`, `onChange` (callback, required), `ariaLabel` (required), `tints`, `labels` | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead`, `Popover` and `TintSwatches` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -4767,6 +4768,68 @@ function setOpen(next) {
 cell.addEventListener('click', () => setOpen(!isOpen));
 ```
 
+### TintSwatches
+
+`TintSwatches` draws the design system's swatch strip (`<TintSwatches>` in the design-system library): a radio group of Fabricate's tint swatches, for one colour chosen from Fabricate's tints, as an activity's or a faction's colour.
+It is the strip Fabricate's own essence editors draw, and Fabricate's tints are its whole palette: a colour outside them is not offered, because each tint is tuned for every palette and the checked swatch's ring is measured against those tints alone.
+The group is one `role="radiogroup"` element, the only element Fabricate draws directly in `target`, inside the standalone style root in a target with no Fabricate root, and each swatch in it is a `<button type="button" role="radio">`, so a swatch never submits a form of yours.
+The swatches fill the width of `target` in rows of cells at least 44px wide and 28px tall, 6px apart, wrapping onto a second row where `target` is narrower than ten cells, so each is a 24px target and more.
+`value` is the checked tint's key, a string matched exactly: `'sage'`, `'mist'`, `'lavender'`, `'rose'`, `'peach'`, `'butter'`, `'aqua'`, `'mauve'`, `'verdant'` or `'azure'`; while it names a swatch that is drawn, that swatch alone states `aria-checked="true"` and draws the checked ring, and every other states `aria-checked="false"`.
+Any other value checks no swatch and is not refused: absence, `''`, `null`, a capitalised name such as `'Rose'` and a token name such as `'--fab-tag-rose'` among them, because Fabricate coerces nothing.
+`onChange` is a required callback, called with one argument, the chosen tint's key, each time a swatch that is not checked is chosen: by a press, by Space or Enter on the focused swatch, or by an arrow key, Home or End, which move focus onto a swatch and choose it.
+It is not called by `mount`, `update` or `destroy`, nor by choosing the checked swatch.
+The strip changes nothing itself: the check stays on the `value` you last passed until your `update` passes a new one, which may be after the callback returns, so to refuse the change pass `value` unchanged and say why in text of your own.
+Until your `update` lands, assistive technology hears the old swatch checked, so update inside `onChange`.
+`ariaLabel` is required final display text naming the radio group, as "Activity colour"; a `mount` without it, or with `''`, is refused with `TintSwatches requires a non-empty "ariaLabel"`.
+The strip draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the group with no name.
+`tints` is an array of tint keys naming the swatches drawn, in its order, each once: a key outside Fabricate's ten, a repeat, a value that is not a string, `'Rose'` and `'--fab-tag-rose'` among them, is dropped; absent, not an array, or naming none of the ten, it draws all ten in Fabricate's order.
+`labels` is an object of final display text keyed by tint key, as `{ rose: 'Rose' }`: a swatch is named by its entry, in its `aria-label` and in the `title` the pointer shows, and a swatch whose entry is absent, not a string or white space alone is named by Fabricate's own name for its tint.
+Each swatch is named by its tint's text in `labels`, or else by Fabricate's own name for the tint, which is English and is not localized.
+A swatch has no text of its own, so its name is all a reader hears of it: in a world whose language is not English pass `labels` for every tint you draw, in the world's language.
+An entry for a tint the strip does not draw names nothing.
+
+- The group is one Tab stop: Tab reaches the checked swatch, or the first swatch where none is checked, and Tab again leaves the group.
+- ArrowRight and ArrowDown move focus to the next swatch and ArrowLeft and ArrowUp to the previous, wrapping at each end; under `direction: rtl`, read from the focused swatch, ArrowLeft moves to the next and ArrowRight to the previous, and ArrowUp and ArrowDown keep their order.
+- Home moves focus to the first swatch and End to the last; each of these keys also chooses the swatch it moves to, as a radio group does, and is not passed on, and an arrow key held with Alt, Control or Meta is left to the browser.
+- Every swatch carries `data-keyboard-focus`, so Foundry runs no keybinding, a canvas pan among them, while one holds focus.
+- An `update` keeps every swatch that is still drawn, so focus stays where it is while the check moves; `destroy` removes them, so where a swatch holds focus, move focus first.
+
+The checked swatch is marked by a 2px inset ring drawn inside its colour in `--fab-biome-icon-foreground`, which clears 3:1 on every tint in all seven palettes, 3.09:1 at the least, and by `aria-checked`, so colour never carries the choice alone.
+Keyboard focus draws the 2px accent outline inset by 2px on the swatch's edge, clear of its colour, so it shows beside the checked ring; it clears 3:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes, 5.19:1 at the least.
+Under the pointer a swatch draws the same accent as a 2px ring 1px outside its edge, never a fill, so a swatch's colour never changes; it draws in the frame the pointer arrives, under either `prefers-reduced-motion` setting, as the focus outline does.
+Each swatch's 1px `--fab-border` edge carries no state.
+Under forced colours each swatch keeps its tint and the checked ring, because the tint is the value itself, and the checked swatch's edge takes the system `Highlight` colour.
+A strip is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, and it is no wider than `target`.
+`TintSwatches` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of TintSwatches`.
+A Fabricate that predates it does not list `TintSwatches` in `components`, `describe('TintSwatches')` answers `null`, and `mount` refuses it with `"TintSwatches" is not published`, so draw your own swatches there.
+The role, names and checked state are read from Chromium's accessibility tree and the keys pressed in Chromium; no screen reader was run.
+Its cell, gap and corner figures beyond what this section states, its classes and `data-manager-color-*` hooks, its leading No-colour radio and the `noneLabel`, `noneChecked` and `onClear` props that draw it for Fabricate's own editors are private, so a `noneLabel` or an `onClear` is refused with `"<key>" is not a prop of TintSwatches`.
+
+A worked strip follows: the colour of one of your activities, beside a caption of your own.
+
+```javascript
+// After `load(['TintSwatches'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the strip describes none: draw your own swatches there.
+if (!fabUi?.describe?.('TintSwatches')) return;
+
+// Your caption above `target`: <span>Activity colour</span>.
+const TINTS = ['sage', 'rose', 'butter', 'azure'];
+let colour = activity.colour ?? 'sage';
+const props = () => ({
+  value: colour,
+  ariaLabel: game.i18n.localize('ACME.ActivityColour'), // The words your caption draws.
+  tints: TINTS,
+  labels: Object.fromEntries(TINTS.map((tint) => [tint, game.i18n.localize(`ACME.Tint.${tint}`)])),
+  onChange: (next) => {
+    colour = next;
+    activity.colour = colour; // Your own state first.
+    strip.update(props()); // Every prop again, with the new `value`.
+  },
+});
+const strip = fabUi.mount('TintSwatches', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -4950,7 +5013,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack`, `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` were published with `load`, so call it for each before mounting.
+`TierTrack`, `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead`, `Popover` and `TintSwatches` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -5100,7 +5163,7 @@ A published component inherits from `target` every inherited text property its o
 Never write `fabricate`, `fabricate-app` or `fabricate-manager` on an element you own.
 A `data-*` name Fabricate writes is private as its classes are: pass only rest names that carry your own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
-Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name but the glyph names an `IconPicker` draws, as its section states.
+Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name but the glyph names an `IconPicker` draws and the tint names a `TintSwatches` draws where you pass no `labels`, as each section states.
 A published component is not a live region unless its section says it is.
 Every component states a root, the Fabricate ancestor its `target` needs.
 A component whose root is `any` resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor.
@@ -5109,7 +5172,7 @@ A `fabricate` component needs a Fabricate root, a `.fabricate` ancestor that is 
 A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
 Every component published at version 1 states `any`, so `fabricate` and `manager` are values `describe` may return for a later component, and no mount you make today is refused for a missing Fabricate ancestor.
 `mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
-Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twenty-one components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only, and the twenty-two components the [standalone style root](#standalone-style-root) section names are drawn there under one, `Stepper` only where `target` is in no `<form>`.
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
@@ -5124,7 +5187,7 @@ A published component draws a control only where its section says so, and each c
 - A `reset` of the `<form>` a control is in, a `Button` whose `type` is `reset` making one, changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so reset no form a published control is in, or destroy the control and mount it again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
-- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each section states, and Foundry's keybindings stay held off as the bullet above states.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` and `TintSwatches` sections do: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key but Tab, with or without Shift, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each section states, and Foundry's keybindings stay held off as the bullet above states.
   A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, and with `trapFocus` every key stops at the document, as its section states.
   A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
   Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each section states, and Space on release.
@@ -5136,10 +5199,10 @@ A published component draws a control only where its section says so, and each c
 - A control draws its own mark for keyboard focus where the component's `root` is `any` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, a `ListRow` button, whose 2px ring is drawn inside the row's edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each section states.
   A text-like input or textarea you draw in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that section states.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
-- A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none, except an `IconPicker` row, named by its glyph's `label`, the caption an `IconPicker` trigger adds to `ariaLabel`, and a `Disclosure` button, which is named by the text you draw in its `head` slot, as its section states.
+- A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none, except an `IconPicker` row, named by its glyph's `label`, the caption an `IconPicker` trigger adds to `ariaLabel`, a `Disclosure` button, which is named by the text you draw in its `head` slot, and a `TintSwatches` swatch, which is named by Fabricate's name for its tint where `labels` names it not, as each section states.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its section states, each never out of `target`.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and Fabricate among the swatches of one `TintSwatches` on the keys its section names, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its section states, each never out of `target`.
   A `Modal` with `trapFocus` is the exception to that rule: Fabricate moves focus into its dialog as it opens, keeps Tab inside it, and returns focus to the element that held it a frame after it closes, as its section states.
   An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its section states.
   An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its section names, and back to the trigger when a choice, Escape or Tab closes it, as its section states.
@@ -5182,7 +5245,7 @@ A published component draws a control only where its section says so, and each c
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each section states.
-  The name a `ListRow` button holds carries its own text as a native `title`, as its section states.
+  The name a `ListRow` button holds carries its own text as a native `title`, and so does each `TintSwatches` swatch its name, as each section states.
   A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
@@ -5191,7 +5254,7 @@ A published component draws a control only where its section says so, and each c
 
 ### Standalone style root
 
-`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
+`Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `Select`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead`, `Popover` and `TintSwatches` state the root `any` and are drawn in your own window, dialog or sheet, where `target` has no Fabricate root; `Stepper` only in a window that holds `target` in no `<form>`, as [Stepper](#stepper) states.
 The panel `Select`, `IconPicker`, `ActionMenu`, `Modal`, `Typeahead` or `Popover` opens there, with no `overlayHost`, is drawn on the standalone layer, as [Overlays](#overlays) states, and that layer counts as a Fabricate root.
 A Fabricate root is a `.fabricate` ancestor of `target` that is not a standalone style root.
 Your own window carries none, so at `mount` Fabricate writes one `<div>` in `target` with `display: contents`, and draws the component inside it.

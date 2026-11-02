@@ -101,7 +101,7 @@ test('the No-colour glyph inks secondary and clears 3:1 on its own fill in every
 });
 
 const CURSOR = '.fabricate-tint-swatch:focus-visible';
-const HOVER = '.fabricate-tint-swatch:hover';
+const HOVER = '.fabricate-tint-swatch:hover::after';
 const PICKER_CURSOR =
   ".fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true']";
 const TILE_HOVER =
@@ -133,7 +133,13 @@ test("the library draws the shipped popover's cursor and hover as the sheet decl
   // The shipped popover is the picker's grid form (issue 2459): its tiles take the picker's cursor
   // and the square tile's hover, which the inline strip's hover rule restates.
   assert.deepEqual(drawnOutlines(), [outlineOf(PICKER_CURSOR), outlineOf(TILE_HOVER)]);
-  assert.deepEqual(outlineOf(HOVER, SWATCHES), outlineOf(TILE_HOVER), 'the strip hover');
+  // The strip draws the same ring as a border 3px outside its edge, 2px wide and 1px clear.
+  const [outline, offset] = outlineOf(TILE_HOVER);
+  assert.deepEqual(
+    ['border', 'inset'].map((property) => declared(SWATCHES, HOVER, property)),
+    [outline, `-${Number.parseFloat(offset) + Number.parseFloat(outline)}px`],
+    'the strip hover'
+  );
 });
 
 /** The cursor's ink on `stack` in each palette: the palettes under 3:1, and every ratio in words. */

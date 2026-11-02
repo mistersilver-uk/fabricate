@@ -1468,7 +1468,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirty-six focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Popover panel and its body, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, the Typeahead row, and the probe button and two inputs', () => {
+  it('judges thirty-eight focusable elements across the shipped closures, each file read once: the ActionMenu item, its panel and its headed list, the Button, the Chip remove button, the Disclosure head, the EditorTabs tab button, the IconButton, the IconPicker trigger, the ListRow button, the Modal dialog, the Popover panel and its body, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its list, its option and its query field, the search input, the SegmentedControl radio, the SelectionCheckbox input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, the TintSwatches radio and its No-colour radio, the Typeahead row, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1510,6 +1510,8 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Stepper.svelte: button',
       'src/ui/svelte/components/Stepper.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: input',
+      'src/ui/svelte/components/TintSwatches.svelte: button',
+      'src/ui/svelte/components/TintSwatches.svelte: button',
       'src/ui/svelte/components/Typeahead.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: input',
@@ -1571,6 +1573,7 @@ describe('each entry matches its component declaration', () => {
         'Typeahead.onChange: 1',
         'Typeahead.onFreeText: 1',
         'Popover.onClose: 0',
+        'TintSwatches.onChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -3478,6 +3481,7 @@ describe('the module sheet and every component style against the published Inspe
         'Disclosure',
         'Typeahead',
         'Popover',
+        'TintSwatches',
       ],
       'an entry with a required root, or drawn under the standalone style root, needs a census of its own'
     );
