@@ -328,6 +328,78 @@ describe('the published EditorTabs names', () => {
   });
 });
 
+describe('a tab’s count on the published EditorTabs', () => {
+  /** Each tab's visible numeral, or null, its name, and whether the mark is hidden. */
+  const countsOf = (tabs) =>
+    tabs.map((node) => {
+      const mark = node.querySelector('.manager-editor-tab-count');
+      return [
+        mark?.textContent ?? null,
+        node.getAttribute('aria-label'),
+        mark?.getAttribute('aria-hidden') ?? null,
+      ];
+    });
+  const withCounts = (...counts) => TABS.map((tab, index) => ({ ...tab, count: counts[index] }));
+
+  it('draws a whole count after the label, hidden from assistive technology, and names the tab "<label>, <count>"', async () => {
+    const { handle, tab, tabs } = mountStrip({ tabs: withCounts(2, 0, 1250) });
+    await settle();
+    assert.deepEqual(countsOf(tabs()), [
+      ['2', 'Inputs, 2', 'true'],
+      ['0', 'Outputs, 0', 'true'],
+      ['1250', 'Notes, 1250', 'true'],
+    ]);
+    const parts = [...tab('inputs').children].map((node) => node.tagName.toLowerCase());
+    assert.deepEqual(parts, ['i', 'span', 'span'], 'glyph, label, then the count');
+    assert.deepEqual(
+      [attributeOf(tabs(), 'role'), attributeOf(tabs(), 'aria-selected')],
+      [
+        ['tab', 'tab', 'tab'],
+        ['true', 'false', 'false'],
+      ]
+    );
+    assert.deepEqual(attributeOf(tabs(), 'tabindex'), ['0', '-1', '-1']);
+    handle.destroy();
+  });
+
+  for (const [claim, value] of [
+    ['a numeric string', '2'],
+    ['a negative', -1],
+    ['a fraction', 1.5],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['null', null],
+    ['a boolean', true],
+  ]) {
+    it(`draws no count and adds nothing to the name for ${claim}, and refuses nothing`, async () => {
+      const { handle, tabs } = mountStrip({ tabs: withCounts(value) });
+      await settle();
+      assert.deepEqual(countsOf(tabs()).at(0), [null, null, null]);
+      assert.equal(tabs()[0].textContent.trim(), 'Inputs');
+      handle.destroy();
+    });
+  }
+
+  it('adds, changes and removes a count on an update, keeping the tab and the selection', async () => {
+    const { handle, props, tab, tabs } = mountStrip();
+    await settle();
+    const node = tab('outputs');
+    assert.deepEqual(countsOf(tabs()).at(1), [null, null, null]);
+    handle.update({ ...props, tabs: withCounts(undefined, 3) });
+    await settle();
+    assert.deepEqual(countsOf(tabs()).at(1), ['3', 'Outputs, 3', 'true']);
+    handle.update({ ...props, tabs: withCounts(undefined, 4) });
+    await settle();
+    assert.deepEqual(countsOf(tabs()).at(1), ['4', 'Outputs, 4', 'true']);
+    handle.update({ ...props, tabs: TABS });
+    await settle();
+    assert.deepEqual(countsOf(tabs()).at(1), [null, null, null]);
+    assert.ok(tab('outputs') === node, 'the same tab throughout');
+    assert.equal(tab('inputs').getAttribute('aria-selected'), 'true');
+    handle.destroy();
+  });
+});
+
 describe('the keyboard on the published EditorTabs', () => {
   for (const [key, from, to] of [
     ['ArrowRight', 'inputs', 'outputs'],

@@ -5,7 +5,8 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
+  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label, count }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
+  | tab `count` | whole number ≥ 0 | absent | Drawn as a `count` mark ahead of any `badges` mark, hidden from assistive technology, and naming the tab "Factions, 2"; anything else, a numeric string included, draws nothing. |
   | `annotated` | boolean | `false` | Reads each tab's `ariaLabel`, `tooltip` and `tierGated` below; off, a tab is drawn from its `id`, `icon` and `label` alone. |
   | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here, and on a tab carrying a named `count` mark (see Invariants). |
   | tab `tooltip` | final text | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
@@ -238,7 +239,19 @@
       : value === undefined || value === null
         ? []
         : [value];
-    return values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable);
+    return [
+      ...itemCount(tab),
+      ...values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable),
+    ];
+  }
+
+  // The tab's own record count, named by its digits so the tab's name carries it once.
+  function itemCount({ count }) {
+    if (!Number.isInteger(count) || count < 0) return [];
+    const name = String(count);
+    return [
+      { vehicle: 'count', label: name, tone: 'neutral', name, suppressZero: false, hidden: true },
+    ];
   }
 
   function badgeTone(tone) {
@@ -317,7 +330,9 @@
   }
 
   function markAttributes(tab, mark) {
-    if (mark.vehicle === 'count') return hook(countDataAttr, tab);
+    if (mark.vehicle === 'count') {
+      return { ...hook(countDataAttr, tab), ...(mark.hidden && { 'aria-hidden': 'true' }) };
+    }
     if (mark.vehicle === 'dot') return hook(dotDataAttr, tab);
     const attributes = badgeDataAttr
       ? { [badgeDataAttr]: tab.id, 'data-badge-tone': mark.tone }
@@ -387,7 +402,7 @@
           class="fas fa-lock manager-editor-tab-lock"
           aria-hidden="true"
         ></i>{/if}
-      {#if badges}
+      {#if marksByTab[tab.id].length > 0}
         {#each marksByTab[tab.id] as mark, markIndex (`${tab.id}-${markIndex}`)}
           {#if mark.vehicle === 'count'}
             <span class="manager-editor-tab-count" {...markHooks[tab.id][markIndex]}
