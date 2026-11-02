@@ -20,7 +20,10 @@ import {
 import { renderedPageHead } from './renderedPageHead.js';
 import { createMountedComponentHarness } from './svelte-component-harness.js';
 
-/** The markup of each `[id, entry, props]` case, mounted through a fresh seam and destroyed. */
+/**
+ * The markup of each `[id, entry, props]` case, in order, each mounted through one fresh seam, settled,
+ * read and destroyed.
+ */
 async function drawnCases(tmpPrefix, cases) {
   const harness = createMountedComponentHarness({
     repoRoot: resolve(import.meta.dirname, '../..'),
@@ -31,25 +34,27 @@ async function drawnCases(tmpPrefix, cases) {
     componentPath: 'src/ui/svelte/published/PublishedComponentHost.svelte',
   });
   const shells = [];
-  const cells = [];
   await harness.setup();
   try {
     const { publishedComponentRuntime: runtime, COMPONENTS: components } =
       await harness.loadRuneModule(PUBLISHED_ADAPTER);
     const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
     const ui = shippedSeam({ createPublishedComponents, runtime, components, report() {} });
-    for (const [id, name, props] of cases) {
-      const target = fabricateTarget(shells);
-      const handle = ui.mount(name, { target, props });
-      await settle();
-      cells.push(`<div data-case="${id}">${target.innerHTML}</div>`);
-      handle.destroy();
-    }
+    const cells = await Promise.all(
+      cases.map(async ([id, name, props]) => {
+        const target = fabricateTarget(shells);
+        const handle = ui.mount(name, { target, props });
+        await settle();
+        const cell = `<div data-case="${id}">${target.innerHTML}</div>`;
+        handle.destroy();
+        return cell;
+      })
+    );
+    return cells.join('');
   } finally {
     for (const shell of shells) shell.remove();
     harness.teardown();
   }
-  return cells.join('');
 }
 
 /** Opens the page; `before` is markup drawn ahead of the cells and `css` a sheet after the module's. */
