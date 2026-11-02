@@ -46,9 +46,11 @@ const rules = Object.entries(corpus).flatMap(([file, css]) =>
   }))
 );
 
-/** The one rule in `file` listing `selector`. */
+/** The one unconditional rule in `file` listing `selector`. */
 function familyRule(selector, file = SHEET) {
-  const found = rules.filter((rule) => rule.file === file && rule.selectors.includes(selector));
+  const found = rules.filter(
+    (rule) => rule.file === file && rule.context === '' && rule.selectors.includes(selector)
+  );
   assert.equal(found.length, 1, `${found.length} ${file} rules list ${selector}`);
   return found[0];
 }
@@ -288,10 +290,32 @@ const BESIDE_THE_FAMILY = Object.freeze([
   `${SHEET} .${ROOT} button:focus-visible`,
 ]);
 
+const FORCED_COLOURS = rules.filter(
+  (rule) => rule.file === COMPONENT && rule.context === '@media (forced-colors: active)'
+);
+
+test('the component restates the selected indicator only under forced colours, in the same box', () => {
+  assert.equal(FORCED_COLOURS.length, 1);
+  const [rule] = FORCED_COLOURS;
+  assert.deepEqual(
+    new Set(rule.selectors),
+    new Set(
+      [DEFAULT_BUTTON, ALIAS_BUTTON].flatMap((button) => [
+        `.${button}.is-active`,
+        `.${button}.is-danger.is-active`,
+      ])
+    )
+  );
+  assert.deepEqual(
+    new Set(propertiesOf(rule).keys()),
+    new Set(['border-bottom-color', 'border-bottom-width', 'padding-bottom'])
+  );
+});
+
 test('no rule beside the family draws a tab, at any container width', () => {
   const family = new Set([FAMILY.tab, FAMILY.hover, FAMILY.current]);
   const beside = rules.flatMap((rule) =>
-    family.has(rule)
+    family.has(rule) || FORCED_COLOURS.includes(rule)
       ? []
       : rule.selectors.filter(drawsATab).map((selector) => `${rule.file} ${selector}`)
   );
