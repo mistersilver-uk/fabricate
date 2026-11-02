@@ -2741,7 +2741,7 @@ Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and 
 The button is named by `label`, the text it draws beside its track, or, where you pass it, by `ariaLabel`, which must then hold that text.
 Pass `label`, `ariaLabel` or both: without either, `mount` refuses with `StatusToggle requires a non-empty "label"`; a `label` that is not a string is refused with `"label" must be a string`; and a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
 Beside a non-blank `label`, an `ariaLabel` that does not contain the label's words as one run of whole words is refused by `mount` and `update` with `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`.
-Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the label clears 4.5:1, 10.15:1 at the least.
+Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the label clears 4.5:1.
 The label is drawn in `target`'s face and size and in the body ink in both states, so the state is told by the track and the announced state, never by the label's ink.
 The labelled switch is not held to the 78px cap: its label wraps at its spaces up to the width of `target`, the button growing taller to hold every line with the track centred against them, and it is never clipped or ellipsised.
 A setting's name of one to four words keeps the label to one line; a sentence about the setting goes in the text `aria-describedby` points at.
@@ -2767,7 +2767,8 @@ Answer its press with the reason, in a `Notice` or a notification of your own, a
 Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
 The switch's track is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog.
 Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
-A labelled button is as wide as its track, its gap and its label, up to the width of `target`, and grows past that height only as its label wraps.
+A labelled button is as wide as its track, its gap and its label, up to the width of `target`, and, in a Foundry window, grows past that height only as its label wraps.
+A wrapped label makes the button as wide as `target`, so its keyboard ring reaches 4px past `target`'s edge; give `target` that much room where it clips.
 The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
 An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide and 2px clear of the button, its label included, so it reaches 4px beyond it on every side; leave that much inside any edge of your own that clips.

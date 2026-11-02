@@ -1507,8 +1507,8 @@
     --fab-toggle-knob: canvas;
   }
 
-  .fabricate-toggle.fabricate-toggle.is-disabled .manager-status-toggle-label,
-  .fabricate-toggle.fabricate-toggle:disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle.is-disabled :is(.manager-status-toggle-label, .manager-status-toggle-name),
+  .fabricate-toggle.fabricate-toggle:disabled :is(.manager-status-toggle-label, .manager-status-toggle-name),
   .fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) .manager-status-toggle-label {
     color: graytext;
   }
@@ -1524,7 +1524,7 @@
   text-overflow: ellipsis;
 }
 
-/* The named switch (issues 2902, 2795): its name sits inside the button, so the whole line presses it, uncapped and wrapping at its spaces up to the target's width, in the target's face and size and the body ink in both states. Height is released, the 22px track's 1px inset makes the 24px floor and Foundry's own button floor still applies, so one line stands as tall as the track-only switch at any size; the corner is the 24px rung's, so the ring clears a wrapped name's lines where the pill's ends would cross them. */
+/* The named switch (issues 2902, 2795): the name sits inside the button so the whole line presses it, uncapped and wrapping in the target's face and size, in the body ink in both states. The 22px track's 1px inset makes the 24px floor, so Foundry's own button floor still applies; the 6px corner keeps the ring clear of a wrapped name's lines. */
 .fabricate-toggle.fabricate-toggle.has-name {
   max-width: 100%;
   height: auto;
