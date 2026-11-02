@@ -682,7 +682,7 @@
       "scope": "shared",
       "why": [
         "The app's one select: a trigger, an option list over `SearchablePopover` with the query field suppressed, and a configurable tick.",
-        "Its family is in the global sheet and the component has no `<style>` block: 62 `.fabricate-select-*` rules in `styles/fabricate.css`, 27 of them CALL-SITE overrides on the trigger box.",
+        "Its family is in the global sheet and the component has no `<style>` block: 64 `.fabricate-select-*` rules in `styles/fabricate.css`, 27 of them CALL-SITE overrides on the trigger box.",
         "`library.html`'s `<Select>` specifies it, and both applications render it, so it is shared.",
         "Issue 2904 publishes `fill`, which stretches the trigger to the width of its slot so a companion's column keeps one width whichever option is chosen; it is the one trigger-box prop, and every other per-site skin stays a descendant rule of the caller's wrapper."
       ]
