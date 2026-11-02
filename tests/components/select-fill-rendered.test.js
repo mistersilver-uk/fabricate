@@ -3,9 +3,9 @@
  * under the module sheet: a filled trigger is as wide as `target` at every width and `size`, in a
  * flex and a block target, in a companion's shell and in a Fabricate window, and keeps that width
  * as the user chooses a longer option, where an unfilled one changes; the long value ends in an
- * ellipsis with the chevron at the trailing edge, in RTL too; the list opens at the filled
- * trigger's start edge, as wide as the trigger within its rung's band; the keyboard mark is the
- * trigger's own border and moves no edge.
+ * ellipsis with the chevron at the trailing edge, in RTL too; the list opens below the filled
+ * trigger, its left edge on the trigger's in LTR, as wide as the trigger within its rung's band;
+ * the keyboard mark is the trigger's own border and moves no edge.
  * Limit: Chromium only, without Foundry's own sheet or Font Awesome's webfonts, so the chevron's
  * box is the empty `<i>`'s; screen-reader speech is not observed.
  */
@@ -165,7 +165,7 @@ describe('a filled published Select’s long value', () => {
 });
 
 describe('the list a filled published Select opens', () => {
-  it('opens at the trigger’s start edge, below it, as wide as the trigger within its rung’s band', () =>
+  it('opens below the trigger, its left edge on the trigger’s in LTR, as wide as the trigger within its rung’s band', () =>
     inFixture('host=companion', async (page) => {
       await inTurn(ids('fill-flex'), async (id) => {
         const size = id.split('-', 3)[2];
@@ -186,7 +186,7 @@ describe('the list a filled published Select opens', () => {
         const { minWidth, maxWidth } = RUNGS[size];
         const wanted = Math.min(Math.max(anchor.width, minWidth), maxWidth);
         near(panel.width, wanted, `${id} list width`);
-        near(panel.left, anchor.left, `${id} list start edge`);
+        near(panel.left, anchor.left, `${id} list left edge`);
         assert.ok(panel.top >= anchor.bottom, `${id} list below the trigger`);
         await page.keyboard.press('Escape');
         await page.locator(listOf).waitFor({ state: 'detached' });

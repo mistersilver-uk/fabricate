@@ -1502,7 +1502,7 @@ Each group states the accepted values of every key that entry publishes.
   - `placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
   - `size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
   - `fill` is `true` or `false`, and `false` when absent: `true` stretches the trigger across the width of `target` at every `size`, so the companion gives `target` the column's width and the trigger keeps it whichever option is chosen; absent, the trigger hugs its label.
-    Under `fill` a label longer than the trigger ends in an ellipsis, the chevron stays at the trailing edge in either direction, and the list opens against the filled trigger, from its start edge.
+    Under `fill` a label longer than the trigger ends in an ellipsis, the chevron stays at the trailing edge in either direction, and the list opens against the filled trigger as it opens against any.
     Only `true` stretches the trigger: Fabricate coerces nothing, so `'true'` or `1` draws it hugging its label.
     `fill` replaces a descendant rule of the companion's own wrapper, which names a part of the component and is outside the contract; no `width` is published, because the column's width is the companion's, on `target`.
     The filled trigger's edge is `target`'s, so anything its keyboard mark draws outside the trigger falls outside `target`, and the companion leaves room for it there, unclipped.

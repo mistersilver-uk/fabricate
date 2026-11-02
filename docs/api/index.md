@@ -3108,7 +3108,7 @@ The select draws no caption, so draw the same words as visible text beside it, a
 `placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
 `size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
 `fill` is `true` or `false`, and `false` when absent: `true` stretches the trigger across the width of `target` at every `size`, so give `target` the width of the column you want, and the trigger keeps that width whichever option is chosen; absent, the trigger hugs its label, so a select whose options differ in length changes width as the user chooses.
-Under `fill` a label longer than the trigger ends in an ellipsis and the chevron stays at the trailing edge, in either direction, and the list opens against the filled trigger, from its start edge.
+Under `fill` a label longer than the trigger ends in an ellipsis and the chevron stays at the trailing edge, in either direction, and the list opens against the filled trigger as it opens against any.
 Fabricate coerces nothing to `fill`: only `true` stretches the trigger, and `'true'` or `1` draws it hugging its label.
 `fill` replaces sizing the trigger with a descendant rule of your own wrapper, which names a part of the component and so is outside the contract; no `width` is published, because the column's width is yours, on `target`, and `fill` makes the trigger take it.
 Under `fill` the trigger's edge is `target`'s, so anything its keyboard mark draws outside the trigger falls outside `target`, and leaving room for it there, unclipped, is yours.
