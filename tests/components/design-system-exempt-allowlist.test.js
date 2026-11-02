@@ -122,6 +122,11 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
+    'the 2px is the border growth it offsets (12 + 2 = 10 + 4), so the box keeps its height; 10 is ' +
+      'not a scale step',
+    { 'src/ui/svelte/components/EditorTabs.svelte': 1 },
+  ],
+  [
     "the hover ring's reach (2px outline at a 1px offset), not spacing",
     { 'styles/fabricate.css': 2 },
   ],

@@ -443,6 +443,7 @@
     .manager-environment-tab-button.is-active,
     .manager-editor-tab-button.is-danger.is-active,
     .manager-environment-tab-button.is-danger.is-active {
+      /* ratchet-exempt(design-system): the 2px is the border growth it offsets (12 + 2 = 10 + 4), so the box keeps its height; 10 is not a scale step */
       padding-bottom: calc(var(--fab-space-3) - 2px);
       border-bottom-width: 4px;
       border-bottom-color: highlight;
