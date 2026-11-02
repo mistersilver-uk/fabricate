@@ -1084,7 +1084,7 @@ describe('a contains key (issue 2852)', () => {
     ['an inherited name', containing({ kind: 'data', contains: 'toString' }), 'toString'],
     ['a value that is no string', containing({ kind: 'data', contains: 1 }), '1'],
     [
-      'a data key',
+      'an optional data key',
       containing({ kind: 'data', contains: 'hint' }, { hint: { kind: 'data' } }),
       'hint',
     ],
@@ -1125,6 +1125,22 @@ describe('a contains key (issue 2852)', () => {
       message: `${PREFIX}"ariaLabel" must contain the text of "caption" ("Per page" is not in "Recipes shown")`,
     });
     assert.ok(mountOf(ui, { caption: 'Per page', ariaLabel: 'Recipes per page' }));
+  });
+
+  it('compares a number in the named data key by its digits', () => {
+    const captioned = {
+      ...LABELLED,
+      props: {
+        caption: { kind: 'data', required: true },
+        ariaLabel: { kind: 'data', contains: 'caption' },
+      },
+    };
+    const { ui } = seamWith({ table: [captioned] });
+    assert.throws(() => mountOf(ui, { caption: 7, ariaLabel: 'Recipes shown' }), {
+      name: 'TypeError',
+      message: `${PREFIX}"ariaLabel" must contain the text of "caption" ("7" is not in "Recipes shown")`,
+    });
+    assert.ok(mountOf(ui, { caption: 7, ariaLabel: 'Recipes, 7 per page' }));
   });
 
   it('leaves contains out of describe', () => {
