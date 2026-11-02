@@ -8,10 +8,60 @@ function holds([node, extras], target) {
   );
 }
 
+const CAPTURE = Object.freeze({ capture: true });
+
+// Calls `current()`, read as each mutation is delivered, once `node` has left the document `sync`
+// was given; a node disconnected at `sync`, or a document with no `MutationObserver`, is not watched.
+function watchDetach(node, current) {
+  let watch = null;
+  const stop = () => {
+    watch?.disconnect();
+    watch = null;
+  };
+  return {
+    stop,
+    sync(doc) {
+      const Observer = doc?.defaultView?.MutationObserver;
+      if (!doc || typeof current() !== 'function') stop();
+      else if (!watch && node.isConnected && typeof Observer === 'function') {
+        watch = new Observer(() => {
+          if (node.isConnected) return;
+          stop();
+          const report = current();
+          if (typeof report === 'function') report();
+        });
+        watch.observe(doc, { childList: true, subtree: true });
+      }
+    },
+  };
+}
+
+// Under `dismissOn: 'click'`, whether a primary-button press went down, then came up, `outside`;
+// `clicked` answers it for the click that ends the press and forgets it.
+function primaryPress(outside) {
+  let state = 'idle';
+  const primary = (event) => event.button === 0 && outside(event);
+  return {
+    down(event) {
+      state = primary(event) ? 'down' : 'idle';
+    },
+    up(event) {
+      state = state === 'down' && primary(event) ? 'up' : 'idle';
+    },
+    clicked(event) {
+      const released = state === 'up' && event.button === 0;
+      state = 'idle';
+      return released;
+    },
+  };
+}
+
 /**
  * Svelte action that calls a callback when a mousedown occurs outside the
  * bound node, or when Escape is pressed while the action is enabled. Both are
  * heard on the node's own document, and a node is told by `nodeType` (issue 2454).
+ * With `dismissOn: 'click'` a press calls it only as the primary button's `click` fires, and only
+ * when that button went down and came up outside, each judged as it happened (issue 2879).
  * While enabled, `onDetached` is called once when the node leaves that document, read when a
  * mutation is delivered, so a removal and re-insertion in one run of script calls nothing; a node
  * attached while disconnected is not watched, nor is a document the node moves to (issue 2671).
@@ -22,6 +72,7 @@ function holds([node, extras], target) {
  * @param {HTMLElement} node
  * @param {{
  *   enabled?: boolean,
+ *   dismissOn?: 'mousedown' | 'click',
  *   onDismiss?: Function,
  *   onDetached?: Function,
  *   onFocusLeave?: Function,
@@ -30,6 +81,7 @@ function holds([node, extras], target) {
  * @returns {{
  *   update(newOptions?: {
  *     enabled?: boolean,
+ *     dismissOn?: 'mousedown' | 'click',
  *     onDismiss?: Function,
  *     onDetached?: Function,
  *     onFocusLeave?: Function,
@@ -44,19 +96,28 @@ export function dismissOnOutsideClick(node, options = {}) {
   let onDetached = options.onDetached;
   let onFocusLeave = options.onFocusLeave;
   let additionalNodes = options.additionalNodes;
+  let onClick = options.dismissOn === 'click';
   // The document the pair is bound to, so it is removed from that one.
   let bound = null;
-  let watch = null;
+  const detachWatch = watchDetach(node, () => onDetached);
 
   function dismiss(event) {
     if (typeof onDismiss === 'function') onDismiss(event);
   }
 
+  function outside({ target }) {
+    return typeof target?.nodeType === 'number' && !holds([node, additionalNodes], target);
+  }
+
+  const press = primaryPress(outside);
+
   function handleMouseDown(event) {
-    const { target } = event;
-    if (typeof target?.nodeType !== 'number') return;
-    if (holds([node, additionalNodes], target)) return;
-    dismiss(event);
+    if (onClick) press.down(event);
+    else if (outside(event)) dismiss(event);
+  }
+
+  function handleClick(event) {
+    if (press.clicked(event) && onClick) dismiss(event);
   }
 
   function handleFocusOut(event) {
@@ -72,49 +133,31 @@ export function dismissOnOutsideClick(node, options = {}) {
     }
   }
 
-  function unwatch() {
-    watch?.disconnect();
-    watch = null;
-  }
-
-  function onMutation() {
-    if (node.isConnected) return;
-    unwatch();
-    if (typeof onDetached === 'function') onDetached();
-  }
-
-  function syncWatch() {
-    if (!bound || typeof onDetached !== 'function') {
-      unwatch();
-      return;
-    }
-    const Observer = bound.defaultView?.MutationObserver;
-    if (watch || !node.isConnected || typeof Observer !== 'function') return;
-    watch = new Observer(onMutation);
-    watch.observe(bound, { childList: true, subtree: true });
-  }
+  const listeners = [
+    ['mousedown', handleMouseDown],
+    ['mouseup', press.up],
+    ['click', handleClick],
+    ['keydown', handleKeyDown],
+    ['focusout', handleFocusOut],
+  ];
 
   function attach() {
     const doc = node?.ownerDocument;
     if (bound || typeof doc?.addEventListener !== 'function') return;
-    doc.addEventListener('mousedown', handleMouseDown, { capture: true });
-    doc.addEventListener('keydown', handleKeyDown, { capture: true });
-    doc.addEventListener('focusout', handleFocusOut, { capture: true });
+    for (const [type, listener] of listeners) doc.addEventListener(type, listener, CAPTURE);
     bound = doc;
   }
 
   function detach() {
-    unwatch();
+    detachWatch.stop();
     if (!bound) return;
-    bound.removeEventListener('mousedown', handleMouseDown, { capture: true });
-    bound.removeEventListener('keydown', handleKeyDown, { capture: true });
-    bound.removeEventListener('focusout', handleFocusOut, { capture: true });
+    for (const [type, listener] of listeners) bound.removeEventListener(type, listener, CAPTURE);
     bound = null;
   }
 
   if (enabled) {
     attach();
-    syncWatch();
+    detachWatch.sync(bound);
   }
 
   return {
@@ -123,17 +166,18 @@ export function dismissOnOutsideClick(node, options = {}) {
       onDetached = newOptions.onDetached;
       onFocusLeave = newOptions.onFocusLeave;
       additionalNodes = newOptions.additionalNodes;
+      onClick = newOptions.dismissOn === 'click';
       const nextEnabled = newOptions.enabled !== false;
       if (nextEnabled !== enabled) {
         enabled = nextEnabled;
         if (enabled) attach();
         else detach();
       }
-      syncWatch();
+      detachWatch.sync(bound);
     },
 
     destroy() {
       detach();
-    }
+    },
   };
 }

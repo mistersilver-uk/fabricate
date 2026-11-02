@@ -1,5 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { pressPointer as press } from '../helpers/pointerPress.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 const { dismissOnOutsideClick } = await import('../../src/ui/svelte/actions/dismissOnOutsideClick.js');
@@ -370,5 +371,93 @@ describe('dismissOnOutsideClick onDetached (issue 2671)', () => {
     } finally {
       view.MutationObserver = MutationObserver;
     }
+  });
+});
+
+describe('dismissOnOutsideClick with dismissOn: click (issue 2879)', () => {
+  before(() => setupDOM());
+  after(() => teardownDOM());
+
+  function clickDismissed(options = {}) {
+    const dialog = document.createElement('div');
+    const field = document.createElement('input');
+    const scrim = document.createElement('div');
+    const panel = document.createElement('div');
+    dialog.append(field);
+    document.body.append(scrim, dialog, panel);
+    const calls = [];
+    const action = dismissOnOutsideClick(dialog, {
+      dismissOn: 'click',
+      onDismiss: (event) => {
+        calls.push(event.type);
+      },
+      ...options,
+    });
+    return { dialog, field, scrim, panel, calls, action };
+  }
+
+  it('calls onDismiss once, with the click, for a primary press that goes down and up outside', () => {
+    const { scrim, calls, action } = clickDismissed();
+    press(scrim);
+    assert.deepEqual(calls, ['click']);
+    action.destroy();
+  });
+
+  it('calls nothing at mousedown, so the release decides', () => {
+    const { scrim, calls, action } = clickDismissed();
+    scrim.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  for (const [name, button] of [['right', 2], ['middle', 1]]) {
+    it(`calls nothing for a ${name}-button press outside`, () => {
+      const { scrim, calls, action } = clickDismissed();
+      press(scrim, scrim, { button });
+      assert.deepEqual(calls, []);
+      action.destroy();
+    });
+  }
+
+  it('calls nothing for a press outside dragged into the node, nor for one dragged out of it', () => {
+    const { scrim, field, calls, action } = clickDismissed();
+    press(scrim, field);
+    press(field, scrim);
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  it('calls nothing for a click with no press, as a keyboard activation outside makes', () => {
+    const { panel, calls, action } = clickDismissed();
+    panel.click();
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  it('judges the press and the release against additionalNodes, read at each', () => {
+    let extra = [];
+    const { scrim, panel, calls, action } = clickDismissed({ additionalNodes: () => extra });
+    extra = [panel];
+    press(panel, scrim);
+    press(scrim, panel);
+    assert.deepEqual(calls, []);
+    extra = [];
+    press(panel, scrim);
+    assert.deepEqual(calls, ['click']);
+    action.destroy();
+  });
+
+  it('still calls onDismiss for Escape, and the default still dismisses at mousedown', () => {
+    const { scrim, calls, action } = clickDismissed();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.deepEqual(calls, ['keydown']);
+    action.update({
+      onDismiss: (event) => {
+        calls.push(event.type);
+      },
+    });
+    scrim.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 }));
+    assert.deepEqual(calls, ['keydown', 'mousedown']);
+    action.destroy();
   });
 });

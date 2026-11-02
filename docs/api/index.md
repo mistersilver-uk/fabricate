@@ -4070,7 +4070,8 @@ An omitted slot draws no body or no footer band, so a dialog with neither draws 
 The dialog's height is capped, so scroll tall content inside one element of your own in the body, which you give `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
 Give your dialog at least one control of your own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
 `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+With `true`, a click of the primary button whose press goes down and comes up outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `click` fires, as does a tap, and so does Escape pressed while focus is outside both (issue 2879).
+A press with any other button, a press that goes down outside and comes up inside the dialog or such a panel, or the reverse, and a `click` with no pointer press, as a keyboard activation of a control outside makes, call nothing.
 In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; pass `closeOnOutsideClick: false`, stop Escape in your own listener, or move focus into the dialog first.
 A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so if your opener opens the dialog on every press, pass `false`, or ignore a `click` whose press began while the dialog was open.
 A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as the panel of a component with an overlay that you mount in a slot: a [`Select`](#select)'s list, an [`IconPicker`](#iconpicker)'s list and query field and an [`ActionMenu`](#actionmenu)'s menu.
@@ -4079,7 +4080,7 @@ Escape pressed while focus is in such a panel is left to that panel: the dialog 
 A `Modal` you mount in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
 An `overlayHost` you pass inside the slot draws your panel inside the dialog, which clips what overflows it.
 With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
-`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
+`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a click or an Escape outside it.
 An Escape held down calls it again on each repeat.
 It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
 Fabricate does not close the dialog itself: it stays open until your `update` closes it or you call `destroy`, so to keep it open, as before a step that would lose work, do nothing; only while `target` is disconnected is the dialog not drawn, as [Overlays](#overlays) states.
@@ -4115,8 +4116,8 @@ The scrim is drawn in the dialog's host just before the dialog and at its `z-ind
 It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
 Over the four page grounds of every palette it never lowers the contrast of the dialog's 1px edge with the window behind and raises it to 3:1 in none, the edge measuring 1.66:1 to 2.51:1, so the dialog's own controls, not its boundary, carry its identification, and the dim sets the dialog apart by fading the window's content.
 It carries `aria-hidden="true"` and no role, so Chromium leaves it out of the accessibility tree, and it takes no focus and is never a Tab stop, but it covers no keyboard path: without `trapFocus`, Tab moves focus onto the dimmed controls behind the scrim, whose focus ring the scrim fades under 1.7:1, as Fabricate's accent ring measures 1.35:1 to 1.69:1 against the dimmed page grounds of every palette, and the dialog is not announced as modal, so pass `trapFocus` `true` whenever you pass `'dim'`.
-It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is; it is a press outside the dialog, so, whichever button it is, it calls `onClose` as its `mousedown` fires with `closeOnOutsideClick` `true` and calls nothing with `false`, and a drag that starts inside the dialog and ends on the scrim calls nothing.
-Where `onClose` closes the dialog, the scrim is gone before the press ends, so in Chromium the press's `mouseup` reaches whatever was behind the scrim and no `click` follows.
+It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is; it is outside the dialog, so with `closeOnOutsideClick` `true` a primary-button click that goes down and comes up on it calls `onClose` as its `click` fires, and with `false` calls nothing; a press with another button, a drag from the scrim into the dialog and a drag from the dialog onto the scrim call nothing.
+The press's `mouseup` and `click` land on the scrim, so where `onClose` closes the dialog nothing behind the scrim hears either.
 A wheel or a touch drag over the scrim does not scroll what is under it.
 For a dim of another colour or strength, over another box, or with a blur, pass `'none'` and draw your own layer, as the lines on its host below state.
 Each of `trapFocus`, `initialFocus`, `footerLayout`, `icon`, `size` and `scrim` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
@@ -4201,8 +4202,8 @@ function close() {
   dialog.update(props());
 }
 
-// A press on the opener while the dialog is open closes it as its `mousedown` fires, and its
-// `click` must not open it again.
+// A press on the opener while the dialog is open closes it as its `click` fires, before your own
+// `click` listener runs, which must not open it again.
 opener.addEventListener('pointerdown', () => {
   openAtPress = isOpen;
 });

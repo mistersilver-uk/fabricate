@@ -21,6 +21,7 @@ import { Window } from 'happy-dom';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
@@ -209,6 +210,12 @@ function pointer(element, type) {
   flushSync();
 }
 
+/** A primary pointer press on `element`, down, up and its click. */
+function pressOn(element) {
+  pressPointer(element);
+  flushSync();
+}
+
 /** Every bubbling `type` event `nodes` hear, each as `<name>:<key or tag>`. */
 function hearing(type, nodes) {
   const heard = [];
@@ -331,8 +338,7 @@ describe('the published Modal opens and closes only through update', () => {
     flushSync();
     await settle();
     assert.ok(listboxIn(), 'the list is open');
-    pointer(closeIn(), 'mousedown');
-    closeIn().click();
+    pressOn(closeIn());
     flushSync();
     await settle();
     assert.ok(!dialogIn(), 'the companion closed the dialog');
@@ -626,9 +632,8 @@ describe('closing the published Modal', () => {
     const { calls, handle, update } = mountModal();
     await settle();
     const inside = companionButton(handle.slot('body'));
-    pointer(inside, 'mousedown');
-    inside.click();
-    pointer(dialogIn(), 'mousedown');
+    pressOn(inside);
+    pressOn(dialogIn());
     update({ title: 'Rename the tool' });
     update({ open: false });
     update({ open: true });
@@ -865,12 +870,12 @@ for (const closeOnOutsideClick of [true, false]) {
 
 describe('outside presses on the published Modal', () => {
   for (const closeOnOutsideClick of [true, false]) {
-    it(`calls onClose ${closeOnOutsideClick ? 'once' : 'never'} for a mousedown on the host outside the dialog with ${closeOnOutsideClick}`, async () => {
+    it(`calls onClose ${closeOnOutsideClick ? 'once' : 'never'} for a press on the host outside the dialog with ${closeOnOutsideClick}`, async () => {
       const target = fabricateTarget(shells, 'fabricate fabricate-app');
       const overlayHost = companionHost(target.parentElement);
       const { calls } = mountModal({ closeOnOutsideClick }, { target, overlayHost });
       await settle();
-      pointer(overlayHost, 'mousedown');
+      pressOn(overlayHost);
       assert.equal(calls.length, closeOnOutsideClick ? 1 : 0);
     });
   }
@@ -887,8 +892,7 @@ describe('outside presses on the published Modal', () => {
     };
     mountModal({ onClose }, { target });
     await settle();
-    pointer(opener, 'mousedown');
-    opener.click();
+    pressOn(opener);
     assert.deepEqual(order, ['close', 'click']);
   });
 
@@ -910,33 +914,33 @@ describe('outside presses on the published Modal', () => {
   }
 
   for (const closeOnOutsideClick of [true, false]) {
-    it(`calls nothing for a mousedown on a slot-mounted Select’s list with ${closeOnOutsideClick}, and the list is still open`, async () => {
+    it(`calls nothing for a press on a slot-mounted Select’s list with ${closeOnOutsideClick}, and the list is still open`, async () => {
       const { calls, list } = await withOpenSelect(closeOnOutsideClick, null);
       assert.ok(!dialogIn().contains(list), 'the list is drawn outside the dialog');
-      pointer(list, 'mousedown');
+      pressOn(list);
       assert.deepEqual(calls, []);
       assert.ok(list.isConnected, 'the list is still open');
     });
 
-    it(`calls nothing for a mousedown or an Escape in that Select’s list when its overlayHost is in the slot, with ${closeOnOutsideClick}`, async () => {
+    it(`calls nothing for a press or an Escape in that Select’s list when its overlayHost is in the slot, with ${closeOnOutsideClick}`, async () => {
       const { calls, list } = await withOpenSelect(closeOnOutsideClick, (slot) =>
         companionHost(slot)
       );
       assert.ok(dialogIn().contains(list), 'the list is drawn inside the dialog');
-      pointer(list, 'mousedown');
+      pressOn(list);
       press(list, 'Escape');
       assert.deepEqual(calls, []);
     });
   }
 
-  it('calls nothing for a mousedown on a slot-mounted Select’s list in the standalone layer, and once for one on the page', async () => {
+  it('calls nothing for a press on a slot-mounted Select’s list in the standalone layer, and once for one on the page', async () => {
     const { calls, list } = await withOpenSelect(true, null, {
       target: fabricateTarget(shells, 'fabricate'),
     });
     assert.ok(list.closest(LAYER), 'the list is drawn in the standalone layer');
-    pointer(list, 'mousedown');
+    pressOn(list);
     assert.deepEqual(calls, []);
-    pointer(document.body, 'mousedown');
+    pressOn(document.body);
     assert.deepEqual(calls, [[]]);
   });
 
@@ -968,7 +972,7 @@ describe('outside presses on the published Modal', () => {
     await settle();
     const list = listboxIn();
     assert.ok(Boolean(list), 'the list is open');
-    pointer(list, 'mousedown');
+    pressOn(list);
     assert.ok(list.isConnected, 'a press there keeps the list');
     press(list, 'Escape');
     await settle();
@@ -976,10 +980,10 @@ describe('outside presses on the published Modal', () => {
     assert.deepEqual([outer.calls, inner.calls], [[], []], 'and neither dialog is dismissed');
   });
 
-  it('calls only the inner onClose for a mousedown and an Escape in a Modal mounted in the body slot, which counts as inside (issue 2678)', async () => {
+  it('calls only the inner onClose for a press and an Escape in a Modal mounted in the body slot, which counts as inside (issue 2678)', async () => {
     const { outer, inner, innerDialog } = await withInnerModal();
     assert.ok(!dialogIn().contains(innerDialog()), 'the inner dialog is drawn outside the outer');
-    pointer(innerDialog(), 'mousedown');
+    pressOn(innerDialog());
     press(innerDialog().querySelector('[data-manager-modal-close]'), 'Escape');
     assert.deepEqual(outer.calls, [], 'the outer dialog is not dismissed');
     assert.deepEqual(inner.calls, [[]], 'the inner one closes once, on its Escape');
@@ -1018,7 +1022,7 @@ describe('outside presses on the published Modal', () => {
     outer.update({ open: true });
     await settle();
     assert.ok(Boolean(innerDialog()), 'and is drawn again when the slot is attached');
-    pointer(innerDialog(), 'mousedown');
+    pressOn(innerDialog());
     assert.deepEqual([outer.calls, inner.calls], [[], []], 'and still counts as inside');
   });
 });
@@ -1160,12 +1164,12 @@ describe('the published Modal in a second window', () => {
     assert.ok(!dialogIn(), 'nothing is drawn in this window');
   });
 
-  it('calls onClose there for a close click, an outside mousedown and an Escape in the dialog', async () => {
+  it('calls onClose there for a close click, an outside press and an Escape in the dialog', async () => {
     const { calls } = mountModal({}, { target: detachedTarget() });
     await settle();
     closeIn(second.document).click();
     flushSync();
-    pointer(second.document.body, 'mousedown');
+    pressOn(second.document.body);
     const event = press(closeIn(second.document), 'Escape');
     assert.equal(calls.length, 3);
     assert.equal(event.defaultPrevented, true);
@@ -1236,8 +1240,8 @@ describe('the modal View Lab specimen cases against the DOM the fixture draws', 
     await settle();
     assert.equal(dialogIn().getAttribute('aria-label'), DIALOG.title);
     assert.ok(dialogIn().textContent.includes(BODY_TEXT), 'the body paragraph');
-    for (const type of ['pointerdown', 'mousedown']) pointer(opener(), type);
-    opener().click();
+    pointer(opener(), 'pointerdown');
+    pressOn(opener());
     flushSync();
     await settle();
     assert.ok(!dialogIn(), 'the press closed it and its click did not reopen it');

@@ -5,9 +5,9 @@
  * region and the standalone layer, and a `contain: layout` region's own box; it lies over the
  * window and a companion layer of lower `z-index`, under the dialog and under a Foundry window
  * stacked above, takes the pointer from the window behind, and leaves the dialog's own pixels
- * unchanged. A press on it closes only with `closeOnOutsideClick`, a drag from inside never does,
- * and where `onClose` closes the dialog the press's `mouseup` lands behind it with no `click`; a
- * wheel over it does not scroll a scrolling host, whose content the scrim and the dialog scroll
+ * unchanged. A primary click or a tap on it closes only with `closeOnOutsideClick`, another button
+ * or a drag across the dialog's edge never does, and where `onClose` closes the dialog the press's
+ * `mouseup` and `click` still land on it (issue 2879); a wheel over it does not scroll a scrolling host, whose content the scrim and the dialog scroll
  * with. It is outside the accessibility tree and takes no focus; Tab reaches the dimmed controls
  * without a trap and not with one. It never fades, and under forced colours it is `Canvas` at its
  * own opacity under the dialog's 1px system-text edge.
@@ -362,9 +362,22 @@ describe('what the Modal scrim paints', () => {
   });
 });
 
-/** What a press at `[x, y]`, or a drag from `from` to `to`, did: closes, focus and window clicks. */
-async function pressed(page, from, to = from) {
-  await page.evaluate(() => {
+/**
+ * What a press at `[x, y]`, or a drag from `from` to `to`, with `button`, did: closes, focus and
+ * window clicks.
+ */
+async function pressed(page, from, to = from, button = 'left') {
+  await listen(page);
+  await page.mouse.move(...from);
+  await page.mouse.down({ button });
+  await page.mouse.move(...to, { steps: 4 });
+  await page.mouse.up({ button });
+  return outcome(page);
+}
+
+/** Counts the window's clicks, marks the focused element and records each `mouseup` and click. */
+function listen(page) {
+  return page.evaluate(() => {
     document.body.dataset.behindClicks = '0';
     for (const button of document.querySelectorAll('[data-behind] button')) {
       button.addEventListener('click', () => {
@@ -376,7 +389,7 @@ async function pressed(page, from, to = from) {
       node?.closest?.('[data-behind]')?.dataset.behind ??
       (node?.closest?.('[data-manager-modal-scrim]') ? 'scrim' : node?.nodeName.toLowerCase());
     document.body.dataset.ups = '';
-    for (const type of ['mouseup', 'click']) {
+    for (const type of ['mouseup', 'click', 'auxclick']) {
       document.addEventListener(
         type,
         (event) => {
@@ -386,10 +399,10 @@ async function pressed(page, from, to = from) {
       );
     }
   });
-  await page.mouse.move(...from);
-  await page.mouse.down();
-  await page.mouse.move(...to, { steps: 4 });
-  await page.mouse.up();
+}
+
+/** The closes, window clicks, focus, drawn dialogs and the `mouseup`s and clicks heard so far. */
+function outcome(page) {
   return page.evaluate(() => ({
     closes: document.body.dataset.modalCloses,
     behindClicks: document.body.dataset.behindClicks,
@@ -445,7 +458,7 @@ describe('a press on the Modal scrim', () => {
     });
   });
 
-  it('removes the dialog and the scrim at mousedown when onClose closes it, so the mouseup lands behind and no click follows', async () => {
+  it('removes the dialog and the scrim at the click when onClose closes it, so the window behind hears neither the mouseup nor the click', async () => {
     const result = await inFixture('&scrim=dim&busy=1&trap=1&closes=1', async (page) =>
       pressed(page, await centreOf(page, '[data-behind="Recipes"]'))
     );
@@ -456,9 +469,56 @@ describe('a press on the Modal scrim', () => {
         closes: '1',
         behindClicks: '0',
         dialogs: 0,
-        ups: 'mouseup:Recipes',
+        ups: 'mouseup:scrim click:scrim',
       }
     );
+  });
+
+  for (const button of ['right', 'middle']) {
+    it(`calls nothing for a ${button}-button press on it, which keeps focus (issue 2879)`, async () => {
+      const result = await inFixture('&scrim=dim&busy=1&trap=1', async (page) =>
+        pressed(page, await centreOf(page, '[data-behind="Recipes"]'), undefined, button)
+      );
+      const { closes, behindClicks, focusKept, dialogs } = result;
+      assert.deepEqual(
+        { closes, behindClicks, focusKept, dialogs },
+        { closes: '0', behindClicks: '0', focusKept: true, dialogs: 2 }
+      );
+    });
+  }
+
+  it('calls nothing for a drag that starts on the scrim and ends inside the dialog (issue 2879)', async () => {
+    const result = await inFixture('&scrim=dim&busy=1&trap=1', async (page) =>
+      pressed(page, [6, 6], await centreOf(page, '[data-modal-text]'))
+    );
+    assert.equal(result.closes, '0');
+    assert.equal(result.dialogs, 2);
+  });
+
+  it('calls onClose once for a touch tap on it, which keeps focus (issue 2879)', async () => {
+    const result = await inFixture(
+      '&scrim=dim&busy=1&trap=1',
+      async (page) => {
+        await listen(page);
+        await page.touchscreen.tap(...(await centreOf(page, '[data-behind="Recipes"]')));
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+        return outcome(page);
+      },
+      { hasTouch: true }
+    );
+    const { closes, behindClicks, focusKept, ups } = result;
+    assert.deepEqual(
+      { closes, behindClicks, focusKept, ups },
+      { closes: '1', behindClicks: '0', focusKept: true, ups: 'mouseup:scrim click:scrim' }
+    );
+  });
+
+  it('calls onClose once for Escape in the dialog, as before (issue 2879)', async () => {
+    const closes = await inFixture('&scrim=dim&busy=1&trap=1', async (page) => {
+      await page.keyboard.press('Escape');
+      return page.evaluate(() => document.body.dataset.modalCloses);
+    });
+    assert.equal(closes, '1');
   });
 
   it('calls nothing for a drag that starts inside the dialog and ends on the scrim', async () => {

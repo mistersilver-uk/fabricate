@@ -36,10 +36,12 @@
     the document in every capture path, so the record precedes every document capture listener
     whatever its registration order.
   - A panel a control inside the dialog opened, or a panel opened from such a panel, counts as
-    inside it wherever it is portaled, by `overlaysOpenedFrom` in `util/overlayHost.js`: a press
+    inside it wherever it is portaled, by `openedInside` in `actions/scrim.js`: a press
     there dismisses nothing, and its Escape is left to the panel, judged from the same record. A
     `Modal` mounted inside the dialog counts so too, being acquired from where it was mounted, and
     so does the scrim drawn just before it.
+  - A press outside dismisses it only as the primary button's `click` fires, and only where that
+    button went down and came up outside the dialog and every panel that counts as inside it.
   - The dialog is drawn only while the element it was mounted in is in its document, so one in a
     slot an `update` detaches closes with it, calling nothing, and is drawn again as the slot
     returns (issue 2678).
@@ -64,15 +66,10 @@
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
-  import { holdScroll, precede } from '../actions/scrim.js';
+  import { holdScroll, inPanelOpenedFrom, openedInside, precede } from '../actions/scrim.js';
   import IconButton from './IconButton.svelte';
   import { focusables, isPage, markedTarget, restoreFocus } from '../util/modalFocus.js';
-  import {
-    acquireOverlayHost,
-    heldBy,
-    overlaysOpenedFrom,
-    releaseOverlayHost,
-  } from '../util/overlayHost.js';
+  import { acquireOverlayHost, heldBy, releaseOverlayHost } from '../util/overlayHost.js';
 
   let {
     open = false,
@@ -152,15 +149,6 @@
     return event.composedPath?.()[0] ?? event.target;
   }
 
-  // True when `origin` is in a panel that counts as inside `container`, or on the scrim just before
-  // one; see Invariants.
-  function inPanelOpenedFrom(container, origin) {
-    const scrim = origin?.closest?.('[data-manager-modal-scrim]');
-    return overlaysOpenedFrom(container).some(
-      (panel) => heldBy(panel, origin) || scrim?.nextElementSibling === panel
-    );
-  }
-
   // True when `origin` sits in an expanded control that `container` holds, looking through open
   // shadow roots to their hosts. An expanded ancestor of the dialog itself never counts.
   function expandedIn(container, origin) {
@@ -205,13 +193,13 @@
   }
 
   // An Escape is judged from the window's record, taken before a panel can close and release
-  // itself; a mousedown, or a key in a document with no window, live.
+  // itself; a click, or a key in a document with no window, live.
   function fromPanelOpenedInside(event) {
     if (escapeRecord?.event === event) return escapeRecord.nested;
     return inPanelOpenedFrom(dialog, originOf(event));
   }
 
-  // An outside mousedown or an Escape that did not come from inside the dialog. Escape inside it
+  // An outside primary click or an Escape that did not come from inside the dialog. Escape inside it
   // is `handleKeydown`'s, so it is not closed twice, nor is an expanded control's.
   function dismissFromOutside(event) {
     if (event?.type === 'keydown' && (event.isComposing || cameFromInside(event))) return;
@@ -324,6 +312,8 @@
       use:heldHost
       use:dismissOnOutsideClick={{
         enabled: open && closeOnOutsideClick,
+        dismissOn: 'click',
+        additionalNodes: () => openedInside(dialog),
         onDismiss: dismissFromOutside,
       }}
       use:modalFocus={trapFocus}

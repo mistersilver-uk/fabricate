@@ -13,6 +13,7 @@ import {
   unmount,
 } from '../../node_modules/svelte/src/index-client.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const MODAL_PATH = 'src/ui/svelte/components/Modal.svelte';
@@ -93,8 +94,6 @@ function dispatchHeard(element, event, nodes) {
 }
 
 const q = (selector) => document.querySelector(selector);
-
-const press = () => new document.defaultView.MouseEvent('mousedown', { bubbles: true });
 
 /** A panel on `<body>` holding an input, as a picker's portaled list does. */
 function panelWithField() {
@@ -275,7 +274,7 @@ for (const closeOnOutsideClick of [true, false]) {
       it('calls nothing for a press in it or an Escape on a field in it', async () => {
         const calls = await open();
         await withPanel(q('[data-plain]'), (panel, field) => {
-          panel.dispatchEvent(press());
+          pressPointer(panel);
           field.dispatchEvent(escape());
           assert.deepEqual(calls, []);
         });
@@ -319,7 +318,7 @@ for (const closeOnOutsideClick of [true, false]) {
           field.dispatchEvent(escape());
           assert.deepEqual(calls, [], 'the Escape in the panel dismisses nothing');
         });
-        document.body.dispatchEvent(press());
+        pressPointer(document.body);
         assert.deepEqual(
           calls,
           closeOnOutsideClick ? [[]] : [],
@@ -333,7 +332,7 @@ for (const closeOnOutsideClick of [true, false]) {
           const anchor = document.createElement('button');
           first.append(anchor);
           await withPanel(anchor, (second, field) => {
-            second.dispatchEvent(press());
+            pressPointer(second);
             field.dispatchEvent(escape());
             assert.deepEqual(calls, []);
           });
@@ -349,7 +348,7 @@ for (const closeOnOutsideClick of [true, false]) {
           try {
             const calls = await open();
             await withPanel(outside.firstChild, (panel, field) => {
-              panel.dispatchEvent(press());
+              pressPointer(panel);
               assert.deepEqual(calls, [[]], 'the press dismisses');
               field.dispatchEvent(escape());
               assert.deepEqual(calls, [[], []], 'and so does the Escape');
@@ -793,7 +792,7 @@ describe('Modal host and window lifecycle', () => {
     flushSync();
     try {
       await withPanel(harness.target.querySelector('[data-plain]'), (panel) => {
-        panel.dispatchEvent(press());
+        pressPointer(panel);
       });
       assert.deepEqual(aCalls, [], 'the dialog that opened the panel stays');
       assert.deepEqual(bCalls, [[]], 'the other one is dismissed once');
