@@ -2058,7 +2058,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
   // The published tab strip (issue 2601): the keyboard-reached, selected tab's ring, ink and
-  // underline, the unselected tab at rest, and the strip's rule.
+  // underline, the unselected tab at rest, the selected tab's count (issue 2896), and the strip's rule.
   'manager-published-tabs-specimen': [
     {
       selector: `${LAB_OUTPUTS_TAB}:focus-visible`,
@@ -2069,6 +2069,10 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: LAB_INPUTS_TAB,
       styles:
         'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+    },
+    {
+      selector: `${LAB_OUTPUTS_TAB} > .manager-editor-tab-count`,
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
     },
     {
       selector: LAB_TABLIST,
