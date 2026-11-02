@@ -1716,12 +1716,19 @@ Each group states the accepted values of every key that entry publishes.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the button on one of those four grounds.
 - **`EditorTabs`.**
   - It is the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels the companion draws.
-    It draws no panel, and no mark, padlock or description on a tab.
-  - `tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
+    It draws no panel, and on a tab no padlock, no description and no mark but the tab's `count`.
+  - `tabs` is required and is an array of `{ id, label, icon, count }` items, one tab each, drawn in that order.
     `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
-    `label` is required and is final display text, the tab's whole visible text and its accessible name; a label of white space alone leaves the tab with no name, so the companion never passes one.
+    `label` is required and is final display text, the tab's visible text and its accessible name, which a `count` follows; a label of white space alone leaves the tab with no name, so the companion never passes one.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+    `count` is optional and is a whole number of 0 or more, as `2`, drawn after the label as the strip's record count, a small muted numeral in the mono face, on the selected tab as on any other.
+    A tab with a `count` is named its label, a comma, a space and the count's digits, as "Factions, 2", and the numeral itself is hidden from assistive technology, so the count is read once; Fabricate adds no word, so the name reads alike in every language.
+    A `count` of 0 is drawn and named, so the companion omits `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped.
+    A `count` that is not a whole number of 0 or more, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
+    The numeral's muted ink clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, on a selected, an unselected and a hovered tab alike; under forced colours it is drawn in the system text colour, and it never marks the selection.
     An item's other members are private and Fabricate draws nothing from them; a function in one is M10.
+    Naming `count` is additive, and `EditorTabs`' `version` stays 1: before it `count` was a private member that drew nothing.
+    A Fabricate that predates it draws no count and refuses none, and `describe` names no item member, so a companion puts a count a reader must have in the panel too.
   - `activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
   - `onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
     The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so the companion makes that `update` from inside `onSelect`, before any `await`.
