@@ -88,6 +88,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/TintPickerButton.svelte',
+    'src/ui/svelte/components/TintSwatches.svelte',
     'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/components/SearchField.svelte',
     // The parties pane's refusal banner is the shared notice as of issue 1515.

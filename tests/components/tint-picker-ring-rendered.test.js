@@ -1,6 +1,6 @@
 /**
- * Issues 2257 D3, 2416 and 2459: the tint swatch's selected ring, keyboard cursor and hover
- * outline, in a browser — on the popover's square tiles and on the inline strip's cells.
+ * Issues 2257 D3, 2416, 2459 and 2901: the tint swatch's selected ring, keyboard cursor and hover
+ * outline, in a browser — on the popover's square tiles and on the inline strip's radios.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -19,9 +19,10 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PICKER = 'src/ui/svelte/components/TintPicker.svelte';
+const SWATCHES = 'src/ui/svelte/components/TintSwatches.svelte';
 const sheet = readStylesheet();
 // `SearchablePopover` itself has no scoped block; its panel's is the one the tiles sit under.
-const scoped = [PICKER, 'src/ui/svelte/components/SearchablePopoverPanel.svelte']
+const scoped = [PICKER, SWATCHES, 'src/ui/svelte/components/SearchablePopoverPanel.svelte']
   .map((path) => scopedComponentCss(resolve(repoRoot, path)).css)
   .join('\n');
 
@@ -35,7 +36,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tint-picker-ring-rendered-',
   rawModules: RAW_MODULES,
-  compiledModules: [...SEARCHABLE_POPOVER_COMPILED_MODULES, PICKER],
+  compiledModules: [...SEARCHABLE_POPOVER_COMPILED_MODULES, SWATCHES, PICKER],
   componentPath: PICKER,
 });
 
@@ -103,15 +104,16 @@ const paint = (cells) =>
     [...globalThis.document.querySelectorAll(cells)].map((cell) => [
       cell.dataset.managerColorToken ?? 'none',
       {
-        ring: globalThis.getComputedStyle(cell.querySelector('.manager-color-swatch') ?? cell)
-          .boxShadow,
+        ring: globalThis.getComputedStyle(
+          cell.querySelector('.manager-color-swatch, .fabricate-tint-swatch-fill') ?? cell
+        ).boxShadow,
         outline: globalThis.getComputedStyle(cell).outlineStyle,
       },
     ])
   );
 
 const TILES = `${PANEL} [role="option"]`;
-const STRIP_CELLS = '[data-manager-color-layout="inline"] .manager-color-preset';
+const STRIP_CELLS = '[data-manager-color-layout="inline"] [role="radio"]';
 const tile = (token) => `${PANEL} [data-manager-color-token="${token}"]`;
 const stripCell = (token) =>
   `[data-manager-color-layout="inline"] [data-manager-color-token="${token}"]`;
@@ -120,7 +122,7 @@ const stripCell = (token) =>
 const stateOf = (selector) => {
   const control = globalThis.document.querySelector(selector);
   const style = globalThis.getComputedStyle(control);
-  const swatch = control.querySelector('.manager-color-swatch');
+  const swatch = control.querySelector('.manager-color-swatch, .fabricate-tint-swatch-fill');
   const fill = swatch ? globalThis.getComputedStyle(swatch) : null;
   const outer = control.getBoundingClientRect();
   const inner = swatch?.getBoundingClientRect() ?? outer;
@@ -144,10 +146,10 @@ const stateOf = (selector) => {
   };
 };
 
-/** Moves keyboard focus one stop on from `from`, so `:focus-visible` is the browser's own. */
-async function tabFrom(page, from) {
-  await page.focus(from);
-  await page.keyboard.press('Tab');
+/** Focuses a strip radio after a key press: the group is one Tab stop, so Tab reaches no other. */
+async function keyFocus(page, selector) {
+  await page.keyboard.press('Shift');
+  await page.focus(selector);
 }
 
 /** The control is under keyboard focus and draws the 2px outline at `offset`. */
@@ -251,7 +253,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
     const page = await open({ colorToken: 'rose', layout: 'inline' });
     try {
       assert.ok(await page.locator('[data-manager-color-layout="inline"].is-inline').count());
-      await tabFrom(page, stripCell('sage'));
+      await keyFocus(page, stripCell('mist'));
       const mist = await page.evaluate(stateOf, stripCell('mist'));
       assertFocusOutline(mist, '-2px', INSET);
       assert.equal(mist.ring, 'none');
@@ -284,7 +286,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
   it("keeps the strip's inset cursor on a keyboard-focused cell under the pointer", async () => {
     const page = await open({ colorToken: 'rose', layout: 'inline' }, [], CORE_BUTTON);
     try {
-      await tabFrom(page, stripCell('sage'));
+      await keyFocus(page, stripCell('mist'));
       await pointAt(page, stripCell('mist'));
       const mist = await page.evaluate(stateOf, stripCell('mist'));
       assert.ok(mist.hover, 'the pointer is not over the focused cell');
@@ -344,7 +346,7 @@ const buttonHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tint-picker-button-rendered-',
   rawModules: RAW_MODULES,
-  compiledModules: [...SEARCHABLE_POPOVER_COMPILED_MODULES, PICKER, BUTTON],
+  compiledModules: [...SEARCHABLE_POPOVER_COMPILED_MODULES, SWATCHES, PICKER, BUTTON],
   componentPath: BUTTON,
 });
 

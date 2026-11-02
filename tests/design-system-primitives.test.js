@@ -241,6 +241,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issues 2257 and 2459: the tint palette and its trigger, on the frames that draw a selected swatch.
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
+  // Issue 2901: the swatch strip, on the frames that draw the inline strip.
+  'src/ui/svelte/components/TintSwatches.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
   // Issue 1782: the typeahead, on the limits tab and each site's open list.
   'src/ui/svelte/components/Typeahead.svelte',

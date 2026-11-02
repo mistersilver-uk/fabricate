@@ -40,6 +40,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/TintPickerButton.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
   ]),
+  // The swatch strip (issue 2901): the inline strip in the world essence entry and the catalogue's
+  // bulk panel.
+  'src/ui/svelte/components/TintSwatches.svelte': Object.freeze([
+    'world-essence-entry-dirty',
+    'world-essence-catalogue-bulk',
+  ]),
   // Issue 1648: each run control maps to a state that actually renders it.
   'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',

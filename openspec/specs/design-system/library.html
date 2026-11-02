@@ -3639,7 +3639,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>Event contract:</b> <b>onChange</b>, default a no-op, receives the whole <code>{colorToken, customColor}</code> pair from a preset click and from a hex edit alike &middot; <b>onClear</b> function or <code>null</code>, default <code>null</code>, is the unset instruction, deliberately NOT folded into <code>onChange</code> as an empty token because that would make every existing consumer learn a new falsy case.
             A pick closes the popover and returns focus to the control that opened it, and No colour calls <b>onClear</b> and then closes.
             The popover is the picker&rsquo;s own panel, which measures, portals and dismisses itself, so there is no position or portal prop.</li>
-          <li><b>Accessible naming:</b> every cell is a real <code>&lt;button&gt;</code> whose localized label is written as BOTH <code>aria-label</code> and <code>title</code>, since a swatch has no text of its own, and is named by <b>presetGridLabel</b> with its siblings: inline, each cell carries <code>aria-pressed</code>, true on the selected cell alone, in a <code>group</code>; in the popover, each tile is an <code>option</code> carrying <code>aria-selected</code>, true on the selected tile alone, in a <code>listbox</code> inside a dialog of the same name.
+          <li><b>Accessible naming:</b> every cell is a real <code>&lt;button&gt;</code> whose localized label is written as BOTH <code>aria-label</code> and <code>title</code>, since a swatch has no text of its own, and is named by <b>presetGridLabel</b> with its siblings: inline, the strip is <code>&lt;TintSwatches&gt;</code>, each cell a <code>radio</code> carrying <code>aria-checked</code>, true on the selected cell alone, in a <code>radiogroup</code> (issue 2901); in the popover, each tile is an <code>option</code> carrying <code>aria-selected</code>, true on the selected tile alone, in a <code>listbox</code> inside a dialog of the same name.
             No colour, the strip&rsquo;s leading cell or the panel&rsquo;s footer action, renders only when the gate is open AND a handler was supplied, because a control that does nothing is worse than none.
             <b>customHexLabel</b> names the hex field and <b>noneLabel</b> No colour.
             The three labels default to their localized English through <code>localizeOr</code>, so a caller passing none still names the palette.</li>
@@ -3673,6 +3673,76 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="delta"><b>One control the set needs.</b> <code>&lt;Menu&gt;</code> is what <code>&lt;PickerRow&gt;</code>’s <code>allowAny</code> opens — eight callers across three studios.
       <code>&lt;TintPicker&gt;</code> ships <code>allowCustom</code> <b>false by default</b>; the two gathering-biome pickers opt in, and the four inline essence surfaces pass <code>false</code> explicitly.<span class="cite"><b>TintPicker.svelte</b>, the specimen · <b>TintPickerButton.svelte</b>, its single-caller trigger · <b>managerColorTokens.js</b> <code>MANAGER_COLOR_TOKENS</code></span></div>
     <div class="delta ok"><code>ActionMenu</code>, the <code>&lt;Menu&gt;</code> primitive, is published through <code>game.fabricate.api.ui</code>.</div>
+  </div>
+  <div class="spec" data-status="shipped" data-status-TintSwatches="shipped">
+    <div class="spec-head">
+      <h4>&lt;TintSwatches&gt;</h4>
+      <span class="st st-shipped">shipped</span>
+      <p class="why">One colour from Fabricate&rsquo;s tints: a radio group of swatches, each a radio named by its tint.</p>
+    </div>
+    <div class="stage">
+      <div class="unit" style="width:300px">
+        <span class="cap">swatch strip &mdash; Rose checked, Mist under keyboard focus, Lavender under the pointer</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:6px;width:100%">
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-sage)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px;outline:2px solid var(--fab-accent);outline-offset:-2px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-mist)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px;outline:2px solid var(--fab-accent);outline-offset:1px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-lavender)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-rose);box-shadow:inset 0 0 0 2px var(--fab-biome-icon-foreground)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-peach)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-butter)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-aqua)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-mauve)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-verdant)"></div>
+          </div>
+          <div style="box-sizing:border-box;height:28px;padding:2px;border:1px solid var(--fab-border);border-radius:7px">
+            <div style="height:100%;border-radius:6px;background:var(--fab-tag-azure)"></div>
+          </div>
+        </div>
+        <span class="k-hint">The strip <code>&lt;TintPicker&gt;</code>&rsquo;s inline layout draws and the published seam draws: 28px cells at least 44px wide in auto-fit tracks that fill the column, 6px apart, each a 1px <code>--fab-border</code> edge at radius 7 around a radius-6 swatch 3px inside it.
+          The checked swatch carries the 2px inset ring in <code>--fab-biome-icon-foreground</code>; keyboard focus is the 2px accent outline inset by 2px, and pointer hover the outset 2px accent outline at a 1px offset, never a fill.</span>
+        </div>
+    </div>
+    <div class="notes">
+      <div>
+        <h5>Canonical spec</h5>
+        <ul>
+          <li><b>group</b> a <code>radiogroup</code> named by <b>ariaLabel</b>; each swatch a <code>&lt;button role="radio" aria-checked&gt;</code> named by its tint in <code>aria-label</code> and <code>title</code>, carrying <code>data-keyboard-focus</code></li>
+          <li><b>keys</b> one Tab stop, the checked radio or else the first; ArrowRight and ArrowDown move to the next swatch and ArrowLeft and ArrowUp to the previous, wrapping, Left and Right swapped under <code>direction: rtl</code>; Home and End reach the ends; each move focuses and chooses; Space, Enter and a press choose</li>
+          <li><b>checked</b> the 2px inset ring on the swatch, at 3:1 on all ten tints in every palette, and <code>aria-checked</code>, so colour never carries it alone &middot; <b>focus</b> the inset accent outline &middot; <b>hover</b> the outset accent outline, never a fill &middot; no transition</li>
+          <li><b>forced colours</b> each swatch keeps its tint and its ring, and the checked swatch&rsquo;s edge takes <code>Highlight</code></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Svelte API</h5>
+        <ul>
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>TintSwatches.svelte</code>&rsquo;s <code>$props()</code> at issue 2901.</li>
+          <li><b>value</b> a tint key, matched exactly, default <code>&apos;&apos;</code> &mdash; any other value checks no swatch &middot; <b>tints</b> an array of tint keys, drawn in its order once each, an unknown key dropped; absent, or naming no tint, all ten &middot; <b>labels</b> <code>{ [tint]: text }</code>, final display text naming a swatch, else Fabricate&rsquo;s own tint name</li>
+          <li><b>ariaLabel</b> string, the group&rsquo;s name, required by contract &middot; <b>noneLabel</b> and <b>noneChecked</b> &mdash; a leading No-colour radio, drawn only beside <b>onClear</b>, and whether it is checked</li>
+          <li><b>Event contract:</b> <b>onChange</b>(token) when a swatch that is not checked is chosen &middot; <b>onClear</b>() when the No-colour radio is; the strip draws no state of its own</li>
+        </ul>
+      </div>
+    </div>
+    <div class="delta ok"><b>Extracted from <code>&lt;TintPicker&gt;</code> and published as <code>TintSwatches</code> (issues 2901 and 2791).</b>
+      The inline strip was a <code>group</code> of <code>aria-pressed</code> buttons inside <code>TintPicker.svelte</code>; it is its own file now, a radio group, which <code>TintPicker</code>&rsquo;s <code>inline</code> layout renders, so the four essence surfaces and a companion draw one strip.
+      A companion mounts it through <code>game.fabricate.api.ui</code> at <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>tints</code> and <code>labels</code>, under the standalone style root in a window of its own.
+      The palette is Fabricate&rsquo;s ten tints: a colour outside them is not offered, because the checked ring is measured against those ten alone.<span class="cite"><b>TintSwatches.svelte</b> &middot; <b>TintPicker.svelte</b> &middot; <b>managerColorTokens.js</b> <code>offeredTintKeys</code></span></div>
   </div>
 </section>
 <section id="marks">
@@ -12523,7 +12593,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       </tr>
       <tr>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Tint picker group name</td>
-        <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">the preset grid is a <code>group</code> named by its localized label, and each cell carries <code>aria-pressed</code></td>
+        <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">the preset grid is a <code>radiogroup</code> named by its localized label, and each cell is a <code>radio</code> carrying <code>aria-checked</code> (issue 2901)</td>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">DONE: role="group" on the preset grid</b></td>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><code>TintPicker.svelte</code>&rsquo;s grid was a plain element carrying <code>presetGridLabel</code>, where the attribute named nothing; and settled with the selected mark, so a reader hears the group, each colour and which one is pressed.
             After captures <b>manager-gathering-biome-colour-popover</b>, <b>world-essence-entry-dirty</b></span></td>

@@ -446,6 +446,7 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
           'src/ui/svelte/apps/manager/InspectorPanel.svelte',
           'src/ui/svelte/apps/manager/BulkEditSection.svelte',
           'src/ui/svelte/apps/manager/scoped/EssenceCatalogueBulkPanel.svelte',
+          'src/ui/svelte/components/TintSwatches.svelte',
           'src/ui/svelte/components/TintPicker.svelte',
           'src/ui/svelte/components/Callout.svelte',
         ],

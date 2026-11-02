@@ -92,6 +92,7 @@ export const ESSENCE_CATALOGUE_BULK_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  'src/ui/svelte/components/TintSwatches.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/apps/manager/scoped/EssenceCatalogueBulkPanel.svelte',
 ]);

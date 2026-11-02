@@ -7,22 +7,22 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `layout` | `'popover'` \| `'inline'` | `'popover'` | `inline` renders the strip instead of the panel. The popover is `SearchablePopover`'s grid form: four columns of square swatch tiles, the query and its count, and the key-hint row (issue 2459). |
+  | `layout` | `'popover'` \| `'inline'` | `'popover'` | `inline` renders the strip, `TintSwatches`, instead of the panel. The popover is `SearchablePopover`'s grid form: four columns of square swatch tiles, the query and its count, and the key-hint row (issue 2459). |
   | `trigger` / `anchor` / `open` / `bounds` | snippet / element or resolver / bindable boolean / selector or resolver | `undefined` / `undefined` / `false` / the primitive's | Forwarded to `SearchablePopover` as they are, so a missing `anchor` is trigger mode. An `anchor` caller binds `open`; a `trigger` caller spreads `attributes` on its own button and names it. |
   | `allowCustom` | boolean | `false` | Whether free-hex entry is offered: the panel's caller footer, or below the strip. Only a caller whose stored model carries a `customColor` sibling (the gathering biome) passes true, because a free hex cannot be guaranteed legible across all seven themes. |
   | `allowNone` / `unset` | booleans | `false` | `allowNone` offers No colour: the strip's leading cell, or the panel's `footerAction`, which clears and closes. `unset` is true when the caller holds no authored colour: `normalizedToken` folds an absent value onto a preset, so without it the palette marks that preset selected for a model that has chosen nothing. |
   | `noneSelected` | boolean or `null` | `null` | Whether the strip's No-colour cell is marked. `null` derives it from `unset`; a bulk-edit stage passes `false` for "leave unchanged", which marks nothing at all. |
   | `onClear` | function or `null` | `null` | The No-colour handler, separate from `onChange` because the two are different instructions; a caller that does not pass it cannot offer No colour. |
-  | `presetGridLabel` / `customHexLabel` / `noneLabel` | pre-localized strings | their English, localized through the `APP_LOCALIZER` context | The palette's name (the strip's `group`, the panel and its `listbox`), the hex field's caption and No colour's name (issue 2257). |
+  | `presetGridLabel` / `customHexLabel` / `noneLabel` | pre-localized strings | their English, localized through the `APP_LOCALIZER` context | The palette's name (the strip's `radiogroup`, the panel and its `listbox`), the hex field's caption and No colour's name (issue 2257). |
 
   Invariants:
   - No colour is offered only when `allowNone` is true and `onClear` is a function.
   - Every swatch's label is both its `aria-label` and its `title`. The palette is a shared
     constant, so the panel, its trigger and the inline strip cannot drift in order, membership or
     naming.
-  - The strip's cells sit in a `group` and only the selected one is `aria-pressed="true"`; the
-    panel's tiles are `option`s and only the selected one is `aria-selected="true"`. Either mark is
-    the sheet's inset ring, never the focus outline (issues 2257 and 2459).
+  - The strip is `TintSwatches`, a `radiogroup` whose checked radio alone is `aria-checked="true"`;
+    the panel's tiles are `option`s and only the selected one is `aria-selected="true"`. Either mark
+    is the inset ring, never the focus outline (issues 2257, 2459 and 2901).
 -->
 <script>
   import { getContext } from 'svelte';
@@ -36,6 +36,7 @@
     tintSwatchStyle,
   } from '../util/managerColorTokens.js';
   import SearchablePopover from './SearchablePopover.svelte';
+  import TintSwatches from './TintSwatches.svelte';
 
   const localize = getContext(APP_LOCALIZER);
   const copy = (key, fallback) => localizeWith(localize, key, undefined, fallback);
@@ -79,8 +80,6 @@
   function normalizedToken(value) {
     return normalizeManagerColorToken(value);
   }
-
-  const isPresetSelected = (token) => !unset && normalizedToken(colorToken) === token;
 
   function selectPreset(token) {
     onChange({ colorToken: token, customColor });
@@ -135,39 +134,14 @@
     class="fabricate-color-picker-popover manager-color-picker-popover is-inline"
     data-manager-color-layout="inline"
   >
-    <span class="manager-color-preset-grid" role="group" aria-label={presetGridLabel || undefined}>
-      {#if showNoColour}
-        <button
-          type="button"
-          class={`manager-color-preset manager-color-preset-none ${noColourSelected ? 'is-selected' : ''}`}
-          aria-label={noneLabel}
-          aria-pressed={noColourSelected ? 'true' : 'false'}
-          title={noneLabel}
-          data-manager-color-none
-          data-keyboard-focus="true"
-          onclick={() => onClear()}
-        >
-          <span class="manager-color-swatch manager-color-swatch-none" aria-hidden="true">
-            <i class="fas fa-slash"></i>
-          </span>
-        </button>
-      {/if}
-      {#each presets as preset (preset.token)}
-        <button
-          type="button"
-          class={`manager-color-preset ${isPresetSelected(preset.token) ? 'is-selected' : ''}`}
-          aria-label={preset.label}
-          aria-pressed={isPresetSelected(preset.token) ? 'true' : 'false'}
-          title={preset.label}
-          data-manager-color-token={preset.token}
-          data-keyboard-focus="true"
-          style={tintSwatchStyle(preset.token, '')}
-          onclick={() => selectPreset(preset.token)}
-        >
-          <span class="manager-color-swatch" aria-hidden="true"></span>
-        </button>
-      {/each}
-    </span>
+    <TintSwatches
+      value={unset ? '' : normalizedToken(colorToken)}
+      ariaLabel={presetGridLabel}
+      noneLabel={showNoColour ? noneLabel : ''}
+      noneChecked={noColourSelected}
+      onChange={selectPreset}
+      {onClear}
+    />
     {#if allowCustom}{@render hexField()}{/if}
   </span>
 {:else}
@@ -205,21 +179,5 @@
     display: grid;
     gap: var(--fab-space-2);
     width: 100%;
-  }
-
-  .manager-color-picker-popover.is-inline .manager-color-preset-grid {
-    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
-  }
-
-  .manager-color-picker-popover.is-inline .manager-color-preset {
-    aspect-ratio: auto;
-    height: 28px;
-    min-height: 28px;
-  }
-
-  .manager-color-swatch-none {
-    color: var(--fab-text-secondary);
-    background: var(--fab-bg-3);
-    font-size: 0.6rem;
   }
 </style>

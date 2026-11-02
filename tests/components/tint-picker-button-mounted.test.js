@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...SEARCHABLE_POPOVER_COMPILED_MODULES,
+    'src/ui/svelte/components/TintSwatches.svelte',
     'src/ui/svelte/components/TintPicker.svelte',
     BUTTON_PATH,
   ],

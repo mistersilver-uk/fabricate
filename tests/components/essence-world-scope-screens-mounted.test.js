@@ -74,6 +74,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/components/TintSwatches.svelte',
     'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',

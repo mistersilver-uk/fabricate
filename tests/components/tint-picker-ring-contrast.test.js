@@ -1,6 +1,6 @@
 /**
- * Issues 2257 D3, 2416 and 2459: the tint palette's selected ring and keyboard cursor, declared and
- * measured, on the inline strip's cells and on the popover's square tiles.
+ * Issues 2257 D3, 2416, 2459 and 2901: the tint palette's selected ring and keyboard cursor,
+ * declared and measured, on `TintSwatches`' radios and on the popover's square tiles.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -21,17 +21,16 @@ import {
 } from '../helpers/themePaletteContrast.js';
 
 const SHEET = 'styles/fabricate.css';
-const PICKER = 'src/ui/svelte/components/TintPicker.svelte';
+const SWATCHES = 'src/ui/svelte/components/TintSwatches.svelte';
 const corpus = collectStyleCorpus();
 const sheet = rulesIn(corpus[SHEET]);
 const themes = themePalettes(sheet);
 
-const SWATCH_RING =
-  '.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch';
+const SWATCH_RING = '.fabricate-tint-swatch.is-selected .fabricate-tint-swatch-fill';
 const TILE_RING =
   ".fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-option[aria-selected='true'] .manager-color-swatch";
-const NONE_RING =
-  '.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch';
+const NONE_RING = '.fabricate-tint-swatch.is-none.is-selected .fabricate-tint-swatch-fill';
+const NONE_FILL = '.fabricate-tint-swatch.is-none .fabricate-tint-swatch-fill';
 
 /** The one declaration of `property` on the rule in `file` whose selector list holds `selector`. */
 function declared(file, selector, property) {
@@ -48,8 +47,8 @@ function declared(file, selector, property) {
 }
 
 /** The token a selected cell's ring is inked in: a 2px inset ring, never an outline. */
-function ringInk(selector) {
-  const ink = declared(SHEET, selector, 'box-shadow').match(
+function ringInk(selector, file = SWATCHES) {
+  const ink = declared(file, selector, 'box-shadow').match(
     /^inset 0 0 0 2px var\((--fab-[\w-]+)\)$/u
   );
   assert.ok(ink, `${selector} draws no 2px inset ring`);
@@ -79,15 +78,13 @@ test('a colour swatch rings in the dark ink at 3:1 on all ten swatches in every 
   const { lowest, short } = measure(ink, fills);
   t.diagnostic(`lowest swatch ring ratio ${lowest.toFixed(2)}:1`);
   assert.deepEqual(short, [], 'a selected swatch would be under WCAG 1.4.11');
-  assert.equal(ringInk(TILE_RING), ink, "the popover's selected tile rings in the same ink");
+  assert.equal(ringInk(TILE_RING, SHEET), ink, "the popover's selected tile rings in the same ink");
 });
 
 test('the No-colour cell rings in the text ink at 3:1 on its own fill in every theme', (t) => {
   const ink = ringInk(NONE_RING);
   assert.equal(ink, '--fab-text');
-  const fill = declared(PICKER, '.manager-color-swatch-none', 'background').match(
-    /^var\((--fab-[\w-]+)\)$/u
-  )?.[1];
+  const fill = declared(SWATCHES, NONE_FILL, 'background').match(/^var\((--fab-[\w-]+)\)$/u)?.[1];
   assert.equal(fill, '--fab-bg-3', 'the No-colour cell is filled from one palette token');
   const { lowest, short } = measure(ink, [fill]);
   t.diagnostic(`lowest No-colour ring ratio ${lowest.toFixed(2)}:1`);
@@ -95,31 +92,27 @@ test('the No-colour cell rings in the text ink at 3:1 on its own fill in every t
 });
 
 test('the No-colour glyph inks secondary and clears 3:1 on its own fill in every theme (issue 2368)', () => {
-  const ink = declaredToken(rulesIn(corpus[PICKER]), '.manager-color-swatch-none', 'color', PICKER);
+  const own = rulesIn(corpus[SWATCHES]);
+  const ink = declaredToken(own, NONE_FILL, 'color', SWATCHES);
   assert.equal(ink, '--fab-text-secondary');
-  const fill = declaredToken(
-    rulesIn(corpus[PICKER]),
-    '.manager-color-swatch-none',
-    'background',
-    PICKER
-  );
+  const fill = declaredToken(own, NONE_FILL, 'background', SWATCHES);
   assert.deepEqual(shortfalls(themes, ink, [fill], 3), []);
   assert.notDeepEqual(shortfalls(themes, '--fab-text-muted', [fill], 3), [], 'muted falls short');
 });
 
-const CURSOR = '.fabricate-color-picker-popover .manager-color-preset:focus-visible';
-const HOVER = '.fabricate-color-picker-popover .manager-color-preset:hover';
+const CURSOR = '.fabricate-tint-swatch:focus-visible';
+const HOVER = '.fabricate-tint-swatch:hover';
 const PICKER_CURSOR =
   ".fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true']";
 const TILE_HOVER =
   ".fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option:hover:not([data-active-option='true'])";
 
-/** The `outline` and `outline-offset` the sheet declares on `selector`. */
-const outlineOf = (selector) =>
-  ['outline', 'outline-offset'].map((property) => declared(SHEET, selector, property));
+/** The `outline` and `outline-offset` `file` declares on `selector`. */
+const outlineOf = (selector, file = SHEET) =>
+  ['outline', 'outline-offset'].map((property) => declared(file, selector, property));
 
 test("the inline strip's keyboard cursor declares the picker cursor's outline (issue 2416)", () => {
-  assert.deepEqual(outlineOf(CURSOR), outlineOf(PICKER_CURSOR));
+  assert.deepEqual(outlineOf(CURSOR, SWATCHES), outlineOf(PICKER_CURSOR));
 });
 
 /** The inline `outline` and `outline-offset` of each outlined cell the library's shipped popover draws. */
@@ -140,12 +133,12 @@ test("the library draws the shipped popover's cursor and hover as the sheet decl
   // The shipped popover is the picker's grid form (issue 2459): its tiles take the picker's cursor
   // and the square tile's hover, which the inline strip's hover rule restates.
   assert.deepEqual(drawnOutlines(), [outlineOf(PICKER_CURSOR), outlineOf(TILE_HOVER)]);
-  assert.deepEqual(outlineOf(HOVER), outlineOf(TILE_HOVER), 'the strip hover');
+  assert.deepEqual(outlineOf(HOVER, SWATCHES), outlineOf(TILE_HOVER), 'the strip hover');
 });
 
 /** The cursor's ink on `stack` in each palette: the palettes under 3:1, and every ratio in words. */
-function cursorOn(stack, cursor = CURSOR) {
-  const ink = declared(SHEET, cursor, 'outline').match(/^2px solid var\((--fab-[\w-]+)\)$/u)?.[1];
+function cursorOn(stack, cursor = CURSOR, file = SWATCHES) {
+  const ink = declared(file, cursor, 'outline').match(/^2px solid var\((--fab-[\w-]+)\)$/u)?.[1];
   assert.ok(ink, 'the cursor is not a 2px outline in one palette token');
   assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
   const ratios = [...themes].map(([theme, tokens]) => [
@@ -173,7 +166,7 @@ test('the popover cursor clears 3:1 on the tile ground and on the panel ground, 
   const tile = declaredToken(sheet, TILE_GROUND, 'background', SHEET);
   assert.deepEqual([tile, panel], ['--fab-surface-soft', '--fab-bg-0']);
   for (const stack of [[tile, panel], [panel]]) {
-    const { short, lowest, figures } = cursorOn(stack, PICKER_CURSOR);
+    const { short, lowest, figures } = cursorOn(stack, PICKER_CURSOR, SHEET);
     t.diagnostic(`lowest cursor ratio on ${stack.join(' over ')} ${lowest}:1 (${figures})`);
     assert.deepEqual(short, [], `the popover cursor would be under WCAG 1.4.11 on ${stack}`);
   }

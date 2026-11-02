@@ -1150,6 +1150,15 @@
       ]
     },
     {
+      "path": "src/ui/svelte/components/TintSwatches.svelte",
+      "library": "<TintSwatches>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/TintPicker.svelte"
+      ],
+      "why": "Issue 2901 extracts `TintPicker`'s inline strip into its own file: a `radiogroup` of Fabricate's tints, each swatch a `radio` named by its tint, with one Tab stop and arrow, Home and End keys that move focus and choose. ONE caller, `components/TintPicker.svelte`, whose `inline` layout the four essence surfaces draw. Its styles are its own scoped block, rooted at `fabricate-tint-swatches`, so it draws alike under any root. Its library specimen reads `shipped`, and its broad-signal override names the frames that draw the strip."
+    },
+    {
       "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
       "library": "<SearchPopover>",
       "evidence": "broad",
