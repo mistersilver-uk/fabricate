@@ -1726,6 +1726,7 @@ A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
 Apart from that fallback, an entry naming none of these renders exactly what it rendered before they existed.
+Under `forced-colors: active` the selected tab's indicator MUST be drawn in `Highlight` and 4px thick against the other tabs' 2px, in a box of the same height, because the reader's colours repaint every tab's transparent border in the text colour and the selected tab would otherwise differ by weight alone (issue 2897).
 
 #### Scenario: The selected id names no rendered tab
 

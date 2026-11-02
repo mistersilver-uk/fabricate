@@ -1659,6 +1659,7 @@ Each group states the accepted values of every key that entry publishes.
     An empty `tabs` draws the named tablist with no tab, so pass at least one item where the strip must be reachable.
   - The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
+  - Under forced colours the reader's colours repaint every tab's border in the text colour, so the selected tab's indicator is drawn in `Highlight` and 4px thick against the others' 2px, in a box of the same height, and the selected tab is told from the others by that indicator and not by its weight.
 - **`RadioCardGroup`.**
   - It is the design system's option cards (`<OptionCards>` in the library): a named `<fieldset>` of cards, one for each item of `options`, each holding a native `<input type="radio">`, for one choice among a few options.
   - `options` is required and is an array of `{ value, label, description, example, badge, icon }` items, one card each, drawn in that order.

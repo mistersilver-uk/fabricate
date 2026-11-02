@@ -436,4 +436,16 @@
   .manager-environment-tab-button.is-danger.is-active {
     border-bottom-color: var(--fab-danger-border);
   }
+
+  /* Forced colours repaint every tab's border in the text colour, so the selected tab's is Highlight and 4px against 2px, in the same box. */
+  @media (forced-colors: active) {
+    .manager-editor-tab-button.is-active,
+    .manager-environment-tab-button.is-active,
+    .manager-editor-tab-button.is-danger.is-active,
+    .manager-environment-tab-button.is-danger.is-active {
+      padding-bottom: calc(var(--fab-space-3) - 2px);
+      border-bottom-width: 4px;
+      border-bottom-color: highlight;
+    }
+  }
 </style>
