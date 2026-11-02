@@ -2529,7 +2529,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
-/* `iconOnly` (issue 2905): the glyph's tile alone, a square sized to it rather than to `target`, with no caret, as every in-app icon-only picker draws it. `:where()` keeps these at the trigger rules' own weight, so they outrank them on order alone and yield to an in-app caller's own icon-only rule. */
+/* `iconOnly` (issue 2905): the glyph's tile alone, a square sized to it rather than to `target`, with no caption and no caret, which is what every in-app icon-only picker shares, whatever size and width its own rule gives it. `:where()` keeps these at the trigger rules' own weight, so they outrank them on order alone and yield to an in-app caller's own icon-only rule. */
 .fabricate-icon-picker .essence-icon-picker-trigger:where(.icon-only) {
   grid-template-columns: var(--fab-icon-picker-chip);
   width: auto;
