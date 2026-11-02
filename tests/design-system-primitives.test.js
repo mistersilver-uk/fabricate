@@ -892,7 +892,7 @@ test('(a) a Stepper change publishes its two frames, then the four specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) a Select change publishes its four frames, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Select.svelte';
   const frames = [
     'manager-recipes-bulk-edit-check-tier',
@@ -901,6 +901,7 @@ test('(a) a Select change publishes its four frames, then the two specimens that
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
+    'manager-published-select-fill-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-select-open',
@@ -1131,7 +1132,7 @@ test('(a) a Modal change publishes its five frames, then the three specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) an ActionMenu change publishes its six frames, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/ActionMenu.svelte';
   const frames = [
     'manager-environment-edit-automatic-force-add',

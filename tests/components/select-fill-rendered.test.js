@@ -156,7 +156,8 @@ describe('a filled published Select’s long value', () => {
           assert.ok(overflows, `${id} value overflows its box`);
           assert.equal(textOverflow, 'ellipsis', `${id} value ellipsises`);
           near(trigger.width, cases[id].target.width, `${id} width`);
-          if (dir === 'ltr') near(chevron.right, trigger.right - inset.end, `${id} chevron at the end`);
+          if (dir === 'ltr')
+            near(chevron.right, trigger.right - inset.end, `${id} chevron at the end`);
           else near(chevron.left, trigger.left + inset.start, `${id} chevron at the end in rtl`);
         }
       }));
