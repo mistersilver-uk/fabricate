@@ -744,7 +744,7 @@ test('manager environments browser and edit route define compact responsive geom
   );
 
   assert.ok(
-    toolbarBlock.includes('max-height: 100px;') && toolbarBlock.includes('overflow-y: auto;'),
+    toolbarBlock.includes('max-height: 112px;') && toolbarBlock.includes('overflow-y: auto;'),
     'environments toolbar should keep wrapped filters height-bounded instead of pushing the empty state down'
   );
   assert.ok(
