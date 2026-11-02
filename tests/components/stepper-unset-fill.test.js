@@ -245,11 +245,11 @@ describe('Stepper fill variant (issue 1050)', () => {
   it('keeps min-width: 0 on the filled input, which is what stops it overflowing', () => {
     const body = bodyOf(FILL_INPUT);
     assert.match(body, /flex: 1 1 0;/);
-    assert.match(body, /width: auto;/);
-    // `width: auto` removes the specified size suggestion that today's `width: 48px`
-    // supplies, leaving the UA min-content width of an `<input>` (~140-180px) as the
-    // flex item's automatic minimum. Without this the filled control's own minimum
+    // A percentage width zeroes a form control's min-content contribution, so the UA width
+    // of an `<input>` never holds a flex or grid column wider (issue 2903), and `min-width: 0`
+    // releases the flex item's automatic minimum, so the filled control's own minimum never
     // OVERFLOWS the 160px slot the variant exists to fill.
+    assert.match(body, /width: 100%;/);
     assert.match(body, /min-width: 0;/);
     assert.match(body, /height: 100%;/);
   });

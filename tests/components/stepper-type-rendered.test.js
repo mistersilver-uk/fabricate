@@ -25,6 +25,7 @@ const COUNT = Object.freeze({ value: 3, min: 0, max: 9, ariaLabel: 'Count' });
 const MOUNTS = Object.freeze({
   default: { props: COUNT },
   comfortable: { props: { ...COUNT, density: 'comfortable' } },
+  toolbar: { props: { ...COUNT, size: '34' } },
   fill: { props: { ...COUNT, fill: true } },
   disabled: { props: { ...COUNT, disabled: true } },
   'disabled-comfortable': { props: { ...COUNT, disabled: true, density: 'comfortable' } },
@@ -172,6 +173,7 @@ it('draws each library unit at the box and opacity its mount ships', () => {
   const pairs = {
     integer: 'default',
     comfortable: 'comfortable',
+    'toolbar · size 34': 'toolbar',
     'vertical · in a 48px slot': 'vertical',
   };
   const boxes = Object.entries(pairs).map(([cap, key]) => [
@@ -181,6 +183,7 @@ it('draws each library unit at the box and opacity its mount ships', () => {
   assert.deepEqual(boxes, [
     ['102x28', '102x28'],
     ['106x30', '106x30'],
+    ['102x34', '102x34'],
     ['48x86', '48x86'],
   ]);
   assert.equal(drawn.units.disabled.opacity, live.cases.disabled.opacity);
@@ -193,8 +196,8 @@ it('draws every horizontal library stepper at a shipped box', () => {
   assert.equal(boxes.filter((box) => box === endpoint).length, 1);
   assert.deepEqual(
     new Set(boxes),
-    new Set(['102x28', '106x30', '84x28', endpoint]),
-    'the default, the comfortable, the 30px-input and the endpoint groups, and no other'
+    new Set(['102x28', '106x30', '102x34', '84x28', endpoint]),
+    'the default, the comfortable, the toolbar, the 30px-input and the endpoint groups, and no other'
   );
 });
 
