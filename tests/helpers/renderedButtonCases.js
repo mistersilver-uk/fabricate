@@ -13,13 +13,15 @@ import { renderedPageHead } from './renderedPageHead.js';
  * them and `extra` markup; resolves `{ browser, tab }`, which the suite closes.
  */
 export async function openButtonCases({ mountEntry, base, cases, tokens, extra = '', viewport }) {
-  const cells = [];
-  for (const [id, props] of cases) {
-    const { target, handle } = mountEntry('Button', { onclick() {}, ...base, ...props });
-    await settle();
-    cells.push(`<div data-case="${id}">${target.innerHTML}</div>`);
-    handle.destroy();
-  }
+  const cells = await Promise.all(
+    cases.map(async ([id, props]) => {
+      const { target, handle } = mountEntry('Button', { onclick() {}, ...base, ...props });
+      await settle();
+      const cell = `<div data-case="${id}">${target.innerHTML}</div>`;
+      handle.destroy();
+      return cell;
+    })
+  );
   const probes = tokens
     .map((name) => `<i data-token="${name}" style="color:var(${name})"></i>`)
     .join('');
