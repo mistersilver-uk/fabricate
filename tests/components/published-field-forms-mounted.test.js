@@ -1,5 +1,6 @@
 /**
- * The published `Field`'s `size`, `face`, `type` and `invalid` (issue 2848): each draws its class
+ * The published `Field`'s `size`, `face`, `type` and `invalid` (issue 2848) and `align` (issue
+ * 2900): each draws its class
  * on the column, an update changes or removes it in the same column with the companion's control
  * and its focus kept, and a value outside its set draws the default.
  * Limit: happy-dom lays nothing out, so the drawn heights, corners, faces, step buttons and error
@@ -14,7 +15,7 @@ import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 
 const { ui, mountEntry } = publishedEntrySeam('fabricate-published-field-forms-');
 const COLUMN = Object.freeze({ as: 'div', children: true });
-const KEYS = Object.freeze(['size', 'face', 'type', 'invalid']);
+const KEYS = Object.freeze(['size', 'face', 'type', 'invalid', 'align']);
 
 /** The control the field's chrome draws, its rung rule's subject, by the root class it needs. */
 const CHROME = (rootClass) =>
@@ -52,6 +53,13 @@ const FORMS = Object.freeze({
   },
   type: { drawn: [['number', 'is-type-number']], defaulted: ['text', 'Number', 'range', true] },
   invalid: { drawn: [[true, 'is-invalid']], defaulted: [false, 'true', 1, null] },
+  align: {
+    drawn: [
+      ['center', 'is-align-center'],
+      ['end', 'is-align-end'],
+    ],
+    defaulted: ['start', 'Center', 'centre', ' end', 'left', 'right', 'justify', 1, null, true],
+  },
 });
 
 describe('the published Field describes its form keys', () => {
@@ -93,20 +101,20 @@ for (const [key, { drawn, defaulted }] of Object.entries(FORMS)) {
 }
 
 describe('the published Field updates a form key in place', () => {
-  it('moves the rung from 26 to 34, then adds the face, type and error state, in one column', async () => {
+  it('moves the rung from 26 to 34, then adds the face, type, error state and alignment, in one column', async () => {
     const { handle, input, column } = await mountField({ size: 26 }, 'number');
     const root = column();
     assert.ok(input.matches(CHROME('is-size-26')), 'the 26 rung reaches the number input');
     assert.equal(handle.update({ ...COLUMN, size: 34 }), true);
     await settle();
     assert.equal(root.className, 'fabricate-field is-size-34');
-    const all = { ...COLUMN, size: 28, face: 'mono', type: 'number', invalid: true };
+    const all = { ...COLUMN, size: 28, face: 'mono', type: 'number', invalid: true, align: 'end' };
     assert.equal(handle.update(all), true);
     await settle();
     assert.ok(column() === root, 'the same column');
     assert.equal(
       root.className,
-      'fabricate-field is-size-28 is-face-mono is-type-number is-invalid',
+      'fabricate-field is-size-28 is-face-mono is-type-number is-invalid is-align-end',
       'each key writes its own class'
     );
     assert.ok(

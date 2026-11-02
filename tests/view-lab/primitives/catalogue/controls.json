@@ -956,6 +956,30 @@
     ]
   },
   {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label",
+      "type": "number",
+      "align": "center"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Threshold"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "number",
+          "value": "1250",
+          "readonly": true
+        }
+      }
+    ]
+  },
+  {
     "spec": "<Typeahead>",
     "cap": "open — the second suggestion active from the keyboard, the first under the pointer",
     "draws": ":scope > div",

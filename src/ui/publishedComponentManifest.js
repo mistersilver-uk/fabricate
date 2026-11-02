@@ -382,6 +382,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       face: Object.freeze({ kind: 'data' }),
       type: Object.freeze({ kind: 'data' }),
       invalid: Object.freeze({ kind: 'data' }),
+      align: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',

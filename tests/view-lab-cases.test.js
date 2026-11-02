@@ -1760,13 +1760,15 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
   ],
-  // The published field's forms (issue 2848): each section's input at its rung and corner, the
-  // number input drawn as a text field with no step buttons, and the focused error input's ring.
+  // The published field's forms (issues 2848 and 2900): each section's input at its rung and
+  // corner, the number inputs drawn as text fields with no step buttons, the threshold's centred
+  // figure, and the focused error input's ring.
   'manager-published-field-forms-specimen': [
     ...[
       ['name', 34, 9],
       ['formula', 30, 7],
       ['uses', 28, 7],
+      ['threshold', 34, 9],
       ['tag', 26, 7],
       ['bonus', 30, 7],
     ].map(([key, height, corner]) => ({
@@ -1774,6 +1776,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: `height: ${height}px; border-radius: ${corner}px`,
     })),
     { selector: labFieldForm('uses'), styles: 'appearance: textfield' },
+    { selector: labFieldForm('threshold'), styles: 'text-align: center; appearance: textfield' },
     {
       selector: `${labFieldForm('bonus')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
