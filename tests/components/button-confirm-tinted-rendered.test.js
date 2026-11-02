@@ -1,7 +1,8 @@
 /**
  * The published `Button` in Chromium, on the markup the seam draws, under the module sheet, in all
  * seven palettes: the `confirm` role (issue 2890) at rest, under the pointer, disabled, busy, under
- * keyboard focus and under forced colours.
+ * keyboard focus and under forced colours; and every role's label, edge and tile composited over the
+ * five tinted fills on the four grounds (issue 2898), pinning which clear 4.5:1 and 3:1 there.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -172,7 +173,11 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
     t.diagnostic(`worst label ${worst.label.toFixed(2)}:1, edge ${worst.edge.toFixed(2)}:1`);
     t.diagnostic(`label under 4.5:1 on --fab-bg-3 in ${[...shortOnBg3].join(', ')}`);
     assert.deepEqual(found, []);
-    assert.ok(shortOnBg3.size > 0, 'as every role but primary and urgent, it falls short on --fab-bg-3');
+    assert.equal(worst.edge.toFixed(2), '3.94', 'the weakest edge, as the Button section states');
+    assert.ok(
+      shortOnBg3.size > 0,
+      'as every role but primary and urgent, it falls short on --fab-bg-3'
+    );
     await setTheme('fabricate');
   });
 
@@ -221,4 +226,140 @@ describe('the published Button confirm role, rendered (issue 2890)', () => {
       }
     });
   }
+});
+
+describe('every Button role on the tinted fills (issue 2898)', () => {
+  /** `shortfalls[role][state][measure]`: each `palette tint over ground` under its floor. */
+  const shortfalls = {};
+  const floors = {};
+
+  before(async () => {
+    await openPage();
+    for (const role of ROLES) {
+      shortfalls[role] = {};
+      floors[role] = {};
+      for (const state of ['rest', 'hover']) {
+        shortfalls[role][state] = { label: [], edge: [], tile: [], both: [], ground: [] };
+        floors[role][state] = { label: Infinity, edge: Infinity, tile: Infinity };
+      }
+    }
+    for (const theme of THEMES) {
+      await setTheme(theme);
+      await rest();
+      const token = await probesNow();
+      for (const role of ROLES) {
+        await rest();
+        for (const [state, face] of [
+          ['rest', await faceOf(role)],
+          ['hover', await hover(role)],
+        ]) {
+          const short = shortfalls[role][state];
+          for (const ground of GROUNDS) {
+            if (readings(face, paint([token[ground]])).edge < 3) short.ground.push(theme);
+            for (const tint of TINTS) {
+              const where = `${theme} ${tint} over ${ground}`;
+              const read = readings(face, paint([token[`--fab-${tint}-soft`], token[ground]]));
+              for (const measure of ['label', 'edge', 'tile'])
+                floors[role][state][measure] = Math.min(
+                  floors[role][state][measure],
+                  read[measure]
+                );
+              if (read.label < 4.5) short.label.push(where);
+              if (read.edge < 3) short.edge.push(where);
+              if (read.tile < 3) short.tile.push(where);
+              if (read.edge < 3 && read.tile < 3) short.both.push(where);
+            }
+          }
+        }
+      }
+    }
+    await rest();
+    await setTheme('fabricate');
+  });
+
+  const fixed = (value) => value.toFixed(2);
+  /** The role's weakest reading of `measure` on a tinted fill, at rest or under the pointer. */
+  const floorOf = (role, measure) =>
+    Math.min(floors[role].rest[measure], floors[role].hover[measure]);
+  const palettesOf = (list) => [...new Set(list.map((where) => where.split(' ', 1)[0]))];
+
+  it('inks a clear label on every tinted fill at rest and under the pointer in neutral, warning, info, accent, urgent and confirm', (t) => {
+    for (const role of ['neutral', 'warning', 'info', 'accent', 'urgent', 'confirm']) {
+      t.diagnostic(`${role} label floor ${fixed(floorOf(role, 'label'))}:1`);
+      assert.deepEqual(shortfalls[role].rest.label, [], `${role} at rest`);
+      assert.deepEqual(shortfalls[role].hover.label, [], `${role} under the pointer`);
+    }
+  });
+
+  it('inks a clear primary label at rest, and under the pointer falls short in foundry-native alone', () => {
+    assert.deepEqual(shortfalls.primary.rest.label, []);
+    assert.equal(shortfalls.primary.hover.label.length, TINTS.length * GROUNDS.length);
+    assert.deepEqual(palettesOf(shortfalls.primary.hover.label), ['foundry-native']);
+  });
+
+  it('inks a clear danger label at rest, and under the pointer falls short on the success and warning fills over --fab-bg-2 in hearth-herb', () => {
+    assert.deepEqual(shortfalls.danger.rest.label, []);
+    assert.deepEqual(shortfalls.danger.hover.label, [
+      'hearth-herb success over --fab-bg-2',
+      'hearth-herb warning over --fab-bg-2',
+    ]);
+  });
+
+  it('inks the ghost and dashed resting label under 4.5:1 on each tinted fill in at least one palette, and clears it under the pointer', () => {
+    for (const role of ['ghost', 'dashed']) {
+      for (const tint of TINTS) {
+        assert.ok(
+          shortfalls[role].rest.label.some((where) => where.includes(` ${tint} over `)),
+          `${role} on ${tint}`
+        );
+      }
+      assert.deepEqual(shortfalls[role].hover.label, [], role);
+    }
+  });
+
+  it('clears 3:1 for the urgent tile and edge and the accent edge on every tinted fill, and the confirm edge on all but the accent fill over --fab-bg-2 in foundry-native', (t) => {
+    for (const role of ['urgent', 'accent', 'confirm']) {
+      t.diagnostic(
+        `${role} edge floor ${fixed(floorOf(role, 'edge'))}:1, tile floor ${fixed(floorOf(role, 'tile'))}:1`
+      );
+    }
+    for (const state of ['rest', 'hover']) {
+      assert.deepEqual(shortfalls.urgent[state].tile, [], `urgent tile ${state}`);
+      assert.deepEqual(shortfalls.urgent[state].edge, [], `urgent edge ${state}`);
+      assert.deepEqual(shortfalls.accent[state].edge, [], `accent edge ${state}`);
+      assert.deepEqual(
+        shortfalls.confirm[state].edge,
+        ['foundry-native accent over --fab-bg-2'],
+        `confirm edge ${state}`
+      );
+    }
+  });
+
+  it('pins the floors the Button section states: the urgent tile and edge at 3.67:1, the confirm label at 4.71:1 under the pointer and the confirm edge at 2.96:1', () => {
+    assert.deepEqual(
+      [fixed(floorOf('urgent', 'tile')), fixed(floorOf('urgent', 'edge'))],
+      ['3.67', '3.67']
+    );
+    assert.equal(fixed(floors.confirm.hover.label), '4.71');
+    assert.ok(floors.confirm.rest.label > floors.confirm.hover.label, 'the pointer is the weakest');
+    assert.equal(fixed(floorOf('confirm', 'edge')), '2.96');
+  });
+
+  it('leaves every other role, at rest, with neither edge nor tile at 3:1 on each tinted fill in at least one palette', () => {
+    for (const role of ['neutral', 'primary', 'ghost', 'dashed', 'danger', 'warning', 'info']) {
+      for (const tint of TINTS) {
+        assert.ok(
+          shortfalls[role].rest.both.some((where) => where.includes(` ${tint} over `)),
+          `${role} on ${tint}`
+        );
+      }
+    }
+  });
+
+  it('draws the neutral, ghost, dashed and danger edges under 3:1 on the four grounds in every palette, and the info edge in six', () => {
+    for (const role of ['neutral', 'ghost', 'dashed', 'danger']) {
+      assert.equal(palettesOf(shortfalls[role].rest.ground).length, THEMES.length, role);
+    }
+    assert.equal(palettesOf(shortfalls.info.rest.ground).length, THEMES.length - 1, 'info');
+  });
 });
