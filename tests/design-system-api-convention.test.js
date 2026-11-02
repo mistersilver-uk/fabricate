@@ -94,6 +94,13 @@ const EXCEPTIONS = Object.freeze([
     reason: 'the armed face has a visible label and a consequence sentence, so the part needs both',
   },
   {
+    component: 'Pagination',
+    name: 'perPageAriaLabel',
+    fault: suffixed('AriaLabel'),
+    reason:
+      'the page-size group has a visible caption and a distinct group name, so the part needs both',
+  },
+  {
     component: 'ChoiceOptionList',
     name: 'onChoose',
     fault: REGISTER_ONLY,

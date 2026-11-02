@@ -1089,6 +1089,11 @@ describe('a contains key (issue 2852)', () => {
       'hint',
     ],
     ['a key that is no data key', containing({ kind: 'aria', contains: 'children' }), 'children'],
+    [
+      'a data key from a key that is no data key',
+      containing({ kind: 'aria', contains: 'hint' }, { hint: { kind: 'data', required: true } }),
+      'hint',
+    ],
   ]) {
     it(`refuses at registration a contains naming ${claim}`, () => {
       const seam = createPublishedComponents({ table: [entry], isReady: () => true });
@@ -1105,6 +1110,22 @@ describe('a contains key (issue 2852)', () => {
       );
     });
   }
+
+  it('takes a contains naming a required data key, and holds a name to its words (issue 2894)', () => {
+    const captioned = {
+      ...LABELLED,
+      props: {
+        caption: { kind: 'data', required: true },
+        ariaLabel: { kind: 'data', contains: 'caption' },
+      },
+    };
+    const { ui } = seamWith({ table: [captioned] });
+    assert.throws(() => mountOf(ui, { caption: 'Per page', ariaLabel: 'Recipes shown' }), {
+      name: 'TypeError',
+      message: `${PREFIX}"ariaLabel" must contain the text of "caption" ("Per page" is not in "Recipes shown")`,
+    });
+    assert.ok(mountOf(ui, { caption: 'Per page', ariaLabel: 'Recipes per page' }));
+  });
 
   it('leaves contains out of describe', () => {
     const { ui } = seamWith({ table: [LABELLED] });

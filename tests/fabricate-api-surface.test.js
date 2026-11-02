@@ -735,6 +735,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           rangeTemplate: required,
           pageTemplate: required,
           density: optional,
+          landmarks: optional,
+          perPageAriaLabel: optional,
         },
         rest: false,
         root: 'any',

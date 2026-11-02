@@ -206,7 +206,7 @@ function assertRefused(overrides, tail) {
 }
 
 describe('the published Pagination', () => {
-  it('describes the fifteen keys its manifest entry publishes, at the fabricate root', () => {
+  it('describes the seventeen keys its manifest entry publishes, at the fabricate root', () => {
     const described = ui().describe('Pagination');
     assert.deepEqual(Object.keys(described.props), [
       'totalCount',
@@ -224,6 +224,8 @@ describe('the published Pagination', () => {
       'rangeTemplate',
       'pageTemplate',
       'density',
+      'landmarks',
+      'perPageAriaLabel',
     ]);
     assert.deepEqual(described.props.onPageChange, { kind: 'callback', required: true });
     assert.equal(described.root, 'any');

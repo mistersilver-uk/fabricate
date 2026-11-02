@@ -103,14 +103,17 @@ function standaloneRootFault({ name, root, standaloneRoot }) {
   return root === 'any' ? null : `${name} states standaloneRoot on the root "${root}"`;
 }
 
-/** Whether a key's `contains` is sound: on a `data` key, naming a `text` key (issue 2852). */
+/**
+ * Whether a key's `contains` is sound: on a `data` key, naming a `text` key (issue 2852) or a
+ * `required` `data` key (issue 2894).
+ */
 function isSoundContains(entry, spec) {
   const name = spec.contains;
+  const other = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
   return (
     spec.kind === 'data' &&
-    typeof name === 'string' &&
-    Object.hasOwn(entry.props, name) &&
-    entry.props[name].kind === 'text'
+    Boolean(other) &&
+    (other.kind === 'text' || (other.kind === 'data' && other.required === true))
   );
 }
 
