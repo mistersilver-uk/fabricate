@@ -536,6 +536,7 @@ A Fabricate that predates the `Medallion` values draws the tile as unset, one th
 - `StatBox`'s `children`, `Stepper`'s `size` and `IconPicker`'s `tint`, and `Button`'s `role` values `accent` and `urgent`, were added at `version` 1, `children` as a content slot: an added optional key or value is additive, so no entry's `version` changed; a Fabricate that predates a key refuses it, with `"children" is not a data attribute` on `StatBox` and `"<key>" is not a prop of <Entry>` on `Stepper` and `IconPicker`, which `describe` shows by leaving the key out of `props`, and one that predates the roles draws `neutral` and refuses nothing.
 - `Button`'s `role` value `confirm` was added at `version` 1: an added value is additive, so the entry's `version` did not change, and a Fabricate that predates it draws `neutral` and refuses nothing, which `describe` cannot show.
 - `IconPicker`'s `iconOnly` was added to its entry at `version` 1 as a `data` key, and its captioned trigger's name took the caption it draws: an added optional key and a name that only gains the visible label are additive, so the entry's `version` did not change, and a Fabricate that predates them refuses `iconOnly` with `"iconOnly" is not a prop of IconPicker`, which `describe` shows by leaving the key out of `props`, and names a captioned trigger by `ariaLabel` alone.
+- `Select`'s `fill` was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"fill" is not a prop of Select`, which `describe` shows by leaving the key out of `props`.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -1500,6 +1501,11 @@ Each group states the accepted values of every key that entry publishes.
     The select draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the control with no name.
   - `placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
   - `size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
+  - `fill` is `true` or `false`, and `false` when absent: `true` stretches the trigger across the width of `target` at every `size`, so the companion gives `target` the column's width and the trigger keeps it whichever option is chosen; absent, the trigger hugs its label.
+    Under `fill` a label longer than the trigger ends in an ellipsis, the chevron stays at the trailing edge in either direction, and the list opens against the filled trigger, from its start edge.
+    Only `true` stretches the trigger: Fabricate coerces nothing, so `'true'` or `1` draws it hugging its label.
+    `fill` replaces a descendant rule of the companion's own wrapper, which names a part of the component and is outside the contract; no `width` is published, because the column's width is the companion's, on `target`.
+    The filled trigger's edge is `target`'s, so anything its keyboard mark draws outside the trigger falls outside `target`, and the companion leaves room for it there, unclipped.
   - A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
     While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
@@ -2865,6 +2871,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **AND** Tab on the trigger with the list open closes it without calling `onChange`, and a `keydown` listener above `target` hears the Tab
 - **AND** a mount whose `options` hold `1` and `'1'` faults when its list opens, calling `onFault` once with the target empty
 - **AND** a mount that omits `options` throws M9, and one that passes a `data-*` key throws M8
+
+#### Scenario: A filled published select keeps its column
+
+- **WHEN** a companion mounts `Select` with `fill: true` into a `target` it gives a width, and the user chooses an option whose label is longer than the trigger
+- **THEN** the trigger is as wide as `target` before and after the choice, at every `size`
+- **AND** the chosen label ends in an ellipsis with the chevron at the trailing edge, and the list opens against the filled trigger
+- **AND** a mount with `fill: 'true'` draws the trigger hugging its label
 
 #### Scenario: A published stage group
 

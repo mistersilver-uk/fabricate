@@ -2478,6 +2478,23 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           The remaining ones are the manager&rsquo;s.</span>
         </div>
       <div class="unit">
+        <span class="cap">fill &mdash; a trigger as wide as the box it sits in</span>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+          <div style="width:220px">
+            <div class="k-field">Ash<svg class="i chev" aria-hidden="true"><use href="#i-cd"/></svg></div>
+          </div>
+          <div style="width:220px">
+            <div class="k-field">
+              <span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Oak heartwood from the northern grove</span>
+              <svg class="i chev" aria-hidden="true"><use href="#i-cd"/></svg>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint"><b><code>fill</code></b> stretches the trigger to the width of the box it sits in (issue 2904), so a column of selects keeps one width whichever option is chosen: a label longer than the trigger ends in an ellipsis and the chevron stays at the trailing edge.
+          The caller sizes the box; the select publishes no width of its own.
+          Without <code>fill</code> the trigger hugs its label.</span>
+        </div>
+      <div class="unit">
         <span class="cap">inline 30 &mdash; a field that is one cell of a row</span>
         <div class="k-row" style="gap:10px">
           <div class="k-ic">
@@ -2518,6 +2535,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>showTick</b> boolean = true — the selected column in the option list</li>
           <li><b>options</b> {value, label, hint?, badge?, disabledReason?, group?}[]</li>
           <li><b>placeholder</b> — the trigger&rsquo;s text while <code>value</code> is null</li>
+          <li><b>fill</b> boolean = false — only <code>true</code> stretches the trigger to its slot&rsquo;s width, the one trigger-box prop; every other per-site skin is a descendant rule of the caller&rsquo;s wrapper</li>
           <li><b>minWidth · maxWidth</b> — the panel&rsquo;s width band, which replaces the rung&rsquo;s own; a call site states one where the rung&rsquo;s floor cuts a label or its ceiling sits under a wider trigger</li>
           <li><b>id · name</b> <span class="req">required</span> — the label and error reference them</li>
           <li><b>label · hint · error</b></li>

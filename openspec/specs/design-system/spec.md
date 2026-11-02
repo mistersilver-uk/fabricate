@@ -1977,6 +1977,7 @@ The difference between the two is INFORMATIONAL — it tells assistive technolog
 `Select` IS THE SEARCH-SUPPRESSED SHAPE OF THIS SAME PICKER: it announces `aria-haspopup="listbox"`, renders no query field, and uses the primitive's OWN trigger rather than a `trigger` snippet, so the combobox contract, the attribute-omission rule below and the naming route are the primitive's throughout.
 A caller composing the primitive's own trigger INHERITS the primitive's whole class family and its paint, so a composing primitive states its own shell against that inherited cascade rather than assuming a bare element — including the panel's inherited width floor and its inherited corner, neither of which a width PROP alone can change, because a floor declared in the sheet outranks an inline width.
 A per-call-site deviation from that shell — a caller's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
+The one exception is filling the slot: `Select`'s `fill` (issue 2904) stretches the trigger to the width of the box it sits in, so the row still states the width, on that box, and a companion, which writes no rule naming a published component's part, gets a trigger that keeps one width whichever option is chosen; the select publishes no width of its own.
 And the panel is PORTALED to the nearest application root, so every driver that clicks an option — a capture step, a mounted test, a smoke step — addresses it from that root rather than from the trigger's own subtree, and a mounted suite declares the application root its production mount really has.
 
 The picker MUST name both surfaces it renders.
@@ -2650,6 +2651,9 @@ A component that states a reason of its own in a docblock is NOT exempt: the pre
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- ratchet-exempt(design-system): reason -->` marker on the line above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
 The gate compares with the base commit rather than with a recorded count, so a change may not add a native select, in a template or in a JavaScript dialog body, unless the element carries that marker; converting one is reported and never required.
 
+A select whose trigger must not change width as its value changes takes `fill` and sits in a box the caller sizes: the trigger takes the box's width at every rung, a label longer than it ends in an ellipsis with the chevron at the trailing edge, and the list measures the filled trigger as it measures any.
+Absent, the trigger hugs its label.
+
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
@@ -2673,6 +2677,12 @@ Two cases are known limits: the rail scope card fits the ring with no spare, and
 - **WHEN** a select's list is open and the user presses Tab
 - **THEN** the list closes without choosing and the trigger reads `aria-expanded="false"`
 - **AND** focus moves to the next control, and a `keydown` listener above the select hears the Tab
+
+#### Scenario: A filled select keeps its width as its value changes
+
+- **WHEN** a select with `fill` sits in a 240px box and the user chooses a label longer than the box
+- **THEN** the trigger stays 240px wide, the label ends in an ellipsis and the chevron stays at the trailing edge
+- **AND** the same select without `fill` widens to its new label
 
 ### Requirement: Art that is an identity is picked as a picture
 
