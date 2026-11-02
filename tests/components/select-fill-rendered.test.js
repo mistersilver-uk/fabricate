@@ -119,7 +119,7 @@ for (const host of ['companion', 'window']) {
           for (const id of ids(form)) {
             near(cases[id].trigger.width, cases[id].target.width, `${id} trigger width`);
             near(cases[id].trigger.left, cases[id].target.left, `${id} start edge`);
-            const size = id.split('-')[2];
+            const size = id.split('-', 3)[2];
             near(cases[id].trigger.height, RUNGS[size].height, `${id} height`);
           }
         }
@@ -168,7 +168,7 @@ describe('the list a filled published Select opens', () => {
   it('opens at the trigger’s start edge, below it, as wide as the trigger within its rung’s band', () =>
     inFixture('host=companion', async (page) => {
       await inTurn(ids('fill-flex'), async (id) => {
-        const size = id.split('-')[2];
+        const size = id.split('-', 3)[2];
         const trigger = `[data-case="${id}"] .fabricate-select-trigger`;
         await pressPointerOn(page, trigger);
         await page.locator(listOf).waitFor();
