@@ -1715,8 +1715,13 @@ test('the pager names its page-size control with the words a GM can see', () => 
   );
   assert.match(
     source,
-    /aria-labelledby=\{captionId\}/,
+    /aria-labelledby=\{groupName \? undefined : captionId\}/,
     'the radiogroup points at THAT through the rest spread, so its name IS the visible text'
+  );
+  assert.match(
+    source,
+    /const groupName = \$derived\(\s*typeof perPageAriaLabel === 'string' && perPageAriaLabel\.trim\(\) \? perPageAriaLabel : ''\s*\)/,
+    'only a non-blank `perPageAriaLabel`, which no in-app caller passes, takes the name from the caption'
   );
   assert.ok(
     !source.includes('PerPageLabel'),
