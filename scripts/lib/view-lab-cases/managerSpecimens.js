@@ -704,6 +704,55 @@ const COMPANION_FORM_FACES = Object.freeze([
 /** Sized to the fixture's two 340px columns and their rows. */
 const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 760 });
 
+/** The button roles fixture's ground, a bar row's button by its key, and a tinted card's verb. */
+const BUTTON_ROLES = '[data-lab-button-roles]';
+const BUTTON_ROLE = (key) => `${BUTTON_ROLES} [data-lab-button-role="${key}"]`;
+const BUTTON_ROLE_CONTROL = (key) => `${BUTTON_ROLE(key)} button`;
+const BUTTON_TINT = (tint) => `${BUTTON_ROLES} [data-lab-button-tint="${tint}"]`;
+const BUTTON_TINT_VERB = (tint, verb) =>
+  `${BUTTON_TINT(tint)} [data-lab-button-verb="${verb}"] button`;
+const BUTTON_ROLE_KEYS = Object.freeze([
+  'neutral',
+  'primary',
+  'confirm',
+  'confirm-hover',
+  'confirm-disabled',
+  'confirm-busy',
+]);
+const BUTTON_ROLE_TINTS = Object.freeze(['info', 'accent', 'success', 'warning', 'danger']);
+const CONFIRM_FACE =
+  'color: var(--fab-success-text); border-top-color: var(--fab-success-strong); background-color: rgba(0, 0, 0, 0)';
+const ACCENT_FACE =
+  'color: var(--fab-accent-text); border-top-color: var(--fab-accent); background-color: rgba(0, 0, 0, 0)';
+
+/** What every button roles frame measures: the bar's faces, and each tinted card's three verbs. */
+const BUTTON_ROLE_FACES = Object.freeze([
+  { selector: BUTTON_ROLE_CONTROL('neutral'), styles: NEUTRAL_FACE },
+  {
+    selector: BUTTON_ROLE_CONTROL('primary'),
+    styles:
+      'color: var(--fab-on-success); border-top-color: var(--fab-success-border); background-color: var(--fab-success)',
+  },
+  { selector: BUTTON_ROLE_CONTROL('confirm'), styles: CONFIRM_FACE },
+  {
+    selector: BUTTON_ROLE_CONTROL('confirm-disabled'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: BUTTON_ROLE_CONTROL('confirm-busy'),
+    styles: 'opacity: 0.7; color: var(--fab-success-text); background-color: rgba(0, 0, 0, 0)',
+  },
+  ...BUTTON_ROLE_TINTS.flatMap((tint) => [
+    { selector: BUTTON_TINT(tint), styles: `background-color: var(--fab-${tint}-soft)` },
+    { selector: BUTTON_TINT_VERB(tint, 'accent'), styles: ACCENT_FACE },
+    { selector: BUTTON_TINT_VERB(tint, 'urgent'), styles: PRESSED_FACE },
+    { selector: BUTTON_TINT_VERB(tint, 'confirm'), styles: CONFIRM_FACE },
+  ]),
+]);
+
+/** Sized to the fixture's two columns, the bar's six rows and the five tinted cards. */
+const BUTTON_ROLES_WINDOW = Object.freeze({ width: 920, height: 420 });
+
 /** The selection checkbox fixture's two grounds, a row by its key, and the box and label it draws. */
 const CHECKBOXES = '[data-lab-selection-checkboxes]';
 const DEEP_CHECKBOXES = '[data-lab-selection-checkboxes-deep]';
@@ -2535,6 +2584,70 @@ export const CASES = Object.freeze([
     themeVariants: ['foundry-native', 'hearth-herb'],
     // `StatBox.svelte`, `Stepper.svelte`, `Button.svelte` and `IconPicker.svelte` are broad signals,
     // each routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-button-roles-specimen',
+    label:
+      "Specimen, mounted through the published seam — the confirm role issue 2890 publishes and the roles issue 2898 measures on tinted fills, in two columns on a companion card's --fab-bg-2 ground, each button beside a caption the companion draws. The left column, rows 8px apart, an action bar: Review in the neutral role, the baseline; Save in the primary role, the solid success tile; Confirm the stage in the confirm role, a check glyph and its label in the success text ink on no fill inside the strong success edge, then once more, then disabled in the disabled face, and Confirming… busy, dimmed in its own colours. The right column, five tinted cards 8px apart, each its soft fill over the card's ground, info, accent, success, warning and danger, captioned with its fill and holding three verbs: Advance in the accent role, a forward-step glyph and the accent text label inside the accent edge on no fill, so the card's tint shows through; Advance in the urgent role, a bell glyph on the solid accent tile; and Confirm the stage in the confirm role. After one step, a click on the second confirm button, the pointer still resting on it, filled in the soft success fill inside the same edge. The frame cannot show the contrast ratios, which the rendered suite composites in all seven palettes, nor the forced-colours repaint, which it emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-button-roles' },
+    steps: [{ selector: BUTTON_ROLE_CONTROL('confirm-hover') }],
+    expectSelector: `${BUTTON_TINT('danger')} [data-lab-button-verb="confirm"] button.is-confirm-action`,
+    expectContained: [
+      ...BUTTON_ROLE_KEYS.map((key) => ({ container: BUTTON_ROLES, target: BUTTON_ROLE(key) })),
+      ...BUTTON_ROLE_TINTS.map((tint) => ({ container: BUTTON_ROLES, target: BUTTON_TINT(tint) })),
+      { container: '.window-content', target: BUTTON_ROLES },
+    ],
+    expectLayout: {
+      controls: [
+        ...BUTTON_ROLE_FACES,
+        // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
+        {
+          selector: BUTTON_ROLE_CONTROL('confirm-hover'),
+          styles:
+            'border-top-color: var(--fab-success-strong); background-color: var(--fab-success-soft)',
+        },
+      ],
+    },
+    position: BUTTON_ROLES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // Judged on the palettes where the success ink and the danger and muted labels read weakest.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `Button.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-button-roles-confirm-focus',
+    label:
+      "Specimen, mounted through the published seam — the confirm role issue 2890 publishes and the roles issue 2898 measures on tinted fills, in two columns on a companion card's --fab-bg-2 ground, each button beside a caption the companion draws. The left column, rows 8px apart, an action bar: Review in the neutral role, the baseline; Save in the primary role, the solid success tile; Confirm the stage in the confirm role, a check glyph and its label in the success text ink on no fill inside the strong success edge, then once more, then disabled in the disabled face, and Confirming… busy, dimmed in its own colours. The right column, five tinted cards 8px apart, each its soft fill over the card's ground, info, accent, success, warning and danger, captioned with its fill and holding three verbs: Advance in the accent role, a forward-step glyph and the accent text label inside the accent edge on no fill, so the card's tint shows through; Advance in the urgent role, a bell glyph on the solid accent tile; and Confirm the stage in the confirm role. After one step, Tab from Save, so the first confirm button carries the 2px accent keyboard ring 2px clear of its success edge, a strip of the card's ground between ring and edge. The frame cannot show the contrast ratios, which the rendered suite composites in all seven palettes, nor the forced-colours repaint, which it emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-button-roles' },
+    steps: [{ selector: BUTTON_ROLE_CONTROL('primary'), press: 'Tab' }],
+    expectSelector: `${BUTTON_ROLES}:has([data-lab-button-tint="danger"] [data-lab-button-verb="confirm"] button) ${BUTTON_ROLE_CONTROL('confirm')}:focus-visible`,
+    expectContained: [
+      ...BUTTON_ROLE_KEYS.map((key) => ({ container: BUTTON_ROLES, target: BUTTON_ROLE(key) })),
+      ...BUTTON_ROLE_TINTS.map((tint) => ({ container: BUTTON_ROLES, target: BUTTON_TINT(tint) })),
+      { container: '.window-content', target: BUTTON_ROLES },
+    ],
+    expectLayout: {
+      controls: [
+        ...BUTTON_ROLE_FACES,
+        {
+          selector: `${BUTTON_ROLE_CONTROL('confirm')}:focus-visible`,
+          styles: `${COMPANION_RING}; outline-color: var(--fab-accent)`,
+        },
+      ],
+    },
+    position: BUTTON_ROLES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // Judged on the palettes where the success ink and the danger and muted labels read weakest.
+    themeVariants: ['foundry-native', 'hearth-herb'],
+    // `Button.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

@@ -1394,6 +1394,12 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
+    ".fabricate-button.fabricate-button.is-confirm-action:not(:disabled, [aria-disabled='true']):hover",
+    'var(--fab-success-soft)',
+    'the outlined confirm verb fills in the family it inks in',
+  ],
+  [
+    MODULE_SHEET,
     ".fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-accent-hover)',
     'a pressed toggle deepens in the accent tile it fills',

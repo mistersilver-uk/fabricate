@@ -721,6 +721,8 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-companion-forms-specimen',
         'manager-published-companion-forms-accent-focus',
         'manager-published-companion-forms-urgent-focus',
+        'manager-published-button-roles-specimen',
+        'manager-published-button-roles-confirm-focus',
         'published-standalone',
         'published-standalone-light',
         'published-standalone-in-window',

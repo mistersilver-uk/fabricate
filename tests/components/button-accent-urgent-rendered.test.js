@@ -9,11 +9,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
-import { settle } from '../helpers/publishedComponentModules.js';
 import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
-import { renderedPageHead } from '../helpers/renderedPageHead.js';
+import { buttonFaceOf, openButtonCases } from '../helpers/renderedButtonCases.js';
 
 const { mountEntry } = publishedEntrySeam('fab-button-accent-urgent-rendered-');
 
@@ -42,31 +39,17 @@ describe('the published Button accent and urgent roles, rendered (issue 2841)', 
   let tab;
 
   before(async () => {
-    const cells = [];
-    for (const [id, props] of CASES) {
-      const { target, handle } = mountEntry('Button', {
-        children: 'Advance',
-        onclick() {},
-        ...props,
-      });
-      await settle();
-      cells.push(`<div data-case="${id}">${target.innerHTML}</div>`);
-      handle.destroy();
-    }
-    const probes = TOKENS.map(
-      (name) => `<i data-token="${name}" style="color:var(${name})"></i>`
-    ).join('');
     const system = ['highlight', 'highlighttext', 'canvastext']
       .map((name) => `<i data-system="${name}" style="color:${name}"></i>`)
       .join('');
-    browser = await chromium.launch();
-    tab = await browser.newPage({ viewport: { width: 600, height: 700 } });
-    await tab.setContent(
-      `${renderedPageHead([])}<body class="game"><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">` +
-        '<style>[data-case]{display:flex;padding:8px}</style>' +
-        `${cells.join('')}<div>${probes}${system}</div></div></body></html>`,
-      { waitUntil: 'load' }
-    );
+    ({ browser, tab } = await openButtonCases({
+      mountEntry,
+      base: { children: 'Advance' },
+      cases: CASES,
+      tokens: TOKENS,
+      extra: system,
+      viewport: { width: 600, height: 700 },
+    }));
   });
 
   after(async () => {
@@ -81,18 +64,7 @@ describe('the published Button accent and urgent roles, rendered (issue 2841)', 
   const tokenColour = (name) => resolved('data-token', name);
   const systemColour = (name) => resolved('data-system', name);
 
-  /** The case's button face as Chromium computes it now. */
-  const faceOf = (id) =>
-    tab.evaluate((hook) => {
-      const style = getComputedStyle(document.querySelector(`[data-case="${hook}"] button`));
-      return {
-        ink: style.color,
-        fill: style.backgroundColor,
-        edge: style.borderTopColor,
-        opacity: style.opacity,
-        outline: [style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor],
-      };
-    }, id);
+  const faceOf = (id) => buttonFaceOf(tab, id);
 
   const rest = async () => {
     await tab.mouse.move(590, 690);

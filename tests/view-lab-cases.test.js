@@ -434,6 +434,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedButtonForms.svelte',
   'tests/view-lab/fixtures/PublishedCompanionForms.svelte',
+  'tests/view-lab/fixtures/PublishedButtonRoles.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
@@ -1134,6 +1135,68 @@ const LAB_COMPANION_CASES = {
     ...LAB_COMPANION_FACES,
     {
       selector: labCompanionForm('button-urgent', 'button:focus-visible'),
+      styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
+    },
+  ],
+};
+/** The button roles fixture's bar button by its row's key, and a tinted card or a verb in it. */
+const labButtonRole = (key) => `[data-lab-button-roles] [data-lab-button-role="${key}"] button`;
+const labButtonTint = (tint) => `[data-lab-button-roles] [data-lab-button-tint="${tint}"]`;
+const LAB_CONFIRM_FACE =
+  'color: var(--fab-success-text); border-top-color: var(--fab-success-strong); background-color: rgba(0, 0, 0, 0)';
+/** What every button roles frame measures (issues 2890, 2898), as the case file states it. */
+const LAB_BUTTON_ROLE_FACES = [
+  {
+    selector: labButtonRole('neutral'),
+    styles:
+      'color: var(--fab-text); border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+  },
+  {
+    selector: labButtonRole('primary'),
+    styles:
+      'color: var(--fab-on-success); border-top-color: var(--fab-success-border); background-color: var(--fab-success)',
+  },
+  { selector: labButtonRole('confirm'), styles: LAB_CONFIRM_FACE },
+  {
+    selector: labButtonRole('confirm-disabled'),
+    styles: 'opacity: 0.62; color: var(--fab-text-muted)',
+  },
+  {
+    selector: labButtonRole('confirm-busy'),
+    styles: 'opacity: 0.7; color: var(--fab-success-text); background-color: rgba(0, 0, 0, 0)',
+  },
+  ...['info', 'accent', 'success', 'warning', 'danger'].flatMap((tint) => [
+    { selector: labButtonTint(tint), styles: `background-color: var(--fab-${tint}-soft)` },
+    {
+      selector: `${labButtonTint(tint)} [data-lab-button-verb="accent"] button`,
+      styles:
+        'color: var(--fab-accent-text); border-top-color: var(--fab-accent); background-color: rgba(0, 0, 0, 0)',
+    },
+    {
+      selector: `${labButtonTint(tint)} [data-lab-button-verb="urgent"] button`,
+      styles:
+        'color: var(--fab-on-accent); border-top-color: var(--fab-accent); background-color: var(--fab-accent)',
+    },
+    {
+      selector: `${labButtonTint(tint)} [data-lab-button-verb="confirm"] button`,
+      styles: LAB_CONFIRM_FACE,
+    },
+  ]),
+];
+/** The button roles specimens' controls: every frame's faces, then its hover or focus. */
+const LAB_BUTTON_ROLE_CASES = {
+  'manager-published-button-roles-specimen': [
+    ...LAB_BUTTON_ROLE_FACES,
+    {
+      selector: labButtonRole('confirm-hover'),
+      styles:
+        'border-top-color: var(--fab-success-strong); background-color: var(--fab-success-soft)',
+    },
+  ],
+  'manager-published-button-roles-confirm-focus': [
+    ...LAB_BUTTON_ROLE_FACES,
+    {
+      selector: `${labButtonRole('confirm')}:focus-visible`,
       styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
     },
   ],
@@ -2202,6 +2265,8 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
   ],
   // The companion forms specimens (issue 2841); their palette variants measure the same controls.
   ...LAB_COMPANION_CASES,
+  // The button roles specimens (issues 2890, 2898); their palette variants measure the same controls.
+  ...LAB_BUTTON_ROLE_CASES,
   // The published selection checkbox (issue 2836): each box's side, the unticked edge, the ticked
   // fill, the keyboard ring and the two label inks, on each palette.
   ...Object.fromEntries(
@@ -8011,6 +8076,28 @@ test('the companion forms specimen case contains every row the companion forms f
     .expectContained.map(({ target }) => /data-lab-companion-form="([\w-]+)"/u.exec(target)?.[1])
     .filter(Boolean);
   assert.deepEqual(contained, keys, 'each row is held inside the ground');
+});
+
+test('the button roles specimen case contains every bar row and tinted card the button roles fixture mounts, in its order', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedButtonRoles.svelte'
+  );
+  for (const hook of ['data-lab-button-roles', 'data-lab-button-role', 'data-lab-button-tint']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const declared = (name) =>
+    [...walkNodes(instance.content)].find(
+      (node) => node.type === 'VariableDeclarator' && node.id.name === name
+    ).init.arguments[0].elements;
+  const rows = declared('ROWS').map((row) => row.elements[0].value);
+  const tints = declared('TINTS').map((tint) => tint.value);
+  const contained = getCaseById('manager-published-button-roles-specimen').expectContained.map(
+    ({ target }) => /data-lab-button-(?:role|tint)="([\w-]+)"/u.exec(target)?.[1]
+  );
+  assert.deepEqual(contained.filter(Boolean), [...rows, ...tints], 'each row and card is held');
 });
 
 test('the segmented forms specimen case measures the rows, surface and rung the segmented forms fixture mounts', () => {
