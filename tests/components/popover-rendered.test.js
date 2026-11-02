@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { chromiumAxNode } from '../helpers/chromiumAxNode.js';
+import { pixelAt } from '../helpers/pagePixels.js';
 import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const server = createViteFixtureServer({ styleMountPrefix: '/@popover-styles/' });
@@ -402,24 +403,6 @@ describe('the published Popover under reduced motion and forced colours', () => 
 /** `[r, g, b]` of a computed `rgb()` colour. */
 function channels(value) {
   return value.match(/\d+/gu).slice(0, 3).map(Number);
-}
-
-/** The `[r, g, b]` Chromium paints at the viewport pixel `x`, `y`. */
-async function pixelAt(page, x, y) {
-  const shot = await page.screenshot({ clip: { x, y, width: 1, height: 1 } });
-  return page.evaluate(
-    async (bytes) => {
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
-      const image = await createImageBitmap(blob);
-      const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      context.drawImage(image, 0, 0);
-      return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
-    },
-    [...shot]
-  );
 }
 
 /** The panel's computed visibility, or `null` with no panel. */
