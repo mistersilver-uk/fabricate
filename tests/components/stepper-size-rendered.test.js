@@ -208,27 +208,27 @@ describe('the published Stepper size rungs, rendered (issues 2841 and 2903)', ()
   for (const id of ['dense', 'toolbar']) {
     it(`lands a pointer at ${id}'s outermost button pixel on it, and one pixel further on the stepper`, async () => {
       const { root, decrement, increment } = await measure(id);
-    const hit = (x, y) =>
-      tab.evaluate(
-        ([px, py]) => {
-          const node = document.elementFromPoint(px, py);
-          if (node?.closest('[data-stepper-decrement]')) return 'decrement';
-          if (node?.closest('[data-stepper-increment]')) return 'increment';
-          return node?.classList.contains('fab-stepper') ? 'stepper' : String(node?.className);
-        },
-        [x, y]
-      );
-    // Chromium hit-tests a fractional point as the next pixel, so each probe is a whole pixel.
-    const [first, last] = [(edge) => edge, (edge) => edge - 1];
-    const middle = root.top + root.height / 2;
-    assert.equal(await hit(first(decrement.left), middle), 'decrement');
-    assert.equal(await hit(first(decrement.left - 1), middle), 'stepper');
-    assert.equal(await hit(last(increment.right), middle), 'increment');
-    assert.equal(await hit(last(increment.right + 1), middle), 'stepper');
-    assert.equal(await hit(decrement.left + 12, first(decrement.top)), 'decrement');
-    assert.equal(await hit(decrement.left + 12, first(decrement.top - 1)), 'stepper');
-    assert.equal(await hit(decrement.left + 12, last(decrement.bottom)), 'decrement');
-    assert.equal(await hit(decrement.left + 12, last(decrement.bottom + 1)), 'stepper');
+      const hit = (x, y) =>
+        tab.evaluate(
+          ([px, py]) => {
+            const node = document.elementFromPoint(px, py);
+            if (node?.closest('[data-stepper-decrement]')) return 'decrement';
+            if (node?.closest('[data-stepper-increment]')) return 'increment';
+            return node?.classList.contains('fab-stepper') ? 'stepper' : String(node?.className);
+          },
+          [x, y]
+        );
+      // Chromium hit-tests a fractional point as the next pixel, so each probe is a whole pixel.
+      const [first, last] = [(edge) => edge, (edge) => edge - 1];
+      const middle = root.top + root.height / 2;
+      assert.equal(await hit(first(decrement.left), middle), 'decrement');
+      assert.equal(await hit(first(decrement.left - 1), middle), 'stepper');
+      assert.equal(await hit(last(increment.right), middle), 'increment');
+      assert.equal(await hit(last(increment.right + 1), middle), 'stepper');
+      assert.equal(await hit(decrement.left + 12, first(decrement.top)), 'decrement');
+      assert.equal(await hit(decrement.left + 12, first(decrement.top - 1)), 'stepper');
+      assert.equal(await hit(decrement.left + 12, last(decrement.bottom)), 'decrement');
+      assert.equal(await hit(decrement.left + 12, last(decrement.bottom + 1)), 'stepper');
     });
   }
 

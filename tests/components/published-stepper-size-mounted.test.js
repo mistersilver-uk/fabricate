@@ -46,9 +46,19 @@ describe('the published Stepper, size', () => {
     });
   }
 
+  const OFF_RUNG = [24, 28, '28', '27', ' 26', '26px', 26.5, '', true, null, [26], { size: 26 }];
   for (const size of [
-    ...[24, 28, '28', '27', ' 26', '26px', 26.5, '', true, null, [26], { size: 26 }],
-    ...[33, 35, 38, '38', ' 34', '34 ', '34px', 34.5, [34], { size: 34 }],
+    ...OFF_RUNG,
+    33,
+    35,
+    38,
+    '38',
+    ' 34',
+    '34 ',
+    '34px',
+    34.5,
+    [34],
+    { size: 34 },
   ]) {
     it(`draws the default rung for ${JSON.stringify(size)}`, async () => {
       const { handle, root } = mountStepper({ size });

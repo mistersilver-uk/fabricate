@@ -1367,7 +1367,7 @@ Each group states the accepted values of every key that entry publishes.
   - `fill` is `true` or `false`, and `false` when absent.
     `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so the companion gives `target` the width it wants filled; absent, the stepper hugs its content.
     The filled stepper is 38px tall, or as tall as the `size` rung the companion states, 26px or 34px.
-    The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to the width of its two buttons and the gaps beside them (issue 2903).
+    The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to little more than its two buttons' width (issue 2903).
   - `density` is `default` or `comfortable`, and `default` when absent.
     `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
     What the stepper draws for a value outside the set is private; today that is the default density.

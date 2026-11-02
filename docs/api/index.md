@@ -2911,7 +2911,7 @@ Without `allowUnset` a `value` of `null` is outside the contract, and what is dr
 `fill` is `true` or `false`, and `false` when absent.
 `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so give `target` the width you want it to fill; absent, the stepper hugs its content.
 The filled stepper is 38px tall, or as tall as the `size` rung you state, 26px or 34px, as stated for `size`.
-The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to the width of its two buttons and the gaps beside them, where it formerly held its column some 30px wider (issue 2903).
+The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to little more than its two buttons' width, where it formerly held its column some 30px wider (issue 2903).
 `density` is `default` or `comfortable`, and `default` when absent.
 `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
 What the stepper draws for a value outside the set is private; today that is the default density.
