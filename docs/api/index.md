@@ -3067,7 +3067,10 @@ Pass an `overlayHost` inside the same Fabricate window, or none, because the lis
 The list opens against the trigger, and its placement inside the host is private.
 `Select` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Select`.
 Its trigger's height, corner, type size, weight and fill are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, and its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own; its open list is drawn the same on the standalone layer as in the player window.
-The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so leave no room for one.
+While the trigger holds focus by keyboard it draws the accent ring, 2px wide and 2px clear of the trigger, so it reaches 4px beyond the trigger on every side, and its 1px border also takes `--fab-accent-border`; a pointer press draws no ring.
+Leave that much inside any edge of your own that clips, a scrolling container's among them.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and against the trigger's own fill over each, at every `size`, and the border alone, which is under 3:1 against the unfocused border, is not what marks focus.
+Under forced colours the ring is kept, drawn in a system colour apart from the ground.
 An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 Foundry 14 gives you no signal when it moves a Fabricate window to or from a detached window, and a select needs none: each list opened after the move is placed and heard in the window that then holds the trigger, as [Overlays](#overlays) states.
 Its sizes beyond each rung's height and corner, its tick, chevron and colours beyond what this section states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, and the list's placement and width are private.

@@ -42,9 +42,10 @@
   font-weight: 600;
 }
 
-/* THE FOCUS TREATMENT, and why it is written at three compounds. `.fabricate button:focus` and `.fabricate button:focus-visible` reach this button at (0,2,1) — the first strips Foundry's orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus state is "border to accent-border, no glow" (issue 1511). */
+/* THE FOCUS TREATMENT: the module's 2px accent ring, 2px clear (4px reach), beside the accent edge. The edge alone clears 3:1 against neither the unfocused edge nor the ground (issue 2893). */
 .fabricate-select .fabricate-select-trigger:focus-visible {
-  outline: none;
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
   border-color: var(--fab-accent-border);
 }
 

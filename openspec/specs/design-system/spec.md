@@ -2595,6 +2595,11 @@ It is a PROP rather than a variant so a caller states that judgement at the call
 
 A select's trigger lets Tab and Shift+Tab through, closing an open list without choosing as focus moves on, and stops every other key, and its list also closes once focus moves outside the trigger and the list, so a keyboard user never leaves an open list behind (issue 2598).
 
+A select's trigger marks keyboard focus with the module's 2px accent ring, 2px clear of the trigger so it reaches 4px beyond it on every side, beside the 1px edge turning to `--fab-accent-border` (issue 2893).
+The edge alone differs from the unfocused edge by 1.56:1 to 2.58:1 across the seven palettes, under the 3:1 of WCAG 2.2 success criteria 1.4.11 and 2.4.13, so the ring is what marks focus.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against each rung's own fill over them, at every size and in the read-only and invalid shapes.
+A pointer press draws no ring, and under forced colours the ring is drawn in a system colour apart from the ground.
+
 #### Scenario: A select offers three plain options
 
 - **WHEN** a surface needs a one-of-N choice with no descriptions or badges
