@@ -838,6 +838,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
   // Issue 2647: a reagent's icon whose choice the companion's own update draws.
   'published-icon-picker': () => import('./fixtures/PublishedIconPicker.svelte'),
+  // Issues 2899 and 2905: an icon-only picker beside a companion's art, and the captioned trigger's name.
+  'published-icon-picker-forms': () => import('./fixtures/PublishedIconPickerForms.svelte'),
   // Issue 2652: a reagent's action menu whose choice the ground records.
   'published-action-menu': () => import('./fixtures/PublishedActionMenu.svelte'),
   // Issue 2656: a reagent's rename dialog, opened and closed by the companion's own updates.

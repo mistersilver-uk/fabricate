@@ -845,6 +845,15 @@ const ICON_PINNED = `${ICON_PANEL} .essence-icon-picker-option.pinned`;
 /** Sized to the fixture's 320px ground and the list that opens below its trigger. */
 const ICON_WINDOW = Object.freeze({ width: 440, height: 560 });
 
+/** The icon picker forms fixture's ground, a row by its key, and a row's trigger. */
+const ICON_FORMS = '[data-lab-icon-picker-forms]';
+const ICON_FORM = (key) => `${ICON_FORMS} > [data-lab-icon-picker-form="${key}"]`;
+const ICON_FORM_TRIGGER = (key) => `${ICON_FORM(key)} .essence-icon-picker-trigger`;
+const ICON_FORMS_FIELD = '.fabricate-icon-picker-popover input';
+
+/** Sized to the fixture's 340px ground and the list the icon-only trigger opens in the window. */
+const ICON_FORMS_WINDOW = Object.freeze({ width: 460, height: 520 });
+
 const MENU_GROUND = '[data-lab-action-menu]';
 const MENU_TARGET = `${MENU_GROUND} [data-lab-action-menu-target]`;
 const MENU_TRIGGER = `${MENU_GROUND} .fabricate-icon-button`;
@@ -2949,6 +2958,55 @@ export const CASES = Object.freeze([
       ],
     },
     position: ICON_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `IconPicker.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-icon-picker-forms-specimen',
+    label:
+      'Specimen, mounted through the published seam — four icon pickers in a 340px column on the --fab-bg-2 ground, 8px apart, each beside the caption the companion prints, after four steps: Enter pressed on the icon-only trigger, which opened the list in the window with focus in its query field; ArrowDown pressed twice there, which moved the active row past the pinned wand row to the first glyph of the vocabulary; and Enter, which chose it, so Fabricate called onChange, whose update drew the chosen glyph, closed the list and returned focus to the trigger. Reading top to bottom: the companion’s own 96px art tile drawing the wand glyph, then the icon-only trigger in a 64px column, the chosen glyph’s tile alone in a square with no caption and no caret, still named Faction icon, holding keyboard focus under the accent ring, 2px wide with 2px of ground between ring and trigger; the captioned trigger in a 96px column, its caption Wand Magic Sparkles cut by an ellipsis after its first letter while its name and tooltip, Faction icon, Wand Magic Sparkles, hold it whole; a 200px captioned trigger showing the flask and Flask, named Reagent icon, Flask; and one whose ariaLabel, Reagent icon: Flask, already holds its caption, so it is named by that alone. The frame cannot show the accessible names, which the rendered suite reads from Chromium’s tree',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-icon-picker-forms' },
+    steps: [
+      { selector: ICON_FORM_TRIGGER('icon-only'), press: 'Enter' },
+      { selector: ICON_FORMS_FIELD, press: 'ArrowDown' },
+      { selector: ICON_FORMS_FIELD, press: 'ArrowDown' },
+      { selector: ICON_FORMS_FIELD, press: 'Enter' },
+    ],
+    // Each captioned trigger named by its caption, and the icon-only one by `ariaLabel` alone,
+    // drawing the chosen glyph, closed and holding the focus Fabricate returned.
+    expectSelector: `${ICON_FORMS}:has(> [data-lab-icon-picker-form="narrow"] .essence-icon-picker-trigger[aria-label="Faction icon, Wand Magic Sparkles"]):has(> [data-lab-icon-picker-form="captioned"] .essence-icon-picker-trigger[aria-label="Reagent icon, Flask"]):has(> [data-lab-icon-picker-form="holds"] .essence-icon-picker-trigger[aria-label="Reagent icon: Flask"]) > [data-lab-icon-picker-form="icon-only"] .essence-icon-picker-trigger.icon-only:not(:has(.fa-wand-magic-sparkles))[aria-label="Faction icon"][aria-expanded="false"]:focus-visible`,
+    expectCenterHit: ICON_FORM_TRIGGER('icon-only'),
+    expectContained: [
+      ...['icon-only', 'narrow', 'captioned', 'holds'].map((key) => ({
+        container: ICON_FORMS,
+        target: `${ICON_FORM(key)} > [data-lab-icon-picker-form-target]`,
+      })),
+      { container: '.window-content', target: ICON_FORMS },
+    ],
+    expectLayout: {
+      controls: [
+        // The icon-only square and its returned ring; its colour is the census's.
+        {
+          selector: ICON_FORM_TRIGGER('icon-only'),
+          styles:
+            'width: 38px; height: 38px; outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+        {
+          selector: `${ICON_FORM_TRIGGER('icon-only')} .essence-icon-picker-trigger-caret`,
+          styles: 'display: none',
+        },
+        // The narrow column's caption, cut by an ellipsis rather than wrapped.
+        {
+          selector: `${ICON_FORM_TRIGGER('narrow')} .essence-icon-picker-trigger-label`,
+          styles: 'text-overflow: ellipsis; white-space: nowrap',
+        },
+      ],
+    },
+    position: ICON_FORMS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `IconPicker.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

@@ -1,0 +1,140 @@
+/**
+ * The published `IconPicker`'s `iconOnly` and its trigger's composed name (issues 2899, 2905), on
+ * Fabricate's real Svelte runtime through a fresh seam under a Fabricate window root: literal
+ * `true` draws the glyph with no caption, named and titled by `ariaLabel` alone, and
+ * any other value draws the captioned trigger, nothing coerced; the captioned trigger's name and
+ * title are `ariaLabel`, a comma and the caption it draws, unless `ariaLabel` already holds the
+ * caption as whole words, so its name always holds its visible label, a stored glyph outside the
+ * vocabulary included; an `update` recomposes the name on the same trigger.
+ * Limit: happy-dom computes no accessible name, so the name read here is the `aria-label`
+ * Chromium's tree reads in `icon-picker-icon-only-rendered`.
+ */
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { settle } from '../helpers/publishedComponentModules.js';
+import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
+
+const { ui, mountEntry } = publishedEntrySeam('fabricate-published-icon-picker-icon-only-');
+const BASE = Object.freeze({
+  value: 'fas fa-flask',
+  onChange() {},
+  ariaLabel: 'Reagent icon',
+  listLabel: 'Reagent icons',
+  searchLabel: 'Search reagent icons',
+  noMatchesText: 'No icon matches.',
+});
+
+/** A picker mounted with `props` over `BASE`: its handle and a reader for its trigger. */
+async function mountPicker(props = {}) {
+  const { target, handle } = mountEntry('IconPicker', { ...BASE, ...props });
+  await settle();
+  const trigger = () => target.querySelector('button.essence-icon-picker-trigger');
+  return { target, handle, trigger };
+}
+
+/** What the trigger draws and how it is named. */
+function drawn(trigger) {
+  const caption = trigger.querySelector('.essence-icon-picker-trigger-label');
+  return {
+    iconOnly: trigger.classList.contains('icon-only'),
+    caption: caption ? caption.textContent.trim() : null,
+    name: trigger.getAttribute('aria-label'),
+    title: trigger.getAttribute('title'),
+    describedBy: trigger.getAttribute('aria-describedby'),
+    glyph: trigger.querySelector(':scope .essence-icon-picker-preview i')?.className ?? null,
+  };
+}
+
+describe('the published IconPicker describes iconOnly', () => {
+  it('lists iconOnly as optional data, after tint', () => {
+    const { props } = ui().describe('IconPicker');
+    assert.deepEqual(Object.keys(props).slice(-2), ['tint', 'iconOnly']);
+    assert.deepEqual(props.iconOnly, { kind: 'data', required: false });
+  });
+});
+
+describe('the published IconPicker iconOnly trigger', () => {
+  it('draws the glyph with no caption, named and titled by ariaLabel alone', async () => {
+    const { handle, trigger } = await mountPicker({ iconOnly: true });
+    assert.deepEqual(drawn(trigger()), {
+      iconOnly: true,
+      caption: null,
+      name: 'Reagent icon',
+      title: 'Reagent icon',
+      describedBy: null,
+      glyph: 'fas fa-flask',
+    });
+    assert.equal(trigger().getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'false');
+    handle.destroy();
+  });
+
+  for (const iconOnly of ['true', 1, 'yes', 'iconOnly', false, null]) {
+    it(`draws the captioned trigger for ${JSON.stringify(iconOnly)}`, async () => {
+      const { handle, trigger } = await mountPicker({ iconOnly });
+      const { iconOnly: glyphOnly, caption } = drawn(trigger());
+      assert.deepEqual([glyphOnly, caption], [false, 'Flask'], 'nothing is coerced');
+      handle.destroy();
+    });
+  }
+
+  it('turns the same trigger icon-only and back on an update', async () => {
+    const { handle, trigger } = await mountPicker();
+    const button = trigger();
+    assert.equal(handle.update({ ...BASE, iconOnly: true }), true);
+    await settle();
+    assert.ok(trigger() === button, 'the same trigger');
+    assert.deepEqual([drawn(button).iconOnly, drawn(button).name], [true, 'Reagent icon']);
+    assert.equal(handle.update({ ...BASE }), true);
+    await settle();
+    assert.deepEqual([drawn(button).caption, drawn(button).name], ['Flask', 'Reagent icon, Flask']);
+    handle.destroy();
+  });
+});
+
+describe('the published IconPicker captioned trigger name', () => {
+  const NAMES = [
+    ['adds the caption after a comma', 'fas fa-flask', 'Reagent icon', 'Reagent icon, Flask'],
+    ['keeps a name that holds it', 'fas fa-flask', 'Reagent icon: Flask', 'Reagent icon: Flask'],
+    ['matches it case-folded', 'fas fa-flask', 'flask for reagents', 'flask for reagents'],
+    ['matches whole words only', 'fas fa-flask', 'Flasks', 'Flasks, Flask'],
+    [
+      'matches every word of the caption, in order',
+      'fas fa-wand-magic-sparkles',
+      'Magic wand',
+      'Magic wand, Wand Magic Sparkles',
+    ],
+    [
+      'holds the caption it makes for a stored glyph outside the vocabulary',
+      'fas fa-premium-sigil-glyph',
+      'Icon',
+      'Icon, Premium Sigil Glyph',
+    ],
+  ];
+  for (const [title, value, ariaLabel, name] of NAMES) {
+    it(title, async () => {
+      const { handle, trigger } = await mountPicker({ value, ariaLabel });
+      const shown = drawn(trigger());
+      assert.equal(shown.name, name);
+      assert.equal(shown.title, name, 'its native tooltip is its name');
+      assert.ok(
+        name.toLowerCase().includes(shown.caption.toLowerCase()),
+        `"${shown.caption}" is the caption it draws`
+      );
+      assert.equal(shown.describedBy, null, 'a published trigger describes nothing');
+      handle.destroy();
+    });
+  }
+
+  it('recomposes on an update of ariaLabel or value', async () => {
+    const { handle, trigger } = await mountPicker();
+    assert.equal(handle.update({ ...BASE, ariaLabel: 'Tool icon' }), true);
+    await settle();
+    assert.equal(drawn(trigger()).name, 'Tool icon, Flask');
+    assert.equal(handle.update({ ...BASE, value: 'fas fa-gear' }), true);
+    await settle();
+    assert.equal(drawn(trigger()).name, `Reagent icon, ${drawn(trigger()).caption}`);
+    handle.destroy();
+  });
+});

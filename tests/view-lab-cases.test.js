@@ -434,7 +434,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedButtonForms.svelte',
   'tests/view-lab/fixtures/PublishedCompanionForms.svelte',
-  'tests/view-lab/fixtures/PublishedButtonRoles.svelte',
+  'tests/view-lab/fixtures/PublishedButtonRoles.svelte',  'tests/view-lab/fixtures/PublishedIconPickerForms.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
@@ -2232,6 +2232,26 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '[data-lab-icon-picker] .essence-icon-picker-trigger',
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The icon-only square focus returned to after a keyboard choice, its ring and hidden caret, and
+  // the narrow column's cut caption (issues 2899, 2905).
+  'manager-published-icon-picker-forms-specimen': [
+    {
+      selector:
+        '[data-lab-icon-picker-forms] > [data-lab-icon-picker-form="icon-only"] .essence-icon-picker-trigger',
+      styles:
+        'width: 38px; height: 38px; outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector:
+        '[data-lab-icon-picker-forms] > [data-lab-icon-picker-form="icon-only"] .essence-icon-picker-trigger .essence-icon-picker-trigger-caret',
+      styles: 'display: none',
+    },
+    {
+      selector:
+        '[data-lab-icon-picker-forms] > [data-lab-icon-picker-form="narrow"] .essence-icon-picker-trigger .essence-icon-picker-trigger-label',
+      styles: 'text-overflow: ellipsis; white-space: nowrap',
     },
   ],
   // The published action menu (issue 2652): the panel's and the first item's concentric corners,

@@ -1,4 +1,8 @@
-/** Issue 2664: under an app localizer the icon picker trigger describes the chosen glyph; a published mount does not. */
+/**
+ * Issue 2664: under an app localizer an icon-only picker trigger describes the chosen glyph; a
+ * captioned trigger's name holds its caption instead (issue 2899), and a published mount describes
+ * nothing.
+ */
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -19,6 +23,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/labelInName.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
@@ -77,11 +82,21 @@ async function inApp() {
 }
 
 describe('2664 IconPicker — the chosen glyph on the trigger', () => {
-  it('describes the chosen glyph by the name the trigger shows', async () => {
+  it('names the chosen glyph by the caption the trigger shows, and describes nothing', async () => {
     const root = await harness.mount(props(), await inApp());
     const shown = root.querySelector('.essence-icon-picker-trigger-label').textContent.trim();
     assert.ok(shown.length > 0, 'the trigger shows a glyph name');
-    assert.deepEqual(descriptionOf(root), [shown]);
+    assert.equal(triggerOf(root).getAttribute('aria-label'), `Reagent icon, ${shown}`);
+    assert.ok(!triggerOf(root).hasAttribute('aria-describedby'), 'the caption is in the name');
+  });
+
+  it('describes the choice on an icon-only trigger, which draws no name', async () => {
+    const full = await harness.mount(props(), await inApp());
+    const name = full.querySelector('.essence-icon-picker-trigger-label').textContent.trim();
+    harness.remount();
+    const root = await harness.mount(props({ iconOnly: true }), await inApp());
+    assert.ok(!root.querySelector('.essence-icon-picker-trigger-label'), 'no visible name drawn');
+    assert.deepEqual(descriptionOf(root), [name]);
     assert.equal(
       triggerOf(root).getAttribute('aria-label'),
       'Reagent icon',
@@ -89,17 +104,8 @@ describe('2664 IconPicker — the chosen glyph on the trigger', () => {
     );
   });
 
-  it('describes the choice on an icon-only trigger, which draws no name', async () => {
-    const full = await harness.mount(props(), await inApp());
-    const [name] = descriptionOf(full);
-    harness.remount();
-    const root = await harness.mount(props({ iconOnly: true }), await inApp());
-    assert.ok(!root.querySelector('.essence-icon-picker-trigger-label'), 'no visible name drawn');
-    assert.deepEqual(descriptionOf(root), [name]);
-  });
-
   it('follows the value when the choice changes', async () => {
-    const root = await harness.mount(props(), await inApp());
+    const root = await harness.mount(props({ iconOnly: true }), await inApp());
     const [before] = descriptionOf(root);
     await harness.setProps({ value: 'fas fa-bolt' });
     const [after] = descriptionOf(root);
@@ -108,7 +114,7 @@ describe('2664 IconPicker — the chosen glyph on the trigger', () => {
 
   it('describes nothing when no glyph is chosen', async () => {
     for (const value of ['', 'not a glyph']) {
-      const root = await harness.mount(props({ value }), await inApp());
+      const root = await harness.mount(props({ value, iconOnly: true }), await inApp());
       assert.ok(
         !triggerOf(root).hasAttribute('aria-describedby'),
         `value "${value}" is no choice, so nothing is described`
@@ -117,10 +123,12 @@ describe('2664 IconPicker — the chosen glyph on the trigger', () => {
     }
   });
 
-  it('keeps the name-only trigger in a mount with no localizer, which is the published mount', async () => {
-    const root = await harness.mount(props());
-    assert.ok(!triggerOf(root).hasAttribute('aria-describedby'));
-    assert.ok(!root.querySelector('[hidden]'), 'and draws no description node');
-    assert.equal(triggerOf(root).getAttribute('aria-label'), 'Reagent icon');
+  it('describes nothing in a mount with no localizer, which is the published mount', async () => {
+    for (const iconOnly of [false, true]) {
+      const root = await harness.mount(props({ iconOnly }));
+      assert.ok(!triggerOf(root).hasAttribute('aria-describedby'));
+      assert.ok(!root.querySelector('[hidden]'), 'and draws no description node');
+      harness.remount();
+    }
   });
 });

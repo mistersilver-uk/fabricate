@@ -253,6 +253,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-icon-picker-choice',
     // Its published tint, in the companion forms specimen (issue 2841).
     'manager-published-companion-forms-specimen',
+    // Its icon-only trigger and its captioned trigger's name (issues 2899, 2905).
+    'manager-published-icon-picker-forms-specimen',
     // The four that mount it with and without a Fabricate root above its target, one with its list
     // open on the standalone layer (issue 2680).
     'published-standalone',

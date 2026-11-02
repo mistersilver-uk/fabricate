@@ -4,6 +4,8 @@
  * `--fab-tag-*` colour the key names, on the glyph's own tile over the trigger's fill; every one of
  * tint key, one per `--fab-tag-*` token the palettes declare, clears the 3:1 non-text floor there but `mauve` and `slate` on
  * `--fab-bg-2` in `foundry-native`, pinned ratio for ratio, and the untinted accent glyph clears it.
+ * The icon-only trigger (issue 2905), whose glyph is its only visible content, lays the same glyph
+ * on the same tile and fill: its own rules declare layout alone.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -59,4 +61,14 @@ test('the untinted accent glyph clears 3:1 on the glyph’s tile over the four g
   for (const ground of GROUNDS) {
     assert.deepEqual(shortfalls(themes, '--fab-accent', tileOver(ground), 3), [], ground);
   }
+});
+
+test('the icon-only trigger’s own rules declare layout alone, so its glyph reads as measured above', () => {
+  const iconOnly = rules.filter((rule) =>
+    splitSelectorList(rule.selector).some((selector) => selector.includes(':where(.icon-only)'))
+  );
+  assert.deepEqual(
+    iconOnly.map((rule) => [...propertiesOf(rule)].map(([property]) => property)),
+    [['grid-template-columns', 'width', 'padding'], ['display']]
+  );
 });

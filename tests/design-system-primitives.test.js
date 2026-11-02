@@ -1099,13 +1099,14 @@ test('(a) a Pagination change publishes its four frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconPicker change publishes its frame, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) an IconPicker change publishes its frame, then the four specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconPicker.svelte';
   const frames = [
     'manager-system-edit-lists',
     'manager-published-icon-picker-specimen',
     'manager-published-icon-picker-choice',
     'manager-published-companion-forms-specimen',
+    'manager-published-icon-picker-forms-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-icon-picker-open',

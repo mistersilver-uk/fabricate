@@ -516,7 +516,9 @@ export function registerEssencesCases() {
       target.querySelector('.essence-icon-picker-trigger'),
       'edit route should use the shared icon picker trigger'
     );
-    assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
+    const iconTrigger = target.querySelector('.essence-icon-picker-trigger');
+    const iconCaption = iconTrigger.querySelector('.essence-icon-picker-trigger-label').textContent;
+    assert.equal(iconTrigger.title, `Change icon, ${iconCaption.trim()}`, 'named by its caption');
     // The icon RESET is an icon-only overlay control on the tile itself now (maintainer
     // feedback), not a control beside the picker, so its label is its accessible name and
     // its tooltip rather than visible text. Asserted on the control, which is what a GM

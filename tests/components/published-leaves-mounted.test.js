@@ -437,7 +437,7 @@ const LEAVES = Object.freeze([
     props: { ...REAGENT_ICON_PICKER, ariaLabel: 'Reagent icon' },
     next: { ...REAGENT_ICON_PICKER, ariaLabel: 'Tool icon' },
     read: (root) => root.querySelector('button').getAttribute('aria-label'),
-    drawn: ['Reagent icon', 'Tool icon'],
+    drawn: ['Reagent icon, Flask', 'Tool icon, Flask'],
   },
   {
     name: 'ActionMenu',
@@ -653,7 +653,6 @@ describe('a key a leaf does not publish', () => {
     ['Pagination', 'class', 'is not a prop of Pagination'],
     ...[
       'disabled',
-      'iconOnly',
       'bounds',
       'triggerClass',
       'triggerStyle',

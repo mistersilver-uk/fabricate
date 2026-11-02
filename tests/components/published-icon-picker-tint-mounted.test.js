@@ -47,9 +47,9 @@ const tintOf = (tile) => [
 ];
 
 describe('the published IconPicker describes its tint', () => {
-  it('lists tint as optional data, last', () => {
+  it('lists tint as optional data, before iconOnly', () => {
     const { props } = ui().describe('IconPicker');
-    assert.equal(Object.keys(props).at(-1), 'tint');
+    assert.deepEqual(Object.keys(props).slice(-2), ['tint', 'iconOnly']);
     assert.deepEqual(props.tint, { kind: 'data', required: false });
   });
 });
@@ -62,7 +62,11 @@ describe('the published IconPicker tint', () => {
         ['essence-icon-picker-preview', 'is-tinted'],
         `var(--fab-tag-${tint})`,
       ]);
-      assert.equal(trigger().getAttribute('aria-label'), 'Activity icon', 'the name is unchanged');
+      assert.equal(
+        trigger().getAttribute('aria-label'),
+        'Activity icon, Leaf',
+        'the name is unchanged'
+      );
       handle.destroy();
     });
   }
