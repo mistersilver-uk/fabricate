@@ -536,11 +536,12 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: {
           on: required,
-          ariaLabel: required,
+          ariaLabel: optional,
           semantics: optional,
           onclick: { kind: 'callback', required: true },
           'aria-labelledby': { kind: 'aria', required: false },
           'aria-describedby': { kind: 'aria', required: false },
+          label: { kind: 'text', required: true },
         },
         rest: true,
         root: 'any',

@@ -825,6 +825,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-chip-forms': () => import('./fixtures/PublishedChipForms.svelte'),
   // Issue 2836: the selection checkbox's states, densities, a wrapping label and a keyboard press.
   'published-selection-checkbox': () => import('./fixtures/PublishedSelectionCheckbox.svelte'),
+  // Issue 2902: the switch's label inside its button, a press on its words and a wrapping label.
+  'published-toggle-labels': () => import('./fixtures/PublishedToggleLabels.svelte'),
   // Issue 2862: disclosure cards at rest, open, pressed open, focused and disabled, and a faction
   // card whose head holds a published chip and bar.
   'published-disclosure': () => import('./fixtures/PublishedDisclosure.svelte'),

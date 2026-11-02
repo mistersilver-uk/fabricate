@@ -1524,6 +1524,23 @@
   text-overflow: ellipsis;
 }
 
+/* The named switch (issues 2902, 2795): its name sits inside the button, so the whole line presses it, uncapped and wrapping at its spaces up to the target's width, in the target's face and size and the body ink in both states. Height is released, the 22px track's 1px inset makes the 24px floor and Foundry's own button floor still applies, so one line stands as tall as the track-only switch at any size; the corner is the 24px rung's, so the ring clears a wrapped name's lines where the pill's ends would cross them. */
+.fabricate-toggle.fabricate-toggle.has-name {
+  max-width: 100%;
+  height: auto;
+  padding-block: 1px;
+  border-radius: 6px;
+  white-space: normal;
+  text-align: start;
+}
+
+.fabricate-toggle .manager-status-toggle-name {
+  min-width: 0;
+  color: var(--fab-text);
+  line-height: 1.3;
+  overflow-wrap: break-word;
+}
+
 .fabricate-manager .manager-system-row:hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-surface-raised);

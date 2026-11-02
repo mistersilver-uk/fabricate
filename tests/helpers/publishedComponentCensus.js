@@ -27,14 +27,15 @@ import {
 } from './publishedComponentGate.js';
 
 /**
- * The published `StatusToggle`'s root (issue 2452): the state classes `on` writes beside it, the
- * classes under which a sheet rule redraws a switch, no extension target sitting in one, the
- * classes its file spells that no published key draws, and what its `:focus-visible` rule
- * declares beside the module ring. No published key writes `disabled`.
+ * The published `StatusToggle`'s root (issue 2452): the state classes `on` writes beside it and
+ * the named form's class `label` writes (issue 2902), the classes under which a sheet rule
+ * redraws a switch, no extension target sitting in one, the classes its file spells that no
+ * published key draws, and what its `:focus-visible` rule declares beside the module ring.
+ * No published key writes `disabled`.
  */
 export const TOGGLE = Object.freeze({
   root: 'fabricate-toggle',
-  writable: new Set(['is-on', 'is-off']),
+  writable: new Set(['is-on', 'is-off', 'has-name']),
   ancestors: new Set([
     'manager-checks-active-card',
     'manager-character-modifier-override-row',

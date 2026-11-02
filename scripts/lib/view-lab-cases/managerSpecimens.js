@@ -738,6 +738,25 @@ const CHECKBOX_KEYS = Object.freeze([
 /** Sized to the fixture's two columns and the first one's seventeen rows. */
 const CHECKBOXES_WINDOW = Object.freeze({ width: 740, height: 640 });
 
+/** The labelled switches' ground, a row by its key, and the button and label it draws (issue 2902). */
+const TOGGLE_LABELS = '[data-lab-toggle-labels]';
+const TOGGLE_LABEL_ROW = (key) => `${TOGGLE_LABELS} > [data-lab-toggle-label="${key}"]`;
+const TOGGLE_LABEL_BUTTON = (key) => `${TOGGLE_LABEL_ROW(key)} button.fabricate-toggle`;
+const TOGGLE_LABEL_NAME = (key) => `${TOGGLE_LABEL_BUTTON(key)} > .manager-status-toggle-name`;
+const TOGGLE_LABEL_KEYS = Object.freeze([
+  'required',
+  'hidden',
+  'switch',
+  'named',
+  'pressed',
+  'focused',
+  'long',
+  'track',
+]);
+
+/** Sized to the fixture's 420px column and its eight rows. */
+const TOGGLE_LABELS_WINDOW = Object.freeze({ width: 520, height: 420 });
+
 /** The disclosure fixture's ground, a row by its key, and the card, head, chevron and body it draws. */
 const DISCLOSURES = '[data-lab-disclosures]';
 const DISCLOSURE_ROW = (key) => `${DISCLOSURES} > [data-lab-disclosure="${key}"]`;
@@ -2579,6 +2598,47 @@ export const CASES = Object.freeze([
     // forge holding the measured minima.
     themeVariants: ['foundry-native', 'hearth-herb', 'ironblood-forge'],
     // `SelectionCheckbox.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-toggle-labels-specimen',
+    label:
+      "Specimen, mounted through the published seam — eight switches in a 420px column on the window's --fab-bg-1 ground, 6px apart, each beside a caption the companion draws at the right, after two steps: a click on the word Spent of the fifth switch, whose callback passed on true in its own update, so its track is filled accent with the knob at the far end; and Tab from that switch, which put keyboard focus on Advance by the elapsed time, so the accent ring, 2px wide and 2px clear, surrounds its track and its label together. Reading top to bottom: Required off, its label in the body ink beside a quiet track, whole and not cut to Re…; Hidden on, an accent track; Spent on, announced as a switch; Required again, named Required ingredients; the pressed Spent; the focused Advance by the elapsed time; Spend the stage’s requirements when the activity begins in a 160px target, wrapping onto several lines beside its track, every word drawn; and as a baseline the track alone, named Group by category, 38px wide. The frame cannot show that a click on the words is a click on the switch, nor the names and pressed or checked states the accessibility tree reports, nor the forced-colours repaint, which the rendered suite clicks, reads and emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-toggle-labels' },
+    steps: [
+      { selector: TOGGLE_LABEL_NAME('pressed') },
+      { selector: TOGGLE_LABEL_BUTTON('pressed'), press: 'Tab' },
+    ],
+    // The pressed switch turned on by the companion's own update, under the fixture's echo of the
+    // state, which only `onclick` writes, and the next switch, off, holding keyboard focus.
+    expectSelector: `${TOGGLE_LABELS}:has(> [data-lab-toggle-label="pressed"][data-lab-toggle-label-on="true"] button.is-on[aria-pressed="true"]) > [data-lab-toggle-label="focused"] button.fabricate-toggle.is-off:focus-visible`,
+    expectContained: [
+      ...TOGGLE_LABEL_KEYS.map((key) => ({
+        container: TOGGLE_LABELS,
+        target: TOGGLE_LABEL_ROW(key),
+      })),
+      { container: '.window-content', target: TOGGLE_LABELS },
+    ],
+    expectLayout: {
+      controls: [
+        // The label's ink and the unclipped short label, the wrapping long one, the ring around
+        // the labelled button and the track-only baseline's width.
+        { selector: TOGGLE_LABEL_NAME('required'), styles: 'color: var(--fab-text)' },
+        { selector: TOGGLE_LABEL_NAME('long'), styles: 'white-space: normal' },
+        {
+          selector: TOGGLE_LABEL_BUTTON('focused'),
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+        },
+        { selector: TOGGLE_LABEL_BUTTON('track'), styles: 'width: 38px' },
+      ],
+    },
+    position: TOGGLE_LABELS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

@@ -984,7 +984,7 @@ test('(a) an IconButton change publishes its two frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a StatusToggle change publishes its six frames, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a StatusToggle change publishes its seven frames, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/StatusToggle.svelte';
   const frames = [
     'manager-system-edit-normal',
@@ -993,6 +993,7 @@ test('(a) a StatusToggle change publishes its six frames, then the three that mo
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
     'manager-published-toggles-specimen',
+    'manager-published-toggle-labels-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

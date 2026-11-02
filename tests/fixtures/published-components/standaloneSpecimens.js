@@ -251,6 +251,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       ariaLabel: 'Spend when this stage begins',
       onclick: press,
     }),
+    'toggle-label': button({ on: false, label: 'Required', onclick: press }),
   }),
   Stepper: Object.freeze({
     'stepper-mid': { props: stepper({}), reach: reach('[data-stepper-decrement]') },
