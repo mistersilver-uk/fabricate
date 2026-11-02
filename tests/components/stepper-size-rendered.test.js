@@ -48,7 +48,11 @@ const CASES = Object.freeze({
   'fill-comfortable': [{ fill: true, density: 'comfortable' }, 200],
 });
 
-/** A filled stepper at the narrow end of a 100px card: in a flex row and a grid column beside a label, and in a max-content box. */
+/**
+ * A filled stepper at the narrow end of a 94px card, beside a 24px label, so the column leaves it
+ * 64px: room for its buttons' row and narrower than that row plus any input's own width, whatever
+ * the font; in a flex row and a grid column.
+ */
 const COLUMNS = Object.freeze({
   'fill-flex-row': 'display:flex;gap:6px;align-items:center',
   'fill-grid-column': 'display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center',
@@ -72,7 +76,8 @@ describe('the published Stepper size rungs, rendered (issues 2841 and 2903)', ()
     await settle();
     for (const [id, layout] of Object.entries(COLUMNS)) {
       hosts.push(
-        `<div data-column="${id}" style="width:100px;${layout}"><span>Qty</span>` +
+        `<div data-column="${id}" style="width:94px;${layout}">` +
+          `<span style="width:24px;overflow:hidden">Qty</span>` +
           `<div data-case="${id}">${target.innerHTML}</div></div>`
       );
     }
@@ -233,9 +238,27 @@ describe('the published Stepper size rungs, rendered (issues 2841 and 2903)', ()
   }
 
   it('keeps a filled stepper’s input at its own width in a max-content box', async () => {
-    const { root, input } = await measure('fill-max-content');
-    assert.ok(input.width > 24, `the input keeps ${input.width}px`);
-    assert.equal(root.width, input.width + 2 + 4 + 22 + 22 + 4);
+    // Against the same input's natural width, read on this page, so no font's figure is pinned.
+    const [filled, natural, padding] = await tab
+      .locator('[data-case="fill-max-content"] input')
+      .evaluate((input) => {
+        const style = getComputedStyle(input);
+        const filledWidth = input.getBoundingClientRect().width;
+        input.style.setProperty('flex', 'none');
+        input.style.setProperty('width', 'auto');
+        const naturalWidth = input.getBoundingClientRect().width;
+        input.style.removeProperty('flex');
+        input.style.removeProperty('width');
+        return [
+          filledWidth,
+          naturalWidth,
+          Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight),
+        ];
+      });
+    assert.ok(natural > padding, `the input draws ${natural}px of its own`);
+    assert.equal(filled, natural, 'the filled input keeps its natural width');
+    const { root } = await measure('fill-max-content');
+    assert.equal(root.width, filled + 2 + 4 + 22 + 22 + 4);
   });
 
   for (const id of ['dense', 'toolbar']) {
