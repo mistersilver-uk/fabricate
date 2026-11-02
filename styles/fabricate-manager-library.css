@@ -1507,8 +1507,8 @@
     --fab-toggle-knob: canvas;
   }
 
-  .fabricate-toggle.fabricate-toggle.is-disabled :is(.manager-status-toggle-label, .manager-status-toggle-name),
-  .fabricate-toggle.fabricate-toggle:disabled :is(.manager-status-toggle-label, .manager-status-toggle-name),
+  .fabricate-toggle.fabricate-toggle.is-disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle:disabled .manager-status-toggle-label,
   .fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) .manager-status-toggle-label {
     color: graytext;
   }
