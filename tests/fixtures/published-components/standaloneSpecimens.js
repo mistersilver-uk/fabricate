@@ -278,6 +278,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       props: stepper({ size: 26 }),
       reach: reach('[data-stepper-decrement]'),
     },
+    'stepper-toolbar': {
+      props: stepper({ size: '34' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
     'stepper-unset': {
       props: stepper({ value: null, allowUnset: true }),
       reach: reach('[data-stepper-decrement]'),

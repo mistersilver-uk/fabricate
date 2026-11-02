@@ -1148,14 +1148,27 @@ The band adds no role and no name, so a `FillBar`, which has neither, drawn ther
 ### Requirement: A stepper's dense rung keeps every pointer target at 24px
 
 `Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one.
-Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; the rung outranks `density` and pins `fill` at 26px.
+It MUST take a `size` that is `34`, as a number or its string, which draws the toolbar rung, level with the 34px `Field`, `Select`, `SearchField` and `SegmentedControl`: a horizontal stepper 34px tall and as wide as the default, with the default 2px padding inside its 1px edge, the input filling the 28px row as it does under `fill`, and each step button the default 22px face inside its 24 by 24 pointer target, its keyboard ring placed as at the default rung (issue 2903).
+Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; each rung outranks `density` and sets `fill`'s height, 26px or 34px, and a filled stepper with no rung stays 38px tall.
+The group keeps its one radius, 7, at every rung, as the library's stepper entry states for the filled variant.
+Under `fill` the input's own width MUST NOT hold its column wider than the buttons' row, so a filled stepper in a flex row or grid column narrows with the room it is given (issue 2903).
 No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
-No in-app caller passes it: the rung exists for the published `Stepper`, whose companion draws a 26px quantity stepper inside a 38px row.
+No in-app caller passes either rung: they exist for the published `Stepper`, whose companions draw a 26px quantity stepper inside a 38px row and a stepper in a row of 34px toolbar controls.
 
 #### Scenario: A dense stepper is pressed at its edge
 
 - **WHEN** a published stepper at `size` `26` is hit-tested at its decrement button's outermost pixel and at the pixel beyond it
 - **THEN** the pointer lands on the button, and then on the stepper's own edge
+
+#### Scenario: A toolbar stepper stands level with its row
+
+- **WHEN** a published stepper at `size` `34` is drawn, filled or not
+- **THEN** it is 34px tall, its input fills the 28px row, and each step button's pointer target is 24 by 24 centred in that row
+
+#### Scenario: A filled stepper narrows with its column
+
+- **WHEN** a filled stepper sits in a flex row or grid column narrower than its input's own width
+- **THEN** the stepper ends inside the column, its input taking only the room the two buttons leave
 
 ### Requirement: Field-sized empty states match their associated controls
 

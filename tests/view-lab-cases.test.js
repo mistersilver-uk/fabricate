@@ -963,6 +963,18 @@ const LAB_COMPANION_FACES = [
     styles: 'height: 28px; padding-top: 2px',
   },
   {
+    selector: labCompanionForm('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
+  },
+  {
     selector: labCompanionForm('button-ghost', 'button'),
     styles: 'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0)',
   },
