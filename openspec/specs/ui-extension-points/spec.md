@@ -1828,7 +1828,8 @@ Each group states the accepted values of every key that entry publishes.
     Two pagers on one screen take distinct names, because a screen-reader user moves between landmarks by name.
   - `landmarks` is `'both'` or `'nav'` and defaults to `'both'`; a value outside the set draws `'both'`, and nothing is coerced.
     `'both'` draws the pager as a region named by `ariaLabel` holding a navigation named by `navLabel`, two landmarks.
-    `'nav'` draws the same pager with no region, so its navigation, named by `navLabel`, is its one landmark, for a screen showing several paged lists; `ariaLabel` is still required there and names nothing.
+    `'nav'` draws the same pager with no region, so its navigation, named by `navLabel`, is its one landmark, for a screen showing several paged lists.
+    `ariaLabel` is still required there, and an empty one is refused with `Pagination requires a non-empty "ariaLabel"` (M9), though it names nothing; the companion passes the list's name, as "Recipes", so the pager still reads sensibly if a later `update` draws `'both'`.
     While the navigation is not drawn, as on a single page without `persistent`, a `'nav'` pager adds no landmark.
     The companion gives each such pager's `navLabel` the name of its list, as "Recipe pages", because that is then the only name a screen-reader user moves between.
   - `previousLabel` and `nextLabel` are required and are the arrows' names, final display text.

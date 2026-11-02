@@ -98,7 +98,7 @@ const EXCEPTIONS = Object.freeze([
     name: 'perPageAriaLabel',
     fault: suffixed('AriaLabel'),
     reason:
-      'the page-size group has a visible caption and a distinct group name, so the part needs both',
+      '`perPageLabel` already holds the visible caption under the conforming `<part>Label` name, so the group name beside it takes `AriaLabel`',
   },
   {
     component: 'ChoiceOptionList',

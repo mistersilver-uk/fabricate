@@ -130,6 +130,16 @@ describe('the published Pagination, landmarks', () => {
     handle.destroy();
   });
 
+  it("still requires ariaLabel under 'nav', though it names nothing there (M9)", () => {
+    const target = fabricateTarget(targets);
+    const props = pagerProps({ landmarks: 'nav', ariaLabel: '' });
+    assert.throws(() => ui().mount('Pagination', { target, props }), {
+      name: 'TypeError',
+      message: `${REFUSAL}Pagination requires a non-empty "ariaLabel"`,
+    });
+    assert.equal(target.childNodes.length, 0);
+  });
+
   for (const value of ['both', 'none', 'region', 'NAV', true, 1, null]) {
     it(`draws both landmarks for ${JSON.stringify(value)}`, async () => {
       const { handle, bar, nav } = mountPager({ landmarks: value });

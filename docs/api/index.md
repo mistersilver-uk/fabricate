@@ -3735,7 +3735,8 @@ While focus is inside the pager it stays drawn, and it is removed once focus lea
 Two pagers on one screen take distinct names, because a screen-reader user moves between landmarks by name.
 `landmarks` is `'both'` or `'nav'` and defaults to `'both'`; a value outside the set draws `'both'`, and nothing is coerced.
 `'both'` draws the pager as a region named by `ariaLabel` holding a navigation named by `navLabel`, two landmarks.
-`'nav'` draws the same pager with no region, so its navigation, named by `navLabel`, is its one landmark, for a screen showing several paged lists; `ariaLabel` is still required there and names nothing.
+`'nav'` draws the same pager with no region, so its navigation, named by `navLabel`, is its one landmark, for a screen showing several paged lists.
+`ariaLabel` is still required there, and an empty one throws `Pagination requires a non-empty "ariaLabel"`, though it names nothing; pass the list's name, as "Recipes", so the pager still reads sensibly if a later `update` draws `'both'`.
 While the navigation is not drawn, as on a single page without `persistent`, a `'nav'` pager adds no landmark.
 Give each such pager's `navLabel` the name of its list, as "Recipe pages", because that is then the only name a screen-reader user moves between.
 `previousLabel` and `nextLabel` are required and are the arrows' names, final display text.
