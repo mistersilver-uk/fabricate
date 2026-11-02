@@ -1,7 +1,7 @@
 /**
- * Issue 2664: under an app localizer an icon-only picker trigger describes the chosen glyph; a
- * captioned trigger's name holds its caption instead (issue 2899), and a published mount describes
- * nothing.
+ * Issue 2664: an icon-only picker trigger describes the chosen glyph by its caption, in every mount,
+ * a published one included (issue 2899); a captioned trigger's name holds its caption instead and
+ * describes nothing.
  */
 
 import assert from 'node:assert/strict';
@@ -123,11 +123,26 @@ describe('2664 IconPicker — the chosen glyph on the trigger', () => {
     }
   });
 
-  it('describes nothing in a mount with no localizer, which is the published mount', async () => {
-    for (const iconOnly of [false, true]) {
-      const root = await harness.mount(props({ iconOnly }));
-      assert.ok(!triggerOf(root).hasAttribute('aria-describedby'));
-      assert.ok(!root.querySelector('[hidden]'), 'and draws no description node');
+  it('describes the icon-only choice by its caption in a mount with no localizer, which is the published mount', async () => {
+    const full = await harness.mount(props());
+    const name = full.querySelector('.essence-icon-picker-trigger-label').textContent.trim();
+    assert.ok(
+      !triggerOf(full).hasAttribute('aria-describedby'),
+      'a captioned trigger describes nothing'
+    );
+    assert.ok(!full.querySelector('[hidden]'), 'and draws no description node');
+    harness.remount();
+    const root = await harness.mount(props({ iconOnly: true }));
+    assert.deepEqual(descriptionOf(root), [name]);
+    assert.equal(
+      triggerOf(root).getAttribute('aria-label'),
+      'Reagent icon',
+      'the name is unchanged'
+    );
+    harness.remount();
+    for (const value of ['', 'not a glyph']) {
+      const none = await harness.mount(props({ value, iconOnly: true }));
+      assert.ok(!triggerOf(none).hasAttribute('aria-describedby'), `value "${value}" is no choice`);
       harness.remount();
     }
   });

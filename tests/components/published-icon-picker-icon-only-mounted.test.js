@@ -1,10 +1,10 @@
 /**
  * The published `IconPicker`'s `iconOnly` and its trigger's composed name (issues 2899, 2905), on
  * Fabricate's real Svelte runtime through a fresh seam under a Fabricate window root: literal
- * `true` draws the glyph with no caption, named and titled by `ariaLabel` alone, and
- * any other value draws the captioned trigger, nothing coerced; the captioned trigger's name and
- * title are `ariaLabel`, a comma and the caption it draws, unless `ariaLabel` already holds the
- * caption as whole words, so its name always holds its visible label, a stored glyph outside the
+ * `true` draws the glyph with no caption, named and titled by `ariaLabel` alone and described by
+ * the chosen glyph's caption, and any other value draws the captioned trigger, nothing coerced; the
+ * captioned trigger's name and title are `ariaLabel`, its trailing punctuation dropped, a comma
+ * and the caption it draws, unless `ariaLabel` already holds the caption as whole words, so its name always holds its visible label, a stored glyph outside the
  * vocabulary included, and an `ariaLabel` the seam passes that is not a string is drawn as written;
  * an `update` recomposes the name on the same trigger.
  * Limit: happy-dom computes no accessible name, so the name read here is the `aria-label`
@@ -42,7 +42,10 @@ function drawn(trigger) {
     caption: caption ? caption.textContent.trim() : null,
     name: trigger.getAttribute('aria-label'),
     title: trigger.getAttribute('title'),
-    describedBy: trigger.getAttribute('aria-describedby'),
+    described: (trigger.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map((id) => trigger.querySelector(`:scope [id="${id}"]`)?.textContent.trim() ?? `#${id}?`),
     glyph: trigger.querySelector(':scope .essence-icon-picker-preview i')?.className ?? null,
   };
 }
@@ -56,14 +59,14 @@ describe('the published IconPicker describes iconOnly', () => {
 });
 
 describe('the published IconPicker iconOnly trigger', () => {
-  it('draws the glyph with no caption, named and titled by ariaLabel alone', async () => {
+  it('draws the glyph with no caption, named and titled by ariaLabel alone and described by its caption', async () => {
     const { handle, trigger } = await mountPicker({ iconOnly: true });
     assert.deepEqual(drawn(trigger()), {
       iconOnly: true,
       caption: null,
       name: 'Reagent icon',
       title: 'Reagent icon',
-      describedBy: null,
+      described: ['Flask'],
       glyph: 'fas fa-flask',
     });
     assert.equal(trigger().getAttribute('aria-haspopup'), 'dialog');
@@ -79,6 +82,18 @@ describe('the published IconPicker iconOnly trigger', () => {
       handle.destroy();
     });
   }
+
+  it('follows the choice in its description, and describes no choice when value holds no glyph', async () => {
+    const { handle, trigger } = await mountPicker({ iconOnly: true });
+    assert.equal(handle.update({ ...BASE, iconOnly: true, value: 'fas fa-gear' }), true);
+    await settle();
+    const [after] = drawn(trigger()).described;
+    assert.ok(after && after !== 'Flask', 'the description names the new glyph');
+    assert.equal(handle.update({ ...BASE, iconOnly: true, value: '' }), true);
+    await settle();
+    assert.deepEqual(drawn(trigger()).described, []);
+    handle.destroy();
+  });
 
   it('turns the same trigger icon-only and back on an update', async () => {
     const { handle, trigger } = await mountPicker();
@@ -123,10 +138,18 @@ describe('the published IconPicker captioned trigger name', () => {
         name.toLowerCase().includes(shown.caption.toLowerCase()),
         `"${shown.caption}" is the caption it draws`
       );
-      assert.equal(shown.describedBy, null, 'a published trigger describes nothing');
+      assert.deepEqual(shown.described, [], 'a captioned trigger describes nothing');
       handle.destroy();
     });
   }
+
+  it('drops the punctuation that ends ariaLabel before the comma', async () => {
+    for (const ariaLabel of ['Reagent icon:', 'Reagent icon - ', 'Reagent icon;,. ']) {
+      const { handle, trigger } = await mountPicker({ ariaLabel });
+      assert.equal(drawn(trigger()).name, 'Reagent icon, Flask', JSON.stringify(ariaLabel));
+      handle.destroy();
+    }
+  });
 
   for (const ariaLabel of [42, true, {}, ['a']]) {
     it(`renders an ariaLabel of ${JSON.stringify(ariaLabel)}, which the seam passes, without throwing`, async () => {

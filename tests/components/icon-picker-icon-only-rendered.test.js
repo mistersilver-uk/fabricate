@@ -3,7 +3,7 @@
  * 2905) in Chromium, mounted through the real seam in a Fabricate window under the module sheet:
  * Chromium's own accessibility tree names a captioned trigger by `ariaLabel` and the caption it
  * draws, once, so its name holds its visible label (WCAG 2.5.3), and an icon-only trigger by
- * `ariaLabel` alone; a caption a narrow column cuts keeps its whole text in the name and the
+ * `ariaLabel` alone, described by the chosen glyph's caption (WCAG 4.1.2); a caption a narrow column cuts keeps its whole text in the name and the
  * tooltip, where the icon-only trigger fits whole; the icon-only trigger is its glyph's tile alone,
  * a square target of at least 24 by 24 (WCAG 2.5.8) that draws the module ring under keyboard
  * focus, keeps its edge, glyph, tile and ring under forced colours, and opens, closes and returns focus as
@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { chromiumAxState } from '../helpers/chromiumAxNode.js';
+import { chromiumAxDescription, chromiumAxState } from '../helpers/chromiumAxNode.js';
 import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const server = createViteFixtureServer({ styleMountPrefix: '/@icon-picker-styles/' });
@@ -110,6 +110,21 @@ describe('the published IconPicker trigger’s name in Chromium’s tree (issue 
         unlisted: { ...button, name: 'Icon, Premium Sigil Glyph' },
         narrow: { ...button, name: 'Faction icon, Wand Magic Sparkles' },
         'icon-only': { ...button, name: 'Reagent icon' },
+      });
+    }));
+
+  it('describes the icon-only trigger by the chosen glyph’s caption, and a captioned one by its tooltip alone', () =>
+    inFixture('', async (page) => {
+      const described = {};
+      for (const id of ['icon-only', 'icon-only-narrow', 'captioned', 'narrow']) {
+        described[id] = await chromiumAxDescription(page, trigger(id));
+      }
+      assert.deepEqual(described, {
+        'icon-only': 'Flask',
+        'icon-only-narrow': 'Wand Magic Sparkles',
+        // Chromium reads the native tooltip, which repeats the name, as the description.
+        captioned: 'Reagent icon, Flask',
+        narrow: 'Faction icon, Wand Magic Sparkles',
       });
     }));
 
