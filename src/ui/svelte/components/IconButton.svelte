@@ -173,6 +173,6 @@
     ></i>{/if}{@render children?.()}{#if descriptionText}<span
       id={descriptionId}
       hidden
-      style:display="none">{descriptionText}</span
+      style:display|important="none">{descriptionText}</span
     >{/if}</button
 >

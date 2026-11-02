@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>The published Button's and IconButton's description beside Foundry's tooltip</title>
+    <!--
+      Served by `tests/components/button-description-tooltip-rendered.test.js` from a Vite dev
+      server, so `mount.js` mounts each described control through the real published seam, live, and
+      Chromium's accessibility tree is read while the tooltip keyboard focus opens is still open.
+    -->
+    <link rel="stylesheet" href="/@button-description-styles/fabricate.css" />
+  </head>
+  <body class="game">
+    <p id="hint">Credits are kept in the ledger.</p>
+    <aside id="tooltip" role="tooltip"></aside>
+    <div class="fabricate fabricate-app" data-fabricate-theme="fabricate" data-fixture-root></div>
+    <script type="module" src="/tests/fixtures/published-button-description/mount.js"></script>
+  </body>
+</html>

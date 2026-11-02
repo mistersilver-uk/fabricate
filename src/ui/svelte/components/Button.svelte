@@ -15,7 +15,7 @@
   | `busy` | boolean | `false` | An action in flight: writes `aria-busy` and `aria-disabled`, never `disabled`, so focus and arm state survive, and swallows the press. `disabled` beside it still renders disabled. |
   | `pressed` | `true` \| `false` \| absent | `undefined` | A toggle's state: writes `aria-pressed`, and `true` the `is-pressed` face; any other value writes neither (issue 2852). |
   | `ariaLabel` / `tooltip` | pre-localized strings | `''` / `''` | The name that replaces the label, which the published seam holds to containing it, and hint text written as `data-tooltip-text` and opened on keyboard focus as `IconButton`'s is; a blank string writes neither. |
-  | `description` | pre-localized string | `''` | The accessible description, drawn hidden inside the button and named after the caller's own `aria-describedby`; held there against Foundry's tooltip, and a blank string writes none (issue 2895). |
+  | `description` | pre-localized string | `''` | The accessible description, drawn hidden inside the button and named after the caller's own `aria-describedby`; held there beside Foundry's open tooltip, and a blank string writes none (issue 2895). |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
   | `element` / `children` | bindable / snippet | `null` / `undefined` | The rendered DOM node, since `bind:this` on a component yields the INSTANCE and a caller that must measure or focus the button has no other way to reach it; and the label, a snippet rather than a string because call sites wrap the label in their own spans. |
 
@@ -64,7 +64,8 @@
     take their `href` from caller data, so the empty case is reachable.
   - No scoped `<style>`: the anchor's `text-decoration: none` and the `is-full-width` rule live in
     `styles/fabricate.css` even though this component emits their classes. The description's
-    `display: none` is inline, because a host reset that sets `display` beats the UA `[hidden]` rule.
+    `display: none` is inline and important, because a host rule that sets `display` beats the UA
+    `[hidden]` rule.
 -->
 <script>
   import { getContext, onDestroy } from 'svelte';
@@ -260,6 +261,6 @@
     ></i>{/if}{@render children?.()}{#if descriptionText}<span
       id={descriptionId}
       hidden
-      style:display="none">{descriptionText}</span
+      style:display|important="none">{descriptionText}</span
     >{/if}</svelte:element
 >

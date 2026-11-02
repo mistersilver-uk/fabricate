@@ -2,8 +2,8 @@
  * The published `Button`'s and `IconButton`'s `description` (issue 2895) on Fabricate's real Svelte
  * runtime, under a Fabricate window root: the hidden element it draws inside the control and names
  * through `aria-describedby`, an id unique to each mount, a blank or non-string value that writes
- * none, `Button`'s composition with the caller's `aria-describedby`, the restore after Foundry's
- * tooltip closes, and the disabled and busy forms.
+ * none, `Button`'s composition with the caller's `aria-describedby`, held after `tooltip` while
+ * Foundry's tooltip is open and restored once it closes, and the disabled and busy forms.
  * Limit: happy-dom computes no accessible name or description, so
  * `tests/components/button-description-rendered.test.js` reads them in Chromium.
  */
@@ -101,6 +101,7 @@ for (const name of ['Button', 'IconButton']) {
       assert.equal(own.textContent, DESCRIPTION);
       assert.ok(own.hidden, 'hidden, so the name never takes its words');
       assert.equal(own.style.display, 'none', 'restated inline over a host reset');
+      assert.equal(own.style.getPropertyPriority('display'), 'important', 'over an important one');
       handle.destroy();
     });
 
@@ -141,7 +142,7 @@ for (const name of ['Button', 'IconButton']) {
       handle.destroy();
     });
 
-    it('is restored once the keyboard tooltip closes, which removed it', async () => {
+    it('stays beside the keyboard tooltip while open, and is restored once it closes', async () => {
       const tooltip = withTooltip();
       const tip = name === 'Button' ? { tooltip: 'Rewinds the clock' } : {};
       const { handle, control } = mountControl(name, { ...tip, description: DESCRIPTION });
@@ -150,7 +151,7 @@ for (const name of ['Button', 'IconButton']) {
       const own = node.getAttribute('aria-describedby');
       keyboardFocus(node);
       await settle();
-      assert.equal(node.getAttribute('aria-describedby'), 'tooltip', 'Foundry’s, while open');
+      assert.equal(node.getAttribute('aria-describedby'), `tooltip ${own}`, 'after Foundry’s');
       node.blur();
       await settle();
       assert.ok(!tooltip.element, 'closed');
@@ -166,7 +167,7 @@ for (const name of ['Button', 'IconButton']) {
       const own = node.getAttribute('aria-describedby');
       tooltip.activate(node, { text: LABEL });
       await settle();
-      assert.equal(node.getAttribute('aria-describedby'), 'tooltip');
+      assert.equal(node.getAttribute('aria-describedby'), `tooltip ${own}`);
       tooltip.deactivate();
       await settle();
       assert.equal(node.getAttribute('aria-describedby'), own);
@@ -200,7 +201,7 @@ describe('the published Button, description beside aria-describedby and busy', (
     handle.destroy();
   });
 
-  it('restores both once the tooltip closes', async () => {
+  it('keeps both beside the open tooltip, and restores both once it closes', async () => {
     const tooltip = withTooltip();
     const { handle, control } = mountControl('Button', {
       description: DESCRIPTION,
@@ -211,10 +212,32 @@ describe('the published Button, description beside aria-describedby and busy', (
     const node = control();
     const composed = node.getAttribute('aria-describedby');
     keyboardFocus(node);
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), `tooltip ${composed}`, 'while open');
     node.click();
     await settle();
     assert.ok(!tooltip.element, 'a press closed it');
     assert.equal(node.getAttribute('aria-describedby'), composed);
+    handle.destroy();
+  });
+
+  it('writes nothing back once an update has dropped the description', async () => {
+    const tooltip = withTooltip();
+    const { handle, update, control } = mountControl('Button', {
+      description: DESCRIPTION,
+      'aria-describedby': HINT_ID,
+    });
+    await settle();
+    assert.equal(update({ 'aria-describedby': HINT_ID }), true);
+    await settle();
+    const node = control();
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID, 'the caller’s alone');
+    tooltip.activate(node, { text: LABEL });
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), 'tooltip', 'Foundry’s alone');
+    tooltip.deactivate();
+    await settle();
+    assert.ok(!node.hasAttribute('aria-describedby'), 'left for the caller to restore');
     handle.destroy();
   });
 

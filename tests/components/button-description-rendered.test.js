@@ -1,9 +1,9 @@
 /**
  * Issue 2895 — the published `Button`'s and `IconButton`'s `description`, read in Chromium's own
- * accessibility tree on the markup the seam draws, under the module sheet and a host rule that sets
- * `display` on every span in a button: the name stays the label or `ariaLabel`, the description is
- * the text, after the caller's own hint on `Button`, at rest, disabled and busy, and the hidden
- * element draws nothing and moves nothing.
+ * accessibility tree on the markup the seam draws, under the module sheet and an important host
+ * rule that sets `display` on every span in a button: the name stays the label or `ariaLabel`, the
+ * description is the text, after the caller's own hint on `Button`, at rest, disabled and busy,
+ * and the hidden element draws nothing and moves nothing.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -38,7 +38,7 @@ before(async () => {
     tmpPrefix: 'fabricate-button-description-rendered-',
     cases: CASES,
     before: `<p id="hint">${HINT}</p>`,
-    css: 'button span{display:inline-block}',
+    css: 'button span{display:inline-block !important}',
   });
 });
 
@@ -82,7 +82,7 @@ describe('the published Button’s and IconButton’s description in Chromium', 
     }
   });
 
-  it('draws nothing and moves nothing, under a host rule that sets display on its spans', async () => {
+  it('draws nothing and moves nothing, under an important host rule that sets display on its spans', async () => {
     for (const [plain, drawn] of [
       ['button-plain', 'button'],
       ['icon-plain', 'icon'],

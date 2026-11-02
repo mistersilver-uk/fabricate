@@ -16,16 +16,17 @@ export const foundryTooltips = Object.freeze({
     if (foundryTooltips.owns(element)) globalThis.game.tooltip.deactivate();
   },
   /**
-   * Writes `read()` back as `element`'s `aria-describedby` whenever it changes while no tooltip is
-   * `element`'s, because Foundry's tooltip replaces the attribute while open and removes it on
-   * close (issue 2895); returns the stop.
+   * Holds `element`'s `aria-describedby` at `read()` whenever it changes, after `tooltip` while the
+   * open tooltip is `element`'s, because Foundry's tooltip writes `tooltip` alone on open and
+   * removes the attribute on close (issue 2895); returns the stop.
    */
   holdDescribedBy(element, read) {
     const observer = new MutationObserver(() => {
       const ids = read();
-      if (!ids || foundryTooltips.owns(element)) return;
-      if (element.getAttribute('aria-describedby') !== ids) {
-        element.setAttribute('aria-describedby', ids);
+      if (!ids) return;
+      const held = foundryTooltips.owns(element) ? `tooltip ${ids}` : ids;
+      if (element.getAttribute('aria-describedby') !== held) {
+        element.setAttribute('aria-describedby', held);
       }
     });
     observer.observe(element, { attributeFilter: ['aria-describedby'] });
