@@ -1145,12 +1145,12 @@ The band adds no role and no name, so a `FillBar`, which has neither, drawn ther
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
 - **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
 
-### Requirement: A stepper's dense rung keeps every pointer target at 24px
+### Requirement: A stepper's rungs keep every pointer target at 24px
 
 `Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one.
 It MUST take a `size` that is `34`, as a number or its string, which draws the toolbar rung, level with the 34px `Field`, `Select`, `SearchField` and `SegmentedControl`: a horizontal stepper 34px tall and as wide as the default, with the default 2px padding inside its 1px edge, the input filling the 28px row as it does under `fill`, and each step button the default 22px face inside its 24 by 24 pointer target, its keyboard ring placed as at the default rung (issue 2903).
 Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; each rung outranks `density` and sets `fill`'s height, 26px or 34px, and a filled stepper with no rung stays 38px tall.
-The group keeps its one radius, 7, at every rung, as the library's stepper entry states for the filled variant.
+The group's corner is its band's: 7 at the 26, 28 and 30px groups, and 9 at the toolbar rung, filled or not, level with the 34px controls it sits beside; a filled stepper with no rung keeps 7 at 38px, as the library's stepper entry states.
 Under `fill` the input's own width MUST NOT hold its column wider than the buttons' row, so a filled stepper in a flex row or grid column narrows with the room it is given (issue 2903).
 No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
 No in-app caller passes either rung: they exist for the published `Stepper`, whose companions draw a 26px quantity stepper inside a 38px row and a stepper in a row of 34px toolbar controls.

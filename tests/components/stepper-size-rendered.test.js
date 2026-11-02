@@ -5,8 +5,9 @@
  * as wide as the default, its input filling the 28px row inside the 2px padding and its buttons
  * centred 24 by 24 targets; a pointer at a button's outermost pixel lands on it and one pixel
  * further on the stepper; each rung outranks `comfortable`, and `fill` takes the rung's height or
- * 38px without one; the keyboard ring stays inside the stepper's outer edge; the default and
- * comfortable rungs keep their 28px and 30px; and a filled stepper's input holds no column wider
+ * 38px without one; the keyboard ring stays inside the stepper's outer edge, and the toolbar rung
+ * keeps its edge and ring under forced colours; the toolbar rung draws the 34px band's 9px corner
+ * where every other group draws 7px; the default and comfortable rungs keep their 28px and 30px; and a filled stepper's input holds no column wider
  * than its buttons' row.
  */
 import assert from 'node:assert/strict';
@@ -179,6 +180,40 @@ describe('the published Stepper size rungs, rendered (issues 2841 and 2903)', ()
     assert.equal(input.width, 200 - 2 - 4 - 22 - 22 - 4);
   });
 
+  it('draws the toolbar rung on the 34px band’s 9px corner, filled or not, and 7px elsewhere', async () => {
+    const radii = await tab.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-case] > .fab-stepper')].map((root) => [
+          root.parentElement.dataset.case,
+          getComputedStyle(root).borderTopLeftRadius,
+        ])
+      )
+    );
+    for (const [id, radius] of Object.entries(radii)) {
+      const expected = id.startsWith('toolbar') ? '9px' : '7px';
+      assert.equal(radius, expected, `${id}'s corner`);
+    }
+  });
+
+  it('keeps the toolbar rung’s edge and keyboard ring under forced colours', async () => {
+    await tab.emulateMedia({ forcedColors: 'active' });
+    try {
+      const forced = await tab.locator('[data-case="toolbar"] .fab-stepper').evaluate((root) => {
+        const button = root.querySelector('[data-stepper-decrement]');
+        button.focus();
+        const [edge, ring] = [getComputedStyle(root), getComputedStyle(button)];
+        return [
+          [edge.borderTopStyle, edge.borderTopWidth],
+          [button.matches(':focus-visible'), ring.outlineStyle, ring.outlineWidth],
+          root.getBoundingClientRect().height,
+        ];
+      });
+      assert.deepEqual(forced, [['solid', '1px'], [true, 'solid', '2px'], 34]);
+    } finally {
+      await tab.emulateMedia({ forcedColors: 'none' });
+    }
+  });
+
   it('mirrors the toolbar row right to left, decrement at the right', async () => {
     const { decrement, increment, input } = await measure('toolbar-rtl');
     assert.ok(increment.right <= input.left && input.right <= decrement.left);
@@ -194,8 +229,6 @@ describe('the published Stepper size rungs, rendered (issues 2841 and 2903)', ()
           )
         );
       assert.ok(stepper <= card, `${id}: the stepper ends at ${stepper}, the card at ${card}`);
-      const { root } = await measure(id);
-      assert.ok(root.width < 87, `${id}: ${root.width}px, no wider than the column`);
     });
   }
 

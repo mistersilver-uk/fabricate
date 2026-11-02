@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks; the dense and toolbar rungs' rules (issues 2841 and 2903) override the scoped default-rung outset, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
+<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks; the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
@@ -16,7 +16,7 @@
   | `placeholder` / `fill` | string / boolean | `''` / `false` | `placeholder` shows while the input is empty and WINS over `inputProps.placeholder`; `fill` sets `width: 100%`, so it stretches correctly only inside a slot that already has an intrinsic width, is mutually exclusive with `orientation="vertical"`, and is 38px tall, or `--fab-stepper-fill-height`, unless a `size` rung sets its height. |
   | `orientation` | `'horizontal'` \| `'vertical'` | `'horizontal'` | An ORDER, not a second control: the two branches render the same three snippets in a different sequence, and draw a different pair of icons. |
   | `density` | `'default'` \| `'comfortable'` | `'default'` | `comfortable` raises EVERY target — the typeable input included — to at least 24x24 for WCAG 2.2 §2.5.8. |
-  | `size` | `26` \| `'26'` \| `34` \| `'34'` | `''` | A rung of a horizontal stepper, outranking `density` and setting `fill`'s height: the dense 26px one has no inner padding, so each 24px target is its own cell (issue 2841), and the 34px toolbar one keeps the default padding with the input filling the row, as under `fill` (issue 2903). Anything else draws the default. |
+  | `size` | `26` \| `'26'` \| `34` \| `'34'` | `''` | A rung of a horizontal stepper, outranking `density` and setting `fill`'s height: the dense 26px one has no inner padding, so each 24px target is its own cell (issue 2841), and the 34px toolbar one keeps the default padding with the input filling the row, as under `fill`, at radius 9 (issue 2903). Anything else draws the default. |
   | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
   | `formatValue` / `parseValue` | functions \| `null` | `null` | Both together opt into the FORMATTED mode below; without them the `type="number"` path and its commit-on-input are unchanged. `parseValue(text)` returns a finite number, `null` for the null endpoint, or anything else for invalid text. |
   | `format` | `'signed'` \| `'unlimited'` | `''` | A built-in formatter, the published way into the FORMATTED mode; `formatValue` and `parseValue` win where both are given, and any other value leaves the `type="number"` path. `signed` draws a leading `+` on positives; `unlimited` draws `0` as `nullLabel` and reports `0` rather than `null`. Typing `nullLabel` selects the endpoint. |
@@ -431,11 +431,13 @@
     margin: 0;
   }
 
-  /* The toolbar rung: the default padding round a 28px row the input fills, as it does under fill. */
+  /* The toolbar rung: the default padding round a 28px row the input fills, as it does under fill,
+     on the 34px band's corner. */
   .fab-stepper.is-size-34:not(.is-vertical) {
     --fab-stepper-fill-height: 34px;
     box-sizing: border-box;
     height: 34px;
+    border-radius: 9px;
   }
 
   .fab-stepper.is-size-34:not(.is-vertical):not(.is-fill) .fab-stepper-input {
