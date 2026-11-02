@@ -4,11 +4,19 @@
  * Each subject of the manager-select fixture mounts a real manager surface; every trigger on it
  * is focused, as Tab would, and measured against each ancestor whose overflow clips, at the
  * manager's two widths. The arm that fails is named, so a toolbar that grows a row, or a scroll
- * box that drops its padding, fails here and not in a GM's window.
+ * box that drops its padding, fails here and not in a GM's window. The roll prompt's scrolling
+ * body holds a full-width Select, so it is measured with its own scoped styles over the module
+ * sheet.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 /** How far the 2px ring, drawn 2px clear, reaches past the trigger. */
@@ -112,3 +120,40 @@ for (const width of WIDTHS) {
     }
   });
 }
+
+describe('the roll prompt’s Select ring', () => {
+  const repoRoot = resolve(import.meta.dirname, '../..');
+  const prompt = scopedComponentCss(
+    resolve(repoRoot, 'src/ui/svelte/apps/crafting/RollPrompt.svelte')
+  );
+  const core = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
+  const page = `<!doctype html><html><head><meta charset="utf-8"><style>${core}</style>
+<style>@layer modules {${readStylesheet()}}</style><style>${prompt.css}</style></head>
+<body class="game"><div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"
+ style="width:420px;padding:20px">
+<div class="fabricate-roll-prompt ${prompt.hashClass}"><div class="fabricate-field prompt-field mode-field">
+<span class="eyebrow">Roll mode</span><div class="fabricate-select"><button
+ class="fabricate-select-trigger fabricate-select-trigger-inline" aria-label="Roll mode">
+<span class="fabricate-select-value">Public</span></button></div></div></div></div></body></html>`;
+  let browser;
+
+  before(async () => {
+    browser = await chromium.launch();
+  });
+
+  after(async () => {
+    await browser?.close();
+  });
+
+  it('is not cut by the prompt’s own scroll box', async () => {
+    const tab = await browser.newPage({ viewport: { width: 600, height: 300 } });
+    try {
+      await tab.setContent(page, { waitUntil: 'load' });
+      await tab.locator(VISIBLE_TRIGGERS).focus();
+      const { arms } = await tab.evaluate(`(${clippedArms})(${RING_REACH})`);
+      assert.deepEqual(arms, []);
+    } finally {
+      await tab.close();
+    }
+  });
+});
