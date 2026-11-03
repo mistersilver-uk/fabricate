@@ -271,6 +271,15 @@ for (const closeOnOutsideClick of [true, false]) {
     });
 
     describe('a panel opened from inside the dialog', () => {
+      it('calls nothing for a drag between it and the page, either way (issue 2879)', async () => {
+        const calls = await open();
+        await withPanel(q('[data-plain]'), (panel) => {
+          pressPointer(panel, document.body);
+          pressPointer(document.body, panel);
+          assert.deepEqual(calls, []);
+        });
+      });
+
       it('calls nothing for a press in it or an Escape on a field in it', async () => {
         const calls = await open();
         await withPanel(q('[data-plain]'), (panel, field) => {

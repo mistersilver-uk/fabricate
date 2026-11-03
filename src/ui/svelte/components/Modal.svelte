@@ -41,7 +41,8 @@
     `Modal` mounted inside the dialog counts so too, being acquired from where it was mounted, and
     so does the scrim drawn just before it.
   - A press outside dismisses it only as the primary button's `click` fires, and only where that
-    button went down and came up outside the dialog and every panel that counts as inside it.
+    button went down and came up outside the dialog and every panel that counts as inside it;
+    `tests/components/modal-mounted.test.js` and `modal-scrim-rendered.test.js` pin it (issue 2879).
   - The dialog is drawn only while the element it was mounted in is in its document, so one in a
     slot an `update` detaches closes with it, calling nothing, and is drawn again as the slot
     returns (issue 2678).

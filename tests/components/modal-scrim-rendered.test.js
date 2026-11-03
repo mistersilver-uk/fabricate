@@ -7,8 +7,8 @@
  * stacked above, takes the pointer from the window behind, and leaves the dialog's own pixels
  * unchanged. A primary click or a tap on it closes only with `closeOnOutsideClick`, another button
  * or a drag across the dialog's edge never does, and where `onClose` closes the dialog the press's
- * `mouseup` and `click` still land on it (issue 2879); a wheel over it does not scroll a scrolling host, whose content the scrim and the dialog scroll
- * with. It is outside the accessibility tree and takes no focus; Tab reaches the dimmed controls
+ * `mouseup` and `click` still land on it (issue 2879); a wheel over it does not scroll a
+ * scrolling host, whose content the scrim and the dialog scroll with. It is outside the accessibility tree and takes no focus; Tab reaches the dimmed controls
  * without a trap and not with one. It never fades, and under forced colours it is `Canvas` at its
  * own opacity under the dialog's 1px system-text edge.
  * Limit: Chromium only; Foundry 14's own window chrome is not loaded, so a Foundry window is the
@@ -458,7 +458,7 @@ describe('a press on the Modal scrim', () => {
     });
   });
 
-  it('removes the dialog and the scrim at the click when onClose closes it, so the window behind hears neither the mouseup nor the click', async () => {
+  it('closes at the click when onClose closes it, so the window behind hears no mouseup or click', async () => {
     const result = await inFixture('&scrim=dim&busy=1&trap=1&closes=1', async (page) =>
       pressed(page, await centreOf(page, '[data-behind="Recipes"]'))
     );

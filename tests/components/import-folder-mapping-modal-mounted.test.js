@@ -348,7 +348,13 @@ describe('a panel the mapping modal opens counts as inside it (issue 2660)', () 
     const panel = openSelectPanel(root, categoryTrigger(1));
     const row = panel.querySelector('[data-popover-option="Metal"]');
     assert.ok(!dialog().contains(panel), 'the list is drawn outside the dialog');
-    press(row);
+    const { MouseEvent } = document.defaultView;
+    const fire = (type) => row.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 1 }));
+    fire('mousedown');
+    flushSync();
+    assert.ok(row.isConnected, 'the list is still open after the press goes down');
+    fire('mouseup');
+    fire('click');
     flushSync();
     assert.equal(categoryTriggerText(root, 1), 'Metal');
     assert.deepEqual(closes, [], 'onClose is not called');
