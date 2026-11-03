@@ -30,14 +30,15 @@ function companionLayer() {
  * @param {HTMLElement} scroller The element the region is appended to.
  * @param {HTMLElement} mountPoint The `target` the dialog is mounted into, moved into the region.
  * @param {string} kind A key of `REGION_STYLES`.
+ * @param {string} [width] The region's CSS width.
  * @returns {HTMLElement} The region, which is the chain's `overlayHost`.
  */
-export function hostInRegion(scroller, mountPoint, kind) {
+export function hostInRegion(scroller, mountPoint, kind, width = '700px') {
   const region = document.createElement('div');
   region.dataset.region = kind;
   Object.assign(region.style, {
     position: 'relative',
-    width: '700px',
+    width,
     height: '360px',
     border: '1px solid currentColor',
     ...REGION_STYLES[kind],
