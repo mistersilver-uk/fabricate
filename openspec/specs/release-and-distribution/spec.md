@@ -88,6 +88,8 @@ The route depends on what is soaking, and both routes satisfy that obligation.
 When a version carrying features is soaking, the hotfix MUST be built from a hotfix line cut from the public version's tag, and MUST carry nothing beyond the fix and the commits already public, because promoting the soak would ship those features.
 When the soaking version is a patch, it carries only fixes and performance changes by construction, so it is promoted first and a further hotfix is cut on top if one is still needed; what reaches `public` this way contains no unreleased feature work.
 A hotfix line MUST NOT be used against a soaking patch, because the version it would compute already exists on a different commit and has already been distributed; the attempt MUST be refused before any tag is minted.
+When nothing is soaking, the release line still equals the public version and carries nothing beyond it, so the fix MUST be landed on the release line through a reviewed change and traverse `early-access` like any other stable version.
+A hotfix line MUST NOT be cut while the release line still equals the public version it would be cut from, because no version remains that the hotfix line may mint; the attempt MUST be refused before the line is cut.
 A hotfix line MUST accept fixes only; a change that would raise the minor or major version MUST fail rather than be released from it.
 A hotfix MUST NOT be published to any channel whose head is a version Foundry considers newer than it, because that would move the head backwards.
 A hotfix MUST NOT raise the module's declared minimum Foundry version, because Foundry refuses to install a package whose minimum exceeds the running core version, stranding exactly the users the hotfix is for.
@@ -106,6 +108,12 @@ The release line and the prerelease line MUST NOT be merged into a hotfix line.
 
 - **WHEN** a fix must reach the current public version while a patch version is soaking
 - **THEN** the soaking patch is promoted first (it carries no unreleased feature), and no hotfix line is cut, because the version it would compute already exists
+
+#### Scenario: hotfixing while nothing is soaking
+
+- **WHEN** a fix must reach the current public version while the release line still equals that version
+- **THEN** the fix is landed on the release line through a reviewed change and reaches `public` through `early-access`
+- **AND** cutting a hotfix line from the public version is refused before the line is cut, because the line could mint no version
 
 #### Scenario: a hotfix that would raise the declared minimum Foundry version
 

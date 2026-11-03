@@ -100,6 +100,8 @@ Which route you take depends on what is currently soaking in early access.
 
 - If a version **carrying features** is soaking, promoting it early would ship those features, so the hotfix is cut on its own line from the public tag, carries only the fix, and goes straight to public through its own channel — the soaking version and any unreleased `main` work stay behind.
 - If a **patch** is soaking, it carries only fixes by construction, so you promote it first and cut a further hotfix on top only if one is still needed.
+- If **nothing** is soaking, the release line still sits on the public tag and carries nothing beyond it, so the fix lands on `release` through a reviewed pull request and ships through early access like any other stable version.
+A hotfix line cut then could never mint, because semantic-release caps it below the release line's next version.
 
 A hotfix line accepts fixes only, is never offered to the private cohorts (its own channel keeps no cohort), and is brought back into the release line and then `main` so neither loses the fix.
 That bring-back into `release` must itself be a reviewed pull request based on `release`, because the forward-port that carries it onward has no other evidence of its provenance and will otherwise refuse it.
@@ -1039,11 +1041,15 @@ The route depends on what is currently soaking in early access (the **Hotfix iso
 A soaking **minor or major** carries features, so promoting it would ship them — cut a **hotfix line** from the public tag instead (route 1).
 A soaking **patch** carries only `fix`/`perf` commits by construction, so promoting it leaks no feature work — **promote the soak first** (route 2), then cut a hotfix on top only if one is still needed.
 The trade when you promote the soak is that you ship a patch that has **not completed its soak**: it leaks no *feature* work, but it forgoes *soak time* — choose it knowingly.
+When **nothing** is soaking, `release` still points at the public tag, so land the fix on `release` through a reviewed pull request (route 3).
+It mints the next patch there and ships through early access, then the release promotion moves it to public.
+Do not cut a hotfix line in this case: semantic-release caps a hotfix line below the release line's next version, so with `release` on the base tag its range is empty and it fails with `EINVALIDNEXTVERSION`.
 
 **Pre-flight.**
-Before cutting a hotfix line, run `git ls-remote --tags origin | node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
-It computes the next patch tag and **refuses** when that tag already appears in the piped remote-tag listing — a signal that a patch is soaking, so route 2 applies.
-The tool never runs `git` itself; you pipe the tag listing in, and an empty or malformed listing is treated as unverifiable and refused.
+Before cutting a hotfix line, run `git ls-remote --tags --heads origin | node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
+It computes the next patch tag and **refuses** when that tag already appears in the piped listing — a signal that a patch is soaking, so route 2 applies.
+It also **refuses** when `refs/heads/release` points at the base tag's commit — nothing is soaking, so route 3 applies.
+The tool never runs `git` itself; you pipe the listing in, and an empty or malformed listing, or one carrying no `refs/heads/release` or no base tag, is treated as unverifiable and refused.
 This is defense-in-depth: semantic-release also refuses the collision (`EINVALIDNEXTVERSION`), but the pre-flight refuses earlier, before the branch is cut, and more legibly.
 
 **Route 1 — cut a hotfix line.**

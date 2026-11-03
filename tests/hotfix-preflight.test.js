@@ -3,10 +3,19 @@ import test from 'node:test';
 
 import { hotfixPreflight, nextPatchTag, run } from '../scripts/lib/hotfixPreflight.js';
 
-// Build a realistic `git ls-remote --tags origin` listing from a set of tags: each line is
-// `<object-id>\trefs/tags/<tag>`, exactly what the piped command emits.
+const TAG_COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const MOVED_RELEASE = 'fedcba9876543210fedcba9876543210fedcba98';
+
+/** One `git ls-remote` line: `<object-id>\t<ref>`, exactly what the piped command emits. */
+const refLine = (objectId, ref) => `${objectId}\t${ref}`;
+
+// A realistic `git ls-remote --tags --heads origin` listing: every tag on one commit, and the
+// release line moved past it, which is the shape a hotfix line can mint from.
 const lsRemote = (...tags) =>
-  `${tags.map((tag) => `0123456789abcdef0123456789abcdef01234567\trefs/tags/${tag}`).join('\n')}\n`;
+  `${[
+    ...tags.map((tag) => refLine(TAG_COMMIT, `refs/tags/${tag}`)),
+    refLine(MOVED_RELEASE, 'refs/heads/release'),
+  ].join('\n')}\n`;
 const silentIo = { log() {}, error() {} };
 
 test('nextPatchTag computes the next patch of a public tag', () => {
@@ -44,13 +53,53 @@ test('hotfixPreflight passes when the computed patch tag is absent from stdin', 
 test('hotfixPreflight matches the WHOLE ref, so a longer superstring never counts', () => {
   // A soaking v1.5.10 must not satisfy a lookup for v1.5.1 — the match keys on the full
   // `refs/tags/<tag>` boundary, not a substring of the ref line.
-  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.10')).ok, true);
+  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.0', 'v1.5.10')).ok, true);
 });
 
 test('hotfixPreflight also matches an annotated tag deref (^{}) ref', () => {
   const result = hotfixPreflight('v1.5.0', lsRemote('v1.5.1', 'v1.5.1^{}'));
   assert.equal(result.ok, false);
   assert.equal(result.code, 1);
+});
+
+test('hotfixPreflight refuses while the release line still sits on the base tag', () => {
+  const listing = `${[
+    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
+    refLine(TAG_COMMIT, 'refs/heads/release'),
+  ].join('\n')}\n`;
+  const result = hotfixPreflight('v1.5.0', listing);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 1);
+  assert.equal(result.nextTag, 'v1.5.1');
+  assert.match(result.message, /release line still sits on v1\.5\.0/);
+  assert.match(result.message, /reviewed pull request/);
+});
+
+test('hotfixPreflight reads an annotated base tag through its ^{} deref, not the tag object', () => {
+  const tagObject = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const listing = `${[
+    refLine(tagObject, 'refs/tags/v1.5.0'),
+    refLine(TAG_COMMIT, 'refs/tags/v1.5.0^{}'),
+    refLine(TAG_COMMIT, 'refs/heads/release'),
+  ].join('\n')}\n`;
+  assert.equal(hotfixPreflight('v1.5.0', listing).ok, false);
+});
+
+test('hotfixPreflight fails closed when the listing carries no release head (tags only)', () => {
+  const tagsOnly = `${refLine(TAG_COMMIT, 'refs/tags/v1.5.0')}\n`;
+  assert.throws(() => hotfixPreflight('v1.5.0', tagsOnly), /refs\/heads\/release.*unverifiable/s);
+});
+
+test('hotfixPreflight fails closed when the base tag is not on origin', () => {
+  assert.throws(() => hotfixPreflight('v1.5.0', lsRemote('v1.4.0')), /not on origin/);
+});
+
+test('run exits 1 while the release line still sits on the base tag', () => {
+  const listing = `${[
+    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
+    refLine(TAG_COMMIT, 'refs/heads/release'),
+  ].join('\n')}\n`;
+  assert.equal(run(['v1.5.0'], listing, silentIo), 1);
 });
 
 test('hotfixPreflight fails closed on empty stdin — the unfiltered listing is never empty', () => {
