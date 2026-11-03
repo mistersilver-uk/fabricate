@@ -3710,8 +3710,12 @@ Build it by inserting the label string itself, as `format('{label}, chosen by {n
 Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
 `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
 It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
-It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
-A `title` that is not a string, or is white space alone, draws no tooltip.
+Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
+A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
+Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
+A Fabricate that predates the description gives the hint to the pointer only.
+A `title` that is not a string, or is white space alone, draws no tooltip and no description.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
 `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -5339,7 +5343,7 @@ A published component draws a control only where its section says so, and each c
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each section states.
   The name a `ListRow` button holds carries its own text as a native `title`, and so does each `TintSwatches` swatch its name, as each section states.
-  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
+  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, and as the radio's accessible description, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

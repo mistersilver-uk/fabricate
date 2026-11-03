@@ -804,7 +804,7 @@ Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fa
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each group states.
   The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so do the name a `ListRow` button holds and each `TintSwatches` swatch.
-  A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its group states.
+  A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, and as the radio's accessible description, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1859,8 +1859,12 @@ Each group states the accepted values of every key that entry publishes.
     Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
     `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
     It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
-    It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
-    A `title` that is not a string, or is white space alone, draws no tooltip.
+    Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
+    A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+    Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
+    Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
+    A Fabricate that predates the description gives the hint to the pointer only.
+    A `title` that is not a string, or is white space alone, draws no tooltip and no description.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
     `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -3061,7 +3065,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `SegmentedControl` with `options`, `value`, `ariaLabel` and `onChange` inside a Fabricate window and the user presses ArrowRight on the checked radio
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
-- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and not as its radio's name
+- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and as its radio's accessible description, and not as its radio's name
 - **AND** a mount that passes `surface: 'panel'` fills the track with `--fab-bg-0`, one that passes `size: 34` draws a 34px track, and an option whose `ariaLabel` contains its `label` names its radio, while one whose `ariaLabel` does not throws M22
 - **AND** a mount that passes `groupName` throws M13
 - **AND** a mount that omits `ariaLabel` throws M9
