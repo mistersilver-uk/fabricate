@@ -1526,7 +1526,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <input id="spec-step-22" aria-label="Quantity, toolbar rung" value="2" readonly>
           <button><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg></button>
         </div>
-        <span class="k-hint">level with a 34px field, select or segmented control; its input fills the 28px row, issue 2903</span>
+        <span class="k-hint">level with a 34px field, select or segmented control; its input fills the 28px row</span>
       </div>
       <div class="unit">
         <span class="cap">vertical · in a 48px slot</span>
@@ -1618,7 +1618,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>orientation</b> horizontal | vertical</li>
           <li><b>density</b> default | comfortable</li>
           <li><b>size</b> 26 | '26' | 34 | '34' — a rung, which outranks <code>density</code> and sets <code>fill</code>&rsquo;s height; a filled stepper with no rung stays 38px.
-            26 is the dense rung, whose rings straddle each part&rsquo;s edge by 1px (issue 2841); 34 is the toolbar rung at radius 9, level with the 34px <code>Field</code>, <code>Select</code>, <code>SearchField</code> and <code>SegmentedControl</code>, with the default rung&rsquo;s rings (issue 2903).
+            26 is the dense rung, whose rings straddle each part&rsquo;s edge by 1px; 34 is the toolbar rung at radius 9, level with the 34px <code>Field</code>, <code>Select</code>, <code>SearchField</code> and <code>SegmentedControl</code>, with the default rung&rsquo;s rings.
             No rung is published below 26, because a step button there would fall under its 24&times;24 target.
             Any other value draws the default.
             No in-app caller passes either.</li>
@@ -1636,8 +1636,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       A click-only stepper is a documented keyboard regression, which is why the shipped component states the rule in its own docblock.
       The API above is the shipped prop set.
       <code>allowUnset</code> carries the semantics that clearing commits <code>null</code> and that adjuncts step from <code>min ?? 0</code>, and the three aria names are derived by a shared helper because 23 call sites drifted when they were not.
-      Its filled variant defaults to 38px, the form rung, and a caller sizes it through <code>--fab-stepper-fill-height</code> at a ladder rung, or a published caller through a <code>size</code> rung, whose height the filled variant takes; its input&rsquo;s own width holds no column wider than the two adjuncts, so a filled stepper narrows with its column (issue 2903).
-      The group&rsquo;s corner is this entry&rsquo;s radius 7, the ladder&rsquo;s value for its 28px default group; the filled variant keeps the same 7 rather than its height&rsquo;s band, because this entry states one radius for its default group; the toolbar rung, a published group sized to sit beside 34px controls, takes its band&rsquo;s 9 instead, filled or not (issue 2903).
+      Its filled variant defaults to 38px, the form rung, and a caller sizes it through <code>--fab-stepper-fill-height</code> at a ladder rung, or a published caller through a <code>size</code> rung, whose height the filled variant takes; its input&rsquo;s own width holds no column wider than the two adjuncts, so a filled stepper narrows with its column.
+      The group&rsquo;s corner is this entry&rsquo;s radius 7, the ladder&rsquo;s value for its 28px default group; the filled variant keeps the same 7 rather than its height&rsquo;s band, because this entry states one radius for its default group; the toolbar rung, a published group sized to sit beside 34px controls, takes its band&rsquo;s 9 instead, filled or not.
       The kit draws this entry&rsquo;s written geometry, and the shipped value, glyph and disabled opacity match it.<span class="cite"><b>Stepper.svelte</b> · <b>stepperLabels.js</b></span></div>
   </div>
 
