@@ -2799,6 +2799,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>hit area</b> 24&times;24 around a painted 20&times;20 · radius 6</li>
           <li><b>on</b> accent fill, on-accent glyph</li>
           <li><b>indeterminate</b> a bar, not a tick</li>
+          <li><b>success</b> tone: a ticked box fills <code>--fab-success</code> inside a <code>--fab-success-strong</code> edge, its tick <code>--fab-on-success</code>; mixed and empty keep the default face</li>
           <li>Core draws both boxes from pseudo-elements: <code>appearance:none</code> <b>and</b> <code>display:none</code> on <code>::before</code>/<code>::after</code></li>
         </ul>
       </div>
@@ -2807,7 +2808,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>SelectionCheckbox.svelte</code>&rsquo;s <code>$props()</code>.</li>
           <li><b>checked</b> — <b>NOT bindable</b>: every call site owns its own state · <b>indeterminate</b>, applied as a DOM property through an effect · <b>disabled</b></li>
-          <li><b>onChange</b>(checked) <span class="req">required</span> · <b>ariaLabel</b> <span class="req">required</span> — neither in the decorative form</li>
+          <li><b>onChange</b>(checked) <span class="req">required</span>, except in the decorative form · <b>ariaLabel</b> optional, naming the input in place of the label</li>
           <li><b>tone</b> default | success — <code>success</code> fills a ticked box <code>--fab-success</code> inside a <code>--fab-success-strong</code> edge, its tick <code>--fab-on-success</code> (issue 2881)</li>
           <li><b>density</b> compact 16/r6 | default 20/r6 | comfortable 22/r6 — each DECLARED, none derived from another</li>
           <li><b>wrapper</b> label | contents — <code>contents</code> is for a host whose own root is a <code>&lt;label&gt;</code>, since nesting labels is invalid HTML</li>

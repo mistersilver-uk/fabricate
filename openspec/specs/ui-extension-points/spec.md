@@ -421,7 +421,7 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
 `waivedBy` lists other `data` keys of the same entry, none `required`, on a `required` `text` or `data` key, which may then be absent or `''` while every key it lists holds a non-blank string (M9), as `Chip`'s `children` lists `icon` and `ariaLabel`; `describe` does not state it and still reports the key `required`, and giving an existing key `waivedBy` is a widening.
-`waivedWhen` names another `data` key of the same entry, neither `required` nor `requiredWhen`, on a `required` `text`, `data` or `callback` key, which may then be absent or `''` while that key holds exactly `true` (M9, issue 2881), as `SelectionCheckbox`'s `label` and `onChange` name `decorative`; registration refuses any other `waivedWhen` with `<name> "<key>" has an unknown waivedWhen "<value>"`, `describe` does not state it and still reports the key `required`, and giving an existing key `waivedWhen` is a widening.
+`waivedWhen` names another `data` key of the same entry, neither `required` nor `requiredWhen`, on a `required` `text`, `data` or `callback` key, which may then be absent, or `''` where it is not a `callback`, while that key holds exactly `true` (M9, issue 2881), as `SelectionCheckbox`'s `label` and `onChange` name `decorative`; registration refuses any other `waivedWhen` with `<name> "<key>" has an unknown waivedWhen "<value>"`, `describe` does not state it and still reports the key `required`, and giving an existing key `waivedWhen` is a widening.
 `contains` names a `text` key, or a `required` `data` key, of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22); `describe` does not state it, and giving an existing key `contains` is a narrowing.
 `itemContains` pairs member names of a `data` key's array items as `{ <member>: <other member> }`, each item's non-blank string `<member>` having to contain the words of its `<other member>`, a string or a number held as its digits, as one whole run (M22), as `SegmentedControl`'s `options` pairs `ariaLabel` with `label`; `describe` does not state it, and giving an existing key `itemContains` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
@@ -2270,7 +2270,7 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`SelectionCheckbox`.**
   - It is the design system's checkbox (`<Checkbox>` in the library): a native `<input type="checkbox">`, visually hidden, inside a `<label>` that draws a square box beside the companion's label, for one choice that is ticked or not.
-    A pointer press anywhere on the box or the label presses the input, and the input is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('input')` reaches it.
+    A pointer press anywhere on the box or the label presses the input, and in the labelled form the input is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('input')` reaches it; the decorative form draws no focusable element.
     An `update` keeps the same input, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
   - The input is named by `label`, the text its wrapping `<label>` draws, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).
   - `label` is required final display text, drawn after the box and wrapping beside it, the box on its first line; it may be absent or `''` beside a non-blank `ariaLabel`, which waives it, and white space alone beside a non-blank `ariaLabel` draws as absent.
@@ -2284,6 +2284,7 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate coerces nothing, so only `true` and `false` are in the contract: another truthy value, the string `'false'` among them, draws the box ticked, `0` and `null` draw it empty, and an absent or `''` `checked` is refused (M9).
   - `indeterminate` is `true` or `false`, and `false` when absent: `true` draws the box edged in the accent on its soft fill with a dash in place of the tick, whatever `checked` is, and states the input mixed.
     Any value but `true`, the string `'true'` among them, draws the box by `checked` alone.
+    A mixed box is passed as `checked: false` with `indeterminate: true`: mixed means some of the things the box stands for are ticked, so a press asks for `true`.
   - `disabled` is `true` or `false`, and `false` when absent: `true` disables the input, draws the box at half opacity and the label in the muted ink, and the box keeps its tick, dash or empty face, so the state stays readable.
     A disabled input takes no focus, is left out of the tab order and reports nothing, so the companion says why in text beside it; another truthy value disables it too, as only `true` and `false` are in the contract.
     A disabled box is drawn at half opacity, its edge, fill and glyph together, beside the `not-allowed` cursor, so it reads as unavailable while its face stays legible; WCAG 2.2 §1.4.11 asks no contrast of an inactive control, and the figures below are the enabled box's.
@@ -2306,6 +2307,8 @@ Each group states the accepted values of every key that entry publishes.
     Only `true` draws it: any other value, the string `'true'` and `1` among them, draws the labelled box and needs its name and `onChange` (M9).
     Beside `decorative: true`, `checked`, `indeterminate`, `density` and `tone` draw the box as they draw the labelled one, and `checked` is still required; `label`, `ariaLabel`, `disabled`, `onChange`, `aria-describedby` and the rest `data-*` attributes are checked as on the labelled box, then drawn nowhere, and `onChange` is never called.
     The box is not a pointer target and reports no press, so the press, the focus, the name, the state, the disabled state and its dimming are the companion row's, and the companion keeps the box's `checked` equal to the state its row states.
+    The box draws no hover or press feedback of its own, so the companion's row draws it.
+    The companion strikes through its row's text, not the row: `text-decoration` on the row reaches the box's tick, and the line crosses it.
     Chromium's tree shows the row's button with its name and pressed state and no node of the box, inside a `<button aria-pressed>` row.
     In a target with no Fabricate root the seam draws the box under the standalone style root, a `<div>` drawn as `display: contents`, so a `<span>` target inside the companion's `<button>` holds that `<div>`, which the HTML content model does not allow there though the browser draws it; a companion mounts where a Fabricate root is above `target` to avoid it.
     An `update` may move a box between the decorative and the labelled form; the labelled form's input is then a new element, so the companion moves focus first where it matters.
@@ -2625,7 +2628,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string, or states `waivedWhen` and the key that names holds `true`. Or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy. With several, the first key in manifest order. Where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
+| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string, or states `waivedWhen` and the key that names holds `true` (a `callback` key's `''` is still refused as not a function). Or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy. With several, the first key in manifest order. Where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
@@ -2842,6 +2845,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onChange` once, with `true`, and the input and the box still show the box empty
 - **AND** after an `update` that passes `checked: true` the same input is checked, keeps focus, and the box draws its tick
 - **AND** a mount that passes neither `label` nor `ariaLabel` throws M9, and one whose `ariaLabel` does not hold the label's words throws M22
+
+#### Scenario: A published decorative selection checkbox in the success tone
+
+- **WHEN** a companion mounts `SelectionCheckbox` with `checked: true`, `decorative: true` and `tone: 'success'`, and no `label`, `ariaLabel` or `onChange`, into a target inside its own `<button aria-pressed="true">` row
+- **THEN** the mount is accepted and draws the box alone, `aria-hidden="true"`, with no `<label>`, no input and nothing focusable, filled with `--fab-success` inside a `--fab-success-strong` edge and its tick in `--fab-on-success`
+- **AND** the accessibility tree shows the row's button with its own name and pressed state and no node of the box
+- **AND** a mount with `decorative: 'true'` and no `label` or `onChange` throws M9, and a Fabricate that predates issue 2881 refuses `decorative` with M13
 
 #### Scenario: A published stepper
 

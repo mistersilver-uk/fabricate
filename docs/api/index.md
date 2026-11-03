@@ -4373,7 +4373,7 @@ const card = fabUi.mount('ToggleCard', { target, props: props() });
 ### SelectionCheckbox
 
 `SelectionCheckbox` draws the design system's checkbox: a native `<input type="checkbox">`, visually hidden, inside a `<label>` that draws a square box beside your label, for one choice that is ticked or not.
-A pointer press anywhere on the box or the label presses the input, and the input is the only focusable element Fabricate draws in `target`, inside the [standalone style root](#standalone-style-root) in a target with no Fabricate root, so `target.querySelector('input')` reaches it.
+A pointer press anywhere on the box or the label presses the input, and in the labelled form the input is the only focusable element Fabricate draws in `target`, inside the [standalone style root](#standalone-style-root) in a target with no Fabricate root, so `target.querySelector('input')` reaches it; the decorative form draws no focusable element.
 An `update` keeps the same input, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first.
 The input is named by `label`, the text its wrapping `<label>` draws, or, where you pass it, by `ariaLabel`, which must then hold that text.
 `label` is required final display text, drawn after the box and wrapping beside it, the box on its first line; it may be absent or `''` beside a non-blank `ariaLabel`, which waives it, and white space alone beside a non-blank `ariaLabel` draws as absent.
@@ -4387,6 +4387,7 @@ A blank `ariaLabel` names nothing, so the name is the label's.
 Fabricate coerces nothing, so only `true` and `false` are in the contract: another truthy value, the string `'false'` among them, draws the box ticked, `0` and `null` draw it empty, and an absent or `''` `checked` is refused with `SelectionCheckbox requires a non-empty "checked"`.
 `indeterminate` is `true` or `false`, and `false` when absent: `true` draws the box edged in the accent on its soft fill with a dash in place of the tick, whatever `checked` is, and states the input mixed.
 Any value but `true`, the string `'true'` among them, draws the box by `checked` alone.
+A mixed box is passed as `checked: false` with `indeterminate: true`: mixed means some of the things the box stands for are ticked, so a press asks for `true`.
 `disabled` is `true` or `false`, and `false` when absent: `true` disables the input, draws the box at half opacity and the label in the muted ink, and the box keeps its tick, dash or empty face, so the state stays readable.
 A disabled input takes no focus, is left out of the tab order and reports nothing, so say why in text beside it; another truthy value disables it too, as only `true` and `false` are in the contract.
 A disabled box is drawn at half opacity, its edge, fill and glyph together, beside the `not-allowed` cursor, so it reads as unavailable while its face stays legible; WCAG 2.2 §1.4.11 asks no contrast of an inactive control, and the figures below are the enabled box's.
@@ -4409,6 +4410,8 @@ The box therefore opens no tooltip, so put what ticking it does in text beside i
 Only `true` draws it: any other value, the string `'true'` and `1` among them, draws the labelled box and needs its name and `onChange`.
 Beside `decorative: true`, `checked`, `indeterminate`, `density` and `tone` draw the box as they draw the labelled one, and `checked` is still required; `label`, `ariaLabel`, `disabled`, `onChange`, `aria-describedby` and the rest `data-*` attributes are checked as on the labelled box, then drawn nowhere, and `onChange` is never called.
 The box is not a pointer target and reports no press, so the press, the focus, the name, the state, the disabled state and its dimming are your row's, and you keep the box's `checked` equal to the state your row states.
+The box draws no hover or press feedback of its own, so your row draws it.
+Strike through your row's text, not the row: `text-decoration` on the row reaches the box's tick, and the line crosses it.
 Chromium's tree shows your row's button with its name and pressed state and no node of the box, inside a `<button aria-pressed>` row.
 The seam draws the box under the [standalone style root](#standalone-style-root), a `<div>` drawn as `display: contents`, in a target with no Fabricate root, so a `<span>` target inside your `<button>` holds that `<div>`, which the HTML content model does not allow there though the browser draws it; mount where a Fabricate root is above `target` to avoid it.
 An `update` may move a box between the decorative and the labelled form; the labelled form's input is then a new element, so move focus first where it matters.
@@ -4910,7 +4913,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 A required prop that its component's section lets be empty while other props hold text, as `Chip`'s `children` beside `icon` and `ariaLabel`, is refused with `<name> requires a non-blank "<other>" when "<key>" is empty` while only some of them do, naming the first that does not.
-A required prop that its component's section lets be empty while another prop is `true`, as `SelectionCheckbox`'s `label` and `onChange` beside `decorative: true`, is not refused as empty while that prop is exactly `true`, and is refused as any required prop is otherwise; `describe` still reports it `required`.
+A required prop that its component's section lets be empty while another prop is `true`, as `SelectionCheckbox`'s `label` and `onChange` beside `decorative: true`, may be absent, or `''` where it is not a callback prop, while that prop is exactly `true`, and is refused as any required prop is otherwise; `describe` still reports it `required`.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 Fill a content slot by mounting a component of your own into its element, or by appending an element you own.

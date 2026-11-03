@@ -462,8 +462,8 @@ describe('the published SelectionCheckbox’s decorative form (issue 2881)', () 
     for (const name of ['aria-label', 'aria-describedby', 'data-row', 'disabled']) {
       assert.ok(!target.querySelector(`[${name}]`), `${name} is drawn nowhere`);
     }
-    box().click();
-    assert.deepEqual(change.calls, [], 'a press on the box reports nothing');
+    assert.equal(target.querySelector('input'), null, 'no input to press');
+    assert.deepEqual(change.calls, [], 'mount calls no onChange');
     handle.destroy();
   });
 

@@ -151,7 +151,10 @@ describe('the decorative box inside a companion’s pressable row', () => {
         'no checkbox, image or generic node of the box'
       );
       // Chromium prunes a hidden node inside a button's subtree, or keeps it ignored.
-      const box = await chromiumAxNode(tab, boxOf(id)).catch(() => ({ ignored: true }));
+      const box = await chromiumAxNode(tab, boxOf(id)).catch((error) => {
+        if (error.message.startsWith('no accessibility node for ')) return { ignored: true };
+        throw error;
+      });
       assert.equal(box.ignored, true, 'the box is hidden from the tree');
     });
   }
