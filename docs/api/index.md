@@ -2077,7 +2077,7 @@ The published components, in publication order:
 | `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `icon`, `size`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `scrim`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback), `aside` (slot), `leading` (slot), `badges` (slot), `meta` (slot), `trailing` (slot), `markSize`, `density`, `layout`, `truncateName`, `detailAlign`, `current`, `busy` | yes |
 | `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
-| `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria) | yes |
+| `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria), `decorative`, `tone` | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
 | `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
 | `Popover` | 1 | `any` | `open`, `anchorId` (required), `placement`, `title` (text, required), `ariaLabel`, `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot) | no |
@@ -4377,6 +4377,7 @@ A pointer press anywhere on the box or the label presses the input, and the inpu
 An `update` keeps the same input, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first.
 The input is named by `label`, the text its wrapping `<label>` draws, or, where you pass it, by `ariaLabel`, which must then hold that text.
 `label` is required final display text, drawn after the box and wrapping beside it, the box on its first line; it may be absent or `''` beside a non-blank `ariaLabel`, which waives it, and white space alone beside a non-blank `ariaLabel` draws as absent.
+It may also be absent or `''` beside `decorative: true`, which draws no label.
 Without either, `mount` refuses with `SelectionCheckbox requires a non-empty "label"`.
 A `label` of white space alone beside no `ariaLabel` leaves the input with no name, so never pass one.
 `ariaLabel` is optional final display text naming the input in place of `label`; beside a non-blank `label` it must contain the label's words as one run of whole words, or `mount` and `update` throw `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`, and beside no `label` it is the box's only name and the box draws alone.
@@ -4391,7 +4392,11 @@ A disabled input takes no focus, is left out of the tab order and reports nothin
 A disabled box is drawn at half opacity, its edge, fill and glyph together, beside the `not-allowed` cursor, so it reads as unavailable while its face stays legible; WCAG 2.2 §1.4.11 asks no contrast of an inactive control, and the figures below are the enabled box's.
 `density` is `compact`, `default` or `comfortable`, and `default` when absent: a 16, 20 or 22px box beside a label set on 16px lines, 18px beside the 22px box, its first line centred on the box; a value outside the set draws `default`.
 The compact box draws no fill, so its edge and empty face sit on the ground beneath it; the default and comfortable boxes fill `--fab-bg-0`.
+`tone` is `default` or `success`, and `default` when absent: `success` draws a ticked box that is not mixed filled with `--fab-success` inside a `--fab-success-strong` edge, its tick in `--fab-on-success`, at every density and on the labelled and the decorative box alike, for a row that is done; a value outside the set draws `default`, the accent.
+A `success` box that is empty or mixed draws as a `default` one, so a mixed box keeps its accent dash, and the tick, not the colour, says the box is ticked; under forced colours a ticked `success` box fills with `Highlight` as a `default` one does.
+Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the `success` edge clears 3:1, 3.94:1 at the least, and its tick clears 3:1 on its fill, 4.79:1 at the least; the edge is the strong step because `--fab-success` itself falls to 2.69:1 on `--fab-bg-2` in the `foundry-native` palette.
 `onChange` is a required callback, called with one argument, `true` or `false`, the state a press asks for: the opposite of the `checked` last passed, so a press on a mixed box whose `checked` is `false` asks for `true`.
+It may be absent beside `decorative: true`, which never calls it.
 It is called once for each press, by pointer on the box or the label or by Space on the focused input, and not by `mount`, `update` or `destroy`.
 The box changes nothing itself: the input and the box keep the `checked` and `indeterminate` you last passed until your `update` passes new ones, which may be after the press returns, so to refuse the change pass them unchanged and say why in text of your own.
 Until your `update` lands, assistive technology hears the old state, so update inside `onChange`, optimistically, and roll the update back if your own write fails.
@@ -4400,6 +4405,13 @@ Pass the id of one element of yours, or several ids separated by spaces, holding
 Each id exists in the tree that holds `target` while the box is shown, and the element it names, which may be beside `target` and need not be inside it, is not `hidden`; an id that does not exist is skipped and the others are still read.
 Rest `data-*` attributes land on the input itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on SelectionCheckbox`.
 The box therefore opens no tooltip, so put what ticking it does in text beside it, tied to it with `aria-describedby`.
+`decorative` is `true` or `false`, and `false` when absent: `true` draws the box alone, `aria-hidden="true"`, with no `<label>`, no input and nothing focusable, for a row of yours that is itself the control, as a `<button type="button" aria-pressed>` whose own text names it and whose `aria-pressed` states what the box shows.
+Only `true` draws it: any other value, the string `'true'` and `1` among them, draws the labelled box and needs its name and `onChange`.
+Beside `decorative: true`, `checked`, `indeterminate`, `density` and `tone` draw the box as they draw the labelled one, and `checked` is still required; `label`, `ariaLabel`, `disabled`, `onChange`, `aria-describedby` and the rest `data-*` attributes are checked as on the labelled box, then drawn nowhere, and `onChange` is never called.
+The box is not a pointer target and reports no press, so the press, the focus, the name, the state, the disabled state and its dimming are your row's, and you keep the box's `checked` equal to the state your row states.
+Chromium's tree shows your row's button with its name and pressed state and no node of the box, inside a `<button aria-pressed>` row.
+The seam draws the box under the [standalone style root](#standalone-style-root), a `<div>` drawn as `display: contents`, in a target with no Fabricate root, so a `<span>` target inside your `<button>` holds that `<div>`, which the HTML content model does not allow there though the browser draws it; mount where a Fabricate root is above `target` to avoid it.
+An `update` may move a box between the decorative and the labelled form; the labelled form's input is then a new element, so move focus first where it matters.
 The `<label>` is the pointer target, at least 24px tall around the box and as wide as the box and its label; around the 16 and 20px boxes it reaches 4px and 2px past the box above and below, and on every side of a box drawn with no label, and it is drawn above in-flow neighbours, so keep 4px clear of any other control around a compact box and 2px around a default one, horizontally as well as vertically, or the target takes the pointer where it overlaps them.
 The target lies over the label text, so a drag across the label selects none of it.
 The keyboard ring is the accent, 2px wide and 2px clear of the box, drawn on the box around its visually hidden input whether or not a Fabricate root is above `target`, so it reaches 4px beyond the box on every side; leave that much inside any edge of yours that clips.
@@ -4417,7 +4429,8 @@ A press through the seam is measured in happy-dom and by one View Lab step, not 
 A box is drawn the same in the Manager, the player window and, under the standalone style root, your own window or dialog, and it is no wider than `target`.
 Its label and empty edge are inks of the dark scheme the standalone style root states, so on Foundry's light theme paint `--fab-bg-1` on `target`; that shortfall is inferred from those inks, not measured.
 A Fabricate that predates it does not list `SelectionCheckbox` in `components`, `describe` answers `null` for it, and `mount` refuses it with `"SelectionCheckbox" is not published`, so draw your own control there.
-Its gap, corner and type figures, its colours beyond what this section states, its `wrapper`, `decorative` and `input` props, and the hooks Fabricate's own callers use are private.
+A Fabricate that predates [issue #2881](https://github.com/mistersilver-uk/fabricate/issues/2881) refuses `decorative` and `tone` with `"decorative" is not a data attribute` and `"tone" is not a data attribute`, and its `describe` lists neither, so read `describe('SelectionCheckbox').props.decorative` first and draw your own box where it is absent.
+Its gap, corner and type figures, its colours beyond what this section states, its `wrapper` and `input` props, and the hooks Fabricate's own callers use are private.
 
 A worked box follows: a flag of your own, named by the label it draws.
 
@@ -4440,6 +4453,28 @@ const props = () => ({
   },
 });
 const box = fabUi.mount('SelectionCheckbox', { target, props: props() });
+```
+
+A decorative box follows, in an objective row of your own that is its own pressable button.
+
+```javascript
+// A Fabricate that predates issue #2881 describes no decorative form: draw your own box there.
+if (!fabUi?.describe?.('SelectionCheckbox')?.props.decorative) return;
+
+const row = document.createElement('button');
+row.type = 'button';
+const slot = document.createElement('span'); // The box's target.
+const text = document.createElement('span');
+text.textContent = 'Gather three iron ore'; // Your row's name; strike it through yourself when done.
+row.append(slot, text);
+const boxProps = (done) => ({ checked: done, decorative: true, tone: 'success' });
+const mark = fabUi.mount('SelectionCheckbox', { target: slot, props: boxProps(objective.done) });
+row.setAttribute('aria-pressed', String(objective.done));
+row.addEventListener('click', () => {
+  objective.done = !objective.done; // Your own state first.
+  row.setAttribute('aria-pressed', String(objective.done));
+  mark.update(boxProps(objective.done));
+});
 ```
 
 ### Disclosure
@@ -4875,6 +4910,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 A required prop that its component's section lets be empty while other props hold text, as `Chip`'s `children` beside `icon` and `ariaLabel`, is refused with `<name> requires a non-blank "<other>" when "<key>" is empty` while only some of them do, naming the first that does not.
+A required prop that its component's section lets be empty while another prop is `true`, as `SelectionCheckbox`'s `label` and `onChange` beside `decorative: true`, is not refused as empty while that prop is exactly `true`, and is refused as any required prop is otherwise; `describe` still reports it `required`.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 Fill a content slot by mounting a component of your own into its element, or by appending an element you own.

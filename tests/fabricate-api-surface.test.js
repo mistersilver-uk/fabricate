@@ -850,6 +850,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: optional,
           onChange: { kind: 'callback', required: true },
           'aria-describedby': { kind: 'aria', required: false },
+          decorative: optional,
+          tone: optional,
         },
         rest: true,
         root: 'any',
