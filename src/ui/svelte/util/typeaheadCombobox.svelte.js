@@ -1,8 +1,9 @@
 // The typeahead combobox's holder contract, written once (issue 2157). The input holds DOM focus
 // and drives a portalled suggestion list, per `openspec/specs/design-system/spec.md` under "A
 // picker announces the panel it opens": the list is open only while the field holds focus and its
-// query is non-empty, each edit leaves no option active, a choice closes the list until the query
-// changes, and Escape empties the query, or with `escapeCloses` first closes an open list.
+// query is non-empty, or with `openOnEmpty` blank too, each edit leaves no option active, a choice
+// closes the list until the query changes, and Escape empties the query, or with `escapeCloses`
+// first closes an open list.
 // A call site spreads `field`, `list` and `option(index)` onto its own markup and applies
 // `typeaheadPanel` with `panel`; it writes no handler of its own. Every config value that can
 // change is a thunk read at call time.
@@ -37,7 +38,11 @@ class TypeaheadCombobox {
 
   #query = $derived(String(this.#config.query() ?? '').trim());
   #count = $derived(Math.max(0, Number(this.#config.count()) || 0));
-  #open = $derived(this.#focused && this.#query !== '' && this.#dismissedAt !== this.#query);
+  #open = $derived(
+    this.#focused &&
+      (this.#query !== '' || Boolean(this.#config.openOnEmpty)) &&
+      this.#dismissedAt !== this.#query
+  );
   #listed = $derived(this.#open && this.#count > 0);
   #active = $derived(
     this.#listed && this.#cursor.query === this.#query && this.#cursor.index < this.#count
@@ -183,6 +188,11 @@ class TypeaheadCombobox {
     else this.#config.setQuery('');
   }
 
+  // ArrowDown reopens a dismissed list at a blank query only under `openOnEmpty`, and activates no row.
+  #reopensEmpty() {
+    return Boolean(this.#config.openOnEmpty) && this.#query === '' && !this.#open;
+  }
+
   // A field whose `onEnterUnchosen` answers `false` has not taken that Enter, so it passes on.
   #onEnterUnchosen(event) {
     if (this.#chosenAt !== null && this.#chosenAt === this.#query) {
@@ -200,6 +210,11 @@ class TypeaheadCombobox {
     }
     if (this.#listed) {
       this.#onListKey(event);
+      return;
+    }
+    if (event.key === 'ArrowDown' && this.#reopensEmpty()) {
+      event.preventDefault();
+      this.#dismissedAt = null;
       return;
     }
     if (event.key === 'Enter' && this.#config.onEnterUnchosen) this.#onEnterUnchosen(event);
@@ -221,6 +236,7 @@ class TypeaheadCombobox {
  * @param {boolean} [config.escapeCloses] Escape closes a shown list and keeps the query, and
  *   empties it only while none is shown
  * @param {boolean} [config.hasNote] the caller shows a note while the query lists nothing
+ * @param {boolean} [config.openOnEmpty] a blank query opens the list on focus or ArrowDown
  * @param {boolean} [config.processKeyComposes] a `keyCode` 229 key counts as composing
  * @param {number} [config.maxHeightCap] the panel's height bound
  * @param {{pitch: number, gap: number, chrome: number}} [config.rows] floors that bound to rows

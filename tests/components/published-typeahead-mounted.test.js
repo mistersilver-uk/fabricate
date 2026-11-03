@@ -217,6 +217,7 @@ describe('the published Typeahead describes and refuses', () => {
         density: optional,
         error: optional,
         countLabel: { kind: 'text', required: false },
+        openOnEmpty: optional,
       },
       rest: false,
       root: 'any',
@@ -384,6 +385,128 @@ describe('the published Typeahead query', () => {
     assert.ok(!listboxIn(), 'an outside press closes it');
     type('iron o');
     assert.ok(Boolean(listboxIn()), 'a new query opens it');
+  });
+});
+
+/** The whole set for a blank query, as a companion listing a short set does, else `matching`. */
+const wholeSet = (query) => (String(query).trim() ? matching(query) : REWARDS);
+
+const focusOn = (field) => {
+  field.focus();
+  flushSync();
+};
+
+describe('the published Typeahead openOnEmpty', () => {
+  it('lists every option on focus of an empty query, with no row active', () => {
+    const { input } = mountTypeahead({ openOnEmpty: true }, { filter: wholeSet });
+    assert.ok(!listboxIn(), 'closed until the field takes focus');
+    focusOn(input());
+    assert.equal(input().getAttribute('aria-expanded'), 'true');
+    assert.equal(input().getAttribute('aria-controls'), listboxIn().id);
+    assert.equal(rowsIn().length, REWARDS.length);
+    assert.ok(!input().hasAttribute('aria-activedescendant'), 'opening leaves no row active');
+    press(input(), 'ArrowDown');
+    assert.equal(active(input()), rowsIn()[0], 'the first ArrowDown reaches the first row');
+  });
+
+  for (const value of ['false', 'true', 1, false]) {
+    it(`lists nothing on an empty query for ${JSON.stringify(value)}, which is not literal true`, () => {
+      const { input } = mountTypeahead({ openOnEmpty: value }, { filter: wholeSet });
+      focusOn(input());
+      assert.ok(!listboxIn(), 'focus opens nothing');
+      const down = press(input(), 'ArrowDown');
+      assert.ok(!listboxIn(), 'nor does ArrowDown');
+      assert.ok(!down.defaultPrevented, 'which passes to the page');
+      assert.equal(input().getAttribute('aria-expanded'), 'false');
+    });
+  }
+
+  it('closes on Escape keeping the empty query, stopped, then lets a second Escape through', () => {
+    const { input, queries } = mountTypeahead({ openOnEmpty: true }, { filter: wholeSet });
+    const heard = [];
+    const shell = input().closest('section');
+    const hear = (event) => {
+      heard.push(event.key);
+    };
+    shell.addEventListener('keydown', hear);
+    focusOn(input());
+    const closing = press(input(), 'Escape');
+    assert.ok(closing.defaultPrevented, 'the first Escape is consumed');
+    assert.ok(!listboxIn(), 'and closes the list');
+    assert.equal(input().getAttribute('aria-expanded'), 'false');
+    const passing = press(input(), 'Escape');
+    assert.ok(!passing.defaultPrevented, 'the second Escape on the empty query is not');
+    assert.deepEqual(heard, ['Escape'], 'and reaches a listener above target');
+    assert.deepEqual(queries, [], 'no edit is reported');
+    shell.removeEventListener('keydown', hear);
+  });
+
+  it('reopens on ArrowDown after Escape, a choice or an outside press, with no row active', () => {
+    const { input, chosen } = mountTypeahead({ openOnEmpty: true }, { filter: wholeSet });
+    focusOn(input());
+    press(input(), 'Escape');
+    const down = press(input(), 'ArrowDown');
+    assert.ok(down.defaultPrevented, 'ArrowDown that opens the list is taken');
+    assert.ok(Boolean(listboxIn()), 'ArrowDown reopens it');
+    assert.ok(!input().hasAttribute('aria-activedescendant'), 'with no row active');
+    rowsIn()[1].dispatchEvent(new globalThis.MouseEvent('click', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(chosen, [['iron-ore']]);
+    assert.ok(!listboxIn(), 'a choice closes it');
+    press(input(), 'ArrowDown');
+    assert.ok(Boolean(listboxIn()), 'and ArrowDown reopens it');
+    document.body.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
+    flushSync();
+    assert.ok(!listboxIn(), 'an outside press closes it');
+    press(input(), 'ArrowDown');
+    assert.ok(Boolean(listboxIn()), 'and ArrowDown reopens it');
+  });
+
+  it('filters by the companion’s own query once typing starts, and lists the whole set again when emptied', () => {
+    const { input, type } = mountTypeahead({ openOnEmpty: true }, { filter: wholeSet });
+    type('cop');
+    assert.deepEqual(
+      rowsIn().map((row) => rowText(row)),
+      ['Copper wire']
+    );
+    type('');
+    assert.equal(rowsIn().length, REWARDS.length, 'an emptied query lists the whole set');
+    assert.ok(!input().hasAttribute('aria-activedescendant'));
+  });
+
+  it('says emptyLabel on an empty query with no options, and Enter there reports no free text', () => {
+    const { input, target, free } = mountTypeahead(
+      { openOnEmpty: true, emptyLabel: 'No scopes yet.', allowFree: true },
+      { filter: () => [] }
+    );
+    focusOn(input());
+    assert.ok(!listboxIn(), 'no listbox without a row');
+    assert.equal(document.querySelector('.fabricate-typeahead-note')?.textContent, 'No scopes yet.');
+    assert.equal(target.querySelectorAll('[role="status"]')[1].textContent, 'No scopes yet.');
+    const enter = press(input(), 'Enter');
+    assert.ok(enter.defaultPrevented, 'allowFree still takes the key');
+    assert.deepEqual(free, [], 'and reports nothing for the empty query');
+  });
+
+  it('is refused by a Fabricate that predates it, which describes no openOnEmpty', () => {
+    const older = seamOver(
+      PUBLISHED_COMPONENT_MANIFEST.map((entry) => {
+        if (entry.name !== 'Typeahead') return entry;
+        const { openOnEmpty: _dropped, ...props } = entry.props;
+        return { ...entry, props };
+      })
+    );
+    assert.ok(!('openOnEmpty' in older.describe('Typeahead').props));
+    const target = fabricateTarget(shells);
+    assert.throws(
+      () =>
+        older.mount('Typeahead', {
+          target,
+          props: { ...NAMED, options: [], onChange() {}, openOnEmpty: true },
+        }),
+      { name: 'TypeError', message: `${REFUSAL}"openOnEmpty" is not a prop of Typeahead` }
+    );
+    assert.equal(target.childNodes.length, 0);
   });
 });
 

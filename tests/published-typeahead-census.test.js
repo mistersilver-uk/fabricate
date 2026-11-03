@@ -121,6 +121,7 @@ describe('the module sheet and every component style against the published Typea
           'density',
           'error',
           'countLabel',
+          'openOnEmpty',
         ],
         'any',
         false,

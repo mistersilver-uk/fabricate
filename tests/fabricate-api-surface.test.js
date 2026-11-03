@@ -885,6 +885,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           density: optional,
           error: optional,
           countLabel: { kind: 'text', required: false },
+          openOnEmpty: optional,
         },
         rest: false,
         root: 'any',
