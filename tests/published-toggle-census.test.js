@@ -56,7 +56,7 @@ const FORCED_COLOURS_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on:has(> .manager-tool-setting-toggle-input:disabled)',
 ]);
 
-/** The nineteen sheet rules that draw a published switch, each with nothing above its root's compound. */
+/** The twenty-one sheet rules that draw a published switch, each with nothing above its root's compound. */
 const TOGGLE_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-toggle',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle',
@@ -70,14 +70,20 @@ const TOGGLE_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-knob',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob',
   `styles/fabricate-manager-library.css: ${DISABLED_CHECKBOX_HOST}`,
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.has-name',
+  'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-name',
   ...FORCED_COLOURS_RULES,
 ]);
 
 /** The classes `StatusToggle.svelte` writes on its root that no published key draws: the indicator's and the checkbox's. */
 const UNPUBLISHED_TOGGLE_CLASSES = Object.freeze(['is-locked', 'manager-tool-setting-toggle']);
 
-/** The switch's two drawn parts, which only a selector through its root or a pinned ancestor may name. */
-const TOGGLE_PARTS = Object.freeze(['manager-status-toggle-track', 'manager-status-toggle-knob']);
+/** The switch's three drawn parts, which only a selector through its root or a pinned ancestor may name. */
+const TOGGLE_PARTS = Object.freeze([
+  'manager-status-toggle-track',
+  'manager-status-toggle-knob',
+  'manager-status-toggle-name',
+]);
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
@@ -89,15 +95,16 @@ const shippedBareButtons = () =>
   );
 
 describe('the module sheet and every component style against the published StatusToggle', () => {
-  // The 46: the nineteen family rules; ten on a root state or host class no published key writes;
-  // seven on a child no published switch draws, its reading or the checkbox's input; and ten caller
-  // rules under a pinned ancestor or a caller's own class, four of them in components.
-  it('reaches a published switch through its nineteen family rules, of 46 that name its root', () => {
+  // The 48: the twenty-one family rules, the named form's two among them (issue 2902); ten on a
+  // root state or host class no published key writes; seven on a child no published switch draws,
+  // its reading or the checkbox's input; and ten caller rules under a pinned ancestor or a caller's
+  // own class, four of them in components.
+  it('reaches a published switch through its twenty-one family rules, of 48 that name its root', () => {
     const census = shippedCensus(TOGGLE, 'StatusToggle');
     assert.deepEqual(writtenOf(reachingOf(census)), [...TOGGLE_FAMILY_RULES].sort(byName));
-    assert.equal(census.length, 46, 'the census of every selector naming the root');
+    assert.equal(census.length, 48, 'the census of every selector naming the root');
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
-    assert.equal(inPartials, 42, 'the partials were read');
+    assert.equal(inPartials, 44, 'the partials were read');
     assert.deepEqual(
       staleAncestors(TOGGLE, census, publishedManagerClasses()),
       [],
@@ -106,10 +113,10 @@ describe('the module sheet and every component style against the published Statu
     assert.deepEqual(
       [Object.keys(entryNamed('StatusToggle').props), gatedRoot(entryNamed('StatusToggle'))],
       [
-        ['on', 'ariaLabel', 'semantics', 'onclick', 'aria-labelledby', 'aria-describedby'],
+        ['on', 'ariaLabel', 'semantics', 'onclick', 'aria-labelledby', 'aria-describedby', 'label'],
         'fabricate',
       ],
-      'a published host, label, disabled state, class or wider root reopens the census'
+      'a published host, disabled state, class or wider root reopens the census'
     );
   });
 
@@ -178,14 +185,14 @@ describe('the module sheet and every component style against the published Statu
     );
   });
 
-  // Seven: the track, the knob, the on knob, the two hover faces and the forced-colours pair.
-  it('names its track and knob only through its root, in the seven family rules that do', () => {
+  // Eight: the track, the knob, the on knob, the two hover faces, the forced-colours pair and the name.
+  it('names its track, knob and name only through its root, in the eight family rules that do', () => {
     const named = everyStylesheet().flatMap(([file, css]) =>
       TOGGLE_PARTS.flatMap((part) =>
         selectorsNaming(css, part).map((complex) => `${file}: ${writtenSelector(css, complex)}`)
       )
     );
-    assert.equal(named.length, 7, 'the parts were read');
+    assert.equal(named.length, 8, 'the parts were read');
     assert.ok(named.every((written) => TOGGLE_FAMILY_RULES.includes(written)));
     assert.deepEqual(partFaults(everyStylesheet(), TOGGLE_PARTS, TOGGLE), []);
   });

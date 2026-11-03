@@ -7,11 +7,12 @@ import { defineSoleWriterClauses } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { withoutComments } from './helpers/stepperSourceContract.js';
 
-/** The three sub-element classes only the primitive may write. */
+/** The four sub-element classes only the primitive may write: the name's since issue 2902. */
 const TREE_CLASSES = Object.freeze([
   'manager-status-toggle-track',
   'manager-status-toggle-knob',
   'manager-status-toggle-label',
+  'manager-status-toggle-name',
 ]);
 
 const PRIMITIVE = 'src/ui/svelte/components/StatusToggle.svelte';
@@ -28,10 +29,11 @@ const TREE_EXCEPTIONS = Object.freeze([
       'manager-status-toggle-track': 1,
       'manager-status-toggle-knob': 1,
       'manager-status-toggle-label': 1,
+      'manager-status-toggle-name': 1,
     }),
     why:
       'the primitive itself, which writes the tree once so that no call site has to remember ' +
-      'it; its docblock names all three classes in prose, which the comment stripping removes',
+      'it; its docblock names the classes in prose, which the comment stripping removes',
   }),
 ]);
 

@@ -368,11 +368,15 @@ describe('the semantics key of the published StatusToggle', () => {
 describe('what the published StatusToggle refuses', () => {
   for (const [claim, props, tail] of [
     [
-      'an absent ariaLabel (M9)',
+      'an absent ariaLabel with no label (M9)',
       { ariaLabel: undefined },
-      'StatusToggle requires a non-empty "ariaLabel"',
+      'StatusToggle requires a non-empty "label"',
     ],
-    ['an empty ariaLabel (M9)', { ariaLabel: '' }, 'StatusToggle requires a non-empty "ariaLabel"'],
+    [
+      'an empty ariaLabel with no label (M9)',
+      { ariaLabel: '' },
+      'StatusToggle requires a non-empty "label"',
+    ],
     ['an absent on (M9)', { on: undefined }, 'StatusToggle requires a non-empty "on"'],
     [
       'an absent onclick (M9)',
@@ -399,7 +403,6 @@ describe('what the published StatusToggle refuses', () => {
 
   for (const key of [
     'as',
-    'label',
     'disabled',
     'trailing',
     'onChange',

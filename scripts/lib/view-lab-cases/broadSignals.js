@@ -289,7 +289,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per
   // state. Then the three specimens that mount it through the published seam (issue 2452), and the
-  // three that mount it with and without a Fabricate root above its target (issue 2456).
+  // three that mount it with and without a Fabricate root above its target (issue 2456), and the
+  // labelled form the seam draws (issue 2902).
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
     'coverage-mode-routed-check-checks',
@@ -297,6 +298,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
     'manager-published-toggles-specimen',
+    'manager-published-toggle-labels-specimen',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

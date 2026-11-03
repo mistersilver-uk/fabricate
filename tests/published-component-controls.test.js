@@ -342,6 +342,14 @@ const OWN_NAMES = Object.freeze({
     heldBy:
       'tests/components/published-radio-card-group-mounted.test.js: the published RadioCardGroup names',
   },
+  // A required text key that `ariaLabel` waives, drawn as the button's own content (issue 2902).
+  'src/ui/svelte/components/StatusToggle.svelte: button': {
+    entry: 'StatusToggle',
+    vocabulary:
+      'The button is named by `label`, the text it draws beside its track, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).',
+    heldBy:
+      'tests/components/published-toggle-label-mounted.test.js: the published StatusToggle names',
+  },
   // A required text key that `ariaLabel` waives, through the input's wrapping `<label>`.
   'src/ui/svelte/components/SelectionCheckbox.svelte: input': {
     entry: 'SelectionCheckbox',
@@ -1394,9 +1402,44 @@ function namedByRequiredLabel(control) {
   return Boolean(keys) && keys.every((key) => entry.props[key].required === true);
 }
 
+/**
+ * The entries whose control draws a published `text` key's words beside `aria-labelledby`, by
+ * entry: the key, which must be required and waived only by names that hold its words, and the
+ * whole line of the entry's group that bars a companion from passing both (issue 2902).
+ */
+const LABELLED_BY_EXCEPTIONS = Object.freeze({
+  StatusToggle: {
+    key: 'label',
+    statedBy: 'A companion passes `label` or `aria-labelledby`, not both.',
+  },
+});
+
+/** What a `LABELLED_BY_EXCEPTIONS` row breaks: a key that is no required text name, or an unstated bar. */
+function labelledByExceptionFaults(entry, { key, statedBy }, lines) {
+  const spec = entry.props[key];
+  const named = (spec?.waivedBy ?? []).every((name) => entry.props[name]?.contains === key);
+  return [
+    ...(spec?.kind === 'text' && spec.required === true && named
+      ? []
+      : [`${entry.name} draws ${key} beside aria-labelledby, which is no required text name`]),
+    ...(groupStates(entry.name, statedBy, lines)
+      ? []
+      : [`${entry.name} draws ${key} beside aria-labelledby, and its group does not bar both`]),
+  ];
+}
+
 /** What an entry that publishes `aria-labelledby` breaks: a reached control it may not sit beside, or none. */
-function labelledByFaults(entry, controls, pins) {
+function labelledByFaults(
+  entry,
+  controls,
+  pins,
+  exceptions = LABELLED_BY_EXCEPTIONS,
+  lines = specLines()
+) {
   if (entry.props[LABELLED_BY]?.kind !== 'aria') return [];
+  if (Object.hasOwn(exceptions, entry.name)) {
+    return labelledByExceptionFaults(entry, exceptions[entry.name], lines);
+  }
   const reached = controls.filter((control) => isReached(control, pins));
   const admitted = reached.length > 0 && reached.every((control) => namedByRequiredLabel(control));
   return admitted ? [] : [`${entry.name} publishes aria-labelledby beside no required name`];
@@ -2587,6 +2630,45 @@ describe('the aria-labelledby admission clause', () => {
         {}
       ).includes(REFUSED)
     );
+  });
+
+  describe('an excepted entry, which draws a text key beside it', () => {
+    const BAR = 'A companion passes `label` or `aria-labelledby`, not both.';
+    const EXCEPTED = { E: { key: 'label', statedBy: BAR } };
+    const STATED = ['- **`E`.**', `  - ${BAR}`];
+    const NAMED_BY = { kind: 'data', contains: 'label' };
+    const WAIVED = { kind: 'text', required: true, waivedBy: ['ariaLabel'] };
+    const faultsOf = (label, lines = STATED, ariaLabel = NAMED_BY) =>
+      labelledByFaults(
+        { name: 'E', props: { label, ariaLabel, ...LABELLED } },
+        [],
+        {},
+        EXCEPTED,
+        lines
+      );
+    const UNNAMED = 'E draws label beside aria-labelledby, which is no required text name';
+    const UNBARRED = 'E draws label beside aria-labelledby, and its group does not bar both';
+
+    it('admits a required text key, waived by a name holding its words, whose group bars both', () => {
+      assert.deepEqual(faultsOf(WAIVED), []);
+    });
+
+    for (const [claim, label, lines, ariaLabel, fault] of [
+      ['a group that does not bar both', WAIVED, ['- **`E`.**'], NAMED_BY, UNBARRED],
+      ['a key that is not text', { kind: 'data', required: true }, STATED, NAMED_BY, UNNAMED],
+      ['a text key that is not required', { kind: 'text' }, STATED, NAMED_BY, UNNAMED],
+      ['a waiver that need not hold its words', WAIVED, STATED, { kind: 'data' }, UNNAMED],
+    ]) {
+      it(`names ${claim} as a fault`, () => {
+        assert.deepEqual(faultsOf(label, lines, ariaLabel), [fault]);
+      });
+    }
+
+    it('excepts only the shipped StatusToggle, whose group bars both', () => {
+      assert.deepEqual(Object.keys(LABELLED_BY_EXCEPTIONS), ['StatusToggle']);
+      const entry = ENTRIES.find(({ name }) => name === 'StatusToggle');
+      assert.deepEqual(labelledByFaults(entry, [], {}), []);
+    });
   });
 });
 

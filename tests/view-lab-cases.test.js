@@ -410,6 +410,7 @@ const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
+  'tests/view-lab/fixtures/PublishedToggleLabels.svelte',
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedPopover.svelte',
   'tests/view-lab/fixtures/publishedPopoverSpecimen.js',
@@ -1139,6 +1140,9 @@ const LAB_COMPANION_CASES = {
 };
 const labCheckbox = (key, part = 'check') =>
   `${key.startsWith('deep-') ? '[data-lab-selection-checkboxes-deep]' : '[data-lab-selection-checkboxes]'} > [data-lab-selection-checkbox="${key}"] .fab-selection-${part}`;
+const labToggleButton = (key) =>
+  `[data-lab-toggle-labels] > [data-lab-toggle-label="${key}"] button.fabricate-toggle`;
+const labToggleName = (key) => `${labToggleButton(key)} > .manager-status-toggle-name`;
 /** The published selection checkbox's specimen (issue 2836), alike on each of its palettes. */
 const CHECKBOX_CONTROLS = Object.freeze([
   {
@@ -2206,6 +2210,17 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       [...CHECKBOX_CONTROLS],
     ])
   ),
+  // The labelled switch (issue 2902): the label's ink, the long label wrapping, the ring around the
+  // labelled button and the track-only baseline's width.
+  'manager-published-toggle-labels-specimen': [
+    { selector: labToggleName('required'), styles: 'color: var(--fab-text)' },
+    { selector: labToggleName('long'), styles: 'white-space: normal' },
+    {
+      selector: labToggleButton('focused'),
+      styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
+    },
+    { selector: labToggleButton('track'), styles: 'width: 38px' },
+  ],
   'manager-published-typeahead-specimen': TYPEAHEAD_SPECIMEN_CONTROLS,
   // The no-match note's ink, and the field lit while it keeps the free text.
   'manager-published-typeahead-no-match': [
@@ -8149,6 +8164,63 @@ test('the selection checkbox specimen case measures and presses rows the fixture
     );
     assert.equal(theme, id.endsWith('-specimen') ? undefined : id.split('-specimen-', 2)[1]);
   }
+});
+
+test('the labelled switch specimen case clicks the words of a switch the fixture mounts through the seam, then tabs on', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedToggleLabels.svelte'
+  );
+  for (const hook of [
+    'data-lab-toggle-labels',
+    'data-lab-toggle-label',
+    'data-lab-toggle-label-on',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.arguments.length === 1
+    ),
+    'the pressed switch draws its new state through the companion’s own update'
+  );
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value)
+    .filter((value) => typeof value === 'string' && /^[a-z-]+$/u.test(value));
+  const rowOf = (selector) => /data-lab-toggle-label="([\w-]+)"/u.exec(selector)?.[1];
+  const { steps, expectLayout, expectSelector } = getCaseById(
+    'manager-published-toggle-labels-specimen'
+  );
+  assert.deepEqual(
+    expectLayout.controls
+      .map(({ selector }) => rowOf(selector))
+      .filter((key) => !keys.includes(key)),
+    [],
+    'each measured row is one the fixture mounts'
+  );
+  assert.deepEqual(
+    steps.map((step) => [rowOf(step.selector), step.press]),
+    [
+      ['pressed', undefined],
+      ['pressed', 'Tab'],
+    ],
+    'a click on the pressed switch, then Tab to the next'
+  );
+  assert.ok(
+    steps[0].selector.endsWith('.manager-status-toggle-name'),
+    'the click lands on the label’s words, not the track'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-toggle-label-on="true"]'),
+    'the frame waits for the companion’s update the click asked for'
+  );
 });
 
 test('the modal scrim specimen case measures the two panes the scrim fixture mounts', () => {

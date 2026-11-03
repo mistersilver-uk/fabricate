@@ -8,7 +8,7 @@
   | `as` | `'button'` \| `'indicator'` \| `'checkbox'` | `'button'` | A CLOSED set, and each is a different THING rather than a variant of the first; see the invariants. An unrecognised value renders the `button` host. |
   | `on` | boolean | `false` | The state. Drives `is-on`/`is-off`, `aria-pressed` (`aria-checked` under `semantics="switch"`) and the knob's travel. |
   | `semantics` | `'pressed'` \| `'switch'` | `'pressed'` | A CLOSED set naming what the `button` host announces: `pressed` is a toggle button (`aria-pressed`), `switch` a press that writes the setting at once (`role="switch"`, `aria-checked`). An unrecognised value renders `pressed`; the other hosts ignore it. |
-  | `label` / `ariaLabel` | pre-localized strings | `''` | The reading beside the switch and the accessible name, each dropped when empty. A site naming its switch through `aria-labelledby` passes that attribute through the rest spread. |
+  | `label` / `ariaLabel` | pre-localized string or snippet / string | `''` | The reading beside the switch and the accessible name, each dropped when empty. A string is the capped reading Fabricate's own rows draw; a snippet, which is what the published `text` key arrives as, is the switch's name, drawn uncapped in `has-name` and naming the button where `ariaLabel` is empty (issue 2902). A site naming its switch through `aria-labelledby` passes that attribute through the rest spread. |
   | `disabled` | boolean | `false` | The `button` host's own attribute and the `checkbox` host's `<input>` attribute; meaningless on `indicator`. |
   | `onclick` / `onChange(checked)` / `trailing` | functions / snippet | no-op / no-op / `undefined` | The `button` host's handler, forwarded verbatim; the `checkbox` host's, named for the value because the `<input>` is an implementation detail of that host; and content rendered after the label. |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
@@ -74,10 +74,14 @@
 
   const STATE_CLASSES = Object.freeze({ on: 'is-on', off: 'is-off' });
 
+  const named = $derived(typeof label === 'function');
+  const NAME_CLASS = 'has-name';
+
   const classes = $derived(
     [
       'fabricate-toggle',
       HOST_CLASSES[host] ?? '',
+      named ? NAME_CLASS : '',
       extraClass,
       on ? STATE_CLASSES.on : STATE_CLASSES.off,
     ]
@@ -93,7 +97,8 @@
 {#snippet face()}
   <span class="manager-status-toggle-track" aria-hidden="true"
     ><span class="manager-status-toggle-knob"></span></span
-  >{#if label}{SPACE}<span class="manager-status-toggle-label">{label}</span
+  >{#if named}<span class="manager-status-toggle-name">{@render label()}</span
+    >{:else if label}{SPACE}<span class="manager-status-toggle-label">{label}</span
     >{/if}{#if trailing}{SPACE}{@render trailing()}{/if}
 {/snippet}
 

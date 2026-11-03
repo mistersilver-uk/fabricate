@@ -277,11 +277,16 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     version: 1,
     props: Object.freeze({
       on: Object.freeze({ kind: 'data', required: true }),
-      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      ariaLabel: Object.freeze({ kind: 'data', contains: 'label' }),
       semantics: Object.freeze({ kind: 'data' }),
       onclick: Object.freeze({ kind: 'callback', required: true }),
       'aria-labelledby': Object.freeze({ kind: 'aria' }),
       'aria-describedby': Object.freeze({ kind: 'aria' }),
+      label: Object.freeze({
+        kind: 'text',
+        required: true,
+        waivedBy: Object.freeze(['ariaLabel']),
+      }),
     }),
     rest: true,
     root: 'any',
