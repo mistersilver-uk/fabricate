@@ -73,6 +73,7 @@ Each default leaves Fabricate's own pagers unchanged, and `tests/components/pagi
 Journal browse density uses the 38px search shell, named by `ariaLabel`, inline Select (the search and filter controls) and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget.
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
 RadioCardGroup's optional per-option `example` MAY draw a third line under the description, and its optional `badge` `{ label, tone }` MAY draw a Chip beside the title in the `positive`, `warning`, `info`, `danger`, `accent` or `secondary` tone, any other tone drawing `secondary`; the radio is described by its badge, description, example, reason and option body, and named by its title alone.
+EditorTabs' optional per-tab `count`, a whole number from 0 to `Number.MAX_SAFE_INTEGER`, MUST draw as the Rail Marker Family's record count after the label (the bare mono numeral, `--fab-text-muted` on every tab), hidden from assistive technology, and MUST name its tab `<label>, <count>`, as "Factions, 2", through no lang key; zero is drawn, a large count is drawn in full, and any other value draws nothing.
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
 
@@ -1145,17 +1146,30 @@ The band adds no role and no name, so a `FillBar`, which has neither, drawn ther
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
 - **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
 
-### Requirement: A stepper's dense rung keeps every pointer target at 24px
+### Requirement: A stepper's rungs keep every pointer target at 24px
 
 `Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one.
-Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; the rung outranks `density` and pins `fill` at 26px.
+It MUST take a `size` that is `34`, as a number or its string, which draws the toolbar rung, level with the 34px `Field`, `Select`, `SearchField` and `SegmentedControl`: a horizontal stepper 34px tall and as wide as the default, with the default 2px padding inside its 1px edge, the input filling the 28px row as it does under `fill`, and each step button the default 22px face inside its 24 by 24 pointer target, its keyboard ring placed as at the default rung.
+Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; each rung outranks `density` and sets `fill`'s height, 26px or 34px, and a filled stepper with no rung stays 38px tall.
+The group's corner is its band's: 7 at the 26, 28 and 30px groups, and 9 at the toolbar rung, filled or not, level with the 34px controls it sits beside; a filled stepper with no rung keeps 7 at 38px, as the library's stepper entry states.
+Under `fill` the input's own width MUST NOT hold its column wider than the buttons' row, so a filled stepper in a flex row or grid column narrows with the room it is given.
 No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
-No in-app caller passes it: the rung exists for the published `Stepper`, whose companion draws a 26px quantity stepper inside a 38px row.
+No in-app caller passes either rung: they exist for the published `Stepper`, whose companions draw a 26px quantity stepper inside a 38px row and a stepper in a row of 34px toolbar controls.
 
 #### Scenario: A dense stepper is pressed at its edge
 
 - **WHEN** a published stepper at `size` `26` is hit-tested at its decrement button's outermost pixel and at the pixel beyond it
 - **THEN** the pointer lands on the button, and then on the stepper's own edge
+
+#### Scenario: A toolbar stepper stands level with its row
+
+- **WHEN** a published stepper at `size` `34` is drawn, filled or not
+- **THEN** it is 34px tall, its input fills the 28px row, and each step button's pointer target is 24 by 24 centred in that row
+
+#### Scenario: A filled stepper narrows with its column
+
+- **WHEN** a filled stepper sits in a flex row or grid column narrower than its input's own width
+- **THEN** the stepper ends inside the column, its input taking only the room the two buttons leave
 
 ### Requirement: Field-sized empty states match their associated controls
 

@@ -2910,14 +2910,18 @@ An unset stepper has no bound to stop at, so neither button is disabled, and a p
 Without `allowUnset` a `value` of `null` is outside the contract, and what is drawn for it is private.
 `fill` is `true` or `false`, and `false` when absent.
 `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so give `target` the width you want it to fill; absent, the stepper hugs its content.
+The filled stepper is 38px tall, or as tall as the `size` rung you state, 26px or 34px, as stated for `size`.
+The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to little more than its two buttons' width.
 `density` is `default` or `comfortable`, and `default` when absent.
 `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
 What the stepper draws for a value outside the set is private; today that is the default density.
-`size` is `26` or `'26'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
-Any other value, `28`, `'27'`, `' 26'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
-The rung outranks `density`, so `comfortable` beside it draws the same 26px stepper, and under `fill` it pins the stepper at 26px across `target`.
+`size` is `26`, `'26'`, `34` or `'34'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
+`34` draws the toolbar rung, level with a `Field`, `Select`, `SearchField` or `SegmentedControl` at its 34px rung: 34px tall and as wide as the default, with the default 2px padding inside the stepper's edge and their 9px corner, the input filling the 28px row between the two buttons, and each button drawn 22 by 22 inside its 24 by 24 pointer target, as at the default rung.
+Any other value, `28`, `'28'`, `'27'`, `' 26'`, `'34px'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
+Each rung outranks `density`, so `comfortable` beside it draws the same 26px or 34px stepper, and under `fill` it sets the stepper's height across `target`, 26px or 34px, where a filled stepper with no rung stays 38px tall, so adding `34` changes nothing for a `fill` you mount today.
 No rung below 26 is published, because one would draw a step button under its 24 by 24 target.
 A Fabricate that predates `size` refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that publishes `size` but predates `34` draws `34` and `'34'` as the default rung, 28px tall or 38px under `fill`, and refuses nothing, so `describe` cannot tell the two apart; adding the value is additive, and the entry stays at `version` 1.
 The stepper steps by one `step` or one stop each way: a row of preset steps around a figure, as −5, −1, +1 and +5, is yours, drawn as published [`Button`](#button)s beside a [`Field`](#field), because each of its presses is an action of its own rather than one value's step.
 `placeholder` is optional text, shown in the input while it is empty.
 It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; pass the text already localised and never rely on it as a name, because `ariaLabel` names the input and a placeholder does not.
@@ -2974,7 +2978,7 @@ A DialogV2's content is always a `<form>`, so do not mount the stepper in one, a
 Give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
-The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
+The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, where `size` `34` draws it as the default rung does, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
 Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and the box of the `format` field inside a Fabricate Manager window, are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
@@ -3525,12 +3529,19 @@ const remove = fabUi.mount('IconButton', {
 ### EditorTabs
 
 `EditorTabs` draws the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels you draw.
-It draws no panel, and no mark, padlock or description on a tab.
-`tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
+It draws no panel, and on a tab no padlock, no description and no mark but the tab's `count`.
+`tabs` is required and is an array of `{ id, label, icon, count }` items, one tab each, drawn in that order.
 Each `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
-Each `label` is required and is final display text, the tab's whole visible text and its accessible name; a label of white space alone leaves the tab with no name, so never pass one.
+Each `label` is required and is final display text, the tab's visible text and its accessible name, which a `count` follows; a label of white space alone leaves the tab with no name, so never pass one.
 Each `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+Each `count` is optional and is a whole number of 0 or more, as `2`, drawn after the label as the strip's record count, a small muted numeral in the mono face, on the selected tab as on any other.
+A tab with a `count` is named its label, a comma, a space and the count's digits, as "Factions, 2", and the numeral itself is hidden from assistive technology, so the count is read once; Fabricate adds no word, so the name reads alike in every language.
+A `count` of 0 is drawn and named, so omit `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped, up to `Number.MAX_SAFE_INTEGER`, above which a count draws nothing.
+A `count` that is not a whole number from 0 to `Number.MAX_SAFE_INTEGER`, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
+The numeral's muted ink clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, on a selected, an unselected and a hovered tab alike; under forced colours it is drawn in the system text colour, and it never marks the selection.
 An item's other members are private and Fabricate draws nothing from them; a function in one is refused.
+Naming `count` is additive, and `EditorTabs`' `version` stays 1: before it `count` was a private member that drew nothing.
+A Fabricate that predates it draws no count and refuses none, and `describe` names no item member, so put a count a reader must have in the panel too.
 `activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
 `onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
 The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so make that `update` from inside `onSelect`, before any `await`.
@@ -3557,7 +3568,7 @@ The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reache
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the strip on one of those four grounds.
 Under forced colours the reader's colours repaint every tab's border in the text colour, so the selected tab's indicator is drawn in `Highlight` and 4px thick against the others' 2px, in a box of the same height, and the selected tab is told from the others by that indicator and not by its weight.
 Its padding, rule, type and colour figures beyond what this section states, and how Fabricate draws a tab strip in its own editors, are private.
-`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab never draws a mark, a padlock, a description or a name of its own.
+`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab draws no mark but its `count`, no padlock and no description, and takes no name but its label and its `count`.
 
 A worked strip follows: two sections of a reagent sheet you draw inside a Fabricate window, for example in an extension target, with one panel shown at a time.
 

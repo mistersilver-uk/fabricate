@@ -278,6 +278,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       props: stepper({ size: 26 }),
       reach: reach('[data-stepper-decrement]'),
     },
+    'stepper-toolbar': {
+      props: stepper({ size: '34' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
     'stepper-unset': {
       props: stepper({ value: null, allowUnset: true }),
       reach: reach('[data-stepper-decrement]'),
@@ -496,6 +500,9 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'tabs-second-active': tabs({}),
     'tabs-none-active': tabs({ activeTab: '' }),
     'tabs-active-panel-only': tabs({ activePanelOnly: true }),
+    'tabs-count': tabs({
+      tabs: TABS.map((tab, index) => ({ ...tab, count: [2, 0, 1250][index] })),
+    }),
   }),
   RadioCardGroup: Object.freeze({
     'cards-row': chosenCard({}),

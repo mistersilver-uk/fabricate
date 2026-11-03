@@ -968,6 +968,18 @@ const LAB_COMPANION_FACES = [
     styles: 'height: 28px; padding-top: 2px',
   },
   {
+    selector: labCompanionForm('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
+  },
+  {
     selector: labCompanionForm('button-ghost', 'button'),
     styles: 'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0)',
   },
@@ -2084,7 +2096,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
   // The published tab strip (issue 2601): the keyboard-reached, selected tab's ring, ink and
-  // underline, the unselected tab at rest, and the strip's rule.
+  // underline, the unselected tab at rest, the selected tab's count (issue 2896), and the strip's rule.
   'manager-published-tabs-specimen': [
     {
       selector: `${LAB_OUTPUTS_TAB}:focus-visible`,
@@ -2095,6 +2107,10 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: LAB_INPUTS_TAB,
       styles:
         'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+    },
+    {
+      selector: `${LAB_OUTPUTS_TAB} > .manager-editor-tab-count`,
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
     },
     {
       selector: LAB_TABLIST,

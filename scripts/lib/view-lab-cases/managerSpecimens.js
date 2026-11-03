@@ -600,6 +600,8 @@ const COMPANION_FORM_KEYS = Object.freeze([
   'stat-plain',
   'stepper-dense',
   'stepper-default',
+  'stepper-toolbar',
+  'stepper-toolbar-fill',
   'button-ghost',
   'button-accent',
   'button-accent-hover',
@@ -621,7 +623,7 @@ const COMPANION_RING = 'outline-style: solid; outline-width: 2px; outline-offset
 
 /**
  * What every companion forms frame measures: the stat band and its track, the success figure and
- * the danger label; the dense and default steppers; each role's face at rest, disabled and busy
+ * the danger label; the dense, default and toolbar steppers; each role's face at rest, disabled and busy
  * beside the ghost baseline; the urgent and pressed tiles of the negative specimen; and each tint.
  */
 const COMPANION_FORM_FACES = Object.freeze([
@@ -656,6 +658,18 @@ const COMPANION_FORM_FACES = Object.freeze([
   {
     selector: COMPANION_FORM_PART('stepper-default', '.fab-stepper'),
     styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
   },
   {
     selector: COMPANION_FORM_PART('button-ghost', 'button'),
@@ -714,7 +728,7 @@ const COMPANION_FORM_FACES = Object.freeze([
 ]);
 
 /** Sized to the fixture's two 340px columns and their rows. */
-const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 760 });
+const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 800 });
 
 /** The button roles fixture's ground, a bar row's button by its key, and a tinted card's verb. */
 const BUTTON_ROLES = '[data-lab-button-roles]';
@@ -2336,7 +2350,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-tabs-specimen',
     label:
-      'Specimen, mounted through the published seam — one tab strip of three tabs, Inputs with a flask glyph, Outputs with a box glyph and Notes with none, across a 360px column on the window’s --fab-bg-1 ground, above the one tabpanel the companion draws, after one step: ArrowRight pressed on the selected Inputs, which moved keyboard focus to Outputs and then called onSelect, whose update drew Outputs selected and showed its panel, One iron ingot, and slag. So Outputs is drawn in the accent ink at weight 600 over its 2px accent underline and carries the accent keyboard ring, 2px wide with 2px of ground between ring and tab, and Inputs in the muted ink at weight 500 with no underline, 46px tall over the strip’s 1px rule',
+      'Specimen, mounted through the published seam — one tab strip of three tabs, Inputs with a flask glyph and a count of 2, named Inputs, 2, Outputs with a box glyph and a count of 2, named Outputs, 2, and Notes with neither, across a 360px column on the window’s --fab-bg-1 ground, above the one tabpanel the companion draws, after one step: ArrowRight pressed on the selected Inputs, which moved keyboard focus to Outputs and then called onSelect, whose update drew Outputs selected and showed its panel, One iron ingot, and slag. So Outputs is drawn in the accent ink at weight 600 over its 2px accent underline and carries the accent keyboard ring, 2px wide with 2px of ground between ring and tab, and Inputs in the muted ink at weight 500 with no underline, 46px tall over the strip’s 1px rule, each count a bare mono numeral in the muted ink at 10.5px after its label, on the selected tab as on the other',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each selection.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2353,8 +2367,8 @@ export const CASES = Object.freeze([
     ],
     expectLayout: {
       controls: [
-        // The focused, selected tab's ring, ink and underline, the unselected tab at rest, and the
-        // strip's rule.
+        // The focused, selected tab's ring, ink and underline, the unselected tab at rest, the
+        // selected tab's count in the muted ink (issue 2896), and the strip's rule.
         {
           selector: `${OUTPUTS_TAB}:focus-visible`,
           styles:
@@ -2364,6 +2378,10 @@ export const CASES = Object.freeze([
           selector: INPUTS_TAB,
           styles:
             'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+        },
+        {
+          selector: `${OUTPUTS_TAB} > .manager-editor-tab-count`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
         },
         {
           selector: TABLIST,
@@ -2542,7 +2560,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-specimen',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second urgent Advance, the pointer still resting on it, its tile deepened to the accent's hover colour, and Tab from the dense stepper's input, so its plus carries the 2px accent ring straddling the button's edge inside the stepper's own. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second urgent Advance, the pointer still resting on it, its tile deepened to the accent's hover colour, and Tab from the dense stepper's input, so its plus carries the 2px accent ring straddling the button's edge inside the stepper's own. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2586,7 +2604,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-accent-focus',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second accent Advance, the pointer still resting on it, filled in the soft accent, and Tab from the ghost Advance, so the first accent Advance carries the 2px accent keyboard ring 2px clear of its edge. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second accent Advance, the pointer still resting on it, filled in the soft accent, and Tab from the ghost Advance, so the first accent Advance carries the 2px accent keyboard ring 2px clear of its edge. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2628,7 +2646,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-urgent-focus',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After one step, Tab from the busy accent Advance, so the first urgent Advance carries the 2px accent keyboard ring 2px clear of its tile, a strip of the card's ground between ring and tile. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After one step, Tab from the busy accent Advance, so the first urgent Advance carries the 2px accent keyboard ring 2px clear of its tile, a strip of the card's ground between ring and tile. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
