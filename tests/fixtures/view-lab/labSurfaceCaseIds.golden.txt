@@ -68,6 +68,7 @@ manager-published-icon-buttons-specimen
 manager-published-button-forms-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
+manager-published-option-cards-manual
 manager-published-segmented-specimen
 manager-published-segmented-forms-specimen
 manager-published-chip-forms-specimen

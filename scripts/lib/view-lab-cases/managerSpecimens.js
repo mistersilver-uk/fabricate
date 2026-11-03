@@ -537,9 +537,15 @@ const CARDS_FIELDSET = `${CARDS_TARGET} > fieldset`;
 const CARDS_LEGEND = `${CARDS_FIELDSET} > legend`;
 const optionCard = (value) => `${CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
 const optionRadio = (value) => `${optionCard(value)} input[type="radio"]`;
+/** The manual group's ground, target and fieldset beneath it (issue 2889), and a card and radio. */
+const MANUAL_GROUND = '[data-lab-option-cards-manual]';
+const MANUAL_TARGET = `${MANUAL_GROUND} > [data-lab-option-cards-manual-target]`;
+const MANUAL_FIELDSET = `${MANUAL_TARGET} > fieldset`;
+const manualCard = (value) => `${MANUAL_FIELDSET} [data-radio-card-option="${value}"]`;
+const manualRadio = (value) => `${manualCard(value)} input[type="radio"]`;
 
-/** Sized to the fixture's 420px ground and its two rows of cards. */
-const CARDS_WINDOW = Object.freeze({ width: 540, height: 300 });
+/** Sized to the fixture's two 420px grounds, each of two rows of cards, one above the other. */
+const CARDS_WINDOW = Object.freeze({ width: 540, height: 560 });
 
 /** The segmented fixture's filter ground and target, and a filter segment and its radio, by value. */
 const SEGMENTED_GROUND = '[data-lab-segmented-ground="filter"]';
@@ -2454,6 +2460,48 @@ export const CASES = Object.freeze([
         {
           selector: CARDS_LEGEND,
           styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+        },
+      ],
+    },
+    position: CARDS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `RadioCardGroup.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-option-cards-manual',
+    label:
+      'Specimen, mounted through the published seam — the same option card group of Breakable, Immune and Limited uses, disabled with its reason Coming soon, mounted beneath the first with activation manual (issue 2889), after one step: ArrowRight pressed on its checked Breakable radio, which Fabricate held from the platform and moved focus alone to the next enabled radio, Immune, so nothing was chosen and onChange was not called. So the Immune card stays at rest, its radio unchecked with the accent keyboard ring, 2px wide with 2px of ground between ring and radio, while Breakable keeps the accent border, the surface-soft ground and the 4px radio edge of the choice',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told only of a choice.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-option-cards' },
+    steps: [{ selector: manualRadio('breakable'), press: 'ArrowRight' }],
+    // Focus on the unchecked Immune radio, Breakable still chosen, and no echo, which only
+    // `onChange` writes.
+    expectSelector:
+      '[data-lab-option-cards-manual]:not([data-lab-option-cards-manual-chosen]) > [data-lab-option-cards-manual-target] > fieldset:has([data-radio-card-option="breakable"].is-active input[type="radio"]:checked) [data-radio-card-option="immune"]:not(.is-active) input[type="radio"]:not(:checked):focus-visible',
+    expectCenterHit: manualCard('immune'),
+    expectContained: [
+      { container: MANUAL_GROUND, target: MANUAL_TARGET },
+      { container: '.window-content', target: MANUAL_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The reached radio's ring and the chosen radio's 4px edge: two shapes, so focus is told
+        // from the choice without colour.
+        {
+          selector: `${manualRadio('immune')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+        {
+          selector: `${manualRadio('breakable')}:checked`,
+          styles: 'border-top-style: solid; border-top-width: 4px',
+        },
+        {
+          selector: manualCard('breakable'),
+          styles:
+            'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
         },
       ],
     },

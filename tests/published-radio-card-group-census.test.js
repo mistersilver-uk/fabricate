@@ -113,6 +113,7 @@ describe('the module sheet and every component style against the published Radio
           'columns',
           'disabled',
           'disabledOptions',
+          'activation',
         ],
         'fabricate',
       ],
