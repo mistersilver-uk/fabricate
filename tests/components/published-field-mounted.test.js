@@ -131,6 +131,7 @@ describe('the published Field draws its column', () => {
         face: { kind: 'data', required: false },
         type: { kind: 'data', required: false },
         invalid: { kind: 'data', required: false },
+        align: { kind: 'data', required: false },
       },
       rest: true,
       root: 'any',

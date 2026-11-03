@@ -180,6 +180,7 @@ a{color:var(--fab-accent)}
 .k-field{display:flex;align-items:center;height:38px;border-radius:9px;padding:0 12px;background:var(--fab-surface-soft);border:1px solid var(--fab-border);color:var(--fab-text);font-size:12.5px;font-weight:500;gap:8px;min-width:0}
 .k-field.inline{height:30px;border-radius:7px;padding:0 var(--fab-space-3);font-size:11.5px;background:var(--fab-bg-2)}
 .k-field.mono{font-family:var(--fab-font-mono);font-size:11.5px}
+.k-field.center{justify-content:center}
 .k-field.invalid{border-color:var(--fab-danger-border);background:var(--fab-danger-soft)}
 .k-field.focus{border-color:var(--fab-accent-border)}
 .k-field.ring{outline:2px solid var(--fab-accent);outline-offset:2px}
@@ -2433,6 +2434,10 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <div class="k-field invalid">Ironvale</div>
           <span class="k-err">A template name must be unique.</span>
         </div>
+        <div class="k-lbl">
+          <span class="k-kicker">Threshold</span>
+          <div class="k-field center">1250</div>
+        </div>
       </div>
       <div class="unit">
         <span class="cap">the option list every select opens</span>
@@ -2502,6 +2507,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>glyphs</b> leading glyph and chevron at the kit&rsquo;s 12px <code>.k-field .i</code> on every rung, never at the rung&rsquo;s type</li>
           <li><b>search</b> the form rung, the glyph IN FLOW 8px before a borderless input that stretches to the shell; <code>compact</code> is the ruled 32px exception at four sites and never a rung</li>
           <li>Sets its own width against core's <code>input{width:100%}</code></li>
+          <li><b>align</b> start · center · end &mdash; the text and placeholder of a field&rsquo;s text, number or textarea control, at logical edges, so <code>end</code> is the left one right to left; a figure field centres its number</li>
         </ul>
       </div>
       <div>
@@ -2524,6 +2530,9 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
             <code>label</code> renders the root as <code>&lt;Field as="label"&gt;</code> with a caption above an inner <code>fabricate-search</code> shell; either of the other two keeps the root a <code>&lt;label class="fabricate-search"&gt;</code></li>
           <li><b>density</b> default | compact · <b>icon</b> = <code>fas fa-search</code>, the glyph before the input · <b>class</b> · a rest spread on the root</li>
           <li><b>inputProps</b> &mdash; the input&rsquo;s own attributes and handlers; a handler runs AFTER the field&rsquo;s own, so a caller&rsquo;s <code>oninput</code> never silences <code>onChange</code></li>
+          <li class="k-hint"><b>&lt;Field&gt; SHIPPED</b> &mdash; read from <code>Field.svelte</code>&rsquo;s <code>$props()</code>.</li>
+          <li><b>as</b> label | div | fieldset <span class="req">required</span> · <b>size</b> 26 | 28 | 30 | 34 | 38 · <b>face</b> sans | serif | mono · <b>type</b> text | number · <b>invalid</b></li>
+          <li><b>align</b> start | center | end = start &mdash; any other value draws start; it never reaches a <code>&lt;select&gt;</code>, <code>Select</code>, <code>SearchField</code> or <code>Stepper</code></li>
         </ul>
       </div>
     </div>

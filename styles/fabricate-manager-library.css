@@ -3767,6 +3767,17 @@
   font-family: var(--fab-font-mono);
 }
 
+/* Field's published alignment (issue 2900), on the controls `face` reaches; `end` is logical, so it is the left edge right to left, and the placeholder follows the control. */
+.fabricate-field.fabricate-field.is-align-center input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']),
+.fabricate-field.fabricate-field.is-align-center textarea {
+  text-align: center;
+}
+
+.fabricate-field.fabricate-field.is-align-end input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']),
+.fabricate-field.fabricate-field.is-align-end textarea {
+  text-align: end;
+}
+
 /* The button-less numeric form: the native step buttons are hidden, and the arrow keys still step. */
 .fabricate-field.fabricate-field.is-type-number input[type='number'] {
   appearance: textfield;

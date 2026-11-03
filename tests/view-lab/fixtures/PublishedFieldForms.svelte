@@ -1,7 +1,7 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issue 2848). It mounts five `Field`s through the
-  page-session seam `game.fabricate.api.ui` binds, as a companion does, each at a published `size`
-  with a `face`, the number `type` or the error state, and draws in each content slot a caption
+  A View Lab specimen, not a Fabricate surface (issues 2848 and 2900). It mounts six `Field`s
+  through the page-session seam `game.fabricate.api.ui` binds, as a companion does, each at a
+  published `size` with a `face`, the number `type`, the centred `align` or the error state, and draws in each content slot a caption
   `<span id>` and one control its `aria-labelledby` names. Every word is a companion's final text,
   so none is localized. `tests/view-lab/mount.js` mounts it for `?specimen=published-field-forms`.
 
@@ -21,6 +21,12 @@
     ],
     ['formula', { size: 30, face: 'mono' }, 'Check formula', { type: 'text', value: '1d20 + 4' }],
     ['uses', { size: 28, face: 'mono', type: 'number' }, 'Uses', { type: 'number', value: '3' }],
+    [
+      'threshold',
+      { size: 34, type: 'number', align: 'center' },
+      'Threshold',
+      { type: 'number', value: '1250' },
+    ],
     ['tag', { size: 26 }, 'Tag', { type: 'text', value: 'Iron' }],
     ['bonus', { size: 30, invalid: true }, 'Bonus', { type: 'text', value: '1d20 +' }],
   ]);

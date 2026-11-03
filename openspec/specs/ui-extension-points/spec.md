@@ -1593,10 +1593,13 @@ Each group states the accepted values of every key that entry publishes.
     The ladder's 44 is not a field rung, and a textarea keeps its own height at every `size`.
   - `face` is `'sans'`, `'serif'` or `'mono'` and defaults to `'sans'`: `'sans'` keeps the face the control inherits from the column, `'serif'` draws the control's text in the design system's serif face, for a name, and `'mono'` in its mono face, for a formula or a figure; any other value draws `'sans'`.
     The face reaches a text-like input, a number input under `type` `'number'`, or a textarea in the slot, never the companion's caption or hint, and the type size stays the column's 12.5px.
+  - `align` is `'start'`, `'center'` or `'end'` and defaults to `'start'`: it is the text alignment of a text-like input, a number input under `type` `'number'`, or a textarea in the slot, and of its placeholder, so `'center'` centres a figure such as a threshold; any other value, `'left'`, `'right'` and `'Center'` among them, draws `'start'`.
+    `'start'` and `'end'` follow the control's own direction, so in a right-to-left document `'start'` draws the text against the right edge and `'end'` against the left; `'center'` is the same in either.
+    The alignment never reaches a `<select>` the companion draws in the slot, which is not part of the field's chrome, or the companion's caption or hint, and it moves no box, padding, keyboard ring or colour, so the control's height, ring and contrast stay those this group states at every `size` and `face`.
   - `type` is `'text'` or `'number'` and defaults to `'text'`: `'number'` gives an `<input type="number">` the companion draws in the slot the field's chrome with no step buttons, the button-less numeric field; any other value draws `'text'`, and what the chrome draws on a number input then is private.
     The input keeps its own behaviour: the arrow keys step it by its `step` between its `min` and `max`, and a screen reader announces it as a spin button with its value, named by the companion's caption as any control in the slot is.
     Chromium, and so Foundry's desktop app, still changes a focused number input when the mouse wheel turns over it, so the companion reads its value on `change` and holds it to its own bounds.
-    A companion whose user should see step buttons mounts a published `Stepper` instead; a `Stepper` mounted in the slot keeps its own height, face and error state, because `size`, `face` and `invalid` never reach it.
+    A companion whose user should see step buttons mounts a published `Stepper` instead; a `Stepper` mounted in the slot keeps its own height, face, alignment and error state, because `size`, `face`, `align` and `invalid` never reach it, and a published `Select` or `SearchField` there keeps its own alignment too.
   - `invalid` is `true` or `false` and defaults to `false`: `true` draws the error state on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries `aria-invalid="true"`, a `--fab-danger-border` edge on a translucent `--fab-danger-soft` fill at the control's own height; any other value, or a control without that attribute, draws none.
     The field cannot reach the companion's control's attributes, so the companion keeps the two signals together: it sets `aria-invalid="true"` on the control whenever it passes `invalid` `true`, and removes it when it passes `false`; a screen reader announces the control as invalid.
     The companion MUST draw a visible text message beneath an invalid control, inked `--fab-danger-text`, with an `id` it adds to the control's `aria-describedby`, so the message is read with the control; an icon it draws beside the message is decorative and carries `aria-hidden="true"`.
@@ -1604,6 +1607,7 @@ Each group states the accepted values of every key that entry publishes.
     The message's `--fab-danger-text` ink clears 4.5:1 on those four grounds in every palette, where `--fab-danger` does not.
     The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge while the control holds focus, clear 4.5:1 and 3:1 on the error fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
   - A Fabricate that predates `size`, `face`, `type` and `invalid` refuses each with `"<key>" is not a data attribute`, and `describe('Field').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+    A Fabricate that predates `align` refuses it with `"align" is not a data attribute`, so the companion checks `describe('Field').props.align` before it passes it; adding it is additive, and the entry stays at `version` 1.
   - Rest `data-*` attributes land on the column root.
   - The field never moves its content slot while it is requested.
   - Its column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
@@ -2883,6 +2887,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the field draws one `<div>` column holding the slot, and the input takes the field's chrome and its inset 1px ring
 - **AND** an `update` keeps focus on the input, and `destroy` leaves `target` empty
 - **AND** a mount that omits `as` throws M9, and a mount into a target with no Fabricate root draws it under the standalone style root
+
+#### Scenario: A published field centres its figure
+
+- **WHEN** a companion mounts `Field` with `as: 'div'`, `children: true`, `type: 'number'` and `align: 'center'`, and draws a caption and an `<input type="number">` in the content slot
+- **THEN** the input's value and its placeholder are drawn centred in the control, at the same height, edge, ring and colours as without `align`
+- **AND** an `update` with `align: 'end'` draws them against the inline end, the left edge in a right-to-left document, in the same column with focus kept
+- **AND** `align: 'right'` draws the default `'start'`, and a `<select>` in the slot keeps its own alignment
 
 #### Scenario: A published well
 
