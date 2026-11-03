@@ -2,7 +2,7 @@
   A View Lab specimen, not a Fabricate surface (issue 2881). It mounts decorative
   `SelectionCheckbox`es through the page-session seam `game.fabricate.api.ui` binds, as a
   companion does, each inside an objective row of the companion's own: a `<button aria-pressed>`
-  holding the box's target and the objective's text, struck through while done. The rows are a
+  holding the box's target and the objective's text, the text alone struck through while done. The rows are a
   done row and an open one in the success tone, the row the case's step presses to done, a done
   row at the compact and the comfortable box, a done row in the default accent tone, a mixed box
   in the success tone, which keeps the accent dash, and as a baseline a labelled success box.
@@ -29,7 +29,8 @@
 
   let targets = $state({});
   let labelled = $state(null);
-  // The echo the case reads; the props read `held`, so the effect does not track the press.
+  // The echo the case reads; the mount effect reads ROWS' initial state, so it does not track the
+  // press.
   let done = $state(Object.fromEntries(ROWS.map(([key, , isDone]) => [key, isDone])));
   const handles = {};
 
@@ -71,7 +72,8 @@
       data-lab-checkbox-row-done={String(done[key])}
       onclick={() => press(key, props)}
       ><span class="published-checkbox-row-box" bind:this={targets[key]}></span><span
-        >{objective}</span
+        class="published-checkbox-row-text"
+        data-lab-checkbox-row-text>{objective}</span
       ></button
     >
   {/each}
@@ -89,13 +91,17 @@
     background: var(--fab-bg-1);
   }
 
+  /* Every row is 28px tall, the comfortable box's height and more, so it takes that band's 7px
+     corner on the radius ladder. */
   .published-checkbox-row {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
+    min-height: 28px;
     padding: var(--fab-space-2xs) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-bg-2);
     color: var(--fab-text);
     text-align: start;
@@ -103,6 +109,10 @@
 
   .published-checkbox-row.is-done {
     color: var(--fab-text-secondary);
+  }
+
+  /* The strike crosses the objective's text alone: on the row it would cross the box's tick too. */
+  .published-checkbox-row.is-done > .published-checkbox-row-text {
     text-decoration: line-through;
   }
 

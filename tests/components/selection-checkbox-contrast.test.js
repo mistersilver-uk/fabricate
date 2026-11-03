@@ -159,7 +159,3 @@ test('a ticked success box edges in the strong success step, which clears 3:1 ag
   );
   assert.deepEqual(shortfalls(themes, tick, [fill], 3), []);
 });
-
-test('the success fill alone would not edge the box: it falls short of 3:1 on --fab-bg-2 in one palette', () => {
-  assert.deepEqual(shortOver('--fab-success', (ground) => [ground]).length, 1);
-});

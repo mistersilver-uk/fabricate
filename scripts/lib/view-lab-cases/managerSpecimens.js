@@ -792,6 +792,7 @@ const CHECKBOXES_WINDOW = Object.freeze({ width: 740, height: 640 });
 const CHECKBOX_ROWS = '[data-lab-checkbox-rows]';
 const OBJECTIVE_ROW = (key) => `${CHECKBOX_ROWS} > [data-lab-checkbox-row="${key}"]`;
 const OBJECTIVE_BOX = (key) => `${OBJECTIVE_ROW(key)} .fab-selection-check`;
+const OBJECTIVE_TEXT = (key) => `${OBJECTIVE_ROW(key)} > [data-lab-checkbox-row-text]`;
 const OBJECTIVE_KEYS = Object.freeze([
   'done',
   'open',
@@ -2749,7 +2750,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-checkbox-rows-specimen',
     label:
-      "Specimen, mounted through the published seam — eight objective rows in a 420px column on the window's --fab-bg-1 ground, 6px apart, each but the last a pressable button of the companion's own on --fab-bg-2 holding a decorative selection checkbox before its objective, the text struck through while done, after one step: a click on Quench the blade, whose companion update ticked its box. Reading top to bottom: Gather three iron ore done, a 20px box filled --fab-success inside its strong success edge with a dark tick; Smelt the ore into bars open, an empty box outlined in --fab-control-outline; Quench the blade, pressed to done, ticked in the success fill; Temper the edge done at the compact 16px box; Fit the hilt done at the comfortable 22px box; Sharpen the blade done in the default tone, its box filled accent; Polish the fittings mixed in the success tone, which keeps the accent dash on its soft fill; and as a baseline the labelled box Forge the blade, ticked in the success fill beside its label. The frame cannot show that each box is hidden from the accessibility tree while its row's button carries the name and pressed state, nor the forced-colours repaint, which the rendered suite reads and emulates",
+      "Specimen, mounted through the published seam — eight objective rows in a 420px column on the window's --fab-bg-1 ground, 6px apart, each but the last a pressable button of the companion's own, 28px tall at radius 7 on --fab-bg-2, holding a decorative selection checkbox before its objective, the objective's text alone struck through while done so no line crosses the tick, after one step: a click on Quench the blade, whose companion update ticked its box. Reading top to bottom: Gather three iron ore done, a 20px box filled --fab-success inside its strong success edge with a dark tick; Smelt the ore into bars open, an empty box outlined in --fab-control-outline; Quench the blade, pressed to done, ticked in the success fill; Temper the edge done at the compact 16px box; Fit the hilt done at the comfortable 22px box; Sharpen the blade done in the default tone, its box filled accent; Polish the fittings mixed in the success tone, which keeps the accent dash on its soft fill; and as a baseline the labelled box Forge the blade, ticked in the success fill beside its label. The frame cannot show that each box is hidden from the accessibility tree while its row's button carries the name and pressed state, nor the forced-colours repaint, which the rendered suite reads and emulates",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2780,6 +2781,13 @@ export const CASES = Object.freeze([
         { selector: OBJECTIVE_BOX('accent'), styles: 'background-color: var(--fab-accent)' },
         { selector: OBJECTIVE_BOX('mixed'), styles: 'border-top-color: var(--fab-accent)' },
         { selector: OBJECTIVE_BOX('labelled'), styles: 'background-color: var(--fab-success)' },
+        // The row on its 28px band's 7px corner, and the strike on the done row's text alone.
+        {
+          selector: OBJECTIVE_ROW('done'),
+          styles: 'height: 28px; border-top-left-radius: 7px',
+        },
+        { selector: OBJECTIVE_ROW('compact'), styles: 'height: 28px' },
+        { selector: OBJECTIVE_TEXT('done'), styles: 'text-decoration-line: line-through' },
       ],
     },
     position: CHECKBOX_ROWS_WINDOW,
