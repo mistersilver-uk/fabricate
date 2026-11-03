@@ -6,8 +6,8 @@
  * and border box in both hosts at rest, under keyboard focus, under the pointer, under reduced
  * motion and under forced colours, and its specimens draw every value of the keys the box reads,
  * the decorative form and the success tone among them (issue 2881).
- * It is a file of its own so `published-standalone-root-rendered.test.js` stays inside the
- * per-file timeout; it repeats that file's minimum, the target face, the core-min sheets and the
+ * It is a file of its own so the shards of `standaloneRootMeasurement.js` stay inside the
+ * per-file timeout; it repeats their minimum, the target face, the core-min sheets and the
  * per-element read, without panels, slots or the harvested arm, which no checkbox draws or needs.
  */
 import assert from 'node:assert/strict';
@@ -46,7 +46,7 @@ const CORE_MIN_SHEETS = Object.freeze([
   fixture('foundry-core-button-min.css'),
   fixture('foundry-core-input-min.css'),
 ]);
-/** The target face `published-standalone-root-rendered.test.js` writes on both hosts. */
+/** The target face `standaloneRootMeasurement.js` writes on both hosts. */
 const targetFace = (width) =>
   `width: ${width}px; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px`;
 

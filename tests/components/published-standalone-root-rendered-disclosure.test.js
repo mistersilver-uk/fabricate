@@ -6,8 +6,8 @@
  * element computes the same compared properties, pseudo elements and border box in both hosts at
  * rest, under keyboard focus, under the pointer, under reduced motion and under forced colours, and
  * its specimens draw every value of the keys the card reads.
- * It is a file of its own so `published-standalone-root-rendered.test.js` stays inside the per-file
- * timeout; it repeats that file's minimum, the target face, the core-min sheets, the per-element
+ * It is a file of its own so the shards of `standaloneRootMeasurement.js` stay inside the per-file
+ * timeout; it repeats their minimum, the target face, the core-min sheets, the per-element
  * read and its harvested arm over Foundry 14.365's own sheet, which skips where no harvest exists,
  * without panels, which no disclosure opens.
  */
@@ -65,7 +65,7 @@ const COMPARED = Object.freeze([
     'margin-bottom',
   ]),
 ]);
-/** The target face `published-standalone-root-rendered.test.js` writes on both hosts. */
+/** The target face `standaloneRootMeasurement.js` writes on both hosts. */
 const targetFace = (width) =>
   `width: ${width}px; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px`;
 
