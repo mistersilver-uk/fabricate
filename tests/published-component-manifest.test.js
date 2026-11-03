@@ -504,6 +504,7 @@ const BUTTON = Object.freeze({
     'is-info-action',
     'is-accent-action',
     'is-urgent-action',
+    'is-confirm-action',
     'is-pressed',
     'is-full-width',
     'is-size-24',
@@ -563,7 +564,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 41 sheet rules that draw a published button, none with a compound above its root. */
+/** The 43 sheet rules that draw a published button, none with a compound above its root. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -598,6 +599,8 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-accent-action:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled)',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-confirm-action:not(:disabled)',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-confirm-action:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled)',
   "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:disabled',
@@ -750,6 +753,10 @@ const ARIA_KEY_SELECTORS = Object.freeze([
   ],
   [
     "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-urgent-action:not(:disabled, [aria-disabled='true']):hover",
+    BUTTON_FACE,
+  ],
+  [
+    "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-confirm-action:not(:disabled, [aria-disabled='true']):hover",
     BUTTON_FACE,
   ],
   [
@@ -3678,7 +3685,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 37 selectors: 35 that draw it, one it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 45 selectors: 43 that draw it, one it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -3720,7 +3727,7 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 35 readings of any stylesheet, each kept off a published control', () => {
+  it('reads a shipped aria key, aria-pressed, aria-checked, aria-busy, aria-disabled or aria-modal in 36 readings of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
     assert.deepEqual(

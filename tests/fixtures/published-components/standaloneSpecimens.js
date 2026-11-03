@@ -230,6 +230,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'button-info': button({ role: 'info', children: 'Roll Wits', onclick: press }),
     'button-accent': button({ role: 'accent', children: 'Advance', onclick: press }),
     'button-urgent': button({ role: 'urgent', children: 'Advance', onclick: press }),
+    'button-confirm': button({ role: 'confirm', children: 'Confirm the stage', onclick: press }),
     'button-full-width': button({ fullWidth: true, children: 'Start batch', onclick: press }),
     'button-size-24': button({ size: '24', children: 'Add tier', onclick: press }),
     'button-size-26': button({ size: '26', children: 'Claim', onclick: press }),

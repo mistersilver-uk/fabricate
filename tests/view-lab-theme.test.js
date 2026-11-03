@@ -38,6 +38,16 @@ const VARIANTS = Object.freeze({
       ])
     )
   ),
+  // Issues 2890 and 2898: the confirm role and the tinted cards, where the success ink and the danger
+  // and muted labels read weakest.
+  ...Object.fromEntries(
+    ['specimen', 'confirm-focus'].flatMap((form) =>
+      ['foundry-native', 'hearth-herb'].map((theme) => [
+        `manager-published-button-roles-${form}-${theme}`,
+        `manager-published-button-roles-${form}`,
+      ])
+    )
+  ),
   // Issue 2860: the published typeahead's open list, on Foundry's own palette and a light one.
   'manager-published-typeahead-specimen-foundry-native': 'manager-published-typeahead-specimen',
   'manager-published-typeahead-specimen-hearth-herb': 'manager-published-typeahead-specimen',

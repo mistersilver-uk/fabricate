@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'dashed'` \| `'warning'` \| `'info'` \| `'accent'` \| `'urgent'` | `'neutral'` | A CLOSED set; see the invariants for how a caller picks. An unrecognised value renders neutral. |
+  | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'dashed'` \| `'warning'` \| `'info'` \| `'accent'` \| `'urgent'` \| `'confirm'` | `'neutral'` | A CLOSED set; see the invariants for how a caller picks. An unrecognised value renders neutral. |
   | `tag` | `'button'` \| `'a'` | `'button'` | An unrecognised value, and `tag="a"` with an empty `href`, render a `<button>`. |
   | `href` / `target` / `rel` | anchor attributes | `''` / `undefined` / `undefined` | Emitted only when an anchor is rendered. An explicit `rel` always wins; unset with `target="_blank"` it defaults to `noreferrer`. |
   | `type` / `disabled` | `'button'` \| `'submit'` \| `'reset'` / boolean | `'button'` / `false` | Both emitted only on a `<button>`, so a manager button inside a form-adjacent card never submits by accident and `disabled` is ignored and warned about on an anchor. A closed set: an unrecognised `type` renders `'button'`, because the browser reads one as `'submit'`. |
@@ -40,8 +40,10 @@
     `warning` the CAUTION verb, which destroys nothing and proceeds against a flagged rule or breaks
     a reference the GM can re-make exactly; `dashed` the ADD action at the foot of its list;
     `neutral` the empty modifier. `accent` (outlined) and `urgent` (solid) are the published seam's
-    forward verb and the one verb that is due now (issue 2841), with no in-app caller. A control
-    that both destroys and cautions is `danger`, and a per-site visual tweak is a pass-through on `class`.
+    forward verb and the one verb that is due now (issue 2841), and `confirm` (outlined, in the
+    success family) the confirming verb that is not its screen's commit (issue 2890), none with an
+    in-app caller. A control that both destroys and cautions is `danger`, and a per-site visual
+    tweak is a pass-through on `class`.
   - THE ROLE-TO-CLASS RELATION IS A NAMED MAPPING, never an `is-${role}` template: the sheet's amber
     treatment is `.fabricate-button.is-warning-action` and `.fabricate-button.is-warning` is declared
     nowhere, so a guessed spelling ships with no treatment; and `scripts/lib/stylesheetLiveClasses.js`
@@ -104,6 +106,7 @@
     info: 'is-info-action',
     accent: 'is-accent-action',
     urgent: 'is-urgent-action',
+    confirm: 'is-confirm-action',
   };
 
   const FULL_WIDTH_CLASS = 'is-full-width';
