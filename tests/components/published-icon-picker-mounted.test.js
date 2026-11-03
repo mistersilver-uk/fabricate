@@ -213,7 +213,7 @@ describe('the published IconPicker mounts, updates on its root and destroys', ()
     assert.equal(update({ ariaLabel: 'Tool icon' }), true);
     await settle();
     assert.ok(target.firstElementChild === root, 'the same root, so nothing remounted');
-    assert.equal(trigger().getAttribute('aria-label'), 'Tool icon');
+    assert.equal(trigger().getAttribute('aria-label'), 'Tool icon, Flask');
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
     assert.deepEqual(reports, []);
@@ -221,10 +221,10 @@ describe('the published IconPicker mounts, updates on its root and destroys', ()
 });
 
 describe('the published IconPicker names', () => {
-  it('its trigger by ariaLabel, its list and dialog by listLabel, and its field by searchLabel', async () => {
+  it('its trigger by ariaLabel and its caption, its list and dialog by listLabel, and its field by searchLabel', async () => {
     const { trigger } = mountPicker();
-    assert.equal(trigger().getAttribute('aria-label'), LABELS.ariaLabel);
-    assert.equal(trigger().getAttribute('title'), LABELS.ariaLabel, 'its native tooltip');
+    assert.equal(trigger().getAttribute('aria-label'), `${LABELS.ariaLabel}, Flask`);
+    assert.equal(trigger().getAttribute('title'), `${LABELS.ariaLabel}, Flask`, 'its tooltip');
     const panel = await open(trigger());
     assert.equal(panel.getAttribute('aria-label'), LABELS.listLabel);
     assert.equal(listboxIn().getAttribute('aria-label'), LABELS.listLabel);
@@ -660,7 +660,6 @@ describe('the published IconPicker refuses', () => {
   it('every unpublished prop, class and a data-* key (M8)', () => {
     for (const key of [
       'disabled',
-      'iconOnly',
       'bounds',
       'triggerClass',
       'triggerStyle',

@@ -62,6 +62,7 @@ manager-published-pagination-specimen
 manager-published-pagination-size-specimen
 manager-published-icon-picker-specimen
 manager-published-icon-picker-choice
+manager-published-icon-picker-forms-specimen
 manager-published-action-menu-specimen
 manager-published-action-menu-choice
 manager-published-modal-specimen

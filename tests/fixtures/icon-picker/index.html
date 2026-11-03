@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Published IconPicker — captioned and icon-only triggers</title>
+    <!--
+      Served by `tests/components/icon-picker-icon-only-rendered.test.js` from a Vite dev server, so
+      `mount.js` can mount the real `IconPicker` through the real published seam. The rules below
+      are the fixture's Foundry stand-ins, as `tests/fixtures/popover/index.html` states them.
+    -->
+    <link rel="stylesheet" href="/@icon-picker-styles/fabricate.css" />
+    <style data-fixture-chrome>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0b0a13;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+
+      .application {
+        position: absolute;
+        inset: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #17161f;
+        border: 1px solid #3b3a48;
+      }
+
+      .application > .window-content {
+        flex: 1 1 auto;
+        display: grid;
+        grid-template-columns: repeat(3, max-content);
+        align-content: start;
+        gap: 24px;
+        min-height: 0;
+        padding: 16px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/icon-picker/mount.js"></script>
+  </body>
+</html>

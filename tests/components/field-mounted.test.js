@@ -18,6 +18,7 @@ const vocabularyHarness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/labelInName.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/foundryIconVocabulary.js',

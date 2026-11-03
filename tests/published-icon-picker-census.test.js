@@ -1,6 +1,6 @@
 /**
  * The module sheet and every component style against the published `IconPicker` (issue 2647): the
- * 14 selectors that name its two roots, the trigger's `fabricate-icon-picker` and the panel's
+ * 16 selectors that name its two roots, the trigger's `fabricate-icon-picker` and the panel's
  * `fabricate-icon-picker-popover`, each of which a published picker matches with nothing above its
  * root, the classes its file spells on them, the bare `button` rules its trigger takes, and the
  * focus marks: the trigger's module ring, 2px wide and 2px clear, which clears 3:1 on the four
@@ -52,7 +52,7 @@ const PICKER = Object.freeze({
   writable: new Set(['essence-icon-picker', 'fabricate-picker', 'manager-travel-picker']),
   ancestors: new Set(),
   drawsChildren: true,
-  undrawn: new Set(['icon-only']),
+  undrawn: new Set(),
 });
 
 /** The panel's root, which the shared picker portals into the overlay host, likewise. */
@@ -68,12 +68,17 @@ const PANEL = Object.freeze({
   undrawn: new Set(['is-compact-option-rows']),
 });
 
-/** The six rules that draw the trigger side, every one in its sheet; `is-tinted` is `tint`'s (issue 2841). */
+/**
+ * The eight rules that draw the trigger side, every one in its sheet; `is-tinted` is `tint`'s
+ * (issue 2841) and `icon-only` is `iconOnly`'s (issue 2905).
+ */
 const PICKER_FAMILY = Object.freeze([
   '.fabricate-icon-picker .essence-icon-picker-preview',
   '.fabricate-icon-picker .essence-icon-picker-preview.is-tinted',
   '.fabricate-icon-picker .essence-icon-picker-trigger',
   '.fabricate-icon-picker .essence-icon-picker-trigger',
+  '.fabricate-icon-picker .essence-icon-picker-trigger:where(.icon-only)',
+  '.fabricate-icon-picker .essence-icon-picker-trigger:where(.icon-only) .essence-icon-picker-trigger-caret',
   '.fabricate-icon-picker .essence-icon-picker-trigger-label',
   '.fabricate-icon-picker.essence-icon-picker',
 ]);
@@ -104,9 +109,9 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published IconPicker', () => {
-  it('reaches a published picker through all 14 selectors that name its two roots', () => {
+  it('reaches a published picker through all 16 selectors that name its two roots', () => {
     const [picker, panel] = [census(PICKER), census(PANEL)];
-    assert.equal(picker.length, 6, 'the census of every selector naming the trigger root');
+    assert.equal(picker.length, 8, 'the census of every selector naming the trigger root');
     assert.equal(panel.length, 8, 'the census of every selector naming the panel root');
     assert.deepEqual(writtenOf(reachingOf(picker)), inSheet(PICKER_FAMILY));
     assert.deepEqual(writtenOf(reachingOf(panel)), inSheet(PANEL_FAMILY));
@@ -123,11 +128,12 @@ describe('the module sheet and every component style against the published IconP
           'searchPlaceholder',
           'noMatchesText',
           'tint',
+          'iconOnly',
         ],
         'fabricate',
         false,
       ],
-      'a published disabled, iconOnly, bounds, class, rest, or a gated root other than `fabricate` reopens the census'
+      'a published disabled, bounds, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });
 
@@ -187,7 +193,6 @@ describe('the icon picker census, synthetic', () => {
   const reachingIn = (shape, css) => writtenOf(reachingOf(syntheticCensus(shape, css)));
 
   for (const [shape, selector] of [
-    [PICKER, '.fabricate-icon-picker .essence-icon-picker-trigger.icon-only'],
     [PANEL, '.fabricate-icon-picker-popover.is-compact-option-rows .essence-icon-picker-option'],
     [PICKER, '.fabricate-icon-picker.is-disabled'],
   ]) {
@@ -198,6 +203,7 @@ describe('the icon picker census, synthetic', () => {
 
   for (const [shape, selector] of [
     [PICKER, '.fabricate-icon-picker .essence-icon-picker-trigger'],
+    [PICKER, '.fabricate-icon-picker .essence-icon-picker-trigger.icon-only'],
     [PANEL, '.fabricate .fabricate-icon-picker-popover .essence-icon-picker-option'],
     [PANEL, '.fabricate-icon-picker-popover[data-x]'],
   ]) {

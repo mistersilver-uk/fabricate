@@ -534,6 +534,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       searchPlaceholder: Object.freeze({ kind: 'data' }),
       noMatchesText: Object.freeze({ kind: 'data', required: true }),
       tint: Object.freeze({ kind: 'data' }),
+      iconOnly: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',

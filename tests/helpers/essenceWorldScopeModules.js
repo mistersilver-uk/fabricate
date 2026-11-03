@@ -79,6 +79,7 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
 export const ESSENCE_CATALOGUE_BULK_RAW_MODULES = Object.freeze([
   'src/ui/model/essenceBulkEditModel.js',
   'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/labelInName.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',

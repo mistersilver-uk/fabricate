@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/labelInName.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
@@ -290,12 +291,10 @@ describe('IconPicker trigger, across the primitive`s spread', () => {
       { context: await localizerContext() }
     );
     const trigger = root.querySelector('.essence-icon-picker-trigger');
+    const name = '[FABRICATE.Admin.Features.Essences.ChooseIcon], Gear';
 
-    assert.equal(
-      trigger.getAttribute('aria-label'),
-      '[FABRICATE.Admin.Features.Essences.ChooseIcon]'
-    );
-    assert.equal(trigger.getAttribute('title'), '[FABRICATE.Admin.Features.Essences.ChooseIcon]');
+    assert.equal(trigger.getAttribute('aria-label'), name, 'and by the caption it shows');
+    assert.equal(trigger.getAttribute('title'), name);
   });
 
   it('states `type="button"` and the keyboard-focus mark on the trigger itself', async () => {
@@ -402,8 +401,8 @@ describe('IconPicker copy', () => {
       { context: await localizerContext() }
     );
     assert.deepEqual(drawnCopy(root), {
-      trigger: 'Reagent icon',
-      title: 'Reagent icon',
+      trigger: 'Reagent icon, Gear',
+      title: 'Reagent icon, Gear',
       dialog: 'Reagent icons',
       list: 'Reagent icons',
       search: 'Search reagent icons',
@@ -416,8 +415,8 @@ describe('IconPicker copy', () => {
     const root = await openWith({}, { context: await localizerContext() });
     const key = (name) => `[FABRICATE.Admin.Features.Essences.${name}]`;
     assert.deepEqual(drawnCopy(root), {
-      trigger: key('ChooseIcon'),
-      title: key('ChooseIcon'),
+      trigger: `${key('ChooseIcon')}, Gear`,
+      title: `${key('ChooseIcon')}, Gear`,
       dialog: key('IconDialogLabel'),
       list: key('IconDialogLabel'),
       search: key('SearchIconLabel'),
@@ -437,8 +436,8 @@ describe('IconPicker copy', () => {
     try {
       const root = await openWith({});
       assert.deepEqual(drawnCopy(root), {
-        trigger: 'Choose icon',
-        title: 'Choose icon',
+        trigger: 'Choose icon, Gear',
+        title: 'Choose icon, Gear',
         dialog: 'Essence icon picker',
         list: 'Essence icon picker',
         search: 'Search essence icons',

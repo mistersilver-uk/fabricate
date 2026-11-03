@@ -10,15 +10,16 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `ariaLabel` / `listLabel` / `searchLabel` | resolved strings | `''` | The trigger's name and tooltip, the list's and its dialog's name, and the query field's name. |
+  | `ariaLabel` / `listLabel` / `searchLabel` | resolved strings | `''` | The trigger's name and tooltip, the list's and its dialog's name, and the query field's name. A captioned trigger's name is `ariaLabel`, its trailing punctuation dropped, a comma and its caption, unless `ariaLabel` already holds the caption as whole words, so it always holds its visible label (WCAG 2.5.3, issue 2899). |
   | `searchPlaceholder` | resolved string | `''` | The query field's hint text, which is not its name. |
   | `noMatchesText` | resolved string | `''` | The line the list draws when a query matches no glyph. |
   | `tint` | one of `TINTS` | `''` | Recolours the trigger's glyph alone in that `--fab-tag-*` colour (issue 2841); any other value tints nothing. |
+  | `iconOnly` | `true` | `false` | Draws the glyph's tile alone, a square with no caption or caret, named by `ariaLabel` alone and described by the chosen glyph's caption, its list aligned to its start edge (issue 2905); any other value draws the captioned trigger. |
 
   Invariants:
-  - Under an app localizer context the trigger's `aria-describedby` names the chosen glyph, and
-    names nothing while `value` holds no glyph; a published mount carries no localizer, so its
-    trigger keeps the name-only contract the published docs state.
+  - An icon-only trigger's `aria-describedby` names the chosen glyph by its caption in every mount,
+    a published one included, and names nothing while `value` holds no glyph; a captioned
+    trigger's name holds its caption, so it describes nothing.
   - Each copy fallback is written at its use site and localized through the `APP_LOCALIZER`
     context; a tree mounted without one draws the English and no placeholder.
   - The snippet trigger states `type="button"` and `data-keyboard-focus="true"` itself, in every
@@ -41,6 +42,7 @@
 <script>
   import { getContext } from 'svelte';
 
+  import { containsLabel } from '../../labelInName.js';
   import { localizeWith } from '../../../utils/localizeWithFallback.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import SearchablePopover from './SearchablePopover.svelte';
@@ -105,9 +107,15 @@
   const tintKey = $derived(TINTS.has(tint) ? tint : '');
   const uid = $props.id();
   const choiceId = `${uid}-choice`;
-  const describesChoice = $derived(Boolean(localize) && Boolean(getEssenceIconName(value)));
-  const triggerName = $derived(
+  const glyphOnly = $derived(iconOnly === true);
+  const describesChoice = $derived(glyphOnly && Boolean(getEssenceIconName(value)));
+  const ownName = $derived(
     ariaLabel || copy('FABRICATE.Admin.Features.Essences.ChooseIcon', 'Choose icon')
+  );
+  const triggerName = $derived(
+    glyphOnly || containsLabel(ownName, selectedOption.label)
+      ? ownName
+      : `${String(ownName).replace(/[\s:;,.-]+$/u, '') || ownName}, ${selectedOption.label}`
   );
 
   function iconRow(option, pinned) {
@@ -195,7 +203,7 @@
     copy('FABRICATE.Admin.Features.Essences.SearchIconLabel', 'Search essence icons')}
   noMatchesHint={noMatchesText ||
     copy('FABRICATE.Admin.Features.Essences.NoIconsFound', 'No icons match that search.')}
-  horizontalAlign={iconOnly ? 'left' : 'right'}
+  horizontalAlign={glyphOnly ? 'left' : 'right'}
   minWidth={260}
   maxWidth={340}
   measureListMetrics={measurePopoverMetrics}
@@ -207,7 +215,7 @@
   {#snippet trigger({ attributes, open })}
     <button
       class={`essence-icon-picker-trigger ${triggerClass}`}
-      class:icon-only={iconOnly}
+      class:icon-only={glyphOnly}
       style={triggerStyle}
       oncontextmenu={handleTriggerContextMenu}
       {disabled}
@@ -226,10 +234,8 @@
       >
         <i class={selectedOption.iconClass}></i>
       </span>
-      {#if !iconOnly}
-        <span class="essence-icon-picker-trigger-label" id={describesChoice ? choiceId : undefined}
-          >{selectedOption.label}</span
-        >
+      {#if !glyphOnly}
+        <span class="essence-icon-picker-trigger-label">{selectedOption.label}</span>
       {:else if describesChoice}
         <span id={choiceId} hidden>{selectedOption.label}</span>
       {/if}

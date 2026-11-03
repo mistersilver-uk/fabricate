@@ -44,6 +44,7 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryTooltip.js',
   'src/utils/fillPlaceholders.js',
   'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/labelInName.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',
