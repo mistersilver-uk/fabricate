@@ -18,7 +18,7 @@
   | `initialFocusSelector` | selector | `''` | Else the element it matches; else the first focusable one. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer box one equal share of the rail, through `display: contents` wrappers. |
   | `icon` | Font Awesome classes | `''` | A decorative glyph before the title, inked `--fab-accent-text`; `''` draws none (issue 2818). |
-  | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | Widths 500px, 560px and 620px, still clamped to the viewport; a value outside the set draws `md`, and a caller's `width` outranks it. |
+  | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | Widths 500px, 560px and 620px, still clamped to 48px short of the box it is centred in (the viewport, or an overlay host that is the containing block of fixed content); a value outside the set draws `md`, and a caller's `width` outranks it. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
   | `scrim` | `'none'` \| `'dim'` | `'none'` | `dim` draws a fixed scrim just before the dialog in its host, over what the dialog is centred in; any other value draws none (issue 2859). |
 
@@ -375,7 +375,9 @@
     display: contents;
   }
 
-  /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28). */
+  /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28).
+     Its width is capped against the containing block of fixed content: the viewport, or a host that
+     is one (`contain: layout`, a `transform`). */
   .fabricate-modal {
     position: fixed;
     top: 50%;
@@ -384,7 +386,7 @@
     z-index: 100;
     display: flex;
     flex-direction: column;
-    width: min(var(--manager-modal-width, 560px), calc(100vw - 48px));
+    width: min(var(--manager-modal-width, 560px), calc(100% - 48px));
     max-height: min(640px, calc(100vh - 64px));
     overflow: hidden;
     background: var(--fab-bg-1);

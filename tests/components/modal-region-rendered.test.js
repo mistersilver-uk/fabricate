@@ -6,8 +6,9 @@
  * the region makes itself the containing block of fixed content (`contain: layout`, a `transform`;
  * not `position: relative`, nor `container-type: inline-size` as the Manager's root sets) and
  * otherwise in the viewport,
- * sits above a companion layer of lower `z-index`, and keeps its width and height caps from the
- * viewport rather than the region.
+ * sits above a companion layer of lower `z-index`, keeps its height cap from the viewport rather
+ * than the region, and, where the region is the containing block, takes its width cap from the
+ * region: 48px short of the region's width, the close control inside it.
  * Limit: Chromium only; Font Awesome's webfonts are not loaded, so the glyph's own box is unmeasured.
  */
 import assert from 'node:assert/strict';
@@ -75,6 +76,59 @@ describe('the Modal width rungs', () => {
   it('clamps a rung to the browser window, 48px short of its width', async () => {
     const width = await inFixture('&size=lg', dialogWidth, { width: 520, height: 800 });
     assert.equal(width, 472);
+  });
+});
+
+/** The dialog and its close control against the region, all in viewport pixels. */
+function againstRegion() {
+  const box = (element) => element.getBoundingClientRect().toJSON();
+  const dialog = box(document.querySelector('[data-manager-modal]'));
+  const region = box(document.querySelector('[data-region]'));
+  const close = box(document.querySelector('[data-manager-modal-close]'));
+  return {
+    width: dialog.width,
+    left: dialog.left - region.left,
+    right: region.right - dialog.right,
+    closeInside: close.left >= region.left && close.right <= region.right,
+  };
+}
+
+describe('the Modal width inside a region that is its containing block', () => {
+  for (const kind of ['contain', 'transform']) {
+    for (const [size, regionWidth, width] of [
+      ['sm', 420, 370],
+      ['md', 420, 370],
+      ['lg', 420, 370],
+      ['lg', 500, 450],
+      ['sm', 720, 500],
+      ['md', 720, 560],
+      ['lg', 720, 620],
+    ]) {
+      it(`draws ${width}px for ${size} in a ${regionWidth}px ${kind} region, inside it with a 24px margin`, async () => {
+        const read = await inFixture(
+          `&region=${kind}&regionWidth=${regionWidth}&size=${size}`,
+          againstRegion
+        );
+        assert.equal(read.width, width);
+        assert.ok(
+          read.left >= 24 - 1 && read.right >= 24 - 1,
+          `margins ${read.left}, ${read.right}`
+        );
+        assert.equal(read.closeInside, true, 'the close control is inside the region');
+      });
+    }
+  }
+
+  it('draws the width the caller states, still within the region', async () => {
+    const page = await openDialog('&region=contain&regionWidth=420&size=lg', DESKTOP);
+    try {
+      await page.$eval(DIALOG, (dialog) =>
+        dialog.style.setProperty('--manager-modal-width', '900px')
+      );
+      assert.equal((await page.evaluate(againstRegion)).width, 370);
+    } finally {
+      await page.close();
+    }
   });
 });
 
@@ -175,9 +229,11 @@ describe('the Modal hosted in a companion region through the overlayHost option'
     });
   }
 
-  it('keeps the width cap from the viewport, not the region', async () => {
-    const read = await inFixture('&region=contain&size=lg', placement, { width: 520, height: 800 });
-    assert.equal(read.dialog.width, 472, 'a 700px region does not widen the 520px viewport’s cap');
+  it('keeps a region the dialog is not centred in from narrowing it, as the viewport is its containing block', async () => {
+    for (const kind of ['plain', 'container']) {
+      const read = await inFixture(`&region=${kind}&regionWidth=420&size=lg`, placement);
+      assert.equal(read.dialog.width, 620, `a 420px ${kind} region leaves the width alone`);
+    }
   });
 
   it('keeps the height cap from the viewport, so a short region clips a tall dialog', async () => {

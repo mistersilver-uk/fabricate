@@ -2108,7 +2108,7 @@ Each group states the accepted values of every key that entry publishes.
     A name of white space alone leaves its element with no name, so the companion never passes one.
   - `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
     It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the viewport of the browser window that holds it or an `overlayHost` region that makes itself the containing block of fixed content.
     A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
     `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
@@ -2182,7 +2182,8 @@ Each group states the accepted values of every key that entry publishes.
     With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so a companion passes such a region to dim its own pane and nothing else, and the viewport where neither the region nor an element above it does, over a companion layer whose `z-index` is below 100 either way.
     A companion passes a region that does not itself scroll, such as the root that holds its scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
     The way for a companion to dim its own window is that contained host, a non-scrolling root of its own such as its studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+    The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+    Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
     Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
@@ -3139,6 +3140,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` with an `overlayHost` that is a pane of its own inside a Fabricate window, over a layer of its own in that pane
 - **THEN** the dialog is drawn inside the pane, centred in it where the pane makes itself the containing block of fixed content and centred in the browser window's viewport where it does not
 - **AND** the dialog is drawn over the companion's layer and no layer of Fabricate's covers the pane
+- **AND** where the pane makes itself the containing block, a pane 420px wide holds a dialog of every `size` at most 372px wide, inside the pane with its close control, and a pane 720px wide leaves each rung at its own width
 
 #### Scenario: A dimmed published dialog
 

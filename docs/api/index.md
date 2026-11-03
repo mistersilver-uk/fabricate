@@ -4076,7 +4076,7 @@ A component with an overlay that you mount in a slot closes its open panel when 
 Never pass a name of white space alone, which leaves its element with no name.
 `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
 It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the viewport of the browser window that holds it or an `overlayHost` region that makes itself the containing block of fixed content.
 A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
 `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
 `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which you make at most one primary.
@@ -4155,11 +4155,13 @@ The dialog is centred in the nearest element above it that makes itself the cont
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
 An `overlayHost` that is a region of your own, such as a pane inside your window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
 Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+In a region that is the containing block, the dialog's width is capped 48px short of the region's width, so it stays inside the region with a 24px margin on each side, and its close control stays inside the region.
 With `scrim` `'none'`, Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
 With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so pass such a region to dim your own pane and nothing else, and the viewport where neither the region nor an element above it does, over a layer of yours whose `z-index` is below 100 either way.
 Pass a region that does not itself scroll, such as the root that holds your scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
 The way to dim your own window is that contained host, a non-scrolling root of yours such as your studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
 Its height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
 Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.
