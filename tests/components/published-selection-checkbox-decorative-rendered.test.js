@@ -200,7 +200,10 @@ describe('the ticked success box in every palette', () => {
         );
         assert.ok(contrast(spaced(paint.tick), spaced(paint.fill)) >= 3, `${id} tick on its fill`);
         for (const ground of GROUNDS) {
-          assert.ok(contrast(spaced(paint.edge), spaced(tokens[ground])) >= 3, `${id} edge on ${ground}`);
+          assert.ok(
+            contrast(spaced(paint.edge), spaced(tokens[ground])) >= 3,
+            `${id} edge on ${ground}`
+          );
         }
       }
       const open = await paintOf('open');
