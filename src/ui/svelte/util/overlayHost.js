@@ -172,14 +172,30 @@ export function createStandaloneOverlayLayer(doc, attributes = {}, parent = doc.
 
 // An element in the browser's top layer: a `<dialog>` opened with `showModal()` or a fullscreen
 // element, both `:modal`, which make everything outside them inert, or an open `popover`.
-const TOP_LAYER_SELECTOR = ':modal, :popover-open';
+// A browser that cannot parse `:popover-open` throws on the pair, so `:modal` alone is tried next,
+// and one that parses neither has no top layer to find.
+const TOP_LAYER_SELECTORS = Object.freeze([':modal, :popover-open', ':modal']);
 
-/** The nearest top-layer element above the first of `nodes` that has one, through open shadow roots. */
+function closestTopLayer(element) {
+  for (const selector of TOP_LAYER_SELECTORS) {
+    try {
+      return element.closest(selector);
+    } catch {
+      // An unparsed selector: try the next one.
+    }
+  }
+  return null;
+}
+
+/**
+ * The nearest top-layer element above the first of `nodes` that has one, through open shadow roots.
+ * A fullscreen document element counts as none, since nothing in its document is inert.
+ */
 export function topLayerAbove(nodes) {
   for (const node of nodes) {
     for (let at = node; at?.closest; at = at.getRootNode?.().host) {
-      const found = at.closest(TOP_LAYER_SELECTOR);
-      if (found) return found;
+      const found = closestTopLayer(at);
+      if (found) return found === found.ownerDocument.documentElement ? null : found;
     }
   }
   return null;

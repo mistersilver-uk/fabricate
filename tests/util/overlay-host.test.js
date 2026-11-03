@@ -446,6 +446,29 @@ describe('a standalone layer in a top-layer element (issue 2884)', () => {
     assert.ok(topLayerAbove([]) === null);
   });
 
+  it('falls back to :modal where :popover-open does not parse, and finds none where neither does', () => {
+    const dialog = element('dialog');
+    const inner = element('div', dialog);
+    const tried = [];
+    inner.closest = (selector) => {
+      tried.push(selector);
+      if (selector.includes(':popover-open')) throw new SyntaxError('unknown pseudo-class');
+      return dialog;
+    };
+    assert.ok(topLayerAbove([inner]) === dialog);
+    assert.deepEqual(tried, [':modal, :popover-open', ':modal']);
+    inner.closest = () => {
+      throw new SyntaxError('unknown pseudo-class');
+    };
+    assert.ok(topLayerAbove([inner]) === null);
+  });
+
+  it('counts a fullscreen document element as no top-layer element', () => {
+    const inner = element();
+    inner.closest = () => document.documentElement;
+    assert.ok(topLayerAbove([inner]) === null);
+  });
+
   it('hands the chain the measured anchor and the anchor the host is acquired from', () => {
     const target = element();
     const anchor = element('button', target);

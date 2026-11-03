@@ -149,6 +149,15 @@ describe('a published overlay entry in a dialog opened with showModal()', () => 
     });
   }
 
+  // A pinned known limit (issue 2917): these panels close on Escape without preventing it, so
+  // Chromium closes the modal dialog too; the fix for that issue flips this case.
+  for (const entry of ['Select', 'IconPicker', 'ActionMenu']) {
+    it(`known limit: closes the dialog too when Escape closes a ${entry} panel in it`, async () => {
+      const result = await within(entry, {}, (page) => probe(page, entry));
+      assert.equal(result.dialogOpen, false);
+    });
+  }
+
   for (const entry of ['Popover', 'Typeahead']) {
     it(`keeps the dialog open when Escape closes a ${entry} panel in it, as the ${entry} prevents the key`, async () => {
       const result = await within(entry, {}, (page) => probe(page, entry));
