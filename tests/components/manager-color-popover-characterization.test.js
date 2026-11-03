@@ -318,6 +318,58 @@ describe('1036 TintPicker — the inline strip (issues 2257, 2901)', () => {
     );
   });
 
+  it('makes one radio the Tab stop beside the No-colour radio, in every selection state', async () => {
+    const stops = (target) =>
+      [...target.querySelectorAll('[role="radio"]')]
+        .filter((radio) => radio.getAttribute('tabindex') === '0')
+        .map((radio) => radio.dataset.managerColorToken ?? 'none');
+    const onClear = () => {};
+    const target = await LAYOUTS.inline.mount({
+      colorToken: '',
+      unset: true,
+      allowNone: true,
+      onClear,
+    });
+    assert.deepEqual(stops(target), ['none'], 'unset checks No colour, the one stop');
+
+    await harness.setProps({ colorToken: 'aqua', unset: false });
+    assert.deepEqual(stops(target), ['aqua'], 'a staged token is the one stop');
+    assert.equal(target.querySelector('[data-manager-color-none]').getAttribute('tabindex'), '-1');
+
+    await harness.setProps({ colorToken: '', unset: true, noneSelected: false });
+    assert.deepEqual(stops(target), ['none'], 'left unchanged, the first radio is the stop');
+    assert.equal(target.querySelectorAll('[aria-checked="true"]').length, 0);
+  });
+
+  it('reaches No colour by ArrowLeft and Home, and an arrow onto a checked No colour calls nothing', async () => {
+    const calls = [];
+    const props = {
+      colorToken: 'sage',
+      allowNone: true,
+      onClear: () => {
+        calls.push('clear');
+      },
+      onChange: (next) => {
+        calls.push(next.colorToken);
+      },
+    };
+    const target = await LAYOUTS.inline.mount(props);
+    const key = (selector, name) =>
+      target
+        .querySelector(selector)
+        .dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
+    key('[data-manager-color-token="sage"]', 'ArrowLeft');
+    assert.ok(document.activeElement?.hasAttribute('data-manager-color-none'), 'focus on None');
+    key('[data-manager-color-token="mist"]', 'Home');
+    assert.deepEqual(calls, ['clear', 'clear'], 'each lands on No colour and clears');
+
+    await harness.setProps({ ...props, colorToken: '', unset: true });
+    calls.length = 0;
+    key('[data-manager-color-token="sage"]', 'ArrowLeft');
+    key('[data-manager-color-token="azure"]', 'ArrowRight');
+    assert.deepEqual(calls, [], 'No colour is already checked, so nothing is called');
+  });
+
   it('clears through the No-colour radio and chooses a preset by an arrow key', async () => {
     const calls = [];
     const target = await LAYOUTS.inline.mount({

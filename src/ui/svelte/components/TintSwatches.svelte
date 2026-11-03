@@ -53,16 +53,16 @@
   );
   const showNone = $derived(named(noneLabel) && typeof onClear === 'function');
   const noneIsChecked = $derived(noneChecked === true);
-  const checkedIndex = $derived(
-    showNone && noneIsChecked
-      ? 0
-      : swatches.findIndex(({ token }) => token === value) + (showNone ? 1 : 0)
-  );
-  const tabStop = $derived(checkedIndex >= (showNone ? 1 : 0) ? checkedIndex : 0);
-
   // Index 0 is the No-colour radio while it is drawn.
+  const offset = $derived(showNone ? 1 : 0);
+  const checkedIndex = $derived.by(() => {
+    if (showNone && noneIsChecked) return 0;
+    const index = swatches.findIndex(({ token }) => token === value);
+    return index < 0 ? -1 : index + offset;
+  });
+  const tabStop = $derived(Math.max(checkedIndex, 0));
+
   function choose(index) {
-    const offset = showNone ? 1 : 0;
     if (index < offset) {
       if (!noneIsChecked) onClear();
       return;
@@ -167,12 +167,12 @@
     transition: none;
   }
 
-  /* Hover is the outset 2px accent ring 1px clear of the edge, drawn as a border so the window's
-     focus ring stays the only outline a published swatch states. */
+  /* Hover is the outset 2px accent ring 1px clear of the 1px edge (`inset` is read from the padding
+     box), drawn as a border so the focus ring stays the only outline a published swatch states. */
   .fabricate-tint-swatch:hover::after {
     content: '';
     position: absolute;
-    inset: -3px;
+    inset: -4px;
     border: 2px solid var(--fab-accent);
     border-radius: 11px;
     pointer-events: none;

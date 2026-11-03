@@ -2,14 +2,12 @@
  * The module sheet and every component style against the published `TintSwatches` (issue 2901):
  * no selector outside its own scoped block names its root class, so a published strip draws alike
  * under any ancestor, and the marks its own scoped rules draw, the inset keyboard ring and the
- * outset hover ring in the accent and the checked ring in the dark ink, which clear 3:1 on the
- * four grounds a published strip sits on and on all ten tints.
+ * outset hover ring in the accent, which clear 3:1 on the four grounds a published strip sits on;
+ * the checked ring's is `tint-picker-ring-contrast.test.js`'s.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
-import { MANAGER_COLOR_TOKEN_KEYS } from '../src/ui/svelte/util/managerColorTokens.js';
 
 import {
   entryNamed,
@@ -97,7 +95,7 @@ describe('the tint swatches census, synthetic', () => {
 });
 
 describe('the marks on the published TintSwatches’ swatches', () => {
-  it('draws keyboard focus as the 2px accent outline inset 2px, and hover as the accent 3px outside', () => {
+  it('draws keyboard focus as the 2px accent outline inset 2px, and hover as the accent 1px clear of the edge', () => {
     assert.equal(
       ownDeclared('.fabricate-tint-swatch:focus-visible', 'outline'),
       '2px solid var(--fab-accent)'
@@ -107,24 +105,13 @@ describe('the marks on the published TintSwatches’ swatches', () => {
       ownDeclared('.fabricate-tint-swatch:hover::after', 'border'),
       '2px solid var(--fab-accent)'
     );
-    assert.equal(ownDeclared('.fabricate-tint-swatch:hover::after', 'inset'), '-3px');
+    assert.equal(ownDeclared('.fabricate-tint-swatch:hover::after', 'inset'), '-4px');
   });
 
   it('draws the accent marks at 3:1 on each ground a published strip sits on, in every palette', () => {
     assert.equal(themes.size, 7);
     for (const ground of GROUNDS) {
       assert.deepEqual(shortfalls(themes, '--fab-accent', [ground], 3), [], ground);
-    }
-  });
-
-  it('draws the checked ring at 3:1 on every tint, in every palette', () => {
-    const ring = ownDeclared(
-      '.fabricate-tint-swatch.is-selected .fabricate-tint-swatch-fill',
-      'box-shadow'
-    ).match(/^inset 0 0 0 2px var\((--fab-[\w-]+)\)$/u)?.[1];
-    assert.equal(ring, '--fab-biome-icon-foreground');
-    for (const token of MANAGER_COLOR_TOKEN_KEYS) {
-      assert.deepEqual(shortfalls(themes, ring, [`--fab-tag-${token}`], 3), [], token);
     }
   });
 

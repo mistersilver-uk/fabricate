@@ -4783,21 +4783,24 @@ Until your `update` lands, assistive technology hears the old swatch checked, so
 `ariaLabel` is required final display text naming the radio group, as "Activity colour"; a `mount` without it, or with `''`, is refused with `TintSwatches requires a non-empty "ariaLabel"`.
 The strip draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the group with no name.
 `tints` is an array of tint keys naming the swatches drawn, in its order, each once: a key outside Fabricate's ten, a repeat, a value that is not a string, `'Rose'` and `'--fab-tag-rose'` among them, is dropped; absent, not an array, or naming none of the ten, it draws all ten in Fabricate's order.
-`labels` is an object of final display text keyed by tint key, as `{ rose: 'Rose' }`: a swatch is named by its entry, in its `aria-label` and in the `title` the pointer shows, and a swatch whose entry is absent, not a string or white space alone is named by Fabricate's own name for its tint.
+`labels` is an object of final display text keyed by tint key, as `{ rose: 'Rose' }`, which a swatch draws as its `aria-label` and as the `title` the pointer shows; an entry that is absent, not a string or white space alone draws nothing.
 Each swatch is named by its tint's text in `labels`, or else by Fabricate's own name for the tint, which is English and is not localized.
 A swatch has no text of its own, so its name is all a reader hears of it: in a world whose language is not English pass `labels` for every tint you draw, in the world's language.
 An entry for a tint the strip does not draw names nothing.
+The strip draws no No-colour radio, because `allowNone` is not published, so once a swatch is checked the strip offers no way back to none; where your record may hold no colour, draw that choice as a control of your own beside it.
 
 - The group is one Tab stop: Tab reaches the checked swatch, or the first swatch where none is checked, and Tab again leaves the group.
-- ArrowRight and ArrowDown move focus to the next swatch and ArrowLeft and ArrowUp to the previous, wrapping at each end; under `direction: rtl`, read from the focused swatch, ArrowLeft moves to the next and ArrowRight to the previous, and ArrowUp and ArrowDown keep their order.
+- ArrowRight and ArrowDown move focus to the next swatch and ArrowLeft and ArrowUp to the previous, wrapping at each end, along the order the swatches are drawn in and never to the row below; under `direction: rtl`, read from the focused swatch, ArrowLeft moves to the next and ArrowRight to the previous, and ArrowUp and ArrowDown keep their order.
 - Home moves focus to the first swatch and End to the last; each of these keys also chooses the swatch it moves to, as a radio group does, and is not passed on, and an arrow key held with Alt, Control or Meta is left to the browser.
 - Every swatch carries `data-keyboard-focus`, so Foundry runs no keybinding, a canvas pan among them, while one holds focus.
 - An `update` keeps every swatch that is still drawn, so focus stays where it is while the check moves; `destroy` removes them, so where a swatch holds focus, move focus first.
 
 The checked swatch is marked by a 2px inset ring drawn inside its colour in `--fab-biome-icon-foreground`, which clears 3:1 on every tint in all seven palettes, 3.09:1 at the least, and by `aria-checked`, so colour never carries the choice alone.
+The choice's non-visual carrier is `aria-checked`, and its visual mark is that dark ring, which is measured against the swatch's colour, not the ground around it, so on a near-black ground it reads only against the tint (issue 2923).
 Keyboard focus draws the 2px accent outline inset by 2px on the swatch's edge, clear of its colour, so it shows beside the checked ring; it clears 3:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes, 5.19:1 at the least.
-Under the pointer a swatch draws the same accent as a 2px ring 1px outside its edge, never a fill, so a swatch's colour never changes; it draws in the frame the pointer arrives, under either `prefers-reduced-motion` setting, as the focus outline does.
-Each swatch's 1px `--fab-border` edge carries no state.
+Under the pointer a swatch draws the same accent as a 2px ring 1px clear outside its 1px border edge, never a fill, so a swatch's colour never changes; it draws in the frame the pointer arrives, under either `prefers-reduced-motion` setting, as the focus outline does.
+Each swatch's 1px `--fab-border` edge carries no state outside forced colours.
+A keyboard-focused swatch under the pointer draws both marks at once, the focus outline inside its edge and the hover ring outside it, 1px apart.
 Under forced colours each swatch keeps its tint and the checked ring, because the tint is the value itself, and the checked swatch's edge takes the system `Highlight` colour.
 A strip is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, and it is no wider than `target`.
 `TintSwatches` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of TintSwatches`.

@@ -133,11 +133,13 @@ test("the library draws the shipped popover's cursor and hover as the sheet decl
   // The shipped popover is the picker's grid form (issue 2459): its tiles take the picker's cursor
   // and the square tile's hover, which the inline strip's hover rule restates.
   assert.deepEqual(drawnOutlines(), [outlineOf(PICKER_CURSOR), outlineOf(TILE_HOVER)]);
-  // The strip draws the same ring as a border 3px outside its edge, 2px wide and 1px clear.
+  // The strip draws the same ring as a border, 2px wide and 1px clear of its 1px edge, placed from
+  // the padding box inside that edge.
   const [outline, offset] = outlineOf(TILE_HOVER);
+  const edge = 1;
   assert.deepEqual(
     ['border', 'inset'].map((property) => declared(SWATCHES, HOVER, property)),
-    [outline, `-${Number.parseFloat(offset) + Number.parseFloat(outline)}px`],
+    [outline, `-${edge + Number.parseFloat(offset) + Number.parseFloat(outline)}px`],
     'the strip hover'
   );
 });

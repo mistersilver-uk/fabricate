@@ -255,16 +255,51 @@ describe('the marks the published TintSwatches draws', () => {
     await page.hover(swatch('ltr', 'mist'));
     const hovered = await page.$eval(swatch('ltr', 'mist'), (element) => {
       const ring = getComputedStyle(element, '::after');
-      const edge = element.getBoundingClientRect();
+      const own = getComputedStyle(element);
       return {
         border: `${ring.borderTopStyle} ${ring.borderTopWidth}`,
         inset: ring.top,
+        // How far the ring's inner edge stands outside the swatch's own border edge.
+        clear:
+          -Number.parseFloat(ring.top) -
+          Number.parseFloat(ring.borderTopWidth) -
+          Number.parseFloat(own.borderTopWidth),
         fill: getComputedStyle(element.firstElementChild).backgroundColor,
-        width: edge.width,
       };
     });
-    assert.deepEqual([hovered.border, hovered.inset], ['solid 2px', '-3px']);
+    assert.deepEqual([hovered.border, hovered.inset, hovered.clear], ['solid 2px', '-4px', 1]);
     assert.equal(hovered.fill, rest, 'the swatch keeps its colour under the pointer');
+    await page.mouse.move(0, 0);
+  });
+
+  it('draws the hover ring and the focus outline together on a focused swatch, a gap apart', async () => {
+    await set('ltr', 'rose');
+    await page.focus('[data-before]');
+    await page.keyboard.press('Tab');
+    await page.hover(swatch('ltr', 'rose'));
+    const both = await page.$eval(swatch('ltr', 'rose'), (element) => {
+      const ring = getComputedStyle(element, '::after');
+      const own = getComputedStyle(element);
+      const outer = -Number.parseFloat(own.outlineOffset) - Number.parseFloat(own.outlineWidth);
+      const ringInner =
+        -Number.parseFloat(ring.top) -
+        Number.parseFloat(ring.borderTopWidth) -
+        Number.parseFloat(own.borderTopWidth);
+      return {
+        focused: element.matches(':focus-visible'),
+        hovered: element.matches(':hover'),
+        outline: own.outlineStyle,
+        ring: ring.borderTopStyle,
+        // The focus outline's outer edge sits `outer` px inside the border edge, the ring's inner
+        // edge `ringInner` px outside it.
+        gap: outer + ringInner,
+      };
+    });
+    assert.deepEqual(
+      [both.focused, both.hovered, both.outline, both.ring],
+      [true, true, 'solid', 'solid']
+    );
+    assert.equal(both.gap, 1, 'the two rings stand 1px apart');
     await page.mouse.move(0, 0);
   });
 
