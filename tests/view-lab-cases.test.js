@@ -1104,6 +1104,8 @@ const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
 /** The option cards fixture's fieldset, one card of it by value, and that card's radio. */
 const LAB_CARDS_FIELDSET = '[data-lab-option-cards] > [data-lab-option-cards-target] > fieldset';
 const labOptionCard = (value) => `${LAB_CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+const LAB_MANUAL_FIELDSET =
+  '[data-lab-option-cards-manual] > [data-lab-option-cards-manual-target] > fieldset';
 const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
 /** The segmented fixture's filter radio by value, and the segment that wraps it. */
 const labFilterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
@@ -2135,6 +2137,23 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${LAB_CARDS_FIELDSET} > legend`,
       styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+    },
+  ],
+  // The manual option cards beneath (issue 2889): the reached radio's ring and the chosen radio's
+  // 4px edge, two shapes, and the chosen card's border.
+  'manager-published-option-cards-manual': [
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="immune"] input[type="radio"]:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]:checked`,
+      styles: 'border-top-style: solid; border-top-width: 4px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"]`,
+      styles:
+        'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
     },
   ],
   // The published segmented control (issue 2644): the keyboard-reached segment's ring, ink and
@@ -10160,6 +10179,67 @@ test('the option cards specimen case presses ArrowRight on the group the fixture
   assert.deepEqual(
     options.map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value),
     ['breakable', 'immune', 'limited'],
+    'Immune is the next enabled option after Breakable'
+  );
+});
+
+test('the manual option cards case presses ArrowRight on the manual group the fixture mounts beneath the first', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedOptionCards.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mountGroup' &&
+        node.arguments[1]?.type === 'ObjectExpression' &&
+        node.arguments[1].properties.some(
+          (property) => property.key?.name === 'activation' && property.value?.value === 'manual'
+        )
+    ),
+    'the fixture mounts a group with activation manual'
+  );
+  for (const hook of [
+    'data-lab-option-cards-manual',
+    'data-lab-option-cards-manual-target',
+    'data-lab-option-cards-manual-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-option-cards-manual'
+  );
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [
+      [
+        `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]`,
+        'ArrowRight',
+      ],
+    ],
+    'one ArrowRight on the manual group’s checked Breakable radio'
+  );
+  assert.ok(
+    expectSelector.includes(':not([data-lab-option-cards-manual-chosen])'),
+    'the case waits on the absence of the echo only onChange writes'
+  );
+  assert.deepEqual(
+    expectLayout.controls,
+    BASE_NON_VERB_CONTROLS['manager-published-option-cards-manual'],
+    'the case measures the ring, the checked edge and the chosen border'
+  );
+  const options = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'OPTIONS').init.arguments[0].elements;
+  assert.deepEqual(
+    options
+      .map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value)
+      .slice(0, 2),
+    ['breakable', 'immune'],
     'Immune is the next enabled option after Breakable'
   );
 });

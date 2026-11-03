@@ -1056,7 +1056,7 @@ test('(a) an EditorTabs change publishes its twenty frames, then the specimen th
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a RadioCardGroup change publishes its six frames, then the specimen that mounts it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a RadioCardGroup change publishes its six frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/RadioCardGroup.svelte';
   const frames = [
     'world-tool-entry-requirements',
@@ -1066,6 +1066,7 @@ test('(a) a RadioCardGroup change publishes its six frames, then the specimen th
     'manager-checks-crafting-modifiers',
     'fabricate-journal-lifecycle-ingredient-route',
     'manager-published-option-cards-specimen',
+    'manager-published-option-cards-manual',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

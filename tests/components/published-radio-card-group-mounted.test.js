@@ -145,7 +145,7 @@ function assertRefused(overrides, tail) {
 }
 
 describe('the published RadioCardGroup', () => {
-  it('describes the eight keys its manifest entry publishes, at the fabricate root', () => {
+  it('describes the nine keys its manifest entry publishes, at the fabricate root', () => {
     const described = ui().describe('RadioCardGroup');
     assert.deepEqual(Object.keys(described.props), [
       'options',
@@ -156,6 +156,7 @@ describe('the published RadioCardGroup', () => {
       'columns',
       'disabled',
       'disabledOptions',
+      'activation',
     ]);
     assert.deepEqual(described.props.onChange, { kind: 'callback', required: true });
     assert.equal(described.root, 'any');

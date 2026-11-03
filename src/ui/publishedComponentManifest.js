@@ -467,6 +467,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       columns: Object.freeze({ kind: 'data' }),
       disabled: Object.freeze({ kind: 'data' }),
       disabledOptions: Object.freeze({ kind: 'data' }),
+      activation: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',

@@ -361,7 +361,8 @@
       "scope": "shared",
       "why": [
         "A radio group with room to explain itself, as `library.html`'s `<OptionCards>` entry states, rooted at `fabricate-option-cards`.",
-        "Both applications render it, so it is shared."
+        "Both applications render it, so it is shared.",
+        "With `activation: 'manual'`, the group holds the arrow keys, Home and End to moving focus over the native radios and chooses only on Space, Enter or a press, so a persisted choice never follows focus."
       ]
     },
     {
