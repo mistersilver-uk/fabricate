@@ -4595,7 +4595,8 @@ A Fabricate that predates `Typeahead` does not list it in `components`, `describ
 - Escape while the list or its empty line is shown closes it and keeps the text.
   Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
   Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
-  Escape on an empty query passes untouched, so a DialogV2 that listens for it closes. Under `openOnEmpty` the list stays closed at the query Escape emptied, so the sequence on a typed query is close, empty, then pass on, and an edit, focus coming back to the input or ArrowDown opens it again.
+  Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+  Under `openOnEmpty` the list stays closed at the query Escape emptied, so the sequence on a typed query is close, empty, then pass on, and an edit, focus coming back to the input or ArrowDown opens it again.
 - Tab and Shift+Tab move focus as the browser does and close the list without a choice, and your listener above `target` hears the Tab.
 - No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
 - A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
