@@ -3112,7 +3112,7 @@ Under `fill` a label longer than the trigger ends in an ellipsis and the chevron
 Fabricate coerces nothing to `fill`: only `true` stretches the trigger, and `'true'` or `1` draws it hugging its label.
 `fill` replaces sizing the trigger with a descendant rule of your own wrapper, which names a part of the component and so is outside the contract; no `width` is published, because the column's width is yours, on `target`, and `fill` makes the trigger take it.
 Under `fill` the trigger's edge is `target`'s, so a keyboard focus mark drawn outside the trigger falls outside `target`; leave room for it there, unclipped.
-A Fabricate that predates `fill` (issue 2904) refuses it with `"fill" is not a prop of Select`, which `describe('Select').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `fill` refuses it with `"fill" is not a prop of Select`, which `describe('Select').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 
 - A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
 - While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
