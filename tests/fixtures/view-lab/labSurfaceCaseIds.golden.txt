@@ -50,6 +50,8 @@ manager-published-search-specimen
 manager-published-search-forms-specimen
 manager-published-select-specimen
 manager-published-select-layer
+manager-published-select-fill-specimen
+manager-published-select-modal-dialog
 manager-published-stage-bars-specimen
 manager-published-stage-bars-forms-specimen
 manager-published-fill-bar-bands-specimen
@@ -66,6 +68,7 @@ manager-published-icon-buttons-specimen
 manager-published-button-forms-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
+manager-published-option-cards-manual
 manager-published-segmented-specimen
 manager-published-segmented-forms-specimen
 manager-published-chip-forms-specimen
@@ -91,6 +94,7 @@ manager-published-modal-scrim-specimen
 manager-published-typeahead-specimen
 manager-published-typeahead-no-match
 manager-published-typeahead-free-text
+manager-published-typeahead-open-on-empty
 manager-published-popover-specimen
 published-standalone
 published-standalone-light

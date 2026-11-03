@@ -287,16 +287,27 @@ const isBlankWaived = ({ waivedBy }, value, copy) =>
   !isNonBlank(value) &&
   waivedBy.every((name) => isNonBlank(copy[name]));
 
+/** The `text` keys of `entry` that a `contains` key names: the visible words a name must hold. */
+const namedTextKeys = (entry) =>
+  new Set(
+    Object.values(entry.props)
+      .map(({ contains }) => contains)
+      .filter((key) => key !== undefined)
+  );
+
 /**
- * M9 over a validated copy, in manifest order: a `required` key absent or `''`, unless waived, or
- * a `requiredWhen` one so while the data key it names is truthy (issue 2452). A waived key holding
- * a blank string is dropped from the copy, so the component draws its waived form (issue 2858). A
- * key whose `waivedWhen` names a key holding `true` is never refused as empty (issue 2881).
+ * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
+ * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
+ * names is truthy (issue 2452). A waived key holding a blank string is dropped from the copy, so
+ * the component draws its waived form (issue 2858). A key whose `waivedWhen` names a key holding
+ * `true` is never refused as empty.
  */
 function assertRequired(entry, copy) {
+  const named = namedTextKeys(entry);
   for (const [key, spec] of Object.entries(entry.props)) {
     if (isBlankWaived(spec, copy[key], copy)) copy[key] = undefined;
-    if (copy[key] !== undefined && copy[key] !== '') continue;
+    const blank = named.has(key) && typeof copy[key] === 'string' && !isNonBlank(copy[key]);
+    if (!blank && copy[key] !== undefined && copy[key] !== '') continue;
     if (spec.waivedWhen !== undefined && copy[spec.waivedWhen] === true) continue;
     if (spec.required === true) {
       assertRequiredKey(entry, key, spec.waivedBy, copy);
@@ -334,10 +345,16 @@ function assertItemsHold(key, items, pairs) {
  * M22 over a validated copy, after M9: a key stating `contains` whose non-blank string does not
  * hold the text of the key it names, a number by its digits, as a name must hold its visible label
  * (WCAG 2.5.3), and an array item's member an `itemContains` pairs with another of that item
- * (issue 2856).
+ * (issue 2856). A
+ * `contains` key holding a blank string or any other kind of value is dropped from the copy first,
+ * so it writes no name and the label stays the name (issue 2882); the drop runs after M9, so a
+ * `contains` key is never `required`.
  */
 function assertContains(entry, copy) {
   for (const [key, { contains, itemContains }] of Object.entries(entry.props)) {
+    if (contains !== undefined && Object.hasOwn(copy, key) && !isNonBlank(copy[key])) {
+      copy[key] = undefined;
+    }
     if (contains !== undefined) assertHolds(copy[key], asLabel(copy[contains]), key, contains);
     if (itemContains !== undefined && Array.isArray(copy[key])) {
       assertItemsHold(key, copy[key], itemContains);

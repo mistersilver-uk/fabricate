@@ -20,6 +20,7 @@ import {
 } from '../helpers/foundryBridgeModules.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { assertTrapsFocus } from '../helpers/modalTrapContract.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -323,8 +324,7 @@ describe('Escape in the mapping modal', () => {
 });
 
 describe('a panel the mapping modal opens counts as inside it (issue 2660)', () => {
-  const press = (node) =>
-    node.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+  const press = (node) => pressPointer(node);
   const escapeOn = (node) =>
     node.dispatchEvent(
       new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
@@ -343,15 +343,18 @@ describe('a panel the mapping modal opens counts as inside it (issue 2660)', () 
     return { root, closes };
   }
 
-  it('chooses a category on a press then a click on its option, and the modal stays', async () => {
+  it('chooses a category on a press on its option, and the modal stays', async () => {
     const { root, closes } = await mountCounting();
     const panel = openSelectPanel(root, categoryTrigger(1));
     const row = panel.querySelector('[data-popover-option="Metal"]');
     assert.ok(!dialog().contains(panel), 'the list is drawn outside the dialog');
-    press(row);
+    const { MouseEvent } = document.defaultView;
+    const fire = (type) => row.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 1 }));
+    fire('mousedown');
     flushSync();
-    assert.ok(row.isConnected, 'the list is still open after the press');
-    row.click();
+    assert.ok(row.isConnected, 'the list is still open after the press goes down');
+    fire('mouseup');
+    fire('click');
     flushSync();
     assert.equal(categoryTriggerText(root, 1), 'Metal');
     assert.deepEqual(closes, [], 'onClose is not called');

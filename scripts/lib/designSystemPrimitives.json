@@ -239,7 +239,8 @@
       "scope": "shared",
       "why": [
         "The editor tab strip, a real tablist with arrow-key selection whose tabs carry a record count or an issue badge.",
-        "`library.html`'s `<TabBar>` specifies it, and the manager's editors and the player application's detail tabs render it, so it is shared."
+        "`library.html`'s `<TabBar>` specifies it, and the manager's editors and the player application's detail tabs render it, so it is shared.",
+        "A tab item's `count` is a whole number from 0 to `Number.MAX_SAFE_INTEGER` drawn as the record-count vehicle, hidden from assistive technology and naming the tab `<label>, <count>`, the one mark the published strip draws."
       ]
     },
     {
@@ -360,7 +361,8 @@
       "scope": "shared",
       "why": [
         "A radio group with room to explain itself, as `library.html`'s `<OptionCards>` entry states, rooted at `fabricate-option-cards`.",
-        "Both applications render it, so it is shared."
+        "Both applications render it, so it is shared.",
+        "With `activation: 'manual'`, the group holds the arrow keys, Home and End to moving focus over the native radios and chooses only on Space, Enter or a press, so a persisted choice never follows focus."
       ]
     },
     {
@@ -682,8 +684,9 @@
       "scope": "shared",
       "why": [
         "The app's one select: a trigger, an option list over `SearchablePopover` with the query field suppressed, and a configurable tick.",
-        "Its family is in the global sheet and the component has no `<style>` block: 62 `.fabricate-select-*` rules in `styles/fabricate.css`, 27 of them CALL-SITE overrides on the trigger box.",
-        "`library.html`'s `<Select>` specifies it, and both applications render it, so it is shared."
+        "Its family is in the global sheet and the component has no `<style>` block: 64 `.fabricate-select-*` rules in `styles/fabricate.css`, 27 of them CALL-SITE overrides on the trigger box.",
+        "`library.html`'s `<Select>` specifies it, and both applications render it, so it is shared.",
+        "`fill` stretches the trigger to the width of its slot so a companion's column keeps one width whichever option is chosen; it is the one trigger-box prop, and every other per-site skin stays a descendant rule of the caller's wrapper."
       ]
     },
     {
@@ -728,7 +731,9 @@
       "scope": "shared",
       "why": [
         "The value stepper, which `library.html`'s `<Stepper>` entry calls the most-used control in the app.",
-        "Both applications render it and it is published, so it is shared."
+        "Both applications render it and it is published, so it is shared.",
+        "The `size` `34` rung is the toolbar rung: the default padding round a 28px row the input fills on the 34px band's radius 9, its step buttons the default 22px faces in 24 by 24 targets, so the group stands level with the 34px `Field`, `Select`, `SearchField` and `SegmentedControl`.",
+        "A filled stepper takes its rung's height, 26 or 34, and stays 38px with none, and its input's own width never holds a column wider than the two buttons."
       ]
     },
     {
@@ -1074,7 +1079,8 @@
       "scope": "shared",
       "why": [
         "The one shared type-to-search control: a trigger-less query field whose suggestion list the query drives, each choice committing at once into a single slot, a filter or a short list the caller owns.",
-        "It is published, so it is shared."
+        "It is published, so it is shared.",
+        "With `openOnEmpty` set to the literal `true`, focus or ArrowDown at a blank query lists every option."
       ]
     }
   ],

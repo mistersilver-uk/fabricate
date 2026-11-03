@@ -784,6 +784,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-search-forms': () => import('./fixtures/PublishedSearchForms.svelte'),
   // Issue 2454: selects whose lists open in an overlay host and on the standalone layer, by the same seam.
   'published-select': () => import('./fixtures/PublishedSelect.svelte'),
+  'published-select-fill': () => import('./fixtures/PublishedSelectFill.svelte'), // Issue 2884: a select in a dialog opened with showModal(), whose list opens inside that dialog.
+  'published-select-modal': () => import('./fixtures/PublishedSelectModal.svelte'),
   // Issue 2455: stage groups named by their stages' labels and names, by the same seam.
   'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
   // Issue 2837: a stage's shares and the thin track, beside the default track.

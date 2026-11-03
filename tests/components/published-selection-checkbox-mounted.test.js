@@ -146,6 +146,16 @@ describe('the published SelectionCheckbox draws', () => {
     });
   }
 
+  it('writes no aria-label for a name that is blank or no string (issue 2882)', async () => {
+    for (const ariaLabel of [true, {}, ' ']) {
+      const { handle, input, text } = mountBox({ ariaLabel });
+      await settle();
+      assert.ok(!input().hasAttribute('aria-label'), `${JSON.stringify(ariaLabel)} writes none`);
+      assert.equal(text().textContent, LABEL, 'the visible label names the input');
+      handle.destroy();
+    }
+  });
+
   it('draws unticked, ticked and mixed, a mixed box reading as mixed when checked too, and reports none of it', async () => {
     const held = mountBox();
     await settle();

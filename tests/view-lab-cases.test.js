@@ -421,6 +421,8 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSearch.svelte',
   'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
+  'tests/view-lab/fixtures/PublishedSelectFill.svelte',
+  'tests/view-lab/fixtures/PublishedSelectModal.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedStageBarsForms.svelte',
   'tests/view-lab/fixtures/PublishedFillBarBands.svelte',
@@ -897,6 +899,10 @@ const labSearchForm = (key, part) =>
   `[data-lab-search-forms] > [data-lab-search-form="${key}"] ${part}`;
 /** A part of one published select of the select fixture, by its section's key. */
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
+/** A part of one published select of the select fill fixture, by its section's key, and its trigger. */
+const labSelectFill = (key, part) =>
+  `[data-lab-select-fill] > [data-lab-select-fill-form="${key}"] ${part}`;
+const SELECT_TRIGGER = '.fabricate-select-trigger';
 /** The one section of the field fixture. */
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 /** The forms fixture's companion input in one section, by the section's key. */
@@ -963,6 +969,18 @@ const LAB_COMPANION_FACES = [
   {
     selector: labCompanionForm('stepper-default', '.fab-stepper'),
     styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
   },
   {
     selector: labCompanionForm('button-ghost', 'button'),
@@ -1087,6 +1105,8 @@ const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
 /** The option cards fixture's fieldset, one card of it by value, and that card's radio. */
 const LAB_CARDS_FIELDSET = '[data-lab-option-cards] > [data-lab-option-cards-target] > fieldset';
 const labOptionCard = (value) => `${LAB_CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+const LAB_MANUAL_FIELDSET =
+  '[data-lab-option-cards-manual] > [data-lab-option-cards-manual-target] > fieldset';
 const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
 /** The segmented fixture's filter radio by value, and the segment that wraps it. */
 const labFilterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
@@ -1753,6 +1773,24 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'border-radius: 11px',
     },
   ],
+  // The published select's fill (issue 2904): each filled trigger as wide as its 240px column at
+  // its rung's height, the long value's ellipsis, and the list as wide as the filled trigger.
+  'manager-published-select-fill-specimen': [
+    {
+      selector: labSelectFill('inline-long', SELECT_TRIGGER),
+      styles: 'width: 240px; height: 30px',
+    },
+    {
+      selector: labSelectFill('inline-long', '.fabricate-select-value'),
+      styles: 'text-overflow: ellipsis; white-space: nowrap',
+    },
+    { selector: labSelectFill('toolbar', SELECT_TRIGGER), styles: 'width: 240px; height: 34px' },
+    { selector: labSelectFill('form', SELECT_TRIGGER), styles: 'width: 240px; height: 38px' },
+    {
+      selector: '[data-lab-select-fill] > div > .fabricate-select-popover',
+      styles: 'width: 240px; border-radius: 11px',
+    },
+  ],
   // The published field (issue 2601): the caption span's flex box and its kicker type, the
   // companion input's chrome, and its inset keyboard ring over its own edge.
   'manager-published-field-specimen': [
@@ -2065,7 +2103,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
   // The published tab strip (issue 2601): the keyboard-reached, selected tab's ring, ink and
-  // underline, the unselected tab at rest, and the strip's rule.
+  // underline, the unselected tab at rest, the selected tab's count (issue 2896), and the strip's rule.
   'manager-published-tabs-specimen': [
     {
       selector: `${LAB_OUTPUTS_TAB}:focus-visible`,
@@ -2076,6 +2114,10 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: LAB_INPUTS_TAB,
       styles:
         'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+    },
+    {
+      selector: `${LAB_OUTPUTS_TAB} > .manager-editor-tab-count`,
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
     },
     {
       selector: LAB_TABLIST,
@@ -2098,6 +2140,23 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${LAB_CARDS_FIELDSET} > legend`,
       styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+    },
+  ],
+  // The manual option cards beneath (issue 2889): the reached radio's ring and the chosen radio's
+  // 4px edge, two shapes, and the chosen card's border.
+  'manager-published-option-cards-manual': [
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="immune"] input[type="radio"]:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]:checked`,
+      styles: 'border-top-style: solid; border-top-width: 4px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"]`,
+      styles:
+        'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
     },
   ],
   // The published segmented control (issue 2644): the keyboard-reached segment's ring, ink and
@@ -2349,6 +2408,17 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '[data-lab-typeahead-ground] [data-lab-typeahead="free"] .fabricate-search',
       styles: 'height: 38px; border-radius: 9px; border-top-color: var(--fab-accent)',
+    },
+  ],
+  // The scope field lit on its empty query, and the whole set's list it opened (issue 2885).
+  'manager-published-typeahead-open-on-empty': [
+    {
+      selector: '[data-lab-typeahead-ground] [data-lab-typeahead="scope"] .fabricate-search',
+      styles: 'height: 34px; border-radius: 9px; border-top-color: var(--fab-accent)',
+    },
+    {
+      selector: '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list',
+      styles: 'border-top-style: solid; border-top-width: 1px; border-radius: 6px',
     },
   ],
   // The published popover's two nudges (issue 2861); their palette variants measure the same controls.
@@ -4686,6 +4756,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
   'manager-published-select-layer',
+  'manager-published-select-modal-dialog',
   'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
@@ -7685,6 +7756,42 @@ test('the select specimen cases act on what the select fixture mounts through th
   );
 });
 
+test('the select fill specimen case acts on the keys and hooks the select fill fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSelectFill.svelte'
+  );
+  const nodes = [...walkNodes({ instance, fragment })];
+  const selects = nodes.find(
+    (node) => node.type === 'VariableDeclarator' && node.id?.name === 'SELECTS'
+  );
+  const keys = selects.init.arguments[0].elements.map((pair) => pair.elements[0].value);
+  const opened = getCaseById('manager-published-select-fill-specimen');
+  const named = new Set(
+    [
+      ...opened.steps.map(({ selector }) => selector),
+      ...opened.expectContained.map(({ target }) => target),
+    ].flatMap((selector) =>
+      [...selector.matchAll(/data-lab-select-fill-form="([a-z-]+)"/g)].map(([, key]) => key)
+    )
+  );
+  assert.deepEqual(
+    [...named].sort(byCodePoint),
+    [...keys].sort(byCodePoint),
+    'the case names every section'
+  );
+  for (const hook of ['data-lab-select-fill', 'data-lab-select-fill-form']) {
+    assert.ok(
+      nodes.some((node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  assert.deepEqual(
+    opened.steps.map(({ selector }) => selector),
+    [labSelectFill('form', SELECT_TRIGGER)],
+    'one press, on the last filled select, whose list has the room reserved beneath it'
+  );
+});
+
 test('the stage bars specimen case names the groups the stage bars fixture mounts through the seam', () => {
   const { instance, fragment } = componentAstOf(
     'tests/view-lab/fixtures/PublishedStageBars.svelte'
@@ -10149,6 +10256,67 @@ test('the option cards specimen case presses ArrowRight on the group the fixture
   assert.deepEqual(
     options.map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value),
     ['breakable', 'immune', 'limited'],
+    'Immune is the next enabled option after Breakable'
+  );
+});
+
+test('the manual option cards case presses ArrowRight on the manual group the fixture mounts beneath the first', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedOptionCards.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mountGroup' &&
+        node.arguments[1]?.type === 'ObjectExpression' &&
+        node.arguments[1].properties.some(
+          (property) => property.key?.name === 'activation' && property.value?.value === 'manual'
+        )
+    ),
+    'the fixture mounts a group with activation manual'
+  );
+  for (const hook of [
+    'data-lab-option-cards-manual',
+    'data-lab-option-cards-manual-target',
+    'data-lab-option-cards-manual-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-option-cards-manual'
+  );
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [
+      [
+        `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]`,
+        'ArrowRight',
+      ],
+    ],
+    'one ArrowRight on the manual group’s checked Breakable radio'
+  );
+  assert.ok(
+    expectSelector.includes(':not([data-lab-option-cards-manual-chosen])'),
+    'the case waits on the absence of the echo only onChange writes'
+  );
+  assert.deepEqual(
+    expectLayout.controls,
+    BASE_NON_VERB_CONTROLS['manager-published-option-cards-manual'],
+    'the case measures the ring, the checked edge and the chosen border'
+  );
+  const options = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'OPTIONS').init.arguments[0].elements;
+  assert.deepEqual(
+    options
+      .map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value)
+      .slice(0, 2),
+    ['breakable', 'immune'],
     'Immune is the next enabled option after Breakable'
   );
 });

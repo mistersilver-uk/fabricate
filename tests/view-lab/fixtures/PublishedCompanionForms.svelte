@@ -3,7 +3,8 @@
   through the page-session seam `game.fabricate.api.ui` binds, as a companion does, each beside a
   caption of the companion's own: progress tiles, a `StatBox` whose `children` slot holds a thin
   `FillBar`, at the start and default layouts and the success tone, a danger tile, and a tile
-  without the slot; a `Stepper` at the dense `size` `26` beside one at the default rung; a card's
+  without the slot; a `Stepper` at the dense `size` `26` beside one at the default rung, and one at
+  the toolbar `size` `'34'` unfilled and filled (issue 2903); a card's
   actions as `Button`s in the `accent` and `urgent` roles beside the `ghost` baseline, each at rest,
   for the pointer and the keyboard, disabled and busy; a negative specimen of an urgent button
   beside a pressed toggle, which the contract forbids in one view; and `IconPicker`s tinted ember,
@@ -74,6 +75,13 @@
     ['stat-plain', 'StatBox start, no children', 'StatBox', TILE],
     ['stepper-dense', 'Stepper size 26', 'Stepper', { ...QUANTITY, size: 26 }],
     ['stepper-default', 'Stepper, the default rung', 'Stepper', QUANTITY],
+    ['stepper-toolbar', "Stepper size '34'", 'Stepper', { ...QUANTITY, size: '34' }],
+    [
+      'stepper-toolbar-fill',
+      "Stepper size '34', fill",
+      'Stepper',
+      { ...QUANTITY, size: '34', fill: true },
+    ],
     ['button-ghost', "Button role 'ghost'", 'Button', { ...ACTION, role: 'ghost' }],
     ['button-accent', "Button role 'accent'", 'Button', ACCENT],
     ['button-accent-hover', "Button role 'accent', for the pointer", 'Button', ACCENT],

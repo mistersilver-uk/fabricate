@@ -885,9 +885,9 @@ test('manager environments browser and edit route define compact responsive geom
       weightFieldBlock.includes('--fab-stepper-fill-height: 28px;'),
     'the blind task weight slot pins the stepper to its natural width and to the row height the bare input had'
   );
-  // The basis holds only against the automatic minimum: a filled Stepper's min-content width is
-  // its number input's intrinsic ~167px plus the chrome, and without `min-width: 0` the slot
-  // measured 221px in the 158px Weight track and the stepper ran under the Override pill.
+  // The basis holds only against the automatic minimum, so the slot never takes its content's
+  // min-content width: when a filled Stepper's number input still contributed its intrinsic ~167px
+  // (before issue 2903), the slot measured 221px in the 158px Weight track without `min-width: 0`.
   assert.ok(
     weightFieldBlock.includes('min-width: 0;'),
     'the blind task weight slot zeroes its automatic minimum so the 102px basis is what the stepper measures'

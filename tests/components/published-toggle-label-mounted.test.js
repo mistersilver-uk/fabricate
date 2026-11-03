@@ -143,6 +143,16 @@ describe('the published StatusToggle names', () => {
     handle.destroy();
   });
 
+  it('writes no aria-label for a name that is blank or no string (issue 2882)', async () => {
+    for (const ariaLabel of [true, {}, ' ']) {
+      const { handle, button } = mountToggle(labelled({ ariaLabel }));
+      await settle();
+      assert.ok(!button().hasAttribute('aria-label'), `${JSON.stringify(ariaLabel)} writes none`);
+      assert.equal(button().querySelector(NAME_SPAN).textContent, LABEL, 'the label names it');
+      handle.destroy();
+    }
+  });
+
   it('writes an ariaLabel that holds the label’s words as the name, and still draws the label', async () => {
     const { handle, button } = mountToggle(labelled({ ariaLabel: 'Required ingredients' }));
     await settle();

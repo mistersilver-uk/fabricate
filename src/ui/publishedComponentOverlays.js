@@ -11,19 +11,26 @@ import {
   acquireStandaloneOverlayLayer,
   createOverlayContainer,
   registerOverlayChain,
+  topLayerAbove,
   unregisterOverlayChain,
 } from './svelte/util/overlayHost.js';
 
 const KEEP = () => {};
 
-/** The option while it is in the target's document, else the nearest overlay root, else the layer. */
-function placeFor(target, option) {
+/**
+ * The option while it is in the target's document, else the nearest overlay root unless a
+ * top-layer element above one of `from` or the target lies between, else the standalone layer in
+ * that top-layer element, else the one on `<body>` (issue 2884).
+ */
+function placeFor(target, option, from = []) {
   if (option?.isConnected && option.ownerDocument === target.ownerDocument) {
     return { host: option, release: KEEP };
   }
+  const top = topLayerAbove([...from, target]);
   const root = target.closest?.(OVERLAY_HOST_SELECTOR);
-  if (root) return { host: root, release: KEEP };
-  return acquireStandaloneOverlayLayer(target.ownerDocument, themeAttributes(target));
+  if (root && (!top || top.contains(root))) return { host: root, release: KEEP };
+  const doc = target.ownerDocument;
+  return acquireStandaloneOverlayLayer(doc, themeAttributes(target), top ?? doc.body);
 }
 
 /** Unmounts `instance` through `unmount`, passing a throw or a rejection to `report`. */
@@ -44,11 +51,11 @@ export function openOverlayChain({ target, option, runtime, report }) {
   const held = new Map();
 
   const chain = {
-    acquire(overlay) {
+    acquire(overlay, from) {
       const lease = held.get(overlay);
       if (lease?.container.isConnected) return lease.container;
       if (lease) chain.release(overlay);
-      const place = placeFor(target, option);
+      const place = placeFor(target, option, from);
       let container;
       try {
         container = createOverlayContainer(place.host, chain);
