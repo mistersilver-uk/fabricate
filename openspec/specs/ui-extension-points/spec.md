@@ -752,7 +752,7 @@ Where the entry's rest keys land on the control itself, `data-validation-focused
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, named by its glyph's `label`, the caption an `IconPicker` trigger adds to `ariaLabel`, and a `Disclosure` button, which is named by the text the companion draws in its `head` slot, as its group states.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
 A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its group states, each never out of `target`.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, Fabricate moves it among the radios of one manual `RadioCardGroup` on the arrow keys, Home and End, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its group states, each never out of `target`.
 A `Modal` with `trapFocus` is the exception to that rule: Fabricate moves focus into its dialog as it opens, keeps Tab inside it, and returns focus to the element that held it a frame after it closes, as its group states.
 An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its group states.
 An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its group names, and back to the trigger when a choice, Escape or Tab closes it, as its group states.
@@ -1782,16 +1782,27 @@ Each group states the accepted values of every key that entry publishes.
   - `disabled` is `true` or `false` and defaults to `false`: `true` disables every radio natively.
   - `disabledOptions` is an array of `{ value, reason }` items, each disabling the option it names, and `reason` is required non-empty final display text drawn beneath the option's description inside its card, never dimmed, and added to the radio's `aria-describedby`.
     An item that names no option is ignored, and where a value is named twice the first non-empty reason wins.
-  - Each control is a native radio, so the group consumes no key itself: the platform's radio group moves focus to the next or the previous enabled radio on the arrow keys, wrapping at either end and skipping a disabled one, and checks it, and `Space` checks the focused radio.
+  - `activation` is `'automatic'` or `'manual'` and defaults to `'automatic'`: whether a key that moves focus also chooses.
+    Only the exact string `'manual'` draws a manual group, and any other value, `'Manual'` and `true` among them, draws an automatic one.
+    `columns`, `layout`, `disabled` and `disabledOptions` draw and disable the same under either.
+    A Fabricate that predates `activation` refuses it with `"activation" is not a data attribute`, and `describe('RadioCardGroup').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
+  - In an automatic group each control is a native radio, so the group consumes no key itself: the platform's radio group moves focus to the next or the previous enabled radio on the arrow keys, wrapping at either end and skipping a disabled one, and checks it, and `Space` checks the focused radio.
     Each such check fires `change`, which calls `onChange`, and every key still bubbles to a companion's `keydown` listener above `target`.
-  - Focus moves only among one group's radios, by the platform's own handling, and never out of `target`.
+  - In a manual group the arrow keys, Home and End move focus and choose nothing, so a companion that writes a persisted setting on each choice is told of a choice only when the user makes one.
+    Fabricate prevents those keys' default and moves focus itself: ArrowDown and ArrowRight to the next enabled radio, ArrowUp and ArrowLeft to the previous one, wrapping at either end and skipping a disabled one, ArrowLeft and ArrowRight swapped where the radios' `direction` is `rtl`, and Home and End to the first and last enabled radio.
+    `Space` checks the focused radio, as the platform does, and Enter is held from the platform and checks it too, so either, or a press, calls `onChange` once with its `value`, and neither calls anything on the checked radio.
+    A key held with Alt, Ctrl or Meta, and every other key, is the platform's, and every key still bubbles to a companion's `keydown` listener above `target`.
+    This departs from the WAI-ARIA radio group pattern, where an arrow key checks the radio it reaches: the radios keep the native roles, so Chromium's accessibility tree has a `group` named by the legend holding `radio`s named by their labels, and the radio an arrow key reaches is focused and states `checked` false until `Space` or Enter chooses it, which is what a screen reader is given to announce; no screen reader was tested.
+    The focused radio's keyboard ring and the chosen card's 4px radio edge, accent border and ground are different shapes, so focus on an unchosen card is told from the choice without colour, and both shapes hold under forced colours.
+  - Focus moves only among one group's radios, by the platform's own handling or, in a manual group, Fabricate's, and never out of `target`.
+    Either group is one Tab stop: the platform's, on the checked radio, or with none checked on an enabled radio of the platform's choosing (Chromium's first, then the one focus last left).
     To return focus to the group, the companion focuses `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when no option is chosen.
     After a key, a declined choice leaves focus on the radio the key reached, drawn unchecked, so the companion moves focus to `target.querySelector('input[type="radio"]:checked')` after declining one.
     In a host that replaces its content on render (a DialogV2, a Handlebars part, or a `submitOnChange` sheet that renders again after the update a choice causes) the radios are new elements after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when none is checked.
     An `update` that sets `disabled`, or names the focused radio's option in `disabledOptions`, disables the radio holding focus, and the platform moves focus to the document body, where Foundry's keybindings hear Escape and the arrow keys, so the companion moves focus first.
   - Each choice fires a bubbling `change`, so a form with `submitOnChange` submits on every choice.
     The radios carry a private `name`, unique to the mount, so the chosen value appears under that name in a form's data, except while the group is disabled, and a document sheet's schema discards the key: the companion reads the choice from `onChange`, never from the form.
-    The group consumes no key, so where the platform applies implicit submission to a focused radio, Enter submits the `<form>` it is in; the companion mounts it in no form whose submit it does not want.
+    An automatic group consumes no key, so where the platform applies implicit submission to a focused radio, Enter submits the `<form>` it is in; the companion mounts it in no form whose submit it does not want, or makes it manual, whose Enter submits nothing.
   - Rest `data-*` attributes land on the fieldset, never on a card or a radio.
   - Its cards, chips and radios come from Fabricate's module sheet, rooted at `.fabricate-option-cards`, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
     It reflows to fewer tracks only under a Fabricate host that names `fabricate-option-host`, a name the companion gives no element, so under the standalone style root it never reflows and the companion chooses `columns` for the width of `target`; when and how it reflows is private.
@@ -2929,6 +2940,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the card is drawn chosen when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
 - **AND** a mount that omits `legend` throws M9, and one that passes `groupName` throws M13
+
+#### Scenario: A manual option card group chooses only on Space, Enter or a press
+
+- **WHEN** a companion mounts `RadioCardGroup` with `activation: 'manual'` and the user presses ArrowRight on the checked radio
+- **THEN** focus moves to the next enabled option's radio, which stays unchecked, and Fabricate calls nothing
+- **AND** Space or Enter on that radio, or a press on its card, calls `onChange` once with its `value`, and Enter submits no form
+- **AND** a mount that passes any other `activation` draws the automatic group, whose ArrowRight checks the radio and calls `onChange`
 
 #### Scenario: A published segmented control
 
