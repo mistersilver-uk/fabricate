@@ -177,13 +177,16 @@ describe('the published TintSwatches on the keyboard', () => {
     await set('subset', 'azure');
     await page.focus(swatch('subset', 'azure'));
     await page.evaluate(() => {
-      globalThis.__heard = [];
-      document.addEventListener('keydown', (event) => globalThis.__heard.push(event.key), {
-        once: true,
-      });
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          document.body.dataset.heard = event.key;
+        },
+        { once: true }
+      );
     });
     await page.keyboard.press('ArrowRight');
-    const heard = page.evaluate(() => globalThis.__heard[0]);
+    const heard = page.evaluate(() => document.body.dataset.heard);
     assert.equal(await heard, 'ArrowRight', 'a listener above the strip still hears the key');
     await page.keyboard.press('Tab');
     assert.equal(await active(), 'page button', 'Tab leaves the group');
