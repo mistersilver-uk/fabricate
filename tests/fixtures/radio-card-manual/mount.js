@@ -47,7 +47,7 @@ const propsOf = (key) => ({
   },
 });
 
-for (const key of Object.keys(CASES)) {
+for (const [key, own] of Object.entries(CASES)) {
   const form = document.createElement('form');
   form.dataset.case = key;
   form.style.width = '420px';
@@ -59,7 +59,7 @@ for (const key of Object.keys(CASES)) {
   if (key === 'rtl') target.dir = 'rtl';
   form.append(edge('before'), target, edge('after'));
   document.body.append(form);
-  values[key] = CASES[key].value;
+  values[key] = own.value;
   handles[key] = publishedComponentSeam.publicApi.mount('RadioCardGroup', {
     target,
     props: propsOf(key),

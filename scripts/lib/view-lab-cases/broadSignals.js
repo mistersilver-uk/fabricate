@@ -527,6 +527,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The group mounted through the published seam, keyboard-chosen (issue 2601), and the three
     // that mount it with and without a Fabricate root above its target (issue 2679).
     'manager-published-option-cards-specimen',
+    // The manual group beneath it, whose arrow key moves focus alone (issue 2889).
+    'manager-published-option-cards-manual',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',

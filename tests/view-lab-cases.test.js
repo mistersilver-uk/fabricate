@@ -1085,6 +1085,8 @@ const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
 /** The option cards fixture's fieldset, one card of it by value, and that card's radio. */
 const LAB_CARDS_FIELDSET = '[data-lab-option-cards] > [data-lab-option-cards-target] > fieldset';
 const labOptionCard = (value) => `${LAB_CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+const LAB_MANUAL_FIELDSET =
+  '[data-lab-option-cards-manual] > [data-lab-option-cards-manual-target] > fieldset';
 const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
 /** The segmented fixture's filter radio by value, and the segment that wraps it. */
 const labFilterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
@@ -2098,6 +2100,23 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${LAB_CARDS_FIELDSET} > legend`,
       styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+    },
+  ],
+  // The manual option cards beneath (issue 2889): the reached radio's ring and the chosen radio's
+  // 4px edge, two shapes, and the chosen card's border.
+  'manager-published-option-cards-manual': [
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="immune"] input[type="radio"]:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]:checked`,
+      styles: 'border-top-style: solid; border-top-width: 4px',
+    },
+    {
+      selector: `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"]`,
+      styles:
+        'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
     },
   ],
   // The published segmented control (issue 2644): the keyboard-reached segment's ring, ink and

@@ -507,6 +507,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       columns: 3,
     }),
     'cards-one-column': chosenCard({ columns: 1 }),
+    'cards-manual': chosenCard({ activation: 'manual' }),
     'cards-example-badge': chosenCard({
       options: CARDS.map((card) =>
         card.value === 'hand'

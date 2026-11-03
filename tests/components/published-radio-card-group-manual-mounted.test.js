@@ -232,7 +232,9 @@ describe('a manual RadioCardGroup', () => {
     const { target, handle, radio } = mountGroup();
     await settle();
     const heard = [];
-    target.addEventListener('keydown', (event) => heard.push(event.key));
+    target.addEventListener('keydown', (event) => {
+      heard.push(event.key);
+    });
     radio('hold').focus();
     for (const key of ['ArrowRight', 'Home', 'End', 'Enter']) press(target, key);
     assert.deepEqual(heard, ['ArrowRight', 'Home', 'End', 'Enter']);

@@ -220,6 +220,7 @@ const VOCABULARY_KEYS = Object.freeze([
   'activePanelOnly',
   'as',
   'footerLayout',
+  'activation',
 ]);
 const DECLARED_VOCABULARIES = Object.freeze({
   columns: Object.freeze(['1', '2', '3']),
