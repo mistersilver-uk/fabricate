@@ -1505,7 +1505,7 @@ Each group states the accepted values of every key that entry publishes.
     Under `fill` a label longer than the trigger ends in an ellipsis, the chevron stays at the trailing edge in either direction, and the list opens against the filled trigger as it opens against any.
     Only `true` stretches the trigger: Fabricate coerces nothing, so `'true'` or `1` draws it hugging its label.
     `fill` replaces a descendant rule of the companion's own wrapper, which names a part of the component and is outside the contract; no `width` is published, because the column's width is the companion's, on `target`.
-    The filled trigger's edge is `target`'s, so anything its keyboard mark draws outside the trigger falls outside `target`, and the companion leaves room for it there, unclipped.
+    The filled trigger's edge is `target`'s, so a keyboard focus mark drawn outside the trigger falls outside `target`, and the companion leaves room for it there, unclipped.
   - A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
     While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.

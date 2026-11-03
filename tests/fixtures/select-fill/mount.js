@@ -4,7 +4,8 @@
  * `display` it names, at each `size`: `fill` true in a flex and in a block target, and absent in a
  * flex target. `?host=window` draws them in a Fabricate window, else in a companion's shell under no
  * Fabricate root; `?dir=rtl` sets the shell's direction. A choice passes the value back through
- * `update` and is echoed on the case's `data-chosen`.
+ * `update` and is echoed on the case's `data-chosen`; `<body data-fixture-ready>` marks every case
+ * mounted.
  */
 import '../../../src/ui/publishedComponents.svelte.js';
 import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -55,7 +56,7 @@ function build() {
     for (const width of WIDTHS) {
       for (const [form, extra, display] of FORMS) {
         const target = document.createElement('div');
-        target.dataset.case = `${form}-${size}-${width}`;
+        target.dataset.case = [String(form), size, width].join('-');
         Object.assign(target.style, { width: `${width}px`, display });
         cases.append(target);
         let handle = null;
@@ -74,8 +75,7 @@ function build() {
       }
     }
   }
-  // ratchet-exempt(lint): the page's ready mark, which the rendered suite reads
-  globalThis.__selectFillReady = true;
+  document.body.dataset.fixtureReady = '';
 }
 
 build();

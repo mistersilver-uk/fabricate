@@ -5,7 +5,7 @@
  * as the user chooses a longer option, where an unfilled one changes; the long value ends in an
  * ellipsis with the chevron at the trailing edge, in RTL too; the list opens below the filled
  * trigger, its left edge on the trigger's in LTR, as wide as the trigger within its rung's band;
- * the keyboard mark is the trigger's own border and moves no edge.
+ * keyboard focus moves none of the trigger's edges.
  * Limit: Chromium only, without Foundry's own sheet or Font Awesome's webfonts, so the chevron's
  * box is the empty `<i>`'s; screen-reader speech is not observed.
  */
@@ -43,7 +43,7 @@ async function inFixture(query, body) {
   });
   try {
     await page.goto(server.url(`/tests/fixtures/select-fill/index.html?${query}`));
-    await page.waitForFunction(() => globalThis.__selectFillReady === true);
+    await page.locator('body[data-fixture-ready]').waitFor({ state: 'attached' });
     await twoFrames(page);
     const answer = await body(page);
     assert.deepEqual(errors, [], 'no page error');
@@ -165,61 +165,57 @@ describe('a filled published Select’s long value', () => {
 });
 
 describe('the list a filled published Select opens', () => {
-  it('opens below the trigger, its left edge on the trigger’s in LTR, as wide as the trigger within its rung’s band', () =>
-    inFixture('host=companion', async (page) => {
-      await inTurn(ids('fill-flex'), async (id) => {
-        const size = id.split('-', 3)[2];
-        const trigger = `[data-case="${id}"] .fabricate-select-trigger`;
-        await pressPointerOn(page, trigger);
-        await page.locator(listOf).waitFor();
-        await twoFrames(page);
-        const [panel, anchor] = await page.evaluate(
-          ([list, button]) =>
-            [list, button].map((selector) => {
-              const { left, top, bottom, width } = document
-                .querySelector(selector)
-                .getBoundingClientRect();
-              return { left, top, bottom, width };
-            }),
-          [listOf, trigger]
-        );
-        const { minWidth, maxWidth } = RUNGS[size];
-        const wanted = Math.min(Math.max(anchor.width, minWidth), maxWidth);
-        near(panel.width, wanted, `${id} list width`);
-        near(panel.left, anchor.left, `${id} list left edge`);
-        assert.ok(panel.top >= anchor.bottom, `${id} list below the trigger`);
-        await page.keyboard.press('Escape');
-        await page.locator(listOf).waitFor({ state: 'detached' });
-      });
-    }));
+  for (const dir of ['ltr', 'rtl']) {
+    it(`opens below the trigger in ${dir}, as wide as the trigger within its rung’s band, its left edge on the trigger’s in ltr`, () =>
+      inFixture(`host=companion&dir=${dir}`, async (page) => {
+        await inTurn(ids('fill-flex'), async (id) => {
+          const size = id.split('-', 3)[2];
+          const trigger = `[data-case="${id}"] .fabricate-select-trigger`;
+          await pressPointerOn(page, trigger);
+          await page.locator(listOf).waitFor();
+          await twoFrames(page);
+          const [panel, anchor] = await page.evaluate(
+            ([list, button]) =>
+              [list, button].map((selector) => {
+                const { left, top, bottom, width } = document
+                  .querySelector(selector)
+                  .getBoundingClientRect();
+                return { left, top, bottom, width };
+              }),
+            [listOf, trigger]
+          );
+          const { minWidth, maxWidth } = RUNGS[size];
+          const wanted = Math.min(Math.max(anchor.width, minWidth), maxWidth);
+          near(panel.width, wanted, `${id} list width`);
+          if (dir === 'ltr') near(panel.left, anchor.left, `${id} list left edge`);
+          assert.ok(panel.top >= anchor.bottom, `${id} list below the trigger`);
+          await page.keyboard.press('Escape');
+          await page.locator(listOf).waitFor({ state: 'detached' });
+        });
+      }));
+  }
 });
 
 describe('a filled published Select under keyboard focus', () => {
-  it('draws its own accent border and keeps its edges where target’s are', () =>
+  it('keeps its border box as wide as target at every size, the focus mark moving no edge', () =>
     inFixture('host=companion', async (page) => {
-      const id = 'fill-flex-form-240';
       const before = await page.evaluate(readCases);
-      await page.evaluate((selector) => {
-        document.querySelector(selector).focus({ focusVisible: true });
-      }, `[data-case="${id}"] .fabricate-select-trigger`);
-      await page.keyboard.press('Shift');
-      const read = await page.evaluate((selector) => {
-        const trigger = document.querySelector(selector);
-        const probe = document.createElement('span');
-        probe.style.color = 'var(--fab-accent-border)';
-        trigger.parentElement.append(probe);
-        const accent = getComputedStyle(probe).color;
-        probe.remove();
-        return {
-          focused: trigger.matches(':focus-visible'),
-          border: getComputedStyle(trigger).borderTopColor,
-          accent,
-        };
-      }, `[data-case="${id}"] .fabricate-select-trigger`);
-      assert.ok(read.focused, 'the trigger holds keyboard focus');
-      assert.equal(read.border, read.accent, 'its border takes --fab-accent-border');
-      const after = await page.evaluate(readCases);
-      near(after[id].trigger.width, before[id].target.width, 'width under focus');
-      near(after[id].trigger.left, before[id].target.left, 'start edge under focus');
+      const ids = SIZES.map((size) => `fill-flex-${size}-240`);
+      await inTurn(ids, async (id) => {
+        const trigger = `[data-case="${id}"] .fabricate-select-trigger`;
+        await page.evaluate((selector) => {
+          document.querySelector(selector).focus({ focusVisible: true });
+        }, trigger);
+        await page.keyboard.press('Shift');
+        const focused = await page.evaluate(
+          (selector) => document.querySelector(selector).matches(':focus-visible'),
+          trigger
+        );
+        assert.ok(focused, `${id} holds keyboard focus`);
+        const after = await page.evaluate(readCases);
+        near(after[id].trigger.width, before[id].target.width, `${id} width under focus`);
+        near(after[id].trigger.width, before[id].trigger.width, `${id} width unchanged by focus`);
+        near(after[id].trigger.left, before[id].target.left, `${id} start edge under focus`);
+      });
     }));
 });
