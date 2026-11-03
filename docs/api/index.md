@@ -154,7 +154,7 @@ It is a raw accessor, so a caller that awaits it is responsible for reporting th
 
 Use these public `game.fabricate` methods when macros or integrations need to browse or craft for the current user.
 They back the player Crafting tab and inject the current Foundry user as the viewer before delegating to runtime internals.
-Browsing and crafting are split into two phases (issue 1075) so the browse cost tracks the page rather than the whole recipe corpus.
+Browsing and crafting are split into two phases so the browse cost tracks the page rather than the whole recipe corpus.
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -661,7 +661,9 @@ It guarantees **nothing about that object's method surface** beyond a declared c
 `CraftingEngine` has hundreds of methods and no reviewer can promise them all, so the honest promise is the handle rather than the surface.
 
 `getCraftingEngine().findComponentItems` is the one carve-out, and it is stated in full because a companion that guards only against a null actor still crashes.
-It takes **documents, not ids**; its third argument is a crafting-system **object**, not an id; and it **throws on a null actor and on a null component**, with only the system argument tolerant.
+It takes **documents, not ids**.
+Its third argument is a crafting-system **object**, not an id.
+And it **throws on a null actor and on a null component**, with only the system argument tolerant.
 
 ### Calling A `stable` Member
 
@@ -887,7 +889,9 @@ If instead the GM's configured stack-quantity path is **wrong**, **do not loop s
 Point the GM at Fabricate's own stack-quantity path advisory, which diagnoses exactly that misconfiguration.
 
 **`credited` is three-valued, and `0` never means "the credit failed".**
-It is the amount for `credited`; `0` for `creditNotConfigured` and for every refusal taken before any mechanism ran; and `null` for both `creditFailed` and `creditUnavailable`.
+It is the amount for `credited`.
+`0` for `creditNotConfigured` and for every refusal taken before any mechanism ran.
+And `null` for both `creditFailed` and `creditUnavailable`.
 So `0` means *Fabricate can prove nothing moved* and `null` means *Fabricate cannot say*, exactly as `affordable: null` already works on `checkAffordability`, with `outcome` carrying the rest.
 `awardComponents`' `awarded` is `null` rather than `0` for that same refusal class, and the two are consistent rather than in disagreement: `awarded` is a sum over `placements[]`, so an empty attempt record makes the sum vacuous rather than zero, while `credited` has no companion structure to be vacuous over.
 
@@ -915,7 +919,7 @@ So the pair takes `actorUuids`, and `fromUuid("Scene.<id>.Token.<id>.Actor.<base
 The read takes human-written names on all three axes — `"Iron Ingot"`, `"gp"`, `"Smith's Tools"` — and answers the canonical `systemId`, `componentId` and `unitId` those names resolved to.
 It takes those ids too, in the same `name` field: an exact id wins outright and anything else falls through to the folded name tier, on every axis.
 So a companion that reads once, caches what came back and later refreshes it can hand the ids straight back rather than returning to the authored name it already replaced — and a rename between the two calls cannot redirect it.
-The consume takes those resolved ids and refuses to guess from a name, because Fabricate's owned-item name matcher is case-sensitive and deprecated (issue 540) and no `stable` promise that authorises a **delete** is going to be built on top of it.
+The consume takes those resolved ids and refuses to guess from a name, because Fabricate's owned-item name matcher is case-sensitive and deprecated and no `stable` promise that authorises a **delete** is going to be built on top of it.
 
 **A name Fabricate printed is a name Fabricate accepts.**
 A coin resolves by its id, its abbreviation or its label.
@@ -1063,7 +1067,7 @@ Widening a published bound is free under the compatibility promise and narrowing
 > If you need to know *why*, call the read: it answers `balanceNotConfigured` on the currency reading itself and names the cause in its own message.
 
 **A consume can emit issue-540 name-tier telemetry, and so can the read.**
-Both resolve an actor's owned stacks through the published `findComponentItems`, which falls back to a case-**sensitive** exact-name match whenever no owned item resolved to the component by durable identity, and reports every such hit through the deprecation telemetry issue 540 exists to measure.
+Both resolve an actor's owned stacks through the published `findComponentItems`, which falls back to a case-**sensitive** exact-name match whenever no owned item resolved to the component by durable identity, and reports every such hit through deprecation telemetry.
 That is correct here — this pair must match exactly what salvage and bulk destroy match, or a gate would predict a write it does not perform.
 What the **read** avoids is the *other* hop: resolving your cost's `name` to a crafting-system **definition** goes through the definition index's own silent primitive, so a companion polling holdings every stage does not register as reliance on the name fallback.
 The item-side hits are deduped per session on `(systemId, definition, item name)`, so polling cannot inflate them either.
@@ -1302,7 +1306,7 @@ Fabricate localizes only its own fallback copy.
 
 `tone` selects the action's button treatment: `primary`, `ghost`, `danger`, or `neutral`, the default, which is the plain Manager button with no added styling.
 Every header action renders at the page header's 38px control height and carries `fabricate-button is-size-38`, so a companion's actions match Core's own.
-It also carries `fab-manager-button`, deprecated at issue 2540: Fabricate styles nothing by it, and it is removed after at least one minor release, announced in the release notes.
+It also carries `fab-manager-button`, which is deprecated: Fabricate styles nothing by it, and it is removed after at least one minor release, announced in the release notes.
 `primary: true` is the older, still-supported spelling of `tone: 'primary'`.
 An action that declares both `primary` and `tone` is refused at registration.
 
@@ -1574,7 +1578,9 @@ autoAdvanceCard.onEditSettings(() => {
 ```
 
 **It is your rail sub-item's own click.**
-Asking for the tab already on screen re-activates it through `onRouteReselect` rather than remounting; any other tab is offered to your own `onBeforeNavigate` guard with `reason: 'tab'`, so unsaved work can still stop it; and an allowed move expands the rail group and activates the view exactly as a click does.
+Asking for the tab already on screen re-activates it through `onRouteReselect` rather than remounting.
+Any other tab is offered to your own `onBeforeNavigate` guard with `reason: 'tab'`, so unsaved work can still stop it.
+And an allowed move expands the rail group and activates the view exactly as a click does.
 Your programmatic request and the GM's click are one navigation, not two that agree today.
 
 **It returns `true` when the request was honoured and `false` when it was refused**, and a promise of either whenever your guard answers asynchronously — a veto may be a dialog, and a synchronous `true` would be a claim about a question still on screen.
@@ -2185,7 +2191,7 @@ So state the signed reading and its band as text beside the bar, as "+10, neutra
 Under forced colours a bar whose `neutralBand` is above 0 draws its fill in the system text colour, solid beyond the band and as a hollow 1px ring within it, so the band is told by shape and the sign by side, never by colour alone.
 A fill only a few pixels wide has no room for the ring: in Chromium a reading of +2 on a 240px track, a fill about 2.4px wide, paints as a solid 2px mark, where +3, about 3.6px wide, shows its ring, so a reading that close to zero is told from one beyond the band by its width alone, and your text carries the reading.
 A `thin` bar whose `neutralBand` is above 0 also keeps a 1px edge in the system text colour, drawn outside its track, so its extent and midpoint stay visible.
-A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract, and issue #2838 tracks it.
+A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract.
 A Fabricate that predates `neutralBand` refuses it with `"neutralBand" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
 `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
@@ -2226,7 +2232,9 @@ It draws no figure, so the visible reading is yours to draw.
 `BandedBar` draws percentages as bars whose whole fill takes one hue from a fixed ramp.
 `rows` is required and is `{ id?, name, percent, fill? }[]`.
 `name` is required in every row, `percent` is a whole number 0–100 printed as `<percent>%`, and every `id` is unique.
-One row is a meter named by its `name`, which is also its visible caption; several rows are a histogram; an empty `rows` draws nothing.
+One row is a meter named by its `name`, which is also its visible caption.
+Several rows are a histogram.
+An empty `rows` draws nothing.
 `fill` is a `FillBar` tone, the ten tag names included, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
 Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
 A tag name paints as `FillBar`'s does, and a name outside every set draws `neutral`, as does a Fabricate that predates the tag names.
@@ -2316,7 +2324,9 @@ With `icon` and `ariaLabel` both non-blank, `children` may be absent, `''` or wh
 An empty `children` with neither key throws `Chip requires a non-empty "children"`, as before, and with one of them throws `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys draws as before.
 The icon-only chip is no control: it takes no focus and offers no target, so the 24px pointer-target floor (WCAG 2.2 success criterion 2.5.8) does not apply, and its tooltip opens on pointer hover only, so a keyboard or touch user never sees it: state the state in visible text in the row or detail the chip sits in, never in the glyph and its tooltip alone.
 Its glyph clears 3:1 against its fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` under every published `tone` and none, in every palette, with no `emphasis`, `dashed` or `bare`, which share that paint, and on the `outlined` and `solid` grounds; its tone is colour alone, drawn alike under forced colors: pass a glyph that differs for each state, as a check, a cross and a question mark, and say the state in `ariaLabel`.
-In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored; Playwright's accessibility snapshot reads them as `img "<name>"` and as the name's text; no screen reader was tested.
+In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored.
+Playwright's accessibility snapshot reads them as `img "<name>"` and as the name's text.
+No screen reader was tested.
 `describe('Chip').props.children` stays `{ kind: 'text', required: true }`, and a `describe` that names `ariaLabel` is from a Fabricate that draws the icon-only chip and `dashed`: one that predates them refuses `ariaLabel` with `"ariaLabel" is not a data attribute` and an empty `children` with `Chip requires a non-empty "children"`, and draws `dashed` as the default chip, so read `describe('Chip').props.ariaLabel` before you pass any of them; adding them is additive, and the entry stays at `version` 1.
 `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
 `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
@@ -2575,10 +2585,12 @@ Build `ariaLabel` by inserting the label string itself, as `format('… {label} 
 An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the component itself compares nothing, so the check is the seam's.
 `tooltip` is optional final display text, a hint the label does not say, as "Rewinds the clock by one day"; a `tooltip` that is not a string, or is blank, writes none.
 Fabricate writes it as `data-tooltip-text` on the button, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the button.
-Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the [`IconButton`](#iconbutton) section states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of yours above `target`, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
+Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the [`IconButton`](#iconbutton) section states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of yours above `target`, and whether Foundry's dismiss keybinding then also runs is not measured.
 While it is open Foundry sets `aria-describedby` to `tooltip` on the button, so a screen reader may read the hint as the button's description, and if you also pass `aria-describedby` and no `description`, restore it as [Ownership and theme](#ownership-and-theme) states.
 A button whose rest props include `data-locked` writes and opens no tooltip, because Foundry pins a copy of any tooltip it opens on such an element and the closes above never reach that copy.
-`description` is optional final display text, the button's accessible description, a hint the label does not say, as "Moves the date back 1 day; credits stay", which a screen reader may read after the name as its own settings decide; a `description` that is not a string, or is blank, writes none, and nothing is coerced.
+`description` is optional final display text, the button's accessible description, a hint the label does not say, as "Moves the date back 1 day.
+Credits stay", which a screen reader may read after the name as its own settings decide.
+A `description` that is not a string, or is blank, writes none, and nothing is coerced.
 Fabricate draws it inside the button as an element hidden from every user, so it is never drawn, never joins the name and moves nothing, and names that element in the button's `aria-describedby`, after any ids you pass in `aria-describedby`.
 `description` is the hint a screen reader is given and `tooltip` the one a sighted user is shown, but while a tooltip is open Foundry describes the button by it too, so give the two different words, because a screen reader may then read both.
 While `description` is drawn and a tooltip Foundry opened on the button is open, whichever way it opened, Fabricate writes the button's `aria-describedby` as `tooltip` followed by your ids and the description's, so a screen reader is given the tooltip and then the description under keyboard focus too, and once the tooltip has closed Fabricate writes back your ids and the description's, so you restore nothing then.
@@ -2598,7 +2610,15 @@ Every rung is at least 24px tall, so the button is its own 24 by 24 pointer targ
 The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
 `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger`, `warning`, `info`, `accent`, `urgent` or `confirm`, and defaults to `neutral`.
 It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing; `info` the verb that reads, rolls or reveals and writes no record, as a roll; `accent` the forward verb, which moves the work on to its next step, as "Advance"; and `urgent` the one verb in its cluster that is due now, as that "Advance" once the stage it ends is complete, at most one in a cluster.
+Each value names a verb, never a colour: `neutral` is the secondary verb.
+`primary` the leading verb of its cluster, at most one in a cluster.
+`ghost` the quiet verb that changes no record, never its cluster's leading verb.
+`dashed` the verb that adds to the list it closes.
+`danger` the destructive verb.
+`warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
+`info` the verb that reads, rolls or reveals and writes no record, as a roll.
+`accent` the forward verb, which moves the work on to its next step, as "Advance".
+And `urgent` the one verb in its cluster that is due now, as that "Advance" once the stage it ends is complete, at most one in a cluster.
 `confirm` is the confirming verb, which moves the work a step on without finishing the record, as "Confirm the stage" beside its screen's `primary` "Save", and is never the screen's commit.
 A verb that both destroys and cautions is `danger`.
 A `dashed` label starts with its verb, as "Add tier", because no plus glyph is drawn.
@@ -2615,8 +2635,8 @@ A row of outlined card actions takes `neutral` for a plain verb that writes a re
 An action bar takes `primary` for its one commit and `confirm` for a confirming step beside it, and `confirm` never stands in for `primary`.
 A bar never carries `confirm` and `accent` together, because in `mythwright` their edges are one colour.
 A dialog's Confirm button that finishes the record is `primary`, not `confirm`.
-A Fabricate that predates the `accent` and `urgent` roles (issue 2841) draws `neutral` for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
-A Fabricate that predates the `confirm` role (issue 2890) draws `neutral` for it and refuses nothing, which `describe` cannot show; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates the `accent` and `urgent` roles draws `neutral` for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates the `confirm` role draws `neutral` for it and refuses nothing, which `describe` cannot show; adding it is additive, and the entry stays at `version` 1.
 A visual role is drawn and never announced: it reaches no assistive technology, so the label says the verb.
 Confirm a destructive press yourself, in a dialog of Foundry's, before anything is written; Fabricate's arm-then-confirm state is private.
 `fullWidth` is `true` or `false`.
@@ -2642,9 +2662,9 @@ As the form's first submit button it is also pressed by implicit submission, so 
 A `reset` button resets that form.
 A form submit in Foundry closes a DialogV2 and saves an editable document sheet, so mount a `submit` button only in a form you own.
 A Fabricate that predates `size`, `icon`, `busy` and `type` refuses each with `"<key>" is not a data attribute`, and `describe('Button').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
-A Fabricate that predates the `'24'` and `'26'` rungs (issue 2853) draws the default rung for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
-A Fabricate that predates `ariaLabel`, `tooltip` and `pressed` (issue 2852) refuses each with `"<key>" is not a data attribute`, which `describe('Button').props` shows by leaving it out, and one that predates the `info` role draws `neutral` and refuses nothing; adding them is additive, and the entry stays at `version` 1.
-A Fabricate that predates `description` (issue 2895) refuses it with `"description" is not a data attribute`, which `describe('Button').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates the `'24'` and `'26'` rungs draws the default rung for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `ariaLabel`, `tooltip` and `pressed` refuses each with `"<key>" is not a data attribute`, which `describe('Button').props` shows by leaving it out, and one that predates the `info` role draws `neutral` and refuses nothing; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `description` refuses it with `"description" is not a data attribute`, which `describe('Button').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 It is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog.
 It inherits `target`'s face; its size, weight and ink are its own.
 Align your own content to the button by centring, never by restating its height.
@@ -2661,7 +2681,7 @@ The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--f
 The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
 `ghost` and `dashed` draw no fill, so their label is the muted ink on your target's own ground and clears that floor by the least.
 On `--fab-bg-3` every visual role but `primary` and `urgent` falls short of it in at least one palette.
-A tinted fill is `--fab-info-soft`, `--fab-accent-soft`, `--fab-success-soft`, `--fab-warning-soft` or `--fab-danger-soft` over one of the four grounds, as a tinted card of your own draws it, and each role is measured on all five over all four in every palette (issue 2898).
+A tinted fill is `--fab-info-soft`, `--fab-accent-soft`, `--fab-success-soft`, `--fab-warning-soft` or `--fab-danger-soft` over one of the four grounds, as a tinted card of your own draws it, and each role is measured on all five over all four in every palette.
 There the label clears 4.5:1 at rest and under the pointer in `neutral`, `warning`, `info`, `accent`, `urgent` and `confirm`, the weakest `confirm`'s at 4.71:1 under the pointer.
 `primary`'s label clears it there at rest and, as on the grounds, not under the pointer in `foundry-native`; `danger`'s clears it at rest, and under the pointer on all but `--fab-success-soft` and `--fab-warning-soft` over `--fab-bg-2` in `hearth-herb`.
 `ghost` and `dashed` clear it there only under the pointer, because their resting label, the muted ink, falls short on each tinted fill in at least one palette.
@@ -2675,7 +2695,9 @@ Mount a button on one of the four grounds or on a tinted fill over one of them, 
 `accent` draws its edge in `--fab-accent`, which clears 3:1 on the four grounds in every palette, and its label clears 4.5:1 on the four grounds and on a tinted fill over any of them, at rest and under the pointer; `urgent` draws the pressed face's tile, which clears 3:1 on the four grounds, and the pressed face's label.
 `confirm` draws its edge in `--fab-success-strong`, which clears 3:1 on the four grounds in every palette, the weakest at 3.94:1 on `--fab-bg-2` in `foundry-native`, and its label clears 4.5:1 on the four grounds at rest and under the pointer; `--fab-success` itself falls under 4.5:1 as a label in `foundry-native` and under 3:1 as an edge on `--fab-bg-2` there, which is why the role draws the success text and strong rungs.
 What the button draws for a `role` value outside its set is private.
-So are its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+So are its height, corner, padding, type size and weight.
+Each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in.
+And how Fabricate redraws a button inside its own toolbars, rows and inspectors.
 `aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
 It is for a button whose press shows and hides a region you draw: pass `false` while the region is hidden and `true` while it is shown, in the same `onclick` that shows or hides it, and omit the prop on a button that does no such thing.
 Hide the region from assistive technology too, with `hidden` and not by height alone, because a region hidden by height alone is still read, and pass `true` only while the region is shown.
@@ -2763,7 +2785,9 @@ Pass `pressed` for a staged edit that your own Save applies, and `switch` for a 
 Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and `on` alone, so none of them is an `aria` prop or a rest key, and an older Fabricate refuses `semantics` with `"semantics" is not a data attribute`, which `describe('StatusToggle').props` shows.
 `label` is optional final display text, the setting's name, which the switch draws beside its track inside its own button, so a press on its words is a press on the switch.
 The button is named by `label`, the text it draws beside its track, or, where you pass it, by `ariaLabel`, which must then hold that text.
-Pass `label`, `ariaLabel` or both: without either, `mount` refuses with `StatusToggle requires a non-empty "label"`; a `label` that is not a string is refused with `"label" must be a string`; and a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
+Pass `label`, `ariaLabel` or both: without either, `mount` refuses with `StatusToggle requires a non-empty "label"`.
+A `label` that is not a string is refused with `"label" must be a string`.
+And a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
 Beside a non-blank `label`, an `ariaLabel` that does not contain the label's words as one run of whole words is refused by `mount` and `update` with `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`.
 Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the label clears 4.5:1.
 The label is drawn in `target`'s face and size and in the body ink in both states, so the state is told by the track and the announced state, never by the label's ink.
@@ -2790,7 +2814,9 @@ Keep the switch of a setting the user cannot change right now enabled.
 Answer its press with the reason, in a `Notice` or a notification of your own, and pass `on` unchanged; do not draw a setting that can never change here as a switch.
 Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
 The switch's track is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog.
-Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
+Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that.
+Where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button.
+Give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
 A labelled button is as wide as its track, its gap and its label, up to the width of `target`, and, in a Foundry window, grows past that height only as its label wraps.
 A wrapped label makes the button as wide as `target`, so its keyboard ring reaches 4px past `target`'s edge; give `target` that much room where it clips.
 The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
@@ -2866,8 +2892,8 @@ A name of white space alone leaves the control with no name, so never pass one.
 To return focus to a stepper, focus its input, `target.querySelector('input')`.
 `decrementTooltip` and `incrementTooltip` are optional final display text, each its button's tooltip, a hint that differs from the button's name, as "One day fewer" beside the name "Decrease days to credit"; one that is not a string, or is blank, writes none.
 While one is open Foundry sets `aria-describedby` to `tooltip` on that button, so a screen reader may read it as the button's description, and a tooltip that repeats the name is read twice; neither replaces its button's name.
-Fabricate writes each as its button's `data-tooltip-text`, which Foundry's own hover listener shows as plain text after a delay, and opens it under keyboard focus, only under `:focus-visible`, through `game.tooltip`, closing it on blur, a press, Escape, `destroy` and an `update` that changes that button's tooltip or disables it, through `disabled` or a bound, as the [`IconButton`](#iconbutton) section states; Escape is not stopped, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
-A Fabricate that predates them (issue 2852) refuses each with `"<key>" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out.
+Fabricate writes each as its button's `data-tooltip-text`, which Foundry's own hover listener shows as plain text after a delay, and opens it under keyboard focus, only under `:focus-visible`, through `game.tooltip`, closing it on blur, a press, Escape, `destroy` and an `update` that changes that button's tooltip or disables it, through `disabled` or a bound, as the [`IconButton`](#iconbutton) section states; Escape is not stopped, and whether Foundry's dismiss keybinding then also runs is not measured.
+A Fabricate that predates them refuses each with `"<key>" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out.
 `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
 `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
 Outside this, what is drawn for `min`, `max` or `step` is private.
@@ -2891,7 +2917,7 @@ What the stepper draws for a value outside the set is private; today that is the
 Any other value, `28`, `'27'`, `' 26'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
 The rung outranks `density`, so `comfortable` beside it draws the same 26px stepper, and under `fill` it pins the stepper at 26px across `target`.
 No rung below 26 is published, because one would draw a step button under its 24 by 24 target.
-A Fabricate that predates `size` (issue 2841) refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `size` refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 The stepper steps by one `step` or one stop each way: a row of preset steps around a figure, as −5, −1, +1 and +5, is yours, drawn as published [`Button`](#button)s beside a [`Field`](#field), because each of its presses is an action of its own rather than one value's step.
 `placeholder` is optional text, shown in the input while it is empty.
 It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; pass the text already localised and never rely on it as a name, because `ariaLabel` names the input and a placeholder does not.
@@ -2943,7 +2969,9 @@ The stepper does not catch Escape, except under `format` as stated for it: the i
 Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
 Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
 `Stepper` takes no rest props, so a `data-*` prop, an `id` and a `title` are refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it; a DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states; give `target` `display: flex` and align your own label to the stepper by centring.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it.
+A DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states.
+Give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
@@ -3009,7 +3037,9 @@ To refuse or transform a query, pass the query you keep back through `update` be
 The field draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
 `density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: it is the shell's height, `'default'` 38px at radius 9 and `'toolbar'` and `'inline'` the rungs of those names [`Select`](#select)'s `size` draws, 34px at radius 9 and 30px at radius 7, each at the default shell's fill, type and glyph; any other value, `'compact'` included, draws `'default'`.
 A search field at `'toolbar'` or `'inline'` stands as tall as a `Select` of that `size` beside it, so the row is one height; the retired 32px height is not a rung, and Fabricate's own compact search, the one `'compact'` draws for Fabricate's callers, is not published.
-`countLabel` is optional final display text drawn after the input inside the shell, as "12 found" or "3 chosen", on one line in the placeholder's muted ink, and the input yields it the width it needs, up to half the shell; past that it ends in an ellipsis, though its region still holds the whole text; `''` or absence draws none.
+`countLabel` is optional final display text drawn after the input inside the shell, as "12 found" or "3 chosen", on one line in the placeholder's muted ink, and the input yields it the width it needs, up to half the shell.
+Past that it ends in an ellipsis, though its region still holds the whole text.
+`''` or absence draws none.
 Keep the count short, a figure and a word, as "12 found", because past half the shell it is cut.
 It is a polite status: Fabricate always draws its region, an element with `role="status"` that is empty while no count is given, so when an `update` writes or changes the text, a screen reader is expected to announce the whole new text, once, after what it is reading.
 It is not expected to be announced when the field is mounted with it, when an `update` passes the same text, or when an `update` changes any other key or the user types, because none of those changes the region; an `update` that drops the count empties the region, which is not expected to be announced either.
@@ -3023,7 +3053,9 @@ The field has no `name`, so it adds nothing to a form's data, and a form with `s
 - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
 - In a DialogV2 that wants Enter to confirm, handle Enter in your own listener above `target`, because the field cancels the form's implicit submission.
 - It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so.
-- In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element; whether the query is cleared first is not stated; stop it in your own `keydown` if you must keep the dialog open.
+- In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element.
+  Whether the query is cleared first is not stated.
+  Stop it in your own `keydown` if you must keep the dialog open.
 
 Rest `data-*` props land on the `<label>` root, never on the input, so no rest name is reserved.
 `SearchField` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, as the shell of its `density`, 38px at radius 9 by default; it fills the width of `target`, so give `target` `display: flex`.
@@ -3083,7 +3115,7 @@ The select draws no caption, so draw the same words as visible text beside it, a
 - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, so your listener above `target` hears Tab and no other key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
 - In a DialogV2, Escape on the trigger does not close the dialog; handle Escape in your own listener on the trigger or move focus first.
 - Tab and Shift+Tab close an open list without calling `onChange` and move focus as the browser does, and your listener above `target` hears the Tab.
-- The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
+- The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing.
 - A press on the trigger does not bubble out of it as a `click`, and a press inside the open list does not bubble out of the list, so your `click` listener above `target` or on the `overlayHost` hears neither.
 
 The list is the component's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
@@ -3164,7 +3196,7 @@ A Fabricate that predates `gap` refuses it with `"gap" is not a data attribute`,
 `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as [`FillBar`](#fillbar)'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.
 Against your ground the `thin` track itself is faint, 1.0:1 to 2.9:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, and in `foundry-native` on `--fab-bg-2` an empty stage cannot be seen at all: `--fab-bg-3` there is a shade darker than `--fab-bg-2`, at 1.00:1, so pass `numbered` or state the stage count as text.
 Under forced colours the `thin` track keeps a 1px edge in the system text colour, as the `default` track's border is drawn there, so each bar's extent stays visible.
-Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, and issue #2838 tracks giving it a forced-colours paint, so state the reading as text.
+Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, so state the reading as text.
 On the `thin` track the state paints read against `--fab-bg-3` as the thin `FillBar`'s tones do: the accent is under 3:1 in `hearth-herb` and `ironblood-forge`, the success in `foundry-native`, and the neutral in `hearth-herb`, `ironblood-forge` and `starglass-arcana`, the weakest the neutral in `hearth-herb` at 2.1:1, so `aria-current` and your text, never the colour, say which stage is current and which are done.
 A Fabricate that predates `track` refuses it with `"track" is not a data attribute`, and `describe('StageBars').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
@@ -3350,7 +3382,9 @@ The lead and the text are drawn one space apart, so punctuate the lead where the
 An item with no `icon` releases the glyph column, so its text starts left of its glyph-led siblings', so give every item of a list an `icon`, or none.
 `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
 At the default placement its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room and a long label squeezes it: keep what you draw there short.
-`actionsPlacement` is `'inline'` or `'below'` and defaults to `'inline'`, the row above; `'below'` draws the host as a column beneath the glyph and the body, as wide as the strip's content box, which stacks the content slot's children by `gap` and stretches each to that width, for a call to action under its note; any other value draws `'inline'`.
+`actionsPlacement` is `'inline'` or `'below'` and defaults to `'inline'`, the row above.
+`'below'` draws the host as a column beneath the glyph and the body, as wide as the strip's content box, which stacks the content slot's children by `gap` and stretches each to that width, for a call to action under its note.
+Any other value draws `'inline'`.
 Under it, a published `Button` you mount with `fullWidth` in a `<span>` of yours in the slot spans the strip, and the body keeps the whole row beside the glyph, at any width the strip is drawn at, 180px included.
 Keep the label short: where the strip is narrower than the label, the label wraps inside the button, and one that wraps onto more lines than the button holds spills past its edges, as [`Button`](#button) states.
 The host follows the body in the DOM at either placement, so a screen reader and the Tab key reach what you draw there after the body.
@@ -3414,7 +3448,11 @@ It is the button's whole accessible name and its tooltip, so a sighted user who 
 A name of white space alone leaves the button with no name and an empty tooltip, so never pass one.
 `role` is `neutral`, `primary`, `ghost`, `danger` or `ghost-danger`, and defaults to `neutral`; a role outside that set draws `neutral`.
 It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster; `ghost` the quiet verb, drawn with no edge or fill at rest, for a control repeated on every row of a list; `danger` the destructive verb; and `ghost-danger` the destructive verb repeated on every row, as a row's delete.
+Each value names a verb, never a colour: `neutral` is the secondary verb.
+`primary` the leading verb of its cluster.
+`ghost` the quiet verb, drawn with no edge or fill at rest, for a control repeated on every row of a list.
+`danger` the destructive verb.
+And `ghost-danger` the destructive verb repeated on every row, as a row's delete.
 A visual role is drawn and never announced, so a destructive role needs the verb in `ariaLabel`: "Delete Iron ingot", never "Iron ingot".
 Confirm a destructive press yourself, in a dialog of Foundry's, before anything is written.
 `size` is `''`, `'20'`, `'22'`, `'24'` or `'26'`, a string, and defaults to `''`: `''` draws the default rung, and `'20'`, `'22'`, `'24'` and `'26'` a square of that many pixels at every role; what it draws for any other value is private.
@@ -3424,7 +3462,7 @@ The widened target takes the pointer from whatever it overlaps, so stand two suc
 `true` draws the button as unavailable, takes it out of the tab order and stops every press, so `onclick` is not called.
 Fabricate coerces no `disabled` to a boolean, so only `true` and `false` are in the contract.
 Never pass `true` while the button holds focus, as [Ownership and theme](#ownership-and-theme) states.
-A Fabricate that predates the `'20'` and `'22'` rungs (issue 2853) draws the default rung for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates the `'20'` and `'22'` rungs draws the default rung for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
 `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
 `aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
 It is for a button whose press shows and hides a region you draw, as the [`Button`](#button) section states; the name is the same in both states, and you omit the prop on a button that does no such thing.
@@ -3436,7 +3474,7 @@ While either tooltip is open, the one hover shows or the one keyboard focus open
 You cannot suppress that second reading at version 1, so keep `ariaLabel` a short verb phrase.
 `description` is optional final display text, the button's accessible description, drawn and held as the [`Button`](#button) section states: inside the button, hidden from every user and named in its `aria-describedby`, after `tooltip` while either tooltip is open, so a screen reader may read the name again and then the description, and alone once it has closed; a value that is not a string, or is blank, writes none.
 It is not the tooltip, which stays `ariaLabel`, and a disabled button keeps it.
-A Fabricate that predates `description` (issue 2895) refuses it with `"description" is not a data attribute`, which `describe('IconButton').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `description` refuses it with `"description" is not a data attribute`, which `describe('IconButton').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on IconButton`.
@@ -3650,7 +3688,9 @@ Neither sets the height of a card or panel you draw around the control, so size 
 `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
 An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
 `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
-`surface` is `'default'` or `'panel'` and defaults to `'default'`: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, under every `density`, `tone` and `size`, and changes no segment, height or ring; the `'pill'` shape draws no track fill, so `'panel'` draws nothing there; any other value, `'Panel'`, `true` and `'false'` among them, draws the default track.
+`surface` is `'default'` or `'panel'` and defaults to `'default'`: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, under every `density`, `tone` and `size`, and changes no segment, height or ring.
+The `'pill'` shape draws no track fill, so `'panel'` draws nothing there.
+Any other value, `'Panel'`, `true` and `'false'` among them, draws the default track.
 `size` is `34` or `'34'`, a number or its string, and defaults to none: `34` draws the track 34px tall, its border included, and stretches each segment to fill it inside the density's padding, so the control lines up with a 34px `Field` or `Button` beside it; any other value, `35` and `'34px'` among them, draws the density's own height.
 Without `size` the `'inline'` density draws a 30px track and `'compact'` and `'field'` a 36px one, and the `'default'` density's height follows the type size and is private; the `'pill'` shape drops the track's padding, so it draws `'inline'` at 26px and `'compact'` and `'field'` at 28px, and `size: 34` still draws 34px there.
 Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
@@ -3679,7 +3719,7 @@ On a `'compact'` or `'field'` track the ring reaches the track's inner edge and 
 The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
 On the `'panel'` track the idle ink, at rest and under the pointer, and the selected segment's ink on its fill, under no `tone` and each published `tone` and `variant`, clear 4.5:1 in every palette, and the ring clears 3:1 on the track; the track is opaque, so this holds on any of the four grounds, but on `--fab-bg-0` it draws no step below its ground, so mount it on one of the other three.
 The selected segment's edge, drawn over its own fill, measures 2.09 to 2.86:1 against the `'panel'` track, its fill 1.23 to 1.38:1, and its `--fab-text` ink 1.89 to 2.79:1 against the idle segments' `--fab-text-muted`, across the seven palettes.
-Under forced colors the segments' edges, fills and inks are all system colours, so weight alone (600 against 500) carries the selected state, as on the default track; a forced-colors selected treatment is a follow-up, [issue #2872](https://github.com/mistersilver-uk/fabricate/issues/2872).
+Under forced colors the segments' edges, fills and inks are all system colours, so weight alone (600 against 500) carries the selected state, as on the default track.
 `groupName`, `iconOnly`, `optionDataAttr` and a `class` are refused, because a rest key must be a `data-*` attribute, so the control never draws an icon-only run or a hook of yours on a segment.
 
 A worked control follows: an ingredient filter on a panel you draw inside a Fabricate window, for example in an extension target.
@@ -3748,7 +3788,7 @@ Each arrow's name is also its tooltip, shown on hover and under keyboard focus a
 A name or caption of white space alone leaves its element with no name, so never pass one.
 `perPageAriaLabel` is optional final display text naming the page-size radiogroup in place of the caption, which is still drawn, as "Per page, recipes", so the groups of several pagers take distinct names; a value that is not a string, or is blank, names none, and the caption names the group.
 It must contain `perPageLabel`'s words as one run of whole words, a number by its digits, compared as [`Button`](#button)'s `ariaLabel` is (WCAG 2.2 success criterion 2.5.3), and a `mount` or `update` whose non-blank `perPageAriaLabel` does not throws `"perPageAriaLabel" must contain the text of "perPageLabel" ("<caption>" is not in "<name>")`; build it by inserting the caption string itself, as `` `${perPageLabel}, recipes` ``.
-A Fabricate that predates `landmarks` and `perPageAriaLabel` (issue 2894) refuses each with `"<key>" is not a prop of Pagination`, which `describe('Pagination').props` shows by leaving it out; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `landmarks` and `perPageAriaLabel` refuses each with `"<key>" is not a prop of Pagination`, which `describe('Pagination').props` shows by leaving it out; adding them is additive, and the entry stays at `version` 1.
 `rangeTemplate` is required and is the summary's template, final display text in which Fabricate replaces `{first}`, `{last}` and `{total}` with the first and last record shown and `totalCount`, as "{first}–{last} of {total} reagents"; with no record shown, `{first}` and `{last}` are both `0`.
 `pageTemplate` is required and is the page-position template, in which Fabricate replaces `{page}` with the one-based page shown and `{total}` with the page count, as "Page {page} of {total}".
 Fabricate fills each placeholder of either template with the number in digits, leaves any other `{name}` as written and changes nothing else, so you choose each template's wording, its plural form included, from the `totalCount` you pass.
@@ -3837,13 +3877,13 @@ Never pass a name of white space alone, which leaves its element with no name.
 Absent, or any other value, `'--fab-tag-rose'`, `'Rose'` and `' rose'` among them, draws the glyph in the default accent, and nothing is coerced.
 The glyph is hidden from assistive technology and the tint is colour alone, so say what the tint means in text of your own where it matters.
 Each tint's glyph clears the 3:1 non-text floor on its tile over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette but `mauve` and `slate` on `--fab-bg-2` in `foundry-native`, at 2.55:1 and 2.57:1, and the untinted glyph clears it on all four in every palette; a captioned trigger names the glyph in text beside it, so there the glyph is never the only carrier of the choice.
-A Fabricate that predates `tint` (issue 2841) refuses it with `"tint" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `tint` refuses it with `"tint" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 `iconOnly` is optional, and only `true` draws the icon-only trigger, for a narrow column beside art of your own: the glyph's tile alone, a square with no caption and no caret, sized to the tile rather than to `target` and drawn at the start of `target`; any other value, `'true'` and `1` among them, draws the captioned trigger, and nothing is coerced.
 An icon-only trigger draws no text, so its name and its native tooltip are `ariaLabel` alone, saying what the picker chooses, as "Faction icon".
 The choice is exposed as the trigger's accessible description: `aria-describedby` names the chosen glyph's caption, as "Crown", in every mount, and names nothing while `value` holds no glyph, so `ariaLabel` need not carry the choice.
 Its glyph is then the only visible carrier of the choice, and in `foundry-native` a glyph tinted `mauve` or `slate` may be hard to see on `--fab-bg-2`, at 2.55:1 and 2.57:1 against the 3:1 non-text floor; whether art of your own beside it shows the same glyph again is yours to decide.
 It is a pointer target at least 24 by 24 CSS pixels (WCAG 2.2 success criterion 2.5.8), and its fill, keyboard ring, keys, list, `aria-haspopup` and `aria-expanded` are the captioned trigger's, so it opens, closes and takes focus back as this section states; under forced colours its edge, glyph and ring are drawn in system colours.
-A Fabricate that predates `iconOnly` (issue 2905) refuses it with `"iconOnly" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out, and one that predates the composed name (issue 2899) names a captioned trigger by `ariaLabel` alone; adding both is additive, and the entry stays at `version` 1.
+A Fabricate that predates `iconOnly` refuses it with `"iconOnly" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out, and one that predates the composed name names a captioned trigger by `ariaLabel` alone; adding both is additive, and the entry stays at `version` 1.
 The two arrived together, so `'iconOnly' in describe('IconPicker').props` tells you the trigger's name holds its caption; where it is `false`, put the caption in `ariaLabel` yourself.
 
 - A press on the trigger, by pointer, Enter or Space, opens the list, and a second press closes it.
@@ -3854,8 +3894,8 @@ The two arrived together, so `'iconOnly' in describe('IconPicker').props` tells 
 - Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
 - A press outside the open list closes it without choosing anything, and focus goes where the press puts it: to the element you pressed when it, or an element around it, takes focus, and otherwise to the page.
   With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
-- Tab in the query field closes the list without calling `onChange`, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger; Shift+Tab there closes the list and returns focus to the trigger (issue 2676).
-- The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
+- Tab in the query field closes the list without calling `onChange`, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger; Shift+Tab there closes the list and returns focus to the trigger.
+- The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing.
 - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, and of its own `click`, and the open list stops every `click` inside it, so your listener above `target` or on the `overlayHost` hears Tab and no other key; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
 - In a DialogV2, Escape on the trigger does not close the dialog; handle Escape in your own listener on the trigger or move focus first.
 - Every key pressed in the query field, Escape included, may reach your listener on the `overlayHost` or above it.
@@ -3934,7 +3974,7 @@ Run a command only for an `id` you match by name, with no closing `else`, so no 
 - In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
 - A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger; to move focus in response, move it from a later task, as from a `setTimeout`.
 - Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
-- Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger, departing from the APG menu button pattern, in which Tab closes the menu and moves on, as Tab in an `IconPicker`'s query field does; the published behaviour is kept so your Tab handling does not change (issue 2700).
+- Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger, departing from the APG menu button pattern, in which Tab closes the menu and moves on, as Tab in an `IconPicker`'s query field does; the published behaviour is kept so your Tab handling does not change.
 - A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
 - A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element you pressed when it, or an element around it, takes focus, and otherwise to the page.
   With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
@@ -4015,7 +4055,7 @@ A press on the control that opened the dialog is an outside press too, and its o
 A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as the panel of a component with an overlay that you mount in a slot: a [`Select`](#select)'s list, an [`IconPicker`](#iconpicker)'s list and query field and an [`ActionMenu`](#actionmenu)'s menu.
 A press in such a panel does not call `onClose`, and the panel takes it as its own section states, so a click on an option chooses it as it does outside a dialog.
 Escape pressed while focus is in such a panel is left to that panel: the dialog neither calls `onClose` nor stops it, and the panel closes and returns focus to its trigger in the dialog, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
-A `Modal` you mount in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone (issue 2678).
+A `Modal` you mount in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
 An `overlayHost` you pass inside the slot draws your panel inside the dialog, which clips what overflows it.
 With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
 `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
@@ -4038,7 +4078,7 @@ With `true`, as the dialog is drawn Fabricate moves focus into it, onto the cont
 Tab from its last control moves focus to its first, Shift+Tab from its first to its last, and a Tab with focus on the page, as after the focused control was removed, moves focus into it.
 Every key but Escape pressed in the dialog bubbles to its host and the host's ancestors and stops at the document, so no bubble-phase window listener hears it, Foundry's keybindings among them.
 Unless `scrim` is `'dim'`, nothing covers the window behind the dialog, which still takes a pointer press, so a press there can move focus out of the dialog; with `'dim'`, a press over the box the scrim covers lands on the scrim and focus stays in the dialog.
-A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog you open in that frame keeps the focus it took (issue 2759).
+A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog you open in that frame keeps the focus it took.
 An Enter held on the control that opened the dialog presses the control focus entered on with each repeat, the close control included, so name a control that does not act on Enter with `initialFocus`, or ignore a `keydown` whose `repeat` is `true`.
 Pass `trapFocus` in the `update` that opens the dialog and keep it until the one that closes it; what changing it while the dialog is open does is private.
 `initialFocus` is optional text that names where focus enters with `trapFocus`: the first control in the dialog, in document order, that carries a `data-initial-focus` attribute equal to the text or sits inside an element that does, so mark an element of your own in a slot, as a search field or the `target` of a published component you mount there.
@@ -4048,7 +4088,7 @@ It is read as the dialog opens, so an `update` that changes it takes effect the 
 `footerLayout` is `'end'` or `'equal'` and defaults to `'end'`: `'end'` draws the footer's top-level children in a row aligned to the end of the band, and `'equal'` gives each of them one equal share of the band's width, in the order you append them.
 A child takes its share as a box, so a [`Button`](#button) you mount in an element of your own there fills it only with `fullWidth`.
 What the footer draws for a value outside the set is private; today that is `'end'`.
-`scrim` is `'none'` or `'dim'` and defaults to `'none'`: `'none'` draws no layer behind the dialog, and `'dim'` draws a scrim, a translucent layer in the palette's own dark overlay colour, under the dialog and over the window behind it (issue 2859).
+`scrim` is `'none'` or `'dim'` and defaults to `'none'`: `'none'` draws no layer behind the dialog, and `'dim'` draws a scrim, a translucent layer in the palette's own dark overlay colour, under the dialog and over the window behind it.
 A value other than `'dim'`, as `'dim '`, `'DIM'`, `true` or `1`, draws none, because Fabricate compares the value as it is and coerces none.
 The scrim is drawn in the dialog's host just before the dialog and at its `z-index`, so it covers the box the dialog is centred in, as the lines on its host below state, and it stacks where the dialog does: the dialog and everything in it are drawn above it and keep their own colours, and a Foundry window stacked above the window that holds it is not dimmed.
 It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
@@ -4064,7 +4104,7 @@ In every mode:
 
 - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field you draw in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
 - Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so your own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
-- An element of yours in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published component mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed calls no `onClose` and the dialog stays open (issue 2677).
+- An element of yours in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published component mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed calls no `onClose` and the dialog stays open.
   Fabricate's own dialogs differ: there the dialog hears an Escape on a closed `Select` or `IconPicker` trigger before the trigger does, and closes.
 - Escape reaches your own `keydown` listeners inside the dialog's slots before it stops.
 - Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
@@ -4179,7 +4219,9 @@ With `onOpen` the button's accessible name is its text in the order it is drawn:
 `tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
 It adds no text or glyph, so state what the tone means in `detail` as well.
 `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
-`markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn; while `busy` replaces `leading`, it sizes the spinner; any other value, a numeric string included, draws `22`, and Fabricate warns in the console.
+`markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn.
+While `busy` replaces `leading`, it sizes the spinner.
+Any other value, a numeric string included, draws `22`, and Fabricate warns in the console.
 `density` is `'dense'` or `'default'` and defaults to `'dense'`: `'default'` draws the roomier row of Fabricate's own browse lists, at a 12px by 16px inset with a 12px gap and an 11px corner, and any other value draws as `'dense'`.
 `layout` is `'row'` or `'card'` and defaults to `'row'`: `'card'` draws the row as a card, its mark above its name and the rest in one column across `target`'s width, at a 12px inset on the card ground with an 11px corner, and any other value draws as `'row'`.
 `truncateName` is `true` or `false` and defaults to `false`: `true` holds the name and the detail each on one line that ends in an ellipsis where its text overflows, the whole text staying in the DOM and in a native `title`, and `false` wraps them.
@@ -4282,7 +4324,7 @@ The card is not itself a control: a press on the title or the second line does n
 A name of white space alone leaves the switch with no name, so never pass one.
 The name never states a position, so no "on", "off", "show" or "hide" at its start or end, as [StatusToggle](#statustoggle) states.
 `sub` is optional final display text drawn under the title in a quieter ink; absent, the second line is empty.
-It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby` (issue 2892), so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
+It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
 A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so put a sentence that must be heard there in `title`.
 `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
 `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
@@ -4360,7 +4402,10 @@ The keyboard ring is the accent, 2px wide and 2px clear of the box, drawn on the
 A focused ticked box shows its accent fill, a gap of the ground and the ring, so the ring stays apart from the box's edge.
 The state is not carried by colour alone: a ticked box draws a tick, a mixed one a dash, and an empty one neither, and the input states it to assistive technology as checked, mixed or not.
 Under forced colours the box draws in the reader's system colours: an empty box keeps its edge and draws no tick, a ticked or mixed one fills with `Highlight` and draws its glyph in `HighlightText`, a disabled box draws its edge in `GrayText`, and fills with it when ticked or mixed, undimmed, and the ring takes the reader's text colour.
-Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes an empty box's edge clears 3:1, 3.34:1 at the least, against the ground a compact box draws on and against the fill the larger boxes enclose; a ticked or mixed box's accent edge clears 3:1, 5.19:1 at the least; the tick clears 3:1 on the accent fill, 5.90:1 at the least, and the dash on the soft fill, 3.94:1 at the least; the label clears 4.5:1, 6.91:1 at the least, and the disabled label still clears it, 4.99:1 at the least.
+Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes an empty box's edge clears 3:1, 3.34:1 at the least, against the ground a compact box draws on and against the fill the larger boxes enclose.
+A ticked or mixed box's accent edge clears 3:1, 5.19:1 at the least.
+The tick clears 3:1 on the accent fill, 5.90:1 at the least, and the dash on the soft fill, 3.94:1 at the least.
+The label clears 4.5:1, 6.91:1 at the least, and the disabled label still clears it, 4.99:1 at the least.
 Under the pointer an enabled empty box raises its edge to `--fab-text-muted`, 4.99:1 at the least, and never below its resting edge.
 `--fab-bg-3` is not a supported ground for the box or its label: there the empty edge falls short of 3:1 in three palettes, 2.14:1 at the least, the label falls short of 4.5:1 in two, 3.51:1 at the least, and the ring falls short in two.
 The contrast figures are read from the palettes and the layout is measured in Chromium; the role and name are read from Chromium's own accessibility tree, the checked, mixed and disabled states are the native input's own mapping, and no screen reader was run.
@@ -4537,7 +4582,10 @@ A Fabricate that predates `Typeahead` does not list it in `components`, `describ
 - The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
 - Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
 - Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.
-- Escape while the list or its empty line is shown closes it and keeps the text; Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`; either stops its propagation, so no listener above `target` hears it, a DialogV2's own included; Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+- Escape while the list or its empty line is shown closes it and keeps the text.
+  Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
+  Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
+  Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
 - Tab and Shift+Tab move focus as the browser does and close the list without a choice, and your listener above `target` hears the Tab.
 - No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
 - A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
@@ -4550,7 +4598,7 @@ Pass an `overlayHost` inside the same Fabricate window, or none, so the list tak
 The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
 Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
 The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal, and this is tracked as a follow-up.
+It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal.
 A row is at least 28px tall, so each is a 24px target.
 `Typeahead` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Typeahead`.
 Its field is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog; it fills the width of `target`, so give `target` `display: flex`.
@@ -4653,7 +4701,7 @@ Focus and keys:
 
 The panel is the component's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens, so `target`'s overflow does not clip it.
 It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog (issue 2884).
+A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog.
 It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
 Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
 The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls you draw inside carry their own edges.
@@ -4738,7 +4786,9 @@ Your function may call `update` or `destroy` on its own handle, or `mount`, befo
 After `destroy`, a fault, or an `update` that omits the prop, Fabricate does not call the function again; a required prop cannot be omitted, so an `update` that omits it throws and the earlier function still answers.
 Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates it refuses the prop.
 An `aria` prop is an ARIA attribute Fabricate writes, under the prop's own name, on the control the component's section names; the component declares no prop of that name.
-It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`; `undefined` or absence writes no attribute; anything else throws `"<key>" must be a string, number or boolean`.
+It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`.
+`undefined` or absence writes no attribute.
+Anything else throws `"<key>" must be a string, number or boolean`.
 An `aria` prop is never required.
 An `update` that changes the prop's value writes it on the same element, and one that omits the prop removes the attribute.
 Fabricate writes the attribute only when the value differs from the one it last wrote, so it puts back nothing other code removed or replaced.
@@ -5009,7 +5059,7 @@ Give `overlayHost` a `position` other than `static` with a size, because it is t
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 `Popover` accepts a host anywhere in `target`'s document, and its section states what one outside every Fabricate window changes.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog (issue 2884).
+A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
 Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
@@ -5019,7 +5069,6 @@ The standalone layer, its class and its `data-fabricate-theme` copy are private 
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; mount it in a dialog that is not modal.
-This is tracked as a follow-up.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.
@@ -5029,7 +5078,7 @@ Its panel and its element are removed, focus is not moved, so focus left in the 
 A `target` that is removed and inserted again within one run of script keeps its panel open.
 A panel stays watched in the document it opened in, so after a Foundry 14 move a detach in the new window does not close it.
 A `target` inside a shadow root closes its panel when that root's host leaves the document, and not when the removal happens inside the shadow root.
-A `Modal` dialog closes the same way while its `target` is disconnected, as when an `update` of another `Modal` whose content slot holds it detaches the slot: the dialog is removed and calls no callback, and because its `open` still stands it is drawn again once `target` is attached, watched in the document it opened in as a panel is (issue 2678).
+A `Modal` dialog closes the same way while its `target` is disconnected, as when an `update` of another `Modal` whose content slot holds it detaches the slot: the dialog is removed and calls no callback, and because its `open` still stands it is drawn again once `target` is attached, watched in the document it opened in as a panel is.
 On Foundry 14 Fabricate does not follow a mount from one window to another, so destroy it and mount again in `_onDetach` and `_onAttach`; that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 
@@ -5060,7 +5109,7 @@ Your own window, a chat message and another module's sheet carry no Fabricate ro
 Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
-A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window (issue 2432).
+A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window.
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
@@ -5091,7 +5140,9 @@ A published component draws a control only where its section says so, and each c
   An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its section states.
   An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its section names, and back to the trigger when a choice, Escape or Tab closes it, as its section states.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so move focus to an element of your own before you call either.
-  The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
+  The destination is, in order: the control the press leads to.
+  The next control in your own content, then the previous one.
+  And where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.
 - To return focus to a published control, after a dialog its press opened has closed, focus the focusable element inside `target` that the component's section names; nothing else inside `target` is yours to select.
 - A press bubbles from the control as a `click`, except a press on a `Select`, `IconPicker` or `ActionMenu` trigger, which stops at the trigger, and a press inside an open `Select` or `IconPicker` list or `ActionMenu` menu, which stops there.
@@ -5126,7 +5177,7 @@ A published component draws a control only where its section says so, and each c
   Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under a standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
-  A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` (issue 2852) show that hint the same way, under the pointer and keyboard focus alike, as each section states.
+  A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each section states.
   The name a `ListRow` button holds carries its own text as a native `title`, as its section states.
   A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
@@ -5170,7 +5221,7 @@ What it gives you and what it leaves to you:
   Fabricate's module sheet reaches a document's head and no shadow root.
   A detached `target` that is no shadow root's is drawn, under a standalone style root written at `mount`.
 - In a Foundry 14 detached window the module sheet is present, so a mount made there is drawn in the theme Fabricate reads from its own document element at `mount`.
-  A later theme change reaches a standalone style root in Fabricate's own document and none in a detached window (issue 2432).
+  A later theme change reaches a standalone style root in Fabricate's own document and none in a detached window.
 - A normal declaration in an unlayered sheet of the host's outranks the module sheet that draws the component, at any specificity.
   The exception is `transition` under reduced motion, which the module sheet states `!important`.
   Your own module sheet, one its manifest gives no `layer`, loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
@@ -5218,8 +5269,7 @@ async _preClose(options) {
 
 Fabricate publishes a primitive when a companion cannot re-draw its meaning without drifting from the design system.
 It does not publish a layout, a control with a single site, or a behaviour that belongs to the companion's own window.
-[Issue #2864](https://github.com/mistersilver-uk/fabricate/issues/2864) rules on each piece the Premium audits found, so a companion does not wait on a change that is not coming.
-A maintainer may reverse any ruling by filing a publish issue under the epic [#2846](https://github.com/mistersilver-uk/fabricate/issues/2846).
+Each piece below is settled, so a companion does not wait on a change that is not coming.
 
 - **Tabular rows and sortable column headers** are companion-owned.
   A table is layout, not a primitive, and [`ListRow`](#listrow) is deliberately a single bordered row.

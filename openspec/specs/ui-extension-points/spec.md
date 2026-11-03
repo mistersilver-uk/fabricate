@@ -34,7 +34,7 @@ Core renders an `href` action as an external anchor with `target="_blank"` and `
 - **`tone` selects one of Core's own Manager header button treatments** — `primary`, `ghost`, `danger`, or `neutral` — so a companion's Back, Delete and Save render through the same classes as the recipe editor's rather than as a companion-only lookalike.
 `primary: true` is the shipped spelling of `tone: 'primary'` and keeps working; a descriptor declaring both is refused rather than silently resolved.
 `primary` and `disabled` are validated as booleans, so no provider field on this seam reaches the renderer unvalidated.
-Every header action carries `fabricate-button is-size-38`, and also `fab-manager-button`, a compat token deprecated at issue 2540: no Fabricate rule names it, and it is removed after at least one minor release, announced in the release notes.
+Every header action carries `fabricate-button is-size-38`, and also `fab-manager-button`, a deprecated compat token: no Fabricate rule names it, and it is removed after at least one minor release, announced in the release notes.
 - Core's own `Unlock with Premium` header action belongs to Core's preview and is never rendered over a registered provider's screens.
 - A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
@@ -43,9 +43,8 @@ Every header action carries `fabricate-button is-size-38`, and also `fab-manager
 `craftingSystemId` is `null` when no crafting system is selected, and the route stays reachable in that state.
 `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
 **The four runtime channels below are functions on that frozen context and never mutable fields**, because the context's identity is what a remount is keyed on: a chrome update must move the header without moving the context.
-- **A companion drives Core's own route chrome at runtime, and this REPLACES the earlier requirement that a drill-down render its identity inside the panel.**
-That requirement was ruled on the grounds that route chrome was fixed at registration and that re-registering per drill-down would flash Core's preview and remount the companion.
-Both remain true of re-registration; the ruling is reversed by widening the seam instead, so a companion that opens an editor no longer has to render a back/delete/save header of its own inside the panel — a visible departure from every other Manager screen — and Core's header is what changes.
+- **A companion drives Core's own route chrome at runtime, so a drill-down does not render its identity inside the panel.**
+Re-registering per drill-down would flash Core's preview and remount the companion, so the seam restates chrome on the live mount instead, and a companion that opens an editor does not render a back/delete/save header of its own inside the panel — a visible departure from every other Manager screen — and Core's header is what changes.
 - **`setRouteChrome(chrome)` restates the live mount's chrome and never remounts it.**
 `chrome` accepts every field a tab may register — `title`, `subtitle`, `breadcrumb`, `actionsLabel`, `actions` — plus `icon` or `image` for header artwork and `status` for a state indicator, so a companion learns one chrome vocabulary rather than two.
 Every field is optional.
@@ -138,7 +137,10 @@ A listener's return value is ignored and nothing a listener does changes what th
 - A companion does not patch Manager DOM or use Foundry render hooks.
 - **Core's preview tablist**, which exists in core-fallback mode only, is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, and Left/Right/Home/End focus-and-activation.
 - **The rail's Downtime children are not a tablist in either mode.**
-They stay native `button` elements carrying `aria-current`, and they do not take `role="tab"`, `aria-selected` or `aria-controls`: the group stays rendered after the GM navigates away, so those attributes would dangle and would announce a route-changing control as an unselected tab; activation routes through the unsaved-draft route-exit confirmation whenever it navigates — re-activating the tab already on screen exits no route and is covered by the re-activation requirement above — which an automatic-activation tablist would fire on every arrow keypress; a horizontal strip's key model cannot be preserved on a vertical rail in any case; and Downtime's children are visually and structurally identical to those of the other rail groups, which are plain buttons.
+They stay native `button` elements carrying `aria-current`, and they do not take `role="tab"`, `aria-selected` or `aria-controls`: the group stays rendered after the GM navigates away, so those attributes would dangle and would announce a route-changing control as an unselected tab.
+Activation routes through the unsaved-draft route-exit confirmation whenever it navigates — re-activating the tab already on screen exits no route and is covered by the re-activation requirement above — which an automatic-activation tablist would fire on every arrow keypress.
+A horizontal strip's key model cannot be preserved on a vertical rail in any case.
+And Downtime's children are visually and structurally identical to those of the other rail groups, which are plain buttons.
 - **In provider mode the companion panel is a `region`**, and carries `tabindex="-1"` rather than `tabindex="0"`: the focus stop existed to scroll the panel, and a companion that owns its layout owns that scrolling, so what remains is programmatic focusability.
 **The region takes the active tab's visible `label` as its name**, by pointing `aria-labelledby` at the label element inside the rail sub-item rather than at the sub-item itself, because a landmark inherits the whole accessible name of what it points at and the sub-item's name is an action rather than a screen.
 That label element exists only while the Downtime rail group is expanded, so the panel's accessible name depends on the rail lock below staying in force; removing the lock without also repointing this labelling breaks the region's name, not merely its keyboard reach.
@@ -256,7 +258,9 @@ Every requirement in this subsection is removed when the Studio releases; nothin
   On Component Rules it leads the group, before `Add from catalogue`; on the world Component catalogue, whose group is otherwise not rendered, it is the group's only content.
 - It shows six Premium crafting icons, a `PREMIUM` badge in the Manager title bar badge's gold treatment, one line of copy, an external `Get Premium` link and a dismiss control.
   The link is §Downtime Preview and Premium Extension's Patreon call to action — the same URL, `_blank`, `rel="noopener noreferrer"` — and, unlike that call to action, the advert carries raster imagery, because the icons are the product it advertises.
-- It renders only while all three hold: `fabricate.experimentalFeatures` is enabled; no provider is registered in either extension registry, which is the predicate the Manager title bar's `PREMIUM` badge reads; and the world setting `fabricate.premiumIconsAdDismissed` is not `true`.
+- It renders only while all three hold: `fabricate.experimentalFeatures` is enabled.
+  No provider is registered in either extension registry, which is the predicate the Manager title bar's `PREMIUM` badge reads.
+  And the world setting `fabricate.premiumIconsAdDismissed` is not `true`.
   A provider registered while the Manager is open hides it at once.
 - **Its experimental gate is TEMPORARY and tied to Fabricate Premium being unreleased**, as §Downtime Preview and Premium Extension, Experimental gate, is, and it is removed with that gate.
 - Dismissing it writes `fabricate.premiumIconsAdDismissed` as `true` for the world, so it is hidden for every GM of that world on both screens; a GM whose Manager is already open stops seeing it the next time that GM opens the Manager.
@@ -297,7 +301,9 @@ It carries no route chrome and no header actions, because the player window has 
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
 `tabId` is always the provider's own bare tab id, never the route key.
 - `context` is frozen, replaced rather than mutated, and carries `{ schemaVersion, surface: 'player', surfaceId, tabId, actorId, isGM, revision, requestRemount }` and no Core store, document or component.
-`actorId` is the shared Actor selection top bar's current selection or `null`; `isGM` is presentation and never an authorization gate, **and it is true for assistant GMs as well as GMs**; `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
+`actorId` is the shared Actor selection top bar's current selection or `null`.
+`isGM` is presentation and never an authorization gate, **and it is true for assistant GMs as well as GMs**.
+`requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
 **A new context identity is produced when and only when one of those values changes**, so a republication that leaves a surface's values unchanged — opening the window, or any other companion registering, unregistering or re-registering — does not remount a live companion.
 - **Core applies no PER-USER visibility or permission gate to a provider tab.**
 Unlike the Manager seam the player window has no GM gate, so every user who can open the window sees the same tabs as every other user: two players never see different rails.
@@ -414,45 +420,45 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 - **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, waivedBy?, contains?, itemContains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
-`waivedBy` lists other `data` keys of the same entry, none `required`, on a `required` `text` or `data` key, which may then be absent or `''` while every key it lists holds a non-blank string (M9, issue 2858), as `Chip`'s `children` lists `icon` and `ariaLabel`; `describe` does not state it and still reports the key `required`, and giving an existing key `waivedBy` is a widening.
-`contains` names a `text` key, or a `required` `data` key (issue 2894), of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22, issue 2852); `describe` does not state it, and giving an existing key `contains` is a narrowing.
-`itemContains` pairs member names of a `data` key's array items as `{ <member>: <other member> }`, each item's non-blank string `<member>` having to contain the words of its `<other member>`, a string or a number held as its digits, as one whole run (M22, issue 2856), as `SegmentedControl`'s `options` pairs `ariaLabel` with `label`; `describe` does not state it, and giving an existing key `itemContains` is a narrowing.
+`waivedBy` lists other `data` keys of the same entry, none `required`, on a `required` `text` or `data` key, which may then be absent or `''` while every key it lists holds a non-blank string (M9), as `Chip`'s `children` lists `icon` and `ariaLabel`; `describe` does not state it and still reports the key `required`, and giving an existing key `waivedBy` is a widening.
+`contains` names a `text` key, or a `required` `data` key, of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22); `describe` does not state it, and giving an existing key `contains` is a narrowing.
+`itemContains` pairs member names of a `data` key's array items as `{ <member>: <other member> }`, each item's non-blank string `<member>` having to contain the words of its `<other member>`, a string or a number held as its digits, as one whole run (M22), as `SegmentedControl`'s `options` pairs `ariaLabel` with `label`; `describe` does not state it, and giving an existing key `itemContains` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 `tooltip` is `true` on an entry whose `restOn` is `'control'` where Fabricate writes a Foundry tooltip attribute on that control in every mount, and is otherwise absent; it reserves `data-locked` beside the names `restOn` reserves, and `describe` does not state it.
-Where only a key writes one, as `Button`'s `tooltip` (issue 2852), the entry states no `tooltip`, so it reserves nothing more, and the component writes no tooltip on a control that carries a `data-locked` rest key.
+Where only a key writes one, as `Button`'s `tooltip`, the entry states no `tooltip`, so it reserves nothing more, and the component writes no tooltip on a control that carries a `data-locked` rest key.
 The names an entry reserves through `restOn` and `tooltip` are fixed for its `version`; reserving another, by giving an entry `tooltip` among other ways, is a narrowing.
 `standaloneRoot` is `true` on an entry whose `root` is `'any'` that Fabricate draws under the standalone style root, as The required ancestor root states, and is otherwise absent; `describe` does not state it.
 `overlays` is `true` where the component opens an overlay, and is otherwise absent; `describe` answers it on every entry as a boolean.
 `lazy` is `true` where the entry's code is fetched by `load` rather than with Fabricate's entry script, and is otherwise absent; `describe` does not state it.
-- The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
-- The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
-- The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
-- The published set continues with `Rail` and `InspectorCard` (issue 2451), in that order.
-- The published set continues with `EmptyState` and `Notice` (issue 2451), in that order.
-- The published set continues with `Button` (issue 2452).
-- The published set continues with `StatusToggle` (issue 2452).
-- The published set continues with `Stepper` (issue 2452).
-- The published set continues with `SearchField` (issue 2453).
-- The published set continues with `Select` (issue 2454).
-- The published set continues with `StageBars` (issue 2455).
-- The published set continues with `Field` (issue 2601).
-- The published set continues with `Well` (issue 2601).
-- The published set continues with `Callout` (issue 2601).
-- The published set continues with `IconButton` (issue 2601).
-- The published set continues with `EditorTabs` (issue 2601).
-- The published set continues with `RadioCardGroup` (issue 2601).
-- The published set continues with `SegmentedControl` (issue 2644).
-- The published set continues with `Pagination` (issue 2646).
-- The published set continues with `IconPicker` (issue 2647).
-- The published set continues with `ActionMenu` (issue 2652).
-- The published set continues with `Modal` (issue 2656).
-- The published set continues with `ListRow` (issue 2784).
-- The published set continues with `ToggleCard` (issue 2775).
-- The published set continues with `SelectionCheckbox` (issue 2836).
-- The published set continues with `Disclosure` (issue 2862).
-- The published set continues with `Typeahead` (issue 2860).
-- The published set continues with `Popover` (issue 2861).
+- The published set opens with `TierTrack`, whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
+- The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip`, in that order.
+- The published set continues with `Kicker` and `Chip`, in that order.
+- The published set continues with `Rail` and `InspectorCard`, in that order.
+- The published set continues with `EmptyState` and `Notice`, in that order.
+- The published set continues with `Button`.
+- The published set continues with `StatusToggle`.
+- The published set continues with `Stepper`.
+- The published set continues with `SearchField`.
+- The published set continues with `Select`.
+- The published set continues with `StageBars`.
+- The published set continues with `Field`.
+- The published set continues with `Well`.
+- The published set continues with `Callout`.
+- The published set continues with `IconButton`.
+- The published set continues with `EditorTabs`.
+- The published set continues with `RadioCardGroup`.
+- The published set continues with `SegmentedControl`.
+- The published set continues with `Pagination`.
+- The published set continues with `IconPicker`.
+- The published set continues with `ActionMenu`.
+- The published set continues with `Modal`.
+- The published set continues with `ListRow`.
+- The published set continues with `ToggleCard`.
+- The published set continues with `SelectionCheckbox`.
+- The published set continues with `Disclosure`.
+- The published set continues with `Typeahead`.
+- The published set continues with `Popover`.
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -461,24 +467,24 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `FillBar`'s track skin is not published at version 1; publishing it later is additive.
 - `FillBar`'s gapped multi-track form is not published at version 1.
-- `EmptyState`'s `compact`, `inline` and `note` (issue 2783) were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `EmptyState`'s `compact`, `inline` and `note` were added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `Chip`'s `swatch`, `tint`, `iconOnly` and `presentation` are not published at version 1; publishing one later is additive.
 - `Button`'s anchor form (the props `tag`, `href`, `rel` and the link prop `target`) is not published at version 1; publishing one later is additive.
-- `Chip`'s `emphasis`, `icon`, `mono` and `struck` (issue 2772) and `Button`'s `size`, `icon`, `busy` and `type` (issue 2773) were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Kicker`'s `size` (issue 2815) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Chip`'s `truncate` (issue 2817) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates it refuses it with `"truncate" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `StatBox`'s `layout` and `note` (issue 2819) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` (issue 2776) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
-- `Modal`'s `icon` and `size` (issue 2818) were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
-- `Modal`'s `scrim` (issue 2859) was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"scrim" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Chip`'s `emphasis`, `icon`, `mono` and `struck` and `Button`'s `size`, `icon`, `busy` and `type` were added to entries at `version` 1: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Kicker`'s `size` was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"size" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Chip`'s `truncate` was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates it refuses it with `"truncate" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatBox`'s `layout` and `note` were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `trapFocus`, `initialFocus` and `footerLayout` were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `icon` and `size` were added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
+- `Modal`'s `scrim` was added to the entry at `version` 1 in the same way, so its `version` did not change, and a Fabricate that predates the key refuses it with `"scrim" is not a prop of Modal`, which `describe` shows by leaving the key out of `props`.
 - `Modal`'s `width`, a free CSS length, is not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
-- `StatusToggle`'s `semantics` (issue 2775) was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `StatusToggle`'s `label` (issue 2902) was added to the entry at `version` 1, `ariaLabel` waiving it: every mount the entry admitted before, which passed a non-blank `ariaLabel`, is still admitted and draws the same, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"label" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatusToggle`'s `semantics` was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatusToggle`'s `label` was added to the entry at `version` 1, `ariaLabel` waiving it: every mount the entry admitted before, which passed a non-blank `ariaLabel`, is still admitted and draws the same, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"label" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `SelectionCheckbox`'s `wrapper` and `decorative`, and so its bare and decorative forms, are not published at version 1, and nor is a native `name`, `value` or `title` on its input; publishing one later is additive.
 - `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a native `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
-- `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` (issue 2782) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
-- `Stepper`'s `placeholder`, `format`, `stops` and `nullLabel` (issue 2787) were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
+- `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
+- `Stepper`'s `placeholder`, `format`, `stops` and `nullLabel` were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `SearchField`'s `icon` and `onChange` are not published at version 1; publishing one later is additive.
 - `Field`'s `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1; publishing one later is additive.
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
@@ -498,41 +504,45 @@ Its `dialogProps` is never published, being attributes under another name, and n
 - `ListRow`'s `inset` and `bodyBasis`, and its `children` snippet, are not published at version 1; publishing one later is additive.
 Its `openProps` and `nameClass` are never published, being attributes and a class under other names.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
-- `FillBar`'s `shares` (issue 2783) was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `FillBar`'s `tone`, and so a `shares` entry's and a `Meter` segment's, took the ten tag names `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` and `slate` (issue 2789) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates them draws each `neutral` and refuses nothing, which `describe` cannot show.
-- `Avatar`'s `icon`, its rungs `28` and `30`, and `Medallion`'s rungs `24`, `28`, `32`, `34`, `36` and `44` (issue 2813) were added at `version` 1: an added optional key or accepted value is additive, so neither entry's `version` changed.
+- `FillBar`'s `shares` was added to its entry at `version` 1 as `{ weight, tone? }`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"shares" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `FillBar`'s `tone`, and so a `shares` entry's and a `Meter` segment's, took the ten tag names `ember`, `butter`, `peach`, `verdant`, `mist`, `azure`, `lavender`, `rose`, `bone` and `slate` at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates them draws each `neutral` and refuses nothing, which `describe` cannot show.
+- `Avatar`'s `icon`, its rungs `28` and `30`, and `Medallion`'s rungs `24`, `28`, `32`, `34`, `36` and `44` were added at `version` 1: an added optional key or accepted value is additive, so neither entry's `version` changed.
 A Fabricate that predates `icon` refuses it with `"icon" is not a prop of Avatar`, which `describe(...).props` shows by leaving the key out.
 A Fabricate that predates a `Medallion` rung draws that size at its edge with the corner `9` and refuses nothing.
 A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draws any size, at the same ratio, and refuses nothing.
-- `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key and neither is published; `format` (issue 2787) opens the formatted mode through two formatters Fabricate holds, `signed` and `unlimited`, and a companion's own formatter is not published at version 1; publishing one later needs a new prop kind, which is additive.
-- `FillBar`'s `density` took `thin` (issue 2821) at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the default track and refuses nothing, which `describe` cannot show.
-- `FillBar`'s `origin` (issue 2821) was added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"origin" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `ListRow`'s `aside` (issue 2793) was added to its entry at `version` 1 as a content slot: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"aside" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `ListRow`'s `leading`, `badges`, `meta` and `trailing` (issue 2843) were added to its entry at `version` 1 as content slots: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`; its `children` and `openProps` are still refused.
-- `Medallion`'s `tone` and `ink` took `warning` and `info`, `StatBox`'s `tone` took `success`, and `Notice`'s `tone` took `accent` (issue 2847), at `version` 1: a widened value set is additive, so no entry's `version` changed, and `describe` cannot show it.
+- `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key and neither is published.
+  `format` opens the formatted mode through two formatters Fabricate holds, `signed` and `unlimited`, and a companion's own formatter is not published at version 1.
+  Publishing one later needs a new prop kind, which is additive.
+- `FillBar`'s `density` took `thin` at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the default track and refuses nothing, which `describe` cannot show.
+- `FillBar`'s `origin` was added to its entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"origin" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `ListRow`'s `aside` was added to its entry at `version` 1 as a content slot: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"aside" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `ListRow`'s `leading`, `badges`, `meta` and `trailing` were added to its entry at `version` 1 as content slots: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`; its `children` and `openProps` are still refused.
+- `Medallion`'s `tone` and `ink` took `warning` and `info`, `StatBox`'s `tone` took `success`, and `Notice`'s `tone` took `accent`, at `version` 1: a widened value set is additive, so no entry's `version` changed, and `describe` cannot show it.
 A Fabricate that predates the `Medallion` values draws the tile as unset, one that predates `success` draws the `StatBox` figure in the `default` ink, and neither refuses anything; `accent` was the notice's own private tone before, so one that predates its publication draws it.
-- `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign` (issue 2850) were added to its entry at `version` 1 as `data` keys, with the mark rungs `28` and `34`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a value outside each key's set draws its default, so adding a value later is additive too.
-- `ListRow`'s `current` and `busy` (issue 2851) were added to its entry at `version` 1 as `data` keys, and its `selected` draws the face without `onOpen`: an added optional key is additive, a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, and one that predates them draws no face for a `selected` without `onOpen` and refuses nothing for it.
-- `Button`'s `size` took `'24'` and `'26'`, and `IconButton`'s `size` took `'20'` and `'22'` (issue 2853), at `version` 1: a widened value set is additive, so neither entry's `version` changed, and a Fabricate that predates a rung draws the default rung for it and refuses nothing, which `describe` cannot show.
-- `Button`'s `ariaLabel`, `tooltip` and `pressed`, its `role` value `info`, and `Stepper`'s `decrementTooltip` and `incrementTooltip` (issue 2852) were added at `version` 1: an added optional key or value is additive, so neither entry's `version` changed; a Fabricate that predates a key refuses it, with `"<key>" is not a data attribute` on `Button` and `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`, and one that predates `info` draws `neutral` and refuses nothing.
-- `Button`'s and `IconButton`'s `description` (issue 2895) was added to each entry at `version` 1 as a `data` key: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates it refuses it with `"description" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign` were added to its entry at `version` 1 as `data` keys, with the mark rungs `28` and `34`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a value outside each key's set draws its default, so adding a value later is additive too.
+- `ListRow`'s `current` and `busy` were added to its entry at `version` 1 as `data` keys, and its `selected` draws the face without `onOpen`: an added optional key is additive, a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, and one that predates them draws no face for a `selected` without `onOpen` and refuses nothing for it.
+- `Button`'s `size` took `'24'` and `'26'`, and `IconButton`'s `size` took `'20'` and `'22'`, at `version` 1: a widened value set is additive, so neither entry's `version` changed, and a Fabricate that predates a rung draws the default rung for it and refuses nothing, which `describe` cannot show.
+- `Button`'s `ariaLabel`, `tooltip` and `pressed`, its `role` value `info`, and `Stepper`'s `decrementTooltip` and `incrementTooltip` were added at `version` 1: an added optional key or value is additive, so neither entry's `version` changed; a Fabricate that predates a key refuses it, with `"<key>" is not a data attribute` on `Button` and `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`, and one that predates `info` draws `neutral` and refuses nothing.
+- `Button`'s and `IconButton`'s `description` was added to each entry at `version` 1 as a `data` key: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates it refuses it with `"description" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 `Button`'s component declares and writes its `aria-describedby` key itself, the companion's ids first and the description's after them, and writes no other `aria` key.
-- `Pagination`'s `landmarks` and `perPageAriaLabel` (issue 2894) were added to its entry at `version` 1 as `data` keys: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a prop of Pagination`, which `describe` shows by leaving the key out of `props`; a `landmarks` outside its two values draws `'both'`, so adding a value later is additive too.
-- `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone` (issue 2854) were added to their entries at `version` 1, `title` and `note` as `text` keys and `leading` and `trailing` as content slots: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a `tone` outside its four values draws none, so adding a value later is additive too.
-- `Callout`'s `actionsPlacement` and `Notice`'s `assertive` (issue 2855) were added to their entries at `version` 1 as `data` keys: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; an `actionsPlacement` outside its two values draws `'inline'`, and an `assertive` that is not `true`, or at a tone other than `danger`, draws the polite status.
-- `StageBars`' `track` and a stage's `shares` (issue 2837) were added at `version` 1, `track` as a `data` key and `shares` as a member of each item of `stages`: an added optional key or member is additive, so the entry's `version` did not change; a Fabricate that predates `track` refuses it with `"track" is not a data attribute`, which `describe` shows by leaving the key out of `props`, and one that predates `shares` draws each stage in its state's paint and refuses nothing, which `describe` cannot show.
-- `FillBar`'s `neutralBand` (issue 2863) was added to its entry at `version` 1 as a `data` key: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"neutralBand" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- A `StageBars` stage's `title` (issue 2857) was added at `version` 1 as a member of each item of `stages`: an added optional member is additive, so the entry's `version` did not change, and a Fabricate that predates it draws no tooltip and refuses nothing, which `describe` cannot show.
-- `StatBox`'s `children` (issue 2841) was added to its entry at `version` 1 as a content slot: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"children" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `StatBox`'s `children` and `Stepper`'s `size` (issue 2841) were added to their entries at `version` 1, `children` as a content slot: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it, with `"children" is not a data attribute` on `StatBox` and `"size" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
-- `StatBox`'s `children`, `Stepper`'s `size` and `IconPicker`'s `tint`, and `Button`'s `role` values `accent` and `urgent` (issue 2841), were added at `version` 1, `children` as a content slot: an added optional key or value is additive, so no entry's `version` changed; a Fabricate that predates a key refuses it, with `"children" is not a data attribute` on `StatBox` and `"<key>" is not a prop of <Entry>` on `Stepper` and `IconPicker`, which `describe` shows by leaving the key out of `props`, and one that predates the roles draws `neutral` and refuses nothing.
-- `Button`'s `role` value `confirm` (issue 2890) was added at `version` 1: an added value is additive, so the entry's `version` did not change, and a Fabricate that predates it draws `neutral` and refuses nothing, which `describe` cannot show.- `IconPicker`'s `iconOnly` (issue 2905) was added to its entry at `version` 1 as a `data` key, and its captioned trigger's name took the caption it draws (issue 2899): an added optional key and a name that only gains the visible label are additive, so the entry's `version` did not change, and a Fabricate that predates them refuses `iconOnly` with `"iconOnly" is not a prop of IconPicker`, which `describe` shows by leaving the key out of `props`, and names a captioned trigger by `ariaLabel` alone.
+- `Pagination`'s `landmarks` and `perPageAriaLabel` were added to its entry at `version` 1 as `data` keys: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a prop of Pagination`, which `describe` shows by leaving the key out of `props`; a `landmarks` outside its two values draws `'both'`, so adding a value later is additive too.
+- `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone` were added to their entries at `version` 1, `title` and `note` as `text` keys and `leading` and `trailing` as content slots: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a `tone` outside its four values draws none, so adding a value later is additive too.
+- `Callout`'s `actionsPlacement` and `Notice`'s `assertive` were added to their entries at `version` 1 as `data` keys: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; an `actionsPlacement` outside its two values draws `'inline'`, and an `assertive` that is not `true`, or at a tone other than `danger`, draws the polite status.
+- `StageBars`' `track` and a stage's `shares` were added at `version` 1, `track` as a `data` key and `shares` as a member of each item of `stages`: an added optional key or member is additive, so the entry's `version` did not change; a Fabricate that predates `track` refuses it with `"track" is not a data attribute`, which `describe` shows by leaving the key out of `props`, and one that predates `shares` draws each stage in its state's paint and refuses nothing, which `describe` cannot show.
+- `FillBar`'s `neutralBand` was added to its entry at `version` 1 as a `data` key: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"neutralBand" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- A `StageBars` stage's `title` was added at `version` 1 as a member of each item of `stages`: an added optional member is additive, so the entry's `version` did not change, and a Fabricate that predates it draws no tooltip and refuses nothing, which `describe` cannot show.
+- `StatBox`'s `children` was added to its entry at `version` 1 as a content slot: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"children" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+- `StatBox`'s `children` and `Stepper`'s `size` were added to their entries at `version` 1, `children` as a content slot: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it, with `"children" is not a data attribute` on `StatBox` and `"size" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
+- `StatBox`'s `children`, `Stepper`'s `size` and `IconPicker`'s `tint`, and `Button`'s `role` values `accent` and `urgent`, were added at `version` 1, `children` as a content slot: an added optional key or value is additive, so no entry's `version` changed; a Fabricate that predates a key refuses it, with `"children" is not a data attribute` on `StatBox` and `"<key>" is not a prop of <Entry>` on `Stepper` and `IconPicker`, which `describe` shows by leaving the key out of `props`, and one that predates the roles draws `neutral` and refuses nothing.
+- `Button`'s `role` value `confirm` was added at `version` 1: an added value is additive, so the entry's `version` did not change, and a Fabricate that predates it draws `neutral` and refuses nothing, which `describe` cannot show.- `IconPicker`'s `iconOnly` was added to its entry at `version` 1 as a `data` key, and its captioned trigger's name took the caption it draws: an added optional key and a name that only gains the visible label are additive, so the entry's `version` did not change, and a Fabricate that predates them refuses `iconOnly` with `"iconOnly" is not a prop of IconPicker`, which `describe` shows by leaving the key out of `props`, and names a captioned trigger by `ariaLabel` alone.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` and an `ActionMenu` item's `data` are not attribute channels, and the publishable subset states which members are stripped.
-- `TierTrack`, `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` were published with `load`; a companion calls it for each before mounting.
-- `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
+- `TierTrack`, `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` are eager for the life of `schemaVersion: 1`.
+  `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker`, `ActionMenu`, `Modal`, `ListRow`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover` were published with `load`.
+  A companion calls it for each before mounting.
+- `Rail` is lazy: only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `standaloneRoot` that is neither absent nor `true` with an `Error` ending `<name> has an unknown standaloneRoot "<value>"`, and one on a `root` other than `'any'` with one ending `<name> states standaloneRoot on the root "<root>"`.
@@ -604,7 +614,9 @@ An `update` made there is drawn on Fabricate's next flush, except that a value i
 - After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again; a `required` key, or a `requiredWhen` one while its guard is truthy, cannot be omitted.
 - A companion detects a callback key with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates the key refuses it.
 - An `aria` key is an ARIA attribute Fabricate writes, under the key's own name, on the control the entry's group names; the component declares no prop of that name.
-It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`; `undefined` or absence writes no attribute; anything else is M13.
+It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`.
+`undefined` or absence writes no attribute.
+Anything else is M13.
 An `aria` key is never `required`.
 - An `update` that changes the key's value writes it on the same element, and one that omits the key removes the attribute.
 Fabricate writes the attribute only when the value differs from the one it last wrote, so it puts back nothing other code removed or replaced.
@@ -613,7 +625,9 @@ Fabricate writes the attribute only when the value differs from the one it last 
 - A camel-case key is a prop the component interprets, and a hyphenated `aria-*` key is an attribute Fabricate writes under that name; a control's name is carried by the key its group names, and by the text that an `aria-labelledby` key its group names points at.
 - A `value` key is a value the component binds and may change itself; its manifest spec is `{ kind: 'value', initial }`, where `initial` is a string, a number, a boolean or `null`, and states no `required`, `element` or `args`.
 A value key's name matches `/^[a-z][A-Za-z0-9]*$/`, and it is never `required`.
-- It takes a string, a number, a boolean or `null`; `undefined` or absence is not passed, so a mount starts at `initial`; anything else is M20, and a function is M10.
+- It takes a string, a number, a boolean or `null`.
+  `undefined` or absence is not passed, so a mount starts at `initial`.
+  Anything else is M20, and a function is M10.
 An object or an array is never a value, because a change made inside one never reaches Fabricate.
 - Each value key synthesises an optional callback, `on<Key>Change`: `on`, the key with its first letter upper-cased, then `Change`, so `query` gives `onQueryChange`.
 It takes a function as a `callback` key does (M17), and the component declares no prop of that name.
@@ -636,7 +650,7 @@ Fabricate's gate holds this, because the runtime does not refuse the resync's `f
 - `'fabricate'`: `target` needs a Fabricate root, a `.fabricate` ancestor that is not a standalone style root.
 Fabricate's window frames carry it (the player window, the Manager and the interactable windows), so both extension targets have it; Foundry writes an application's `classes` on the frame element, above `.window-content`.
 - `'manager'`: `target` needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
-- `ListRow` (issue 2784) is the one entry that states `'fabricate'`, and no entry states `'manager'`; M16's ancestor refusals apply to both.
+- `ListRow` is the one entry that states `'fabricate'`, and no entry states `'manager'`; M16's ancestor refusals apply to both.
 - `mount` and `mountMany` decide it by class, with `target.closest`, and refuse a target outside the root with M16, `mountMany` judging each item.
 It is checked at `mount` and `mountMany` only.
 A Foundry 14 detached window's target is judged the same way.
@@ -651,11 +665,11 @@ Registration refuses a `standaloneRoot` that is neither absent nor `true`, and o
 - The standalone style root is judged at `mount` and `mountMany` only, is never an overlay host, and is removed by `destroy` and by a fault, so `target` is left as it was.
 It is removed by reference, wherever it then is; a companion's re-render that already took it away with the old content leaves nothing to remove, and supersedes the claim as it does any mount's.
 - It states the Fabricate window's ink and its dark colour scheme and paints no ground: in a window or dialog of its own the companion paints `--fab-bg-1` on `target`, or nests the entry in an `InspectorCard` or `Well`, as for `Callout`, because on Foundry's light theme whatever an entry draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the `ActionMenu` trigger among them, the switch's off face, `Field`'s ink and the caption and hint the companion draws in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, the `form` `Select` trigger's and the `IconPicker` trigger's ink on theirs, `SegmentedControl`'s labels at `density` `'default'` or in the `'pill'` shape, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows; `RadioCardGroup`'s cards, a default `Pagination` bar, the `inline` and `toolbar` `Select` triggers, and the list, menu or dialog an overlay entry opens paint their own ground.
-`--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window (issue 2432).
+`--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window.
 - A companion's content in a content slot of such a mount takes the Fabricate window's ink, dark colour scheme, palette tokens, focus ring and reduced-motion rule, as it does in a Fabricate window; Fabricate's heading normalisation does not reach it, so a heading there takes Foundry's own face and ink.
 - An entry whose root is `'fabricate'` or `'manager'`, mounted in a content slot of such a mount with no Fabricate root above, is refused.
 - The module sheet reaches a document's head and no shadow root, so an entry drawn under the standalone style root is refused (M16) where `target` has no Fabricate root and its root node is a shadow root; a detached target that is no shadow root's is drawn, under a standalone style root written at `mount`.
-- In a Foundry 14 detached window the module sheet is present (read in the 14.365 sources, not run), so a mount made there is drawn in the theme read from Fabricate's own document element at `mount`; a later theme change reaches a standalone style root in Fabricate's own document and none in a detached window (issue 2432).
+- In a Foundry 14 detached window the module sheet is present (read in the 14.365 sources, not run), so a mount made there is drawn in the theme read from Fabricate's own document element at `mount`; a later theme change reaches a standalone style root in Fabricate's own document and none in a detached window.
 - A normal declaration in an unlayered sheet of the host's outranks the module sheet that draws such an entry at any specificity, except `transition` under reduced motion, which the module sheet states `!important`; a companion's own module sheet, one its manifest gives no `layer`, loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
 - A document sheet disables every control in its form when the document is not editable, so a companion mounts after `super._onRender`.
 - A Font Awesome glyph's box follows the Font Awesome the running build ships, which the admission clause does not measure.
@@ -667,7 +681,7 @@ The test page sets one typeface on its body so both arms compare like with like.
 Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the entry does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the admission clause does not measure them, core's `fieldset`, `legend`, radio and `textarea` rules are measured only where the harvest exists, an ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.
 The harvested arm draws under no Foundry theme class.
 - Chromium draws a search field's cancel button and a number field's spin buttons itself, in the dark colour scheme, and computes no author style for them, so the admission clause does not read them.
-- A design-system row scoped `manager-only` is not published (issue #2456): the rows that take a Fabricate record shape are domain-coupled, and `InspectorPanel` and the `Bulk*` rows need the Manager's scroller and `--fab-manager-inspector-*` tokens; a later issue may publish one as `root: 'manager'`.
+- A design-system row scoped `manager-only` is not published: the rows that take a Fabricate record shape are domain-coupled, and `InspectorPanel` and the `Bulk*` rows need the Manager's scroller and `--fab-manager-inspector-*` tokens; a later issue may publish one as `root: 'manager'`.
 The rows are `BulkDeleteCard`, `BulkEditPanelShell`, `InspectorPanel`, `BulkEditSection`, `BulkSelectionToolbar`, `BulkStagingInset`, `ProgressiveStageList`, `IconFactRow`, `InlineRenameField`, `InlineVocabularyAdd`, `ModifierLibraryRow`, `RollDataExpressionInput`, `SubjectModifierPicker`, `VocabularyShell`, `VocabularyShellPanel`, `EssenceChip`, `CompositionList`, `GatheringModifierEditor`, `RecipeResultGroupCard`, `PickerRow`, `ChoiceGroup`, `PickerRowAmount`, `KindAdder`, `RecipeResultsSection`, `ScopedEntrySystemsCard`, `CheckCharacterValueField`, `CheckOptionGroup`, `PreviewAsPicker`, `OverridePlayerSees`, `SetCard` and `RoutingOverview`.
 
 ### Overlays
@@ -683,14 +697,14 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
   3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
 - An overlay that is open keeps its panel in the host it opened in while that host stays connected, so an `overlayHost` moved to another document while it is open leaves the panel in it, and the next overlay to open picks its host again.
-- The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input (issue 2680).
-- A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: a companion does not mount `Popover`, or any overlay entry, in one, or it passes an `overlayHost` inside that dialog (issue 2884).
+- The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input.
+- A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: a companion does not mount `Popover`, or any overlay entry, in one, or it passes an `overlayHost` inside that dialog.
 - Unless the panel's own group says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's group says so, as for an `IconPicker` list or an `ActionMenu` menu.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 The `<div>` carries `display: contents` and, where its host is the standalone layer, `pointer-events: auto`, `font-family: var(--font-body, var(--font-primary, sans-serif))` and `font-size: var(--font-size-14)`, and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-- An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; the companion mounts it in a dialog that is not modal, and this is tracked as a follow-up.
+- An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; the companion mounts it in a dialog that is not modal.
 - An overlay's outside-press, focus-leave, Escape and scroll listeners, and the watch an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
 An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
@@ -701,17 +715,17 @@ Its panel and `<div>` are removed, focus is not moved, so focus left in the pane
 A `target` that is removed and inserted again within one run of script keeps its panel open.
 A panel stays watched in the document it opened in, so after a Foundry 14 move a detach in the new window does not close it.
 A `target` inside a shadow root closes its panel when that root's host leaves the document, and not when the removal happens inside the shadow root.
-A `Modal` dialog closes the same way while its `target` is disconnected, as when an `update` of another `Modal` whose content slot holds it detaches the slot: the dialog is removed and calls no callback, and because its `open` still stands it is drawn again once `target` is attached, watched in the document it opened in as a panel is (issue 2678).
+A `Modal` dialog closes the same way while its `target` is disconnected, as when an `update` of another `Modal` whose content slot holds it detaches the slot: the dialog is removed and calls no callback, and because its `open` still stands it is drawn again once `target` is attached, watched in the document it opened in as a panel is.
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 - An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
 The gate also holds that the closure of an `overlays: true` entry names no `resolveOverlayHost` as an import, a re-export, a namespace or dynamic-import member or a destructured key, because `actions/anchoredPopover.js` and `Modal` acquire their host through the chain.
-- `Select` (issue 2454) is the first entry whose `overlays` is `true`: its list is the overlay, and its group states what the list draws.
-- `IconPicker` (issue 2647) is the second: its list and its query field are the overlay, and its group states what they draw.
-- `ActionMenu` (issue 2652) is the third: its menu is the overlay, and its group states what it draws.
-- `Modal` (issue 2656) is the fourth: its dialog is the overlay, and its group states what it draws.
-- `Typeahead` (issue 2860) is the fifth: its suggestion list is the overlay, and its group states what the list draws.
-- `Popover` (issue 2861) is the sixth: its panel is the overlay, and its group states what it draws.
+- `Select` is the first entry whose `overlays` is `true`: its list is the overlay, and its group states what the list draws.
+- `IconPicker` is the second: its list and its query field are the overlay, and its group states what they draw.
+- `ActionMenu` is the third: its menu is the overlay, and its group states what it draws.
+- `Modal` is the fourth: its dialog is the overlay, and its group states what it draws.
+- `Typeahead` is the fifth: its suggestion list is the overlay, and its group states what the list draws.
+- `Popover` is the sixth: its panel is the overlay, and its group states what it draws.
 
 ### Interactive components
 
@@ -730,7 +744,9 @@ In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter a
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, a published behaviour kept so a companion's Tab handling does not change, and in an open `IconPicker` list's query field, where it closes the list and moves focus on from, or back to, the trigger, as each group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element, except while a `Select` or `IconPicker` trigger holds focus, because it stops Escape, as each group states.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
 An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
-- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, a `ListRow` button, whose 2px ring is drawn inside the row's edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states, and the module's base stylesheet draws the same 1px inset ring on every other input and textarea under a Fabricate root except a checkbox, radio, range, color, file, button, submit, reset or image input, so a number, search or date input outside a `Field` takes it too.
+- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root.
+  Otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, a `ListRow` button, whose 2px ring is drawn inside the row's edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states.
+  A text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states, and the module's base stylesheet draws the same 1px inset ring on every other input and textarea under a Fabricate root except a checkbox, radio, range, color, file, button, submit, reset or image input, so a number, search or date input outside a `Field` takes it too.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, named by its glyph's `label`, the caption an `IconPicker` trigger adds to `ariaLabel`, and a `Disclosure` button, which is named by the text the companion draws in its `head` slot, as its group states.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
@@ -740,7 +756,9 @@ A `Modal` with `trapFocus` is the exception to that rule: Fabricate moves focus 
 An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when a choice, Escape or Tab in the query field closes the list, from which the browser moves a forward Tab on, as its group states.
 An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its group names, and back to the trigger when a choice, Escape or Tab closes it, as its group states.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so the companion moves focus to an element of its own before it calls either.
-The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
+The destination is, in order: the control the press leads to.
+The next control in the companion's own content, then the previous one.
+And where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
 Where the destination is drawn by the same change, the companion draws it first, focuses it, and then removes the control.
 - To return focus to a published control, after a dialog its press opened has closed, the companion focuses the focusable element inside `target` that the entry's group names; nothing else inside `target` is the companion's to select.
 - A press bubbles from the control as a `click`, except a press on a `Select`, `IconPicker` or `ActionMenu` trigger, which stops at the trigger, and a press inside an open `Select` or `IconPicker` list or `ActionMenu` menu, which stops there.
@@ -775,7 +793,7 @@ A `Disclosure` draws none: its chevron changes direction at once and its head st
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
-  A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` (issue 2852) show that hint the same way, under the pointer and keyboard focus alike, as each group states.
+  A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each group states.
   The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so does the name a `ListRow` button holds.
   A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
@@ -783,7 +801,7 @@ Where the entry's rest keys land on the control itself, `data-tooltip` and every
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
 A control whose face is a glyph alone is published only with a key for its name that is `required`, or `requiredWhen` the key that draws the control, and its group says whether the pointer is shown that name.
 
-### The issue 2448 components
+### Avatar, Medallion, FillBar, Meter, BandedBar, StatBox and InfoStrip
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -850,8 +868,8 @@ Each group states the accepted values of every key that entry publishes.
     Under forced colours a bar whose `neutralBand` is above 0 draws its fill in the system text colour, solid beyond the band and as a hollow 1px ring within it, so the band is told by shape and the sign by side, never by colour alone.
     A fill only a few pixels wide has no room for the ring: in Chromium a reading of +2 on a 240px track, a fill about 2.4px wide, paints as a solid 2px mark, where +3, about 3.6px wide, shows its ring, so a reading that close to zero is told from one beyond the band by its width alone, and the companion's text carries the reading.
     A `thin` bar whose `neutralBand` is above 0 also keeps a 1px edge in the system text colour, drawn outside its track, so its extent and midpoint stay visible.
-    A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract, and issue #2838 tracks it.
-    Naming `neutralBand` (issue 2863) is additive, so the entry's `version` stays 1, and a Fabricate that predates it refuses it with `"neutralBand" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+    A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract.
+    Naming `neutralBand` is additive, so the entry's `version` stays 1, and a Fabricate that predates it refuses it with `"neutralBand" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track; any other value draws `default`.
     `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
     Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so the colour never carries a reading alone.
@@ -883,7 +901,9 @@ Each group states the accepted values of every key that entry publishes.
 - **`BandedBar`.**
   - `rows` is required and is `{ id?, name, percent, fill? }[]`.
     `name` is required in every row, and `percent` is a whole number 0–100, printed as `<percent>%`.
-  - One row is a meter named by its `name`, which is also its visible caption; several are a histogram; none draws nothing.
+  - One row is a meter named by its `name`, which is also its visible caption.
+    Several are a histogram.
+    None draws nothing.
   - `fill` is a `FillBar` tone, the ten tag names included, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
     Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
     A tag name paints as `FillBar`'s does, and a name outside every set draws `neutral`, as does a Fabricate that predates the tag names.
@@ -923,12 +943,17 @@ Each group states the accepted values of every key that entry publishes.
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
   Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
-- **Private and undocumented:** a fact's `props` member, a stripped member that Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Private and undocumented:** a fact's `props` member, a stripped member that Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none.
+  A `size` off its ladder.
+  `Medallion`'s own default size.
+  A `color` that is not a token reference.
+  The `hazard-mid` fill.
+  A `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
   It is not a refusal.
 
-### The issue 2451 components
+### Kicker, Chip, Rail, InspectorCard, EmptyState and Notice
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -971,7 +996,9 @@ Each group states the accepted values of every key that entry publishes.
     An empty `children` with neither key is M9, `Chip requires a non-empty "children"`, as before, and with one of them is M9's waiver fault, `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys draws as before.
     The icon-only chip is no control: it takes no focus and offers no target, so the 24px pointer-target floor (WCAG 2.2 success criterion 2.5.8) does not apply, and its tooltip opens on pointer hover only, so a keyboard or touch user never sees it: the companion states the state in visible text in the row or detail the chip sits in, never in the glyph and its tooltip alone.
     Its glyph clears 3:1 against its fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` under every published `tone` and none, in every palette, with no `emphasis`, `dashed` or `bare`, which share that paint, and on the `outlined` and `solid` grounds; its tone is colour alone, drawn alike under forced colors: the companion passes a glyph that differs for each state, as a check, a cross and a question mark, and says the state in `ariaLabel`.
-    In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored; Playwright's accessibility snapshot reads them as `img "<name>"` and as the name's text; no screen reader was tested.
+    In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored.
+    Playwright's accessibility snapshot reads them as `img "<name>"` and as the name's text.
+    No screen reader was tested.
     `describe('Chip').props.children` stays `{ kind: 'text', required: true }`, and a `describe` that names `ariaLabel` is from a Fabricate that draws the icon-only chip and `dashed`: one that predates them refuses `ariaLabel` (M13) and an empty `children` (M9), and draws `dashed` as the default chip, so a companion reads `describe('Chip').props.ariaLabel` before it passes any of them; adding them is additive, and the entry stays at `version` 1.
   - `mono` is `true` or `false`; `true` sets the label in the monospace face with tabular figures, so columns of counts, DCs and quantities line up.
   - `struck` is `true` or `false`; `true` draws the label struck through on a dashed-edged chip, for a value switched off in the scope being read, and `bare` draws no edge.
@@ -1111,9 +1138,12 @@ Each group states the accepted values of every key that entry publishes.
   - The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so the companion never mounts a notice with an action inside a tinted panel.
     Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: the companion passes a verb phrase.
   - It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
-- **Private:** every other `Chip` tone and density, and its `lit` emphasis; the card's padding, gap, corner and border figures; how Fabricate redraws a card inside its own Checks rail and inspectors; and the panel's and the notice's own figures.
+- **Private:** every other `Chip` tone and density, and its `lit` emphasis.
+  The card's padding, gap, corner and border figures.
+  How Fabricate redraws a card inside its own Checks rail and inspectors.
+  And the panel's and the notice's own figures.
 
-### The issue 2452 components
+### Button, StatusToggle and Stepper
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1136,10 +1166,12 @@ Each group states the accepted values of every key that entry publishes.
     An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the component itself compares nothing, so the check is the seam's.
   - `tooltip` is optional final display text, a hint the label does not say, as "Rewinds the clock by one day"; a `tooltip` that is not a string, or is blank, writes none.
     Fabricate writes it as `data-tooltip-text` on the button, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the button.
-    Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the `IconButton` group states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of the companion's above `target`, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
+    Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the `IconButton` group states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of the companion's above `target`, and whether Foundry's dismiss keybinding then also runs is not measured.
     While it is open Foundry sets `aria-describedby` to `tooltip` on the button, so a screen reader may read the hint as the button's description, and a companion that also passes `aria-describedby` and no `description` restores it as Interactive components states.
     A button whose rest keys include `data-locked` writes and opens no tooltip, because Foundry pins a copy of any tooltip it opens on such an element and the closes above never reach that copy.
-  - `description` is optional final display text, the button's accessible description, a hint the label does not say, as "Moves the date back 1 day; credits stay", which a screen reader may read after the name as its own settings decide; a `description` that is not a string, or is blank, writes none, and nothing is coerced.
+  - `description` is optional final display text, the button's accessible description, a hint the label does not say, as "Moves the date back 1 day.
+    Credits stay", which a screen reader may read after the name as its own settings decide.
+    A `description` that is not a string, or is blank, writes none, and nothing is coerced.
     Fabricate draws it inside the button as an element hidden from every user, so it is never drawn, never joins the name and moves nothing, and names that element in the button's `aria-describedby`, after any ids the companion passes in `aria-describedby`.
     `description` is the hint a screen reader is given and `tooltip` the one a sighted user is shown, but while a tooltip is open Foundry describes the button by it too, so the companion gives the two different words, because a screen reader may then read both.
     While `description` is drawn and a tooltip Foundry opened on the button is open, whichever way it opened, Fabricate writes the button's `aria-describedby` as `tooltip` followed by the companion's ids and the description's, so a screen reader is given the tooltip and then the description under keyboard focus too, and once the tooltip has closed Fabricate writes back the companion's ids and the description's, so the companion restores nothing then.
@@ -1159,7 +1191,15 @@ Each group states the accepted values of every key that entry publishes.
     The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
   - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger`, `warning`, `info`, `accent`, `urgent` or `confirm`, and defaults to `neutral`.
     It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-    Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing; `info` the verb that reads, rolls or reveals and writes no record, as a roll; `accent` the forward verb, which moves the work on to its next step, as "Advance"; and `urgent` the one verb in its cluster that is due now, as that "Advance" once the stage it ends is complete, at most one in a cluster.
+    Each value names a verb, never a colour: `neutral` is the secondary verb.
+    `primary` the leading verb of its cluster, at most one in a cluster.
+    `ghost` the quiet verb that changes no record, never its cluster's leading verb.
+    `dashed` the verb that adds to the list it closes.
+    `danger` the destructive verb.
+    `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
+    `info` the verb that reads, rolls or reveals and writes no record, as a roll.
+    `accent` the forward verb, which moves the work on to its next step, as "Advance".
+    And `urgent` the one verb in its cluster that is due now, as that "Advance" once the stage it ends is complete, at most one in a cluster.
     `confirm` is the confirming verb, which moves the work a step on without finishing the record, as "Confirm the stage" beside its screen's `primary` "Save", and is never the screen's commit.
     A verb that both destroys and cautions is `danger`.
     A `dashed` label starts with its verb, as "Add tier", because no plus glyph is drawn.
@@ -1175,8 +1215,8 @@ Each group states the accepted values of every key that entry publishes.
     An action bar takes `primary` for its one commit and `confirm` for a confirming step beside it, and `confirm` never stands in for `primary`.
     A bar never carries `confirm` and `accent` together, because in `mythwright` their edges are one colour.
     A dialog's Confirm button that finishes the record is `primary`, not `confirm`.
-    A Fabricate that predates the `accent` and `urgent` roles (issue 2841) draws `neutral` for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
-    A Fabricate that predates the `confirm` role (issue 2890) draws `neutral` for it and refuses nothing, which `describe` cannot show; adding it is additive, and the entry stays at `version` 1.
+    A Fabricate that predates the `accent` and `urgent` roles draws `neutral` for each and refuses nothing, which `describe` cannot show; adding them is additive, and the entry stays at `version` 1.
+    A Fabricate that predates the `confirm` role draws `neutral` for it and refuses nothing, which `describe` cannot show; adding it is additive, and the entry stays at `version` 1.
     A visual role is drawn and never announced: it reaches no assistive technology, so the label says the verb.
     A destructive press is confirmed by the companion, in a dialog of Foundry's, before anything is written; Fabricate's arm-then-confirm state is private.
   - `fullWidth` is `true` or `false`.
@@ -1234,7 +1274,7 @@ Each group states the accepted values of every key that entry publishes.
   - The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
     On `--fab-bg-3` every visual role but `primary` and `urgent` falls short of it in at least one palette.
-    On a tinted fill, `--fab-info-soft`, `--fab-accent-soft`, `--fab-success-soft`, `--fab-warning-soft` or `--fab-danger-soft` over one of the four grounds, the label clears 4.5:1 at rest and under the pointer in `neutral`, `warning`, `info`, `accent`, `urgent` and `confirm` in every palette (issue 2898).
+    On a tinted fill, `--fab-info-soft`, `--fab-accent-soft`, `--fab-success-soft`, `--fab-warning-soft` or `--fab-danger-soft` over one of the four grounds, the label clears 4.5:1 at rest and under the pointer in `neutral`, `warning`, `info`, `accent`, `urgent` and `confirm` in every palette.
     There `primary`'s label clears it at rest and not under the pointer in `foundry-native`, `danger`'s at rest, and under the pointer on all but `--fab-success-soft` and `--fab-warning-soft` over `--fab-bg-2` in `hearth-herb`, and `ghost`'s and `dashed`'s only under the pointer, their resting muted label falling short on each tinted fill in at least one palette.
     On a tinted fill the `urgent` tile and edge and the `accent` edge clear 3:1, and the `confirm` edge does on all but `--fab-accent-soft` over `--fab-bg-2` in `foundry-native`; for every other role, `accent`, `urgent` and `confirm` excluded, on each of the five tinted fills there is at least one palette and ground where, at rest, both its edge and its tile fall under 3:1.
     `accent` is excluded because its edge passes on every tinted fill, though its tile is 1.00:1, as it draws no fill.
@@ -1246,7 +1286,7 @@ Each group states the accepted values of every key that entry publishes.
 - **`StatusToggle`.**
   - It is the design system's switch (`<Toggle>` in the library), drawn as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off.
     By default it exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology; `semantics` makes it a switch.
-    The only text it draws is `label`, beside the track inside the button (issue 2902).
+    The only text it draws is `label`, beside the track inside the button.
     A choice between two named things is not a switch: the companion draws its own control for it.
   - `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
     Fabricate coerces nothing, so only `true` and `false` are in the contract.
@@ -1257,7 +1297,7 @@ Each group states the accepted values of every key that entry publishes.
   - `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
     The design-system capability's rule on announcing a switch says which to pass.
     Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and `on` alone, so none of them is an `aria` key or a rest key.
-  - `label` is optional final display text, the setting's name, which the switch draws beside its track inside its own button, so a press on its words is a press on the switch (issues 2902, 2795).
+  - `label` is optional final display text, the setting's name, which the switch draws beside its track inside its own button, so a press on its words is a press on the switch.
     The button is named by `label`, the text it draws beside its track, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).
     A companion passes `label`, `ariaLabel` or both: a mount that passes neither throws M9, a `label` that is not a string throws M14, and a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
     The label is drawn in `target`'s face and size and in the body ink in both states, so the state is told by the track and the announced state, never by the label's ink.
@@ -1284,7 +1324,9 @@ Each group states the accepted values of every key that entry publishes.
     Its press answers with the reason, in a `Notice` or a notification of the companion's, and `on` is passed unchanged; a setting that can never change here is not drawn as a switch.
     A setting that is unavailable also says so in the visible text `aria-describedby` points at, so it is heard when the switch takes focus, not only after a press.
   - Its track is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
-    Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button; the companion gives `target` `display: flex` and `align-items: center`, and centres its own label against the switch.
+    Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that.
+    Where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button.
+    The companion gives `target` `display: flex` and `align-items: center`, and centres its own label against the switch.
     A labelled button is as wide as its track, its gap and its label, up to the width of `target`, and grows past that height only as its label wraps.
   - The button is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('button')` reaches it.
     An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
@@ -1307,7 +1349,7 @@ Each group states the accepted values of every key that entry publishes.
     To return focus to a stepper the companion focuses its input, `target.querySelector('input')`.
   - `decrementTooltip` and `incrementTooltip` are optional final display text, each its button's tooltip, a hint that differs from the button's name, as "One day fewer" beside the name "Decrease days to credit"; one that is not a string, or is blank, writes none.
     While one is open Foundry sets `aria-describedby` to `tooltip` on that button, so a screen reader may read it as the button's description, and a tooltip that repeats the name is read twice; neither replaces its button's name.
-    Fabricate writes each as its button's `data-tooltip-text`, which Foundry's own hover listener shows as plain text after a delay, and opens it under keyboard focus, only under `:focus-visible`, through `game.tooltip`, closing it on blur, a press, Escape, `destroy` and an `update` that changes that button's tooltip or disables it, through `disabled` or a bound, as the `IconButton` group states; Escape is not stopped, and whether Foundry's dismiss keybinding then also runs is not measured (issue 2868).
+    Fabricate writes each as its button's `data-tooltip-text`, which Foundry's own hover listener shows as plain text after a delay, and opens it under keyboard focus, only under `:focus-visible`, through `game.tooltip`, closing it on blur, a press, Escape, `destroy` and an `update` that changes that button's tooltip or disables it, through `disabled` or a bound, as the `IconButton` group states; Escape is not stopped, and whether Foundry's dismiss keybinding then also runs is not measured.
   - `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
     `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
     A `min`, `max` or `step` outside this is outside the contract, and what is drawn for it is private.
@@ -1330,7 +1372,7 @@ Each group states the accepted values of every key that entry publishes.
     Any other value, `28`, `'27'`, `' 26'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
     The rung outranks `density`, so `comfortable` beside it draws the same 26px stepper, and under `fill` it pins the stepper at 26px across `target`.
     No rung below 26 is published, because one would draw a step button under its 24 by 24 target.
-    A Fabricate that predates `size` (issue 2841) refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+    A Fabricate that predates `size` refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
     The stepper steps by one `step` or one stop each way: a row of preset steps around a figure, as −5, −1, +1 and +5, is the companion's, drawn as published `Button`s beside a `Field`, because each of its presses is an action of its own rather than one value's step.
   - `placeholder` is optional text, shown in the input while it is empty.
     It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; the companion passes the text already localised and never relies on it as a name, because `ariaLabel` names the input and a placeholder does not.
@@ -1381,13 +1423,21 @@ Each group states the accepted values of every key that entry publishes.
     Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
     Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
   - It takes no rest keys, so a `data-*` key, an `id` and a `title` are refused (M8).
-  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it.
+    A DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states.
+    The companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, and inside the stepper's own outer edge in every case, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
-- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap on a switch without `label`, its label's line height, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, the box of the `format` field inside a Fabricate Manager window, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
+- **Private:** what the button draws for a `role` value outside its set.
+  Its height, corner, padding, type size and weight.
+  Each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in.
+  And how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+  And `StatusToggle`'s track and knob sizes, its button's width, its 78px cap on a switch without `label`, its label's line height, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards.
+  And `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, the box of the `format` field inside a Fabricate Manager window, and how Fabricate redraws a stepper in its own rows and cards.
+  The stepper's box is its own in every container, while core's line-height and transition still reach it.
 
-### The issue 2453 components
+### SearchField
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1405,7 +1455,9 @@ Each group states the accepted values of every key that entry publishes.
     The field draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the control with no name.
   - `density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: it is the shell's height, `'default'` 38px at radius 9 and `'toolbar'` and `'inline'` the rungs of those names `Select`'s `size` draws, 34px at radius 9 and 30px at radius 7, each at the default shell's fill, type and glyph; any other value, `'compact'` included, draws `'default'`.
     A search field at `'toolbar'` or `'inline'` stands as tall as a `Select` of that `size` beside it, so the row is one height; the retired 32px height is not a rung, and Fabricate's own compact search, the one `'compact'` draws for Fabricate's callers, is not published.
-  - `countLabel` is optional final display text drawn after the input inside the shell, as "12 found" or "3 chosen", on one line in the placeholder's muted ink, and the input yields it the width it needs, up to half the shell; past that it ends in an ellipsis, though its region still holds the whole text; `''` or absence draws none.
+  - `countLabel` is optional final display text drawn after the input inside the shell, as "12 found" or "3 chosen", on one line in the placeholder's muted ink, and the input yields it the width it needs, up to half the shell.
+    Past that it ends in an ellipsis, though its region still holds the whole text.
+    `''` or absence draws none.
     The companion keeps the count short, a figure and a word, as "12 found", because past half the shell it is cut.
     It is a polite status: Fabricate always draws its region, an element with `role="status"` that is empty while no count is given, so when an `update` writes or changes the text, a screen reader is expected to announce the whole new text, once, after what it is reading.
     It is not expected to be announced when the field is mounted with it, when an `update` passes the same text, or when an `update` changes any other key or the user types, because none of those changes the region; an `update` that drops the count empties the region, which is not expected to be announced either.
@@ -1417,7 +1469,9 @@ Each group states the accepted values of every key that entry publishes.
   - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
     The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
   - It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so.
-  - In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element; whether the query is cleared first is not stated; a companion that must keep the dialog open stops it in its own `keydown`.
+  - In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element.
+    Whether the query is cleared first is not stated.
+    A companion that must keep the dialog open stops it in its own `keydown`.
   - A DialogV2 companion that wants Enter to confirm handles Enter in its own listener above `target`, because the field cancels the form's implicit submission.
   - Rest `data-*` attributes land on the `<label>` root, never on the input, so the entry reserves no rest name.
   - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, as the shell of its `density`, 38px at radius 9 by default; it fills the width of `target`, which the companion gives `display: flex`.
@@ -1426,7 +1480,7 @@ Each group states the accepted values of every key that entry publishes.
   - An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced; `destroy` removes it, so where it holds focus the companion moves focus first.
 - **Private:** `SearchField`'s sizes beyond its height and corner, its glyph and colours beyond what its group states, what it draws for a `value` that is not a string, and how Fabricate redraws a search field in its own toolbars, rosters and cards.
 
-### The issue 2454 components
+### Select
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1451,7 +1505,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
   - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, so a companion's listener above `target` hears Tab and no other key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
     In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
-    Tab and Shift+Tab close an open list without choosing and move focus as the browser does, and the list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
+    Tab and Shift+Tab close an open list without choosing and move focus as the browser does, and the list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing.
     A press on the trigger does not bubble out of it as a `click`, and a press inside the open list does not bubble out of the list, so a companion's `click` listener above `target` or the `overlayHost` hears neither.
   - The list is the entry's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the list's hidden live region is clipped only under a `.fabricate` ancestor; under the standalone style root the companion passes none, and the list opens on the standalone layer.
@@ -1464,7 +1518,7 @@ Each group states the accepted values of every key that entry publishes.
   - Foundry 14 gives the companion no signal when it moves a window between browser windows, and a select needs none: a list opened after the move is placed and heard in the window that then holds the trigger, as Overlays states.
 - **Private:** `Select`'s sizes beyond each rung's height and corner, its tick, chevron and colours beyond what its group states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, the list's placement and width, and how Fabricate redraws a select in its own toolbars, rows, cards and dialogs.
 
-### The issue 2455 components
+### StageBars
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1481,7 +1535,7 @@ Each group states the accepted values of every key that entry publishes.
     `weight` is the stage's share of the row: a finite number above zero, else 1, so the bars are each `weight` over the sum of the weights wide and a list that names none draws equal bars.
     A `weight` that is a numeric string reads 1, and a bar narrower than its caption cuts the caption off with an ellipsis.
     Naming `weight` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws equal bars, which `describe` cannot show.
-    A stage's `shares` (issue 2837) is an array of `{ weight, tone? }`, read as `FillBar`'s `shares` are: two or more draw the stage's fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is as wide as the stage's `value`.
+    A stage's `shares` is an array of `{ weight, tone? }`, read as `FillBar`'s `shares` are: two or more draw the stage's fill as abutting shares, each `weight` over the sum of the weights wide, and the whole stack is as wide as the stage's `value`.
     A share's `tone` is one of `FillBar`'s sixteen tones and defaults to `success`, a tone outside them draws `neutral`, and a member of a share other than `weight` and `tone` is private and dropped from the copy Fabricate renders, so a `color` on a share paints nothing.
     A share's `weight` sizes it within its own stage's fill, and a stage's `weight` sizes the stage's bar within the row, so the two never mix.
     Two or more shares take the place of the stage's state paint: the current stage draws no accent and a filled one no success, and the bar keeps its `aria-current` and its value; one share, none or a `shares` that is not an array draws the state's paint as before.
@@ -1489,7 +1543,7 @@ Each group states the accepted values of every key that entry publishes.
     So the companion says which stage is current and which are done as text beside the bars, and states each share as text too: the shares are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other.
     Against the `default` track 9 of the 448 readings of the sixteen tones on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes are under 3:1, all on `--fab-bg-2` and six of them in `foundry-native`, the weakest `success` there at 2.3:1; against the `thin` track they read as the thin `FillBar`'s do, 20 of the 112 under 3:1 and none under 1.8:1.
     Naming `shares` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws each stage in its state's paint and refuses nothing, which `describe` cannot show, so the text beside the bars carries the shares on either.
-    A stage's `title` (issue 2857) is final display text, a hint about the stage, as "Smelt: 3 of 5 days", and Fabricate writes it as the bar's `data-tooltip-text` where it is a non-blank string, numbered or not, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the bar.
+    A stage's `title` is final display text, a hint about the stage, as "Smelt: 3 of 5 days", and Fabricate writes it as the bar's `data-tooltip-text` where it is a non-blank string, numbered or not, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the bar.
     A `title` that is not a string, or is blank, writes none.
     The bar is no control and takes no focus, so the tooltip opens on pointer hover only and a keyboard or touch user never sees it: a title is a hint and never the only carrier of a stage's state, so the companion says each stage's state and reading in its `label` or `valueText` and in its own text beside the bars.
     While it is open Foundry may describe the bar by it through `aria-describedby`, so a screen reader may read it too; no screen reader was tested.
@@ -1498,13 +1552,13 @@ Each group states the accepted values of every key that entry publishes.
     Naming `title` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws no tooltip and refuses nothing, which `describe` cannot show.
     A member other than `name`, `label`, `valueText`, `value`, `weight`, `shares` and `title` is private, and an empty `stages` draws the named group with no bar.
   - `gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
-    Naming `gap` (issue 2821) is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"gap" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+    Naming `gap` is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"gap" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as `FillBar`'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.
     Against the companion's ground the `thin` track itself is faint, 1.0:1 to 2.9:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, and in `foundry-native` on `--fab-bg-2` an empty stage cannot be seen at all: `--fab-bg-3` there is a shade darker than `--fab-bg-2`, at 1.00:1, so the companion passes `numbered` or states the stage count as text.
     Under forced colours the `thin` track keeps a 1px edge in the system text colour, as the `default` track's border is drawn there, so each bar's extent stays visible.
-    Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, and issue #2838 tracks giving it a forced-colours paint, so the companion states the reading as text.
+    Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, so the companion states the reading as text.
     On the `thin` track the state paints read against `--fab-bg-3` as the thin `FillBar`'s tones do: the accent is under 3:1 in `hearth-herb` and `ironblood-forge`, the success in `foundry-native`, and the neutral in `hearth-herb`, `ironblood-forge` and `starglass-arcana`, the weakest the neutral in `hearth-herb` at 2.1:1, so `aria-current` and the companion's text, never the colour, say which stage is current and which are done.
-    Naming `track` (issue 2837) is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"track" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
+    Naming `track` is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"track" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
   - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
     A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
@@ -1516,7 +1570,7 @@ Each group states the accepted values of every key that entry publishes.
   - It is not a live region: an `update` redraws the bars in place and announces nothing.
 - **Private:** `StageBars`' `default` track's height, each track's corner, its gaps beyond `gap`'s two, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
 
-### The issue 2601 components
+### Field, Well, Callout, IconButton, EditorTabs and RadioCardGroup
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1596,7 +1650,9 @@ Each group states the accepted values of every key that entry publishes.
     An item with no `icon` releases the glyph column, so its text starts left of its glyph-led siblings', so the companion gives every item of a list an `icon`, or none.
   - `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
     At the default placement its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room, a long label squeezes it, and the companion keeps what it draws there short.
-  - `actionsPlacement` is `'inline'` or `'below'` and defaults to `'inline'`, the row above; `'below'` draws the host as a column beneath the glyph and the body, as wide as the strip's content box, which stacks the content slot's children by `gap` and stretches each to that width, for a call to action under its note; any other value draws `'inline'`.
+  - `actionsPlacement` is `'inline'` or `'below'` and defaults to `'inline'`, the row above.
+    `'below'` draws the host as a column beneath the glyph and the body, as wide as the strip's content box, which stacks the content slot's children by `gap` and stretches each to that width, for a call to action under its note.
+    Any other value draws `'inline'`.
     Under it, a published `Button` the companion mounts with `fullWidth` in a `<span>` of its own in the slot spans the strip, and the body keeps the whole row beside the glyph, at any width the strip is drawn at, 180px included.
     The companion keeps the label short: where the strip is narrower than the label, the label wraps inside the button, and one that wraps onto more lines than the button holds spills past its edges, as the `Button` group states.
     The host follows the body in the DOM at either placement, so a screen reader and the Tab key reach what the companion draws there after the body.
@@ -1624,7 +1680,11 @@ Each group states the accepted values of every key that entry publishes.
     A name of white space alone leaves the button with no name and an empty tooltip, so the companion never passes one.
   - `role` is `neutral`, `primary`, `ghost`, `danger` or `ghost-danger`, and defaults to `neutral`; a role outside that set draws `neutral`.
     It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-    Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster; `ghost` the quiet verb, drawn with no edge or fill at rest, for a control repeated on every row of a list; `danger` the destructive verb; and `ghost-danger` the destructive verb repeated on every row, as a row's delete.
+    Each value names a verb, never a colour: `neutral` is the secondary verb.
+    `primary` the leading verb of its cluster.
+    `ghost` the quiet verb, drawn with no edge or fill at rest, for a control repeated on every row of a list.
+    `danger` the destructive verb.
+    And `ghost-danger` the destructive verb repeated on every row, as a row's delete.
     A visual role is drawn and never announced, so a destructive role needs the verb in `ariaLabel`: "Delete Iron ingot", never "Iron ingot".
     The companion confirms a destructive press in a dialog of Foundry's before anything is written.
   - `size` is `''`, `'20'`, `'22'`, `'24'` or `'26'`, a string, and defaults to `''`: `''` draws the default rung, and `'20'`, `'22'`, `'24'` and `'26'` a square of that many pixels at every role; what it draws for any other value is private.
@@ -1726,9 +1786,14 @@ Each group states the accepted values of every key that entry publishes.
     An empty `options` draws the named fieldset with no card and no radio, so nothing inside `target` takes focus; the companion passes at least one option where the group must be reachable.
   - The radio's keyboard ring is the accent, 2px wide and 2px clear, drawn on the card's own ground.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against a chosen card's `--fab-surface-soft` over `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the group on one of those four grounds.
-- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards; `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors; `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors; `RadioCardGroup`'s card, chip, radio and type figures, its `data-radio-card-*` and `data-tool-choice-*` hooks, the width it reflows at, and how Fabricate draws option cards in its own editors.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails.
+  `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
+  `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards.
+  `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors.
+  `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors.
+  `RadioCardGroup`'s card, chip, radio and type figures, its `data-radio-card-*` and `data-tool-choice-*` hooks, the width it reflows at, and how Fabricate draws option cards in its own editors.
 
-### The issue 2644 components
+### SegmentedControl
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1766,7 +1831,9 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `'accent'`, `'accent-soft'` or `'info'` and defaults to none: `'accent'` fills the selected segment solid in the accent and `'info'` in the info colour, each leaving the other segments bare, and `'accent-soft'` tints it softly in the accent; any other value is private.
     An `'accent'` or `'accent-soft'` control draws such an option in the info tint, not in its own.
   - `shape` is `'pill'` or absent: `'pill'` draws the segments as separate pills, with no fill, edge or padding on the track; any other value is private.
-  - `surface` is `'default'` or `'panel'` and defaults to `'default'`: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, under every `density`, `tone` and `size`, and changes no segment, height or ring; the `'pill'` shape draws no track fill, so `'panel'` draws nothing there; any other value, `'Panel'`, `true` and `'false'` among them, draws the default track.
+  - `surface` is `'default'` or `'panel'` and defaults to `'default'`: `'panel'` fills the track with `--fab-bg-0`, one step below a `--fab-bg-1` panel, under every `density`, `tone` and `size`, and changes no segment, height or ring.
+    The `'pill'` shape draws no track fill, so `'panel'` draws nothing there.
+    Any other value, `'Panel'`, `true` and `'false'` among them, draws the default track.
   - `size` is `34` or `'34'`, a number or its string, and defaults to none: `34` draws the track 34px tall, its border included, and stretches each segment to fill it inside the density's padding, so the control lines up with a 34px `Field` or `Button` beside it; any other value, `35` and `'34px'` among them, draws the density's own height.
     Without `size` the `'inline'` density draws a 30px track and `'compact'` and `'field'` a 36px one, and the `'default'` density's height follows the type size and is private; the `'pill'` shape drops the track's padding, so it draws `'inline'` at 26px and `'compact'` and `'field'` at 28px, and `size: 34` still draws 34px there.
   - Naming `density`'s `'compact'` and `'field'` values and an option's `title` is additive, and `SegmentedControl`'s `version` stays 1: no key is new, so no Fabricate refuses either.
@@ -1795,10 +1862,10 @@ Each group states the accepted values of every key that entry publishes.
     The selected state is carried by weight alone under forced colors, in every density, and no test checks forced colors beyond that weight, and by nothing in the `'pill'` shape.
     On the `'panel'` track the idle ink, at rest and under the pointer, and the selected segment's ink on its fill, under no `tone` and each published `tone` and `variant`, clear 4.5:1 in every palette, and the ring clears 3:1 on the track; the track is opaque, so this holds on any of the four grounds, but on `--fab-bg-0` it draws no step below its ground, so the companion mounts it on one of the other three.
     The selected segment's edge, drawn over its own fill, measures 2.09 to 2.86:1 against the `'panel'` track, its fill 1.23 to 1.38:1, and its `--fab-text` ink 1.89 to 2.79:1 against the idle segments' `--fab-text-muted`, across the seven palettes.
-    Under forced colors the segments' edges, fills and inks are all system colours, so weight alone (600 against 500) carries the selected state, as on the default track; a forced-colors selected treatment is a follow-up (issue #2872).
+    Under forced colors the segments' edges, fills and inks are all system colours, so weight alone (600 against 500) carries the selected state, as on the default track.
 - **Private:** `SegmentedControl`'s track and segment figures beyond the heights its group states, each rung's type size, its colours beyond what its group states, what it draws for a private option member, `variant`, `density`, `tone` or `shape` value, and how Fabricate draws a segmented control in its own rows, pager and editors.
 
-### The issue 2646 components
+### Pagination
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1857,7 +1924,7 @@ Each group states the accepted values of every key that entry publishes.
     The ring clears 3:1 against the default bar's `--fab-bg-1` and, under `'compact'`, against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts a compact pager on one of those four grounds and leaves room for the ring inside any edge of its own that clips.
 - **Private:** `Pagination`'s bar, arrow, label and type figures, its colours beyond what its group states, its `data-pagination-*` hooks, what it draws for a `totalCount`, `pageSize`, `pageIndex` or offered size outside what its group states, and how Fabricate draws a pager in its own browse columns, rails and inspectors.
 
-### The issue 2647 components
+### IconPicker
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1878,7 +1945,7 @@ Each group states the accepted values of every key that entry publishes.
     It is not called by `mount`, `update`, opening or closing the list, a query, Escape or an outside press.
     The picker changes nothing itself: the trigger shows the new glyph when the companion's `update` passes it as `value`, and a companion that refuses the choice passes `value` unchanged.
   - `ariaLabel` is required final display text naming what the picker chooses, as "Reagent icon".
-    The trigger's name is `ariaLabel`, less any spacing, `:`, `;`, `,`, `.` or `-` that ends it, then a comma and a space, then the caption it draws, as "Reagent icon, Flask" from "Reagent icon" or "Reagent icon:", so it always holds its visible label (WCAG 2.2 success criterion 2.5.3) and the choice is heard, and the companion never rebuilds Fabricate's caption, a stored glyph's outside the vocabulary included (issue 2899).
+    The trigger's name is `ariaLabel`, less any spacing, `:`, `;`, `,`, `.` or `-` that ends it, then a comma and a space, then the caption it draws, as "Reagent icon, Flask" from "Reagent icon" or "Reagent icon:", so it always holds its visible label (WCAG 2.2 success criterion 2.5.3) and the choice is heard, and the companion never rebuilds Fabricate's caption, a stored glyph's outside the vocabulary included.
     Where `ariaLabel` already holds the caption's words as one run of whole words, compared as `Button`'s `ariaLabel` is held to its label (M22), the name is `ariaLabel` alone, so "Reagent icon: Flask" names the trigger with the caption once; nothing is refused, as the comparison only chooses the name.
     The caption is the glyph's English `label`, which is not localized, so a name in another language holds that English label as the caption it draws does.
     The name is also the trigger's native tooltip, so a caption an ellipsis cuts in a narrow `target` reads whole under the pointer.
@@ -1891,13 +1958,13 @@ Each group states the accepted values of every key that entry publishes.
     Absent, or any other value, `'--fab-tag-rose'`, `'Rose'` and `' rose'` among them, draws the glyph in the default accent, and nothing is coerced.
     The glyph is hidden from assistive technology and the tint is colour alone, so the companion says what the tint means in text of its own where it matters.
     Each tint's glyph clears the 3:1 non-text floor on its tile over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette but `mauve` and `slate` on `--fab-bg-2` in `foundry-native`, at 2.55:1 and 2.57:1, and the untinted glyph clears it on all four in every palette; a captioned trigger names the glyph in text beside it, so there the glyph is never the only carrier of the choice.
-    A Fabricate that predates `tint` (issue 2841) refuses it with `"tint" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
-  - `iconOnly` is optional, and only `true` draws the icon-only trigger, for a narrow column beside the companion's own art: the glyph's tile alone, a square with no caption and no caret, sized to the tile rather than to `target` and drawn at the start of `target`; any other value, `'true'` and `1` among them, draws the captioned trigger, and nothing is coerced (issue 2905).
+    A Fabricate that predates `tint` refuses it with `"tint" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+  - `iconOnly` is optional, and only `true` draws the icon-only trigger, for a narrow column beside the companion's own art: the glyph's tile alone, a square with no caption and no caret, sized to the tile rather than to `target` and drawn at the start of `target`; any other value, `'true'` and `1` among them, draws the captioned trigger, and nothing is coerced.
     An icon-only trigger draws no text, so its name and its native tooltip are `ariaLabel` alone, saying what the picker chooses, as "Faction icon".
     The choice is exposed as the trigger's accessible description: `aria-describedby` names the chosen glyph's caption, as "Crown", in every mount, and names nothing while `value` holds no glyph, so the companion's `ariaLabel` need not carry the choice.
     Its glyph is then the only visible carrier of the choice, and in `foundry-native` a glyph tinted `mauve` or `slate` may be hard to see on `--fab-bg-2`, at 2.55:1 and 2.57:1 against the 3:1 non-text floor; whether the companion's own art beside it shows the same glyph again is the companion's to decide.
     It is a pointer target at least 24 by 24 CSS pixels (WCAG 2.2 success criterion 2.5.8), and its fill, keyboard ring, keys, list, `aria-haspopup` and `aria-expanded` are the captioned trigger's, so it opens, closes and takes focus back as this group states; under forced colours its edge, glyph and ring are drawn in system colours.
-    A Fabricate that predates `iconOnly` (issue 2905) refuses it with `"iconOnly" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out, and one that predates the composed name (issue 2899) names a captioned trigger by `ariaLabel` alone; adding both is additive, and the entry stays at `version` 1.
+    A Fabricate that predates `iconOnly` refuses it with `"iconOnly" is not a prop of IconPicker`, which `describe('IconPicker').props` shows by leaving it out, and one that predates the composed name names a captioned trigger by `ariaLabel` alone; adding both is additive, and the entry stays at `version` 1.
     The two arrived together, so `'iconOnly' in describe('IconPicker').props` tells the companion the trigger's name holds its caption; where it is `false`, the companion puts the caption in `ariaLabel` itself.
   - A press on the trigger, by pointer, Enter or Space, opens the list, and a second press closes it.
     When the list opens, focus moves into its query field, outside `target`.
@@ -1907,8 +1974,8 @@ Each group states the accepted values of every key that entry publishes.
     Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
-    Tab in the query field closes the list without choosing, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger, and Shift+Tab there closes the list and returns focus to the trigger (issue 2676).
-    The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing (issue 2598).
+    Tab in the query field closes the list without choosing, moves focus to the trigger and leaves the browser to move it on from there, so focus lands where it would if the list were drawn just after the trigger, and Shift+Tab there closes the list and returns focus to the trigger.
+    The list also closes without choosing, moving no focus, once focus moves to an element outside the trigger and the list; focus leaving the browser window, or moving between the main window and a detached one, closes nothing.
   - The trigger stops the propagation of every key but Tab, with or without Shift, pressed while it holds focus, and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears Tab and no other key; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
     In a DialogV2, Escape on the trigger does not close the dialog; the companion handles Escape in its own listener on the trigger or moves focus first.
     Every key pressed in the query field, Escape included, may reach a companion's listener on the `overlayHost` or above it.
@@ -1925,7 +1992,7 @@ Each group states the accepted values of every key that entry publishes.
   - A list opened after Foundry 14 moves the window is placed and heard in the window that then holds the trigger, its focus and measures included, as Overlays states.
 - **Private:** `IconPicker`'s trigger, row, tile and type figures, its colours beyond what its group states, the default glyph, the list's placement, width and height, which glyphs a query matches and their order, its `essence-icon-picker-*` and `data-popover-*` hooks, and how Fabricate draws an icon picker in its own editors and rails.
 
-### The issue 2652 components
+### ActionMenu
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -1960,7 +2027,7 @@ Each group states the accepted values of every key that entry publishes.
     In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
     A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger, and a companion that moves focus in response moves it from a later task, as from a `setTimeout`.
     Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
-    Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger, departing from the APG menu button pattern, in which Tab closes the menu and moves on, as Tab in an `IconPicker`'s query field does; the published behaviour is kept so a companion's Tab handling does not change (issue 2700).
+    Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger, departing from the APG menu button pattern, in which Tab closes the menu and moves on, as Tab in an `IconPicker`'s query field does; the published behaviour is kept so a companion's Tab handling does not change.
     A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
     A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
@@ -1981,7 +2048,7 @@ Each group states the accepted values of every key that entry publishes.
   - A menu opened after Foundry 14 moves the window is placed and heard in the window that then holds the trigger, its focus and arrow keys included, as Overlays states.
 - **Private:** `ActionMenu`'s glyph, its trigger, menu, item and type figures, its colours beyond what its group states, the menu's placement and width, an item's `tone`, its `manager-action-menu-*` classes and `data-action-menu-*` hooks, and how Fabricate draws a menu in its own rows, adders and kind menus.
 
-### The issue 2656 components
+### Modal
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2014,7 +2081,7 @@ Each group states the accepted values of every key that entry publishes.
     A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as a `Select`'s list, an `IconPicker`'s list and query field and an `ActionMenu`'s menu that the companion mounts in a slot.
     A press in such a panel does not call `onClose`, and the panel takes it as its own group states, so a click on an option chooses it as it does outside a dialog.
     Escape pressed while focus is in such a panel is left to that panel: the dialog neither calls `onClose` nor stops it, and the panel closes and returns focus to its trigger in the dialog, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
-    A `Modal` the companion mounts in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone (issue 2678).
+    A `Modal` the companion mounts in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
     An `overlayHost` inside the slot draws a panel inside the dialog, which clips what overflows it.
     With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
   - `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
@@ -2033,7 +2100,7 @@ Each group states the accepted values of every key that entry publishes.
     Tab from its last control moves focus to its first, Shift+Tab from its first to its last, and a Tab with focus on the page, as after the focused control was removed, moves focus into it.
     Every key but Escape pressed in the dialog bubbles to its host and the host's ancestors and stops at the document, so no bubble-phase window listener hears it, Foundry's keybindings among them.
     Unless `scrim` is `'dim'`, nothing covers the window behind the dialog, which still takes a pointer press, so a press there can move focus out of the dialog; with `'dim'`, a press over the box the scrim covers lands on the scrim and focus stays in the dialog.
-    A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog the companion opens in that frame keeps the focus it took (issue 2759).
+    A frame after an `update` closes the dialog, or `destroy` removes it, Fabricate returns focus to the element that held it as the dialog opened, if focus is then on the page and that element is still connected, enabled and not the page; otherwise focus stays where it is, so a trapped dialog the companion opens in that frame keeps the focus it took.
     An Enter held on the control that opened the dialog presses the control focus entered on with each repeat, the close control included, so the companion names a control that does not act on Enter with `initialFocus`, or ignores a `keydown` whose `repeat` is `true`.
     The companion passes `trapFocus` in the `update` that opens the dialog and keeps it until the one that closes it; what changing it while the dialog is open does is private.
   - `initialFocus` is optional text that names where focus enters with `trapFocus`: the first control in the dialog, in document order, that carries a `data-initial-focus` attribute equal to the text or sits inside an element that does, so the companion marks an element of its own in a slot, as a search field or the `target` of a published entry it mounts there.
@@ -2043,7 +2110,7 @@ Each group states the accepted values of every key that entry publishes.
   - `footerLayout` is `'end'` or `'equal'` and defaults to `'end'`: `'end'` draws the footer's top-level children in a row aligned to the end of the band, and `'equal'` gives each of them one equal share of the band's width, in the order the companion appends them.
     A child takes its share as a box, so a published `Button` the companion mounts in an element of its own there fills it only with `fullWidth`.
     What the footer draws for a value outside the set is private; today that is `'end'`.
-  - `scrim` is `'none'` or `'dim'` and defaults to `'none'`: `'none'` draws no layer behind the dialog, and `'dim'` draws a scrim, a translucent layer in the palette's own dark overlay colour, under the dialog and over the window behind it (issue 2859).
+  - `scrim` is `'none'` or `'dim'` and defaults to `'none'`: `'none'` draws no layer behind the dialog, and `'dim'` draws a scrim, a translucent layer in the palette's own dark overlay colour, under the dialog and over the window behind it.
     A value other than `'dim'`, as `'dim '`, `'DIM'`, `true` or `1`, draws none, because Fabricate compares the value as it is and coerces none.
     The scrim is drawn in the dialog's host just before the dialog and at its `z-index`, so it covers the box the dialog is centred in, as the lines on its host below state, and it stacks where the dialog does: the dialog and everything in it are drawn above it and keep their own colours, and a Foundry window stacked above the window that holds it is not dimmed.
     It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
@@ -2055,7 +2122,7 @@ Each group states the accepted values of every key that entry publishes.
     For a dim of another colour or strength, over another box, or with a blur, the companion passes `'none'` and draws its own layer, as the lines on its host below state.
   - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
-    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed closes nothing (issue 2677).
+    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops Escape, as a `Select`'s or an `IconPicker`'s trigger does, so Escape on such a trigger whose list is closed closes nothing.
     Fabricate's own dialogs differ: there the dialog hears an Escape on a closed `Select` or `IconPicker` trigger before the trigger does, and closes.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
     Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
@@ -2084,7 +2151,7 @@ Each group states the accepted values of every key that entry publishes.
     A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
 - **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its height and placement beyond what its group states, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
-### The issue 2784 components
+### ListRow
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2101,7 +2168,9 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
     It adds no text or glyph, so the companion states what the tone means in `detail` as well.
   - `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
-  - `markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn; while `busy` replaces `leading`, it sizes the spinner; any other value, a numeric string included, draws `22`, and Fabricate warns in the console.
+  - `markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn.
+    While `busy` replaces `leading`, it sizes the spinner.
+    Any other value, a numeric string included, draws `22`, and Fabricate warns in the console.
   - `density` is `'dense'` or `'default'` and defaults to `'dense'`: `'default'` draws the roomier row of Fabricate's own browse lists, at a 12px by 16px inset with a 12px gap and an 11px corner, and any other value draws as `'dense'`.
   - `layout` is `'row'` or `'card'` and defaults to `'row'`: `'card'` draws the row as a card, its mark above its name and the rest in one column across `target`'s width, at a 12px inset on the card ground with an 11px corner, and any other value draws as `'row'`.
   - `truncateName` is `true` or `false` and defaults to `false`: `true` holds the name and the detail each on one line that ends in an ellipsis where its text overflows, the whole text staying in the DOM and in a native `title`, and `false` wraps them.
@@ -2158,7 +2227,7 @@ Each group states the accepted values of every key that entry publishes.
     `destroy` removes the row.
 - **Private:** `ListRow`'s figures and its colours beyond what its group states, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists and headings.
 
-### The issue 2775 components
+### ToggleCard
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2170,7 +2239,7 @@ Each group states the accepted values of every key that entry publishes.
     A name of white space alone leaves the switch with no name, so the companion never passes one.
     The name never states a position, so no "on", "off", "show" or "hide" at its start or end, as the `StatusToggle` group states.
   - `sub` is optional final display text drawn under the title in a quieter ink; absent, the second line is empty.
-    It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby` (issue 2892), so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
+    It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
     A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so a sentence that must be heard there belongs in `title`.
   - `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
   - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
@@ -2188,7 +2257,7 @@ Each group states the accepted values of every key that entry publishes.
   - It takes no rest keys, so a `data-*` key is refused (M8).
 - **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and tone classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
 
-### The issue 2836 components
+### SelectionCheckbox
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2227,7 +2296,10 @@ Each group states the accepted values of every key that entry publishes.
     A focused ticked box shows its accent fill, a gap of the ground and the ring, so the ring stays apart from the box's edge.
   - The state is not carried by colour alone: a ticked box draws a tick, a mixed one a dash, and an empty one neither, and the input states it to assistive technology as checked, mixed or not.
     Under forced colours the box draws in the reader's system colours: an empty box keeps its edge and draws no tick, a ticked or mixed one fills with `Highlight` and draws its glyph in `HighlightText`, a disabled box draws its edge in `GrayText`, and fills with it when ticked or mixed, undimmed, and the ring takes the reader's text colour.
-  - Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes an empty box's edge clears 3:1, 3.34:1 at the least, against the ground a compact box draws on and against the fill the larger boxes enclose; a ticked or mixed box's accent edge clears 3:1, 5.19:1 at the least; the tick clears 3:1 on the accent fill, 5.90:1 at the least, and the dash on the soft fill, 3.94:1 at the least; the label clears 4.5:1, 6.91:1 at the least, and the disabled label, which WCAG 2.2 §1.4.3 exempts, still clears it, 4.99:1 at the least.
+  - Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes an empty box's edge clears 3:1, 3.34:1 at the least, against the ground a compact box draws on and against the fill the larger boxes enclose.
+    A ticked or mixed box's accent edge clears 3:1, 5.19:1 at the least.
+    The tick clears 3:1 on the accent fill, 5.90:1 at the least, and the dash on the soft fill, 3.94:1 at the least.
+    The label clears 4.5:1, 6.91:1 at the least, and the disabled label, which WCAG 2.2 §1.4.3 exempts, still clears it, 4.99:1 at the least.
     Under the pointer an enabled empty box raises its edge to `--fab-text-muted`, 4.99:1 at the least, and never below its resting edge.
 `--fab-bg-3` is not a supported ground for the box or its label: there the empty edge falls short of 3:1 in three palettes, 2.14:1 at the least, the label falls short of 4.5:1 in two, 3.51:1 at the least, and the ring falls short in two.
   - A box is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it is no wider than `target`.
@@ -2235,7 +2307,7 @@ Each group states the accepted values of every key that entry publishes.
   - A Fabricate that predates the entry does not list it in `components`, `describe` answers `null` for it, and `mount` refuses it with `"SelectionCheckbox" is not published` (M3), so the companion draws its own control there.
 - **Private:** `SelectionCheckbox`'s gap, corner and type figures, its colours beyond what its group states, its `wrapper`, `decorative` and `input` props and so its bare and decorative forms, the hooks Fabricate's own callers use, and how Fabricate draws a box in its own windows.
 
-### The issue 2862 components
+### Disclosure
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2285,7 +2357,7 @@ Each group states the accepted values of every key that entry publishes.
     `destroy` removes the card.
 - **Private:** `Disclosure`'s padding, gap and type figures beyond what its group states, its `fabricate-disclosure-*` classes beyond its root, its `is-open` class, how the chevron is drawn, and its body element's id, which is unique to each mount.
 
-### The issue 2860 components
+### Typeahead
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2341,7 +2413,10 @@ Each group states the accepted values of every key that entry publishes.
     The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
     Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
     Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.
-    Escape while the list or its empty line is shown closes it and keeps the text; Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`; either stops its propagation, so no listener above `target` hears it, a DialogV2's own included; Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+    Escape while the list or its empty line is shown closes it and keeps the text.
+    Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
+    Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
+    Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
     Tab and Shift+Tab move focus as the browser does and close the list without a choice, and a companion's listener above `target` hears the Tab.
     No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
     A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
@@ -2353,7 +2428,7 @@ Each group states the accepted values of every key that entry publishes.
     The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
     Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
     The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-    It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; the companion mounts it in a dialog that is not modal, and this is tracked as a follow-up.
+    It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; the companion mounts it in a dialog that is not modal.
     A row is at least 28px tall, so each is a 24px target.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its field is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it fills the width of `target`, which the companion gives `display: flex`.
@@ -2366,7 +2441,7 @@ Each group states the accepted values of every key that entry publishes.
   - `source`, `itemLabel`, `itemIcon`, `onChoose`, `label`, `ariaLabelledBy`, `icon`, `inputProps`, `listClass`, `listProps`, `listMaxHeight`, `optionClass`, `optionHeight`, `optionDataAttr` and `class`, which Fabricate's own callers pass, are not published at version 1; publishing one later is additive.
 - **Private:** `Typeahead`'s sizes beyond the field's height and corner, its glyph, tick and colours beyond what its group states, the list's placement, width and height, what it draws for a member or value outside its contract, and how Fabricate draws a typeahead in its own windows.
 
-### The issue 2861 components
+### Popover
 
 Each group states the accepted values of every key that entry publishes.
 
@@ -2415,7 +2490,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape pressed on an element inside the panel whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element, as an open `Select` list's is, so the next Escape closes the popover; Escape pressed while focus is elsewhere calls nothing.
   - The panel is the entry's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states, so `target`'s overflow does not clip it.
     It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-    A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so the companion never mounts a `Popover` in one without an `overlayHost` inside that dialog (issue 2884).
+    A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so the companion never mounts a `Popover` in one without an `overlayHost` inside that dialog.
   - It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
   - Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
     The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls the companion draws inside carry their own edges.
@@ -2434,7 +2509,7 @@ The _publishable subset_ is the candidates that pass the static rules below.
 The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
 A _stripped member_ is a per-item member of a published `data` key that `STRIPPED_ITEM_MEMBERS` in `src/ui/publishedComponentProps.js` names.
 An _allowed member_ is a per-item member of a published `data` key that `ALLOWED_ITEM_MEMBERS` in the same file names, and the seam passes only those.
-A _withheld value_ is a value of a published `data` key that `WITHHELD_VALUES` in the same file names, as `<Entry>.<key>.<value>`: its component draws it for Fabricate's own callers alone, and the seam passes `undefined` in its place, so the key draws its default (issue 2849), as `Chip`'s tones beyond its group's six are (issue 2858) and `Typeahead`'s `'compact'` density is (issue 2860).
+A _withheld value_ is a value of a published `data` key that `WITHHELD_VALUES` in the same file names, as `<Entry>.<key>.<value>`: its component draws it for Fabricate's own callers alone, and the seam passes `undefined` in its place, so the key draws its default, as `Chip`'s tones beyond its group's six are and `Typeahead`'s `'compact'` density is.
 
 - **A candidate is publishable when it passes every static rule.**
   - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
@@ -2486,7 +2561,7 @@ A child component that a script module in the closure also draws, which no compo
 A value built up by a mutation after its declaration, such as `const box = {}; Object.assign(box, items[0])` or an array pushed to in an `$effect`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
-It also keeps only the members `ALLOWED_ITEM_MEMBERS` names for a key whose component draws a member the published form does not state: a `FillBar` share keeps `weight` and `tone`, so a `color`, `background` or any other member it carries is dropped and never drawn, and so does each share of a `StageBars` stage, a row naming the member below the key that holds those items (issue 2837).
+It also keeps only the members `ALLOWED_ITEM_MEMBERS` names for a key whose component draws a member the published form does not state: a `FillBar` share keeps `weight` and `tone`, so a `color`, `background` or any other member it carries is dropped and never drawn, and so does each share of a `StageBars` stage, a row naming the member below the key that holds those items.
 It passes `undefined` for a withheld value, on `mount` and on `update`, and refuses nothing for it: `SearchField`'s `density` of `'compact'` draws the default shell.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
 A dropped `aria-label` is release-noted.
@@ -2530,14 +2605,14 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string; or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy; with several, the first key in manifest order; where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
+| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string. Or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy. With several, the first key in manifest order. Where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
-| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction`; or, on such an entry whose group also says that control carries Foundry's tooltip, `data-locked`; or an `aria` key not holding a string, number or boolean (a function is M10) | `"<key>" is not a data attribute`, `"<key>" is reserved on <name>`, or `"<key>" must be a string, number or boolean` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean. Or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction`. Or, on such an entry whose group also says that control carries Foundry's tooltip, `data-locked`. Or an `aria` key not holding a string, number or boolean (a function is M10) | `"<key>" is not a data attribute`, `"<key>" is reserved on <name>`, or `"<key>" must be a string, number or boolean` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
-| M16 | `target` is outside the entry's required ancestor root, where a standalone style root is no Fabricate root; or the entry is drawn under the standalone style root, `target` has no Fabricate root and its root node is a shadow root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor`, or `<name> cannot be drawn in a shadow root` |
+| M16 | `target` is outside the entry's required ancestor root, where a standalone style root is no Fabricate root. Or the entry is drawn under the standalone style root, `target` has no Fabricate root and its root node is a shadow root. Checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor`, or `<name> cannot be drawn in a shadow root` |
 | M17 | A `callback` key holding a value that is not a function | `"<key>" must be a function` |
 | M18 | `overlayHost` is not `undefined`, and is not an element of `target.ownerDocument`, by `nodeType` and never `instanceof`; checked on every entry, directly after M16 | `overlayHost must be an element in the target's document` |
 | M19 | The entry is lazy and its code is not loaded: `load` never requested it, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
@@ -2563,7 +2638,9 @@ Fabricate never empties a slot element and never calls into a companion's runtim
 - `destroy` never throws: if the runtime's unmount throws, Fabricate reports it as `console.error('Fabricate | Published component render failed:', name, error)` and still releases the target.
 A teardown that throws during the unmount is reported the same way, a microtask later.
 After such a teardown the target may still hold a node of Fabricate's, so the companion empties it before mounting there again.
-- The companion MUST call `destroy` on every path that ends the mount: its own cleanup; an ApplicationV2 close (in `_preClose`, `_onClose`, or before `super.close`); and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting into the new target), because DialogV2 and Handlebars `_replaceHTML` replace their content on render and `destroy` works on a detached target.
+- The companion MUST call `destroy` on every path that ends the mount: its own cleanup.
+  An ApplicationV2 close (in `_preClose`, `_onClose`, or before `super.close`).
+  And on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting into the new target), because DialogV2 and Handlebars `_replaceHTML` replace their content on render and `destroy` works on a detached target.
 A mount whose content slot holds the companion's own content ends in this order on each of those paths: the companion unmounts what it drew there with its own runtime, then calls `destroy` on the outermost handle, which ends every published mount nested in its slot elements.
 A navigation provider does both in the cleanup its `mount` returned, which Core calls while the target is still connected and before `requestRemount` clears it.
 A host that replaces its content on every render (DialogV2, a Handlebars part) does both on each re-render and mounts again in `_onRender`.
@@ -2615,7 +2692,7 @@ An entry whose `overlays` is `true` opens its overlay and may write the standalo
 - The companion mounts after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 - Svelte injects a component's scoped stylesheet into the target's own document head, so a mount into an attached target in its final document is styled, a Foundry 14 detached window included.
-A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window (issue 2432).
+A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window.
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 - Mount at the composite level, on stable keyed elements, and reuse a mount through `update`.
 
