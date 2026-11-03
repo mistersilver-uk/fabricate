@@ -127,7 +127,10 @@ function check(radio) {
 
 describe('a manual RadioCardGroup', () => {
   it('describes activation as a data key', () => {
-    assert.deepEqual(ui().describe('RadioCardGroup').props.activation, { kind: 'data', required: false });
+    assert.deepEqual(ui().describe('RadioCardGroup').props.activation, {
+      kind: 'data',
+      required: false,
+    });
   });
 
   it('moves focus on each arrow key, skipping the disabled option and wrapping, and chooses nothing', async () => {
