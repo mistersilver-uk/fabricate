@@ -75,6 +75,7 @@ const measure = () =>
             height: bar.getBoundingClientRect().height,
             border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => style[`border${side}Width`]),
             borderColor: style.borderTopColor,
+            outline: style.outlineStyle,
             background: style.backgroundColor,
             fill: fill.getBoundingClientRect().height,
             fillBackground: getComputedStyle(fill).backgroundColor,
@@ -158,6 +159,13 @@ describe('StageBars forms, rendered (issue 2837)', () => {
       }
     }
     assert.equal(forced.rows.thin[0].borderColor, forced.rows.default[0].borderColor);
+    for (const bar of forced.rows.thin) {
+      assert.equal(
+        bar.outline,
+        'none',
+        'FillBar’s outside edge would be clipped, so none is drawn'
+      );
+    }
   });
 
   it('draws the fill in the text colour under forced colours on either track, so it is told from the track’s ground', () => {

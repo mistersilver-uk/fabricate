@@ -150,6 +150,7 @@
       > .fab-stage-bars-track
       > :global(.fab-fill-bar) {
       border: 1px solid canvastext;
+      outline: none;
     }
   }
 

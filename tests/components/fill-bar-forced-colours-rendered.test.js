@@ -57,6 +57,16 @@ const ROWS = [
       { weight: 1, tone: 'azure' },
     ],
   },
+  { id: 'compact', value: 50, density: 'compact' },
+  {
+    id: 'thin-coloured-shares',
+    value: 80,
+    density: 'thin',
+    shares: [
+      { weight: 1, color: 'var(--fab-success)' },
+      { weight: 1, color: 'var(--fab-danger)' },
+    ],
+  },
   { id: 'thin-up', value: 60, density: 'thin', origin: 'center' },
   { id: 'thin-down', value: -60, density: 'thin', origin: 'center' },
   { id: 'thin-zero', value: 0, density: 'thin', origin: 'center' },
@@ -97,6 +107,7 @@ const measure = () =>
             trackPaint: paint(track),
             fillPaint: paint(fill),
             fillAdjust: fillStyle.forcedColorAdjust,
+            shares: [...track.querySelectorAll('.fab-fill-bar-share')].map(paint),
             edge: {
               border: style.borderTopWidth,
               outline: [style.outlineStyle, style.outlineWidth, style.outlineColor],
@@ -196,7 +207,7 @@ describe('FillBar under forced colours, rendered (issue 2838)', () => {
   });
 
   it('draws every single fill in the text colour on either density, so it is told from the ground', () => {
-    for (const id of ['default', 'thin', 'thin-colour']) {
+    for (const id of ['default', 'compact', 'thin', 'thin-colour']) {
       const { fillPaint, fillAdjust } = forced.rows[id];
       assert.equal(fillAdjust, 'none', id);
       assert.equal(fillPaint, forced.probes.text, `${id} fill`);
@@ -209,9 +220,15 @@ describe('FillBar under forced colours, rendered (issue 2838)', () => {
     }
   });
 
-  it('draws a stacked fill solid in the text colour, so its extent is seen', () => {
-    assert.ok(same(forced.sample['thin-stacked'].fillCentre, forced.text));
-    assert.ok(!same(forced.sample['thin-stacked'].fillCentre, forced.ground));
+  it('draws a stacked fill solid in the text colour across both shares, a caller colour included', () => {
+    for (const id of ['thin-stacked', 'thin-coloured-shares']) {
+      const { leftHalf, rightHalf, above } = forced.sample[id];
+      assert.ok(same(leftHalf, forced.text), `${id}: first share`);
+      assert.ok(same(rightHalf, forced.text), `${id}: second share`);
+      assert.ok(same(above, forced.text), `${id}: the edge`);
+      const { track, fill } = forced.rows[id];
+      assert.ok(Math.abs(fill.width - track.width * 0.8) <= 1, `${id}: 80% wide`);
+    }
   });
 
   it('draws a centred fill in the text colour on its own side of the midpoint, and nothing on the other', () => {
@@ -241,6 +258,8 @@ describe('FillBar under forced colours, rendered (issue 2838)', () => {
     assert.equal(rows.default.edge.border, '1px');
     assert.equal(rows.default.edge.outline[0], 'none');
     assert.equal(rows['thin-colour'].fillPaint, probes.success, 'a caller colour still paints');
+    assert.equal(rows['thin-coloured-shares'].shares[0], probes.success, 'and so does a share’s');
+    assert.notEqual(rows['thin-coloured-shares'].shares[1], probes.success);
     assert.notEqual(rows.thin.fillPaint, probes.text);
     assert.notEqual(rows.thin.fillPaint, rows.thin.trackPaint);
   });
