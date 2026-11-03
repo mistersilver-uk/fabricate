@@ -2191,11 +2191,13 @@ The bar announces nothing and its inks never say good or bad: the neutral ink is
 So state the signed reading and its band as text beside the bar, as "+10, neutral".
 Under forced colours a bar whose `neutralBand` is above 0 draws its fill in the system text colour, solid beyond the band and as a hollow 1px ring within it, so the band is told by shape and the sign by side, never by colour alone.
 A fill only a few pixels wide has no room for the ring: in Chromium a reading of +2 on a 240px track, a fill about 2.4px wide, paints as a solid 2px mark, where +3, about 3.6px wide, shows its ring, so a reading that close to zero is told from one beyond the band by its width alone, and your text carries the reading.
-A `thin` bar whose `neutralBand` is above 0 also keeps a 1px edge in the system text colour, drawn outside its track, so its extent and midpoint stay visible.
-A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract.
 A Fabricate that predates `neutralBand` refuses it with `"neutralBand" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
 `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+Under forced colours the user agent paints every background to the ground, so every fill is drawn solid in the system text colour instead, a single fill, a stack of shares and a centred fill alike, and a `color` is drawn in it too.
+A `thin` track keeps a 1px edge in the system text colour, drawn outside its box as an outline, so its extent and midpoint stay visible and its fill keeps the whole 4px.
+A stack of shares is one solid fill there, and a bipolar bar draws no midpoint mark there either, so state each share and the signed reading as text beside the bar.
+A bipolar fill always starts at the midpoint, so the side it grows to tells the sign without colour, and a reading of zero draws an empty track.
 Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so never leave a reading to its colour.
 The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
 A Fabricate that predates `thin` draws the default track and refuses nothing, and `describe` cannot tell you which one is running; adding it is additive, and the entry stays at `version` 1.
@@ -3208,7 +3210,7 @@ A Fabricate that predates `gap` refuses it with `"gap" is not a data attribute`,
 `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as [`FillBar`](#fillbar)'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.
 Against your ground the `thin` track itself is faint, 1.0:1 to 2.9:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, and in `foundry-native` on `--fab-bg-2` an empty stage cannot be seen at all: `--fab-bg-3` there is a shade darker than `--fab-bg-2`, at 1.00:1, so pass `numbered` or state the stage count as text.
 Under forced colours the `thin` track keeps a 1px edge in the system text colour, as the `default` track's border is drawn there, so each bar's extent stays visible.
-Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, so state the reading as text.
+Under forced colours the fill on either track is drawn solid in the system text colour, as [`FillBar`](#fillbar)'s is, so state the reading as text beside the bars.
 On the `thin` track the state paints read against `--fab-bg-3` as the thin `FillBar`'s tones do: the accent is under 3:1 in `hearth-herb` and `ironblood-forge`, the success in `foundry-native`, and the neutral in `hearth-herb`, `ironblood-forge` and `starglass-arcana`, the weakest the neutral in `hearth-herb` at 2.1:1, so `aria-current` and your text, never the colour, say which stage is current and which are done.
 A Fabricate that predates `track` refuses it with `"track" is not a data attribute`, and `describe('StageBars').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
