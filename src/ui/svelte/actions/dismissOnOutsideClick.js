@@ -37,7 +37,8 @@ function watchDetach(node, current) {
 }
 
 // Under `dismissOn: 'click'`, whether a primary-button press went down, then came up, `outside`;
-// `clicked` answers it for the click that ends the press and forgets it.
+// `clicked` answers it for a pointer's click, `detail` above 0, never a keyboard's or `click()`'s,
+// and forgets it, as `reset` does.
 function primaryPress(outside) {
   let state = 'idle';
   const primary = (event) => event.button === 0 && outside(event);
@@ -49,9 +50,12 @@ function primaryPress(outside) {
       state = state === 'down' && primary(event) ? 'up' : 'idle';
     },
     clicked(event) {
-      const released = state === 'up' && event.button === 0;
+      const released = state === 'up' && event.button === 0 && event.detail > 0;
       state = 'idle';
       return released;
+    },
+    reset() {
+      state = 'idle';
     },
   };
 }
@@ -128,9 +132,8 @@ export function dismissOnOutsideClick(node, options = {}) {
   }
 
   function handleKeyDown(event) {
-    if (event.key === 'Escape') {
-      dismiss(event);
-    }
+    press.reset();
+    if (event.key === 'Escape') dismiss(event);
   }
 
   const listeners = [
@@ -150,6 +153,7 @@ export function dismissOnOutsideClick(node, options = {}) {
 
   function detach() {
     detachWatch.stop();
+    press.reset();
     if (!bound) return;
     for (const [type, listener] of listeners) bound.removeEventListener(type, listener, CAPTURE);
     bound = null;
