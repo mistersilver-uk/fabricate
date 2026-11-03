@@ -8343,8 +8343,11 @@ test('the objective rows specimen case presses a companion row the fixture mount
   const geometry = expectLayout.controls.find(({ styles }) =>
     styles.includes('border-top-left-radius')
   );
+  const declared = new Map(
+    geometry.styles.split(';').map((pair) => pair.split(':').map((part) => part.trim()))
+  );
   const [height, radius] = ['height', 'border-top-left-radius'].map((name) =>
-    Number(new RegExp(`(?:^|; )${name}: (\\d+)px`, 'u').exec(geometry.styles)?.[1])
+    Number.parseFloat(declared.get(name))
   );
   assert.equal(radius, bandCorner(height), 'the row measures its height band’s ladder corner');
   assert.ok(
