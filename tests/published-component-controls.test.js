@@ -202,7 +202,8 @@ const FOCUSABLE_REACH = Object.freeze({
   },
   // Drawn only when `as`, which the entry does not publish, is `'checkbox'`.
   'src/ui/svelte/components/StatusToggle.svelte: input': null,
-  // In the `control` snippet, which both wrapper forms render; `decorative` is not published.
+  // In the `control` snippet, which both wrapper forms render and reach reads as unguarded; the
+  // decorative form draws neither (issue 2881).
   'src/ui/svelte/components/SelectionCheckbox.svelte: input': 'always',
   // In snippets both branches of `{#if isVertical}` render, which reach reads as unguarded.
   'src/ui/svelte/components/Stepper.svelte: button[data-stepper-decrement]': 'always',

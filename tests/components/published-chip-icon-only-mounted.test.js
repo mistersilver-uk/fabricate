@@ -128,13 +128,13 @@ describe('the published Chip, icon-only', () => {
     });
   }
 
-  it('still draws children of white space alone without both keys, as before', async () => {
-    const mounted = mountChip({ children: ' ', icon: GLYPH.icon });
-    await settle();
-    assert.deepEqual(classesOf(mounted.chip()), [ROOT]);
-    assert.equal(mounted.chip().textContent, ' ');
-    mounted.handle.destroy();
-    mounted.remove();
+  it('M9: refuses children of white space alone without both keys, as it does an empty one', () => {
+    const target = companionTarget([]);
+    assert.throws(
+      () => ui().mount('Chip', { target, props: { children: ' ', icon: GLYPH.icon } }),
+      fault('Chip requires a non-blank "ariaLabel" when "children" is empty')
+    );
+    target.parentElement.remove();
   });
 
   it('draws no label span beside the glyph under truncate', async () => {

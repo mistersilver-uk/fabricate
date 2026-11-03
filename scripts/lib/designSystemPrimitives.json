@@ -705,7 +705,8 @@
       "scope": "shared",
       "why": [
         "The box a gate list and a selection header both use, including the tri-state a some-rows-selected header needs, as `library.html`'s `<Checkbox>` entry states.",
-        "It is published, so it is shared."
+        "It is published, so it is shared.",
+        "The decorative form serves a companion's own `<button aria-pressed>` row, and a `tone` of `success` fills a ticked box with the success family; no importer changes."
       ]
     },
     {

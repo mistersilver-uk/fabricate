@@ -417,11 +417,12 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, waivedBy?, contains?, itemContains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, waivedBy?, waivedWhen?, contains?, itemContains?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy?, standaloneRoot? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
 `waivedBy` lists other `data` keys of the same entry, none `required`, on a `required` `text` or `data` key, which may then be absent or `''` while every key it lists holds a non-blank string (M9), as `Chip`'s `children` lists `icon` and `ariaLabel`; `describe` does not state it and still reports the key `required`, and giving an existing key `waivedBy` is a widening.
-`contains` names a `text` key, or a `required` `data` key, of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22); `describe` does not state it, and giving an existing key `contains` is a narrowing.
+`waivedWhen` names another `data` key of the same entry, neither `required` nor `requiredWhen`, on a `required` `text`, `data` or `callback` key, which may then be absent, or `''` where it is not a `callback`, while that key holds exactly `true` (M9), as `SelectionCheckbox`'s `label` and `onChange` name `decorative`; registration refuses any other `waivedWhen` with `<name> "<key>" has an unknown waivedWhen "<value>"`, `describe` does not state it and still reports the key `required`, and giving an existing key `waivedWhen` is a widening.
+`contains` names a `text` key, or a `required` `data` key, of the same entry, on a `data` key whose non-blank string must contain that key's words as one whole run (M22), and whose blank or non-string value is dropped from the props so it writes no name, the `text` key then counting white space alone as empty (M9); `describe` does not state it, and giving an existing key `contains` is a narrowing.
 `itemContains` pairs member names of a `data` key's array items as `{ <member>: <other member> }`, each item's non-blank string `<member>` having to contain the words of its `<other member>`, a string or a number held as its digits, as one whole run (M22), as `SegmentedControl`'s `options` pairs `ariaLabel` with `label`; `describe` does not state it, and giving an existing key `itemContains` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
@@ -482,7 +483,9 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `StatusToggle`'s `as`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `semantics` was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"<key>" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
 - `StatusToggle`'s `label` was added to the entry at `version` 1, `ariaLabel` waiving it: every mount the entry admitted before, which passed a non-blank `ariaLabel`, is still admitted and draws the same, so the entry's `version` did not change, and a Fabricate that predates the key refuses it with `"label" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
-- `SelectionCheckbox`'s `wrapper` and `decorative`, and so its bare and decorative forms, are not published at version 1, and nor is a native `name`, `value` or `title` on its input; publishing one later is additive.
+- `SelectionCheckbox`'s `wrapper`, and so its bare form, is not published at version 1, and nor is a native `name`, `value` or `title` on its input.
+  Publishing one later is additive.
+  Its `decorative` form and `tone` are published additively.
 - `Stepper`'s `orientation` is not published at version 1, and nor is an `id` or a native `title` on its input or buttons, which the component declares no prop for; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `fill` and `density` were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `Stepper`'s `placeholder`, `format`, `stops` and `nullLabel` were added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates a key refuses it with `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
@@ -551,6 +554,7 @@ A lazy entry mounts, draws and behaves, its focus and keyboard behaviour include
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `standaloneRoot` that is neither absent nor `true` with an `Error` ending `<name> has an unknown standaloneRoot "<value>"`, and one on a `root` other than `'any'` with one ending `<name> states standaloneRoot on the root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
+It refuses a `waivedWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, or that sits on a key that is not `required` or not `text`, `data` or `callback`, with an `Error` ending `<name> "<key>" has an unknown waivedWhen "<other>"`.
 It refuses a `contains` that is not a string naming a `text` key of the entry, or that sits on a key that is not `data`, with an `Error` ending `<name> "<key>" has an unknown contains "<other>"`.
 It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
 It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an unknown lazy "<value>"`, a lazy entry its runtime binds to no loader or to a component with one ending `<name> is lazy, so its runtime binds a loader and no component`, and an entry that is not lazy bound to a loader with one ending `<name> is not lazy, so its runtime binds no loader`.
@@ -568,7 +572,7 @@ It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an 
 - A `data` key takes data (M10 to M12) and the component receives a snapshot copy.
 - A `text` key takes a string.
 Fabricate draws it as plain text inside the component and never reads it as HTML; the element Fabricate wraps it in is private.
-- A `text` key that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a `required` one refuses `''` (M9).
+- A `text` key that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a `required` one refuses `''`, or white space alone where a `contains` key names it (M9).
 - An `update` changes the text in place and remounts nothing.
 - A `slot` key is a content slot, a place where the component draws the companion's own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it; anything else is M15.
@@ -998,7 +1002,7 @@ Each group states the accepted values of every key that entry publishes.
     Beside a label the label is hidden from assistive technology and `ariaLabel` is drawn beside it as visually hidden text, so the chip keeps no role and a reader hears the name once, as inline text, with no image role; so a companion never puts a control or other interactive content in a named chip's label.
     The name must contain the label's words as one run of whole words, as `Button`'s `ariaLabel` must, and a `mount` or `update` whose non-blank `ariaLabel` does not contain `children` is refused with `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")` (M22); the companion uses it for a short label whose meaning needs more words, as `3` named `3 days waiting`.
     With `icon` and `ariaLabel` both non-blank, `children` may be absent, `''` or white space alone, which draws the icon-only chip: the glyph alone on a square, 20px at `default` and 15px at `list`, `role="img"` under `ariaLabel` with the glyph hidden from assistive technology, and `ariaLabel` written as its `data-tooltip-text`, which Foundry shows on pointer hover only; a rest `data-tooltip-text` the companion passes replaces that.
-    An empty `children` with neither key is M9, `Chip requires a non-empty "children"`, as before, and with one of them is M9's waiver fault, `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys draws as before.
+    An empty `children` with neither key is M9, `Chip requires a non-empty "children"`, as before, and with one of them is M9's waiver fault, `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys is refused as an empty one (M9).
     The icon-only chip is no control: it takes no focus and offers no target, so the 24px pointer-target floor (WCAG 2.2 success criterion 2.5.8) does not apply, and its tooltip opens on pointer hover only, so a keyboard or touch user never sees it: the companion states the state in visible text in the row or detail the chip sits in, never in the glyph and its tooltip alone.
     Its glyph clears 3:1 against its fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` under every published `tone` and none, in every palette, with no `emphasis`, `dashed` or `bare`, which share that paint, and on the `outlined` and `solid` grounds; its tone is colour alone, drawn alike under forced colors: the companion passes a glyph that differs for each state, as a check, a cross and a question mark, and says the state in `ariaLabel`.
     In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored.
@@ -1157,7 +1161,7 @@ Each group states the accepted values of every key that entry publishes.
   - `children` is required and is the label, final display text, and the button's accessible name unless `ariaLabel` replaces it.
     The button hugs its label on one line while it has the room.
     Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
-    A label of white space alone draws a button with no name, so the companion never passes one.
+    A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, `Button requires a non-empty "children"` (M9), even beside an `ariaLabel`, so the `ariaLabel` is never the only name a label-less button has.
   - `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
     The glyph never joins or replaces the name: a glyph-only button is `IconButton`.
   - `ariaLabel` is optional final display text that replaces the label as the button's accessible name, for a label too short to say its verb, as a visible "+7" named "Credit +7 days to Mira".
@@ -1168,7 +1172,7 @@ Each group states the accepted values of every key that entry publishes.
     Where the runtime has no `Intl.Segmenter`, Fabricate splits words at spacing alone, so a label inside unspaced text is refused there.
     A `mount` or `update` whose non-blank `ariaLabel` does not contain it is refused with `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")` (M22), and an `update` leaves the earlier props drawn, so the companion passes a matching `ariaLabel` in the `update` that changes `children`.
     The companion builds `ariaLabel` by inserting the label string itself, as `format('… {label} …', { label: children })` with a format of its own, so it contains the label by construction, and puts the label first where the language allows, because a translation that rewords or reorders the label's words makes `mount` throw M22.
-    An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the component itself compares nothing, so the check is the seam's.
+    An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the seam drops it from the props, so the component never draws it, and the check is the seam's.
   - `tooltip` is optional final display text, a hint the label does not say, as "Rewinds the clock by one day"; a `tooltip` that is not a string, or is blank, writes none.
     Fabricate writes it as `data-tooltip-text` on the button, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the button.
     Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the `IconButton` group states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of the companion's above `target`, and whether Foundry's dismiss keybinding then also runs is not measured.
@@ -1304,7 +1308,7 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and `on` alone, so none of them is an `aria` key or a rest key.
   - `label` is optional final display text, the setting's name, which the switch draws beside its track inside its own button, so a press on its words is a press on the switch.
     The button is named by `label`, the text it draws beside its track, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).
-    A companion passes `label`, `ariaLabel` or both: a mount that passes neither throws M9, a `label` that is not a string throws M14, and a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
+    A companion passes `label`, `ariaLabel` or both: a mount that passes neither throws M9, a `label` that is not a string throws M14, a `label` of white space alone counts as absent (M9), and a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
     The label is drawn in `target`'s face and size and in the body ink in both states, so the state is told by the track and the announced state, never by the label's ink.
     The labelled switch is not held to the 78px cap: its label wraps at its spaces up to the width of `target`, the button growing taller to hold every line with the track centred against them, and it is never clipped or ellipsised.
     A setting's name of one to four words keeps the label to one line; a sentence about the setting goes in the text `aria-describedby` points at.
@@ -1316,7 +1320,7 @@ Each group states the accepted values of every key that entry publishes.
   - `ariaLabel` and `label` name the setting so that "pressed" or "on" means the setting is in effect: "Group by category", "Hidden tasks".
     Neither states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
   - A companion that mounts the switch without `label` draws the setting's name as visible text beside the switch, from one string that it also passes as `ariaLabel`, and passes both again in any `update` that changes the text, so the spoken name always contains the words the user sees; that text does not press the switch unless the companion wires it to `onclick`, so a companion whose words must press the switch passes them as `label`.
-    A name of white space alone leaves the switch with no name, so the companion never passes one.
+    An `ariaLabel` of white space alone is dropped and names nothing, so the companion never relies on one.
   - `aria-labelledby` is an `aria` key: Fabricate writes it on the button.
     It is the id of the companion's element that holds the visible name and nothing else, or several such ids separated by spaces, in the tree that holds `target`, which may be beside `target` and need not be inside it.
     When at least one id names an element, that element's text is the switch's name and `ariaLabel` is not read.
@@ -2303,25 +2307,31 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`SelectionCheckbox`.**
   - It is the design system's checkbox (`<Checkbox>` in the library): a native `<input type="checkbox">`, visually hidden, inside a `<label>` that draws a square box beside the companion's label, for one choice that is ticked or not.
-    A pointer press anywhere on the box or the label presses the input, and the input is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('input')` reaches it.
+    A pointer press anywhere on the box or the label presses the input, and in the labelled form the input is the only focusable element Fabricate draws in `target`, inside the standalone style root in a target with no Fabricate root, so `target.querySelector('input')` reaches it; the decorative form draws no focusable element.
     An `update` keeps the same input, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
   - The input is named by `label`, the text its wrapping `<label>` draws, or, where it is passed, by `ariaLabel`, which must then hold that text (M22).
   - `label` is required final display text, drawn after the box and wrapping beside it, the box on its first line; it may be absent or `''` beside a non-blank `ariaLabel`, which waives it, and white space alone beside a non-blank `ariaLabel` draws as absent.
+    It may also be absent or `''` beside `decorative: true`, which draws no label (`waivedWhen`).
     Without either, `mount` refuses with `SelectionCheckbox requires a non-empty "label"` (M9).
-    A `label` of white space alone beside no `ariaLabel` leaves the input with no name, so the companion never passes one.
+    A `label` of white space alone beside no non-blank `ariaLabel` is refused as an empty one, `SelectionCheckbox requires a non-empty "label"` (M9).
   - `ariaLabel` is optional final display text naming the input in place of `label`; beside a non-blank `label` it must contain the label's words as one run of whole words, or `mount` and `update` throw `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`, and beside no `label` it is the box's only name and the box draws alone.
     The companion passes it where the visible label is too short to say what ticking does, as "Ember salt spent when this stage begins" beside the label "Spent"; "Spend Ember salt when this stage begins" beside "Spent" is refused, because "Spent" is not among its words.
-    A blank `ariaLabel` names nothing, so the name is the label's.
+    An `ariaLabel` that is blank or not a string is dropped from the props and names nothing, so the name is the label's.
   - `checked` is `true` or `false`, and is required: `true` draws the box filled in the accent with a tick and states the input checked, and `false` draws it empty.
     Fabricate coerces nothing, so only `true` and `false` are in the contract: another truthy value, the string `'false'` among them, draws the box ticked, `0` and `null` draw it empty, and an absent or `''` `checked` is refused (M9).
   - `indeterminate` is `true` or `false`, and `false` when absent: `true` draws the box edged in the accent on its soft fill with a dash in place of the tick, whatever `checked` is, and states the input mixed.
     Any value but `true`, the string `'true'` among them, draws the box by `checked` alone.
+    A mixed box is passed as `checked: false` with `indeterminate: true`: mixed means some of the things the box stands for are ticked, so a press asks for `true`.
   - `disabled` is `true` or `false`, and `false` when absent: `true` disables the input, draws the box at half opacity and the label in the muted ink, and the box keeps its tick, dash or empty face, so the state stays readable.
     A disabled input takes no focus, is left out of the tab order and reports nothing, so the companion says why in text beside it; another truthy value disables it too, as only `true` and `false` are in the contract.
     A disabled box is drawn at half opacity, its edge, fill and glyph together, beside the `not-allowed` cursor, so it reads as unavailable while its face stays legible; WCAG 2.2 §1.4.11 asks no contrast of an inactive control, and the figures below are the enabled box's.
   - `density` is `compact`, `default` or `comfortable`, and `default` when absent: a 16, 20 or 22px box beside a label set on 16px lines, 18px beside the 22px box, its first line centred on the box; a value outside the set draws `default`.
     The compact box draws no fill, so its edge and empty face sit on the ground beneath it; the default and comfortable boxes fill `--fab-bg-0`.
+  - `tone` is `default` or `success`, and `default` when absent: `success` draws a ticked box that is not mixed filled with `--fab-success` inside a `--fab-success-strong` edge, its tick in `--fab-on-success`, at every density and on the labelled and the decorative box alike, for a row that is done; a value outside the set draws `default`, the accent.
+    A `success` box that is empty or mixed draws as a `default` one, so a mixed box keeps its accent dash, and the tick, not the colour, says the box is ticked; under forced colours a ticked `success` box fills with `Highlight` as a `default` one does.
+    Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the `success` edge clears 3:1, 3.94:1 at the least, and its tick clears 3:1 on its fill, 4.79:1 at the least.
   - `onChange` is a required callback, called with one argument, `true` or `false`, the state a press asks for: the opposite of the `checked` last passed, so a press on a mixed box whose `checked` is `false` asks for `true`.
+    It may be absent beside `decorative: true`, which never calls it (`waivedWhen`).
     It is called once for each press, by pointer on the box or the label or by Space on the focused input, and not by `mount`, `update` or `destroy`.
     The box changes nothing itself: the input and the box keep the `checked` and `indeterminate` last passed until the companion's `update` passes new ones, which may be after the press returns, so a companion that refuses the change passes them unchanged and says why in text of its own.
     Until that `update` lands, assistive technology hears the old state, so the companion updates inside `onChange`, optimistically, and rolls the update back if its own write fails.
@@ -2330,6 +2340,15 @@ Each group states the accepted values of every key that entry publishes.
     Each id exists in the tree that holds `target` while the box is shown, and the element it names, which may be beside `target` and need not be inside it, is not `hidden`; an id that does not exist is skipped and the others are still read.
   - Rest `data-*` attributes land on the input itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The box therefore opens no tooltip, so what ticking it does goes in text beside it, tied to it with `aria-describedby`.
+  - `decorative` is `true` or `false`, and `false` when absent: `true` draws the box alone, `aria-hidden="true"`, with no `<label>`, no input and nothing focusable, for a companion row that is itself the control, as a `<button type="button" aria-pressed>` whose own text names it and whose `aria-pressed` states what the box shows.
+    Only `true` draws it: any other value, the string `'true'` and `1` among them, draws the labelled box and needs its name and `onChange` (M9).
+    Beside `decorative: true`, `checked`, `indeterminate`, `density` and `tone` draw the box as they draw the labelled one, and `checked` is still required; `label`, `ariaLabel`, `disabled`, `onChange`, `aria-describedby` and the rest `data-*` attributes are checked as on the labelled box, then drawn nowhere, and `onChange` is never called.
+    The box is not a pointer target and reports no press, so the press, the focus, the name, the state, the disabled state and its dimming are the companion row's, and the companion keeps the box's `checked` equal to the state its row states.
+    The box draws no hover or press feedback of its own, so the companion's row draws it.
+    The companion strikes through its row's text, not the row: `text-decoration` on the row reaches the box's tick, and the line crosses it.
+    Chromium's tree shows the row's button with its name and pressed state and no node of the box, inside a `<button aria-pressed>` row.
+    In a target with no Fabricate root the seam draws the box under the standalone style root, a `<div>` drawn as `display: contents`, so a `<span>` target inside the companion's `<button>` holds that `<div>`, which the HTML content model does not allow there though the browser draws it; a companion mounts where a Fabricate root is above `target` to avoid it.
+    An `update` may move a box between the decorative and the labelled form; the labelled form's input is then a new element, so the companion moves focus first where it matters.
   - The `<label>` is the pointer target, at least 24px tall around the box (WCAG 2.2 §2.5.8) and as wide as the box and its label; around the 16 and 20px boxes it reaches 4px and 2px past the box above and below, and on every side of a box drawn with no label, and it is drawn above in-flow neighbours, so the companion keeps 4px clear of any other control around a compact box and 2px around a default one, horizontally as well as vertically, or the target takes the pointer where it overlaps them.
     The target lies over the label text, so a drag across the label selects none of it.
   - The keyboard ring is the accent, 2px wide and 2px clear of the box, drawn on the box around its visually hidden input whether or not a Fabricate root is above `target`, so it reaches 4px beyond the box on every side, and the companion leaves that much inside any edge of its own that clips.
@@ -2345,7 +2364,8 @@ Each group states the accepted values of every key that entry publishes.
   - A box is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it is no wider than `target`.
     Its label and empty edge are inks of the dark scheme the standalone style root states, so on Foundry's light theme the companion paints `--fab-bg-1` on `target`; that shortfall is inferred from those inks, not measured.
   - A Fabricate that predates the entry does not list it in `components`, `describe` answers `null` for it, and `mount` refuses it with `"SelectionCheckbox" is not published` (M3), so the companion draws its own control there.
-- **Private:** `SelectionCheckbox`'s gap, corner and type figures, its colours beyond what its group states, its `wrapper`, `decorative` and `input` props and so its bare and decorative forms, the hooks Fabricate's own callers use, and how Fabricate draws a box in its own windows.
+    A Fabricate that predates `decorative` and `tone` refuses them with `"decorative" is not a data attribute` and `"tone" is not a data attribute` (M13), and its `describe` lists neither, so the companion reads `describe('SelectionCheckbox').props.decorative` first and draws its own box where it is absent.
+- **Private:** `SelectionCheckbox`'s gap, corner and type figures, its colours beyond what its group states, its `wrapper` and `input` props and so its bare form, the hooks Fabricate's own callers use, and how Fabricate draws a box in its own windows.
 
 ### Disclosure
 
@@ -2513,9 +2533,9 @@ Each group states the accepted values of every key that entry publishes.
     It is placed again when its document scrolls, when its window resizes, when an `update` changes `placement`, when the panel or the anchor changes size, and once per animation frame after its document changes, as when a reflow or a Foundry window's move shifts the anchor.
     While the anchor lies wholly outside its window's viewport or outside an ancestor that clips its overflow, as when its scroller scrolls it away, the panel is hidden, stays open and calls nothing, and it shows again when the anchor returns.
   - `title` is optional final display text drawn as the panel's level-3 heading, a level the companion cannot change, and the dialog's name where no `ariaLabel` is passed.
-    One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` and no `ariaLabel`, is refused with `Popover requires a non-empty "title"` (M9).
+    One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` or white space alone and no `ariaLabel`, is refused with `Popover requires a non-empty "title"` (M9).
   - `ariaLabel` is optional final display text that names the dialog in place of the heading; beside a `title` it must hold the title's words, in order and as whole words, or the mount is refused (M22), so the spoken name starts from what is shown.
-    A name of white space alone leaves the panel with no name, so the companion never passes one.
+    An `ariaLabel` of white space alone, or that is not a string, is dropped and names nothing; the `title` names the panel.
   - `body` is a content slot whose element is a `<div>`, drawn below the heading in a padded column the panel spaces by `gap`, which scrolls when the panel's height is capped.
     The companion fills the slot before it opens the popover, or in the same task, because focus moves into the panel a microtask after it is drawn.
     The body takes focus where the slot holds no control, and while it overflows with no control in it, it is also a Tab stop, so the keyboard scrolls it with the arrow keys, Page Up, Page Down, Home and End; it then draws the window's accent ring 2px wide inside its own edge.
@@ -2692,7 +2712,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent, or `''` where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string. Or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy. With several, the first key in manifest order. Where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
+| M9 | A `required` prop is absent, or `''` (or white space alone where a `contains` key names it) where the key is not a `callback`, unless it states `waivedBy` and every key that lists holds a non-blank string, or states `waivedWhen` and the key that names holds `true` (a `callback` key's `''` is still refused as not a function). Or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy. With several, the first key in manifest order. Where some but not every key a `waivedBy` lists holds a non-blank string, the fault names the first that does not as `<other>` | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy`, or `<name> requires a non-blank "<other>" when "<key>" is empty` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
@@ -2909,6 +2929,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onChange` once, with `true`, and the input and the box still show the box empty
 - **AND** after an `update` that passes `checked: true` the same input is checked, keeps focus, and the box draws its tick
 - **AND** a mount that passes neither `label` nor `ariaLabel` throws M9, and one whose `ariaLabel` does not hold the label's words throws M22
+
+#### Scenario: A published decorative selection checkbox in the success tone
+
+- **WHEN** a companion mounts `SelectionCheckbox` with `checked: true`, `decorative: true` and `tone: 'success'`, and no `label`, `ariaLabel` or `onChange`, into a target inside its own `<button aria-pressed="true">` row
+- **THEN** the mount is accepted and draws the box alone, `aria-hidden="true"`, with no `<label>`, no input and nothing focusable, filled with `--fab-success` inside a `--fab-success-strong` edge and its tick in `--fab-on-success`
+- **AND** the accessibility tree shows the row's button with its own name and pressed state and no node of the box
+- **AND** a mount with `decorative: 'true'` and no `label` or `onChange` throws M9, and a Fabricate that predates the decorative form refuses `decorative` with M13
 
 #### Scenario: A published stepper
 

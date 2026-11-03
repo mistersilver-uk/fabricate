@@ -4,7 +4,8 @@
  * `.window-content` and into a bare ApplicationV2 one, then drawn in one page per palette with
  * `<html>` naming the other. Every element computes the same compared properties, pseudo elements
  * and border box in both hosts at rest, under keyboard focus, under the pointer, under reduced
- * motion and under forced colours, and its specimens draw every value of the keys the box reads.
+ * motion and under forced colours, and its specimens draw every value of the keys the box reads,
+ * the decorative form and the success tone among them (issue 2881).
  * It is a file of its own so `published-standalone-root-rendered.test.js` stays inside the
  * per-file timeout; it repeats that file's minimum, the target face, the core-min sheets and the
  * per-element read, without panels, slots or the harvested arm, which no checkbox draws or needs.
@@ -63,9 +64,20 @@ const SPECIMENS = Object.freeze([
     'checkbox-disabled-mixed',
     { checked: false, indeterminate: true, disabled: true, density: 'comfortable', label: LABEL },
   ],
+  ['checkbox-on-success', { checked: true, tone: 'success', label: LABEL }],
+  [
+    'checkbox-decorative-success-compact',
+    { checked: true, decorative: true, tone: 'success', density: 'compact' },
+  ],
 ]);
+/** The specimens that draw the box alone, with no wrapper or input (issue 2881). */
+const DECORATIVE = new Set(
+  SPECIMENS.filter(([, props]) => props.decorative === true).map(([id]) => id)
+);
 /** The specimens Tab reaches, whose input takes keyboard focus. */
-const FOCUSED = SPECIMENS.filter(([, props]) => props.disabled !== true).map(([id]) => id);
+const FOCUSED = SPECIMENS.filter(
+  ([id, props]) => props.disabled !== true && !DECORATIVE.has(id)
+).map(([id]) => id);
 
 let browser;
 const MEASURED = {};
@@ -233,7 +245,10 @@ async function measure(markup, palette) {
   for (const [id] of SPECIMENS) {
     reads.hover[id] = {};
     for (const host of HOSTS) {
-      await tab.hover(`[data-host="${id}-${host}"] .fab-selection-checkbox`, { force: true });
+      await tab.hover(
+        `[data-host="${id}-${host}"] :is(.fab-selection-checkbox, .fab-selection-check)`,
+        { force: true }
+      );
       await settled(tab);
       reads.hover[id][host] = await read(tab, id, host);
       await tab.mouse.move(0, 0);
@@ -268,7 +283,7 @@ after(async () => {
 });
 
 describe('the standalone checkbox specimens', () => {
-  it('draw every value of checked, indeterminate, disabled, density and label', () => {
+  it('draw every value of checked, indeterminate, disabled, density, label, decorative and tone', () => {
     const drawn = (key, read) => new Set(SPECIMENS.map(([, props]) => read(props[key])));
     const flag = (value) => value === true;
     const both = new Set([false, true]);
@@ -276,6 +291,11 @@ describe('the standalone checkbox specimens', () => {
     assert.deepEqual(drawn('indeterminate', flag), both);
     assert.deepEqual(drawn('disabled', flag), both);
     assert.deepEqual(drawn('label', Boolean), both);
+    assert.deepEqual(drawn('decorative', flag), both);
+    assert.deepEqual(
+      drawn('tone', (value) => value ?? 'default'),
+      new Set(['default', 'success'])
+    );
     // Read from the box's own table, so a fourth density cannot hide.
     const table = [
       ...walkNodes(componentAstOf('src/ui/svelte/components/SelectionCheckbox.svelte').instance),
@@ -310,7 +330,8 @@ for (const palette of PALETTES) {
         const reads = MEASURED[palette][state];
         assert.ok(Object.keys(reads).length > 0, `${state} read something`);
         for (const [id, { window, bare }] of Object.entries(reads)) {
-          assert.ok(window.length >= 3, `${id} drew its wrapper, input and box`);
+          const drawnParts = DECORATIVE.has(id) ? 2 : 3;
+          assert.ok(window.length >= drawnParts, `${id} drew its box and any wrapper and input`);
           assert.deepEqual(bare, window, `${id} ${state}`);
         }
       });

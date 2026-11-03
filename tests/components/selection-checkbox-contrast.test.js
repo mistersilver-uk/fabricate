@@ -6,7 +6,8 @@
  * box's accent edge clears 3:1 against the ground; the tick clears 3:1 on the accent fill at every
  * density and the dash on the soft fill over each ground; the label clears 4.5:1, and the disabled
  * label, which §1.4.3 exempts, still does; the hover edge is never weaker than the resting one; and
- * on `--fab-bg-3`, which is not a supported ground, the edge and the label fall short.
+ * on `--fab-bg-3`, which is not a supported ground, the edge and the label fall short. Issue 2881's
+ * success face: its strong edge clears 3:1 against each ground, and its tick 3:1 on its fill.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -141,4 +142,20 @@ test('on --fab-bg-3, which the group does not support, the edge falls short in t
     shortfalls(themes, tokenOf('.fab-selection-label', 'color'), ['--fab-bg-3']).length,
     2
   );
+});
+
+test('a ticked success box edges in the strong success step, which clears 3:1 against each ground, and its tick clears 3:1 on the success fill', () => {
+  const selector = '.fab-selection-check.is-checked.is-success';
+  const edge = tokenOf(selector, 'border-color');
+  const fill = tokenOf(selector, 'background');
+  const tick = tokenOf(selector, 'color');
+  assert.deepEqual(
+    [edge, fill, tick],
+    ['--fab-success-strong', '--fab-success', '--fab-on-success']
+  );
+  assert.deepEqual(
+    shortOver(edge, (ground) => [ground]),
+    []
+  );
+  assert.deepEqual(shortfalls(themes, tick, [fill], 3), []);
 });

@@ -42,6 +42,7 @@ import {
   WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
+import { bandCorner } from '../scripts/lib/radiusLadder.js';
 import { CANVAS_APPS } from '../scripts/lib/view-lab-cases/caseConstants.js';
 import { chooseSelectOption } from '../scripts/lib/view-lab-cases/caseFactories.js';
 import {
@@ -410,6 +411,7 @@ const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
+  'tests/view-lab/fixtures/PublishedCheckboxRows.svelte',
   'tests/view-lab/fixtures/PublishedToggleLabels.svelte',
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedPopover.svelte',
@@ -1225,6 +1227,8 @@ const LAB_BUTTON_ROLE_CASES = {
 };
 const labCheckbox = (key, part = 'check') =>
   `${key.startsWith('deep-') ? '[data-lab-selection-checkboxes-deep]' : '[data-lab-selection-checkboxes]'} > [data-lab-selection-checkbox="${key}"] .fab-selection-${part}`;
+const labObjectiveRow = (key) => `[data-lab-checkbox-rows] > [data-lab-checkbox-row="${key}"]`;
+const labObjectiveBox = (key) => `${labObjectiveRow(key)} .fab-selection-check`;
 const labToggleButton = (key) =>
   `[data-lab-toggle-labels] > [data-lab-toggle-label="${key}"] button.fabricate-toggle`;
 const labToggleName = (key) => `${labToggleButton(key)} > .manager-status-toggle-name`;
@@ -2359,6 +2363,28 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       [...CHECKBOX_CONTROLS],
     ])
   ),
+  // The decorative objective rows (issue 2881): the success face, the empty edge, the three rungs,
+  // the accent tone, the mixed box's accent edge and the labelled success baseline.
+  'manager-published-checkbox-rows-specimen': [
+    {
+      selector: labObjectiveBox('done'),
+      styles:
+        'width: 20px; height: 20px; background-color: var(--fab-success); border-top-color: var(--fab-success-strong); color: var(--fab-on-success)',
+    },
+    { selector: labObjectiveBox('open'), styles: 'border-top-color: var(--fab-control-outline)' },
+    { selector: labObjectiveBox('pressed'), styles: 'background-color: var(--fab-success)' },
+    { selector: labObjectiveBox('compact'), styles: 'width: 16px; height: 16px' },
+    { selector: labObjectiveBox('comfortable'), styles: 'width: 22px; height: 22px' },
+    { selector: labObjectiveBox('accent'), styles: 'background-color: var(--fab-accent)' },
+    { selector: labObjectiveBox('mixed'), styles: 'border-top-color: var(--fab-accent)' },
+    { selector: labObjectiveBox('labelled'), styles: 'background-color: var(--fab-success)' },
+    { selector: labObjectiveRow('done'), styles: 'height: 28px; border-top-left-radius: 7px' },
+    { selector: labObjectiveRow('compact'), styles: 'height: 28px' },
+    {
+      selector: `${labObjectiveRow('done')} > [data-lab-checkbox-row-text]`,
+      styles: 'text-decoration-line: line-through',
+    },
+  ],
   // The labelled switch (issue 2902): the label's ink, the long label wrapping, the ring around the
   // labelled button and the track-only baseline's width.
   'manager-published-toggle-labels-specimen': [
@@ -8384,6 +8410,59 @@ test('the selection checkbox specimen case measures and presses rows the fixture
     );
     assert.equal(theme, id.endsWith('-specimen') ? undefined : id.split('-specimen-', 2)[1]);
   }
+});
+
+test('the objective rows specimen case presses a companion row the fixture mounts a decorative box in', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedCheckboxRows.svelte'
+  );
+  for (const hook of [
+    'data-lab-checkbox-rows',
+    'data-lab-checkbox-row',
+    'data-lab-checkbox-row-done',
+    'data-lab-checkbox-row-text',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const keys = [
+    ...[...walkNodes(instance.content)]
+      .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+      .map((node) => node.elements[0].value),
+    'labelled',
+  ];
+  const rowOf = (selector) => /data-lab-checkbox-row="([\w-]+)"/u.exec(selector)?.[1];
+  const { steps, expectLayout, expectSelector } = getCaseById(
+    'manager-published-checkbox-rows-specimen'
+  );
+  assert.deepEqual(
+    expectLayout.controls
+      .map(({ selector }) => rowOf(selector))
+      .filter((key) => !keys.includes(key)),
+    [],
+    'each measured row is one the fixture mounts'
+  );
+  assert.deepEqual(
+    steps.map((step) => [rowOf(step.selector), step.press]),
+    [['pressed', undefined]],
+    'one click on the pressed row'
+  );
+  const geometry = expectLayout.controls.find(({ styles }) =>
+    styles.includes('border-top-left-radius')
+  );
+  const declared = new Map(
+    geometry.styles.split(';').map((pair) => pair.split(':').map((part) => part.trim()))
+  );
+  const [height, radius] = ['height', 'border-top-left-radius'].map((name) =>
+    Number.parseFloat(declared.get(name))
+  );
+  assert.equal(radius, bandCorner(height), 'the row measures its height band’s ladder corner');
+  assert.ok(
+    expectSelector.includes('[data-lab-checkbox-row-done="true"]'),
+    'the frame waits for the companion’s update the click asked for'
+  );
 });
 
 test('the labelled switch specimen case clicks the words of a switch the fixture mounts through the seam, then tabs on', () => {

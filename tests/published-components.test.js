@@ -1359,6 +1359,131 @@ describe('a waivedBy key (issue 2858)', () => {
   }
 });
 
+const BOXED = Object.freeze({
+  name: 'Boxed',
+  path: 'src/ui/svelte/components/Boxed.svelte',
+  version: 1,
+  props: {
+    checked: { kind: 'data', required: true },
+    decorative: { kind: 'data' },
+    label: { kind: 'text', required: true, waivedWhen: 'decorative' },
+    onChange: { kind: 'callback', required: true, args: 1, waivedWhen: 'decorative' },
+    note: { kind: 'data' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Boxed' }),
+});
+
+describe('a waivedWhen key (issue 2881)', () => {
+  const mountOf = (ui, props) => ui.mount('Boxed', { target: new FakeTarget(), props });
+
+  it('takes an absent or empty key while the key its waivedWhen names is true', () => {
+    const { ui } = seamWith({ table: [BOXED] });
+    for (const label of [undefined, '']) {
+      assert.doesNotThrow(
+        () => mountOf(ui, { checked: true, decorative: true, label }),
+        String(label)
+      );
+    }
+  });
+
+  for (const decorative of [undefined, false, 'true', 1]) {
+    it(`M9: refuses the empty key while the waiving key is ${String(decorative)}, on mount and update`, () => {
+      const { ui } = seamWith({ table: [BOXED] });
+      const message = 'Boxed requires a non-empty "label"';
+      assert.throws(() => mountOf(ui, { checked: true, decorative }), refusal(message));
+      const handle = mountOf(ui, { checked: true, decorative: true });
+      assert.throws(() => handle.update({ checked: true, decorative }), refusal(message));
+    });
+  }
+
+  it('waives a required callback too, and still refuses one that is not a function', () => {
+    const { ui } = seamWith({ table: [BOXED] });
+    assert.throws(
+      () => mountOf(ui, { checked: true, label: 'Done' }),
+      refusal('Boxed requires a non-empty "onChange"')
+    );
+    assert.throws(
+      () => mountOf(ui, { checked: true, decorative: true, onChange: 'x' }),
+      refusal('"onChange" must be a function')
+    );
+  });
+
+  it('never waives the key the entry requires without one', () => {
+    const { ui } = seamWith({ table: [BOXED] });
+    assert.throws(
+      () => mountOf(ui, { decorative: true }),
+      refusal('Boxed requires a non-empty "checked"')
+    );
+  });
+
+  it('still reports the key required and states no waivedWhen in describe', () => {
+    const { ui } = seamWith({ table: [BOXED] });
+    const { label, onChange } = ui.describe('Boxed').props;
+    assert.deepEqual(
+      [label, onChange],
+      [
+        { kind: 'text', required: true },
+        { kind: 'callback', required: true },
+      ]
+    );
+  });
+
+  const waiving = (spec, extra = {}) => ({
+    ...BOXED,
+    props: { ...BOXED.props, ...extra, label: spec },
+  });
+  for (const [claim, entry, other] of [
+    [
+      'a key that is not required',
+      waiving({ kind: 'text', waivedWhen: 'decorative' }),
+      'decorative',
+    ],
+    [
+      'a slot key',
+      waiving({ kind: 'slot', required: true, waivedWhen: 'decorative' }),
+      'decorative',
+    ],
+    ['an unpublished key', waiving({ kind: 'text', required: true, waivedWhen: 'nope' }), 'nope'],
+    ['itself', waiving({ kind: 'text', required: true, waivedWhen: 'label' }), 'label'],
+    [
+      'a text key',
+      waiving({ kind: 'text', required: true, waivedWhen: 'hint' }, { hint: { kind: 'text' } }),
+      'hint',
+    ],
+    ['a required key', waiving({ kind: 'text', required: true, waivedWhen: 'checked' }), 'checked'],
+    [
+      'a requiredWhen key',
+      waiving(
+        { kind: 'text', required: true, waivedWhen: 'hint' },
+        { hint: { kind: 'data', requiredWhen: 'note' } }
+      ),
+      'hint',
+    ],
+    [
+      'a list',
+      waiving({ kind: 'text', required: true, waivedWhen: ['decorative'] }),
+      '["decorative"]',
+    ],
+  ]) {
+    it(`refuses at registration a waivedWhen on ${claim}`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Boxed "label" has an unknown waivedWhen "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();

@@ -703,7 +703,7 @@ describe('a key a leaf does not publish', () => {
       'class',
       'data-x',
     ].map((key) => ['ToggleCard', key, 'is not a prop of ToggleCard']),
-    ...['decorative', 'wrapper', 'input', 'class', 'value', 'name'].map((key) => [
+    ...['wrapper', 'input', 'class', 'value', 'name'].map((key) => [
       'SelectionCheckbox',
       key,
       'is not a data attribute',
