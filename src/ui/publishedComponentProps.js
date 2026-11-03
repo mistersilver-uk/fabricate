@@ -337,6 +337,9 @@ export function containsLabel(name, label) {
   );
 }
 
+/** A value M22 compares a name with: a number by its digits, anything else as it is. */
+const asLabel = (value) => (typeof value === 'number' ? String(value) : value);
+
 /** M22's refusal of a non-blank string `name` that does not hold the string `text`. */
 function assertHolds(name, text, key, other) {
   if (typeof name !== 'string' || typeof text !== 'string' || !name.trim()) return;
@@ -349,21 +352,21 @@ function assertHolds(name, text, key, other) {
 function assertItemsHold(key, items, pairs) {
   for (const [index, item] of items.entries()) {
     for (const [member, other] of Object.entries(pairs)) {
-      const [name, shown] = [item?.[member], item?.[other]];
-      const label = typeof shown === 'number' ? String(shown) : shown;
-      assertHolds(name, label, `${key}[${index}].${member}`, `${key}[${index}].${other}`);
+      const [name, shown] = [item?.[member], asLabel(item?.[other])];
+      assertHolds(name, shown, `${key}[${index}].${member}`, `${key}[${index}].${other}`);
     }
   }
 }
 
 /**
  * M22 over a validated copy, after M9: a key stating `contains` whose non-blank string does not
- * hold the text of the `text` key it names, as a name must hold its visible label (WCAG 2.5.3),
- * and an array item's member an `itemContains` pairs with another of that item (issue 2856).
+ * hold the text of the key it names, a number by its digits, as a name must hold its visible label
+ * (WCAG 2.5.3), and an array item's member an `itemContains` pairs with another of that item
+ * (issue 2856).
  */
 function assertContains(entry, copy) {
   for (const [key, { contains, itemContains }] of Object.entries(entry.props)) {
-    if (contains !== undefined) assertHolds(copy[key], copy[contains], key, contains);
+    if (contains !== undefined) assertHolds(copy[key], asLabel(copy[contains]), key, contains);
     if (itemContains !== undefined && Array.isArray(copy[key])) {
       assertItemsHold(key, copy[key], itemContains);
     }

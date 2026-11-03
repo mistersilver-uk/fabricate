@@ -323,7 +323,8 @@ function declarationFaults(entry, ast) {
       ? []
       : [`${key} has the unshipped kind ${spec.kind}`];
     if (spec.kind === 'aria') {
-      const own = ariaFaults(key, spec, entry, Boolean(prop));
+      const composed = COMPOSED_ARIA[entry.path]?.key === key;
+      const own = ariaFaults(key, spec, entry, Boolean(prop) && !composed);
       return [
         ...unshipped,
         ...own,
@@ -405,7 +406,26 @@ const JS_ARIA_READERS = Object.freeze({
     "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
   'src/ui/svelte/actions/popoverFocus.js: closest([aria-expanded="true"])':
     "a control a companion draws in a published Popover's slot keeps Escape while it is expanded, as Popover's group states",
+  'src/ui/svelte/util/foundryTooltip.js: getAttribute(aria-describedby)':
+    "a published control drawing a description compares the ids it wrote itself, to write them back after Foundry's tooltip, as Button's group states",
 });
+
+/**
+ * The entries whose component declares and writes one `aria` key itself, by path: the key, written
+ * as the caller's ids followed by the component's own, and in `heldBy` the mounted clause that
+ * holds that order (issue 2895).
+ */
+const COMPOSED_ARIA = Object.freeze({
+  'src/ui/svelte/components/Button.svelte': {
+    key: 'aria-describedby',
+    heldBy:
+      'tests/components/published-button-description-mounted.test.js: the published Button, description beside aria-describedby and busy',
+  },
+});
+
+/** `entry`'s `aria` keys less the one its component composes. */
+const uncomposedAriaKeys = (entry) =>
+  ariaKeysOf(entry).filter((key) => key !== COMPOSED_ARIA[entry.path]?.key);
 
 /**
  * The classes `tone`, `density`, `emphasis`, `mono`, `struck`, `truncate` and the icon-only form
@@ -1042,7 +1062,7 @@ function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS,
     ...(tipped && entry.tooltip !== true ? [UNSTATED_TOOLTIP] : []),
     ...(!tipped && entry.tooltip !== undefined ? [OVERSTATED_TOOLTIP] : []),
     ...controls.flatMap((control) =>
-      controlRestFaults(control, RESERVED_ON_A_CONTROL, ariaKeysOf(entry))
+      controlRestFaults(control, RESERVED_ON_A_CONTROL, uncomposedAriaKeys(entry))
     ),
   ];
 }
@@ -1372,6 +1392,17 @@ describe('a lazy entry, whose code load fetches (issue 2455)', () => {
 });
 
 describe('each entry matches its component declaration', () => {
+  it('lets a component declare and write an aria key only where it composes it, pinned and held', () => {
+    assert.deepEqual(Object.keys(COMPOSED_ARIA), ['src/ui/svelte/components/Button.svelte']);
+    for (const [path, { key, heldBy }] of Object.entries(COMPOSED_ARIA)) {
+      const entry = PUBLISHED_COMPONENT_MANIFEST.find((candidate) => candidate.path === path);
+      assert.equal(entry.props[key]?.kind, 'aria', `${key} is ${entry.name}'s aria key`);
+      const declared = propLocals(componentAstOf(path)).map((prop) => prop.key);
+      assert.ok(declared.includes(key), `${entry.name} declares ${key}`);
+      assert.deepEqual(unheldClauses([heldBy]), [], 'its heldBy names a describe block');
+    }
+  });
+
   it('keeps a declared rest unpublished only where it lands on a tag no published key draws', () => {
     assert.deepEqual(Object.keys(UNPUBLISHED_REST), [
       'src/ui/svelte/components/Select.svelte',
@@ -3720,6 +3751,7 @@ describe('the module sheet and every component style against the published Butto
           'ariaLabel',
           'tooltip',
           'pressed',
+          'description',
         ],
         'fabricate',
       ],

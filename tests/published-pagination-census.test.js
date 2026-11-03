@@ -130,6 +130,8 @@ describe('the module sheet and every component style against the published Pagin
           'rangeTemplate',
           'pageTemplate',
           'density',
+          'landmarks',
+          'perPageAriaLabel',
         ],
         'fabricate',
       ],

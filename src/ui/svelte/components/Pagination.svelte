@@ -11,7 +11,9 @@
   | `showPageSize` | boolean | `true` | Opt-OUT. The page-size control is not rendered, caption included, when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
   | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the page-size control with it, so a POINTER reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. A KEYBOARD reader is spared: each arrow key on a page-size radio commits, so the bar stays mounted while focus is inside it, moving between its own controls included, and hides once focus leaves it entirely. |
   | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
+  | `landmarks` | `'both'` \| `'nav'` | `'both'` | `'nav'` leaves the root unnamed, so it is no region and `ariaLabel` names nothing; any other value draws both (issue 2894). |
   | `previousLabel` / `nextLabel` / `perPageLabel` | resolved strings | `''` | The arrows' names, which are also their tooltips, and the page-size caption. |
+  | `perPageAriaLabel` | resolved string | `''` | The page-size radiogroup's name in place of the caption, which stays drawn; blank, the caption names it (issue 2894). |
   | `rangeTemplate` / `pageTemplate` | resolved templates | `''` | The summary over `{first}` `{last}` `{total}` and the page label over `{page}` `{total}`; whoever supplies a template, it is filled here. |
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row: its page-size control takes SegmentedControl's `inline` rung (the default bar takes the default rung), the "Per page" caption stays visible, and the full page sentence stays in the accessibility tree. |
   | `edge` | boolean | `false` | With `compact`, the bar closes a pane section: its rule spans the section and it pads itself by `--fab-section-inset` (`--fab-space-2` by default) inline and below. |
@@ -24,13 +26,14 @@
     the page-size segments carry their own ring. Both rules are
     `openspec/specs/design-system/spec.md`'s.
   - THE PAGE-SIZE RADIOGROUP carries `data-pagination-size` and is named by the visible "Per page"
-    caption through `aria-labelledby`. Its radio `name` is per instance, so two pagers on one
-    screen never uncheck each other.
+    caption through `aria-labelledby`, or by a non-blank `perPageAriaLabel`. Its radio `name` is
+    per instance, so two pagers on one screen never uncheck each other.
   - THIS COMPONENT EMITS TWO LANDMARKS — an `aria-label`led `<section>` is a REGION and the `<nav>`
-    inside it is a second — so a screen drawing two bars would publish two identically named entries
-    in the one list a screen-reader user navigates BY. Both names default to `''` with the fallback
-    written at the USE SITE, which is the shape `tests/design-system-required-names.test.js`
-    requires; callers pass a RESOLVED string, not a key. Each fallback is localized through the
+    inside it is a second, the nav alone under `landmarks="nav"` — so a screen drawing two bars
+    would publish two identically named entries in the one list a screen-reader user navigates
+    BY. Both names default to `''` with the fallback written at the USE SITE, which is the shape
+    `tests/design-system-required-names.test.js` requires; callers pass a RESOLVED string, not a
+    key. Each fallback is localized through the
     `APP_LOCALIZER` context, and a tree mounted without one draws the English.
   - AN UPDATE THAT DISABLES OR REMOVES THE FOCUSED ARROW moves focus to the other arrow while it is
     enabled, else to the checked page-size radio, else blurs the arrow and releases the hold, unless
@@ -58,9 +61,11 @@
     multiPageOnly = false,
     ariaLabel = '',
     navLabel = '',
+    landmarks = 'both',
     previousLabel = '',
     nextLabel = '',
     perPageLabel = '',
+    perPageAriaLabel = '',
     rangeTemplate = '',
     pageTemplate = '',
     density = 'default',
@@ -71,6 +76,10 @@
   const copy = (key, fallback) => localizeWith(localize, key, undefined, fallback);
 
   const compact = $derived(density === 'compact');
+
+  const groupName = $derived(
+    typeof perPageAriaLabel === 'string' && perPageAriaLabel.trim() ? perPageAriaLabel : ''
+  );
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
   const firstShown = $derived(totalCount === 0 ? 0 : pageIndex * pageSize + 1);
@@ -182,7 +191,9 @@
     onfocusout={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) holdOpen = false;
     }}
-    aria-label={ariaLabel || copy('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={landmarks === 'nav'
+      ? undefined
+      : ariaLabel || copy('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
       {fill(
@@ -236,7 +247,8 @@
           value={Number(pageSize)}
           groupName={`${instanceId}-size`}
           optionDataAttr="data-pagination-size-option"
-          aria-labelledby={captionId}
+          ariaLabel={groupName}
+          aria-labelledby={groupName ? undefined : captionId}
           data-pagination-size=""
           onChange={changePageSize}
         />

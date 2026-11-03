@@ -2,7 +2,7 @@
  * One element's node in Chromium's own accessibility tree, read over CDP rather than through
  * Playwright's snapshot: its role, name and whether it is ignored, and each descendant the tree
  * does not ignore, in tree order (issues 2856, 2858); `chromiumAxState` reads its role, name and
- * state properties instead (issue 2836).
+ * state properties instead (issue 2836), and `chromiumAxDescribed` its description.
  */
 async function axTreeOf(page, selector, read) {
   const session = await page.context().newCDPSession(page);
@@ -46,5 +46,14 @@ export function chromiumAxState(page, selector) {
   return axTreeOf(page, selector, (own) => ({
     ...roleAndName(own),
     ...Object.fromEntries((own.properties ?? []).map(({ name, value }) => [name, value?.value])),
+  }));
+}
+
+/** The node's role, name and accessible description (issue 2895). */
+export function chromiumAxDescribed(page, selector) {
+  return axTreeOf(page, selector, (own) => ({
+    role: own.role?.value,
+    name: own.name?.value ?? '',
+    description: own.description?.value ?? '',
   }));
 }

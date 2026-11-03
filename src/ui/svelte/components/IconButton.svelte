@@ -10,6 +10,7 @@
   | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'ghost-danger'` | `'neutral'` | A closed subset of `Button`'s verb roles plus the ghost-danger compound; an unrecognised value renders neutral. Never an ARIA role. |
   | `size` | `''` \| `'20'` \| `'22'` \| `'24'` \| `'26'` | `''` | The rung, named as a string as `Button`'s is: `''` is 34, `'26'` the banded Modal's close; `'20'` and `'22'` widen their pointer target to 24px (issue 2853); an unrecognised value draws 34. |
   | `tooltip` | pre-localized string | `ariaLabel` | The plain-text name shown on hover and keyboard focus; `''` shows none. |
+  | `description` | pre-localized string | `''` | The accessible description, drawn hidden inside the button as `Button`'s is (issue 2895). |
   | `disabled` | boolean | `false` | Forwarded to the `<button>`. |
   | `onclick` | function | no-op | Forwarded, so a call site keeps its `event.stopPropagation()`. |
   | `children` | snippet | `undefined` | Content after the glyph, for a caller whose label is not an icon. |
@@ -47,6 +48,7 @@
     role = 'neutral',
     size = '',
     tooltip = undefined,
+    description = '',
     disabled = false,
     onclick = () => {},
     children = undefined,
@@ -56,6 +58,7 @@
     'data-tooltip': dataTooltip = undefined,
     'data-tooltip-html': dataTooltipHtml = undefined,
     'data-tooltip-text': dataTooltipText = undefined,
+    'aria-describedby': describedByIds = undefined,
     onfocus = undefined,
     onblur = undefined,
     onkeydown = undefined,
@@ -89,6 +92,20 @@
   );
 
   const accessibleName = $derived(ariaLabel || undefined);
+
+  const descriptionId = $props.id();
+
+  const descriptionText = $derived(
+    typeof description === 'string' && description.trim() ? description : ''
+  );
+
+  const describedBy = $derived(
+    descriptionText ? [describedByIds, descriptionId].filter(Boolean).join(' ') : describedByIds
+  );
+
+  $effect(() => {
+    if (descriptionText && element) return tooltips?.holdDescribedBy?.(element, () => describedBy);
+  });
 
   const callerTooltip = $derived(
     [title, dataTooltip, dataTooltipHtml, dataTooltipText].some((value) => value != null)
@@ -141,6 +158,7 @@
   class={classes}
   data-keyboard-focus="true"
   aria-label={accessibleName}
+  aria-describedby={describedBy}
   data-tooltip-text={dataTooltipText ?? (tooltipText || undefined)}
   {disabled}
   {title}
@@ -151,5 +169,10 @@
   onfocus={showOnKeyboardFocus}
   onblur={hideOnBlur}
   onkeydown={hideOnEscape}
-  >{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{@render children?.()}</button
+  >{#if icon}<i class={icon} aria-hidden="true"
+    ></i>{/if}{@render children?.()}{#if descriptionText}<span
+      id={descriptionId}
+      hidden
+      style:display|important="none">{descriptionText}</span
+    >{/if}</button
 >

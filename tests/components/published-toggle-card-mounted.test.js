@@ -190,16 +190,49 @@ describe('the published ToggleCard draws', () => {
 });
 
 describe('the published ToggleCard names', () => {
-  it('names its switch by title in both states, and never by sub', async () => {
+  it('names its switch by title in both states, never by sub', async () => {
     const { handle, button } = mountCard({ sub: SUB });
     await settle();
     assert.equal(button().getAttribute('aria-label'), TITLE);
     assert.equal(handle.update(base({ on: true, sub: SUB })), true);
     await settle();
     assert.equal(button().getAttribute('aria-label'), TITLE, 'the same name while on');
-    assert.ok(!button().hasAttribute('aria-describedby'), 'the second line is no description');
     handle.destroy();
   });
+
+  it('describes its switch by the sub line it draws, in both states (issue 2892)', async () => {
+    const { target, handle, button } = mountCard({ sub: SUB });
+    await settle();
+    const subLine = () => target.querySelector('.manager-recipe-status-sub');
+    const described = () =>
+      target.ownerDocument.querySelector(`[id="${button().getAttribute('aria-describedby')}"]`);
+    assert.ok(described() === subLine(), 'the drawn sub line');
+    assert.equal(subLine().textContent.trim(), SUB);
+    assert.equal(handle.update(base({ on: true, sub: 'Spent as the stage starts.' })), true);
+    await settle();
+    assert.ok(described() === subLine(), 'still the sub line while on');
+    assert.equal(subLine().textContent.trim(), 'Spent as the stage starts.');
+    handle.destroy();
+  });
+
+  it('gives each card’s sub line an id of its own', async () => {
+    const [first, second] = [mountCard({ sub: SUB }), mountCard({ sub: SUB })];
+    await settle();
+    const ids = [first, second].map(({ button }) => button().getAttribute('aria-describedby'));
+    assert.ok(ids[0] && ids[1] && ids[0] !== ids[1], 'two ids');
+    first.handle.destroy();
+    second.handle.destroy();
+  });
+
+  for (const sub of [undefined, '', ' '.repeat(3), 7]) {
+    it(`writes no description for a sub of ${JSON.stringify(sub)}`, async () => {
+      const { target, handle, button } = mountCard(sub === undefined ? {} : { sub });
+      await settle();
+      assert.ok(!button().hasAttribute('aria-describedby'), 'no aria-describedby');
+      assert.ok(!target.querySelector('.manager-recipe-status-sub').hasAttribute('id'), 'no id');
+      handle.destroy();
+    });
+  }
 });
 
 describe('a press on the published ToggleCard', () => {

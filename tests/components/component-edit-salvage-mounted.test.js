@@ -137,8 +137,8 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     const sub = target.querySelector('.manager-recipe-status-sub');
     assert.deepEqual(
       [...sub.attributes].map((a) => a.name).sort(),
-      ['class'],
-      'the sub-line carries only its class'
+      ['class', 'id'],
+      'the sub-line carries only its class and the id the switch is described by (issue 2892)'
     );
     cardHarness.remount();
   });

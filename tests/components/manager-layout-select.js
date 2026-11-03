@@ -1707,7 +1707,7 @@ test('the pager names its page-size control with the words a GM can see', () => 
   );
   assert.match(
     source,
-    /aria-labelledby=\{captionId\}/,
+    /aria-labelledby=\{groupName \? undefined : captionId\}/,
     'the radiogroup points at THAT through the rest spread, so its name IS the visible text'
   );
   assert.ok(

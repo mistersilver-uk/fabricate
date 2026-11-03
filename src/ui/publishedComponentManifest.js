@@ -7,10 +7,11 @@
  * args? }`, its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`: `waivedBy` lists the `data`
  * keys whose non-blank strings together let a `required` key be empty (issue 2858),
  * `requiredWhen` names the `data` key while which it is required (issue 2452), `contains` the
- * `text` key whose text a `data` key's non-empty string must hold (issue 2852), `itemContains`
- * the same of a `data` array's item members, as `{ <member>: <member it holds> }` (issue 2856),
- * a `text` key takes a string, and a `slot` key is filled through `handle.slot`, in a `<div>`
- * unless `element` says `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
+ * `text` key, or `required` `data` key (issue 2894), whose text a `data` key's non-empty string
+ * must hold (issue 2852), `itemContains` the same of a `data` array's item members, as
+ * `{ <member>: <member it holds> }` (issue 2856), a `text` key takes a string, and a `slot` key
+ * is filled through `handle.slot`, in a `<div>` unless `element` says `'span'`. `root` is the
+ * ancestor the target needs: `'any'`, `'fabricate'` or
  * `'manager'` (issue 2451). A `callback` key takes a function, called with its first `args`
  * arguments, none when unstated (issue 2452). An entry whose rest keys land on a control it draws
  * also states `restOn: 'control'`, which makes M13 refuse `RESERVED_ON_A_CONTROL` among its rest
@@ -265,6 +266,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ariaLabel: Object.freeze({ kind: 'data', contains: 'children' }),
       tooltip: Object.freeze({ kind: 'data' }),
       pressed: Object.freeze({ kind: 'data' }),
+      description: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
@@ -426,6 +428,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       disabled: Object.freeze({ kind: 'data' }),
       onclick: Object.freeze({ kind: 'callback', required: true }),
       'aria-expanded': Object.freeze({ kind: 'aria' }),
+      description: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',
@@ -511,6 +514,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       rangeTemplate: Object.freeze({ kind: 'data', required: true }),
       pageTemplate: Object.freeze({ kind: 'data', required: true }),
       density: Object.freeze({ kind: 'data' }),
+      landmarks: Object.freeze({ kind: 'data' }),
+      perPageAriaLabel: Object.freeze({ kind: 'data', contains: 'perPageLabel' }),
     }),
     rest: false,
     root: 'any',
