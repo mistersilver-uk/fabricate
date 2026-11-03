@@ -749,7 +749,7 @@ test('the library\'s "Ruled out" section draws one Merged well per merged name o
   assert.ok(section, 'the library has no "Ruled out" section to read');
   const wells = [
     ...section.matchAll(
-      /<span class="tag t-out">Merged<\/span><span class="k-mono"[^>]*>&lt;(\w+)&gt;<\/span>/gu
+      /<span class="tag t-out">Merged<\/span>\s*<span class="k-mono"[^>]*>&lt;(\w+)&gt;<\/span>/gu
     ),
   ].map((match) => match[1]);
   const merged = RULED_OUT.flatMap((entry) =>

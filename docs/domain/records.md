@@ -119,7 +119,17 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-mode
 
 It contains one or more Environment Tasks.
 
-Canonical mapping: Registered world setting `fabricate.gatheringEnvironments`; normalized and validated by `GatheringEnvironmentStore`; listed for players through viewer-enforcing `game.fabricate.listGatheringForActor()` backed by an internally constructed `GatheringEngine`; backend immediate resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap wiring, and global accessor facade implemented; GM admin editor supports environment fields, Environment Task list CRUD/base fields, selected Environment Task result-group/tool-reference (`toolIds`)/visibility-gate authoring (routed tasks carry no per-task result-selection provider as of 1.6.0; they resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`), progressive check/award-mode authoring, selected Environment Task time-requirement authoring, and selected Environment Task failure-outcome authoring through store-owned draft callbacks; save failures expose structured validation state and keep the dirty draft unpersisted; stale scene/macro references remain visible and preserved until changed; new environment shells remain disabled placeholders until configured and enabled; dirty draft discard confirmation protects navigation, replacement, and close; dedicated player app shell, app registration, Items Directory entry, active/history rows, terminal feedback surfaces, container-query responsive polish for narrow ApplicationV2 windows, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage implemented; live Foundry validation remains conditional for future runtime-specific or screenshot-required work
+Canonical mapping: Registered world setting `fabricate.gatheringEnvironments`.
+Normalized and validated by `GatheringEnvironmentStore`.
+Listed for players through viewer-enforcing `game.fabricate.listGatheringForActor()` backed by an internally constructed `GatheringEngine`.
+Backend immediate resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap wiring, and global accessor facade implemented.
+GM admin editor supports environment fields, Environment Task list CRUD/base fields, selected Environment Task result-group/tool-reference (`toolIds`)/visibility-gate authoring (routed tasks carry no per-task result-selection provider as of 1.6.0; they resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`), progressive check/award-mode authoring, selected Environment Task time-requirement authoring, and selected Environment Task failure-outcome authoring through store-owned draft callbacks.
+Save failures expose structured validation state and keep the dirty draft unpersisted.
+Stale scene/macro references remain visible and preserved until changed.
+New environment shells remain disabled placeholders until configured and enabled.
+Dirty draft discard confirmation protects navigation, replacement, and close.
+Dedicated player app shell, app registration, Items Directory entry, active/history rows, terminal feedback surfaces, container-query responsive polish for narrow ApplicationV2 windows, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage implemented.
+Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 Spec reference: openspec/specs/overview/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 

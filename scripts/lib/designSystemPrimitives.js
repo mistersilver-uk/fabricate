@@ -11,6 +11,8 @@
  * {@link DESIGN_SYSTEM_PRIMITIVES} and `{ path, library, evidence, callers, why }` on
  * {@link NOT_A_PRIMITIVE}. `evidence` is `'broad'` or `'targeted'` and drives `viewLabCases.js`
  * routing; `callers` holds paths, asserted equal to what `componentImporters.js` measures.
+ * In the JSON a `why` may be an array of prose fragments, one per line so that independent edits
+ * land on different lines; every row here carries it joined with a single space.
  */
 import { readFileSync } from 'node:fs';
 
@@ -50,6 +52,7 @@ const MANIFEST = JSON.parse(
 function frozenTable(rows) {
   return Object.freeze(
     rows.map((row) => {
+      if (Array.isArray(row.why)) row.why = row.why.join(' ');
       for (const value of Object.values(row)) if (Array.isArray(value)) Object.freeze(value);
       return Object.freeze(row);
     })
