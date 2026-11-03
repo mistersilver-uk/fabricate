@@ -184,6 +184,8 @@ The glyph opts out of forced colours' backplate, which would paint it as a block
 And the ring keeps the forced text colour.
 Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the unticked edge MUST clear 3:1 against the compact box's ground and the larger boxes' fill, the ticked and mixed accent edge 3:1 against the ground, the tick on the accent fill and the dash on the soft fill 3:1, and the label, `--fab-text-secondary`, and the disabled label, `--fab-text-muted`, 4.5:1; `tests/components/selection-checkbox-contrast.test.js` holds them.
 `BulkStagingInset`'s `check` rows draw their decorative box through it, so that box's empty edge is `--fab-control-outline` rather than the `--fab-border-strong` it drew by hand, which measured 1.64 to 2.21:1.
+Its `tone` is `default` or `success`: a ticked `success` box that is not mixed MUST fill with `--fab-success` inside a `--fab-success-strong` edge and ink its tick `--fab-on-success`, at every density and in the labelled and the decorative form, an empty or mixed one drawing as `default`; the strong edge MUST clear 3:1 against the four grounds above and the tick 3:1 on the fill, which `tests/components/selection-checkbox-contrast.test.js` holds, and under forced colours it fills with `Highlight` as the accent box does (issue 2881).
+Only a `decorative` that is exactly `true` draws the decorative form, and a companion draws it through `game.fabricate.api.ui` inside its own pressable row, which carries the name and the state the hidden box shows (issue 2881).
 
 #### Scenario: A labelled checkbox
 

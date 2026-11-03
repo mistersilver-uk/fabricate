@@ -213,6 +213,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .k-cb .i{width:12px;height:12px}
 .k-cb.on i,.k-cb.ind i{background:var(--fab-accent);border-color:var(--fab-accent);color:var(--fab-on-accent)}
 .k-cb.dis{opacity:.42;cursor:default}
+.k-cb.done i{background:var(--fab-success);border-color:var(--fab-success-strong);color:var(--fab-on-success)}
 .k-badge{display:inline-flex;align-items:center;gap:var(--fab-space-1);padding:var(--fab-space-1) var(--fab-space-2);border-radius:999px;font-size:10px;font-weight:600;background:var(--fab-surface-soft);color:var(--fab-text-secondary)}
 .k-badge.accent{background:var(--fab-accent-soft);color:var(--fab-accent-text)}
 .k-badge.success{background:var(--fab-success-soft);color:var(--fab-success-text)}
@@ -2747,6 +2748,15 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <i><svg class="i"><use href="#i-check"/></svg></i>
         </div>
       </div>
+      <div class="unit">
+        <span class="cap">success &mdash; a done row, decorative in its own pressed button</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="k-cb done">
+            <i><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></i>
+          </div>
+          <span style="font-size:12px;color:var(--fab-text-secondary);text-decoration:line-through">Gather three iron ore</span>
+        </div>
+      </div>
       <div class="unit grow" style="min-width:220px">
         <span class="cap">labelled &mdash; the box on the label&rsquo;s first line</span>
         <div style="display:flex;gap:8px;align-items:flex-start;max-width:220px">
@@ -2797,7 +2807,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>SelectionCheckbox.svelte</code>&rsquo;s <code>$props()</code>.</li>
           <li><b>checked</b> — <b>NOT bindable</b>: every call site owns its own state · <b>indeterminate</b>, applied as a DOM property through an effect · <b>disabled</b></li>
-          <li><b>onChange</b>(checked) <span class="req">required</span> · <b>ariaLabel</b> <span class="req">required</span></li>
+          <li><b>onChange</b>(checked) <span class="req">required</span> · <b>ariaLabel</b> <span class="req">required</span> — neither in the decorative form</li>
+          <li><b>tone</b> default | success — <code>success</code> fills a ticked box <code>--fab-success</code> inside a <code>--fab-success-strong</code> edge, its tick <code>--fab-on-success</code> (issue 2881)</li>
           <li><b>density</b> compact 16/r6 | default 20/r6 | comfortable 22/r6 — each DECLARED, none derived from another</li>
           <li><b>wrapper</b> label | contents — <code>contents</code> is for a host whose own root is a <code>&lt;label&gt;</code>, since nesting labels is invalid HTML</li>
           <li><b>decorative</b> boolean = false — the box ALONE, <code>aria-hidden</code> and with no input, for a host element that already announces the checked state: a multi-select picker row carries it as <code>aria-selected</code>, and an input inside that row would nest one control in another.
@@ -2817,6 +2828,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       Under forced colours an unticked box draws no glyph and a ticked or mixed one fills with <code>Highlight</code>, its glyph clear of the forced backplate.
       A disabled box draws at half opacity, and an enabled empty one raises its edge under the pointer.
       <code>BulkStagingInset</code>&rsquo;s <code>check</code> rows draw their decorative box through it, so its empty edge is <code>--fab-control-outline</code>.<span class="cite"><b>SelectionCheckbox.svelte</b> &middot; <b>BulkStagingInset.svelte</b></span></div>
+    <div class="delta ok"><b>Decorative form and success tone published (issue 2881).</b>
+      A companion passes <code>decorative: true</code> for the box alone, <code>aria-hidden</code> with no label or input, inside its own <code>&lt;button aria-pressed&gt;</code> row, which needs no <code>label</code> or <code>onChange</code>; <code>tone: 'success'</code> fills a ticked box with <code>--fab-success</code> inside a <code>--fab-success-strong</code> edge, its tick in <code>--fab-on-success</code>, and a mixed or empty box keeps the default face.<span class="cite"><b>SelectionCheckbox.svelte</b></span></div>
   </div>
 <div class="spec" data-status="shipped" data-status-RunActionBar="shipped">
     <div class="spec-head">
