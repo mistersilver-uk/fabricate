@@ -61,8 +61,8 @@
   font: inherit;
 }
 
-/* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). */
-.fabricate-manager input[type="text"],
+/* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). `:not(:where(.fab-stepper-input))` leaves the formatted Stepper's field to the component without adding specificity to the rule. */
+.fabricate-manager input[type="text"]:not(:where(.fab-stepper-input)),
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
 .fabricate-manager input[type="tel"],
@@ -85,7 +85,7 @@
   line-height: 1.4;
 }
 
-.fabricate-manager input[type="text"]:disabled,
+.fabricate-manager input[type="text"]:not(:where(.fab-stepper-input)):disabled,
 .fabricate-manager input[type="url"]:disabled,
 .fabricate-manager input[type="email"]:disabled,
 .fabricate-manager input[type="tel"]:disabled,

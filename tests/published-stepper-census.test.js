@@ -30,12 +30,15 @@ import {
 const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const STEPPER_CLASSES = new Set(['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct']);
 
-/** The eighteen selectors outside `Stepper.svelte` that name a part of it: thirteen `:not()` exemptions, and five under a pinned ancestor. */
+/** The twenty selectors outside `Stepper.svelte` that name a part of it: fifteen `:not()` exemptions, and five under a pinned ancestor. */
 const STEPPER_SELECTORS = Object.freeze([
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper)',
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper-input)',
   "src/ui/svelte/apps/manager/component/CheckOverrideField.svelte: :global(.manager-salvage-dc-controls .fab-stepper:has(input[aria-invalid='true']))",
   "src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte: :global(.manager-task-dc-row .fab-stepper:has(input[aria-invalid='true']))",
+  // The Manager's text-field baseline and its disabled face, which exclude the field without adding specificity.
+  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:not(:where(.fab-stepper-input))',
+  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:not(:where(.fab-stepper-input)):disabled',
   'styles/fabricate-manager-checks-modifiers.css: .fabricate-rule-row .fabricate-rule-row-body .fabricate-field input:not(.fab-stepper-input):not([type="radio"]):not([type="range"])',
   // The same selector list, written twice in the sheet: the field chrome's edge rule and its height rule.
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
@@ -71,8 +74,6 @@ const BARE_INPUT_RULES = Object.freeze([
   'styles/fabricate-base.css: .fabricate input[data-validation-focused]',
   "styles/fabricate-base.css: .fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']))[data-validation-focused]",
   'styles/fabricate-manager-shell.css: .fabricate-manager input',
-  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]',
-  'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:disabled',
 ]);
 
 /** The classes under which a rule redraws a bare `input`; no extension target sits in one. */
@@ -202,12 +203,18 @@ const negatesType = (part) =>
     (inner) => inner.type === 'AttributeSelector' && inner.name === 'type' && !inner.matcher
   );
 
+/** Whether a simple selector is the field's own class, bare or alone inside a `:where()`. */
+const isFieldClass = (inner) =>
+  (inner.type === 'ClassSelector' && inner.name === 'fab-stepper-input') ||
+  (inner.type === 'PseudoClassSelector' &&
+    inner.name === 'where' &&
+    inner.args?.children.length === 1 &&
+    inner.args.children[0].children.length === 1 &&
+    inner.args.children[0].children[0].selectors.length === 1 &&
+    isFieldClass(inner.args.children[0].children[0].selectors[0]));
+
 /** Whether a `:not()` holds the field's own class alone, which the published field always carries. */
-const negatesField = (part) =>
-  negatesAlone(
-    part,
-    (inner) => inner.type === 'ClassSelector' && inner.name === 'fab-stepper-input'
-  );
+const negatesField = (part) => negatesAlone(part, isFieldClass);
 
 /**
  * Whether a `type` matcher requires a type other than `number` or `text`: only `=` and `~=` name a
@@ -293,7 +300,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Stepper', () => {
-  it('names a part of the stepper outside its own file in eighteen selectors, none of which a published stepper takes', () => {
+  it('names a part of the stepper outside its own file in twenty selectors, none of which a published stepper takes', () => {
     const census = stepperSelectors(everyStylesheet());
     assert.deepEqual(writtenOf(census), [...STEPPER_SELECTORS].sort(byName));
     assert.deepEqual(
@@ -310,7 +317,7 @@ describe('the module sheet and every component style against the published Stepp
     }
   });
 
-  it('reaches a published number or formatted field through the nine module rules a bare input takes, and no other', () => {
+  it('reaches a published number or formatted field through the seven module rules a bare input takes, and no other', () => {
     const census = shippedBareInputs();
     assert.deepEqual(writtenOf(reachingOf(census)), [...BARE_INPUT_RULES].sort(byName));
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
@@ -363,6 +370,7 @@ describe('the stepper census, synthetic', () => {
 
   for (const selector of [
     '.a input:not(.fab-stepper-input)',
+    '.a input:not(:where(.fab-stepper-input))',
     '.manager-task-dc-row .fab-stepper',
     '.x [data-salvage-dc-override] .fab-stepper-adjunct',
   ]) {
@@ -393,6 +401,7 @@ describe('the stepper census, synthetic', () => {
     '.a input[type~="url"]',
     '.a input:not([type], .b)',
     '.a input:not(.fab-stepper-input)',
+    '.a input[type="text"]:not(:where(.fab-stepper-input))',
   ]) {
     it(`admits the bare input rule ${selector}`, () => {
       assert.deepEqual(inputsIn(`${selector} { gap: 0 }`), []);
@@ -420,6 +429,8 @@ describe('the stepper census, synthetic', () => {
     '.a input:not(.b [type])',
     '.a input:not(.fab-stepper-input:focus)',
     '.a input:not(.b .fab-stepper-input)',
+    '.a input:not(:where(.b .fab-stepper-input))',
+    '.a input:not(:where(.b))',
   ]) {
     it(`refuses the bare input rule ${selector}`, () => {
       assert.deepEqual(inputsIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);

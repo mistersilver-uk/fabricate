@@ -2931,7 +2931,7 @@ Fabricate draws it in the muted ink, which clears the contrast floor, and a `pla
 `format` is `signed` or `unlimited`, and absent for the plain number field.
 Either value draws a text field with the spinbutton role in place of the number field, and the field reports a number only when the user presses Enter or it loses focus, where the number field reports on every keystroke.
 A `signed` field draws a positive number with a leading plus, as `+5`, zero as `0` and a negative number with a hyphen-minus, as `-5`, and reads an optional plus, hyphen-minus or true minus sign followed by digits with an optional decimal point, as `1.5`, `.5` or `5.`; any other text, such as `1e3` or `5%`, is not a number.
-The `signed` field asks the browser for its decimal keypad, `inputmode="decimal"`, which some touch keypads show without a minus key, so offer the buttons too where negative numbers matter on touch.
+The `signed` field asks the browser for its text keypad, `inputmode="text"`, because a decimal keypad shows no minus key on some touch devices, and an `unlimited` field asks for the decimal keypad, `inputmode="decimal"`.
 An `unlimited` field draws every number but zero as itself, with no plus, and draws `0` as the `nullLabel` words, as "No limit", for a quantity whose zero means there is none; it takes those words in any case, or `0`, as that endpoint, and reports the endpoint as `0`, never `null`.
 Without `nullLabel`, an `unlimited` field draws `0` as the number, and `allowUnset` is outside the contract.
 An `unlimited` field is meant for a `min` of `0`: a `min` above `0` is outside the contract, and with no `min` a negative number is reachable and the endpoint sits mid-range; a typed `0` selects the endpoint before `min` clamps it.
@@ -2975,13 +2975,13 @@ The stepper does not catch Escape, except under `format` as stated for it: the i
 Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
 Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
 `Stepper` takes no rest props, so a `data-*` prop, an `id` and a `title` are refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, and the Manager's text-field baseline draws no box on the `format` field.
 A DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states.
 Give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, where `size` `34` draws it as the default rung does, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
-Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and the box of the `format` field inside a Fabricate Manager window, are private.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max` are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
 

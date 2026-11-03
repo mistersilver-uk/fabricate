@@ -88,7 +88,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     // Issue 2005: the only text input is the opt-in formatted field, a spinbutton with its own keys.
     const numberField = /<input\b[^>]*\btype="number"[^>]*>/.exec(markup)?.[0] ?? '';
     assert.ok(
-      (markup.match(/type="text"\s+inputmode="decimal"\s+role="spinbutton"/g) ?? []).length
+      (markup.match(/type="text"\s+inputmode=\{[^}]+\}\s+role="spinbutton"/g) ?? []).length
         === (markup.match(/type="text"/g) ?? []).length,
       'it does not drift to a text input, which would remove native keyboard stepping'
     );
