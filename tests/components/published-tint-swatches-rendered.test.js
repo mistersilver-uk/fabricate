@@ -176,13 +176,14 @@ describe('the published TintSwatches on the keyboard', () => {
   it('leaves the arrow keys to the document past the strip, and lets Tab leave it', async () => {
     await set('subset', 'azure');
     await page.focus(swatch('subset', 'azure'));
-    const heard = page.evaluate(
-      () =>
-        new Promise((done) => {
-          document.addEventListener('keydown', (event) => done(event.key), { once: true });
-        })
-    );
+    await page.evaluate(() => {
+      globalThis.__heard = [];
+      document.addEventListener('keydown', (event) => globalThis.__heard.push(event.key), {
+        once: true,
+      });
+    });
     await page.keyboard.press('ArrowRight');
+    const heard = page.evaluate(() => globalThis.__heard[0]);
     assert.equal(await heard, 'ArrowRight', 'a listener above the strip still hears the key');
     await page.keyboard.press('Tab');
     assert.equal(await active(), 'page button', 'Tab leaves the group');
