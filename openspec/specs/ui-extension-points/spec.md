@@ -2391,8 +2391,7 @@ Each group states the accepted values of every key that entry publishes.
 - **`Typeahead`.**
   - It is the design system's typeahead (`<Typeahead>` in the library), published in its data form: a search field whose list of suggestions the query drives, for one choice from a set too long to step through, which commits as it is made, and optionally for the user's own text when nothing matches.
     It is an editable combobox: the input holds focus throughout and names the active row, and the list is an overlay.
-    For a short set the user should see whole, the companion uses `Select`: an empty query lists nothing here, and the field never shows the current value's label, so the companion draws its current value beside it.
-    A list shown on focus before any typing is a named follow-up, `openOnEmpty`, and not part of version 1.
+    An empty query lists nothing here unless the companion passes `openOnEmpty`, which shows a short set whole before any typing; the field never shows the current value's label, so the companion draws its current value beside it.
     The input is the only focusable element Fabricate draws in `target`, so to return focus to the typeahead the companion focuses `target.querySelector('input')`.
   - `options` is required and lists the rows the current query yields, in drawn order, each `{ value, label, icon?, detail? }`: `value` is a string or a number, `label` is required final display text, `icon` is optional Font Awesome classes for a glyph drawn before the label and hidden from assistive technology, and `detail` is optional final display text drawn as a second line under the label; a row's accessible name is its label followed by its detail.
     Fabricate filters nothing: the companion hands the list the rows its own search yields for the query it holds, in its own order and number, and caps a long result itself; Fabricate draws every row it is given inside the list's scroll.
@@ -2414,7 +2413,7 @@ Each group states the accepted values of every key that entry publishes.
   - `onChange` is a required callback, called with one argument, the chosen row's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses a row by pointer or by Enter on the active row, the current row included.
     It is not called by `mount`, `update`, typing, opening or closing the list, Escape, Tab, a press outside the list or Enter with no row active.
     The typeahead changes nothing itself on a choice: the query and `value` stay as they were, and the companion passes what it keeps through `update`, as `query: ''` to empty the field after a choice.
-    A choice closes the list until the query is edited again, and Enter at that query then commits nothing more.
+    A choice closes the list until the query is edited again, and Enter at that query then commits nothing more; under `openOnEmpty` it stays closed until the user edits the query, focus comes back to the input or ArrowDown on a blank query opens it, so a query the companion passes through `update` after the choice, as `query: ''`, synchronously or later, does not reopen it.
   - `ariaLabel` is required and names the input and its list, final display text naming what is searched, as "Find a reward".
     The typeahead draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the field with no name.
   - `placeholder` is optional final display text shown while the field is empty, and is not the field's name.
@@ -2429,14 +2428,22 @@ Each group states the accepted values of every key that entry publishes.
   - `onFreeText` is a callback, required while `allowFree` is truthy, called with one argument, the query with its leading and trailing white space removed, as the user's own text when no row is wanted.
     It is not called by a press, by Enter on an active row, by Enter on a blank query or inside a composition, or while `allowFree` is falsy.
     It changes nothing itself either: the companion empties the field with `query: ''` in an `update` when it takes the text.
+  - `openOnEmpty` is `true` or `false`, and defaults to `false`: while it is `true`, focus on a blank query, or ArrowDown there after Escape, a choice or a press outside closed the list, opens the list with every row `options` passes, so the companion passes the whole set for `''`; Fabricate still filters nothing, and the rows follow the companion's `options` as the query changes.
+    Only the literal `true` turns it on: Fabricate coerces nothing, so the string `'false'`, the string `'true'` and `1` leave it off, and only `true` and `false` are in the contract.
+    Opening leaves no row active, so the first ArrowDown of an open list reaches the first row; the list opens on focus whether a press, Tab or a script moved focus there, and a press on an input that already holds focus does not reopen a list Escape or a choice closed, which ArrowDown or an edit does.
+    While it is `true` and `options` draws no row for a blank query, `emptyLabel` shows there as it does for a query that matches nothing, and is said into the status region.
+    A companion uses it for a short set the user should see whole; a set the user never searches is a `Select`.
+    A Fabricate that predates the key refuses it with `"openOnEmpty" is not a prop of Typeahead` (M8), and its `describe('Typeahead')` omits it, so the companion passes it only where `describe('Typeahead').props.openOnEmpty` is present.
+    Fabricate's own typeaheads, which pass `source`, never read it.
   - `density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: the field's shell at the heights `SearchField`'s `density` draws, 38px at radius 9, 34px at radius 9 and 30px at radius 7; any other value, `'compact'` included, draws `'default'`.
   - `error` is optional final display text: while it is a non-blank string the field takes the error face, `Select`'s danger edge on the `--fab-danger-soft` fill, its input states `aria-invalid="true"`, and the text is drawn beneath the field in the `--fab-danger-text` ink and is the input's description through `aria-describedby`; absent, `''`, white space alone or not a string, none of them is drawn.
     While the input holds focus, the field's lit border is drawn in place of the danger edge, and the fill and the message stay.
     The danger edge falls short of 3:1 against the grounds below, and forced colours remove the fill, so the message carries the error and says what to do.
     While an error shows, the list opens below the message, so it never covers it.
     The message makes the field taller, so a companion draws a field that can show an error at the `'default'` `density`, in a place that need not stay one height.
-  - The list is open only while the input holds focus, the query is not blank and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
+  - The list is open only while the input holds focus, the query is not blank or `openOnEmpty` is `true`, and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
     ArrowDown and ArrowUp move the active row and wrap at each end, ArrowDown from no active row to the first and ArrowUp to the last; each edit of the query leaves no row active, so a query typed again never brings a row back.
+    While nothing is shown, ArrowDown on a blank query opens the list with no row active and takes the key only while `openOnEmpty` is `true`; otherwise it passes to the page.
     The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
     Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
     Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.
@@ -2444,6 +2451,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
     Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
     Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+    Under `openOnEmpty` the list stays closed at the query Escape emptied, so the sequence on a typed query is close, empty, then pass on, and an edit, focus coming back to the input or ArrowDown opens it again.
     Tab and Shift+Tab move focus as the browser does and close the list without a choice, and a companion's listener above `target` hears the Tab.
     No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
     A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.

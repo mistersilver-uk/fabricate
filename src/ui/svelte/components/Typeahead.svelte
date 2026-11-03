@@ -11,6 +11,7 @@
   | `options` | `[{ value, label, icon?, detail? }]` | `undefined` | In place of `source`, `itemLabel`, `itemIcon` and `onChoose`: the caller hands the list the rows its query yields; absent lists none. Not an array faults; an item without a string or number `value` and a non-blank `label` is not drawn. |
   | `value` / `onChange(value)` | string \| number \| null / function | `undefined` | The option matched by `===` carries a tick and `aria-checked="true"`; a choice reports the option's own `value`. |
   | `allowFree` / `onFreeText(text)` | truthy / function | `false` | Enter with no option active reports the trimmed, non-blank query. |
+  | `openOnEmpty` | `true` | `false` | Only the literal `true`: focus or ArrowDown on a blank query lists every option (issue 2885). |
   | `error` | string | `''` | Non-blank: the invalid face, `aria-invalid` and this message beneath, naming the input's description; the list opens below the message. |
   | `countLabel` | snippet | `undefined` | Passed to the field's own count region. |
 
@@ -39,6 +40,7 @@
     value = undefined,
     onChange = undefined,
     allowFree = false,
+    openOnEmpty = false,
     onFreeText = undefined,
     error = '',
     countLabel = undefined,
@@ -115,6 +117,10 @@
     return offered;
   }
 
+  function listsOnEmpty() {
+    return offered && openOnEmpty === true;
+  }
+
   function showsNote() {
     return Boolean(emptyLabel);
   }
@@ -151,6 +157,9 @@
     },
     get hasNote() {
       return showsNote();
+    },
+    get openOnEmpty() {
+      return listsOnEmpty();
     },
     get maxHeightCap() {
       return listCap();

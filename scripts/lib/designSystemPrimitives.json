@@ -1077,7 +1077,8 @@
       "scope": "shared",
       "why": [
         "The one shared type-to-search control: a trigger-less query field whose suggestion list the query drives, each choice committing at once into a single slot, a filter or a short list the caller owns.",
-        "It is published, so it is shared."
+        "It is published, so it is shared.",
+        "With `openOnEmpty` set to the literal `true`, focus or ArrowDown at a blank query lists every option."
       ]
     }
   ],

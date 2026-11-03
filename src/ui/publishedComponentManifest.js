@@ -687,6 +687,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
       error: Object.freeze({ kind: 'data' }),
       countLabel: Object.freeze({ kind: 'text' }),
+      openOnEmpty: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',
