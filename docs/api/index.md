@@ -2076,7 +2076,7 @@ The published components, in publication order:
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
 | `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `icon`, `size`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `scrim`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback), `aside` (slot), `leading` (slot), `badges` (slot), `meta` (slot), `trailing` (slot), `markSize`, `density`, `layout`, `truncateName`, `detailAlign`, `current`, `busy` | yes |
-| `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
+| `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required), `tone` | no |
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria), `decorative`, `tone` | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
 | `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text), `openOnEmpty` | no |
@@ -4365,20 +4365,26 @@ The name never states a position, so no "on", "off", "show" or "hide" at its sta
 It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
 A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so put a sentence that must be heard there in `title`.
 `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
-`on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+`on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow `on` only through `tone`.
 Fabricate coerces nothing, so only `true` and `false` are in the contract.
 The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when your `update` passes it, which may be after the press returns.
 To refuse the change, pass `on` unchanged and say why in text of your own, so the card never shows a state you do not hold.
 `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
 Pass `pressed` or `switch` as [StatusToggle](#statustoggle) states.
+`tone` is `neutral`, `enabled`, `locked` or `info`, and defaults to `neutral`.
+It tints the card while `on` is `true`: `enabled` in the success family, `locked` in the accent family and `info` in the info family, each an edge on a soft fill with the second line in the secondary ink so it still reads on the tint.
+`neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown.
+Choose it by what the setting means to your user, `enabled` for a preference that is switched on, `locked` for one that is enforced and `info` for an informational policy.
+The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, and a tone's edge falls short of 3:1 against the ground in some palettes, so never rely on the colour to say it.
+Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint has no motion of its own.
+A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe('ToggleCard').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
 Work out the new state from the `on` you last passed.
 It is not called by `mount`, `update` or `destroy`.
 The switch has no unavailable state at version 1, as [StatusToggle](#statustoggle) states, and the card takes no `disabled`.
 A card is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog, and it grows to the width of `target`.
-The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
 It takes no rest props, so a `data-*` attribute is refused with `"<key>" is not a prop of ToggleCard`.
-Its padding, gap, corner, border and fill figures, its type figures, its colours beyond what this section and [StatusToggle](#statustoggle) state, and the hooks and tone classes Fabricate's own callers use are private.
+Its padding, gap, corner, border and fill figures, its type figures, its colours beyond what this section and [StatusToggle](#statustoggle) state, and the hooks and classes Fabricate's own callers use are private.
 
 A worked card follows: a setting of your own, named by the title the card draws.
 

@@ -2,7 +2,7 @@
  * The module sheet and every component style against the published `ToggleCard` (issue 2775): the
  * selectors that name its root class, which of them a published card can match, and where those
  * sit; the status-card parts it spells, which only a selector through its root or a pinned
- * ancestor may name; and the tone classes no published key writes.
+ * ancestor may name; and the tone classes only `tone` writes.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, and takes
  * on trust that no extension target sits under one of `TOGGLE_CARD.ancestors`.
  */
@@ -37,6 +37,21 @@ const CARD_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card',
 ]);
 
+/** The sheet rules that draw a published card's tone, each through a class only `tone` writes. */
+const CARD_TONE_RULES = Object.freeze([
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-sub',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-info.is-on',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-info.is-on .manager-recipe-status-sub',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-locked.is-on',
+  'styles/fabricate-manager-library.css: .fabricate-toggle-card.manager-recipe-status-card.is-locked.is-on .manager-recipe-status-sub',
+]);
+
+/** The classes `tone` writes, which a card's `variant` writes in the app. */
+const TONE_CLASSES = Object.freeze(['is-enabled', 'is-locked', 'is-info']);
+
 /** The card's drawn parts, which only a selector through its root or a pinned ancestor may name. */
 const CARD_PARTS = Object.freeze([
   'manager-recipe-status-icon',
@@ -66,27 +81,29 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published ToggleCard', () => {
-  it('reaches a published card through its five family rules, of ten that name its root', () => {
+  it('reaches a published card through its five family rules and eight tone rules, of thirteen that name its root', () => {
     const census = shippedCensus(TOGGLE_CARD, 'ToggleCard');
-    assert.equal(census.length, 10, 'the census of every selector naming the root');
-    assert.deepEqual(writtenOf(reachingOf(census)), [...CARD_FAMILY_RULES].sort(byName));
+    assert.equal(census.length, 13, 'the census of every selector naming the root');
+    assert.deepEqual(
+      writtenOf(reachingOf(census)),
+      [...CARD_FAMILY_RULES, ...CARD_TONE_RULES].sort(byName)
+    );
     assert.deepEqual(
       [Object.keys(entryNamed('ToggleCard').props), entryNamed('ToggleCard').root],
-      [['title', 'sub', 'icon', 'on', 'semantics', 'onToggle'], 'any'],
+      [['title', 'sub', 'icon', 'on', 'semantics', 'onToggle', 'tone'], 'any'],
       'a published variant, hook name or wider root reopens the census'
     );
   });
 
-  it('keeps the tone rules off a published card only by the tone classes no published key writes', () => {
-    const toned = shippedCensus(TOGGLE_CARD, 'ToggleCard').filter(({ safe }) => safe);
-    assert.equal(toned.length, 5);
-    const writesTones = {
+  it('keeps the tone rules off a published card only by the tone classes `tone` writes', () => {
+    assert.ok(TONE_CLASSES.every((name) => TOGGLE_CARD.writable.has(name)));
+    const withoutTones = {
       ...TOGGLE_CARD,
-      writable: new Set([...TOGGLE_CARD.writable, 'is-enabled', 'is-locked', 'is-info']),
+      writable: new Set([...TOGGLE_CARD.writable].filter((name) => !TONE_CLASSES.includes(name))),
     };
-    assert.equal(
-      reachingOf(shippedCensus(writesTones, 'ToggleCard')).length,
-      CARD_FAMILY_RULES.length + toned.length
+    assert.deepEqual(
+      writtenOf(reachingOf(shippedCensus(withoutTones, 'ToggleCard'))),
+      [...CARD_FAMILY_RULES].sort(byName)
     );
   });
 
@@ -122,7 +139,7 @@ describe('the toggle card census, synthetic', () => {
       .map(({ written }) => written);
 
   for (const [claim, selector] of [
-    ['a tone class no published key writes', '.fabricate-toggle-card.is-info'],
+    ['a class no published key writes', '.fabricate-toggle-card.is-danger'],
     ['a pinned ancestor', '.fabricate-manager .manager-checks-flag-list .fabricate-toggle-card'],
     ['a classed child no closure spells', '.fabricate-toggle-card .manager-unspelled'],
   ]) {

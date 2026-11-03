@@ -520,6 +520,13 @@
   overflow-wrap: break-word;
 }
 
+/* The muted ink falls short of 4.5:1 on a toned fill in most palettes, so a toned, on card draws its sub line in the secondary ink. */
+.fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-sub,
+.fabricate-toggle-card.manager-recipe-status-card.is-locked.is-on .manager-recipe-status-sub,
+.fabricate-toggle-card.manager-recipe-status-card.is-info.is-on .manager-recipe-status-sub {
+  color: var(--fab-text-secondary);
+}
+
 /* Section title reused by the Duration and Step-durations cards (serif, no h3 card-heading chrome). */
 .fabricate-manager .manager-recipe-section-title {
   margin: 0;

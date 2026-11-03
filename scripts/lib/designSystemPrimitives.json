@@ -418,7 +418,8 @@
       "scope": "shared",
       "why": [
         "A titled card wrapping a binary control.",
-        "`<Toggle>` is the bare control and `<Card>` is the container, so a card-plus-toggle is a composition of two entries and names neither, and it is shared."
+        "`<Toggle>` is the bare control and `<Card>` is the container, so a card-plus-toggle is a composition of two entries and names neither, and it is shared.",
+        "It publishes a closed `tone` of `neutral`, `enabled`, `locked` or `info`, which tints an on card in the success, accent or info family and leaves the switch to carry the state."
       ]
     },
     {
