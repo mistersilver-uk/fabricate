@@ -44,6 +44,12 @@ manager-published-companion-forms-accent-focus-hearth-herb
 manager-published-companion-forms-urgent-focus
 manager-published-companion-forms-urgent-focus-foundry-native
 manager-published-companion-forms-urgent-focus-hearth-herb
+manager-published-button-roles-specimen
+manager-published-button-roles-specimen-foundry-native
+manager-published-button-roles-specimen-hearth-herb
+manager-published-button-roles-confirm-focus
+manager-published-button-roles-confirm-focus-foundry-native
+manager-published-button-roles-confirm-focus-hearth-herb
 manager-published-selection-checkbox-specimen
 manager-published-selection-checkbox-specimen-foundry-native
 manager-published-selection-checkbox-specimen-hearth-herb

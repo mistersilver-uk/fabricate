@@ -832,6 +832,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-disclosure': () => import('./fixtures/PublishedDisclosure.svelte'),
   // Issue 2841: a progress tile whose stat box holds a thin fill bar in its content slot.
   'published-companion-forms': () => import('./fixtures/PublishedCompanionForms.svelte'),
+  // Issues 2890 and 2898: the confirm role beside the commit, and the roles on each tinted fill.
+  'published-button-roles': () => import('./fixtures/PublishedButtonRoles.svelte'),
   // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.
   'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
   // Issue 2647: a reagent's icon whose choice the companion's own update draws.

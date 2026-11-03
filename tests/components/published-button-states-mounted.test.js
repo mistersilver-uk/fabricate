@@ -4,7 +4,8 @@
  * under a Fabricate window root: the name that replaces the label and the refusal of one that does
  * not hold it (M22), the hint written as Foundry's plain tooltip text and opened under keyboard
  * focus through the runtime's facade, the `aria-pressed` each value writes and the face `true`
- * draws, and the role's class; and the `accent` and `urgent` roles' classes (issue 2841).
+ * draws, and the role's class; and the `accent` and `urgent` roles' classes (issue 2841) and the
+ * `confirm` role's (issue 2890).
  * Limit: happy-dom does not tell a keyboard focus from a pointer one, so each focus clause answers
  * `:focus-visible` on the button.
  */
@@ -277,8 +278,9 @@ describe('the published Button, pressed and info', () => {
   for (const [role, roleClass] of [
     ['accent', 'is-accent-action'],
     ['urgent', 'is-urgent-action'],
+    ['confirm', 'is-confirm-action'],
   ]) {
-    it(`writes the ${role} role’s class (issue 2841), and an update replaces it`, async () => {
+    it(`writes the ${role} role’s class, and an update replaces it`, async () => {
       const { handle, update, button } = mountButton({ role });
       await settle();
       assert.deepEqual(authoredClasses(button()), ['fabricate-button', roleClass]);

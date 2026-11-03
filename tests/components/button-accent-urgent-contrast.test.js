@@ -5,6 +5,8 @@
  * label `--fab-on-accent` on the solid `--fab-accent`, each clearing 4.5:1; the accent edge and the
  * urgent tile, both `--fab-accent`, clear 3:1 on the four grounds; the accent label also clears on
  * every tone's tinted fill at rest and under the pointer; and neither face draws a ring of its own.
+ * The outlined `confirm` label (issue 2890) inks `--fab-success-text` on no fill at rest and on
+ * `--fab-success-soft` under the pointer inside a `--fab-success-strong` edge that clears 3:1.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -27,6 +29,7 @@ const GROUNDS = ['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2'];
 const HOVER = ":not(:disabled, [aria-disabled='true']):hover";
 const ACCENT = '.fabricate-button.fabricate-button.is-accent-action';
 const URGENT = '.fabricate-button.fabricate-button.is-urgent-action';
+const CONFIRM = '.fabricate-button.fabricate-button.is-confirm-action';
 
 /** Each face's label, fill and edge; `transparent` draws the ground beneath it. */
 const FACES = Object.freeze([
@@ -34,6 +37,8 @@ const FACES = Object.freeze([
   [`${ACCENT}${HOVER}`, ['--fab-accent-text', '--fab-accent-soft', '--fab-accent']],
   [`${URGENT}:not(:disabled)`, ['--fab-on-accent', '--fab-accent', '--fab-accent']],
   [`${URGENT}${HOVER}`, ['--fab-on-accent', '--fab-accent-hover', '--fab-accent-hover']],
+  [`${CONFIRM}:not(:disabled)`, ['--fab-success-text', 'transparent', '--fab-success-strong']],
+  [`${CONFIRM}${HOVER}`, ['--fab-success-text', '--fab-success-soft', '--fab-success-strong']],
 ]);
 
 /** A face's fill as a stack over `ground`, top first. */
@@ -58,8 +63,8 @@ for (const [selector, tokens] of FACES) {
   });
 }
 
-test('the accent edge and the urgent tile clear 3:1 on each of the four grounds at rest and under the pointer', () => {
-  for (const edge of ['--fab-accent', '--fab-accent-hover']) {
+test('the accent and confirm edges and the urgent tile clear 3:1 on each of the four grounds at rest and under the pointer', () => {
+  for (const edge of ['--fab-accent', '--fab-accent-hover', '--fab-success-strong']) {
     for (const ground of GROUNDS) {
       assert.deepEqual(shortfalls(themes, edge, [ground], 3), [], `${edge} on ${ground}`);
     }
@@ -86,10 +91,19 @@ test('the accent label clears 4.5:1 on every tone’s tinted fill at rest and un
   );
 });
 
-test('neither face draws a ring of its own, so the button keeps the accent ring 2px clear', () => {
+test('the success ink falls short as a label in foundry-native and as an edge on --fab-bg-2 there, so confirm draws the success text and strong rungs', () => {
+  const short = (ink, stack, floor = 4.5) =>
+    shortfalls(themes, ink, stack, floor).map((line) => line.slice(0, line.indexOf(':')));
+  for (const ground of GROUNDS) {
+    assert.ok(short('--fab-success', [ground]).includes('foundry-native'), ground);
+  }
+  assert.deepEqual(short('--fab-success', ['--fab-bg-2'], 3), ['foundry-native']);
+});
+
+test('no role face draws a ring of its own, so the button keeps the accent ring 2px clear', () => {
   const faces = screen.filter((rule) =>
     splitSelectorList(rule.selector).some((part) =>
-      /^\.fabricate-button\..*\.is-(?:accent|urgent)-action\b/u.test(part)
+      /^\.fabricate-button\..*\.is-(?:accent|urgent|confirm)-action\b/u.test(part)
     )
   );
   assert.deepEqual(
@@ -99,7 +113,9 @@ test('neither face draws a ring of its own, so the button keeps the accent ring 
       ['border-color', 'color', 'background'],
       ['border-color', 'color', 'background'],
       ['border-color', 'color', 'background'],
+      ['border-color', 'color', 'background'],
+      ['border-color', 'color', 'background'],
     ],
-    'the accent and urgent faces at rest and under the pointer'
+    'the accent, urgent and confirm faces at rest and under the pointer'
   );
 });

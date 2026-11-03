@@ -984,6 +984,19 @@
   background: var(--fab-accent-hover);
 }
 
+/* The `confirm` role (issue 2890): the confirming verb that is not its screen's commit, outlined in the success family; the success text and strong rungs, because `--fab-success` falls short as its label and edge in foundry-native. */
+.fabricate-button.fabricate-button.is-confirm-action:not(:disabled) {
+  border-color: var(--fab-success-strong);
+  color: var(--fab-success-text);
+  background: transparent;
+}
+
+.fabricate-button.fabricate-button.is-confirm-action:not(:disabled, [aria-disabled='true']):hover {
+  border-color: var(--fab-success-strong);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
 /* The pressed face (issue 2852): `pressed: true` writes `is-pressed` beside `aria-pressed`, so a caller's hand-written `aria-pressed` keeps the face it drew. It is a solid accent tile in the ink drawn on the accent, so it differs from the keyboard ring, an outline 2px clear of the edge, by a fill that clears 3:1 against the unpressed face and every ground a button is mounted on. At (0,6,0) at rest and (0,7,0) under the pointer it outranks every role's face whatever the import order, so a pressed toggle loses its role's own colours. */
 .fabricate-button.fabricate-button.fabricate-button.fabricate-button.is-pressed:not(:disabled) {
   border-color: var(--fab-accent);

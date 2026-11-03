@@ -805,8 +805,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
   // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
-  // the forms specimen (issue 2853) and the companion forms specimens' roles (issue 2841), and the
-  // three that mount it with and without a Fabricate root above its target (issue 2456).
+  // the forms specimen (issue 2853), the companion forms specimens' roles (issue 2841) and the
+  // confirm role and tinted cards (issues 2890, 2898), and the three that mount it with and without
+  // a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
@@ -817,6 +818,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-companion-forms-specimen',
     'manager-published-companion-forms-accent-focus',
     'manager-published-companion-forms-urgent-focus',
+    'manager-published-button-roles-specimen',
+    'manager-published-button-roles-confirm-focus',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
