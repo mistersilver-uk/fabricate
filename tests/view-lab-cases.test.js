@@ -10097,6 +10097,67 @@ test('the option cards specimen case presses ArrowRight on the group the fixture
   );
 });
 
+test('the manual option cards case presses ArrowRight on the manual group the fixture mounts beneath the first', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedOptionCards.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mountGroup' &&
+        node.arguments[1]?.type === 'ObjectExpression' &&
+        node.arguments[1].properties.some(
+          (property) => property.key?.name === 'activation' && property.value?.value === 'manual'
+        )
+    ),
+    'the fixture mounts a group with activation manual'
+  );
+  for (const hook of [
+    'data-lab-option-cards-manual',
+    'data-lab-option-cards-manual-target',
+    'data-lab-option-cards-manual-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-option-cards-manual'
+  );
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [
+      [
+        `${LAB_MANUAL_FIELDSET} [data-radio-card-option="breakable"] input[type="radio"]`,
+        'ArrowRight',
+      ],
+    ],
+    'one ArrowRight on the manual group’s checked Breakable radio'
+  );
+  assert.ok(
+    expectSelector.includes(':not([data-lab-option-cards-manual-chosen])'),
+    'the case waits on the absence of the echo only onChange writes'
+  );
+  assert.deepEqual(
+    expectLayout.controls,
+    BASE_NON_VERB_CONTROLS['manager-published-option-cards-manual'],
+    'the case measures the ring, the checked edge and the chosen border'
+  );
+  const options = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'OPTIONS').init.arguments[0].elements;
+  assert.deepEqual(
+    options
+      .map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value)
+      .slice(0, 2),
+    ['breakable', 'immune'],
+    'Immune is the next enabled option after Breakable'
+  );
+});
+
 test('the segmented specimen case presses ArrowRight on the filter the fixture mounts through the seam', () => {
   const FIXTURE = 'tests/view-lab/fixtures/PublishedSegmented.svelte';
   const { instance, fragment } = componentAstOf(FIXTURE);

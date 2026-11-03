@@ -2382,7 +2382,8 @@ export const CASES = Object.freeze([
     steps: [{ selector: manualRadio('breakable'), press: 'ArrowRight' }],
     // Focus on the unchecked Immune radio, Breakable still chosen, and no echo, which only
     // `onChange` writes.
-    expectSelector: `${MANUAL_GROUND}:not([data-lab-option-cards-manual-chosen]):has(${manualCard('breakable').slice(MANUAL_GROUND.length + 1)}.is-active input[type="radio"]:checked) ${manualCard('immune').slice(MANUAL_GROUND.length + 1)}:not(.is-active) input[type="radio"]:not(:checked):focus-visible`,
+    expectSelector:
+      '[data-lab-option-cards-manual]:not([data-lab-option-cards-manual-chosen]) > [data-lab-option-cards-manual-target] > fieldset:has([data-radio-card-option="breakable"].is-active input[type="radio"]:checked) [data-radio-card-option="immune"]:not(.is-active) input[type="radio"]:not(:checked):focus-visible',
     expectCenterHit: manualCard('immune'),
     expectContained: [
       { container: MANUAL_GROUND, target: MANUAL_TARGET },
