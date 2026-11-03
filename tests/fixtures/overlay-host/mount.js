@@ -63,11 +63,14 @@ function buildHost() {
     return scroller;
   }
 
+  // `?frameWidth=<px>` narrows the window and `?frameTransform=<css>` transforms it, as Foundry's
+  // scaling of a window does.
   const frameStyles = {
     left: `${frameLeft}px`,
     top: `${frameTop}px`,
-    width: '900px',
+    width: `${params.get('frameWidth') ?? 900}px`,
     height: '520px',
+    transform: params.get('frameTransform') ?? '',
   };
 
   if (hostKind === 'app') {

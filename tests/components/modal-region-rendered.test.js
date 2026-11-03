@@ -7,8 +7,9 @@
  * not `position: relative`, nor `container-type: inline-size` as the Manager's root sets) and
  * otherwise in the viewport,
  * sits above a companion layer of lower `z-index`, keeps its height cap from the viewport rather
- * than the region, and, where the region is the containing block, takes its width cap from the
- * region: 48px short of the region's width, the close control inside it.
+ * than the region, and, where the region (or a transformed window) is the containing block, takes
+ * its width cap from it: 48px short of its padding box, the close control inside it, past the
+ * browser window where the region is wider and with no content width where it is 48px or less.
  * Limit: Chromium only; Font Awesome's webfonts are not loaded, so the glyph's own box is unmeasured.
  */
 import assert from 'node:assert/strict';
@@ -30,11 +31,11 @@ after(async () => {
 });
 
 /** The fixture with the dialog open over the sheet in `layer(modules)`, with `query` appended. */
-async function openDialog(query, viewport) {
+async function openDialog(query, viewport, host = 'app') {
   const page = await fixtureServer.newPage({ viewport });
   await page.goto(
     fixtureServer.url(
-      `/tests/fixtures/overlay-host/index.html?host=app&component=modal&layer=modules&frameLeft=40&frameTop=40${query}`
+      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal&layer=modules&frameLeft=40&frameTop=40${query}`
     ),
     { waitUntil: 'load' }
   );
@@ -47,14 +48,17 @@ async function openDialog(query, viewport) {
 }
 
 /** Runs `read` against a page opened with `query`, closing the page after. */
-async function inFixture(query, read, viewport = DESKTOP) {
-  const page = await openDialog(query, viewport);
+async function inFixture(query, read, viewport = DESKTOP, host = 'app') {
+  const page = await openDialog(query, viewport, host);
   try {
     return await page.evaluate(read);
   } finally {
     await page.close();
   }
 }
+
+const TOO_NARROW = Object.freeze({ width: 520, height: 800 });
+const near = (actual, expected) => Math.abs(actual - expected) <= 1;
 
 const dialogWidth = () =>
   document.querySelector('[data-manager-modal]').getBoundingClientRect().width;
@@ -83,12 +87,13 @@ describe('the Modal width rungs', () => {
 function againstRegion() {
   const box = (element) => element.getBoundingClientRect().toJSON();
   const dialog = box(document.querySelector('[data-manager-modal]'));
-  const region = box(document.querySelector('[data-region]'));
+  const element = document.querySelector('[data-region]');
+  const region = box(element);
   const close = box(document.querySelector('[data-manager-modal-close]'));
   return {
     width: dialog.width,
-    left: dialog.left - region.left,
-    right: region.right - dialog.right,
+    left: dialog.left - (region.left + element.clientLeft),
+    right: region.right - element.clientLeft - dialog.right,
     closeInside: close.left >= region.left && close.right <= region.right,
   };
 }
@@ -110,10 +115,10 @@ describe('the Modal width inside a region that is its containing block', () => {
           againstRegion
         );
         assert.equal(read.width, width);
-        assert.ok(
-          read.left >= 24 - 1 && read.right >= 24 - 1,
-          `margins ${read.left}, ${read.right}`
-        );
+        // The region's padding box is 2px (its border) narrower than its border box.
+        const capped = width === regionWidth - 2 - 48;
+        assert.ok(read.left >= 23.5 && read.right >= 23.5, `margins ${read.left}, ${read.right}`);
+        if (capped) assert.ok(near(read.left, 24) && near(read.right, 24), 'a 24px margin');
         assert.equal(read.closeInside, true, 'the close control is inside the region');
       });
     }
@@ -130,6 +135,54 @@ describe('the Modal width inside a region that is its containing block', () => {
       await page.close();
     }
   });
+});
+
+describe('the Modal width where the host is narrower or wider than the dialog can use', () => {
+  it('draws a host wider than the browser window at the host’s width, past the window', async () => {
+    const read = await inFixture(
+      '&region=contain&regionWidth=700&size=lg',
+      againstRegion,
+      TOO_NARROW
+    );
+    assert.equal(read.width, 620, 'min(620px, 698px − 48px), not the window’s 472px');
+  });
+
+  it('draws a host 48px wide or narrower with no content width, inside it', async () => {
+    for (const regionWidth of [50, 20]) {
+      const read = await inFixture(`&region=contain&regionWidth=${regionWidth}`, againstRegion);
+      assert.ok(read.width <= 2, `${regionWidth}px host: the borders alone, ${read.width}px`);
+    }
+  });
+
+  it('draws a 100px host’s dialog 50px wide', async () => {
+    const read = await inFixture('&region=contain&regionWidth=100', againstRegion);
+    assert.equal(read.width, 50);
+  });
+});
+
+describe('the Modal width in a window Foundry scales with a transform', () => {
+  const layoutWidth = () => document.querySelector('[data-manager-modal]').offsetWidth;
+
+  for (const host of ['app', 'manager']) {
+    it(`caps the dialog at the transformed ${host} window’s width less 48px, in the window’s own pixels`, async () => {
+      const read = await inFixture(
+        '&frameWidth=400&frameTransform=scale(0.75)&size=lg',
+        () => ({
+          layout: document.querySelector('[data-manager-modal]').offsetWidth,
+          drawn: document.querySelector('[data-manager-modal]').getBoundingClientRect().width,
+        }),
+        DESKTOP,
+        host
+      );
+      assert.equal(read.layout, 350, 'the frame’s 398px padding box less 48px');
+      assert.ok(near(read.drawn, 350 * 0.75), `drawn ${read.drawn}px`);
+    });
+
+    it(`leaves the dialog at its rung in the same ${host} window with no transform, where the viewport is its containing block`, async () => {
+      const read = await inFixture('&frameWidth=400&size=lg', layoutWidth, DESKTOP, host);
+      assert.equal(read, 620);
+    });
+  }
 });
 
 describe('the Modal header glyph', () => {
@@ -191,8 +244,6 @@ function placement() {
     ),
   };
 }
-
-const near = (actual, expected) => Math.abs(actual - expected) <= 1;
 
 describe('the Modal hosted in a companion region through the overlayHost option', () => {
   for (const kind of ['contain', 'transform']) {

@@ -375,9 +375,7 @@
     display: contents;
   }
 
-  /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28).
-     Its width is capped against the containing block of fixed content: the viewport, or a host that
-     is one (`contain: layout`, a `transform`). */
+  /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28). */
   .fabricate-modal {
     position: fixed;
     top: 50%;
