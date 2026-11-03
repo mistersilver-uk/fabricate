@@ -150,6 +150,35 @@ describe('the published Typeahead openOnEmpty, in Chromium', () => {
     });
   });
 
+  it('keeps a typed query’s list closed once the second Escape empties it, and lets a third through', async () => {
+    await within({ openOnEmpty: true }, async (page) => {
+      await page.evaluate(() => {
+        document.body.dataset.heard = '';
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') document.body.dataset.heard += 'Escape ';
+        });
+      });
+      await page.locator('input').focus();
+      await page.keyboard.type('cop');
+      await settled(page);
+      assert.equal((await page.evaluate(state)).rows, 1, 'the typed query lists its match');
+      await press(page, 'Escape');
+      await press(page, 'Escape');
+      const cleared = await page.evaluate(state);
+      assert.deepEqual([cleared.expanded, cleared.rows, cleared.focused], ['false', 0, true]);
+      assert.equal(await page.locator('input').inputValue(), '', 'the field is emptied');
+      assert.equal(await page.evaluate(() => document.body.dataset.heard), '', 'both stopped');
+      await press(page, 'Escape');
+      assert.equal(await page.evaluate(() => document.body.dataset.heard.trim()), 'Escape');
+      assert.deepEqual(await page.evaluate(() => globalThis.__typeahead.calls.query), [
+        'c',
+        'co',
+        'cop',
+        '',
+      ]);
+    });
+  });
+
   it('lists nothing on the empty field for the string true, which is not coerced', async () => {
     await within({ openOnEmpty: 'true' }, async (page) => {
       await press(page, 'Tab');

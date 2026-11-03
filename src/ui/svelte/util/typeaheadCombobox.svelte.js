@@ -32,6 +32,9 @@ class TypeaheadCombobox {
   #focused = $state(false);
   // The query a press elsewhere dismissed the list at, so typing a different one reopens it.
   #dismissedAt = $state(null);
+  // Under `openOnEmpty`, a choice or Escape's emptied query closed the list until focus, an edit or
+  // ArrowDown, so a query the caller writes, as `''` after a choice, does not reopen it.
+  #shut = $state(false);
   // The query a choice was made at, at which Enter commits nothing more until the query changes.
   #chosenAt = null;
   #cursor = $state({ query: '', index: -1 });
@@ -41,7 +44,8 @@ class TypeaheadCombobox {
   #open = $derived(
     this.#focused &&
       (this.#query !== '' || Boolean(this.#config.openOnEmpty)) &&
-      this.#dismissedAt !== this.#query
+      this.#dismissedAt !== this.#query &&
+      !(this.#shut && Boolean(this.#config.openOnEmpty))
   );
   #listed = $derived(this.#open && this.#count > 0);
   #active = $derived(
@@ -127,6 +131,7 @@ class TypeaheadCombobox {
     this.#input = event.currentTarget;
     this.#focused = true;
     this.#dismissedAt = null;
+    this.#shut = false;
   };
 
   #onInput = (event) => {
@@ -143,6 +148,7 @@ class TypeaheadCombobox {
   #choose(index) {
     this.#cursor = { query: '', index: -1 };
     this.#dismissedAt = this.#query;
+    this.#shut = true;
     this.#chosenAt = this.#query;
     this.#config.onChoose(index);
   }
@@ -185,7 +191,10 @@ class TypeaheadCombobox {
     event.stopPropagation();
     this.#cursor = { query: '', index: -1 };
     if (closes) this.#dismiss();
-    else this.#config.setQuery('');
+    else {
+      this.#shut = true;
+      this.#config.setQuery('');
+    }
   }
 
   // ArrowDown reopens a dismissed list at a blank query only under `openOnEmpty`, and activates no row.
@@ -215,6 +224,7 @@ class TypeaheadCombobox {
     if (event.key === 'ArrowDown' && this.#reopensEmpty()) {
       event.preventDefault();
       this.#dismissedAt = null;
+      this.#shut = false;
       return;
     }
     if (event.key === 'Enter' && this.#config.onEnterUnchosen) this.#onEnterUnchosen(event);

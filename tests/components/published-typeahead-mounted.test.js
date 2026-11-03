@@ -491,6 +491,76 @@ describe('the published Typeahead openOnEmpty', () => {
     assert.deepEqual(free, [], 'and reports nothing for the empty query');
   });
 
+  it('keeps a typed query’s list closed once a second Escape empties it, and lets a third through', () => {
+    const { input, type, queries } = mountTypeahead({ openOnEmpty: true }, { filter: wholeSet });
+    type('cop');
+    assert.ok(press(input(), 'Escape').defaultPrevented, 'the first Escape closes the list');
+    assert.ok(press(input(), 'Escape').defaultPrevented, 'the second empties the field');
+    assert.equal(input().value, '');
+    assert.deepEqual(queries.at(-1), ['', 'cop']);
+    assert.ok(!listboxIn(), 'the emptied query does not reopen the whole set');
+    assert.equal(input().getAttribute('aria-expanded'), 'false');
+    assert.ok(!press(input(), 'Escape').defaultPrevented, 'a third Escape passes on');
+    press(input(), 'ArrowDown');
+    assert.equal(rowsIn().length, REWARDS.length, 'ArrowDown reopens it');
+  });
+
+  for (const timing of ['synchronously', 'after onChange returns']) {
+    it(`stays closed after a choice whose companion empties the query ${timing}`, async () => {
+      let mounted;
+      const empty = () => mounted.update({ query: '' });
+      const { input, type, handle } = (mounted = mountTypeahead(
+        {
+          openOnEmpty: true,
+          onChange: () => {
+            if (timing === 'synchronously') empty();
+            else queueMicrotask(empty);
+          },
+        },
+        { filter: wholeSet }
+      ));
+      type('cop');
+      press(input(), 'ArrowDown');
+      press(input(), 'Enter');
+      await Promise.resolve();
+      flushSync();
+      assert.equal(handle.value('query'), '', 'the companion emptied the query');
+      assert.ok(!listboxIn(), 'and the whole set did not reopen');
+      assert.equal(document.activeElement, input(), 'with focus still in the field');
+      press(input(), 'ArrowDown');
+      assert.ok(Boolean(listboxIn()), 'ArrowDown reopens it');
+    });
+  }
+
+  it('opens over an error, beside a count, at each density, the shell unchanged', () => {
+    for (const density of ['default', 'toolbar', 'inline']) {
+      const { input, target, handle } = mountTypeahead(
+        {
+          openOnEmpty: true,
+          density,
+          error: 'Choose a scope from the list.',
+          countLabel: '3 scopes',
+        },
+        { filter: wholeSet }
+      );
+      focusOn(input());
+      assert.equal(rowsIn().length, REWARDS.length, `${density}: the whole set lists`);
+      assert.equal(input().getAttribute('aria-invalid'), 'true');
+      assert.equal(
+        target.querySelector('.fabricate-typeahead-error').textContent,
+        'Choose a scope from the list.'
+      );
+      assert.equal(target.querySelector('.fabricate-search-count').textContent, '3 scopes');
+      const shell = target.querySelector('.fabricate-search');
+      assert.equal(shell.classList.contains('is-density-toolbar'), density === 'toolbar');
+      assert.equal(shell.classList.contains('is-density-inline'), density === 'inline');
+      input().blur();
+      flushSync();
+      handle.destroy();
+      handles.splice(handles.indexOf(handle), 1);
+    }
+  });
+
   it('is refused by a Fabricate that predates it, which describes no openOnEmpty', () => {
     const older = seamOver(
       PUBLISHED_COMPONENT_MANIFEST.map((entry) => {
