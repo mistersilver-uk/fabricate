@@ -185,6 +185,7 @@ Start each sentence on its own line; never hard-wrap a single sentence across mu
 Headings and list items stay one per line as usual, and a multi-sentence list item still puts each sentence on its own line.
 A multi-sentence table cell keeps its sentences in the one cell, inside the markdownlint disable region described in Build & Test.
 Nothing re-wraps Markdown (Prettier skips it), so author it this way by hand.
+- Versioned docs and specs state behaviour, not provenance: never enumerate which issue or PR published a thing, because GitHub tracks the work.
 - How GitHub issue, PR, and comment bodies are wrapped is in [Commit conventions](CONTRIBUTING.md#commit-conventions), and when an existing document is reflowed is in [Markdown linting (markdownlint)](CONTRIBUTING.md#markdown-linting-markdownlint).
 
 ## Git Conventions
