@@ -3,7 +3,8 @@
  * 2814) on Fabricate's real Svelte runtime, through a fresh seam registered with the adapter's own
  * table: each density's track class, its removal on an `update`, the values outside the set, the
  * hint written as the segment's `data-tooltip-text` and never as a native `title`, its removal and
- * change on an `update`, the radio's name and the radiogroup's roles left as they were, and a hint
+ * change on an `update`, the radio's name and the radiogroup's roles left as they were, the hint
+ * published as the radio's `aria-describedby` through a hidden node outside the label, and a hint
  * that makes no `game.tooltip` call under keyboard focus.
  * Limit: happy-dom answers no `:focus-visible` and runs no radio arrow navigation, so the focus
  * clause only guards a future focus handler by asserting `game.tooltip` receives no call;
@@ -193,12 +194,7 @@ describe('an option title on the published SegmentedControl', () => {
     for (const { value, label } of OPTIONS) {
       assert.equal(segment(value).querySelector('.manager-segment-label').textContent, label);
       assert.equal(segment(value).textContent.trim(), label, 'the hint is not in the name text');
-      for (const name of [
-        'aria-label',
-        'aria-labelledby',
-        'aria-describedby',
-        'aria-description',
-      ]) {
+      for (const name of ['aria-label', 'aria-labelledby', 'aria-description']) {
         assert.ok(!radio(value).hasAttribute(name), `${value} radio has no ${name}`);
       }
     }
@@ -211,6 +207,70 @@ describe('an option title on the published SegmentedControl', () => {
     handle.destroy();
   });
 
+  it('describes each hinted radio by a hidden node outside its label, and an unhinted one by none', async () => {
+    const { handle, target, radio, segment } = mountControl();
+    await settle();
+    const described = (value) => {
+      const ids = radio(value).getAttribute('aria-describedby');
+      return ids === null ? null : target.ownerDocument.querySelector(`[id="${ids}"]`);
+    };
+    for (const { value, title } of OPTIONS.slice(0, 2)) {
+      const node = described(value);
+      assert.equal(node?.textContent, title, `${value} is described by its hint`);
+      assert.ok(node.hasAttribute('hidden'), `${value} description is hidden`);
+      assert.ok(!segment(value).contains(node), `${value} description is outside the label`);
+    }
+    assert.equal(radio('skip').getAttribute('aria-describedby'), null, 'no title, no description');
+    assert.equal(target.querySelectorAll('[hidden]').length, 2, 'a node only per hint');
+    for (const { value, label } of OPTIONS) {
+      assert.equal(segment(value).textContent.trim(), label, `${value} name text is its label`);
+      assert.ok(!radio(value).hasAttribute('aria-label'), `${value} name is not overridden`);
+    }
+    handle.destroy();
+  });
+
+  it('gives each mount and each option its own description id', async () => {
+    const first = mountControl();
+    const second = mountControl({}, fabricateTarget(targets));
+    await settle();
+    const ids = [first, second].flatMap(({ radio }) =>
+      ['warn', 'fail'].map((value) => radio(value).getAttribute('aria-describedby'))
+    );
+    assert.equal(new Set(ids).size, 4, ids.join(' '));
+    assert.ok(
+      ids.every((id) => id && !/\s/u.test(id)),
+      'one id token each'
+    );
+    first.handle.destroy();
+    second.handle.destroy();
+  });
+
+  it('keeps the description in step with the title on an update', async () => {
+    const { handle, props, radio, target } = mountControl();
+    await settle();
+    const text = () => {
+      const id = radio('warn').getAttribute('aria-describedby');
+      return id === null ? null : target.ownerDocument.querySelector(`[id="${id}"]`)?.textContent;
+    };
+    const restate = async (title) => {
+      const options = OPTIONS.map((option) =>
+        option.value === 'warn' ? { value: 'warn', label: 'Warn', title } : option
+      );
+      assert.equal(handle.update({ ...props, options }), true);
+      await settle();
+    };
+    await restate('Warn the player only');
+    assert.equal(text(), 'Warn the player only');
+    await restate(undefined);
+    assert.equal(text(), null);
+    assert.equal(radio('warn').getAttribute('aria-describedby'), null);
+    await restate('Back again');
+    assert.equal(text(), 'Back again');
+    await restate('  ');
+    assert.equal(radio('warn').getAttribute('aria-describedby'), null);
+    handle.destroy();
+  });
+
   it('writes the hint as text, never as markup', async () => {
     const hint = '<b>Bold</b> & "quoted"';
     const { handle, target, segment } = mountControl({
@@ -219,6 +279,7 @@ describe('an option title on the published SegmentedControl', () => {
     });
     await settle();
     assert.equal(segment('a').getAttribute('data-tooltip-text'), hint);
+    assert.equal(target.querySelector('[hidden]').textContent, hint);
     assert.equal(target.querySelector('b'), null);
     handle.destroy();
   });
@@ -232,6 +293,7 @@ describe('an option title on the published SegmentedControl', () => {
       await settle();
       assert.ok(!segment('a').hasAttribute('data-tooltip-text'), `title ${JSON.stringify(title)}`);
       assert.equal(target.querySelectorAll('[title]').length, 0);
+      assert.equal(target.querySelectorAll('[aria-describedby], [hidden]').length, 0);
       handle.destroy();
     }
   });
