@@ -41,10 +41,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-biome-colour-popover',
   ]),
   // The swatch strip (issue 2901): the inline strip in the world essence entry and the catalogue's
-  // bulk panel.
+  // bulk panel, its specimen mounted through the published seam, and the three frames that mount it
+  // with and without a Fabricate root above its target.
   'src/ui/svelte/components/TintSwatches.svelte': Object.freeze([
     'world-essence-entry-dirty',
     'world-essence-catalogue-bulk',
+    'manager-published-tint-swatches-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // Issue 1648: each run control maps to a state that actually renders it.
   'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([

@@ -55,6 +55,12 @@ const VARIANTS = Object.freeze({
   // and on a second.
   'manager-published-popover-specimen-foundry-native': 'manager-published-popover-specimen',
   'manager-published-popover-specimen-hearth-herb': 'manager-published-popover-specimen',
+  // Issue 2901: the published swatch strips, on the palette whose checked ring reads lowest on a
+  // tint and on a light one.
+  'manager-published-tint-swatches-specimen-foundry-native':
+    'manager-published-tint-swatches-specimen',
+  'manager-published-tint-swatches-specimen-hearth-herb':
+    'manager-published-tint-swatches-specimen',
   // Issues 2837 and 2863: the published thin tracks and neutral band on the palettes where their
   // inks and track read weakest.
   'manager-published-fill-bar-bands-specimen-foundry-native':
