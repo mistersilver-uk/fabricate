@@ -95,6 +95,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-typeahead-specimen',
     'manager-published-typeahead-no-match',
     'manager-published-typeahead-free-text',
+    'manager-published-typeahead-open-on-empty',
   ]),
   // The list and grid switch (issue 2412): the essence browser in each arrangement.
   'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([
@@ -527,6 +528,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The group mounted through the published seam, keyboard-chosen (issue 2601), and the three
     // that mount it with and without a Fabricate root above its target (issue 2679).
     'manager-published-option-cards-specimen',
+    // The manual group beneath it, whose arrow key moves focus alone (issue 2889).
+    'manager-published-option-cards-manual',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-in-window',
@@ -659,10 +662,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // body visible is the only state in which the control is more than a chevron.
   'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
-  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), the two specimens
-  // that mount it through the published seam open its list in an overlay host and on the
-  // standalone layer (issue 2454), and the four that mount it with and without a Fabricate root
-  // above its target, one with its list open (issue 2680).
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), the three specimens
+  // that mount it through the published seam open its list in an overlay host, on the standalone
+  // layer (issue 2454) and on a layer inside a modal dialog (issue 2884), its filled triggers (issue 2904), and the four that mount it
+  // with and without a Fabricate root above its target, one with its list open (issue 2680).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
@@ -670,6 +673,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
+    'manager-published-select-fill-specimen',
+    'manager-published-select-modal-dialog',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-select-open',

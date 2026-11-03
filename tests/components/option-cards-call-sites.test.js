@@ -251,6 +251,14 @@ test('every render site passes value, groupName, onChange and a legend, and only
   }
 });
 
+test('no render site passes activation, so every in-app group keeps the automatic keys (issue 2889)', () => {
+  assert.ok(SITES.length > 0, 'the render sites were read');
+  const manual = SITES.filter(({ node }) =>
+    node.attributes.some((attribute) => attribute.name === 'activation')
+  ).map(({ where }) => where);
+  assert.deepEqual(manual, []);
+});
+
 test('every catalogue row renders the group directly with the required props, all declared', () => {
   assertFloor('RadioCardGroup catalogue rows', ROWS.length, 2);
   for (const { file, index, row } of ROWS) {

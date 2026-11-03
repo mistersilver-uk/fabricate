@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>RadioCardGroup — manual activation on the real runtime</title>
+    <!--
+      Served by `tests/components/radio-card-group-manual-rendered.test.js` from a Vite dev
+      server, so `mount.js` mounts the REAL `RadioCardGroup` through the real published seam (issue
+      2889): what a key press calls and where focus goes are what its script and the platform do
+      at runtime, which static markup cannot show.
+    -->
+    <link rel="stylesheet" href="/@radio-card-manual-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="./mount.js"></script>
+  </body>
+</html>

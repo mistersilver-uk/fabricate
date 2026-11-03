@@ -2,7 +2,8 @@
   A View Lab specimen, not a Fabricate surface (issue 2860). It mounts five `Typeahead`s through
   the page-session seam `game.fabricate.api.ui` binds, as a companion does: each companion holds its
   own query, hands the list the rewards whose name holds it, and draws the text naming the field
-  above it. Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js`
+  above it; the Scope field passes `openOnEmpty` and searches three parties, the whole set listed for
+  a blank query (issue 2885). Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js`
   mounts it for `?specimen=published-typeahead` only.
 
   The ground is two 320px columns on `--fab-bg-1`, and the overlay host of every list, so a list
@@ -23,9 +24,21 @@
     { value: 'copper-wire', label: 'Copper wire', icon: 'fas fa-bolt' },
   ]);
 
-  /** Each section's key, its heading, its column, and its field's props. */
+  const PARTIES = Object.freeze([
+    { value: 'ironwrights', label: 'The Ironwrights', icon: 'fas fa-users' },
+    { value: 'moonsilver', label: 'Moonsilver Company', icon: 'fas fa-users' },
+    { value: 'wardens', label: 'Ashen Wardens', icon: 'fas fa-users' },
+  ]);
+
+  /** Each section's key, its heading, its column, its field's props, and the set it searches. */
   const FIELDS = Object.freeze([
-    ['scope', 'Scope', 'left', { density: 'toolbar', placeholder: 'Search parties' }],
+    [
+      'scope',
+      'Scope',
+      'left',
+      { density: 'toolbar', placeholder: 'Search parties', openOnEmpty: true },
+      PARTIES,
+    ],
     ['rule', 'Standing rule', 'left', { density: 'inline', placeholder: 'Search factions' }],
     ['bonus', 'Bonus reward', 'left', { error: 'Choose a reward from the list.' }],
     [
@@ -41,9 +54,11 @@
     ['reward', 'Reward', 'right', { value: 7, placeholder: 'Search rewards' }],
   ]);
 
-  const matching = (query) => {
+  // A blank query lists the whole set only for a field that passes `openOnEmpty`.
+  const matching = (set, query, whole) => {
     const needle = String(query).trim().toLowerCase();
-    return needle ? REWARDS.filter(({ label }) => label.toLowerCase().includes(needle)) : [];
+    if (!needle) return whole ? set : [];
+    return set.filter(({ label }) => label.toLowerCase().includes(needle));
   };
 
   let ground = $state(null);
@@ -53,12 +68,12 @@
   $effect(() => {
     if (!ground || FIELDS.some(([key]) => !targets[key])) return undefined;
     const { mount } = publishedComponentSeam.publicApi;
-    const handles = FIELDS.map(([key, label, , extra]) => {
+    const handles = FIELDS.map(([key, label, , extra, set = REWARDS]) => {
       let query = '';
       let handle;
       const props = () => ({
         ariaLabel: label,
-        options: matching(query),
+        options: matching(set, query, extra.openOnEmpty === true),
         onChange: (value) => ground.setAttribute(`data-lab-typeahead-${key}-chosen`, value),
         // The companion takes the text as its reward and empties the field, which closes its line.
         onFreeText: (text) => {
