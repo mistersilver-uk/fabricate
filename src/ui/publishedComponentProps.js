@@ -299,7 +299,8 @@ const namedTextKeys = (entry) =>
  * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
  * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
  * names is truthy (issue 2452). A waived key holding a blank string is dropped from the copy, so
- * the component draws its waived form (issue 2858).
+ * the component draws its waived form (issue 2858). A key whose `waivedWhen` names a key holding
+ * `true` is never refused as empty.
  */
 function assertRequired(entry, copy) {
   const named = namedTextKeys(entry);
@@ -307,6 +308,7 @@ function assertRequired(entry, copy) {
     if (isBlankWaived(spec, copy[key], copy)) copy[key] = undefined;
     const blank = named.has(key) && typeof copy[key] === 'string' && !isNonBlank(copy[key]);
     if (!blank && copy[key] !== undefined && copy[key] !== '') continue;
+    if (spec.waivedWhen !== undefined && copy[spec.waivedWhen] === true) continue;
     if (spec.required === true) {
       assertRequiredKey(entry, key, spec.waivedBy, copy);
       continue;

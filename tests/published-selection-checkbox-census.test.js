@@ -25,8 +25,8 @@ const COMPONENT = 'src/ui/svelte/components/SelectionCheckbox.svelte';
 
 /**
  * The published box's label wrapper: the classes `disabled` and `label` write beside it, and the
- * one Fabricate card a rule lays a wrapper out under. No published key draws the decorative or
- * bare form, which draw no wrapper.
+ * one Fabricate card a rule lays a wrapper out under. No published key draws the bare form, which
+ * draws no wrapper; the decorative form draws none either, and `BOX` holds its root.
  */
 const CHECKBOX = Object.freeze({
   root: 'fab-selection-checkbox',
@@ -34,6 +34,20 @@ const CHECKBOX = Object.freeze({
   ancestors: new Set(['fab-library-card']),
   drawsChildren: true,
   disables: true,
+  undrawn: new Set(),
+});
+
+/**
+ * The published decorative box (issue 2881), the box alone at the root: the classes `density`,
+ * `checked`, `indeterminate` and `tone` write beside it, and the two Fabricate hosts whose rules
+ * name it, each beside its input, which a decorative box never draws.
+ */
+const BOX = Object.freeze({
+  root: 'fab-selection-check',
+  writable: new Set(['is-sm', 'is-md', 'is-lg', 'is-checked', 'is-indeterminate', 'is-success']),
+  ancestors: new Set(['manager-import-mapping-match', 'fab-bulk-selection-all']),
+  drawsChildren: false,
+  disables: false,
   undrawn: new Set(),
 });
 
@@ -67,10 +81,12 @@ describe('the module sheet and every component style against the published Selec
           'ariaLabel',
           'onChange',
           'aria-describedby',
+          'decorative',
+          'tone',
         ],
         'fabricate',
       ],
-      'a published wrapper, decorative form or class reopens the census'
+      'a published wrapper or class reopens the census'
     );
   });
 
@@ -97,6 +113,33 @@ describe('the module sheet and every component style against the published Selec
     for (const name of CHECKBOX.writable)
       assert.ok(tokens.has(name), `${COMPONENT} spells ${name}`);
   });
+});
+
+describe('the module sheet and every component style against the published decorative box', () => {
+  it('names the box in two selectors, each under a Fabricate host, and reaches it through none', () => {
+    const shipped = shippedCensus(BOX, 'SelectionCheckbox');
+    assert.deepEqual(writtenOf(shipped), [
+      'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte: .fab-bulk-selection-all :global(.fab-selection-input:focus-visible + .fab-selection-check)',
+      'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte: .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check)',
+    ]);
+    assert.deepEqual(reachingOf(shipped), []);
+  });
+
+  it('spells every class it writes on the box', () => {
+    const tokens = new Set(
+      spelledStrings(COMPONENT, SHIPPED).flatMap((spelled) => spelled.split(/\s+/))
+    );
+    for (const name of BOX.writable) assert.ok(tokens.has(name), `${COMPONENT} spells ${name}`);
+  });
+
+  for (const selector of ['.fab-selection-check', '.fabricate .fab-selection-check.is-success']) {
+    it(`refuses ${selector}, which nothing keeps off a published decorative box`, () => {
+      const css = `${selector} { gap: 0 }`;
+      assert.deepEqual(writtenOf(reachingOf(syntheticCensus(BOX, css))), [
+        `sheet.css: ${selector}`,
+      ]);
+    });
+  }
 });
 
 describe('the selection checkbox census, synthetic', () => {

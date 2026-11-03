@@ -8,7 +8,8 @@
   | --- | --- | --- | --- |
   | `checked` / `indeterminate` / `disabled` | booleans | `false` | The three input states. `indeterminate` is a DOM PROPERTY, not an attribute, so it is applied through an effect rather than markup — written in markup it would do nothing at all, silently. |
   | `density` | `'compact'` \| `'default'` \| `'comfortable'` | `'default'` | 16px, 20px and 22px border-box squares, all at radius 6. Each box is declared, never derived: a scale that multiplied one number would make the shipped 16px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
-  | `decorative` | boolean | `false` | Draws the box ALONE, `aria-hidden` and with no input, for a host element that already carries the checked state itself: a multi-select picker row announces it with `aria-selected`, and an input inside that row would nest one control in another. `wrapper`, `ariaLabel`, `onChange` and the rest spread do nothing in this form. |
+  | `decorative` | boolean | `false` | Only `true` draws the box ALONE, `aria-hidden` and with no input, for a host element that already carries the checked state itself: a multi-select picker row announces it with `aria-selected`, a companion's pressable row with `aria-pressed`, and an input inside that row would nest one control in another. `wrapper`, `label`, `ariaLabel`, `disabled`, `onChange` and the rest spread do nothing in this form (issue 2881). |
+  | `tone` | `'default'` \| `'success'` | `'default'` | `success` fills a ticked box that is not mixed with the success family, for a done row; any other value draws the accent. The tick, not the colour, carries the state (issue 2881). |
   | `wrapper` | `'label'` \| `'contents'` | `'label'` | `label` renders a `<label>` around the input and box, for a host whose action group would otherwise leave the visible box with no label association and no click target. `contents` renders the two as bare siblings, for a host whose OWN root is a `<label>` — nesting labels is invalid HTML and an ambiguous click target. |
   | `ariaLabel` / `element` | already-localized string / bindable | `''` / `null` | The accessible name — this is an import-free leaf — and the real input, exposed so a host can manage focus, since it is visually hidden and cannot be reached by query without reaching through this component's internals. |
   | `label` | snippet | `undefined` | Visible text drawn after the box inside the `label` wrapper, wrapping beside it, which names the input; `contents` and `decorative` ignore it (issue 2836). |
@@ -35,6 +36,7 @@
     density = 'default',
     wrapper = 'label',
     decorative = false,
+    tone = 'default',
     ariaLabel = '',
     label = undefined,
     onChange = () => {},
@@ -53,6 +55,7 @@
 
   const mixed = $derived(indeterminate === true);
   const glyph = $derived(mixed ? 'fas fa-minus' : 'fas fa-check');
+  const done = $derived(tone === 'success' && Boolean(checked) && !mixed);
 
   $effect(() => {
     if (input) input.indeterminate = mixed;
@@ -87,11 +90,12 @@
     class="fab-selection-check {sizeClass}"
     class:is-checked={checked}
     class:is-indeterminate={mixed}
+    class:is-success={done}
     aria-hidden="true"><i class={glyph}></i></span
   >
 {/snippet}
 
-{#if decorative}
+{#if decorative === true}
   {@render box()}
 {:else if wrapper === 'contents'}
   {@render control()}
@@ -184,6 +188,12 @@
 
   .fab-selection-check.is-sm.is-checked {
     color: var(--fab-on-accent);
+  }
+
+  .fab-selection-check.is-checked.is-success {
+    border-color: var(--fab-success-strong);
+    background: var(--fab-success);
+    color: var(--fab-on-success);
   }
 
   .fab-selection-check.is-indeterminate {

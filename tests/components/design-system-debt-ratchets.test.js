@@ -1457,6 +1457,12 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     `${COMPONENTS}/SelectionCheckbox.svelte`,
+    '.fab-selection-check.is-checked.is-success',
+    'var(--fab-success)',
+    'the ticked success box, `.k-cb.done i`, for a done row (issue 2881)',
+  ],
+  [
+    `${COMPONENTS}/SelectionCheckbox.svelte`,
     '.fab-selection-check:is(.is-sm, .is-md, .is-lg):is(.is-checked, .is-indeterminate)',
     'highlight',
     'under forced colours a ticked or mixed box is the reader’s Highlight (issue 2836)',
