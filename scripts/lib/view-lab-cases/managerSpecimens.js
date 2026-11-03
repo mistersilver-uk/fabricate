@@ -1635,7 +1635,8 @@ export const CASES = Object.freeze([
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
-  managerCase({    id: 'manager-published-select-modal-dialog',
+  managerCase({
+    id: 'manager-published-select-modal-dialog',
     label:
       'Specimen, mounted through the published seam — a select inside a dialog opened with showModal(), as a DialogV2 with modal: true is, after one step: a press on its trigger, which passed no overlay host, so its list opened on a standalone layer inside the dialog, drawn above the page in the browser’s top layer, where it takes the pointer, rather than under the dialog, where it would be inert. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order, and extends past the dialog’s own edge unclipped. The frame draws inside the manager window',
     // Beyond the smoke: a companion mounts it through `api.ui` in its own modal dialog.
