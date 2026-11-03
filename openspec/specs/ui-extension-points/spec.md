@@ -2391,7 +2391,7 @@ Each group states the accepted values of every key that entry publishes.
   - `onChange` is a required callback, called with one argument, the chosen row's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses a row by pointer or by Enter on the active row, the current row included.
     It is not called by `mount`, `update`, typing, opening or closing the list, Escape, Tab, a press outside the list or Enter with no row active.
     The typeahead changes nothing itself on a choice: the query and `value` stay as they were, and the companion passes what it keeps through `update`, as `query: ''` to empty the field after a choice.
-    A choice closes the list until the query is edited again, and Enter at that query then commits nothing more.
+    A choice closes the list until the query is edited again, and Enter at that query then commits nothing more; under `openOnEmpty` it stays closed until the user edits the query, focus comes back to the input or ArrowDown on a blank query opens it, so a query the companion passes through `update` after the choice, as `query: ''`, synchronously or later, does not reopen it.
   - `ariaLabel` is required and names the input and its list, final display text naming what is searched, as "Find a reward".
     The typeahead draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the field with no name.
   - `placeholder` is optional final display text shown while the field is empty, and is not the field's name.
@@ -2428,7 +2428,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape while the list or its empty line is shown closes it and keeps the text.
     Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
     Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
-    Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+    Escape on an empty query passes untouched, so a DialogV2 that listens for it closes. Under `openOnEmpty` the list stays closed at the query Escape emptied, so the sequence on a typed query is close, empty, then pass on, and an edit, focus coming back to the input or ArrowDown opens it again.
     Tab and Shift+Tab move focus as the browser does and close the list without a choice, and a companion's listener above `target` hears the Tab.
     No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
     A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
