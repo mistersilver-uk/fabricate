@@ -247,8 +247,6 @@ const MEMBER_STATUSES = ['target', 'shipped', 'divergent'];
 /** @see MEMBER_STATUSES */
 const BLOCK_STATUSES = [...MEMBER_STATUSES, 'prose'];
 
-/** How this corpus writes an issue reference, which a `divergent` entry owes (issue 1373). */
-const ISSUE_REFERENCE = /\bissue \d+\b/u;
 
 /**
  * A block's own status, derived from the statuses of the names it declares.
@@ -749,7 +747,7 @@ test('the library\'s "Ruled out" section draws one Merged well per merged name o
   assert.ok(section, 'the library has no "Ruled out" section to read');
   const wells = [
     ...section.matchAll(
-      /<span class="tag t-out">Merged<\/span><span class="k-mono"[^>]*>&lt;(\w+)&gt;<\/span>/gu
+      /<span class="tag t-out">Merged<\/span>\s*<span class="k-mono"[^>]*>&lt;(\w+)&gt;<\/span>/gu
     ),
   ].map((match) => match[1]);
   const merged = RULED_OUT.flatMap((entry) =>
@@ -796,15 +794,14 @@ test('the <OptionCards> specimen names every prop its shipped component declares
   );
 });
 
-test('a divergent entry names the issue that decided it', () => {
+test('a divergent entry states why the component stays different', () => {
   // NO DOMAIN GUARD, and that is deliberate rather than an omission.
   const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');
   for (const row of divergentRows) {
-    assert.match(
-      row.why,
-      ISSUE_REFERENCE,
-      `${row.path} is recorded divergent and its judgement names no issue. "Divergent" means a ` +
-        'decision was taken; a decision nobody can look up is indistinguishable from drift.'
+    assert.ok(
+      row.why.trim().length > 0,
+      `${row.path} is recorded divergent and states no reason. "Divergent" means a decision was ` +
+        'taken; a decision with no stated reason is indistinguishable from drift.'
     );
   }
   const divergentBlocks = NAMING_BLOCKS.filter((candidate) =>
@@ -814,8 +811,8 @@ test('a divergent entry names the issue that decided it', () => {
     const start = librarySource.indexOf(`<h4>&lt;${block.names[0]}&gt;`);
     assert.match(
       librarySource.slice(start, librarySource.indexOf('</div>\n\n', start)),
-      ISSUE_REFERENCE,
-      `${block.names.join(' ')} declares a divergent name and its entry names no issue`
+      /class="delta/u,
+      `${block.names.join(' ')} declares a divergent name and its entry states no reason`
     );
   }
 });

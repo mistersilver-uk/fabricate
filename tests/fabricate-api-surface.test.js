@@ -198,28 +198,28 @@ function documentedComponentSections() {
  */
 function specifiedComponentGroups() {
   const groups = [
-    '2448',
-    '2451',
-    '2452',
-    '2453',
-    '2454',
-    '2455',
-    '2601',
-    '2644',
-    '2646',
-    '2647',
-    '2652',
-    '2656',
-    '2784',
-    '2775',
-    '2836',
-    '2862',
-    '2860',
-    '2861',
-  ].flatMap((issue) => {
-    const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
+    'Avatar, Medallion, FillBar, Meter, BandedBar, StatBox and InfoStrip',
+    'Kicker, Chip, Rail, InspectorCard, EmptyState and Notice',
+    'Button, StatusToggle and Stepper',
+    'SearchField',
+    'Select',
+    'StageBars',
+    'Field, Well, Callout, IconButton, EditorTabs and RadioCardGroup',
+    'SegmentedControl',
+    'Pagination',
+    'IconPicker',
+    'ActionMenu',
+    'Modal',
+    'ListRow',
+    'ToggleCard',
+    'SelectionCheckbox',
+    'Disclosure',
+    'Typeahead',
+    'Popover',
+  ].flatMap((heading) => {
+    const start = SPECIFIED.indexOf(`\n### ${heading}\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
-    assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
+    assert.ok(start !== -1 && end !== -1, `the ${heading} heading, then another heading`);
     return SPECIFIED.slice(start, end)
       .split(/^- \*\*/mu)
       .flatMap((group) => {

@@ -62,14 +62,14 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-entity-edi
 
 Salvage, complications and difficulty stay the system's alone, because two systems SHOULD disagree about them and none of them has a world referent to disagree about.
 Recipes, Tools, salvage definitions, and gathering results reference components by Fabricate component identity, not by raw Foundry Item identity.
-A component's `componentId` was historically both a within-system identity and the cross-system reference target Tools pointed at; issue 561 gave Tools their own identity, relieving `componentId` of the reference role.
-Issue 570 then made `CraftingSystemExporter.prepareForImport(…, 'copy')` regenerate every component id and remap every within-payload component reference, closing the copy-import id-collision residual.
-Component ids remain per-system-unique only (independently-authored systems and worlds that copy-imported before issue 570 can still share ids), so `componentId`'s within-system identity role and the `roles[systemId]` scoping stay load-bearing.
+A component's `componentId` is a within-system identity, and Tools carry an identity of their own rather than referencing it.
+`CraftingSystemExporter.prepareForImport(…, 'copy')` regenerates every component id and remaps every within-payload component reference, so a copy import cannot collide ids.
+Component ids remain per-system-unique only (independently-authored systems, and systems copy-imported by a Fabricate that did not regenerate ids, can still share ids), so `componentId`'s within-system identity role and the `roles[systemId]` scoping stay load-bearing.
 When import sees a broken recorded compendium/source UUID, the component uses the live dropped Item UUID as its primary source and keeps the broken UUID in `aliasItemUuids`.
-That broken UUID is never a find-existing or adoption reference, so Items sharing one unresolvable entry become separate components (issue 2246).
+That broken UUID is never a find-existing or adoption reference, so Items sharing one unresolvable entry become separate components.
 The import withholds that alias when another component of its system, or a World Component other than the one it adopts, already claims it, compared without a pack uuid's document-type segment, and still reports the fallback it took.
 The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback, and replace-source is not excepted.
-**AN IMPORTED COMPONENT IS REGISTERED AS A WORLD COMPONENT ITS SYSTEM HOLDS** (issue 2218): every path that brings an Item into a system — a single drop, a pack, a folder and its mapping commit, the Compendium Directory action and `addItemFromUuid` — also writes the world entity and the `(component, system)` membership record, in one `fabricate.componentScope` write per run issued after the run's `craftingSystems` write.
+**AN IMPORTED COMPONENT IS REGISTERED AS A WORLD COMPONENT ITS SYSTEM HOLDS**: every path that brings an Item into a system — a single drop, a pack, a folder and its mapping commit, the Compendium Directory action and `addItemFromUuid` — also writes the world entity and the `(component, system)` membership record, in one `fabricate.componentScope` write per run issued after the run's `craftingSystems` write.
 The in-system record's id IS the world entity's id, so a record that ADOPTS an existing **World Component** takes that entity's id instead of minting one, and two systems that import one Item share one id for it.
 That does not make ids world-unique: an id match alone binds nothing, and a component whose id a world entity carries without sharing its source is left unregistered.
 `createItem` is not an import and registers nothing, and an Item embedded in an actor is imported as before and registers nothing.
@@ -83,11 +83,13 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-s
 The distinction the name exists to protect: the tag VOCABULARY is authored on the crafting system (`CraftingSystem.itemTags`) and the VALUES are authored on the managed component DEFINITION (`Component.tags`) — never on the Foundry item a character holds.
 Fabricate has five readers of `flags.fabricate.tags` and NO writer, so "what tags does this held item carry?" is answered by the UNION of the tags of the component the item resolves to and any item-level tag flag left by a third party or a hand-edited world.
 Every seam with system-component context takes that union; the model-only fallbacks that have none (`Ingredient.matches`, and the legacy bare `ingredient.tag` branch) read the flag alone and are reached only when no matcher is injected.
-Issue 1075 is the cautionary case: the browse row's material tally read the item flag alone, which is empty in every real world, so every tag ingredient reported unsatisfied and a row said "missing materials" beside an inspector saying "Available" — a premise checked against a fixture that stamped the flag, rather than against the code that writes the data.
 Gated by the system's `enableTags` feature.
 Distinct from **Recipe Category** and **Component Category**, which are single-valued grouping labels rather than a matching axis.
 
-Canonical mapping: `Component.tags` and `CraftingSystem.itemTags`; `tagsHandler.matchesItem` in `src/models/match/matchTypes.js`; `RecipeManager._matchesTagIngredient`; `tagsOf` in `src/systems/inventorySnapshot.js`
+Canonical mapping: `Component.tags` and `CraftingSystem.itemTags`.
+`tagsHandler.matchesItem` in `src/models/match/matchTypes.js`.
+`RecipeManager._matchesTagIngredient`.
+`tagsOf` in `src/systems/inventorySnapshot.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/destructive-changes-and-migrations/spec.md
 
@@ -95,7 +97,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/destructive-c
 
 `Recipe.getExecutionSteps()` returns the ordered steps (synthesizing one implicit step for a single-step recipe); the **first execution step** (entry, `[0]`) is where the player listing reads required materials and craftability, and the **terminal (final) execution step** is where it reads the recipe's product (PRODUCES).
 **Only the TERMINAL step must produce.**
-Every non-`failure` result group on the terminal step must hold at least one result; a result group on an earlier step MAY be empty, so an intermediate step can cost time, materials and a check while awarding nothing (issue 1907).
+Every non-`failure` result group on the terminal step must hold at least one result; a result group on an earlier step MAY be empty, so an intermediate step can cost time, materials and a check while awarding nothing.
 An empty intermediate group is AUTHORED DATA, never residue — the same standing the reserved `role: 'failure'` group has — so no strip, cascade or normalizer may prune it.
 `progressive` is the exception in both directions: `ResolutionModeService`'s `stepRequiresOrderedResults` still applies to EVERY progressive step, because a progressive stage IS what it awards.
 The **product step** is what every PRODUCT read resolves against (`CraftingListingBuilder._productStep`): terminal once a recipe runs more than one step, its only step otherwise, shared by the listing's PRODUCES row and the `routedByCheck` tier table so the two cannot disagree.
@@ -119,7 +121,17 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-mode
 
 It contains one or more Environment Tasks.
 
-Canonical mapping: Registered world setting `fabricate.gatheringEnvironments`; normalized and validated by `GatheringEnvironmentStore`; listed for players through viewer-enforcing `game.fabricate.listGatheringForActor()` backed by an internally constructed `GatheringEngine`; backend immediate resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap wiring, and global accessor facade implemented; GM admin editor supports environment fields, Environment Task list CRUD/base fields, selected Environment Task result-group/tool-reference (`toolIds`)/visibility-gate authoring (routed tasks carry no per-task result-selection provider as of 1.6.0; they resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`), progressive check/award-mode authoring, selected Environment Task time-requirement authoring, and selected Environment Task failure-outcome authoring through store-owned draft callbacks; save failures expose structured validation state and keep the dirty draft unpersisted; stale scene/macro references remain visible and preserved until changed; new environment shells remain disabled placeholders until configured and enabled; dirty draft discard confirmation protects navigation, replacement, and close; dedicated player app shell, app registration, Items Directory entry, active/history rows, terminal feedback surfaces, container-query responsive polish for narrow ApplicationV2 windows, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage implemented; live Foundry validation remains conditional for future runtime-specific or screenshot-required work
+Canonical mapping: Registered world setting `fabricate.gatheringEnvironments`.
+Normalized and validated by `GatheringEnvironmentStore`.
+Listed for players through viewer-enforcing `game.fabricate.listGatheringForActor()` backed by an internally constructed `GatheringEngine`.
+Backend immediate resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap wiring, and global accessor facade implemented.
+GM admin editor supports environment fields, Environment Task list CRUD/base fields, selected Environment Task result-group/tool-reference (`toolIds`)/visibility-gate authoring (routed tasks carry no per-task result-selection provider as of 1.6.0; they resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`), progressive check/award-mode authoring, selected Environment Task time-requirement authoring, and selected Environment Task failure-outcome authoring through store-owned draft callbacks.
+Save failures expose structured validation state and keep the dirty draft unpersisted.
+Stale scene/macro references remain visible and preserved until changed.
+New environment shells remain disabled placeholders until configured and enabled.
+Dirty draft discard confirmation protects navigation, replacement, and close.
+Dedicated player app shell, app registration, Items Directory entry, active/history rows, terminal feedback surfaces, container-query responsive polish for narrow ApplicationV2 windows, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage implemented.
+Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 Spec reference: openspec/specs/overview/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -127,7 +139,10 @@ Spec reference: openspec/specs/overview/spec.md, openspec/specs/gathering-and-ha
 
 These rules are authoritative once authored; existing worlds without a `rules` object may still read legacy per-task item selection, per-environment event selection, and per-environment event policy fields for compatibility.
 
-Canonical mapping: `gatheringConfig.systems[systemId].rules`; normalized by admin store and `GatheringRichStateService`; edited from Manager V2 Gathering Settings; runtime d100 resolution uses `highestRankedDrop`, `allDrops`, or `limitedDrops` for rewards and events, plus `successWithEvent` or `failureWithEvent` for event outcome
+Canonical mapping: `gatheringConfig.systems[systemId].rules`.
+Normalized by admin store and `GatheringRichStateService`.
+Edited from Manager V2 Gathering Settings.
+Runtime d100 resolution uses `highestRankedDrop`, `allDrops`, or `limitedDrops` for rewards and events, plus `successWithEvent` or `failureWithEvent` for event outcome
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-system-studio/spec.md
 
@@ -138,17 +153,37 @@ Geography is NOT a composition axis (geography is the first-class `GatheringReal
 Task-level availability gates decide whether the task can be attempted; drop rows define component or Item rewards, quantity, base drop chance, and per-drop time/weather modifiers.
 Persisted/imported drop rows must resolve to an owning-system component or a Foundry Item UUID.
 
-Canonical mapping: `gatheringConfig.systems[systemId].tasks`; normalized by `adminStore`; browsed and edited from Manager V2 Gathering Tasks; duplicated by `duplicateGatheringLibraryTask()` with fresh task/drop-row ids; import/seed/admin save boundaries reject stale reward targets
+Canonical mapping: `gatheringConfig.systems[systemId].tasks`.
+Normalized by `adminStore`.
+Browsed and edited from Manager V2 Gathering Tasks.
+Duplicated by `duplicateGatheringLibraryTask()` with fresh task/drop-row ids.
+Import/seed/admin save boundaries reject stale reward targets
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-gathering-app/spec.md
 
 ## Environment Task
 
 D100 reward and event row selection is owned by Gathering Rules rather than each Environment Task once system rules are authored.
-Result-group authoring currently edits group order/name and component-result `componentId`/`quantity`; tool authoring references existing system-owned library Tools by id (`toolIds`); visibility-gate authoring is formula-only (`formula` + `threshold`, no provider/macro); routed tasks carry **no** per-task result-selection provider (as of 1.6.0) and resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`, so there is no routed result-selection authoring on the task; progressive authoring currently edits `awardMode` and a formula-only `check` (`formula` + optional `threshold`, no provider/macro); time-requirement authoring clears `timeRequirement` for immediate tasks or edits duration units for timed tasks; failure-outcome authoring clears to default feedback or edits text/macro outcomes.
+Result-group authoring currently edits group order/name and component-result `componentId`/`quantity`.
+Tool authoring references existing system-owned library Tools by id (`toolIds`).
+Visibility-gate authoring is formula-only (`formula` + `threshold`, no provider/macro).
+Routed tasks carry **no** per-task result-selection provider (as of 1.6.0) and resolve via the system-level `gatheringCraftingCheck.routed.rollFormula`, so there is no routed result-selection authoring on the task.
+Progressive authoring currently edits `awardMode` and a formula-only `check` (`formula` + optional `threshold`, no provider/macro).
+Time-requirement authoring clears `timeRequirement` for immediate tasks or edits duration units for timed tasks.
+Failure-outcome authoring clears to default feedback or edits text/macro outcomes.
 Progressive gathering thresholds come from referenced component difficulty, not inline result difficulty.
 
-Canonical mapping: Normalized and validated by `GatheringEnvironmentStore`; selected Environment Task visibility gate edits use store-owned draft mutation only after both `formula` and `threshold` are present; incomplete visibility input is local UI state, not persisted model state; disabled draft shells skip routed/progressive completeness but still validate any present `failureOutcome`; validation errors are field-addressable and include result-group/result collection anchors; the check `threshold` is optional and distinct from the required visibility-gate threshold; failure-mode switching clears stale mode fields (routed gathering has no per-task result-selection provider to switch as of 1.6.0); listed with visibility and attemptability through viewer-enforcing global methods; scene/token, duplicate-run, tool, and other attemptability blockers keep otherwise visible entries listable with localized reasons; non-GM blind listings expose a generic action instead of real task identity; Environment Tasks without `timeRequirement` resolve routed/progressive terminal outcomes immediately, while Environment Tasks with `timeRequirement` create a guarded `waitingTime` run and are completed by the module-private `GatheringEngine.processWorldTime(worldTime)` dispatcher when mature
+Canonical mapping: Normalized and validated by `GatheringEnvironmentStore`.
+Selected Environment Task visibility gate edits use store-owned draft mutation only after both `formula` and `threshold` are present.
+Incomplete visibility input is local UI state, not persisted model state.
+Disabled draft shells skip routed/progressive completeness but still validate any present `failureOutcome`.
+Validation errors are field-addressable and include result-group/result collection anchors.
+The check `threshold` is optional and distinct from the required visibility-gate threshold.
+Failure-mode switching clears stale mode fields (routed gathering has no per-task result-selection provider to switch as of 1.6.0).
+Listed with visibility and attemptability through viewer-enforcing global methods.
+Scene/token, duplicate-run, tool, and other attemptability blockers keep otherwise visible entries listable with localized reasons.
+Non-GM blind listings expose a generic action instead of real task identity.
+Environment Tasks without `timeRequirement` resolve routed/progressive terminal outcomes immediately, while Environment Tasks with `timeRequirement` create a guarded `waitingTime` run and are completed by the module-private `GatheringEngine.processWorldTime(worldTime)` dispatcher when mature
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md
 
@@ -164,7 +199,9 @@ It is true for a legitimate wait (`routeGatedExecution`'s collapsed-chain gate o
 It stays false for a zero-mutation refusal and for the settled-failure returns (`resolveCheckFailure`, `resolveModeValidationFailure`, `runResolutionPreflight`).
 A false value there is not always observable: `runResolutionPreflight`'s refusal calls `completeStepFailure` after `_beginNativeStage` has already written a truthy `historySettlement` onto the run's in-progress step, so `_discardPhantomRun`'s own guard (no step carries a `historySettlement`) already withholds the discard regardless of `resolved`.
 
-Canonical mapping: `CraftingEngine._discardPhantomRun`; `CraftingEngine._openCraftContext`; `craftPipeline.js` (`routeGatedExecution`, `_startTimedStep`'s `abort`, `commitCraft`, `resolveCheckFailure`, `resolveModeValidationFailure`, `runResolutionPreflight`)
+Canonical mapping: `CraftingEngine._discardPhantomRun`.
+`CraftingEngine._openCraftContext`.
+`craftPipeline.js` (`routeGatedExecution`, `_startTimedStep`'s `abort`, `commitCraft`, `resolveCheckFailure`, `resolveModeValidationFailure`, `runResolutionPreflight`)
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
@@ -183,15 +220,17 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-s
 FINISH can use it after source items are deleted, and legacy cancellation can reverse actual spending rather than refunding a planned amount.
 Version-1 timed stages instead persist selection intent and defer editable-material and currency spending until execution.
 
-Canonical mapping: `CraftingRunManager.markStepPrepared`; `CraftingEngine._startTimedStep` / `reverseRunConsumption`; `CraftingRunStepState.preparedConsumption`
+Canonical mapping: `CraftingRunManager.markStepPrepared`.
+`CraftingEngine._startTimedStep` / `reverseRunConsumption`.
+`CraftingRunStepState.preparedConsumption`
 
 Spec reference: openspec/specs/data-models/spec.md
 
 ## Salvage Run
 
 It also carries the **Player Result Order** captured at start (`resultOrder`, a list of result ids) plus the `userId` of the user who started it — see **Result Order Asymmetry**.
-The capture is **live as of issue 675**: the player Inventory tab's salvage panel is the UI caller `CraftingEngine.salvage` never had, and its store writes the `salvage:<systemId>:<componentId>` order the run captures — so `resultOrder` now carries a real order on a real player run rather than `null` on every one.
-That surface IS the "future player salvage app" this mechanism was built for, and capturing at start is what stopped it inheriting the resume-race defect.
+The capture is **live**: the player Inventory tab's salvage panel is a UI caller of `CraftingEngine.salvage`, and its store writes the `salvage:<systemId>:<componentId>` order the run captures — so `resultOrder` carries a real order on a player run.
+Capturing at start keeps that surface clear of the resume race.
 
 Canonical mapping: `SalvageRunManager`
 
@@ -203,19 +242,26 @@ It exists because an **inventory row and a salvage are scoped to different thing
 So **a row's aggregated quantity is not a salvageability predicate**: a row reading 5 across three actors can still fail the engine's check if the target actor holds fewer than `ingredientQuantity`.
 This is latent rather than live only because `ingredientQuantity` is effectively always `1` (it defaults to `1`, no UI authors it, and only unit tests set it higher — so a true multi-actor split cannot occur today), which is why there is deliberately **no engine-side pooling and no shortfall-blocked UI state**.
 Anything that makes `ingredientQuantity` authorable re-opens this gap and must resolve it explicitly rather than by widening the row's quantity read.
-As of issue 766 a card can aggregate participations across crafting systems, so `salvage.targetActorId` and the salvageable owned quantity are computed **per participation** — over the participation's OWN contributing documents, not the card's cross-system union — and the store salvages the **selected** participation's `(systemId, componentId, targetActorId)`, never the primary.
+A card can aggregate participations across crafting systems, so `salvage.targetActorId` and the salvageable owned quantity are computed **per participation** — over the participation's OWN contributing documents, not the card's cross-system union — and the store salvages the **selected** participation's `(systemId, componentId, targetActorId)`, never the primary.
 
-Canonical mapping: `salvage.targetActorId` in `InventoryListingBuilder`; `CraftingEngine.salvage`/`CraftingEngine.findComponentItems`; `game.fabricate.salvageComponent` (`actorId`)
+Canonical mapping: `salvage.targetActorId` in `InventoryListingBuilder`.
+`CraftingEngine.salvage`/`CraftingEngine.findComponentItems`.
+`game.fabricate.salvageComponent` (`actorId`)
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
 ## Inventory Card / System Participation
 
 `InventoryListingBuilder` **aggregates then collapses**: participations whose **contributing-document identity sets intersect** join one card, and the card's `totalQuantity`/`sources` are the **union** of contributing documents **deduped by `item.uuid` alone** (never a compendium/duplicate-source union — those are shared across distinct documents and would undercount) and summed per source actor.
-The card carries a `systems[]` participation array the inspector's **system selector** (a native `<select>` drop-down, so it scales past two or three systems) scopes the whole body to; display name/img come from the salvageable-biased **primary** participation; `broken` is a **singular** physical property of the document(s).
+The card carries a `systems[]` participation array the inspector's **system selector** (a native `<select>` drop-down, so it scales past two or three systems) scopes the whole body to.
+Display name/img come from the salvageable-biased **primary** participation.
+`broken` is a **singular** physical property of the document(s).
 Same-component aggregation across stacks/actors is preserved; essence rows and Books & Scrolls rows are NOT collapsed.
 
-Canonical mapping: `InventoryListingBuilder._collapseParticipationsToCards`/`_buildSystemParticipations`; `documentIdentity`; `InventorySystemSelector.svelte`; `inventoryStore.selectedParticipation`
+Canonical mapping: `InventoryListingBuilder._collapseParticipationsToCards`/`_buildSystemParticipations`.
+`documentIdentity`.
+`InventorySystemSelector.svelte`.
+`inventoryStore.selectedParticipation`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
@@ -223,7 +269,9 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-mode
 
 Runtime listing projects UI-safe active/history rows for the selected actor, including empty or blocked browsing states: non-GM blind and missing-environment rows stay generic, while targeted rows can expose useful labels and terminal metadata.
 
-Canonical mapping: `GatheringRunManager`; persisted at `Actor.flags.fabricate.gatheringRuns`; projected by `GatheringEngine.listForActor()` as `activeRuns` and recent `history`
+Canonical mapping: `GatheringRunManager`.
+Persisted at `Actor.flags.fabricate.gatheringRuns`.
+Projected by `GatheringEngine.listForActor()` as `activeRuns` and recent `history`
 
 Spec reference: openspec/specs/overview/spec.md, openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -234,7 +282,10 @@ Creation stays in the activity flows.
 Finished is its history browser; per-user dismissal hides an entry without deleting actor history.
 The Run Journal UI is distinct from the persisted Execution Journal and private Run Authority Ledger.
 
-Canonical mapping: `RunJournalBuilder` (`src/ui/presenters/RunJournalBuilder.js`); `RunModel` / `StepModel` / `JournalListing`; `journalStore.svelte.js`; `src/ui/svelte/apps/journal/`
+Canonical mapping: `RunJournalBuilder` (`src/ui/presenters/RunJournalBuilder.js`).
+`RunModel` / `StepModel` / `JournalListing`.
+`journalStore.svelte.js`.
+`src/ui/svelte/apps/journal/`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-journal-app/spec.md, openspec/specs/recipes-and-steps/spec.md
 
@@ -254,7 +305,9 @@ An unpaused active gate is ready when `availableAt <= worldTime`, otherwise wait
 Readiness uses world time rather than an asynchronously updated native waiting status.
 A ready status does not itself authorize execution: versioned action capabilities also check authority, ownership, inputs and recovery.
 
-Canonical mapping: `RunJournalBuilder`; `RunModel.derivedStatus`; `journalRunStatus.js`
+Canonical mapping: `RunJournalBuilder`.
+`RunModel.derivedStatus`.
+`journalRunStatus.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-journal-app/spec.md
 
@@ -263,7 +316,10 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-journal-ap
 Redaction does not remove the crafting owner's otherwise permitted actions.
 Version-1 crafting and gathering instead default to manual completion and share the eligible world-time preference contract; `manualAdvance` remains a compatibility signal rather than their authorization predicate.
 
-Canonical mapping: `RunModel.manualAdvance` / `actions`; `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`); `Fabricate.advanceCraftingRun`; `journalRunCommands.js`
+Canonical mapping: `RunModel.manualAdvance` / `actions`.
+`resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
+`Fabricate.advanceCraftingRun`.
+`journalRunCommands.js`
 
 Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-journal-app/spec.md
 
@@ -273,10 +329,13 @@ It lives on the aggregate whose results are ordered — `Recipe.allowPlayerResul
 It is NOT the player's chosen order; see **Player Result Order**.
 There is exactly ONE owner: the former system-level `craftingCheck.progressive.allowPlayerReorder` was retired from all three progressive check blocks by the 1.17.0 migration precisely so no second copy with unstated precedence survives.
 An absent key reads `true`, which is why nothing seeds it.
-Gathering has no reorder feature (no ordered result-stage surface exists), so its copy was removed without replacement.
-The salvage half gained its **first UI consumer** in issue 675 (the player Inventory tab's salvage panel): before it, the permission was modelled, authorable, captured and read at award time with no surface that let a player exercise it, so a GM setting it had no observable effect.
+Gathering has no reorder feature (no ordered result-stage surface exists), so it carries no such copy.
+The salvage half's UI consumer is the player Inventory tab's salvage panel.
 
-Canonical mapping: `Recipe.allowPlayerResultReorder`; `CraftingSystemManager._normalizeSalvage`, `normalizeSalvage` in `src/systems/normalize/salvage.js`; `ToggleCard.svelte` on the recipe Results tab + the salvage editor; `InventorySalvagePanel.svelte` (the first consumer)
+Canonical mapping: `Recipe.allowPlayerResultReorder`.
+`CraftingSystemManager._normalizeSalvage`, `normalizeSalvage` in `src/systems/normalize/salvage.js`.
+`ToggleCard.svelte` on the recipe Results tab + the salvage editor.
+`InventorySalvagePanel.svelte` (its consumer)
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-crafting-app/spec.md
 
@@ -286,7 +345,11 @@ It is a **standing preference** applying to every craft of that recipe until cha
 It is **never exported**: both halves ride on state `import-export` §Authoring-versus-runtime boundary already excludes (a salvage run's captured order is "active timed runs"; the settings map is user-scoped runtime state), so the split between this and **Result Order Permission** lands exactly on the spec's existing authoring/runtime boundary with no new rule invented.
 Reconciliation against the authored list is one shared pure rule: never drops a result, tail-appends the unranked in authored order (so an unranked stage can never displace a ranked one), never reorders an id-less result, and first-match-wins on duplicate ids (the editors and the save path refuse a result id repeated within one recipe or step, so only stored data that predates that refusal reaches this rule).
 
-Canonical mapping: `progressiveResultOrder.js` (`progressiveOrderKey`/`applyPlayerResultOrder`); `SETTING_KEYS.PROGRESSIVE_RESULT_ORDER`; `craftingStore.svelte.js`; `inventoryStore.svelte.js` (the `salvage:` writer, which must FLUSH its debounced write before a salvage run starts, or the run captures a stale order); `ProgressiveBody.svelte` and `SalvageProgressiveBody.svelte`, which render the order through `SortableList` with `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`
+Canonical mapping: `progressiveResultOrder.js` (`progressiveOrderKey`/`applyPlayerResultOrder`).
+`SETTING_KEYS.PROGRESSIVE_RESULT_ORDER`.
+`craftingStore.svelte.js`.
+`inventoryStore.svelte.js` (the `salvage:` writer, which must FLUSH its debounced write before a salvage run starts, or the run captures a stale order).
+`ProgressiveBody.svelte` and `SalvageProgressiveBody.svelte`, which render the order through `SortableList` with `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/import-export/spec.md, openspec/specs/ui-crafting-app/spec.md
 
@@ -307,11 +370,15 @@ It carries `enabled`, `secret`, a `biomes` list (terrain/ecology traits drawn fr
 **Realm vs Foundry Region:** a Gathering Realm is the Fabricate concept; a Foundry "Region" (`RegionDocument` / Region Behaviour) is a distinct Scene object that maps **many-to-one** onto a Realm through `sceneMappings[].sceneRegionUuid`.
 Removing that collision is why the Fabricate concept was renamed from **Gathering Region** to **Gathering Realm** (the Foundry-bridge `sceneRegionUuid`/`sceneUuid` field names are kept verbatim).
 **SHIPPED:** normalization, validation, CRUD, import/export ride-along as the world travel slice (merging destination-wins by id, with reveal mode and modifier visibility seeded only into an unconfigured world), and full realm authoring at World > Travel > Realms (name, description, image, enabled, secret, biomes; create/delete with referenced-by confirm).
-Deleting a realm never blocks: it is stripped from the realm membership of every environment that cited it first, and a realm id an environment ALREADY carried that the library has since lost is PRUNED on the next environment save rather than rejected (#1848), so one deleted realm cannot make every environment in the world unsaveable.
+Deleting a realm never blocks: it is stripped from the realm membership of every environment that cited it first, and a realm id an environment ALREADY carried that the library has since lost is PRUNED on the next environment save rather than rejected, so one deleted realm cannot make every environment in the world unsaveable.
 Realm-aware travel is gated by `gatheringRealmSettings.enabled` (default false); World Party CRUD is not.
 `sceneMappings` are authored through World > Travel > **Map Region Links** and are **applied at runtime** by live token-derived sensing (Phase 3, SHIPPED); `modifiers` (Phase 4 realm modifiers) normalize/validate and round-trip but are **not yet applied at runtime**, as is `sort`/ordering authoring.
 
-Canonical mapping: `GatheringRealm`; `normalizeGatheringRealm`/`validateGatheringRealmList`/`normalizeTravelConfig` in `src/systems/gatheringRealms.js`; persisted as `TravelConfig.realms[]` in the `fabricate.travelConfig` world setting; CRUD via `GatheringRealmStore`; authored at World > Travel > Realms by `GatheringRealmsTab.svelte`
+Canonical mapping: `GatheringRealm`.
+`normalizeGatheringRealm`/`validateGatheringRealmList`/`normalizeTravelConfig` in `src/systems/gatheringRealms.js`.
+Persisted as `TravelConfig.realms[]` in the `fabricate.travelConfig` world setting.
+CRUD via `GatheringRealmStore`.
+Authored at World > Travel > Realms by `GatheringRealmsTab.svelte`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/import-export/spec.md, openspec/specs/ui-world-scope/spec.md, openspec/specs/ui-gathering-app/spec.md
 
@@ -323,7 +390,9 @@ Parties are **excluded from crafting-system import/export** (they reference worl
 A newly created party defaults to disabled; enabling does **not** require a travel actor, because a party without one resolves to no current realm and so leaves its members exactly where an actor in no party stands.
 **Composite uniqueness invariant:** an actor may be associated with at most one _enabled_ party in total — as a member, as the travel actor, or both (when both, the same party) — so a selected actor's current realm is unambiguous; membership in disabled parties does not count.
 
-Canonical mapping: `GatheringParty`; world setting `fabricate.gatheringParties`; `GatheringPartyStore` (owns the composite invariant, `findEnabledPartyForActor`, stamped override set/clear)
+Canonical mapping: `GatheringParty`.
+World setting `fabricate.gatheringParties`.
+`GatheringPartyStore` (owns the composite invariant, `findEnabledPartyForActor`, stamped override set/clear)
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-world-scope/spec.md, openspec/specs/ui-gathering-app/spec.md
 
@@ -333,7 +402,9 @@ It is an **Actor UUID** (`travelActorUuid`), NOT a placed Token UUID or prototyp
 A party has at most one travel actor and is not required to have one in order to be enabled; one travel actor may represent at most one enabled party.
 The travel actor may also appear in its own party's `memberActorUuids` (allowed, not a duplicate).
 
-Canonical mapping: `GatheringParty.travelActorUuid`; assigned at World > Parties; uniqueness enforced by `GatheringPartyStore`
+Canonical mapping: `GatheringParty.travelActorUuid`.
+Assigned at World > Parties.
+Uniqueness enforced by `GatheringPartyStore`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -343,14 +414,19 @@ The two scalars this record used to carry — `revealMode` (`manual` | `onPartyT
 **SHIPPED:** the record, defaults, read/write normalization, and the `enabled` gate (`isGatheringRealmsEnabled(system)` is the single source of truth every gate point — engine, resolver, public API, Manager nav/editor — reads); `revealMode` is consumed by disclosure logic.
 `onPartyTokenEntry` automation (Phase 3) and modifier-visibility application (Phase 4) are not yet shipped.
 
-Canonical mapping: `GatheringRealmSettings`; `normalizeGatheringRealmSettings`/`validateGatheringRealmSettings`/`isGatheringRealmsEnabled` in `src/systems/gatheringRealms.js`; persisted on `CraftingSystem.gatheringRealmSettings` as `{ enabled }`; the two scalars persisted in `TravelConfig` via `normalizeTravelConfig`/`validateTravelConfig`
+Canonical mapping: `GatheringRealmSettings`.
+`normalizeGatheringRealmSettings`/`validateGatheringRealmSettings`/`isGatheringRealmsEnabled` in `src/systems/gatheringRealms.js`.
+Persisted on `CraftingSystem.gatheringRealmSettings` as `{ enabled }`.
+The two scalars persisted in `TravelConfig` via `normalizeTravelConfig`/`validateTravelConfig`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
 ## Current Realm Resolution
 
 Canonical source tokens are `manualOverride`, `travelActor`, and `unresolved` (player-facing labels `GM override`, `Travel actor`, `No current realm`).
-**SHIPPED resolution order:** a GM manual override wins (its realm ids are authoritative, INCLUDING an explicitly-included _disabled_ realm as a GM diagnostic/preview; _missing_ realm ids become `staleRealmIds` and do not resolve); otherwise resolution falls through to live token-derived Scene-Region sensing (`senseSceneRegions` over the travel actor's tokens matched against `sceneMappings[].sceneRegionUuid`, `source: 'travelActor'`); a party with no sensed match resolves to `unresolved`.
+**SHIPPED resolution order:** a GM manual override wins (its realm ids are authoritative, INCLUDING an explicitly-included _disabled_ realm as a GM diagnostic/preview; _missing_ realm ids become `staleRealmIds` and do not resolve).
+Otherwise resolution falls through to live token-derived Scene-Region sensing (`senseSceneRegions` over the travel actor's tokens matched against `sceneMappings[].sceneRegionUuid`, `source: 'travelActor'`).
+A party with no sensed match resolves to `unresolved`.
 The `travelActor` source is a live, shipped resolution branch (Phase 3), and the Travel UI renders the live `Travel actor` source label.
 
 Canonical mapping: `GatheringLocationService.resolveCurrentRealms`/`resolveForActor`/`buildCurrentRealmContext` in `src/systems/GatheringLocationService.js`; constructor-injected into `GatheringEngine`
@@ -370,14 +446,21 @@ Spec reference: openspec/specs/ui-gathering-app/spec.md, openspec/specs/gatherin
 
 ## Environment Location Availability
 
-**Exclusions win** (any current realm in an excluded realm/biome blocks the environment); inclusions match when any current realm id/biome is included; exclusion-only rules are "globally available except in excluded current realms/biomes"; empty-after-normalization or absent fields leave the environment **ungated** (legacy behavior preserved).
+**Exclusions win** (any current realm in an excluded realm/biome blocks the environment).
+Inclusions match when any current realm id/biome is included.
+Exclusion-only rules are "globally available except in excluded current realms/biomes".
+Empty-after-normalization or absent fields leave the environment **ungated** (legacy behavior preserved).
 When inclusion-gated and no current realm resolves, the environment is blocked with `NO_CURRENT_REALM`; a matched-but-excluded or no-match-while-resolved case is `LOCATION_BLOCKED`.
 The engine re-evaluates this in the **start-attempt guard**, not just listing, so stale listing state cannot start an invalid attempt.
 The whole evaluation is gated by `gatheringRealmSettings.enabled`: when the subsystem is off (the default), `_locationBlockedReasons` early-returns the ungated shape and every environment is available.
-The legacy single `region` free-text string is **inert** (not matching, not editor-surfaced; migrated to `includedRealmIds`); the legacy `biomes` list stays a composition match dimension.
+The legacy single `region` free-text string is **inert** (not matching, not editor-surfaced; migrated to `includedRealmIds`).
+The legacy `biomes` list stays a composition match dimension.
 Neither is a `GatheringRealm.id`.
 
-Canonical mapping: `GatheringEnvironment.{included,excluded}{Realm,Biome}Ids`; `environmentHasLocationRules`/`evaluateLocationAvailability` in `src/systems/gatheringLocation.js`; engine listing + start guard via `_locationBlockedReasons`; realm-id save-boundary validation in `GatheringEnvironmentStore`
+Canonical mapping: `GatheringEnvironment.{included,excluded}{Realm,Biome}Ids`.
+`environmentHasLocationRules`/`evaluateLocationAvailability` in `src/systems/gatheringLocation.js`.
+Engine listing + start guard via `_locationBlockedReasons`.
+Realm-id save-boundary validation in `GatheringEnvironmentStore`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -388,7 +471,9 @@ This is the internal **"out of reach"** vocabulary (the player-facing toggle is 
 Blind (masked) is orthogonal: a blind-but-reachable environment is `locked === false`; a blind-and-locked one is out of reach.
 The player-side, client-persisted "hide unavailable" toggle hides exactly the `locked === true` listings and never the merely task-blocked ones.
 
-Canonical mapping: `locked` on `_playerListingFields`/`_lockedEnvironmentListing` in `src/ui/presenters/GatheringListingBuilder.js`; `GATHERING_HIDE_UNAVAILABLE` client setting; `GatheringEnvironmentList.svelte`
+Canonical mapping: `locked` on `_playerListingFields`/`_lockedEnvironmentListing` in `src/ui/presenters/GatheringListingBuilder.js`.
+`GATHERING_HIDE_UNAVAILABLE` client setting.
+`GatheringEnvironmentList.svelte`
 
 Spec reference: openspec/specs/ui-gathering-app/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -404,12 +489,14 @@ Spec reference: openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/
 
 ## Discovered Gathering Realms
 
-Logical shape `{ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } }` (world-wide since issue 1282), where `source` is one of `manual` | `partyToken` | `import` | `api` (the `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are kept verbatim).
+Logical shape `{ [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } }` (world-wide), where `source` is one of `manual` | `partyToken` | `import` | `api` (the `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are kept verbatim).
 Discovery follows the character across party changes.
 **SHIPPED:** the flag helpers and GM reveal/hide mutators (writes validate the realm exists in the world realm library); reads never throw on stale `partyId`, and reads accept the legacy `discoveredGatheringRegions` flag as a fallback while every write force-replaces the whole `discoveredGatheringRealms` map and force-deletes a present legacy key.
 Player-facing discovery controls and `partyToken` auto-discovery are later-phase follow-ups.
 
-Canonical mapping: `discoveredGatheringRealms`; `revealGatheringRealm`/`hideGatheringRealm`/`getDiscoveredRealmIds` in `src/systems/gatheringRealmDiscovery.js`; `src/config/flags.js`
+Canonical mapping: `discoveredGatheringRealms`.
+`revealGatheringRealm`/`hideGatheringRealm`/`getDiscoveredRealmIds` in `src/systems/gatheringRealmDiscovery.js`.
+`src/config/flags.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -422,11 +509,16 @@ Each classified cross-reference is an **unresolved-reference** entry (`{ kind, o
 Recipes carry durable **import provenance** (`Recipe.importSource`, re-stamped on every import with the source pack's identity — the payload's `system.id` in keep-mode, else the created system id — and absent/`null` on hand-authored recipes): under `overwriteExisting` a reinstall auto-prunes ONLY provenance-matched recipes the new payload dropped, and never auto-removes unprovenanced (GM-authored or pre-provenance legacy) or foreign-pack recipes — those are kept and reported.
 Every orphan candidate is surfaced in the summary's `orphans[]` with a `disposition` (`pruned` for the auto-removed, `reported` for the kept) plus a `recipes.pruned` count; the prune folds into the single batched `recipes` write (a prune-only reinstall still writes once) followed by ONE bulk actor-flag cleanup pass, and copy-mode never enters the prune path (a fresh system id has no persisted recipes to overwrite).
 A GM edit to an imported recipe RETAINS its provenance (an edit is still the pack's recipe), so it IS auto-pruned if the pack later drops it; the escape hatch is to author a fresh (unprovenanced) recipe.
-Copy-mode rebinds record-container ids (system and environment; realm ids are NOT rebound since issue 1282, because realms are world scope and a copy that minted fresh ones would duplicate the world's geography rather than recognise it) but PRESERVES task/event/character-modifier ids so environment→library linkages survive.
+Copy-mode rebinds record-container ids (system and environment; realm ids are NOT rebound, because realms are world scope and a copy that minted fresh ones would duplicate the world's geography rather than recognise it) but PRESERVES task/event/character-modifier ids so environment→library linkages survive.
 Since schema `6` the envelope also carries the three **world-scope entity slices** (`componentScope`, `essenceScope`, `toolScope`), FILTERED BY MEMBERSHIP to the exported system, derived by the payload upcast from the bundle's own system through the same `1.30.0` migration the world side applies; the upcast DERIVES and never STRIPS, because the in-system arrays stay authoritative.
 Copy mode no longer regenerates every component id: it BINDS an incoming component to the destination world entity its source references name and mints only when nothing matches, which is what stops a re-import creating a second world record for an item the destination already holds.
 
-Canonical mapping: `buildExportPayload`/`assembleGatheringAuthoringBundle`/`assembleScopedEntityBundle` (`CraftingSystemExporter.js`, `authoringExport.js`); `migrateExportPayload.js`; `resolveImportReferences`/`rebindCopyComponentIds` (`importReferenceResolver.js`); `CompendiumImporter.importFromPackData`; `worldScopeImportMerge.js`; `buildImportReportContent` (`importReportContent.js`)
+Canonical mapping: `buildExportPayload`/`assembleGatheringAuthoringBundle`/`assembleScopedEntityBundle` (`CraftingSystemExporter.js`, `authoringExport.js`).
+`migrateExportPayload.js`.
+`resolveImportReferences`/`rebindCopyComponentIds` (`importReferenceResolver.js`).
+`CompendiumImporter.importFromPackData`.
+`worldScopeImportMerge.js`.
+`buildImportReportContent` (`importReportContent.js`)
 
 Spec reference: openspec/specs/import-export/spec.md, openspec/specs/data-models/spec.md
 
@@ -437,15 +529,18 @@ Its **staged draft** is the not-yet-written change the GM is assembling: a singl
 A **staged axis** is one the draft will actually write; category and tags carry a natural empty sentinel so their staging is derivable, while essences and difficulty do not (an empty map and a zero are both meaningful values) and therefore carry an explicit staged flag — so "clear this on every selected component" is never mistaken for "leave it alone".
 **Apply** writes every staged axis to every selected component through the set-apply write in ONE persist, re-normalizing each written component under the owning system exactly as a single-component write does, then clears the selection and the staged draft.
 Salvage is never a bulk axis.
-Its selection model, its selection toolbar and its panel chrome are SHARED primitives rather than Component Studio code (issue 1010): **Recipe Bulk Edit** renders the same toolbar, panel shell, section headings, staged single-valued select and Apply action, so the two operations differ only in the axes each stages.
+Its selection model, its selection toolbar and its panel chrome are SHARED primitives rather than Component Studio code: **Recipe Bulk Edit** renders the same toolbar, panel shell, section headings, staged single-valued select and Apply action, so the two operations differ only in the axes each stages.
 Distinct from a single-component edit, which is authored in the component editor against that component's own draft.
-**AND DISTINCT FROM THE WORLD COMPONENT CATALOGUE'S OWN BULK PANEL, which is a DIFFERENT OPERATION OVER DIFFERENT RECORDS and is deliberately not this term** (issue 1371).
-This one stages IN-SYSTEM component fields inside ONE selected crafting system; that one stages a MEMBERSHIP DIRECTION (`Add to` / `Remove from`) against a chosen set of systems, a **World Defaults** category, world tags and — as of maintainer ruling M25, re-pointed by M31 at revision 18 — ESSENCE VALUES written into each selected component's WORLD `essences` section (`updateWorldDefaultSection`, merging per record over its world map), which every crafting system that inherits the section follows at once and an overriding one ignores, over **World Component** records, and offers an armed bulk DELETE of the world records themselves.
+**AND DISTINCT FROM THE WORLD COMPONENT CATALOGUE'S OWN BULK PANEL, which is a DIFFERENT OPERATION OVER DIFFERENT RECORDS and is deliberately not this term**.
+This one stages IN-SYSTEM component fields inside ONE selected crafting system; that one stages a MEMBERSHIP DIRECTION (`Add to` / `Remove from`) against a chosen set of systems, a **World Defaults** category, world tags and ESSENCE VALUES written into each selected component's WORLD `essences` section (`updateWorldDefaultSection`, merging per record over its world map), which every crafting system that inherits the section follows at once and an overriding one ignores, over **World Component** records, and offers an armed bulk DELETE of the world records themselves.
 Both panels draw their groups on ONE shared staging inset with a row kind (M23–M25), so they share their anatomy as well as their chrome; what they still do not share is the write each row stages.
 They share the bulk selection model and the panel chrome and nothing else: neither the axes, nor the records written, nor the scope the selection is cleared by.
 The distinction is recorded rather than named, because a second `… Bulk Edit` noun over a different record set is precisely the kind of overload this glossary exists to catch, and the shipped screens supply no authored label for it.
 
-Canonical mapping: `applyBulkEditToComponents` in `CraftingSystemManager`; `src/ui/model/componentBulkEditModel.js` over the shared `src/utils/bulkSelectionModel.js`; `bulkSelectedComponentIds` in `createComponentBrowserState()`; `BulkSelectionToolbar.svelte`/`ComponentBulkEditPanel.svelte` over the shared `BulkEditPanelShell.svelte`/`BulkEditSection.svelte`/`BulkEditSelect.svelte` chrome
+Canonical mapping: `applyBulkEditToComponents` in `CraftingSystemManager`.
+`src/ui/model/componentBulkEditModel.js` over the shared `src/utils/bulkSelectionModel.js`.
+`bulkSelectedComponentIds` in `createComponentBrowserState()`.
+`BulkSelectionToolbar.svelte`/`ComponentBulkEditPanel.svelte` over the shared `BulkEditPanelShell.svelte`/`BulkEditSection.svelte`/`BulkEditSelect.svelte` chrome
 
 Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-visual-style/spec.md, openspec/specs/data-models/spec.md
 
@@ -453,7 +548,9 @@ Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-visu
 
 The Recipe Studio sibling of **Component Bulk Edit**: it shares that operation's selection set, selection toolbar and panel chrome, and differs only in the axes it stages.
 Its **staged draft** is a single-valued category overwrite, a status intention (leave unchanged / enable / disable), a lock intention (leave unchanged / lock / unlock), a **Recipe Check Tier**, and recipe-book membership.
-The book axis is a SEARCH-AND-PICK control, not the tri-state run the Component Studio's tag axis uses: a trigger opens a searchable list of the system's AUTHORED recipe items, each stating its kind and how many of the selected recipes it holds; picking one opens a card offering Add and Remove, each labelled with the number of recipes it would actually affect and each unavailable when that number is zero; and each staged item joins a list stating its operation, its affected count and its own control to leave that item unchanged.
+The book axis is a SEARCH-AND-PICK control, not the tri-state run the Component Studio's tag axis uses: a trigger opens a searchable list of the system's AUTHORED recipe items, each stating its kind and how many of the selected recipes it holds.
+Picking one opens a card offering Add and Remove, each labelled with the number of recipes it would actually affect and each unavailable when that number is zero.
+And each staged item joins a list stating its operation, its affected count and its own control to leave that item unchanged.
 The divergence from the Component Studio is deliberate and confined to this axis — a chip per item stops being readable at the eight-plus recipe items a real system carries — and both panels render the same shared chrome.
 Staging accumulates across items rather than being limited to the one on screen.
 The check tier is the ONE axis carrying an explicit staged flag.
@@ -465,7 +562,11 @@ A refused enable is a PARTIAL success: that recipe stays off while its other sta
 Applying then clears the selection and the staged draft.
 Distinct from a single-recipe edit, which is authored in the recipe editor against that recipe's own draft, and from the Contents tab, which authors ONE book's membership.
 
-Canonical mapping: `applyBulkEditToRecipes` in `CraftingSystemManager`; `src/ui/model/recipeBulkEditModel.js` over the shared `src/utils/bulkSelectionModel.js`; `bulkSelectedRecipeIds` in `createRecipeBrowserState()`; `adminStore.applyRecipeBulkEdit`; `BulkSelectionToolbar.svelte`/`RecipeBulkEditPanel.svelte` over the shared `BulkEditPanelShell.svelte`/`BulkEditSection.svelte`/`BulkEditSelect.svelte` chrome, with the book axis on the shared `SearchablePopover.svelte`
+Canonical mapping: `applyBulkEditToRecipes` in `CraftingSystemManager`.
+`src/ui/model/recipeBulkEditModel.js` over the shared `src/utils/bulkSelectionModel.js`.
+`bulkSelectedRecipeIds` in `createRecipeBrowserState()`.
+`adminStore.applyRecipeBulkEdit`.
+`BulkSelectionToolbar.svelte`/`RecipeBulkEditPanel.svelte` over the shared `BulkEditPanelShell.svelte`/`BulkEditSection.svelte`/`BulkEditSelect.svelte` chrome, with the book axis on the shared `SearchablePopover.svelte`
 
 Spec reference: openspec/specs/ui-system-studio/spec.md
 
@@ -484,7 +585,12 @@ This seam neither extends nor uses the **Gathering Party** aggregate: `Gathering
 In provider mode the Downtime rail group is **locked expanded**: mode-scoped (route AND provider mode together, never the route alone) and **display-only** — it derives what the rail displays and never writes the GM's stored `managerRailCollapsed` client preference, because a collapsed rail hides the submenu outright and with no tab strip that would leave zero reachable tab switchers.
 That lock is also the accessible-name seam's own foundation: the panel region's `aria-labelledby` target is a rail sub-item label that exists only while the group is expanded.
 
-Canonical mapping: `game.fabricate.api.managerExtensions.registerWorldNavProvider`; `src/ui/managerExtensions.js`; `WorldDowntimeExtensionHost.svelte`; `WORLD_DOWNTIME_PREVIEW_PROVIDER`; `CORE_DOWNTIME_PREVIEW_TAB_IDS`; `MANAGER_HOOKS`
+Canonical mapping: `game.fabricate.api.managerExtensions.registerWorldNavProvider`.
+`src/ui/managerExtensions.js`.
+`WorldDowntimeExtensionHost.svelte`.
+`WORLD_DOWNTIME_PREVIEW_PROVIDER`.
+`CORE_DOWNTIME_PREVIEW_TAB_IDS`.
+`MANAGER_HOOKS`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 
@@ -504,7 +610,13 @@ Re-registering the identical object is neither, and bringing an already-open win
 Core publishes observational `fabricate.player.*` hooks for registration, surface mount/unmount and tab change; a listener changes nothing.
 The seam creates, reads and writes no record, setting, flag, actor data or world state of its own.
 
-Canonical mapping: `game.fabricate.api.playerExtensions.registerPlayerNavProvider`; `src/ui/playerExtensions.js`; `src/ui/extensionRegistry.js`; `src/ui/playerNavModel.js`; `PlayerExtensionHost.svelte`; `FabricateAppRoot.svelte`; `PLAYER_HOOKS`
+Canonical mapping: `game.fabricate.api.playerExtensions.registerPlayerNavProvider`.
+`src/ui/playerExtensions.js`.
+`src/ui/extensionRegistry.js`.
+`src/ui/playerNavModel.js`.
+`PlayerExtensionHost.svelte`.
+`FabricateAppRoot.svelte`.
+`PLAYER_HOOKS`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 
@@ -514,7 +626,6 @@ A presentation primitive, not a record: Fabricate persists nothing for it.
 A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot, value }` handle.
 "Seam" names that mount function only; the target is the companion's element, and the component is Fabricate's primitive.
 The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, plus `overlays: true` where an entry opens an overlay, plus `restOn` where an entry's rest keys land on a control it draws, which `describe` omits and whose reserved names are fixed for the entry's `version`, plus `standaloneRoot: true` where an entry is drawn under the standalone style root, which is private and which `describe` omits, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
-Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`; issue #2452 publishes callbacks, the first control and ARIA attributes on a control; issue #2453 publishes bound values; issue #2454 publishes the overlay host; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `root: 'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; issue #2680 widens the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, so no entry published before it has the root `'fabricate'`; issue #2784 publishes `ListRow` at the root `'fabricate'`; issue #2793 publishes `ListRow`'s `aside`; issue #2843 publishes `ListRow`'s `leading`, `badges`, `meta` and `trailing`; issue #2850 publishes `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign`; issue #2851 publishes `ListRow`'s `current` and `busy`; issue #2848 publishes `Field`'s `size`, `face`, `type` and `invalid`; issue #2849 publishes `SearchField`'s `density` and `countLabel`; issue #2853 publishes `Button`'s 24px and 26px rungs and `IconButton`'s 20px and 22px ones; issue #2852 publishes `Button`'s `ariaLabel`, `tooltip`, `pressed` and `info` role and `Stepper`'s step tooltips; issue #2854 publishes `InspectorCard`'s `tone`, `title`, `note`, `leading` and `trailing` and `Well`'s `tone`; issue #2855 publishes `Callout`'s `actionsPlacement` and `Notice`'s `assertive`; issue #2856 publishes `SegmentedControl`'s `surface` and `size` and an option's `ariaLabel`; issue #2858 publishes `Chip`'s `ariaLabel`, its icon-only form and its `dashed` emphasis; issue #2837 publishes `StageBars`' `track` and a stage's `shares`; issue #2857 publishes a `StageBars` stage's `title`; issue #2863 publishes `FillBar`'s `neutralBand`; issue #2841 publishes `StatBox`'s `children` slot, `Stepper`'s dense `size`, `Button`'s `accent` and `urgent` roles and `IconPicker`'s `tint`; issue #2859 publishes `Modal`'s `scrim`; issue #2836 publishes `SelectionCheckbox`; issue #2862 publishes `Disclosure`; issue #2860 publishes `Typeahead`; issue #2861 publishes `Popover`, an anchored non-modal dialog; issue #2902 publishes `StatusToggle`'s `label`, the setting's name drawn inside the switch's button; issue #2890 publishes `Button`'s `confirm` role; issue #2898 states each `Button` role's contrast on a tinted fill; issue #2895 publishes `Button`'s and `IconButton`'s `description`; issue #2892 describes `ToggleCard`'s switch by its `sub` line; issue #2894 publishes `Pagination`'s `landmarks` and `perPageAriaLabel`; issue #2905 publishes `IconPicker`'s `iconOnly`, and issue #2899 names its captioned trigger by the caption it draws.
 A prop is plain data, a string of text, a content slot, a callback, an ARIA attribute Fabricate writes on a control or a bound value; a snippet that takes arguments is never published.
 `describe` returns `{ version, props, rest, root, overlays }`, where `overlays` says whether the entry opens an overlay, and an entry states `overlays: true` in the manifest only where it does.
 Only `Select`, `IconPicker`, `ActionMenu`, `Modal`, `Typeahead` and `Popover` state `overlays: true`, and every other entry opens no overlay.
@@ -529,8 +640,8 @@ The panel it holds draws in a Fabricate window's typeface and at Foundry's appli
 Fabricate removes it with `destroy` and with a fault, and it writes none under a Fabricate root.
 The standalone style root paints no ground, so the companion supplies the ground, and an entry drawn under it is refused (M16) where the target has no Fabricate root and its root node is a shadow root.
 An entry that states `standaloneRoot: true` states `root: 'any'`, and registration refuses `standaloneRoot` on any other root.
-The twenty-one entries drawn this way are `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` (issue #2456), `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination` (issue #2679), `Select`, `IconPicker`, `ActionMenu` and `Modal` (issue #2680), `ToggleCard` (issue #2775), `SelectionCheckbox` (issue #2836), `Disclosure` (issue #2862), `Typeahead` (issue #2860) and `Popover` (issue #2861).
-Issue #2456 rules that no design-system row scoped `manager-only` is published.
+The twenty-one entries drawn this way are `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `Select`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover`.
+No design-system row scoped `manager-only` is published.
 The 31 rows are named in `openspec/specs/ui-extension-points/spec.md`, under Published UI Components.
 The published `Rail` is a section primitive, not the Manager rail.
 The published `Notice` is the design system's notice, drawn in the companion's element, and is unrelated to a Foundry notification.
@@ -542,7 +653,16 @@ Its `current` marks the row's place in a sequence and its `busy` the row's work 
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
-Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentCallbacks.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponentOverlays.js`; `src/ui/publishedComponentStandaloneRoot.js`; `src/ui/svelte/util/overlayHost.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
+Canonical mapping: `game.fabricate.api.ui`.
+`src/ui/publishedComponentSeam.js`.
+`src/ui/publishedComponentProps.js`.
+`src/ui/publishedComponentCallbacks.js`.
+`src/ui/publishedComponentManifest.js`.
+`src/ui/publishedComponentOverlays.js`.
+`src/ui/publishedComponentStandaloneRoot.js`.
+`src/ui/svelte/util/overlayHost.js`.
+`src/ui/publishedComponents.svelte.js`.
+`PublishedComponentHost.svelte`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 
@@ -551,27 +671,34 @@ Spec reference: openspec/specs/ui-extension-points/spec.md
 Four marks share the family.
 `.manager-nav-count` is the RECORD-COUNT vehicle: a bare mono tabular numeral with no fill or border, e.g. "Gathering 69".
 `.manager-nav-issue-badge` is the ISSUE-SUMMARY vehicle: a filled warning pill that names its unit in its `aria-label`, e.g. "1 issue", and the one mark of the four that deliberately survives a collapsed rail, because it is a parent group's only remaining signal once its labels and children are hidden.
-`.manager-nav-dirty-marker` is a 6px filled dot meaning unsaved changes, distinguished from the issue pill by SHAPE as well as colour (issue 1096).
-The `PREMIUM` chip is a distinct gold-keyed identity mark drawn by `.manager-nav-premium`, a VEHICLE OF ITS OWN since issue 1515 — it used to ride the count vehicle's box to inherit the collapsed-rail hide, which now names each trailing marker itself, so a tier gate is no longer drawn through the record-count vehicle — prominent while Core's preview holds a surface and MUTED, not removed, while a provider holds it — except while a nonzero Downtime rollup shows, which takes that row's single trailing track for as long as it shows, the one carve-out the chip rule admits.
+`.manager-nav-dirty-marker` is a 6px filled dot meaning unsaved changes, distinguished from the issue pill by SHAPE as well as colour.
+The `PREMIUM` chip is a distinct gold-keyed identity mark drawn by `.manager-nav-premium`, a VEHICLE OF ITS OWN, not the count vehicle's box (the collapsed-rail hide names each trailing marker itself, so a tier gate is never drawn through the record-count vehicle), prominent while Core's preview holds a surface and MUTED, not removed, while a provider holds it — except while a nonzero Downtime rollup shows, which takes that row's single trailing track for as long as it shows, the one carve-out the chip rule admits.
 That vehicle is cited by SELECTOR here and never by a line into the sheet: the chip's own box sits among the rail chrome it neighbours while its tone sits with the other markers, so no single range holds it and any number would go stale the next time either moves.
-The comment above `.manager-nav-count` in `styles/fabricate.css`, "A rail count badge is a BARE NUMERAL, not a badge (issue 643)", is a STYLING correction — the record-count vehicle must draw as bare text, never a filled chip — and NOT a vocabulary ban: its own opening clause reads "count badge", using badge as the umbrella the styling note narrows rather than rejects.
-A companion's tab badge (issue 1302) renders through the ISSUE-SUMMARY vehicle, CORRECTED at issue 1515: this family's discriminator between vehicle one and vehicle two is that the second carries a count AND names its unit in its `aria-label`, which a companion's badge does, and the Downtime parent's rollup is the SUM of exactly those badges, so a sum and its addends cannot be different marks.
+The comment above `.manager-nav-count` in `styles/fabricate.css`, "A rail count badge is a BARE NUMERAL, not a badge", is a STYLING correction — the record-count vehicle must draw as bare text, never a filled chip — and NOT a vocabulary ban: its own opening clause reads "count badge", using badge as the umbrella the styling note narrows rather than rejects.
+A companion's tab badge renders through the ISSUE-SUMMARY vehicle: this family's discriminator between vehicle one and vehicle two is that the second carries a count AND names its unit in its `aria-label`, which a companion's badge does, and the Downtime parent's rollup is the SUM of exactly those badges, so a sum and its addends cannot be different marks.
 The `Soon` word on a disabled planned-view row is NOT a member of this family at all and no longer borrows one: it is neither a record count, nor an issue summary, nor an unsaved marker, nor a tier gate, so it draws through `.manager-nav-planned` and claims no membership.
 The premium padlock drawn by `.manager-editor-tab-lock` after a label on the shared editor tab strip is NOT a member either: it is a tier gate on a tab, not a rail mark, and it draws through the tab strip's own vehicle.
 The Downtime rail parent's rollup renders through that same vehicle, and for the reason every issue-summary mark is amber: **the mark is amber because it asks for attention, not because it reports a fault** — the rollup states how many tabs have something to say, not that anything is wrong.
-A tab strip's issue summary follows the same rule: its tone states how much attention the tab asks for, so a PASS mark is neutral (issue 1373).
+A tab strip's issue summary follows the same rule: its tone states how much attention the tab asks for, so a PASS mark is neutral.
 
-Canonical mapping: `.manager-nav-count`; `.manager-nav-issue-badge`; `.manager-nav-dirty-marker`; `.manager-nav-premium` (the `PREMIUM` chip, its own vehicle since issue 1515); NOT a member: `.manager-nav-planned`; `.manager-editor-tab-lock` (the tab-strip premium padlock); `src/ui/svelte/apps/manager/checks/checksNav.js`; `styles/fabricate.css`
+Canonical mapping: `.manager-nav-count`.
+`.manager-nav-issue-badge`.
+`.manager-nav-dirty-marker`.
+`.manager-nav-premium` (the `PREMIUM` chip, its own vehicle).
+NOT a member: `.manager-nav-planned`.
+`.manager-editor-tab-lock` (the tab-strip premium padlock).
+`src/ui/svelte/apps/manager/checks/checksNav.js`.
+`styles/fabricate.css`
 
 Spec reference: openspec/specs/ui-manager-shell/spec.md
 
 ## World Component / World Essence / World Tool
 
 Named for what it is, rather than the unsearchable generic "world record".
-**PERSISTED, READ AND WRITTEN** as of `1.30.0` (issue 1358 modelled it; issue 1359 gave it a home; the epic 1357 world-scope migration of issue 1363 fills it): each roster is a real world setting — `fabricate.componentScope.entities` and its essence and tool siblings — registered, loaded on every client at boot, one half of a live **Valid Id Basis**, and now populated by the migration.
+**PERSISTED, READ AND WRITTEN** from `1.30.0`: each roster is a real world setting — `fabricate.componentScope.entities` and its essence and tool siblings — registered, loaded on every client at boot, one half of a live **Valid Id Basis**, and now populated by the migration.
 **COMPONENTS AND TOOLS group by resolved SOURCE ITEM** - one entity per item across every system, taking display identity from the OLDEST contributing system as a UNIT, UNIONING the three source-link fields across the group, and re-keying every other member to the elected id.
 **ESSENCES DO NOT**: at `1.30.0` they group by trimmed `id`, that pass re-keys none of them, and its re-key map carries no essence leg.
-**`1.34.0` (issue 1654) THEN MERGES THEM BY BEHAVIOUR**: world essences whose canonicalised `(name, macro, effectSource)` triples are equal become one, every reference the re-key invalidates in the SETTINGS CORPUS is rewritten, the old-to-new pairs ride in the pass's OWN `fabricate.worldEssenceMergeMap` rather than a leg on the `1.30.0` map, and every retired id is TOMBSTONED there so none is ever reissued.
+**`1.34.0` THEN MERGES THEM BY BEHAVIOUR**: world essences whose canonicalised `(name, macro, effectSource)` triples are equal become one, every reference the re-key invalidates in the SETTINGS CORPUS is rewritten, the old-to-new pairs ride in the pass's OWN `fabricate.worldEssenceMergeMap` rather than a leg on the `1.30.0` map, and every retired id is TOMBSTONED there so none is ever reissued.
 Not literally EVERY reference: an ambiguous per-item `flags.fabricate.fabricate.essences` override key is deliberately left alone, and a world Item, a compendium Item and an unlinked synthetic token actor are never reached at all — which the tombstone does not repair but makes SAFE, since a key matching no live definition contributes nothing while a reissued id would contribute the WRONG essence.
 So a world essence id is OPAQUE and may be RETIRED — never a stable semantic slug, which is the premise `1.30.0` was written on and which was false.
 Two unlinked definitions of the same NAME are never merged FOR COMPONENTS AND TOOLS, which have a source item that COULD have proved identity and did not; an essence has no source item at all, so `1.34.0` does merge two same-name essences whose behaviour matches.
@@ -580,34 +707,40 @@ The IDENTITY FLOOR is unchanged and still tolerates a hand-edited roster: a non-
 A crafting system's own `components` / `essenceDefinitions` / `tools` nevertheless stay LIVE AND AUTHORITATIVE while `## CraftingSystem` requirement 36 holds — see **World Identity Snapshot** — and the roster being READ is not authority over them.
 It is the first layer of `## Scoped Entity Definitions`; the second is its **World Defaults** and the third is a **System Membership Record**.
 The three shipped world-scope lifts (`CurrencyConfig`, `TravelConfig`, `CharacterLibraries`) moved their SUBSTANCE wholly, because two systems cannot meaningfully disagree about a coin ladder; here they SHOULD disagree, so only identity moves.
-**FOUR WRITERS ADD A WORLD COMPONENT, AND THE CATALOGUE'S DROP ZONE IS ONE OF THEM**: the `1.30.0` migration, the world catalogue's create, a crafting-system import merging into a scope that is already seeded, and, since issue 2218, every component import.
-**AN ESSENCE OR TOOL ROW IS REGISTERED AT THE SAVE CHOKEPOINT, NOT BY A WRITER OF ITS OWN** (issue 2554): `CraftingSystemManager.save` plans every system it serialises, so every path that writes a system obeys one rule.
+**FOUR WRITERS ADD A WORLD COMPONENT, AND THE CATALOGUE'S DROP ZONE IS ONE OF THEM**: the `1.30.0` migration, the world catalogue's create, a crafting-system import merging into a scope that is already seeded, and every component import.
+**AN ESSENCE OR TOOL ROW IS REGISTERED AT THE SAVE CHOKEPOINT, NOT BY A WRITER OF ITS OWN**: `CraftingSystemManager.save` plans every system it serialises, so every path that writes a system obeys one rule.
 Each distinct id a system holds has exactly one world entity and one `(entity, system)` membership, and the world entity owns identity while the membership owns enablement and overrides.
 The planner decides per row: REGISTERED, CREATE (a new entity under the row's own id), ADOPT (a membership joining the same-id entity), or CONFLICTING, which stays unregistered and is reported once per session.
 A Tool adopts the same-id entity when the two share a source or are both source-less, and an essence adopts the same-id entity and never matches by name.
 CONFLICTING covers an id or source another entity owns, a retired essence id, and a Tool leaving unauthored a section the world default authors, which no membership can express.
 The `1.36.0` migration runs the same planner over stored systems, reports a Tool matching two or more entities as AMBIGUOUS, and deletes and re-keys nothing.
-Components are not yet held to this rule when created directly rather than imported (follow-up).
+Components created directly rather than imported are not held to this rule.
 
 **THE VOCABULARY THAT CHANGE SETTLES.**
 A component import REGISTERS the component it brings into a system as a World Component that system HOLDS, where the pair it writes is a world entity under the in-system record's own id, built as that record's lifted identity, and a `(component, system)` membership record.
 A system ADOPTS a World Component that already exists: the import matches the Item to it by a shared source reference before the new record's id is minted, the new record takes the entity's id, and no second entity is created, which is the verb the catalogue's `Add to this system` already carried.
 A component whose system holds no such pair is A COMPONENT WITH NO WORLD COMPONENT and never "record-less", because it has an in-system record and `data-models` already calls the opposite pair, a membership record with no in-system record, "recordless".
-It is the state of a component created in the system rather than imported, of one imported from an Item embedded in an actor, and of one imported before issue 2218 or through a world write that failed, and importing the Item again registers only the last of those.
+It is the state of a component created in the system rather than imported, of one imported from an Item embedded in an actor, and of one imported by a Fabricate that wrote no World Component or through a world write that failed, and importing the Item again registers only the last of those.
 Importing again also leaves unregistered a component whose source a World Component under a DIFFERENT id already shares, because binding it would re-key a component that recipes, salvage results, gathering drop rows, tool links and owned-item identity flags may name; its recovery is to delete that other World Component where no system holds it and import again.
 **THREE RULES NOW ANSWER "IS THIS THE SAME WORLD COMPONENT", AND THEY ARE NOT ONE RULE.**
 The migration groups by the six-spelling source-reference set, the crafting-system import BINDS through the **World Entity Index** to the largest intersection and keeps that binding injective, and a component import takes the FIRST entity in roster order sharing any of `registeredItemUuid`, `originItemUuid` and `aliasItemUuids`, comparing a pack Item's uuid without its document-type segment.
-The imported Item's compendium source that does not resolve is not one of the references that match compares (issue 2246).
+The imported Item's compendium source that does not resolve is not one of the references that match compares.
 An import does not leave a new record unregistered through such a source when the World Component claiming it is already flushed, because it withholds that alias there.
 The component import's match reads the World Component's STORED source link, which nothing refreshes when a system re-points its own record.
 
-Canonical mapping: `src/systems/scopedDefinitions.js`; `componentScope.js` / `essenceScope.js` / `toolScope.js`; `normalizeWorldEntities` / `createScopedDefinitionStore` (`src/systems/scopedDefinitionStore.js`); `src/systems/worldScopeStores.js`; `SETTING_KEYS.COMPONENT_SCOPE` / `ESSENCE_SCOPE` / `TOOL_SCOPE`; `planWorldComponentRegistration` / `adoptedWorldComponentId` / `flushWorldComponentRegistrations` (`src/systems/manager/worldComponentRegistration.js`); `sourceReferenceKey` (`src/utils/sourceReferenceUnion.js`)
+Canonical mapping: `src/systems/scopedDefinitions.js`.
+`componentScope.js` / `essenceScope.js` / `toolScope.js`.
+`normalizeWorldEntities` / `createScopedDefinitionStore` (`src/systems/scopedDefinitionStore.js`).
+`src/systems/worldScopeStores.js`.
+`SETTING_KEYS.COMPONENT_SCOPE` / `ESSENCE_SCOPE` / `TOOL_SCOPE`.
+`planWorldComponentRegistration` / `adoptedWorldComponentId` / `flushWorldComponentRegistrations` (`src/systems/manager/worldComponentRegistration.js`).
+`sourceReferenceKey` (`src/utils/sourceReferenceUnion.js`)
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/overview/spec.md
 
 ## World Defaults
 
-The migration ELECTS each default from the OLDEST contributing system — the same donor that wins identity — across SEVEN sections: component `category` and `essences` (the latter since `1.32.0`, issue 1371, and the one section whose membership switches are decided by EQUALITY with the elected map rather than written off, so a system already carrying the donor's values is created inheriting them), essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
+The migration ELECTS each default from the OLDEST contributing system — the same donor that wins identity — across SEVEN sections: component `category` and `essences` (the latter from `1.32.0`, and the one section whose membership switches are decided by EQUALITY with the elected map rather than written off, so a system already carrying the donor's values is created inheriting them), essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
 TWO are excluded for two DIFFERENT reasons: component `tags` because the merge is ADDITIVE with no inherit switch, so a world list is granted to every member system at once whoever the donor is; and the tool-breakage authority because its problem is unknowable PROVENANCE rather than an ambiguous donor.
 FIVE constraints can decline an individual SECTION, and a declined section simply gets none and is reported.
 FOUR are addressability rules — a `general` category, a non-world-addressable `effectSource` or `onBreak` target, and a `repairRequirements` recipe naming a component some group system is not a member of.
@@ -616,8 +749,8 @@ Without it a member that authored nothing carries an ABSENT section, which under
 `effectSource` and `macro` need no such precondition because they are NEW section names colliding with nothing on the in-system record, so `{}` and `null` are storable overrides and the membership builder writes both UNCONDITIONALLY; `breakage` and `onBreak` are spelled IDENTICALLY to the in-system `Tool` keys and the **Read Union** spreads resolved sections LAST, so an override of `{}` would erase a live in-system block instead.
 No resolved value moves at migration time, because the migration writes every switch OVERRIDING except the component `essences` one, which it decides by equality with the elected map; a world default changes what a system resolves only through a record written inheriting afterwards, by add-from-catalogue or by a component import, or through an override a GM clears later.
 Editing one world value changes behaviour in every inheriting system at once, so a world-defaults editor states the **inherit count** before the change lands.
-**A WORLD COMPONENT A COMPONENT IMPORT CREATES CARRIES NO WORLD DEFAULT** (issue 2218): the import registers identity alone and elects nothing, so the system's category and essence values stay on its in-system record, and its membership record, inheriting every section, goes on resolving them until a GM authors a world default.
-From then on that system is one of the inheriting systems the count states, where a component imported before issue 2218 had no World Component for a world default to reach.
+**A WORLD COMPONENT A COMPONENT IMPORT CREATES CARRIES NO WORLD DEFAULT**: the import registers identity alone and elects nothing, so the system's category and essence values stay on its in-system record, and its membership record, inheriting every section, goes on resolving them until a GM authors a world default.
+From then on that system is one of the inheriting systems the count states, where a component with no World Component has nothing for a world default to reach.
 Every field is ABSENCE-PRESERVING — an unauthored component category in particular must never normalize to the reserved `general` bucket, because that would reset every inheriting system on the first resolve.
 A world default carries NO `enabled` flag; disabling world-wide is N membership edits, never a fourth layer.
 
@@ -629,8 +762,8 @@ Spec reference: openspec/specs/data-models/spec.md
 
 **NOT a fourth layer of `## Scoped Entity Definitions`**: it holds VALUES the scoped entities and the in-system vocabularies draw FROM, never entities, sections or membership, which is why it is modelled here.
 An entry is `{id, name}`; `id` is the TRIMMED, LOWERCASED name, derived rather than a `randomID()`, because there is no rename affordance at world scope and an entry's identity IS its name.
-De-duplication is on `id`, FIRST-WINS — this DIVERGES from the system-scope rule, where `normalizeCustomComponentCategories` de-duplicates on the case-PRESERVING value so `Reagent` and `reagent` stay two distinct system categories (the root cause of issue 1397); the world rule is the one the shared icon maps and the reference counter already assume.
-Issue 1397 is fixed at the DISPLAY layer: the three system row builders de-duplicate on that same normalized key, first spelling wins in stored order, the one row carries a pointer-only `title` naming every spelling, and deleting it removes them all and reassigns their records by one cascade; storage stays case-preserving, component tags never diverged because `normalizeTag` already lower-cases, and reconciling storage is issue 1411's.
+De-duplication is on `id`, FIRST-WINS — this DIVERGES from the system-scope rule, where `normalizeCustomComponentCategories` de-duplicates on the case-PRESERVING value so `Reagent` and `reagent` stay two distinct system categories; the world rule is the one the shared icon maps and the reference counter already assume.
+Case variants are merged at the DISPLAY layer: the three system row builders de-duplicate on that same normalized key, first spelling wins in stored order, the one row carries a pointer-only `title` naming every spelling, and deleting it removes them all and reassigns their records by one cascade; storage stays case-preserving, component tags never diverged because `normalizeTag` already lower-cases.
 Each category vocabulary's reserved `general` bucket is implicit per system, never persisted and refused on add through the two shipped guards; component tags have no reserved bucket.
 **KEY ABSENCE IS PRESERVED PER KIND**, which departs from both `CharacterLibrariesStore` and `ScopedDefinitionStore` (both mark every sub-key seeded on any write): `isSeeded(kind)` answers from raw key presence on the persisted payload, `false` and never a throw for an unrecognised kind, so "never authored" and "authored and then emptied" stay distinguishable across a reload.
 **Each entry's reference count is COUNTED, never derived from a name** — `buildVocabularyUsage`, the same counter the system-scope Tags & Categories screen uses, run over every crafting system's recipes and components world-wide.
@@ -640,21 +773,25 @@ The COUNT and the one-click delete GATE are different numbers: an entry deletes 
 Nothing else cascades: a crafting system's own `componentCategories`, `categories` and `itemTags` arrays, and its own components and recipes, are untouched.
 **AUTHORABLE BUT NOT YET CONSUMED**: until the consumer sweep repoints `componentCategoryOptions` and its siblings to read it, a world vocabulary entry is authored and offered by nothing — the screen states no icon control and no rename affordance for the same reason, because no consumer decides where either would live yet.
 
-Canonical mapping: `src/systems/worldVocabulary.js` (`normalizeWorldVocabularyEntries`, `worldVocabularyEntryId`, `planWorldCategoryClear`, `planWorldTagStrip`); `src/systems/WorldVocabularyStore.js` (`createWorldVocabularyStore`); `createWorldVocabularyActions` (`src/ui/svelte/stores/worldScopeActions.js`); `projectWorldVocabulary` / `WORLD_VOCABULARY_KINDS` (`src/ui/svelte/stores/worldScopeProjection.js`); `SETTING_KEYS.WORLD_VOCABULARY`
+Canonical mapping: `src/systems/worldVocabulary.js` (`normalizeWorldVocabularyEntries`, `worldVocabularyEntryId`, `planWorldCategoryClear`, `planWorldTagStrip`).
+`src/systems/WorldVocabularyStore.js` (`createWorldVocabularyStore`).
+`createWorldVocabularyActions` (`src/ui/svelte/stores/worldScopeActions.js`).
+`projectWorldVocabulary` / `WORLD_VOCABULARY_KINDS` (`src/ui/svelte/stores/worldScopeProjection.js`).
+`SETTING_KEYS.WORLD_VOCABULARY`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-world-scope/spec.md
 
 ## System Membership Record
 
 Its ABSENCE means the entity does not exist in that system — a REFUSAL at use, never a prune.
-**That rule is LIVE as of issue 1359, and it is what forces TWO unions rather than one.**
+**That rule is LIVE, and it is what forces TWO unions rather than one.**
 A **Read Union** is MEMBERSHIP-FILTERED, so an entity with no record here is absent from that system's list; a **Valid Id Basis** is deliberately NOT, so a reference to that same entity survives normalization and is refused at use.
 One function serving both would convert the refusal into a silent, persisted deletion on the first normalize.
-The relation is **membership**, deliberately not "rules" (`gatheringConfig.systems[<id>].rules` is already **System Gathering Rules**, and the shipped `Rules & Resources` route owns "Rules" at world scope) and deliberately not "catalogue" (retired as a domain noun at issue 1117).
+The relation is **membership**, deliberately not "rules" (`gatheringConfig.systems[<id>].rules` is already **System Gathering Rules**, and the shipped `Rules & Resources` route owns "Rules" at world scope) and deliberately not "catalogue" (not a domain noun).
 `Component Rules` / `Essence Rules` / `Tool Rules` / `Component catalogue` are SCREEN TITLES from the prototype and are not domain nouns.
 `enabled` is opt-in per entity and STRUCTURALLY absent on a component.
-**ADDING AND REMOVING ONE ARE COMPOSED VERBS AS OF ISSUE 1371, and each is TWO writes** — this record plus the crafting system's own in-system record — because the **Read Union**'s row set is the in-system array's, so a membership record written alone names an entity no reader can see and a membership record deleted alone leaves an in-system record the union pushes through unchanged.
-Both are published UNDER the family's existing `addToSystem` / `removeFromSystem` keys rather than beside them, because every membership control in the product reaches the family through those two; a THIRD composed verb, `bulkEditRules(systemId, componentIds, edit)`, joined them at maintainer ruling M25 so the world catalogue's bulk panel can write essence values into a system's in-system records through the same published path.
+**ADDING AND REMOVING ONE ARE COMPOSED VERBS, and each is TWO writes** — this record plus the crafting system's own in-system record — because the **Read Union**'s row set is the in-system array's, so a membership record written alone names an entity no reader can see and a membership record deleted alone leaves an in-system record the union pushes through unchanged.
+Both are published UNDER the family's existing `addToSystem` / `removeFromSystem` keys rather than beside them, because every membership control in the product reaches the family through those two; a THIRD composed verb, `bulkEditRules(systemId, componentIds, edit)`, sits beside them so the world catalogue's bulk panel can write essence values into a system's in-system records through the same published path.
 The ADD path rolls back the record IT wrote when the in-system seed is refused for a duplicate source reference, and leaves a record the GM authored earlier alone.
 The REMOVE path's in-system half is the SANCTIONED DELETE CASCADE for components — every recipe in that system naming the id is rewritten, the ones left without a usable ingredient set or result are disabled, and its essence, salvage and alchemy references are reconciled — so `Remove from this system` and `Delete this system's component` leave the same system behind and the world entity is the whole of the difference; a system manager that cannot run the cascade REFUSES the whole removal rather than writing half of it.
 **THE REMOVE PATH'S COMPENSATION IS ITS ORDER, NOT A ROLLBACK** (revision 11): the in-system delete runs first and the membership record second, because a row gone with the record left is INERT (the union draws nothing, and the next add reuses the record) while a record gone with the row left is the ghost — and no rollback could be written, since the family publishes no verb that restores a membership record with its overrides intact and the two failure windows are indistinguishable from the store.
@@ -663,33 +800,37 @@ The verb answers whether anything CHANGED rather than whether it succeeded, so a
 **WHAT A RECORD INHERITS FOLLOWS FROM WHICH WRITER MADE IT, SO "EVERY RECORD OVERRIDES" DESCRIBES THE MIGRATION AND NOTHING ELSE.**
 The migration writes one record per ORIGINAL definition, each value copied verbatim and each switch written so that no resolved value moves: overriding, except the component `essences` switch, which it decides by equality with the elected map.
 Add-from-catalogue writes `{ entityId, systemId, inherit: {} }`, which inherits every section.
-A component import (issue 2218) writes that same inherit-everything record, with TWO exceptions decided when the write is issued, from the in-system record as the run left it, and only against a world default the World Component already carries.
+A component import writes that same inherit-everything record, with TWO exceptions decided when the write is issued, from the in-system record as the run left it, and only against a world default the World Component already carries.
 For a component the system ALREADY HELD, each section the world default authors with a different value is written `inherit: false` carrying the record's own value — its `category`, and its `essences` wherever the two normalized maps differ — so importing again never changes what an existing component resolves.
 For a record the run ADDED, a category other than the reserved `general` that differs from an authored world category is written as an override, so the category a folder mapping staged is the one the system resolves, and every other section inherits as it does for a component added from the catalogue.
 Neither exception can fire for a World Component the import itself creates, since that entity has no world default; its record inherits every section and resolves the in-system record's own values until one is authored.
-**THE IMPORT WRITES THE IN-SYSTEM RECORD FIRST AND THIS RECORD SECOND**, and only for a record the persisted `craftingSystems` setting holds: an in-system record with no membership record is the state every imported component was in before issue 2218 and the next import repairs it, where a membership record naming no in-system record would count the system as a member in the catalogue while its own list could not show the component.
+**THE IMPORT WRITES THE IN-SYSTEM RECORD FIRST AND THIS RECORD SECOND**, and only for a record the persisted `craftingSystems` setting holds: an in-system record with no membership record is a state the next import repairs, where a membership record naming no in-system record would count the system as a member in the catalogue while its own list could not show the component.
 One residual is accepted: when two runs overlap over one system and one saves before the other flushes, the second registers the first's freshly adopted record as one the system already held, so its record keeps the in-system values instead of inheriting the world's.
 
 A registration that CREATES the entity writes a record that inherits every section and carries the row's `enabled`, plus a Tool's `repairRequirements`.
 A registration that ADOPTS an existing entity writes a record that overrides only the sections whose world default would change the row, which departs from the fully overriding `1.30.0` shape on purpose.
 A record whose `systemId` names no current system is a membership of a deleted system, reported at `1.36.0` and never deleted.
 
-Canonical mapping: `normalizeMemberships` / `resolveScopedDefinition` (`src/systems/scopedDefinitions.js`); `unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`) versus `CraftingSystemManager._scopeEntityBasis`; `planWorldComponentRegistration` (`src/systems/manager/worldComponentRegistration.js`)
+Canonical mapping: `normalizeMemberships` / `resolveScopedDefinition` (`src/systems/scopedDefinitions.js`).
+`unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`) versus `CraftingSystemManager._scopeEntityBasis`.
+`planWorldComponentRegistration` (`src/systems/manager/worldComponentRegistration.js`)
 
 Spec reference: openspec/specs/data-models/spec.md
 
 ## World Entity Index
 
-It is the collaborator that makes **match-or-mint** possible (issue 1364, epic 1357): an incoming entity whose SOURCE-REFERENCE SET intersects an index entry's BINDS to that entry's id, and only an unmatched or UNLINKED one mints.
+It is the collaborator that makes **match-or-mint** possible: an incoming entity whose SOURCE-REFERENCE SET intersects an index entry's BINDS to that entry's id, and only an unmatched or UNLINKED one mints.
 Named for what it is — an index of **World Component** / **World Essence** / **World Tool** records keyed for lookup — rather than "destination corpus", which would suggest a second corpus rather than a read of the shipped one.
-It is INJECTED AND REQUIRED, never defaulted: a copy-mode call without one THROWS, because falling back to minting a fresh id for every entity is exactly the duplication this epic exists to end and a silent default would reintroduce it at the one call site nobody re-reads.
+It is INJECTED AND REQUIRED, never defaulted: a copy-mode call without one THROWS, because falling back to minting a fresh id for every entity is exactly the duplication world scope exists to prevent and a silent default would reintroduce it at the one call site nobody re-reads.
 The set it matches on is the MIGRATION's six-spelling one — `originItemUuid`, `registeredItemUuid`, `sourceUuid`, `sourceItemUuid`, and `aliasItemUuids` OR, only in its absence, `fallbackItemIds` — computed over the IN-SYSTEM record and never over the derived world-entity slice, because the slice has already canonicalised the legacy spellings and matching there would silently narrow the rule.
 An incoming set intersecting MORE THAN ONE index entry binds to the LARGEST intersection with a first-wins tie-break and REPORTS the ambiguity; it never merges the destination's entities and never mints.
 The converse — TWO incoming records intersecting ONE index entry — is resolved by the **ID-claim ladder**, which makes the binding INJECTIVE: an index entry is claimed by at most one record per import, a record whose best candidate is taken falls to the next unclaimed one and mints only when none remains, and the contested id is reported against both owners.
 Both routes into it are ordinary — two records sharing a `registeredItemUuid`, or two records sharing nothing with each other that both intersect an index entry the `1.30.0` union WIDENED — and without the ladder the second record silently disappears from the system, because a duplicate definition id is last-wins in every index builder.
 It changes ONE id class: tools and essences keep their ids verbatim under copy mode and their collisions are reported rather than repaired.
 
-Canonical mapping: `prepareForImport` (`src/systems/CraftingSystemExporter.js`); `rebindCopyComponentIds` (`src/systems/importReferenceResolver.js`); `sourceReferencesOf` / `toolSourceReferences` (`src/systems/worldScopeEntityGrouping.js`)
+Canonical mapping: `prepareForImport` (`src/systems/CraftingSystemExporter.js`).
+`rebindCopyComponentIds` (`src/systems/importReferenceResolver.js`).
+`sourceReferencesOf` / `toolSourceReferences` (`src/systems/worldScopeEntityGrouping.js`)
 
 Spec reference: openspec/specs/import-export/spec.md, openspec/specs/data-models/spec.md
 
@@ -702,11 +843,14 @@ It exists because a migration runs on the ACTIVE GM alone, so every player and a
 Unfiltered, an entity union would give every system every world entity and delete the **System Membership Record**; over raw world entities, it would hand back **World Defaults** in place of a system's own overrides and bypass **Section Inheritance**.
 **It is the exact counterpart of a Valid Id Basis and must never be the same function** — that basis is deliberately NOT membership-filtered, because an absent membership record is a refusal and never a prune, so a world entity a system is not a member of is ABSENT from its read union and PRESENT in its basis.
 Memoization keys on the two OBJECTS a union is derived from — the world corpus and the system's live array — and never on a system id, which would alias a deleted-and-recreated system, alias across manager instances, and alias two copy-imported systems that deliberately share ids; the world half needs no revision counter because the corpus is replaced wholesale, so a replicated write invalidates by identity.
-The three entity unions have PRODUCTION CONSUMERS as of issue 1370: every non-UI reader enters through the **Scoped Entity Read Seam**, and the character-library union of issue 1308 is the other shipped instance.
+The three entity unions have PRODUCTION CONSUMERS: every non-UI reader enters through the **Scoped Entity Read Seam**, and the character-library union is the other shipped instance.
 **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS, WORLD-WINS IS INVERTED FOR THE THREE ENTITY UNIONS** - the union answers every KEY the in-system record carries, the in-system ROW ORDER, and the in-system ROW SET, and the world layer supplies only the keys that record does not carry; a lifted identity field the record does not carry is DELETED from the merged row, because absence is a value.
 That inversion is BOUNDED and retires with requirement 36, not with the read repointing.
 
-Canonical mapping: `unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`); `CraftingSystemManager.resolveScopedComponents` / `resolveScopedEssences` / `resolveScopedTools`; `getScopedDefinitionUnion` (`src/utils/definitionIndex.js`); `resolveModifierLibrary` / `resolveCharacterPrerequisiteLibrary` (`src/systems/characterLibraries.js`)
+Canonical mapping: `unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`).
+`CraftingSystemManager.resolveScopedComponents` / `resolveScopedEssences` / `resolveScopedTools`.
+`getScopedDefinitionUnion` (`src/utils/definitionIndex.js`).
+`resolveModifierLibrary` / `resolveCharacterPrerequisiteLibrary` (`src/systems/characterLibraries.js`)
 
 Spec reference: openspec/specs/data-models/spec.md
 
@@ -717,7 +861,7 @@ It is **FOUNDRY-FREE**, reading the world corpus through a lazy, fully optional-
 A store that throws degrades to "no world half" and never takes a craft down.
 **AN UNKNOWN WORLD HALF ANSWERS THE IN-SYSTEM ARRAY ITSELF** - the same object, not a copy and not a rebuild - when the store is absent, unloaded, throwing, empty, or the record carries no id: `null` means UNKNOWN and UNKNOWN prunes nothing, a rebuild against a null corpus drops id-less rows and de-duplicates, and object identity is what keeps the definition index and the recipe manager's signature guard warm.
 **READING IS NOT AUTHORITY AND IS NOT A SHED**: the arrays are unchanged, and `## CraftingSystem` requirement 36 still decides.
-**THE GM MANAGER READS THROUGH A SECOND, NAMED DOOR RATHER THAN THROUGH THIS ONE** (issue 1371 r19–r20): its surfaces are not repointed at the seam, because the authoring accessor must go on answering the persisted record — a merged row offered for editing is a row no writer can save back — so every GM read of a component's ESSENCES overlays this seam's answer onto that one field through ONE shared accessor, and the row projection, the essence library's usage count and roster, the world catalogue's reference figure, the essence delete confirmation's impact and the override rule all consume it.
+**THE GM MANAGER READS THROUGH A SECOND, NAMED DOOR RATHER THAN THROUGH THIS ONE**: its surfaces are not repointed at the seam, because the authoring accessor must go on answering the persisted record — a merged row offered for editing is a row no writer can save back — so every GM read of a component's ESSENCES overlays this seam's answer onto that one field through ONE shared accessor, and the row projection, the essence library's usage count and roster, the world catalogue's reference figure, the essence delete confirmation's impact and the override rule all consume it.
 Two surfaces over one conceptual value reading different fields is the defect that states away, and it was found twice before it was.
 Deliberately NOT repointed: `src/ui/**` outside `src/ui/presenters/`, every migration reader, the import and export paths, the manager's authoring surface and `getItems`, the pre-persist alchemy validator, the durable-identity restamp, and every destructive prune basis.
 
@@ -727,9 +871,11 @@ Spec reference: openspec/specs/data-models/spec.md
 
 ## World Identity Snapshot
 
-**EACH EDITOR'S WRITTEN SET IS ITS OWN AND IS NARROWER THAN THE LIFTED SET**, so "has a writer" is never read as "every field is written": the ESSENCE entry authors `name`, `icon`, `colorToken` and `description`; the TOOL entry authors the display `name` alone, because the description a Tool has is its linked Item's; and the COMPONENT entry authors `name`, `img` and `description` for a record with NO source item ONLY — for a LINKED record those three are drawn READ-ONLY from the linked Item under maintainer ruling M7, so the field is buffered and no control on the screen can move it.
+**EACH EDITOR'S WRITTEN SET IS ITS OWN AND IS NARROWER THAN THE LIFTED SET**, so "has a writer" is never read as "every field is written": the ESSENCE entry authors `name`, `icon`, `colorToken` and `description`.
+The TOOL entry authors the display `name` alone, because the description a Tool has is its linked Item's.
+And the COMPONENT entry authors `name`, `img` and `description` for a record with NO source item ONLY — for a LINKED record those three are drawn READ-ONLY from the linked Item, so the field is buffered and no control on the screen can move it.
 It is equal to the in-system copy at migration time BY CONSTRUCTION — the migration writes the merged identity back onto every in-system record — and it goes stale on the first identity edit on either side.
-A World Component a component import CREATES (issue 2218) starts equal for the same reason, being built from the in-system record; one a system ADOPTS is not made equal, because the adopting record keeps the identity the import read from its Item and the entity keeps its stored one, so the detector may name that pair from the next session, and no later import refreshes the entity.
+A World Component a component import CREATES starts equal for the same reason, being built from the in-system record; one a system ADOPTS is not made equal, because the adopting record keeps the identity the import read from its Item and the entity keeps its stored one, so the detector may name that pair from the next session, and no later import refreshes the entity.
 Dual-write is not available: the identity-writer set cannot be enumerated, since `save()` flushes every in-memory mutation including ones made in place by code paths that never called it.
 So the mechanism is RE-DERIVATION AT READ TIME, inside the **Read Union**, on every read - never a one-shot boot pass, which cannot hold because the component metadata refresh bound to the item-update hook rewrites `name`, `img` and `description` in place at any point in a session.
 A pure detector, EMPTY on the migration's own output, reports the divergence once per session to the ACTIVE GM as a DISCLOSURE; it repairs nothing, and it is blind to BEHAVIOUR drift by design.
@@ -754,6 +900,11 @@ A **MERGE REFUSAL** drops a WHOLE equivalence group — no merge, no retirement,
 The **MERGE MAP** is `fabricate.worldEssenceMergeMap`, a setting OF ITS OWN rather than a leg on the `1.30.0` re-key map, with two NESTED and therefore namespace-disjoint legs — `systems` (the per-system old-to-new pairs, TRANSIENT, cleared once the migration has completed) and `retired` (the tombstone, PERMANENT).
 A world essence id is consequently OPAQUE AND MAY BE RETIRED: no reader may treat it as a stable slug or derive anything from its spelling, which is the premise `1.30.0` was written on and which was false.
 
-Canonical mapping: `buildWorldEssenceEquivalence` / `ESSENCE_MERGE_REFUSAL_REASONS` (`src/migration/worldEssenceEquivalence.js`); `mergeEquivalentWorldEssences` (`src/migration/mergeEquivalentWorldEssences.js`); `worldEssenceMergeLegs` / `mayClearWorldEssenceMergeMap` / `buildWorldEssenceMergeRemapNotice` (`src/systems/remapWorldScopeIdentityFlags.js`); `buildWorldEssenceMergeNotice` / `describeWorldEssenceMerge` (`src/systems/worldScopeEntityNotice.js`); `mintEssenceId` / `retiredEssenceIds` (`essenceScoped.js`, `worldScopeProjection.js`); `SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP`
+Canonical mapping: `buildWorldEssenceEquivalence` / `ESSENCE_MERGE_REFUSAL_REASONS` (`src/migration/worldEssenceEquivalence.js`).
+`mergeEquivalentWorldEssences` (`src/migration/mergeEquivalentWorldEssences.js`).
+`worldEssenceMergeLegs` / `mayClearWorldEssenceMergeMap` / `buildWorldEssenceMergeRemapNotice` (`src/systems/remapWorldScopeIdentityFlags.js`).
+`buildWorldEssenceMergeNotice` / `describeWorldEssenceMerge` (`src/systems/worldScopeEntityNotice.js`).
+`mintEssenceId` / `retiredEssenceIds` (`essenceScoped.js`, `worldScopeProjection.js`).
+`SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP`
 
 Spec reference: openspec/specs/destructive-changes-and-migrations/spec.md, openspec/specs/overview/spec.md, openspec/specs/data-models/spec.md

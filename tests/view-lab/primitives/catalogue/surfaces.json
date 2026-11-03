@@ -143,7 +143,7 @@
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
-    "cap": "field — inline at the width of a control, 34px high (issue 1649)",
+    "cap": "field — inline at the width of a control, 34px high",
     "draws": ".k-empty",
     "path": "src/ui/svelte/components/EmptyState.svelte",
     "props": {
@@ -154,7 +154,7 @@
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
-    "cap": "fill — the whole box of a bounded host (issue 1648)",
+    "cap": "fill — the whole box of a bounded host",
     "draws": ".k-empty",
     "path": "src/ui/svelte/components/EmptyState.svelte",
     "slot": {
