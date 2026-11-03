@@ -2062,7 +2062,7 @@ The published components, in publication order:
 | `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel`, `semantics`, `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria), `label` (text, required) | yes |
 | `Stepper` | 1 | `any` | `value` (required), `min`, `max`, `step`, `disabled`, `allowUnset`, `fill`, `density`, `placeholder`, `format`, `stops`, `nullLabel`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required), `decrementTooltip`, `incrementTooltip`, `size` | no |
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required), `density`, `countLabel` (text) | yes |
-| `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
+| `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size`, `fill` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `gap`, `track`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align` | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot), `tone` | yes |
@@ -2079,7 +2079,7 @@ The published components, in publication order:
 | `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria) | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
-| `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
+| `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text), `openOnEmpty` | no |
 | `Popover` | 1 | `any` | `open`, `anchorId` (required), `placement`, `title` (text, required), `ariaLabel`, `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -2910,14 +2910,18 @@ An unset stepper has no bound to stop at, so neither button is disabled, and a p
 Without `allowUnset` a `value` of `null` is outside the contract, and what is drawn for it is private.
 `fill` is `true` or `false`, and `false` when absent.
 `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so give `target` the width you want it to fill; absent, the stepper hugs its content.
+The filled stepper is 38px tall, or as tall as the `size` rung you state, 26px or 34px, as stated for `size`.
+The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to little more than its two buttons' width.
 `density` is `default` or `comfortable`, and `default` when absent.
 `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
 What the stepper draws for a value outside the set is private; today that is the default density.
-`size` is `26` or `'26'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
-Any other value, `28`, `'27'`, `' 26'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
-The rung outranks `density`, so `comfortable` beside it draws the same 26px stepper, and under `fill` it pins the stepper at 26px across `target`.
+`size` is `26`, `'26'`, `34` or `'34'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
+`34` draws the toolbar rung, level with a `Field`, `Select`, `SearchField` or `SegmentedControl` at its 34px rung: 34px tall and as wide as the default, with the default 2px padding inside the stepper's edge and their 9px corner, the input filling the 28px row between the two buttons, and each button drawn 22 by 22 inside its 24 by 24 pointer target, as at the default rung.
+Any other value, `28`, `'28'`, `'27'`, `' 26'`, `'34px'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
+Each rung outranks `density`, so `comfortable` beside it draws the same 26px or 34px stepper, and under `fill` it sets the stepper's height across `target`, 26px or 34px, where a filled stepper with no rung stays 38px tall, so adding `34` changes nothing for a `fill` you mount today.
 No rung below 26 is published, because one would draw a step button under its 24 by 24 target.
 A Fabricate that predates `size` refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that publishes `size` but predates `34` draws `34` and `'34'` as the default rung, 28px tall or 38px under `fill`, and refuses nothing, so `describe` cannot tell the two apart; adding the value is additive, and the entry stays at `version` 1.
 The stepper steps by one `step` or one stop each way: a row of preset steps around a figure, as −5, −1, +1 and +5, is yours, drawn as published [`Button`](#button)s beside a [`Field`](#field), because each of its presses is an action of its own rather than one value's step.
 `placeholder` is optional text, shown in the input while it is empty.
 It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; pass the text already localised and never rely on it as a name, because `ariaLabel` names the input and a placeholder does not.
@@ -2974,7 +2978,7 @@ A DialogV2's content is always a `<form>`, so do not mount the stepper in one, a
 Give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.
 An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
-The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
+The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, where `size` `34` draws it as the default rung does, and inside the stepper's own outer edge in every case, so leave no room for it, provided nothing of your own clips inside the stepper's box.
 Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and the box of the `format` field inside a Fabricate Manager window, are private.
 
 A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
@@ -3107,6 +3111,12 @@ The select changes nothing itself: the trigger shows the new choice when your `u
 The select draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
 `placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
 `size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
+`fill` is `true` or `false`, and `false` when absent: `true` stretches the trigger across the width of `target` at every `size`, so give `target` the width of the column you want, and the trigger keeps that width whichever option is chosen; absent, the trigger hugs its label, so a select whose options differ in length changes width as the user chooses.
+Under `fill` a label longer than the trigger ends in an ellipsis and the chevron stays at the trailing edge, in either direction, and the list opens against the filled trigger as it opens against any.
+Fabricate coerces nothing to `fill`: only `true` stretches the trigger, and `'true'` or `1` draws it hugging its label.
+`fill` replaces sizing the trigger with a descendant rule of your own wrapper, which names a part of the component and so is outside the contract; no `width` is published, because the column's width is yours, on `target`, and `fill` makes the trigger take it.
+Under `fill` the trigger's edge is `target`'s, so a keyboard focus mark drawn outside the trigger falls outside `target`; leave room for it there, unclipped.
+A Fabricate that predates `fill` refuses it with `"fill" is not a prop of Select`, which `describe('Select').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
 
 - A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
 - While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
@@ -4072,7 +4082,8 @@ An omitted slot draws no body or no footer band, so a dialog with neither draws 
 The dialog's height is capped, so scroll tall content inside one element of your own in the body, which you give `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
 Give your dialog at least one control of your own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
 `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+With `true`, a click of the primary button whose press goes down and comes up outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `click` fires, as does a tap, and so does Escape pressed while focus is outside both.
+A press with any other button, a press that goes down outside and comes up inside the dialog or such a panel, or the reverse, and a `click` with no pointer press, as a keyboard activation of a control outside makes, call nothing.
 In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; pass `closeOnOutsideClick: false`, stop Escape in your own listener, or move focus into the dialog first.
 A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so if your opener opens the dialog on every press, pass `false`, or ignore a `click` whose press began while the dialog was open.
 A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as the panel of a component with an overlay that you mount in a slot: a [`Select`](#select)'s list, an [`IconPicker`](#iconpicker)'s list and query field and an [`ActionMenu`](#actionmenu)'s menu.
@@ -4081,7 +4092,7 @@ Escape pressed while focus is in such a panel is left to that panel: the dialog 
 A `Modal` you mount in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
 An `overlayHost` you pass inside the slot draws your panel inside the dialog, which clips what overflows it.
 With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
-`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
+`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a click or an Escape outside it.
 An Escape held down calls it again on each repeat.
 It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
 Fabricate does not close the dialog itself: it stays open until your `update` closes it or you call `destroy`, so to keep it open, as before a step that would lose work, do nothing; only while `target` is disconnected is the dialog not drawn, as [Overlays](#overlays) states.
@@ -4117,8 +4128,10 @@ The scrim is drawn in the dialog's host just before the dialog and at its `z-ind
 It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
 Over the four page grounds of every palette it never lowers the contrast of the dialog's 1px edge with the window behind and raises it to 3:1 in none, the edge measuring 1.66:1 to 2.51:1, so the dialog's own controls, not its boundary, carry its identification, and the dim sets the dialog apart by fading the window's content.
 It carries `aria-hidden="true"` and no role, so Chromium leaves it out of the accessibility tree, and it takes no focus and is never a Tab stop, but it covers no keyboard path: without `trapFocus`, Tab moves focus onto the dimmed controls behind the scrim, whose focus ring the scrim fades under 1.7:1, as Fabricate's accent ring measures 1.35:1 to 1.69:1 against the dimmed page grounds of every palette, and the dialog is not announced as modal, so pass `trapFocus` `true` whenever you pass `'dim'`.
-It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is; it is a press outside the dialog, so, whichever button it is, it calls `onClose` as its `mousedown` fires with `closeOnOutsideClick` `true` and calls nothing with `false`, and a drag that starts inside the dialog and ends on the scrim calls nothing.
-Where `onClose` closes the dialog, the scrim is gone before the press ends, so in Chromium the press's `mouseup` reaches whatever was behind the scrim and no `click` follows.
+It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is.
+It is outside the dialog, so with `closeOnOutsideClick` `true` a primary-button click that goes down and comes up on it calls `onClose` as its `click` fires, and with `false` calls nothing.
+A press with another button, a drag from the scrim into the dialog and a drag from the dialog onto the scrim call nothing.
+The press's `mouseup` and `click` land on the scrim, so where `onClose` closes the dialog nothing behind the scrim hears either.
 A wheel or a touch drag over the scrim does not scroll what is under it.
 For a dim of another colour or strength, over another box, or with a blur, pass `'none'` and draw your own layer, as the lines on its host below state.
 Each of `trapFocus`, `initialFocus`, `footerLayout`, `icon`, `size` and `scrim` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
@@ -4203,8 +4216,8 @@ function close() {
   dialog.update(props());
 }
 
-// A press on the opener while the dialog is open closes it as its `mousedown` fires, and its
-// `click` must not open it again.
+// A press on the opener while the dialog is open closes it as its `click` fires, before your own
+// `click` listener runs, which must not open it again.
 opener.addEventListener('pointerdown', () => {
   openAtPress = isOpen;
 });
@@ -4554,8 +4567,7 @@ card.slot('body').append(renderFactionDetails(faction));
 
 `Typeahead` draws the design system's typeahead: a search field whose list of suggestions the query drives, for one choice from a set too long to step through, which commits as it is made, and optionally for text of your own when nothing matches.
 It is an editable combobox: the input holds focus throughout and names the active row, and the list is an overlay.
-For a short set the user should see whole, use [`Select`](#select): an empty query lists nothing here, and the field never shows the current value's label, so draw your current value beside it.
-A list shown on focus before any typing is a named follow-up, `openOnEmpty`, and not part of version 1.
+An empty query lists nothing here unless you pass `openOnEmpty`, which shows a short set whole before any typing; the field never shows the current value's label, so draw your current value beside it.
 The input is the only focusable element Fabricate draws in `target`, so to return focus to the typeahead, focus `target.querySelector('input')`.
 `options` is required and lists the rows the current query yields, in drawn order, each `{ value, label, icon?, detail? }`: `value` is a string or a number, `label` is required final display text, `icon` is optional Font Awesome classes for a glyph drawn before the label and hidden from assistive technology, and `detail` is optional final display text drawn as a second line under the label; a row's accessible name is its label followed by its detail.
 Fabricate filters nothing: you hand the list the rows your own search yields for the query you hold, in your own order and number, so cap a long result yourself; Fabricate draws every row it is given inside the list's scroll.
@@ -4577,7 +4589,7 @@ A `value` that is neither a string, a number nor `null` is outside the contract,
 `onChange` is a required callback, called with one argument, the chosen row's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses a row by pointer or by Enter on the active row, the current row included.
 It is not called by `mount`, `update`, typing, opening or closing the list, Escape, Tab, a press outside the list or Enter with no row active.
 The typeahead changes nothing itself on a choice: the query and `value` stay as they were, and you pass what you keep through `update`, as `query: ''` to empty the field after a choice.
-A choice closes the list until the query is edited again, and Enter at that query then commits nothing more.
+A choice closes the list until the query is edited again, and Enter at that query then commits nothing more; under `openOnEmpty` it stays closed until the user edits the query, focus comes back to the input or ArrowDown on a blank query opens it, so a query you pass through `update` after the choice, as `query: ''`, synchronously or later, does not reopen it.
 `ariaLabel` is required and names the input and its list, final display text naming what is searched, as "Find a reward".
 The typeahead draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the field with no name.
 `placeholder` is optional final display text shown while the field is empty, and is not the field's name.
@@ -4592,6 +4604,12 @@ Fabricate coerces nothing, so the string `'false'` turns it on, and only `true` 
 `onFreeText` is a callback, required while `allowFree` is truthy, called with one argument, the query with its leading and trailing white space removed, as your user's own text when no row is wanted.
 It is not called by a press, by Enter on an active row, by Enter on a blank query or inside a composition, or while `allowFree` is falsy.
 It changes nothing itself either: empty the field with `query: ''` in an `update` when you take the text, as the worked example does.
+`openOnEmpty` is `true` or `false`, and defaults to `false`: while it is `true`, focus on a blank query, or ArrowDown there after Escape, a choice or a press outside closed the list, opens the list with every row `options` passes, so pass the whole set for `''`; Fabricate still filters nothing, and the rows follow your `options` as the query changes.
+Only the literal `true` turns it on: Fabricate coerces nothing, so the string `'false'`, the string `'true'` and `1` leave it off, and only `true` and `false` are in the contract.
+Opening leaves no row active, so the first ArrowDown of an open list reaches the first row; the list opens on focus whether the press, Tab or a script moved focus there, and a press on an input that already holds focus does not reopen a list Escape or a choice closed, which ArrowDown or an edit does.
+While it is `true` and `options` draws no row for a blank query, `emptyLabel` shows there as it does for a query that matches nothing, and is said into the status region.
+Use it for a short set the user should see whole, as a picker among a handful of scopes; a set too long to read at a glance stays a typed search, and a set the user never searches is a [`Select`](#select).
+A Fabricate that predates `openOnEmpty` refuses it with `"openOnEmpty" is not a prop of Typeahead`, and its `describe('Typeahead')` omits it, so pass it only where `describe('Typeahead').props.openOnEmpty` is present.
 `density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: the field's shell at the heights [`SearchField`](#searchfield)'s `density` draws, 38px at radius 9, 34px at radius 9 and 30px at radius 7; any other value, `'compact'` included, draws `'default'`.
 `error` is optional final display text: while it is a non-blank string the field takes the error face, `Select`'s danger edge on the `--fab-danger-soft` fill, its input states `aria-invalid="true"`, and the text is drawn beneath the field in the `--fab-danger-text` ink and is the input's description through `aria-describedby`; absent, `''`, white space alone or not a string, none of them is drawn.
 While the input holds focus, the field's lit border is drawn in place of the danger edge, and the fill and the message stay.
@@ -4600,8 +4618,9 @@ While an error shows, the list opens below the message, so it never covers it.
 The message makes the field taller, so draw a field that can show an error at the `'default'` `density`, in a place that need not stay one height.
 A Fabricate that predates `Typeahead` does not list it in `components`, `describe('Typeahead')` answers `null`, and `mount` refuses it with `"Typeahead" is not published`, so draw your own field there.
 
-- The list is open only while the input holds focus, the query is not blank and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
+- The list is open only while the input holds focus, the query is not blank or `openOnEmpty` is `true`, and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
 - ArrowDown and ArrowUp move the active row and wrap at each end, ArrowDown from no active row to the first and ArrowUp to the last; each edit of the query leaves no row active, so a query typed again never brings a row back.
+- While nothing is shown, ArrowDown on a blank query opens the list with no row active and takes the key only while `openOnEmpty` is `true`; otherwise it passes to the page.
 - The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
 - Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
 - Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.
@@ -4609,6 +4628,7 @@ A Fabricate that predates `Typeahead` does not list it in `components`, `describ
   Escape while nothing is shown and the query is not empty empties it, which reports `''` through `onQueryChange`.
   Either stops its propagation, so no listener above `target` hears it, a DialogV2's own included.
   Escape on an empty query passes untouched, so a DialogV2 that listens for it closes.
+  Under `openOnEmpty` the list stays closed at the query Escape emptied, so the sequence on a typed query is close, empty, then pass on, and an edit, focus coming back to the input or ArrowDown opens it again.
 - Tab and Shift+Tab move focus as the browser does and close the list without a choice, and your listener above `target` hears the Tab.
 - No key is acted on inside an IME composition, and a key Safari reports with `keyCode` 229 counts as one, so Enter that ends a composition chooses nothing.
 - A press on a row chooses it and closes the list, and the input keeps focus, because a press inside the list does not take it; the pointer over a row fills it and moves no active row.
@@ -4621,7 +4641,6 @@ Pass an `overlayHost` inside the same Fabricate window, or none, so the list tak
 The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
 Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
 The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal.
 A row is at least 28px tall, so each is a 24px target.
 `Typeahead` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Typeahead`.
 Its field is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog; it fills the width of `target`, so give `target` `display: flex`.
@@ -4724,12 +4743,12 @@ Focus and keys:
 
 The panel is the component's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens, so `target`'s overflow does not clip it.
 It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog.
+In a `<dialog>` opened with `showModal()` that holds the anchor or `target`, it is drawn in that dialog, as [Overlays](#overlays) states, so it is not inert there.
 It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
 Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
 The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls you draw inside carry their own edges.
 `Popover` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Popover`.
-Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or a dialog that is not modal, on the standalone layer there.
+Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, modal or not, on the standalone layer there.
 An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach your controls in its slot.
 Whether a screen reader announces the panel as a dialog, and by which name, as it takes focus is the reader's; Fabricate's suites read Chromium's accessibility tree only.
 Its padding, gap, corner and type figures, its colours and placement beyond what this section states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks are private.
@@ -5075,23 +5094,24 @@ A component whose `describe(name).overlays` is `true` opens an overlay: a panel 
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
 1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
-2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
-3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
+2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer, unless it lies outside the top-layer element step 3 names;
+3. else, where the element the panel is placed against or `target` is inside an element in the browser's top layer, a `<dialog>` opened with `showModal()` as a DialogV2 with `modal: true` is, a fullscreen element or an open `popover`, a standalone layer Fabricate keeps inside the nearest such element while any overlay is open on it, themed as the one below, so the panel is that element's descendant: it is drawn above the page with it, it is not inert, it takes the pointer and it is in the accessibility tree;
+4. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 `Popover` accepts a host anywhere in `target`'s document, and its section states what one outside every Fabricate window changes.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
-Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
+Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer on `<body>` bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it, and one in a panel on a layer inside a top-layer element bubbles through that element and its ancestors first, outside any `<form>` in it, so a listener of yours on your dialog element hears it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 Where its host is the standalone layer, that element states `pointer-events: auto` and a Fabricate window's typeface and size, `var(--font-body, var(--font-primary, sans-serif))` and `var(--font-size-14)`.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; mount it in a dialog that is not modal.
+An `overlayHost` you pass outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert, so in such a dialog pass one inside it, or none.
+In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless your own listener prevents that key.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.

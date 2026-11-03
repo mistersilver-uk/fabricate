@@ -301,6 +301,9 @@ const LAYER_LIST =
   'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover';
 /** One option of a list, by the value the fixture passes. */
 const SELECT_OPTION = (list, value) => `${list} [data-popover-option="${value}"]`;
+/** The modal dialog of the `published-select-modal` specimen, and the list its select opens in it. */
+const SELECT_DIALOG = '[data-lab-select-dialog]';
+const DIALOG_LIST = `${SELECT_DIALOG} > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover`;
 
 /** Each trigger inside the ground, and the ground inside the window. */
 const SELECT_CONTAINMENT = Object.freeze([
@@ -313,6 +316,17 @@ const SELECT_CONTAINMENT = Object.freeze([
 
 /** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
 const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
+
+/** The select fill fixture's ground, one of its sections by key, and a part of that section's select. */
+const SELECT_FILL = '[data-lab-select-fill]';
+const SELECT_FILL_PART = (key, part) =>
+  `${SELECT_FILL} > [data-lab-select-fill-form="${key}"] ${part}`;
+const SELECT_FILL_KEYS = Object.freeze(['inline-long', 'toolbar', 'hug', 'form']);
+/** The list the ground hosts as every select's `overlayHost`, in the container the seam mounts there. */
+const SELECT_FILL_LIST = `${SELECT_FILL} > div > .fabricate-select-popover`;
+
+/** Sized to the fixture's 320px ground and its four sections, the last with room for its list. */
+const SELECT_FILL_WINDOW = Object.freeze({ width: 440, height: 600 });
 
 /** The stage bars fixture's ground, and one of its sections by key: relative to the ground, for inside its `:has()`, and from the document. */
 const STAGE_BARS_GROUND = '[data-lab-stage-bars-ground]';
@@ -595,6 +609,8 @@ const COMPANION_FORM_KEYS = Object.freeze([
   'stat-plain',
   'stepper-dense',
   'stepper-default',
+  'stepper-toolbar',
+  'stepper-toolbar-fill',
   'button-ghost',
   'button-accent',
   'button-accent-hover',
@@ -616,7 +632,7 @@ const COMPANION_RING = 'outline-style: solid; outline-width: 2px; outline-offset
 
 /**
  * What every companion forms frame measures: the stat band and its track, the success figure and
- * the danger label; the dense and default steppers; each role's face at rest, disabled and busy
+ * the danger label; the dense, default and toolbar steppers; each role's face at rest, disabled and busy
  * beside the ghost baseline; the urgent and pressed tiles of the negative specimen; and each tint.
  */
 const COMPANION_FORM_FACES = Object.freeze([
@@ -651,6 +667,18 @@ const COMPANION_FORM_FACES = Object.freeze([
   {
     selector: COMPANION_FORM_PART('stepper-default', '.fab-stepper'),
     styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: COMPANION_FORM_PART('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
   },
   {
     selector: COMPANION_FORM_PART('button-ghost', 'button'),
@@ -709,7 +737,7 @@ const COMPANION_FORM_FACES = Object.freeze([
 ]);
 
 /** Sized to the fixture's two 340px columns and their rows. */
-const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 760 });
+const COMPANION_FORMS_WINDOW = Object.freeze({ width: 820, height: 800 });
 
 /** The button roles fixture's ground, a bar row's button by its key, and a tinted card's verb. */
 const BUTTON_ROLES = '[data-lab-button-roles]';
@@ -1560,6 +1588,75 @@ export const CASES = Object.freeze([
         { selector: LAYER_LIST, styles: 'border-radius: 11px' },
       ],
     },
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: OPEN_PANEL_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-fill-specimen',
+    label:
+      "Specimen, mounted through the published seam — four selects in 240px columns on the window's --fab-bg-1 ground, each beneath the text that names it, after one step: a press on the last. Reading top to bottom: an inline select with fill, 30px tall and as wide as its column, its long choice Oak heartwood from the northern grove, seasoned three winters, ending in an ellipsis before the chevron at the trailing edge; a toolbar select with fill, 34px tall and as wide as its column, reading Yew; a form select without fill reading Ash, hugging its label well short of its column; and a form select with fill reading Ash, as wide as its column, whose list is open beneath it in the ground, as wide as the trigger, reading Ash ticked and filled as the chosen row, then the long label and Yew",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select-fill' },
+    steps: [{ selector: SELECT_FILL_PART('form', SELECT_TRIGGER) }],
+    // The list the press opened, in the ground, with the chosen row marked.
+    expectSelector: `${SELECT_FILL}:has(> [data-lab-select-fill-form="form"] ${SELECT_TRIGGER}[aria-expanded="true"]) > div > .fabricate-select-popover [data-popover-option="ash"][aria-selected="true"]`,
+    expectCenterHit: SELECT_OPTION(SELECT_FILL_LIST, 'yew'),
+    expectContained: [
+      ...SELECT_FILL_KEYS.map((key) => ({
+        container: SELECT_FILL,
+        target: SELECT_FILL_PART(key, SELECT_TRIGGER),
+      })),
+      { container: SELECT_FILL, target: SELECT_FILL_LIST },
+      { container: '.window-content', target: SELECT_FILL },
+    ],
+    expectLayout: {
+      controls: [
+        // Each filled trigger as wide as its 240px column at its rung's height, the long value's
+        // ellipsis, and the list as wide as the filled form trigger, the form rung's floor.
+        {
+          selector: SELECT_FILL_PART('inline-long', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 30px',
+        },
+        {
+          selector: SELECT_FILL_PART('inline-long', '.fabricate-select-value'),
+          styles: 'text-overflow: ellipsis; white-space: nowrap',
+        },
+        {
+          selector: SELECT_FILL_PART('toolbar', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 34px',
+        },
+        {
+          selector: SELECT_FILL_PART('form', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 38px',
+        },
+        { selector: SELECT_FILL_LIST, styles: 'width: 240px; border-radius: 11px' },
+      ],
+    },
+    position: SELECT_FILL_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-modal-dialog',
+    label:
+      'Specimen, mounted through the published seam — a select inside a dialog opened with showModal(), as a DialogV2 with modal: true is, after one step: a press on its trigger, which passed no overlay host, so its list opened on a standalone layer inside the dialog, drawn above the page in the browser’s top layer, where it takes the pointer, rather than under the dialog, where it would be inert. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order, and extends past the dialog’s own edge unclipped. The frame draws inside the manager window',
+    // Beyond the smoke: a companion mounts it through `api.ui` in its own modal dialog.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select-modal' },
+    steps: [{ selector: `${SELECT_DIALOG} ${SELECT_TRIGGER}` }],
+    // The list the press opened, on the layer inside the modal dialog, with nothing chosen yet.
+    expectSelector: `${SELECT_DIALOG}:modal > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover [data-popover-option="tier"]`,
+    expectCenterHit: SELECT_OPTION(DIALOG_LIST, 'tier'),
+    expectContained: [
+      { container: SELECT_DIALOG, target: `${SELECT_DIALOG} ${SELECT_TRIGGER}` },
+      { container: '.window-content', target: DIALOG_LIST },
+    ],
     position: SELECT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
@@ -2535,7 +2632,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-specimen',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second urgent Advance, the pointer still resting on it, its tile deepened to the accent's hover colour, and Tab from the dense stepper's input, so its plus carries the 2px accent ring straddling the button's edge inside the stepper's own. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second urgent Advance, the pointer still resting on it, its tile deepened to the accent's hover colour, and Tab from the dense stepper's input, so its plus carries the 2px accent ring straddling the button's edge inside the stepper's own. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2579,7 +2676,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-accent-focus',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second accent Advance, the pointer still resting on it, filled in the soft accent, and Tab from the ghost Advance, so the first accent Advance carries the 2px accent keyboard ring 2px clear of its edge. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After two steps, a click on the second accent Advance, the pointer still resting on it, filled in the soft accent, and Tab from the ghost Advance, so the first accent Advance carries the 2px accent keyboard ring 2px clear of its edge. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2621,7 +2718,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-companion-forms-urgent-focus',
     label:
-      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After one step, Tab from the busy accent Advance, so the first urgent Advance carries the 2px accent keyboard ring 2px clear of its tile, a strip of the card's ground between ring and tile. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
+      "Specimen, mounted through the published seam — the forms issue 2841 publishes, in two 340px columns on a companion card's --fab-bg-2 ground, 8px apart, each 140px tile beside a caption the companion draws. Reading left to right and down: a progress tile, the label Progress over the mono figure 42% at the start layout, and 8px beneath them the box's content band holding a published thin FillBar, a 4px --fab-bg-3 track filled 42% in the accent, spanning the box's content width; the same tile complete, 100% in the success ink over a full success track; the default layout, the serif figure 3 of 5 centred over Stages done, its track 60% filled beneath; a danger tile, Missing over 2 with the note Two reagents short, its label in the secondary ink on the danger fill; and the progress tile without the slot, the baseline the band adds to. Then a quantity stepper at 3 at the dense size 26, 26px tall with no padding inside its edge, its minus and plus each filling a 24 by 24 cell and its input a 24px-tall one; and the same stepper at the default rung, 28px tall with 2px of padding round its 22px buttons; and at the toolbar size 34, 34px tall with the same padding, its input filling the 28px row between the same buttons, then filled across its 140px tile at the same 34px. Then a card's Advance action: in the ghost role, the baseline, its muted label on no fill; in the accent role, a forward-step glyph and its label in the accent text ink on no fill inside the accent edge, then twice more, then disabled in the disabled face and busy, dimmed in its own colours; in the urgent role, a bell glyph and the label on the solid accent tile, then twice more, then disabled and busy. Then a negative specimen, captioned so: an urgent Advance beside a pressed Show the reward toggle, which draw the same accent tile and which the contract forbids in one view. Last, icon pickers whose tints ember, mauve and slate colour the leaf glyph on their triggers, beside one untinted, its glyph in the accent. After one step, Tab from the busy accent Advance, so the first urgent Advance carries the 2px accent keyboard ring 2px clear of its tile, a strip of the card's ground between ring and tile. The frame cannot show that a screen reader reads each tile once with nothing for the bar, nor each step button's 24px pointer target, nor the forced-colours repaint, which the rendered suites read, hit-test and emulate",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -3347,6 +3444,39 @@ export const CASES = Object.freeze([
         {
           selector: TYPEAHEAD_SHELL('free'),
           styles: 'height: 38px; border-radius: 9px; border-top-color: var(--fab-accent)',
+        },
+      ],
+    },
+    position: TYPEAHEAD_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Typeahead.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-typeahead-open-on-empty',
+    label:
+      'Specimen, mounted through the published seam — the same five typeaheads after one step that presses into Scope, which passes openOnEmpty, while its query is empty: its 1px accent border lit and its placeholder Search parties still shown, and its list open beneath it at its width on --fab-bg-2 inside a 1px strong edge at radius 6, over Standing rule, reading The Ironwrights, Moonsilver Company and Ashen Wardens, each with a users glyph, no row active and none ticked. The frame draws inside the manager window; ArrowDown reopening the list after Escape, and the list staying shut for any value but true, are the mounted and rendered suites’',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-typeahead' },
+    steps: [{ selector: TYPEAHEAD_INPUT('scope') }],
+    // The whole set the empty query opened, with no row active.
+    expectSelector: `${TYPEAHEADS}:has(${TYPEAHEAD_SECTION('scope')} input[aria-expanded="true"]:placeholder-shown:not([aria-activedescendant])) > div > .fabricate-typeahead-list[role="listbox"]:has(> [role="option"]:nth-child(3)):not(:has([aria-selected="true"]))`,
+    expectCenterHit: [TYPEAHEAD_ROW(3)],
+    expectContained: [
+      { container: TYPEAHEADS, target: TYPEAHEAD_LIST },
+      { container: '.window-content', target: TYPEAHEADS },
+    ],
+    expectLayout: {
+      controls: [
+        {
+          selector: TYPEAHEAD_SHELL('scope'),
+          styles: 'height: 34px; border-radius: 9px; border-top-color: var(--fab-accent)',
+        },
+        {
+          selector: TYPEAHEAD_LIST,
+          styles: 'border-top-style: solid; border-top-width: 1px; border-radius: 6px',
         },
       ],
     },

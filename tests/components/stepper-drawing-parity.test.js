@@ -94,6 +94,19 @@ test('the kit group declares the shipped gap, padding, edge and ground', () => {
   ]);
 });
 
+test('the kit toolbar group declares the shipped 34px rung, its corner and its filled input', () => {
+  assertPairs('.k-step.toolbar', '.fab-stepper.is-size-34:not(.is-vertical)', [
+    ['box-sizing'],
+    ['height'],
+    ['border-radius'],
+  ]);
+  assertPairs(
+    '.k-step.toolbar input',
+    '.fab-stepper.is-size-34:not(.is-vertical):not(.is-fill) .fab-stepper-input',
+    [['height']]
+  );
+});
+
 test('the composite and the standalone vertical unit share the shipped vertical rules', () => {
   for (const part of ['', ' button', ' .i', ' input']) {
     const [rule, ...others] = rulesListing(kit, `.k-stepset .k-step${part}`);

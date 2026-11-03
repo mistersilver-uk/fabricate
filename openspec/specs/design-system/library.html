@@ -163,6 +163,8 @@ a{color:var(--fab-accent)}
 .k-step input{width:48px;height:22px;text-align:center;background:transparent;border:0;color:var(--fab-text);font-family:var(--fab-font-mono);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}
 .k-step.comfy button{width:24px;height:24px}
 .k-step.comfy input{height:24px}
+.k-step.toolbar{box-sizing:border-box;height:34px;border-radius:9px}
+.k-step.toolbar input{height:100%}
 .k-stepset{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;width:360px}
 .k-stepset .cell{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:8px;border:1px solid var(--fab-border);border-radius:9px;background:var(--fab-surface-soft);text-align:center}
 .k-stepset label{font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fab-text-muted)}
@@ -1518,6 +1520,15 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         </div>
       </div>
       <div class="unit">
+        <span class="cap">toolbar · size 34</span>
+        <div class="k-step toolbar">
+          <button><svg class="i" aria-hidden="true"><use href="#i-minus"/></svg></button>
+          <input id="spec-step-22" aria-label="Quantity, toolbar rung" value="2" readonly>
+          <button><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg></button>
+        </div>
+        <span class="k-hint">level with a 34px field, select or segmented control; its input fills the 28px row</span>
+      </div>
+      <div class="unit">
         <span class="cap">vertical · in a 48px slot</span>
         <div class="k-step vert" style="width:48px">
           <button><svg class="i"><use href="#i-cu"/></svg></button>
@@ -1584,7 +1595,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Canonical spec</h5>
         <ul>
-          <li><b>group</b> 1px border · radius 7 · surface-soft · 2px padding and gap · 28px by default, 30px at comfortable density, and 26px with no padding at the dense rung, <code>size</code> 26, whose 24&times;24 adjuncts and 24px-tall input fill the row to the group&rsquo;s edge</li>
+          <li><b>group</b> 1px border · radius 7, 9 at the toolbar rung · surface-soft · 2px padding and gap · 28px by default, 30px at comfortable density, and 26px with no padding at the dense rung, <code>size</code> 26, whose 24&times;24 adjuncts and 24px-tall input fill the row to the group&rsquo;s edge, and 34px at the toolbar rung, <code>size</code> 34, whose input fills the 28px row inside the default padding while each adjunct keeps its 22px face in a 24&times;24 target, on its band&rsquo;s radius 9</li>
           <li><b>adjunct</b> 22&times;22 by default, 24&times;24 at comfortable density · icon 9px · hover surface-raised on a 6px corner</li>
           <li><b>value</b> input, centred, mono 500 11.5px, tabular-nums · 48px wide</li>
           <li><b>unit</b> outside the group · 500 10px</li>
@@ -1606,10 +1617,11 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>ariaLabel · decrementLabel · incrementLabel</b> <span class="req">required, derived</span></li>
           <li><b>orientation</b> horizontal | vertical</li>
           <li><b>density</b> default | comfortable</li>
-          <li><b>size</b> 26 | '26' — the dense rung; it outranks <code>density</code>, pins <code>fill</code> at 26px, and draws each ring straddling its part&rsquo;s edge by 1px.
-            No rung is published below it, because a step button there would fall under its 24&times;24 target.
+          <li><b>size</b> 26 | '26' | 34 | '34' — a rung, which outranks <code>density</code> and sets <code>fill</code>&rsquo;s height; a filled stepper with no rung stays 38px.
+            26 is the dense rung, whose rings straddle each part&rsquo;s edge by 1px; 34 is the toolbar rung at radius 9, level with the 34px <code>Field</code>, <code>Select</code>, <code>SearchField</code> and <code>SegmentedControl</code>, with the default rung&rsquo;s rings.
+            No rung is published below 26, because a step button there would fall under its 24&times;24 target.
             Any other value draws the default.
-            No in-app caller passes it.</li>
+            No in-app caller passes either.</li>
           <li><b>fill · placeholder · inputProps · disabled</b></li>
           <li><b>format</b> signed | unlimited — the built-in formatters that open the formatted mode below without a function: <code>signed</code> draws a leading plus on a positive number, <code>unlimited</code> draws <code>0</code> as <code>nullLabel</code> and reports <code>0</code>, never <code>null</code>; any other value leaves the number field</li>
           <li><b>formatValue · parseValue · stops · nullLabel</b> — the opt-in formatted mode: a <code>role="spinbutton"</code> text input with decimal inputmode that commits on Enter or blur, restores its display for invalid text or on Escape, and steps to the nearest stop above or below, so an off-list value stays exact until stepped.
@@ -1624,8 +1636,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       A click-only stepper is a documented keyboard regression, which is why the shipped component states the rule in its own docblock.
       The API above is the shipped prop set.
       <code>allowUnset</code> carries the semantics that clearing commits <code>null</code> and that adjuncts step from <code>min ?? 0</code>, and the three aria names are derived by a shared helper because 23 call sites drifted when they were not.
-      Its filled variant defaults to 38px, the form rung, and a caller sizes it through <code>--fab-stepper-fill-height</code> at a ladder rung.
-      The group&rsquo;s corner is this entry&rsquo;s radius 7, the ladder&rsquo;s value for its 28px default group; the filled variant keeps the same 7 rather than its height&rsquo;s band, because this entry states one group radius.
+      Its filled variant defaults to 38px, the form rung, and a caller sizes it through <code>--fab-stepper-fill-height</code> at a ladder rung, or a published caller through a <code>size</code> rung, whose height the filled variant takes; its input&rsquo;s own width holds no column wider than the two adjuncts, so a filled stepper narrows with its column.
+      The group&rsquo;s corner is this entry&rsquo;s radius 7, the ladder&rsquo;s value for its 28px default group; the filled variant keeps the same 7 rather than its height&rsquo;s band, because this entry states one radius for its default group; the toolbar rung, a published group sized to sit beside 34px controls, takes its band&rsquo;s 9 instead, filled or not.
       The kit draws this entry&rsquo;s written geometry, and the shipped value, glyph and disabled opacity match it.<span class="cite"><b>Stepper.svelte</b> · <b>stepperLabels.js</b></span></div>
   </div>
 
@@ -2480,6 +2492,23 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           The remaining ones are the manager&rsquo;s.</span>
         </div>
       <div class="unit">
+        <span class="cap">fill &mdash; a trigger as wide as the box it sits in</span>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+          <div style="width:220px">
+            <div class="k-field">Ash<svg class="i chev" aria-hidden="true"><use href="#i-cd"/></svg></div>
+          </div>
+          <div style="width:220px">
+            <div class="k-field">
+              <span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Oak heartwood from the northern grove</span>
+              <svg class="i chev" aria-hidden="true"><use href="#i-cd"/></svg>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint"><b><code>fill</code></b> stretches the trigger to the width of the box it sits in, so a column of selects keeps one width whichever option is chosen: a label longer than the trigger ends in an ellipsis and the chevron stays at the trailing edge.
+          The caller sizes the box; the select publishes no width of its own.
+          Without <code>fill</code> the trigger hugs its label.</span>
+        </div>
+      <div class="unit">
         <span class="cap">inline 30 &mdash; a field that is one cell of a row</span>
         <div class="k-row" style="gap:10px">
           <div class="k-ic">
@@ -2520,6 +2549,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>showTick</b> boolean = true — the selected column in the option list</li>
           <li><b>options</b> {value, label, hint?, badge?, disabledReason?, group?}[]</li>
           <li><b>placeholder</b> — the trigger&rsquo;s text while <code>value</code> is null</li>
+          <li><b>fill</b> boolean = false — only <code>true</code> stretches the trigger to its slot&rsquo;s width, the one trigger-box prop; every other per-site skin is a descendant rule of the caller&rsquo;s wrapper</li>
           <li><b>minWidth · maxWidth</b> — the panel&rsquo;s width band, which replaces the rung&rsquo;s own; a call site states one where the rung&rsquo;s floor cuts a label or its ceiling sits under a wider trigger</li>
           <li><b>id · name</b> <span class="req">required</span> — the label and error reference them</li>
           <li><b>label · hint · error</b></li>
@@ -2546,7 +2576,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       Its TYPE is written as a literal rather than as <code>var(--fab-manager-recipe-control-font)</code>, because that property is declared only under <code>.fabricate-manager</code> and a primitive rooted outside every application may not read one &mdash; outside the area it is undefined and the declaration falls back to inheritance.
       Its WEIGHT is the 600 the sort-direction <code>Button</code> computes on the recipes, components and essences browser rows, measured in Chromium.<br><br><b>Six divergences from this entry&rsquo;s surface, each with its reason.</b>
       The FILL is stated per size as a token, because this entry&rsquo;s own &ldquo;surface-soft in cards &middot; bg-2 inside bg-1 rows&rdquo; is CONTEXTUAL and not one of the three shipped call sites is either context.
-      A call site may state its own trigger fill and its own width floor as a descendant rule from its wrapper class &mdash; a divergence from this entry&rsquo;s prop-only surface, taken because the trigger&rsquo;s box belongs to the row it sits in.
+      A call site may state its own trigger fill and its own width floor as a descendant rule from its wrapper class &mdash; a divergence from this entry&rsquo;s prop-only surface, except stretching the trigger to its slot, which is the <code>fill</code> prop; the divergence is taken because the trigger&rsquo;s box belongs to the row it sits in.
       <code>id</code> and <code>name</code> are satisfied by an <code>aria-labelledby</code> from the trigger to the caption the labelled form renders, rather than by a <code>for</code>/<code>id</code> pair, because there is no labelable element carrying an <code>id</code> for a <code>for</code> to point at.
       It is not a <code>&lt;Field as="label"&gt;</code> CONTAINMENT, because a <code>&lt;label&gt;</code> FORWARDS a caption click into the control it names, and this control&rsquo;s panel is dismissed on <code>mousedown</code> while it is open, so from the open state the caption would dismiss the list and the forwarded click re-open it.
       The host is <code>&lt;Field as="div"&gt;</code> and the pointer is the whole mechanism; <code>name</code> is emitted on that button, valid and inert.
@@ -2555,7 +2585,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       And <code>triggerProps</code> is part of the declared surface because call sites drive their control by a <code>data-*</code> hook that a registry step, the mounted suites and the Foundry smoke all address.
       It is NOT enough for a native tooltip: <code>SearchablePopover</code> spreads it first and then writes <code>title</code>, <code>aria-label</code> and <code>aria-labelledby</code> from its own props, so any of the three placed in <code>triggerProps</code> is deleted.
       A <code>triggerTitle</code> pass-through and an <code>ariaDescribedBy</code> beside the two name props carry the DESCRIPTION the labelled form draws: its <code>hint</code> or <code>error</code> span carries an <code>id</code> the trigger points at, and a caller drawing its own conditional hint passes the id it drew.
-      Together they take the declared surface to <b>25 props</b>.<br><br><b>Declared with no caller on this commit</b>, and held by test rather than by a frame: <code>mono</code>, <code>icon</code>, <code>error</code>, <code>readonly</code>, and the option shape&rsquo;s <code>badge</code> and <code>disabledReason</code>.
+      The declared surface is <b>26</b> props, <code>fill</code> among them.<br><br><b>Declared with no caller on this commit</b>, and held by test rather than by a frame: <code>mono</code>, <code>icon</code>, <code>error</code>, <code>readonly</code>, and the option shape&rsquo;s <code>badge</code> and <code>disabledReason</code>.
       <code>triggerTitle</code> has two callers in the recipe studio, and <code>placeholder</code>, <code>invalid</code> and the option shape&rsquo;s <code>disabled</code> have one at the checks trigger editor&rsquo;s tier-step target.
       This register is CORRECTED as well as shortened, and it separates the component props from the option shape&rsquo;s fields, because the two <code>disabled</code>s are different declarations.
       The prop <code>label</code> has callers at the twelve interactables call sites, the prop <code>disabled</code> at <code>InteractableConfigRoot.svelte</code> and the manager&rsquo;s <code>BulkEditSelect.svelte</code>, and <code>hint</code> at the world currency provider field.
@@ -2665,7 +2695,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>inputProps</b> &mdash; the input&rsquo;s attributes, under the holder&rsquo;s own; a holder handler passed here is dropped with a warning</li>
         <li><b>listClass</b> &middot; <b>listProps</b> &middot; <b>listMaxHeight</b> = 148 &middot; <b>optionClass</b> &middot; <b>optionHeight</b> = 28 &middot; <b>optionDataAttr</b></li>
         <li><b>class</b> &middot; a rest spread on the field&rsquo;s root</li>
-        <li><b>options</b> [{ value, label, icon?, detail? }] &mdash; the DATA FORM, drawn while <b>source</b> is absent: each row a glyph, its label over a second line, and a tick at its end on the row matching <b>value</b>; <b>onChange</b>(value) &middot; <b>allowFree</b> + <b>onFreeText</b>(text) for Enter with no row active &middot; <b>error</b> &mdash; the select&rsquo;s invalid face with its message beneath, the list opening below the message &middot; <b>countLabel</b> &mdash; the field&rsquo;s own polite count</li>
+        <li><b>options</b> [{ value, label, icon?, detail? }] &mdash; the DATA FORM, drawn while <b>source</b> is absent: each row a glyph, its label over a second line, and a tick at its end on the row matching <b>value</b>; <b>onChange</b>(value) &middot; <b>allowFree</b> + <b>onFreeText</b>(text) for Enter with no row active &middot; <b>error</b> &mdash; the select&rsquo;s invalid face with its message beneath, the list opening below the message &middot; <b>countLabel</b> &mdash; the field&rsquo;s own polite count &middot; <b>openOnEmpty</b> &mdash; only the literal <code>true</code>: focus or ArrowDown on a blank query lists every row</li>
       </ul>
       </div>
     </div>
@@ -2708,7 +2738,34 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         A choice closes the list until the query is edited; Escape closes an open list keeping the text, and empties the text only once nothing is shown.
         A query that matches nothing shows <b>emptyLabel</b> as the panel&rsquo;s one quiet line in the muted ink and writes it into a polite status region the field always draws.</span>
     </div>
-    <div class="delta ok"><code>Typeahead</code> is published through <code>game.fabricate.api.ui</code> in its data form: <code>options</code>, the <code>query</code> value and <code>onQueryChange</code>, <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>placeholder</code>, <code>emptyLabel</code>, <code>allowFree</code> and <code>onFreeText</code>, <code>density</code> (the seam withholds <code>compact</code>) and <code>error</code>, at the <code>any</code> root under the standalone style root, its list the entry&rsquo;s overlay.
+    <div class="unit">
+      <span class="cap">the data form with <code>openOnEmpty</code> &mdash; focus on the empty field lists the whole short set, no row active</span>
+      <div style="width:300px">
+        <div class="k-field focus">
+          <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+          <span class="ph">Choose a scope&hellip;</span>
+        </div>
+        <div style="margin-top:4px;border-radius:6px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-md);padding:var(--fab-space-1);display:grid;gap:var(--fab-space-2xs);font-size:12px;font-weight:500;line-height:1.4">
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>World</span>
+          </div>
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text);background:var(--fab-surface-active)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>Party</span>
+            <span style="color:var(--fab-accent);font-size:11px">&#10003;</span>
+          </div>
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>Character</span>
+          </div>
+        </div>
+      </div>
+      <span class="k-hint">Only the literal <code>true</code> opens a blank query; the companion passes the whole set for <code>''</code> and still filters by its own query once typing starts.
+        Opening names no active row, so the first ArrowDown reaches the first; the first Escape closes the list and is stopped, a second passes on; ArrowDown reopens a list Escape, a choice or an outside press closed.
+        Fabricate&rsquo;s own typeaheads never pass it.</span>
+    </div>
+    <div class="delta ok"><code>Typeahead</code> is published through <code>game.fabricate.api.ui</code> in its data form: <code>options</code>, the <code>query</code> value and <code>onQueryChange</code>, <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>placeholder</code>, <code>emptyLabel</code>, <code>allowFree</code> and <code>onFreeText</code>, <code>density</code> (the seam withholds <code>compact</code>), <code>error</code> and <code>openOnEmpty</code>, at the <code>any</code> root under the standalone style root, its list the entry&rsquo;s overlay.
       The issue named it <code>Combobox</code>; the set already owns the meaning, so the published name is the component&rsquo;s own.
       The function props stay Fabricate&rsquo;s, and every rule the data form adds hangs on a class only it writes, so the four call sites above draw as before.</div>
     <div class="delta ok"><b>One shared control for the three typeahead comboboxes.</b>

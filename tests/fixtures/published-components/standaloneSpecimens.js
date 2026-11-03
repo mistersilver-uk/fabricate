@@ -278,6 +278,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       props: stepper({ size: 26 }),
       reach: reach('[data-stepper-decrement]'),
     },
+    'stepper-toolbar': {
+      props: stepper({ size: '34' }),
+      reach: reach('[data-stepper-decrement]'),
+    },
     'stepper-unset': {
       props: stepper({ value: null, allowUnset: true }),
       reach: reach('[data-stepper-decrement]'),
@@ -356,6 +360,7 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'select-form-chosen': closedSelect({ value: 'forge' }),
     'select-inline-chosen': closedSelect({ value: 'brew', size: 'inline' }),
     'select-toolbar-placeholder': closedSelect({ size: 'toolbar', placeholder: 'Choose a method' }),
+    'select-fill': closedSelect({ value: 'hand', fill: true }),
     'select-open': {
       props: selectProps({ value: 'forge' }),
       open: [{ key: 'ArrowDown' }],

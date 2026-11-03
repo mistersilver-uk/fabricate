@@ -1146,17 +1146,30 @@ The band adds no role and no name, so a `FillBar`, which has neither, drawn ther
 - **THEN** it inks `--fab-danger-text` and clears 4.5:1 on the danger fill in all seven palettes
 - **AND** the label inks `--fab-text-secondary` and clears 4.5:1 there too
 
-### Requirement: A stepper's dense rung keeps every pointer target at 24px
+### Requirement: A stepper's rungs keep every pointer target at 24px
 
 `Stepper` MUST take a `size` that is `26`, as a number or its string, which draws a horizontal stepper 26px tall and as wide as the default, with no padding inside its 1px edge, so each step button fills a 24 by 24 cell to that edge and the input a 24px-tall one.
-Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; the rung outranks `density` and pins `fill` at 26px.
+It MUST take a `size` that is `34`, as a number or its string, which draws the toolbar rung, level with the 34px `Field`, `Select`, `SearchField` and `SegmentedControl`: a horizontal stepper 34px tall and as wide as the default, with the default 2px padding inside its 1px edge, the input filling the 28px row as it does under `fill`, and each step button the default 22px face inside its 24 by 24 pointer target, its keyboard ring placed as at the default rung.
+Any other value MUST draw the default 28px stepper, and `density` `'comfortable'` the 30px one; each rung outranks `density` and sets `fill`'s height, 26px or 34px, and a filled stepper with no rung stays 38px tall.
+The group's corner is its band's: 7 at the 26, 28 and 30px groups, and 9 at the toolbar rung, filled or not, level with the 34px controls it sits beside; a filled stepper with no rung keeps 7 at 38px, as the library's stepper entry states.
+Under `fill` the input's own width MUST NOT hold its column wider than the buttons' row, so a filled stepper in a flex row or grid column narrows with the room it is given.
 No rung below 26 is published, because one would put a step button under its 24 by 24 pointer target (WCAG 2.2 success criterion 2.5.8).
-No in-app caller passes it: the rung exists for the published `Stepper`, whose companion draws a 26px quantity stepper inside a 38px row.
+No in-app caller passes either rung: they exist for the published `Stepper`, whose companions draw a 26px quantity stepper inside a 38px row and a stepper in a row of 34px toolbar controls.
 
 #### Scenario: A dense stepper is pressed at its edge
 
 - **WHEN** a published stepper at `size` `26` is hit-tested at its decrement button's outermost pixel and at the pixel beyond it
 - **THEN** the pointer lands on the button, and then on the stepper's own edge
+
+#### Scenario: A toolbar stepper stands level with its row
+
+- **WHEN** a published stepper at `size` `34` is drawn, filled or not
+- **THEN** it is 34px tall, its input fills the 28px row, and each step button's pointer target is 24 by 24 centred in that row
+
+#### Scenario: A filled stepper narrows with its column
+
+- **WHEN** a filled stepper sits in a flex row or grid column narrower than its input's own width
+- **THEN** the stepper ends inside the column, its input taking only the room the two buttons leave
 
 ### Requirement: Field-sized empty states match their associated controls
 
@@ -1978,6 +1991,7 @@ The difference between the two is INFORMATIONAL — it tells assistive technolog
 `Select` IS THE SEARCH-SUPPRESSED SHAPE OF THIS SAME PICKER: it announces `aria-haspopup="listbox"`, renders no query field, and uses the primitive's OWN trigger rather than a `trigger` snippet, so the combobox contract, the attribute-omission rule below and the naming route are the primitive's throughout.
 A caller composing the primitive's own trigger INHERITS the primitive's whole class family and its paint, so a composing primitive states its own shell against that inherited cascade rather than assuming a bare element — including the panel's inherited width floor and its inherited corner, neither of which a width PROP alone can change, because a floor declared in the sheet outranks an inline width.
 A per-call-site deviation from that shell — a caller's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
+The one exception is filling the slot: `Select`'s `fill` stretches the trigger to the width of the box it sits in, so the row still states the width, on that box, and a companion, which writes no rule naming a published component's part, gets a trigger that keeps one width whichever option is chosen; the select publishes no width of its own.
 And the panel is PORTALED to the nearest application root, so every driver that clicks an option — a capture step, a mounted test, a smoke step — addresses it from that root rather than from the trigger's own subtree, and a mounted suite declares the application root its production mount really has.
 
 The picker MUST name both surfaces it renders.
@@ -2004,8 +2018,9 @@ Its suggestion list is a floating surface, so it is portalled to the nearest app
 A suggestion list positioned inside its own row is clipped by that row's scrolling ancestor and lengthens the ancestor's scroll area instead of floating over the page.
 Its input is the HOLDER of the listbox contract above: DOM focus never leaves it, the holder's key map moves an active option it names through `aria-activedescendant`, and each suggestion is a `role="option"` row with `tabindex="-1"`.
 The list is open only while the input holds focus and its query is non-empty, and a choice closes it until the query is edited.
+In the data form, `openOnEmpty` at the literal `true` opens it on a blank query too, on focus or on `ArrowDown` once Escape, a choice or an outside press closed it, with no option active, so a short set is shown whole before any typing; Fabricate's own typeaheads never pass it.
 Each edit of the query leaves no option active, so a query typed again never brings an active option back, and `Enter` at the query a choice was made at commits nothing more.
-`Escape` empties the query from the holder rather than from the document, because an empty query is the only closed state this widget has.
+`Escape` empties the query from the holder rather than from the document, because without `openOnEmpty` an empty query is the only closed state this widget has; under `openOnEmpty` the emptied query keeps the list closed until focus, an edit or `ArrowDown`, as a choice does.
 `Enter` commits the active option, and with none active it commits nothing unless the call site's own requirement names what it commits.
 Its data form is the one `game.fabricate.api.ui` publishes: it takes its rows as `options` of `{ value, label, icon?, detail? }` in place of `source`, `itemLabel`, `itemIcon` and `onChoose`, reports a choice through `onChange` with the row's own `value`, and marks the row matching `value` with a tick and `aria-checked`, leaving `aria-selected` to the active option.
 With no option active, `Enter` in the data form commits the trimmed query through `onFreeText` only where `allowFree` asks, and `error` draws `Select`'s invalid face on its field with the message beneath it, named by `aria-describedby`, the list then opening below the message.
@@ -2651,6 +2666,9 @@ A component that states a reason of its own in a docblock is NOT exempt: the pre
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- ratchet-exempt(design-system): reason -->` marker on the line above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
 The gate compares with the base commit rather than with a recorded count, so a change may not add a native select, in a template or in a JavaScript dialog body, unless the element carries that marker; converting one is reported and never required.
 
+A select whose trigger must not change width as its value changes takes `fill` and sits in a box the caller sizes: the trigger takes the box's width at every rung, a label longer than it ends in an ellipsis with the chevron at the trailing edge, and the list measures the filled trigger as it measures any.
+Absent, the trigger hugs its label.
+
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
@@ -2674,6 +2692,12 @@ Two cases are known limits: the rail scope card fits the ring with no spare, and
 - **WHEN** a select's list is open and the user presses Tab
 - **THEN** the list closes without choosing and the trigger reads `aria-expanded="false"`
 - **AND** focus moves to the next control, and a `keydown` listener above the select hears the Tab
+
+#### Scenario: A filled select keeps its width as its value changes
+
+- **WHEN** a select with `fill` sits in a 240px box and the user chooses a label longer than the box
+- **THEN** the trigger stays 240px wide, the label ends in an ellipsis and the chevron stays at the trailing edge
+- **AND** the same select without `fill` widens to its new label
 
 ### Requirement: Art that is an identity is picked as a picture
 
@@ -2832,7 +2856,7 @@ The import flow — mapping folders, then reading the reference report — is th
 This is distinct from a one-shot confirmation, which stays `confirmDialog`, and from a Foundry-owned dialog, whose body is a cleaned HTML string rather than a mounted component.
 
 The modal portals into the application root, or into the host the overlay chain picks for a published mount, so it stacks above the window rather than beneath it, and its close control is named by `closeLabel`, which every Fabricate caller passes and the published entry requires, because it renders as an icon alone.
-It dismisses on an outside click and on Escape.
+It dismisses on an outside click, of the primary button, pressed down and released outside it, and on Escape; a press with another button or one dragged across its edge dismisses nothing.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
