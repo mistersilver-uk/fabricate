@@ -4547,7 +4547,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       A caller&rsquo;s scoped block cannot reach the leaf&rsquo;s element, so a meter&rsquo;s fill state arrives as a segment&rsquo;s <code>tone</code> or <code>color</code>, and the event scale&rsquo;s middle step is the named theme colour <code>--fab-hazard-mid</code> rather than a mix.
       <b>One gap is recorded rather than worked around:</b> two of the four hand-rolled fills declared a <code>transition: width</code>, one with a <code>prefers-reduced-motion</code> escape, and the leaf declares neither &mdash; so both bars move instantly.
       The run card and run detail stage tracks take a <code>--fab-space-chip</code> gap rather than <code>--fab-space-1</code>.
-      The leaf&rsquo;s centred fill takes a <code>neutralBand</code>: a reading inside it, its edge included, paints the neutral ink, and under forced colours a banded fill is solid beyond the band and a hollow ring within it where it is wide enough for one, and a thin banded track keeps an edge.<span class="cite">Measured in the View Lab</span></div>
+      The leaf&rsquo;s centred fill takes a <code>neutralBand</code>: a reading inside it, its edge included, paints the neutral ink, and under forced colours a banded fill is solid beyond the band and a hollow ring within it where it is wide enough for one.
+      Under forced colours every fill is drawn solid in the system text colour but for a banded fill within its band, which is a hollow ring, and a thin track keeps a 1px outline edge, so the extent is seen where the user agent would paint the fill to the ground, and a centred bar draws no midpoint mark in any mode because its fill starts at the midpoint.<span class="cite"><b>fill-bar-forced-colours-rendered.test.js</b></span></div>
   </div>
 <div class="spec" data-status="shipped" data-status-WorldClockChip="shipped">
     <div class="spec-head">
@@ -6502,7 +6503,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Canonical spec</h5>
         <ul>
-        <li><b>panel</b> radius 11 · <code>--fab-bg-1</code> · 1px <code>--fab-border-strong</code> · <code>--fab-shadow-lg</code> · <b>width</b> <code>min(560px, 100vw &minus; 48px)</code> by default; the 460px here is the specimen&rsquo;s stage, not a width the component draws</li>
+        <li><b>panel</b> radius 11 · <code>--fab-bg-1</code> · 1px <code>--fab-border-strong</code> · <code>--fab-shadow-lg</code> · <b>width</b> <code>min(560px, 100% &minus; 48px)</code> by default, where 100% is the viewport or a host that is the containing block of fixed content; the 460px here is the specimen&rsquo;s stage, not a width the component draws</li>
         <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in muted ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph.
           An optional <b>icon</b> is a 12px glyph in <code>--fab-accent-text</code> before the title, with the same 12px gap; none draws no element</li>
         <li><b>body</b> padded 16, its sections 16 apart</li>
@@ -6527,7 +6528,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>onClose</b> = no-op &mdash; called on the close button, on Escape inside the dialog and, with <b>closeOnOutsideClick</b>, on an outside click or an Escape outside it; the caller sets <b>open</b> false from it</li>
         <li><b>title · subtitle</b> &mdash; the dialog takes its accessible name from <b>title</b></li>
         <li><b>closeLabel</b> = 'Close' &mdash; the close renders as an icon alone, so it takes its own name</li>
-        <li><b>width</b> = 560px, clamped to the viewport &middot; <b>size</b> sm | md | lg = md &mdash; 500px, 560px and 620px through a class, so a published dialog states no inline style; a caller&rsquo;s <b>width</b> outranks it</li>
+        <li><b>width</b> = 560px, clamped to the box the dialog is centred in &middot; <b>size</b> sm | md | lg = md &mdash; 500px, 560px and 620px through a class, so a published dialog states no inline style; a caller&rsquo;s <b>width</b> outranks it</li>
         <li><b>icon</b> = '' &mdash; Font Awesome classes for the header glyph, hidden from assistive technology</li>
         <li><b>body</b> and <b>footer</b> snippets</li>
         <li><b>dialogProps</b> &mdash; an object spread onto the dialog element, for the caller&rsquo;s own <code>data-*</code> hooks only, never a <code>class</code></li>
@@ -6541,7 +6542,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
     <div class="delta">It is distinct from a core <code>DialogV2</code>: this is a mounted Svelte surface inside the application, for a multi-step flow with its own state; a one-shot confirmation is still <code>confirmDialog</code>.<span class="cite"><b>Modal.svelte</b> · <b>RollPrompt.svelte</b> · <b>ImportFolderMappingModal.svelte</b> · <b>ImportReportModal.svelte</b> · <b>ComponentAddFromCatalogueDialog.svelte</b></span></div>
     <div class="delta ok"><code>Modal</code> is published through <code>game.fabricate.api.ui</code>, with <code>trapFocus</code>, <code>initialFocus</code> and <code>footerLayout</code>, and with <code>icon</code> and <code>size</code>, and with <code>scrim</code>.
-      It draws no scrim unless <code>scrim</code> is <code>dim</code>, and its width and height caps follow the browser window, so a region it is hosted in clips it rather than shrinking it.</div>
+      It draws no scrim unless <code>scrim</code> is <code>dim</code>, and its height cap follows the browser window, so a region it is hosted in clips it rather than shortening it.</div>
     <div class="delta ok"><b>The subtitle inks <code>--fab-text-muted</code>.</b>
       The specimen&rsquo;s <code>--fab-text-subtle</code> measures 3.34&ndash;3.78:1 on <code>--fab-bg-2</code> in six palettes at 10.5px, under the 4.5:1 floor, and the spec already inks small text muted for the same reason; the size, weight and 1px gap are unchanged.</div>
   </div>

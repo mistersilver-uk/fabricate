@@ -4,7 +4,7 @@
  * borderless and `--fab-bg-3`, so its fill is the whole 6px, where `FillBar`'s own thin rule
  * draws 4px and the default track's 1px border leaves a 4px fill; under forced colours the thin
  * track keeps a 1px edge as the default one does; and a stage's shares split its fill by weight.
- * It also characterises, without promising, the forced-colours fill issue 2838 tracks.
+ * The fill itself is drawn in the system text colour there (issue 2838).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -34,6 +34,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${SCOPED.map((name) => scopedComponentCss(resolve(repoRoot, component(name))).css).join('\n')}</style>
 </head><body class="game"><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
   <span data-probe style="display:block;width:1px;height:1px;background:var(--fab-bg-3)"></span>
+  <span data-probe-text style="display:block;width:1px;height:1px;forced-color-adjust:none;background:canvastext"></span>
   ${markup}
 </div></body></html>`;
 
@@ -61,6 +62,7 @@ const rgb = (colour) => colour.match(/\d+/gu).slice(0, 3).join(' ');
 const measure = () =>
   tab.evaluate(() => {
     const probe = getComputedStyle(document.querySelector('[data-probe]')).backgroundColor;
+    const text = getComputedStyle(document.querySelector('[data-probe-text]')).backgroundColor;
     const rows = Object.fromEntries(
       [...document.querySelectorAll('[data-row]')].map((row) => [
         row.dataset.row,
@@ -73,6 +75,7 @@ const measure = () =>
             height: bar.getBoundingClientRect().height,
             border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => style[`border${side}Width`]),
             borderColor: style.borderTopColor,
+            outline: style.outlineStyle,
             background: style.backgroundColor,
             fill: fill.getBoundingClientRect().height,
             fillBackground: getComputedStyle(fill).backgroundColor,
@@ -85,7 +88,7 @@ const measure = () =>
         }),
       ])
     );
-    return { probe, rows };
+    return { probe, text, rows };
   });
 
 let rest;
@@ -156,15 +159,20 @@ describe('StageBars forms, rendered (issue 2837)', () => {
       }
     }
     assert.equal(forced.rows.thin[0].borderColor, forced.rows.default[0].borderColor);
+    for (const bar of forced.rows.thin) {
+      assert.equal(
+        bar.outline,
+        'none',
+        'FillBar’s outside edge would be clipped, so none is drawn'
+      );
+    }
   });
 
-  // A characterisation of CURRENT behaviour, not a contract: issue 2838 will give the fill a
-  // forced-colours paint, and this test is then expected to change with it.
-  it('characterises today’s forced colours: Chromium repaints the fill to the track’s own ground on either track (issue 2838 will change this)', () => {
+  it('draws the fill in the text colour under forced colours on either track, so it is told from the track’s ground', () => {
     for (const id of ['default', 'thin']) {
       const [full] = forced.rows[id];
-      assert.equal(rgb(full.fillBackground), rgb(full.background), `${id}: the fill is not seen`);
-      assert.notEqual(full.borderColor, full.background, `${id}: the edge is`);
+      assert.notEqual(rgb(full.fillBackground), rgb(full.background), `${id}: the fill is seen`);
+      assert.equal(full.fillBackground, forced.text, `${id}: in the text colour`);
       assert.notEqual(rest.rows[id][0].fillBackground, rest.rows[id][0].background);
     }
   });

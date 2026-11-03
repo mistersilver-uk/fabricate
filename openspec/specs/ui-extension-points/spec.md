@@ -876,11 +876,16 @@ Each group states the accepted values of every key that entry publishes.
     So the companion states the signed reading and its band as text beside the bar, as "+10, neutral".
     Under forced colours a bar whose `neutralBand` is above 0 draws its fill in the system text colour, solid beyond the band and as a hollow 1px ring within it, so the band is told by shape and the sign by side, never by colour alone.
     A fill only a few pixels wide has no room for the ring: in Chromium a reading of +2 on a 240px track, a fill about 2.4px wide, paints as a solid 2px mark, where +3, about 3.6px wide, shows its ring, so a reading that close to zero is told from one beyond the band by its width alone, and the companion's text carries the reading.
-    A `thin` bar whose `neutralBand` is above 0 also keeps a 1px edge in the system text colour, drawn outside its track, so its extent and midpoint stay visible.
-    A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract.
     Naming `neutralBand` is additive, so the entry's `version` stays 1, and a Fabricate that predates it refuses it with `"neutralBand" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track; any other value draws `default`.
     `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+    Under forced colours the user agent paints every background to the ground, so a fill is drawn solid in the system text colour instead, a single fill, a stack of shares and a centred fill alike, but for a banded bar's fill within its band, which is a hollow ring.
+    A caller's `color` is not drawn there.
+    A `thin` track keeps a 1px edge in the system text colour, drawn as an outline outside its own box, so its extent and midpoint stay visible and its fill keeps the whole 4px.
+    A parent that clips its overflow clips that outline, so the edge there is the parent's own.
+    A stack of shares is one solid fill there, so the companion states each share as text beside the bar.
+    A bipolar bar draws no midpoint mark, in any mode: its fill always starts at the midpoint, so the side it grows to tells the sign without colour, and a reading of zero draws an empty track.
+    Under forced colours a bipolar bar differs from a start-origin bar by the text beside it alone, because a reading of -100 draws the same pixels as a start-origin value of 50, so the companion states the signed reading as text.
     Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so the colour never carries a reading alone.
     The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
   - It is decorative: it has no role and no name and reaches no assistive technology, so the companion states the reading as text beside it.
@@ -900,6 +905,7 @@ Each group states the accepted values of every key that entry publishes.
     The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
     No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
     The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so the companion always states each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
+    Under forced colours the segments draw as one solid fill, as `FillBar`'s shares do, so the split is told by that text alone.
     A `segments` that is not an array (`null`, an object, a string or a number) faults the mount, which is contained as any render fault is.
     Drawing a second or later entry and reading an entry's `value` are additive, and `Meter`'s `version` stays 1: before them a second or later entry was reserved and an entry's `value` was unnamed and so private, and a one-entry list draws as it did.
     `describe` cannot tell a companion whether the running Fabricate draws segments: one that predates them draws the whole fill in the first entry's paint and refuses nothing, so the text beside the meter carries the segments on either.
@@ -1574,7 +1580,9 @@ Each group states the accepted values of every key that entry publishes.
   - `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as `FillBar`'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.
     Against the companion's ground the `thin` track itself is faint, 1.0:1 to 2.9:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, and in `foundry-native` on `--fab-bg-2` an empty stage cannot be seen at all: `--fab-bg-3` there is a shade darker than `--fab-bg-2`, at 1.00:1, so the companion passes `numbered` or states the stage count as text.
     Under forced colours the `thin` track keeps a 1px edge in the system text colour, as the `default` track's border is drawn there, so each bar's extent stays visible.
-    Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, so the companion states the reading as text.
+    Under forced colours the fill on either track is drawn solid in the system text colour, as `FillBar`'s is, and each bar keeps the track's own 1px edge in that colour.
+    The stage states, done, current and to do, and a stage's share split all draw the same solid fill there, so they are not told apart.
+    So the companion states each stage's state and reading as text beside the track.
     On the `thin` track the state paints read against `--fab-bg-3` as the thin `FillBar`'s tones do: the accent is under 3:1 in `hearth-herb` and `ironblood-forge`, the success in `foundry-native`, and the neutral in `hearth-herb`, `ironblood-forge` and `starglass-arcana`, the weakest the neutral in `hearth-herb` at 2.1:1, so `aria-current` and the companion's text, never the colour, say which stage is current and which are done.
     Naming `track` is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"track" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
@@ -2112,7 +2120,7 @@ Each group states the accepted values of every key that entry publishes.
     A name of white space alone leaves its element with no name, so the companion never passes one.
   - `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
     It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the padding box of the nearest ancestor that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do, such as your `overlayHost` region or a Foundry window scaled with a `transform`, and otherwise the viewport of the browser window that holds it.
     A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
     `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
@@ -2186,7 +2194,9 @@ Each group states the accepted values of every key that entry publishes.
     With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so a companion passes such a region to dim its own pane and nothing else, and the viewport where neither the region nor an element above it does, over a companion layer whose `z-index` is below 100 either way.
     A companion passes a region that does not itself scroll, such as the root that holds its scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
     The way for a companion to dim its own window is that contained host, a non-scrolling root of its own such as its studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+    The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+    A region wider than the browser window draws it at the region's width, and a region 48px wide or narrower draws it with no content width.
+    Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
     Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
@@ -3143,6 +3153,8 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` with an `overlayHost` that is a pane of its own inside a Fabricate window, over a layer of its own in that pane
 - **THEN** the dialog is drawn inside the pane, centred in it where the pane makes itself the containing block of fixed content and centred in the browser window's viewport where it does not
 - **AND** the dialog is drawn over the companion's layer and no layer of Fabricate's covers the pane
+- **AND** where the pane makes itself the containing block, a pane whose padding box is 420px wide holds a dialog of every `size` at most 372px wide, 24px from each side of that box and with its close control inside it, and a pane whose padding box is 720px wide leaves each rung at its own width
+- **AND** a pane wider than the browser window draws the dialog at the pane's width, past the window's edge
 
 #### Scenario: A dimmed published dialog
 
