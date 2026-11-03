@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
+import { pixelAt } from '../helpers/pagePixels.js';
 import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@overlay-host-styles/' });
@@ -236,24 +237,6 @@ describe('the Modal scrim over a region that scrolls', () => {
     assert.deepEqual(moved, [100, 100]);
   });
 });
-
-/** The `[r, g, b]` Chromium paints at the viewport pixel `x`, `y`. */
-async function pixelAt(page, x, y) {
-  const shot = await page.screenshot({ clip: { x, y, width: 1, height: 1 } });
-  return page.evaluate(
-    async (bytes) => {
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
-      const image = await createImageBitmap(blob);
-      const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      context.drawImage(image, 0, 0);
-      return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
-    },
-    [...shot]
-  );
-}
 
 /** A pixel of the window behind, right of its buttons, and one of the dialog's body. */
 const paintPoints = (page) =>

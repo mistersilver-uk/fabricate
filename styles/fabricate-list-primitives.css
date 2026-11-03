@@ -39,7 +39,7 @@
 }
 
 .fabricate-manager .manager-environments-toolbar {
-  max-height: 100px;
+  max-height: 112px;
   align-content: flex-start;
   overflow-y: auto;
 }

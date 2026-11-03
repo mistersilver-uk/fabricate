@@ -1459,7 +1459,8 @@ Each group states the accepted values of every key that entry publishes.
     The list opens against the trigger, and its placement inside the host is private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its trigger's height, corner, type size, weight and fill are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog; its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own, and its open list is drawn the same on the standalone layer as in the player window.
-  - The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so the companion leaves no room for one.
+  - While the trigger holds focus by keyboard it draws the accent ring, 2px wide and 2px clear, so it reaches 4px beyond the trigger on every side and the companion leaves that much inside any edge of its own that clips, and its 1px border also takes `--fab-accent-border`; a pointer press draws no ring.
+    The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette and against the trigger's own fill over each, at every `size`, and under forced colours it is drawn in a system colour apart from the ground.
   - An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus the companion moves focus first.
   - Foundry 14 gives the companion no signal when it moves a window between browser windows, and a select needs none: a list opened after the move is placed and heard in the window that then holds the trigger, as Overlays states.
 - **Private:** `Select`'s sizes beyond each rung's height and corner, its tick, chevron and colours beyond what its group states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, the list's placement and width, and how Fabricate redraws a select in its own toolbars, rows, cards and dialogs.
@@ -1685,6 +1686,7 @@ Each group states the accepted values of every key that entry publishes.
     An empty `tabs` draws the named tablist with no tab, so pass at least one item where the strip must be reachable.
   - The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
+  - Under forced colours the reader's colours repaint every tab's border in the text colour, so the selected tab's indicator is drawn in `Highlight` and 4px thick against the others' 2px, in a box of the same height, and the selected tab is told from the others by that indicator and not by its weight.
 - **`RadioCardGroup`.**
   - It is the design system's option cards (`<OptionCards>` in the library): a named `<fieldset>` of cards, one for each item of `options`, each holding a native `<input type="radio">`, for one choice among a few options.
   - `options` is required and is an array of `{ value, label, description, example, badge, icon }` items, one card each, drawn in that order.

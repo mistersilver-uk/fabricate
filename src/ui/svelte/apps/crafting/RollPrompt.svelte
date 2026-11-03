@@ -274,6 +274,9 @@
     flex: 1 1 auto;
     gap: var(--fab-space-4);
     min-height: 0;
+    /* The scroll box clips at its padding edge, so it holds the controls' 4px ring reach inside it and the margin hands that room back to the body's padding. */
+    padding: var(--fab-space-1);
+    margin: calc(var(--fab-space-1) * -1);
     overflow-y: auto;
     color: var(--fab-text);
   }

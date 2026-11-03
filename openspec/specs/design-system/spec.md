@@ -1731,6 +1731,7 @@ A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
 Apart from that fallback, an entry naming none of these renders exactly what it rendered before they existed.
+Under `forced-colors: active` the selected tab's indicator MUST be drawn in `Highlight` and 4px thick against the other tabs' 2px, in a box of the same height, because the reader's colours repaint every tab's transparent border in the text colour and the selected tab would otherwise differ by weight alone (issue 2897).
 
 #### Scenario: The selected id names no rendered tab
 
@@ -2599,6 +2600,13 @@ It ships and is exercised in BOTH polarities: kept for the scoped catalogue's la
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 A select's trigger lets Tab and Shift+Tab through, closing an open list without choosing as focus moves on, and stops every other key, and its list also closes once focus moves outside the trigger and the list, so a keyboard user never leaves an open list behind (issue 2598).
+
+A select's trigger marks keyboard focus with the module's 2px accent ring, 2px clear of the trigger so it reaches 4px beyond it on every side, beside the 1px edge turning to `--fab-accent-border` (issue 2893).
+The edge alone differs from the unfocused edge by 1.56:1 to 2.58:1 across the seven palettes, under the 3:1 of WCAG 2.2 success criteria 1.4.11 and 2.4.13, so the ring is what marks focus.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against each rung's own fill over them, at every size and in the read-only and invalid shapes.
+A pointer press draws no ring, and under forced colours the ring is drawn in a system colour apart from the ground.
+Because the ring is outset, a host that clips its descendants MUST leave 4px between a trigger and its clip edge, which is the reason the older inset ring on a flush `<select>` existed: the manager's environments filter bar and the roll prompt's scroll box now do, and `tests/components/select-ring-clip-rendered.test.js` measures every manager-select fixture subject against that reach.
+Two cases are known limits: the rail scope card fits the ring with no spare, and a Select that sits flush to a manager editor tab panel's left edge is not covered by the fixture subjects.
 
 #### Scenario: A select offers three plain options
 

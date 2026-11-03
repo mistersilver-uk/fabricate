@@ -1155,8 +1155,8 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
   // TWO STATES AND TWO AREAS, and the pair is the point. `:focus` is what a mouse leaves behind
   // and `.fabricate button:focus` must have stripped core's orange outline AND its 4px glow;
   // `:focus-visible` is what a keyboard leaves, and there the component's own rule has to beat
-  // `.fabricate button:focus-visible`'s 2px accent OUTSET outline with the specimen's "border to
-  // accent-border, no glow".
+  // `.fabricate button:focus-visible`'s 2px accent OUTSET outline with its own identical ring,
+  // beside the border moving to accent-border, and draw no glow (issue 2893).
   const context = await openLayoutContext({
     viewport: { width: 900, height: 400 },
     deviceScaleFactor: 1,
@@ -1255,23 +1255,15 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
         tokens['accent-border'],
         `${area}: the specimen's focus state is the BORDER moving to accent-border`
       );
-      assert.equal(
-        tabbed.outlineStyle,
-        'none',
-        `${area}: "no glow" — so the family's rule beats \`.fabricate button:focus-visible\`'s ` +
-          '2px accent outset outline at (0,2,1), which it does at (0,3,0) in the same layer'
+      assert.deepEqual(
+        [tabbed.outlineStyle, tabbed.outlineWidth, tabbed.outlineColour],
+        ['solid', '2px', tokens.accent],
+        `${area}: the 2px accent ring marks keyboard focus beside the border (issue 2893)`
       );
       assert.equal(
         tabbed.boxShadow,
         'none',
-        `${area}: and no ring is drawn as a shadow either. Because the winning rule draws NO ` +
-          'outset ring, the clipped-edge defect that the player select`s inset ring exists for ' +
-          'cannot arise for a converted control at all'
-      );
-      assert.notEqual(
-        tabbed.outlineColour,
-        tokens.accent,
-        `${area}: nor is the accent outline merely recoloured — it is gone`
+        `${area}: and no glow is drawn as a shadow, which the area reset's \`box-shadow: none\` holds`
       );
     }
   } finally {
