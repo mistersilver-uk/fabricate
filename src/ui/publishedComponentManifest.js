@@ -727,4 +727,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     standaloneRoot: true,
     overlays: true,
   }),
+  Object.freeze({
+    name: 'TintSwatches',
+    path: 'src/ui/svelte/components/TintSwatches.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      tints: Object.freeze({ kind: 'data' }),
+      labels: Object.freeze({ kind: 'data' }),
+    }),
+    rest: false,
+    root: 'any',
+    standaloneRoot: true,
+  }),
 ]);

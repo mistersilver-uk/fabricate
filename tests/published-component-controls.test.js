@@ -213,6 +213,10 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': 'format',
   // One row for each of `options` (issue 2860).
   'src/ui/svelte/components/Typeahead.svelte: button': 'options',
+  // One radio for each tint `tints` offers, all ten when it offers none (issue 2901).
+  'src/ui/svelte/components/TintSwatches.svelte: button': 'tints',
+  // The No-colour radio, drawn only beside `onClear`, which the entry does not publish.
+  'src/ui/svelte/components/TintSwatches.svelte: button[data-manager-color-none]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
@@ -272,6 +276,14 @@ const CLOSURE_NAMES = Object.freeze({
  * published keys whose items' text names it, and the mounted clause that reads its accessible name.
  */
 const OWN_NAMES = Object.freeze({
+  // Each tint's `labels` text, or else Fabricate's own name for it (issue 2901).
+  'src/ui/svelte/components/TintSwatches.svelte: button': {
+    entry: 'TintSwatches',
+    vocabulary:
+      "Each swatch is named by its tint's text in `labels`, or else by Fabricate's own name for the tint, which is English and is not localized.",
+    heldBy:
+      'tests/components/published-tint-swatches-mounted.test.js: the published TintSwatches names',
+  },
   // Each item's `label`, which the entry's group states is required.
   'src/ui/svelte/components/ActionMenu.svelte: button': {
     entry: 'ActionMenu',
@@ -555,6 +567,13 @@ const ENTRY_EVENTS = Object.freeze({
       tag: 'input',
       heldBy:
         'tests/components/published-segmented-control-mounted.test.js: the keyboard on the published SegmentedControl',
+    },
+  },
+  TintSwatches: {
+    onkeydown: {
+      tag: 'button',
+      heldBy:
+        'tests/components/published-tint-swatches-mounted.test.js: the keyboard on the published TintSwatches',
     },
   },
   SelectionCheckbox: {
@@ -1511,6 +1530,19 @@ const SCOPED_RINGS = Object.freeze({
         declarations: [
           ['outline', '2px solid var(--fab-accent)'],
           ['outline-offset', '2px'],
+        ],
+      },
+    ],
+  },
+  'src/ui/svelte/components/TintSwatches.svelte': {
+    statedBy:
+      "The `TintSwatches` swatch keeps its own ring, the picker's 2px accent outline inset by 2px on the swatch's edge, so it composes with the checked swatch's inset ring.",
+    rules: [
+      {
+        selector: '.fabricate-tint-swatch:focus-visible',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '-2px'],
         ],
       },
     ],

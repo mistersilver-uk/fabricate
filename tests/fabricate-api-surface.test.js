@@ -192,8 +192,7 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775, 2836, 2862 and 2860 headings, by name and in
+ * Each top-level bullet one component names under the spec's component-group headings, by name and in
  * the order the spec states them.
  */
 function specifiedComponentGroups() {
@@ -216,6 +215,7 @@ function specifiedComponentGroups() {
     'Disclosure',
     'Typeahead',
     'Popover',
+    'TintSwatches',
   ].flatMap((heading) => {
     const start = SPECIFIED.indexOf(`\n### ${heading}\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
@@ -319,6 +319,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Disclosure',
       'Typeahead',
       'Popover',
+      'TintSwatches',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -910,6 +911,19 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: false,
         root: 'any',
         overlays: true,
+      },
+      TintSwatches: {
+        version: 1,
+        props: {
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          tints: optional,
+          labels: optional,
+        },
+        rest: false,
+        root: 'any',
+        overlays: false,
       },
     });
     assert.deepEqual(

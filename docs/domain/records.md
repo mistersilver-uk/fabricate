@@ -640,7 +640,7 @@ The panel it holds draws in a Fabricate window's typeface and at Foundry's appli
 Fabricate removes it with `destroy` and with a fault, and it writes none under a Fabricate root.
 The standalone style root paints no ground, so the companion supplies the ground, and an entry drawn under it is refused (M16) where the target has no Fabricate root and its root node is a shadow root.
 An entry that states `standaloneRoot: true` states `root: 'any'`, and registration refuses `standaloneRoot` on any other root.
-The twenty-one entries drawn this way are `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `Select`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead` and `Popover`.
+The twenty-two entries drawn this way are `Button`, `IconButton`, `StatusToggle`, `InspectorCard`, `Well`, `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs`, `Pagination`, `Select`, `IconPicker`, `ActionMenu`, `Modal`, `ToggleCard`, `SelectionCheckbox`, `Disclosure`, `Typeahead`, `Popover` and `TintSwatches`.
 No design-system row scoped `manager-only` is published.
 The 31 rows are named in `openspec/specs/ui-extension-points/spec.md`, under Published UI Components.
 The published `Rail` is a section primitive, not the Manager rail.

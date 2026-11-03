@@ -3149,9 +3149,8 @@
   font-size: 0.8rem;
 }
 
-/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in and out over half a second; a highlight appears in the frame the state changes, on the trigger, the popover and the inline strip alike. */
-.fabricate-color-picker .manager-color-picker-trigger,
-.fabricate-color-picker-popover .manager-color-preset {
+/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in and out over half a second; a highlight appears in the frame the state changes. */
+.fabricate-color-picker .manager-color-picker-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3174,37 +3173,12 @@
 }
 
 .fabricate-color-picker .manager-color-picker-trigger:hover,
-.fabricate-color-picker .manager-color-picker-trigger:focus-visible,
-.fabricate-color-picker-popover .manager-color-preset:hover {
+.fabricate-color-picker .manager-color-picker-trigger:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 1px;
 }
 
-/* A swatch's keyboard cursor is the picker's inset outline, and follows the hover rule so a focused swatch under the pointer keeps it (issue 2416). */
-.fabricate-color-picker-popover .manager-color-preset:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: -2px;
-}
-
-.fabricate-color-picker-popover .manager-color-preset-grid {
-  display: grid;
-  gap: var(--fab-space-chip);
-}
-
-.fabricate-color-picker-popover .manager-color-preset {
-  border: 1px solid var(--fab-border);
-}
-
-/* A selected swatch is an inset ring at 3:1 on its fill, apart from the hover and cursor outlines (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
-.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch {
-  box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
-}
-
-.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch {
-  box-shadow: inset 0 0 0 2px var(--fab-text);
-}
-
-/* In the popover the swatch is a square tile's content (issue 2459): the selected tile keeps the soft ground, outranking the primitive's active ground, so the inset ring is the mark. */
+/* In the popover the swatch is a square tile's content (issue 2459): the selected tile keeps the soft ground, outranking the primitive's active ground, so its inset ring at 3:1 on the fill is the mark (`tint-picker-ring-contrast.test.js`). */
 .fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-option[aria-selected='true'] .manager-color-swatch {
   box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
 }

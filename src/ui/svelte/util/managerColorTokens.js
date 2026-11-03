@@ -3,7 +3,7 @@
 // gets from a colour cell (`aria-label` and `title`), so they live under a SHARED namespace —
 // `TintPicker` also draws the biome and character-modifier pickers, so the keys cannot sit
 // under `Essence.*`. Import-free, and `localize` is the caller's: every mount harness compiling
-// either colour component must copy this module verbatim, dependencies and all.
+// a colour component must copy this module verbatim, dependencies and all.
 export const MANAGER_COLOR_TOKENS = Object.freeze([
   Object.freeze({ token: 'sage', label: 'Sage' }),
   Object.freeze({ token: 'mist', label: 'Mist' }),
@@ -28,6 +28,15 @@ export const MANAGER_COLOR_TOKEN_KEY_PREFIX = 'FABRICATE.Admin.Manager.Colour.To
 export function normalizeManagerColorToken(value) {
   const token = String(value || '').replace(/^--fab-tag-/, '');
   return MANAGER_COLOR_TOKEN_KEYS.includes(token) ? token : 'sage';
+}
+
+// A caller's subset of the palette: an array's offered keys in its order, once each, exactly as
+// written; anything else, or an array naming none of them, offers all ten.
+export function offeredTintKeys(tints) {
+  const offered = Array.isArray(tints)
+    ? [...new Set(tints)].filter((token) => MANAGER_COLOR_TOKEN_KEYS.includes(token))
+    : [];
+  return offered.length > 0 ? offered : [...MANAGER_COLOR_TOKEN_KEYS];
 }
 
 // Interpolating the key is safe ONLY here: this module is the single producer over a frozen key set

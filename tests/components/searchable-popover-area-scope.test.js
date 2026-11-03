@@ -147,13 +147,12 @@ const PRIMITIVES = Object.freeze([
       'manager-color-picker',
       'manager-color-picker-popover',
       'manager-color-picker-trigger',
-      'manager-color-preset',
     ]),
-    // Measured at issue 2459, the box rule gone and the tile ring rooted on the picker panel: 12
-    // written, 17 family selectors, 15 owned, 2 caller overrides.
-    writtenFloor: 10,
-    familyFloor: 14,
-    ownedFloor: 12,
+    // Measured at issue 2901, the strip's cells gone to `TintSwatches`' scoped block: 6 written,
+    // 10 family selectors, 8 owned, 2 caller overrides.
+    writtenFloor: 5,
+    familyFloor: 9,
+    ownedFloor: 7,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-color-picker', root: 'fabricate-color-picker' }),
       Object.freeze({

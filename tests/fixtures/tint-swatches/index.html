@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TintSwatches — the published strip on the real runtime</title>
+    <!--
+      Served by `tests/components/published-tint-swatches-rendered.test.js` from a Vite dev server,
+      so `mount.js` mounts the REAL `TintSwatches` through the real published seam (issue 2901):
+      what a key moves and chooses, the names and states Chromium's tree reports and the marks the
+      strip draws are what its script and sheet do at runtime, which static markup cannot show.
+    -->
+    <link rel="stylesheet" href="/@tint-swatches-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+
+      [data-case] {
+        margin: 12px;
+        padding: 8px;
+        background: var(--fab-bg-1);
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="./mount.js"></script>
+  </body>
+</html>

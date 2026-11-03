@@ -96,6 +96,7 @@ manager-published-typeahead-no-match
 manager-published-typeahead-free-text
 manager-published-typeahead-open-on-empty
 manager-published-popover-specimen
+manager-published-tint-swatches-specimen
 published-standalone
 published-standalone-light
 published-standalone-select-open

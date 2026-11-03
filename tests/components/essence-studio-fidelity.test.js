@@ -23,7 +23,7 @@ const repoRoot = resolve(__dirname, '../..');
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
 const TINT_PICKER = 'src/ui/svelte/components/TintPicker.svelte';
-const colourPopoverSource = read(TINT_PICKER);
+const swatchesSource = read('src/ui/svelte/components/TintSwatches.svelte');
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
 // The GRID card's anatomy and look now live in the shared studio-library primitive.
@@ -56,30 +56,21 @@ function styleBlock(source) {
 
 describe('essence studio prototype fidelity (issue 1036)', () => {
   it('sizes the INLINE colour palette instead of letting its container size it', () => {
-    const styles = styleBlock(colourPopoverSource);
-
-    // The rendered symptom: the palette took the width of whatever hosted it.
+    // The strip is `TintSwatches` (issue 2901), which sizes its own cells.
+    const styles = styleBlock(swatchesSource);
     assert.ok(
-      styles.includes('.manager-color-picker-popover.is-inline .manager-color-preset {'),
-      'the inline palette must size its own cell'
-    );
-    assert.ok(
-      /\.manager-color-picker-popover\.is-inline \.manager-color-preset \{[^}]*aspect-ratio: auto;/s.test(
-        styles
-      ),
-      'and release the square constraint that made the cell as tall as the column is wide'
-    );
-    assert.ok(
-      /\.manager-color-picker-popover\.is-inline \.manager-color-preset \{[^}]*height: 28px;/s.test(
-        styles
-      ),
+      /\.fabricate-tint-swatch \{[^}]*height: 28px;/s.test(styles),
       'at a fixed swatch height rather than a derived one'
     );
     assert.ok(
-      /\.manager-color-picker-popover\.is-inline \.manager-color-preset-grid \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(44px, 1fr\)\);/s.test(
+      /\.fabricate-tint-swatches \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(44px, 1fr\)\);/s.test(
         styles
       ),
       'over auto-fit tracks, which is one row in the editor and two in the rail'
+    );
+    assert.ok(
+      !/aspect-ratio/.test(styles),
+      'with no square constraint to make a cell as tall as the column is wide'
     );
 
     // The popover is the picker's grid form at four columns (issue 2459), read from its call site.

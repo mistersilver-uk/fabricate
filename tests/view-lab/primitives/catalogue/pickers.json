@@ -477,7 +477,23 @@
       "presetsKey": "FABRICATE.Admin.Manager.Essence.Colour.Presets",
       "noneKey": "FABRICATE.Admin.Manager.Essence.Colour.None"
     },
-    "note": "Wired as `EssenceIdentityTab` wires its colour strip: the No-colour cell first, pressed because the row is `unset`. The No-colour cell's fa-slash inks --fab-text-secondary, which clears 3:1 on bg-3 in all seven themes (issue 2368)."
+    "note": "Wired as `EssenceIdentityTab` wires its colour strip: the No-colour radio first, checked because the row is `unset`. The No-colour cell's fa-slash inks --fab-text-secondary, which clears 3:1 on bg-3 in all seven themes (issue 2368)."
+  },
+  {
+    "spec": "<TintSwatches>",
+    "cap": "swatch strip — Rose checked, Mist under keyboard focus, Lavender under the pointer",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TintSwatches.svelte",
+    "inset": 4,
+    "note": "The shipped strip at rest, Rose checked; the drawing's focus and hover marks are states the Lab does not hold.",
+    "undrawn": {
+      "Activity colour": "the group's accessible name; the drawing names no group",
+      "rose": "the checked tint's key, which the drawing draws as Rose's ring"
+    },
+    "props": {
+      "value": "rose",
+      "ariaLabel": "Activity colour"
+    }
   },
   {
     "spec": "<TintPicker> <Menu>",

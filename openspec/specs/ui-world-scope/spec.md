@@ -590,6 +590,7 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
     The panel states the count the selection register states and offers `Clear selection`.
     `Icon` is offered from the essence icon set and `Colour` from the tint palette with no custom value, the same controls the world essence entry draws.
     Each axis is staged as leave unchanged or a value, and `Colour` alone may also stage no colour.
+    `Colour` is the tint strip's radio group with No colour as its first radio, so while the axis is left unchanged that radio is the group's Tab stop, and Space on it, or ArrowLeft from the first tint, Home or an arrow that wraps onto it, stages no colour for every selected essence; that stages a draft only, which Apply alone writes (issue 2901).
     Applying writes only the staged fields to each selected essence's WORLD record, through the essence family's `updateEntity`, one essence at a time with both staged fields in one patch.
     A cleared colour writes the empty token the entry's own clear writes.
     A write that does not answer `true`, or throws, is counted and the run continues.

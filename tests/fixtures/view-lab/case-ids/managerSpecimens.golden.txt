@@ -84,6 +84,9 @@ manager-published-typeahead-open-on-empty
 manager-published-popover-specimen
 manager-published-popover-specimen-foundry-native
 manager-published-popover-specimen-hearth-herb
+manager-published-tint-swatches-specimen
+manager-published-tint-swatches-specimen-foundry-native
+manager-published-tint-swatches-specimen-hearth-herb
 published-standalone
 published-standalone-light
 published-standalone-select-open

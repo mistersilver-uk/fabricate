@@ -416,6 +416,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedPopover.svelte',
   'tests/view-lab/fixtures/publishedPopoverSpecimen.js',
+  'tests/view-lab/fixtures/PublishedTintSwatches.svelte',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
@@ -7276,9 +7277,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Disclosure',
   'Typeahead',
   'Popover',
+  'TintSwatches',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox, Disclosure, Typeahead and Popover and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu, Modal, ToggleCard, SelectionCheckbox, Disclosure, Typeahead, Popover and TintSwatches and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -10452,7 +10454,7 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
     ).init
   ).elements.map((column) => frozen(column).elements.map((key) => key.value));
-  assert.equal(columns.flat().length, 25, 'the fixture lays twenty-five targets in its columns');
+  assert.equal(columns.flat().length, 26, 'the fixture lays twenty-six targets in its columns');
   for (const id of [
     'published-standalone',
     'published-standalone-light',

@@ -43,6 +43,7 @@ import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
+import TintSwatches from './svelte/components/TintSwatches.svelte';
 import ToggleCard from './svelte/components/ToggleCard.svelte';
 import Typeahead from './svelte/components/Typeahead.svelte';
 import Well from './svelte/components/Well.svelte';
@@ -88,6 +89,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Disclosure.svelte': Disclosure,
   'src/ui/svelte/components/Typeahead.svelte': Typeahead,
   'src/ui/svelte/components/Popover.svelte': Popover,
+  'src/ui/svelte/components/TintSwatches.svelte': TintSwatches,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

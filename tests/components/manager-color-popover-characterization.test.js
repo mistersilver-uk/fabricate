@@ -1,6 +1,7 @@
 /**
  * Characterization suite for `TintPicker` (issue 1036); its naming and marks (issue 2257); its
- * popover as `SearchablePopover`'s grid form (issue 2459). The shared cases run over both layouts.
+ * popover as `SearchablePopover`'s grid form (issue 2459); its strip as `TintSwatches`' radio group
+ * (issue 2901). The shared cases run over both layouts.
  */
 
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -29,6 +30,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...SEARCHABLE_POPOVER_COMPILED_MODULES,
+    'src/ui/svelte/components/TintSwatches.svelte',
     'src/ui/svelte/components/TintPicker.svelte',
   ],
   componentPath: 'src/ui/svelte/components/TintPicker.svelte',
@@ -69,8 +71,8 @@ function stageAnchor() {
  */
 const LAYOUTS = Object.freeze({
   inline: Object.freeze({
-    mark: 'aria-pressed',
-    group: '[role="group"]',
+    mark: 'aria-checked',
+    group: '[role="radiogroup"]',
     mount: (props, options) => harness.mount({ layout: 'inline', ...props }, options),
   }),
   popover: Object.freeze({
@@ -100,16 +102,16 @@ function onlyMarked(marked) {
   return Object.fromEntries(PRESETS.map(([token]) => [token, String(marked === token)]));
 }
 
-/** The inline strip's `aria-pressed`, the No-colour cell first under `none` when it renders. */
-function pressedStates(target) {
+/** The inline strip's `aria-checked`, the No-colour radio first under `none` when it renders. */
+function checkedStates(target) {
   const none = target.querySelector('[data-manager-color-none]');
-  const marks = markStates(target, 'aria-pressed');
-  return none ? { none: none.getAttribute('aria-pressed'), ...marks } : marks;
+  const marks = markStates(target, 'aria-checked');
+  return none ? { none: none.getAttribute('aria-checked'), ...marks } : marks;
 }
 
-function onlyPressed(pressed, { none = false } = {}) {
-  const marks = onlyMarked(pressed);
-  return none ? { none: String(pressed === 'none'), ...marks } : marks;
+function onlyChecked(checked, { none = false } = {}) {
+  const marks = onlyMarked(checked);
+  return none ? { none: String(checked === 'none'), ...marks } : marks;
 }
 
 /** The panel's footer action, by its text: the popover's No colour. */
@@ -278,7 +280,9 @@ for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
     it('paints each swatch from its own token through the `--manager-color-swatch` vehicle', async () => {
       const scope = await mount({ colorToken: 'sage', customColor: '#AABBCC' });
       const cell = scope.querySelector('[data-manager-color-token="mauve"]');
-      const painted = layout === 'inline' ? cell : cell.querySelector('.manager-color-swatch');
+      const painted = cell.querySelector(
+        layout === 'inline' ? '.fabricate-tint-swatch-fill' : '.manager-color-swatch'
+      );
       assert.match(
         painted.getAttribute('style'),
         /--manager-color-swatch:\s*var\(--fab-tag-mauve\)/,
@@ -288,25 +292,100 @@ for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
   });
 }
 
-describe('1036 TintPicker — the inline strip (issue 2257)', () => {
-  it('presses the selected cell alone, across every selection state', async () => {
+describe('1036 TintPicker — the inline strip (issues 2257, 2901)', () => {
+  it('checks the selected radio alone, across every selection state', async () => {
     const onClear = () => {};
     const target = await LAYOUTS.inline.mount({ colorToken: 'rose' });
-    assert.deepEqual(pressedStates(target), onlyPressed('rose'), 'a token presses its cell');
+    assert.deepEqual(checkedStates(target), onlyChecked('rose'), 'a token checks its radio');
+    assert.equal(
+      target.querySelectorAll('[role="radio"]').length,
+      10,
+      'each preset is a radio of the group'
+    );
 
     await harness.setProps({ colorToken: '', unset: true, allowNone: true, onClear });
     assert.deepEqual(
-      pressedStates(target),
-      onlyPressed('none', { none: true }),
-      'with the No-colour cell offered, unset presses that cell'
+      checkedStates(target),
+      onlyChecked('none', { none: true }),
+      'with the No-colour radio offered, unset checks that radio'
     );
 
     await harness.setProps({ noneSelected: false });
     assert.deepEqual(
-      pressedStates(target),
-      onlyPressed(null, { none: true }),
-      'a bulk stage left unchanged presses nothing at all'
+      checkedStates(target),
+      onlyChecked(null, { none: true }),
+      'a bulk stage left unchanged checks nothing at all'
     );
+  });
+
+  it('makes one radio the Tab stop beside the No-colour radio, in every selection state', async () => {
+    const stops = (target) =>
+      [...target.querySelectorAll('[role="radio"]')]
+        .filter((radio) => radio.getAttribute('tabindex') === '0')
+        .map((radio) => radio.dataset.managerColorToken ?? 'none');
+    const onClear = () => {};
+    const target = await LAYOUTS.inline.mount({
+      colorToken: '',
+      unset: true,
+      allowNone: true,
+      onClear,
+    });
+    assert.deepEqual(stops(target), ['none'], 'unset checks No colour, the one stop');
+
+    await harness.setProps({ colorToken: 'aqua', unset: false });
+    assert.deepEqual(stops(target), ['aqua'], 'a staged token is the one stop');
+    assert.equal(target.querySelector('[data-manager-color-none]').getAttribute('tabindex'), '-1');
+
+    await harness.setProps({ colorToken: '', unset: true, noneSelected: false });
+    assert.deepEqual(stops(target), ['none'], 'left unchanged, the first radio is the stop');
+    assert.equal(target.querySelectorAll('[aria-checked="true"]').length, 0);
+  });
+
+  it('reaches No colour by ArrowLeft and Home, and an arrow onto a checked No colour calls nothing', async () => {
+    const calls = [];
+    const props = {
+      colorToken: 'sage',
+      allowNone: true,
+      onClear: () => {
+        calls.push('clear');
+      },
+      onChange: (next) => {
+        calls.push(next.colorToken);
+      },
+    };
+    const target = await LAYOUTS.inline.mount(props);
+    const key = (selector, name) =>
+      target
+        .querySelector(selector)
+        .dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
+    key('[data-manager-color-token="sage"]', 'ArrowLeft');
+    assert.ok(document.activeElement?.hasAttribute('data-manager-color-none'), 'focus on None');
+    key('[data-manager-color-token="mist"]', 'Home');
+    assert.deepEqual(calls, ['clear', 'clear'], 'each lands on No colour and clears');
+
+    await harness.setProps({ ...props, colorToken: '', unset: true });
+    calls.length = 0;
+    key('[data-manager-color-token="sage"]', 'ArrowLeft');
+    key('[data-manager-color-token="azure"]', 'ArrowRight');
+    assert.deepEqual(calls, [], 'No colour is already checked, so nothing is called');
+  });
+
+  it('clears through the No-colour radio and chooses a preset by an arrow key', async () => {
+    const calls = [];
+    const target = await LAYOUTS.inline.mount({
+      colorToken: 'sage',
+      allowNone: true,
+      onClear: () => {
+        calls.push('clear');
+      },
+      onChange: (next) => {
+        calls.push(next.colorToken);
+      },
+    });
+    target.querySelector('[data-manager-color-none]').click();
+    const sage = target.querySelector('[data-manager-color-token="sage"]');
+    sage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    assert.deepEqual(calls, ['clear', 'mist'], 'No colour clears, and ArrowRight chooses Mist');
   });
 
   it('marks every cell for keyboard focus, so Foundry runs no keybinding while one holds it (issue 2784)', async () => {
