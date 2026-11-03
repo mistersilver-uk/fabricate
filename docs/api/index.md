@@ -2321,7 +2321,7 @@ The glyph is never the chip's name, so a chip whose meaning rests on it carries 
 Beside a label the label is hidden from assistive technology and `ariaLabel` is drawn beside it as visually hidden text, so the chip keeps no role and a reader hears the name once, as inline text, with no image role; so never put a control or other interactive content in a named chip's label.
 The name must contain the label's words as one run of whole words, as `Button`'s `ariaLabel` must, and a `mount` or `update` whose non-blank `ariaLabel` does not contain `children` throws `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")`; use it for a short label whose meaning needs more words, as `3` named `3 days waiting`.
 With `icon` and `ariaLabel` both non-blank, `children` may be absent, `''` or white space alone, which draws the icon-only chip: the glyph alone on a square, 20px at `default` and 15px at `list`, `role="img"` under `ariaLabel` with the glyph hidden from assistive technology, and `ariaLabel` written as its `data-tooltip-text`, which Foundry shows on pointer hover only; a rest `data-tooltip-text` you pass replaces that.
-An empty `children` with neither key throws `Chip requires a non-empty "children"`, as before, and with one of them throws `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys draws as before.
+An empty `children` with neither key throws `Chip requires a non-empty "children"`, as before, and with one of them throws `Chip requires a non-blank "<key>" when "children" is empty`, naming the missing `icon` or `ariaLabel`; a string of white space alone, or a value that is no string, counts as missing, and a `children` of white space alone without both keys is refused as an empty one.
 The icon-only chip is no control: it takes no focus and offers no target, so the 24px pointer-target floor (WCAG 2.2 success criterion 2.5.8) does not apply, and its tooltip opens on pointer hover only, so a keyboard or touch user never sees it: state the state in visible text in the row or detail the chip sits in, never in the glyph and its tooltip alone.
 Its glyph clears 3:1 against its fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` under every published `tone` and none, in every palette, with no `emphasis`, `dashed` or `bare`, which share that paint, and on the `outlined` and `solid` grounds; its tone is colour alone, drawn alike under forced colors: pass a glyph that differs for each state, as a check, a cross and a question mark, and say the state in `ariaLabel`.
 In Chromium's own accessibility tree the icon-only chip is an `image` named by `ariaLabel` with nothing beneath it, and a named labelled chip has no image role and holds the name as its one text, the label ignored.
@@ -2571,7 +2571,7 @@ const saved = fabUi.mount('Notice', {
 `children` is required and is the label, final display text, and the button's accessible name unless `ariaLabel` replaces it.
 The button hugs its label on one line while it has the room.
 Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: pass a short verb phrase and give the button the room for one line.
-A label of white space alone draws a button with no name, so never pass one.
+A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, with `Button requires a non-empty "children"`, even beside an `ariaLabel`, so the `ariaLabel` is never the only name a label-less button has.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
 The glyph never joins or replaces the name: a glyph-only button is [`IconButton`](#iconbutton).
 `ariaLabel` is optional final display text that replaces the label as the button's accessible name, for a label too short to say its verb, as a visible "+7" named "Credit +7 days to Mira".
@@ -2582,7 +2582,7 @@ A symbol is never read as a word and a word never matches part of another, so "+
 Where the runtime has no `Intl.Segmenter`, Fabricate splits words at spacing alone, so a label inside unspaced text is refused there.
 A `mount` or `update` whose non-blank `ariaLabel` does not contain it throws `"ariaLabel" must contain the text of "children" ("<label>" is not in "<name>")`, and an `update` leaves the earlier props drawn, so pass a matching `ariaLabel` in the `update` that changes `children`.
 Build `ariaLabel` by inserting the label string itself, as `format('… {label} …', { label: children })` with a format of your own, so it contains the label by construction, and put the label first where the language allows, because a translation that rewords or reorders the label's words makes `mount` throw M22.
-An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the component itself compares nothing, so the check is the seam's.
+An `ariaLabel` that is not a string, or is blank, writes no name and is compared with nothing, so the label stays the name; the seam drops it from the props, so the component never draws it, and the check is the seam's.
 `tooltip` is optional final display text, a hint the label does not say, as "Rewinds the clock by one day"; a `tooltip` that is not a string, or is blank, writes none.
 Fabricate writes it as `data-tooltip-text` on the button, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the button.
 Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `tooltip` or passes `disabled: true`, as the [`IconButton`](#iconbutton) section states; it closes only its own tooltip and does not stop Escape, which still bubbles to a `keydown` listener of yours above `target`, and whether Foundry's dismiss keybinding then also runs is not measured.
@@ -2787,6 +2787,7 @@ Fabricate writes `aria-pressed`, `aria-checked` and `role` from `semantics` and 
 The button is named by `label`, the text it draws beside its track, or, where you pass it, by `ariaLabel`, which must then hold that text.
 Pass `label`, `ariaLabel` or both: without either, `mount` refuses with `StatusToggle requires a non-empty "label"`.
 A `label` that is not a string is refused with `"label" must be a string`.
+A `label` of white space alone counts as absent, so it is refused where no non-blank `ariaLabel` is passed.
 And a blank `label` beside a non-blank `ariaLabel` draws nothing and names nothing.
 Beside a non-blank `label`, an `ariaLabel` that does not contain the label's words as one run of whole words is refused by `mount` and `update` with `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`.
 Over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes the label clears 4.5:1.
@@ -2800,7 +2801,7 @@ It is final display text, the same in both states, because `aria-pressed` or `ar
 `ariaLabel` and `label` name the setting so that "pressed" or "on" means the setting is in effect: "Group by category", "Hidden tasks".
 Neither states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
 Where you mount the switch without `label`, draw the setting's name as visible text beside the switch, from one string that you also pass as `ariaLabel`, and pass both again in any `update` that changes the text, so the spoken name always contains the words the user sees; that text does not press the switch unless you wire it to `onclick`, so where your words must press the switch, pass them as `label`.
-A name of white space alone leaves the switch with no name, so never pass one.
+An `ariaLabel` of white space alone is dropped and names nothing, so never rely on one.
 `aria-labelledby` is an `aria` prop: Fabricate writes it on the button.
 It is the id of your element that holds the visible name and nothing else, or several such ids separated by spaces, in the tree that holds `target`.
 The element may sit beside `target`; it need not be inside it.
@@ -4410,10 +4411,10 @@ An `update` keeps the same input, so focus stays on it while its state changes; 
 The input is named by `label`, the text its wrapping `<label>` draws, or, where you pass it, by `ariaLabel`, which must then hold that text.
 `label` is required final display text, drawn after the box and wrapping beside it, the box on its first line; it may be absent or `''` beside a non-blank `ariaLabel`, which waives it, and white space alone beside a non-blank `ariaLabel` draws as absent.
 Without either, `mount` refuses with `SelectionCheckbox requires a non-empty "label"`.
-A `label` of white space alone beside no `ariaLabel` leaves the input with no name, so never pass one.
+A `label` of white space alone beside no non-blank `ariaLabel` is refused as an empty one, with `SelectionCheckbox requires a non-empty "label"`.
 `ariaLabel` is optional final display text naming the input in place of `label`; beside a non-blank `label` it must contain the label's words as one run of whole words, or `mount` and `update` throw `"ariaLabel" must contain the text of "label" ("<label>" is not in "<name>")`, and beside no `label` it is the box's only name and the box draws alone.
 Pass it where the visible label is too short to say what ticking does, as "Ember salt spent when this stage begins" beside the label "Spent"; "Spend Ember salt when this stage begins" beside "Spent" is refused, because "Spent" is not among its words.
-A blank `ariaLabel` names nothing, so the name is the label's.
+An `ariaLabel` that is blank or not a string is dropped and names nothing, so the name is the label's.
 `checked` is `true` or `false`, and is required: `true` draws the box filled in the accent with a tick and states the input checked, and `false` draws it empty.
 Fabricate coerces nothing, so only `true` and `false` are in the contract: another truthy value, the string `'false'` among them, draws the box ticked, `0` and `null` draw it empty, and an absent or `''` `checked` is refused with `SelectionCheckbox requires a non-empty "checked"`.
 `indeterminate` is `true` or `false`, and `false` when absent: `true` draws the box edged in the accent on its soft fill with a dash in place of the tick, whatever `checked` is, and states the input mixed.
@@ -4715,9 +4716,9 @@ It is as wide as its content, at most 360px and at most its host's width less 16
 It is placed again when its document scrolls, when its window resizes, when an `update` changes `placement`, when the panel or the anchor changes size, and once per animation frame after its document changes, as when a reflow or a Foundry window's move shifts the anchor.
 While the anchor lies wholly outside its window's viewport or outside an ancestor that clips its overflow, as when its scroller scrolls it away, the panel is hidden, stays open and calls nothing, and it shows again when the anchor returns.
 `title` is optional final display text drawn as the panel's level-3 heading, a level you cannot change, and the dialog's name where no `ariaLabel` is passed.
-One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` and no `ariaLabel`, is refused with `Popover requires a non-empty "title"`.
+One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` and no `ariaLabel`, is refused with `Popover requires a non-empty "title"`, and a `title` of white space alone counts as `''`.
 `ariaLabel` is optional final display text that names the dialog in place of the heading; beside a `title` it must hold the title's words, in order and as whole words, or the mount is refused, so the spoken name starts from what is shown.
-Never pass a name of white space alone, which leaves the panel with no name.
+An `ariaLabel` of white space alone, or that is not a string, is dropped and names nothing; the `title` names the panel.
 `body` is a content slot whose element is a `<div>`, drawn below the heading in a padded column the panel spaces by `gap`, which scrolls when the panel's height is capped.
 Fill the slot before you open the popover, or in the same task, because focus moves into the panel a microtask after it is drawn.
 The body takes focus where the slot holds no control, and while it overflows with no control in it, it is also a Tab stop, so the keyboard scrolls it with the arrow keys, Page Up, Page Down, Home and End; it then draws the window's accent ring 2px wide inside its own edge.
@@ -4889,7 +4890,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   Where it also says that control carries Foundry's tooltip, `data-locked` throws the same.
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
   A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
-  A name that must contain a component's visible text, as `Button`'s `ariaLabel` its `children`, throws `"<key>" must contain the text of "<other>" ("<text>" is not in "<name>")` when it holds a non-blank string that does not contain that text's words as one run of whole words.
+  A name that must contain a component's visible text, as `Button`'s `ariaLabel` its `children`, is dropped when it is blank or not a string, so it writes no name, and throws `"<key>" must contain the text of "<other>" ("<text>" is not in "<name>")` when it holds a non-blank string that does not contain that text's words as one run of whole words.
   For a `SegmentedControl` option's `ariaLabel` and its `label`, `<key>` and `<other>` name the option, as `options[<index>].ariaLabel` and `options[<index>].label`.
 - `onFault` is optional, and is described with faults below.
 - `overlayHost` is optional, and is described under [Overlays](#overlays).
@@ -4910,7 +4911,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 - `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
-A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` (or white space alone where a `contains` key names it) where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 A required prop that its component's section lets be empty while other props hold text, as `Chip`'s `children` beside `icon` and `ariaLabel`, is refused with `<name> requires a non-blank "<other>" when "<key>" is empty` while only some of them do, naming the first that does not.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
