@@ -368,6 +368,7 @@ A prerelease promotion MAY advance the release line without a per-change review 
 
 When a forward-port would carry file content onto the prerelease line, it MUST establish mechanically that every commit it carries is attributable to a change reviewed **against the release line**, as **Release line change provenance** requires, and MUST NOT accept an operator's assertion that this is so.
 A change reviewed against a different line MUST NOT be treated as accounted for merely because that review took place and was merged.
+A non-merge commit is accounted for when a merge commit in the range is attributable to a change reviewed against the release line and introduced that commit, meaning it is reachable from that merge's later parents and not from its first, because that review covered every commit the merge brought in.
 A merge commit that introduces no content beyond what its parents already carry satisfies this without a review of its own; a merge commit that introduces content present in no parent does not.
 Whether a merge introduced content of its own MUST be established by reproducing the merge from its parents and comparing the result with what the merge recorded, never inferred from which files the merge touched, because a clean automatic merge and a merge carrying invented content touch exactly the same files.
 A forward-port that cannot establish change provenance MUST refuse, and MUST NOT treat an absence of evidence as an absence of unreviewed content.
@@ -384,6 +385,12 @@ A forward-port completed from a supplied resolution is subject to this requireme
 
 - **WHEN** it would carry a commit it cannot attribute to a change reviewed against the release line
 - **THEN** it fails, naming that commit, and does not offer the reader's own confirmation as the ordinary remedy
+
+#### Scenario: a commit carried into the release line by a reviewed merge
+
+- **WHEN** a commit's own recorded review is against another line, and a merge commit in the range belongs to a change reviewed against the release line and introduced that commit
+- **THEN** the commit is accounted for by that merge's review, and the forward-port proceeds without an override
+- **AND** a commit the merge did not introduce, or a merge commit, is not accounted for this way
 
 #### Scenario: the forward-port's own merge introduces content
 
