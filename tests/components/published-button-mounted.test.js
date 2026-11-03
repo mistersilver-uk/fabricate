@@ -165,15 +165,13 @@ describe('the published Button', () => {
     wide.handle.destroy();
   });
 
-  it('draws a label of markup as text, and a label of white space as a button with no name', async () => {
+  it('draws a label of markup as text, and refuses a label of white space, which names nothing', async () => {
     const marked = mountButton({ children: '<b>x</b>' });
-    const blank = mountButton({ children: ' ' });
     await settle();
     assert.equal(marked.button().textContent, '<b>x</b>');
     assert.ok(!marked.target.querySelector('b'), 'never parsed as markup');
-    assert.equal(blank.button().textContent, ' ', 'accepted, and drawn as passed');
     marked.handle.destroy();
-    blank.handle.destroy();
+    assertRefused({ children: ' ' }, 'Button requires a non-empty "children"');
   });
 
   it('lands a rest data attribute on the button itself, data-locked among them', async () => {
