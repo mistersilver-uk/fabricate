@@ -1852,11 +1852,11 @@ Each group states the accepted values of every key that entry publishes.
     `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
     It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
     Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
-    A screen reader announces the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+    A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
     Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
     Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
     A Fabricate that predates the description gives the hint to the pointer only.
-    A `title` that is not a string, or is white space alone, draws no tooltip.
+    A `title` that is not a string, or is white space alone, draws no tooltip and no description.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
     `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.

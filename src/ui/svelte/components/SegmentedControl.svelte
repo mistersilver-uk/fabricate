@@ -63,7 +63,7 @@
 
   // `34` and `'34'` both draw the 34px rung, as `Field`'s `size` does.
   const sizeClass = $derived([34, '34'].includes(size) ? ' is-size-34' : '');
-  // The hint's description node: a per-mount id from the control's `uid` and the option's index.
+  // Index-based, because an option's value may be a number or contain characters an id cannot.
   const hintId = (i) => `fabricate-segmented-${uid}-hint-${i}`;
   const textOf = (value) => (typeof value === 'string' && value.trim() ? value : undefined);
 

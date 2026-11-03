@@ -100,9 +100,8 @@ const radioOf = (id, value) => `[data-case="${id}"] input[value="${value}"]`;
 describe('an option hint in Chromium’s accessibility tree', () => {
   for (const id of ['first', 'second', 'compact']) {
     it(`describes each hinted radio of the ${id} control by its hint and leaves its name`, async () => {
-      const read = await Promise.all(
-        HINTED.map(({ value }) => chromiumAxDescribed(tab, radioOf(id, value)))
-      );
+      const read = [];
+      for (const { value } of HINTED) read.push(await chromiumAxDescribed(tab, radioOf(id, value)));
       assert.deepEqual(read, [
         { role: 'radio', name: 'Warn', description: HINTED[0].title },
         { role: 'radio', name: 'Fail, chosen by Mira', description: HINTED[1].title },
@@ -113,9 +112,8 @@ describe('an option hint in Chromium’s accessibility tree', () => {
 
   it('names the same radios the same with no hint, and describes none', async () => {
     for (const id of ['bare', 'compact-bare']) {
-      const read = await Promise.all(
-        BARE.map(({ value }) => chromiumAxDescribed(tab, radioOf(id, value)))
-      );
+      const read = [];
+      for (const { value } of BARE) read.push(await chromiumAxDescribed(tab, radioOf(id, value)));
       assert.deepEqual(read, [
         { role: 'radio', name: 'Warn', description: '' },
         { role: 'radio', name: 'Fail, chosen by Mira', description: '' },
