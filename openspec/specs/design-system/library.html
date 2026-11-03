@@ -4547,7 +4547,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       A caller&rsquo;s scoped block cannot reach the leaf&rsquo;s element, so a meter&rsquo;s fill state arrives as a segment&rsquo;s <code>tone</code> or <code>color</code>, and the event scale&rsquo;s middle step is the named theme colour <code>--fab-hazard-mid</code> rather than a mix.
       <b>One gap is recorded rather than worked around:</b> two of the four hand-rolled fills declared a <code>transition: width</code>, one with a <code>prefers-reduced-motion</code> escape, and the leaf declares neither &mdash; so both bars move instantly.
       The run card and run detail stage tracks take a <code>--fab-space-chip</code> gap rather than <code>--fab-space-1</code>.
-      The leaf&rsquo;s centred fill takes a <code>neutralBand</code>: a reading inside it, its edge included, paints the neutral ink, and under forced colours a banded fill is solid beyond the band and a hollow ring within it where it is wide enough for one, and a thin banded track keeps an edge.<span class="cite">Measured in the View Lab</span></div>
+      The leaf&rsquo;s centred fill takes a <code>neutralBand</code>: a reading inside it, its edge included, paints the neutral ink, and under forced colours a banded fill is solid beyond the band and a hollow ring within it where it is wide enough for one.
+      Under forced colours every fill is drawn solid in the system text colour but for a banded fill within its band, which is a hollow ring, and a thin track keeps a 1px outline edge, so the extent is seen where the user agent would paint the fill to the ground, and a centred bar draws no midpoint mark in any mode because its fill starts at the midpoint.<span class="cite"><b>fill-bar-forced-colours-rendered.test.js</b></span></div>
   </div>
 <div class="spec" data-status="shipped" data-status-WorldClockChip="shipped">
     <div class="spec-head">
