@@ -4,7 +4,7 @@
  * neutral ink on its own side of the midpoint and one beyond it the sign's ink; under forced
  * colours a banded bar draws its fill in the system text colour, solid beyond the band and as a
  * hollow 1px ring within it, so the two differ by shape as well as by side, while a bar with no
- * band is left to the user agent, which today repaints its fill to the forced ground (issue 2838).
+ * band is solid throughout (issue 2838).
  * The ring needs room: a fill about 2.4px wide paints solid, which is pinned beside one that keeps
  * it, and a thin banded track keeps an outline edge that leaves its 4px fill room for the ring.
  */
@@ -230,10 +230,9 @@ describe('FillBar neutral band, rendered (issue 2863)', () => {
     assert.match(inside(rows['thin-beyond'].run), /^#+$/u);
   });
 
-  it('leaves a bar with no band to the user agent, which repaints its fill to the forced ground', () => {
+  it('draws a bar with no band solid in the text colour under forced colours, as a banded one beyond its band', () => {
     const { rows } = forced;
-    const channels = (colour) => colour.match(/\d+/gu).slice(0, 3).join(' ');
-    assert.equal(channels(rows.unbanded.paint), channels(forced.probes.canvas));
+    assert.equal(rows.unbanded.paint, forced.probes.text);
     assert.equal(rows.unbanded.ring[0], 'none');
   });
 });
