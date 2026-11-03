@@ -530,7 +530,7 @@ The distinction is a domain fact and is decided per field from what the model st
 **Formatted numeric values.**
 A formatted stepper is a `role="spinbutton"` text input that commits a valid finite value on Enter or blur, and nothing while the GM types.
 Its `inputmode` is `text` for the signed built-in, whose minus key a decimal keypad can lack, and `decimal` otherwise.
-The Manager's text-field baseline draws no box on it, so it computes the same field in every window.
+The Manager's text-field baseline draws no box on it, so outside the rows and cards that redraw it, it computes the same field in every window.
 Enter never submits an enclosing form, invalid or partial text restores the committed display, and Escape during an edit restores it without blurring and without reaching Foundry's bindings.
 Stepping moves to the nearest strictly greater or smaller stop, so an off-list value stays exact until it is stepped, and Home and End select the lowest and highest numeric stops.
 A caller-named null endpoint (Otherwise) is distinct from an unset value: the endpoint sits one step below the lowest stop, renders its label and states it in `aria-valuetext` with no `aria-valuenow`, while an unset value renders the placeholder and persists null.

@@ -2975,7 +2975,8 @@ The stepper does not catch Escape, except under `format` as stated for it: the i
 Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
 Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
 `Stepper` takes no rest props, so a `data-*` prop, an `id` and a `title` are refused with `"<key>" is not a prop of Stepper`.
-`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`, and the Manager's text-field baseline draws no box on the `format` field.
+`Stepper` is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window that holds `target` in no `<form>`.
+The Manager's text-field baseline draws no box on the `format` field.
 A DialogV2's content is always a `<form>`, so do not mount the stepper in one, as the sentence on Enter above states.
 Give `target` `display: flex` and align your own label to the stepper by centring.
 The input and the two buttons are the only focusable elements inside `target`.

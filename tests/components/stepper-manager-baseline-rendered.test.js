@@ -61,7 +61,10 @@ const ROOTS = Object.freeze({
 /** The page head with the module sheet in `layer(modules)`, or flat where `layered` is false. */
 const headOf = (layered) => {
   const head = renderedPageHead(['Stepper']);
-  return layered ? head : head.replace(`@layer modules {${readStylesheet()}}`, readStylesheet());
+  if (layered) return head;
+  const flat = head.replace(`@layer modules {${readStylesheet()}}`, () => readStylesheet());
+  assert.notEqual(flat, head, 'the layer wrapper was found and removed');
+  return flat;
 };
 
 for (const [cascade, layered] of Object.entries({ layered: true, flat: false })) {
@@ -71,9 +74,11 @@ for (const [cascade, layered] of Object.entries({ layered: true, flat: false }))
 
     before(async () => {
       const hosts = [];
+      const shown = {};
       for (const [id, props] of Object.entries(CASES)) {
         const { target, handle } = mountEntry('Stepper', { ...BASE, ...props });
         await settle();
+        shown[id] = target.querySelector('input').value;
         for (const [root, classes] of Object.entries(ROOTS)) {
           hosts.push(
             `<div class="${classes}" data-root="${root}"><div data-case="${id}" style="width:240px">${target.innerHTML}</div></div>`
@@ -90,6 +95,12 @@ for (const [cascade, layered] of Object.entries({ layered: true, flat: false }))
           `</div></body></html>`,
         { waitUntil: 'load' }
       );
+      // `innerHTML` carries no input value, so each field is given the text it mounted with.
+      await tab.evaluate((values) => {
+        for (const input of document.querySelectorAll('[data-case] input')) {
+          input.value = values[input.closest('[data-case]').dataset.case];
+        }
+      }, shown);
     });
 
     after(async () => {
@@ -103,6 +114,7 @@ for (const [cascade, layered] of Object.entries({ layered: true, flat: false }))
           const style = getComputedStyle(input);
           return {
             ...Object.fromEntries(properties.map((name) => [name, style[name]])),
+            shown: input.value,
             clipped: input.scrollWidth > input.clientWidth,
           };
         }, PROPERTIES);
@@ -112,7 +124,9 @@ for (const [cascade, layered] of Object.entries({ layered: true, flat: false }))
         const bare = await computed('bare', id);
         const manager = await computed('manager', id);
         assert.deepEqual(manager, bare);
+        if (id === 'endpoint') assert.equal(manager.shown, 'No limit');
         assert.equal(manager.borderTopWidth, '0px', 'the field draws no border of its own');
+        assert.notEqual(manager.shown, '', 'the field holds its text');
         assert.equal(manager.clipped, false, 'the text fits the field');
       });
     }

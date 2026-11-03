@@ -1436,7 +1436,8 @@ Each group states the accepted values of every key that entry publishes.
     Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
     Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
   - It takes no rest keys, so a `data-*` key, an `id` and a `title` are refused (M8).
-  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`, and the Manager's text-field baseline draws no box on the `format` field.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`.
+    The Manager's text-field baseline draws no box on the `format` field.
     A DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states.
     The companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
