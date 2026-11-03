@@ -192,8 +192,7 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647, 2652, 2656, 2784, 2775, 2836, 2862, 2860, 2861 and 2901 headings, by name and in
+ * Each top-level bullet one component names under the spec's component-group headings, by name and in
  * the order the spec states them.
  */
 function specifiedComponentGroups() {
@@ -216,7 +215,7 @@ function specifiedComponentGroups() {
     'Disclosure',
     'Typeahead',
     'Popover',
-    '2901',
+    'TintSwatches',
   ].flatMap((heading) => {
     const start = SPECIFIED.indexOf(`\n### ${heading}\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
