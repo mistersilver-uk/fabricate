@@ -535,16 +535,15 @@ describe('the published SelectionCheckbox’s decorative form (issue 2881)', () 
 
 describe('the published SelectionCheckbox’s tone (issue 2881)', () => {
   it('marks a ticked success box, on the labelled and the decorative form, at every density', async () => {
-    for (const density of ['compact', 'default', 'comfortable']) {
-      const labelled = mountBox({ checked: true, tone: 'success', density });
-      const decorative = mountDecorative({ checked: true, tone: 'success', density });
-      await settle();
-      for (const { box } of [labelled, decorative]) {
-        assert.ok(box().classList.contains('is-success'), density);
-        assert.ok(box().querySelector('i.fa-check'), 'the tick still carries the state');
-      }
-      labelled.handle.destroy();
-      decorative.handle.destroy();
+    const held = ['compact', 'default', 'comfortable'].flatMap((density) => [
+      mountBox({ checked: true, tone: 'success', density }),
+      mountDecorative({ checked: true, tone: 'success', density }),
+    ]);
+    await settle();
+    for (const { box, handle } of held) {
+      assert.ok(box().classList.contains('is-success'), box().className);
+      assert.ok(box().querySelector('i.fa-check'), 'the tick still carries the state');
+      handle.destroy();
     }
   });
 
