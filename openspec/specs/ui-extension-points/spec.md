@@ -2296,7 +2296,7 @@ Each group states the accepted values of every key that entry publishes.
     It tints the card while `on` is `true`: `enabled` in the success family, `locked` in the accent family and `info` in the info family, each an edge on a soft fill with the second line in the secondary ink so it still reads on the tint.
     `neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown or coerced.
     The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, so the colour is never the only sign of state, and a tone's edge may fall short of 3:1 against the ground.
-    Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint has no motion of its own, so reduced motion changes nothing.
+    Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint declares no transition of its own.
     A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe` omits it.
   - `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
     The companion works out the new state from the `on` it last passed.

@@ -1,6 +1,6 @@
 <!--
-  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle. Its five
-  classes' rules are rooted at `fabricate-toggle-card`, so the card paints the same in a bare
+  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle. Its rules
+  are rooted at `fabricate-toggle-card`, so the card paints the same in a bare
   `<div>` as in the manager. String props are PRE-LOCALIZED, which keeps this a presentational leaf.
 
   Props:

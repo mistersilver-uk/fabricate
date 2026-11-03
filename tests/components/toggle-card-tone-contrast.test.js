@@ -1,7 +1,8 @@
 /**
  * The published `ToggleCard`'s tones, read off the shipped rules over the seven palettes on the four
  * grounds a card is mounted on: the title clears 4.5:1 on every toned fill, the sub line too in the
- * secondary ink a toned card takes (the muted ink falls short on a toned fill, where pinned), the
+ * secondary ink a toned card takes (the muted ink falls short on some tones and grounds, where pinned),
+ * the Tool editor's neutral repaint keeping the muted ink, the tone rules declaring no transition, the
  * switch's accent track clears 3:1 against every toned fill and the knob 3:1 on the track, and a
  * toned glyph clears 3:1. Every tone's edge falls short of 3:1 against the ground in some palette,
  * which is why the switch and its words carry the state rather than the card's edge or fill.
@@ -10,7 +11,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
-import { declaredToken, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls,
+  themePalettes,
+} from '../helpers/themePaletteContrast.js';
 
 const SHEET = 'styles/fabricate.css';
 const corpus = collectStyleCorpus();
@@ -54,15 +60,53 @@ test('a toned, on card draws its sub line in the secondary ink, which clears 4.5
     'color'
   );
   assert.equal(resting, '--fab-text-muted');
-  assert.deepEqual(shortfalls(themes, resting, ['--fab-surface-soft', '--fab-bg-2']), []);
+  for (const ground of GROUNDS) {
+    assert.deepEqual(shortfalls(themes, resting, ['--fab-surface-soft', ground]), [], ground);
+  }
   for (const [tone, cls, family] of TONES) {
     const ink = token(`${ON(cls)} .manager-recipe-status-sub`, 'color');
     assert.equal(ink, '--fab-text-secondary', tone);
-    for (const ground of GROUNDS) assert.deepEqual(shortOn(ink, family, ground), [], tone);
+    for (const ground of GROUNDS) {
+      assert.deepEqual(shortOn(ink, family, ground), [], tone);
+      assert.deepEqual(
+        shortfalls(themes, ink, [`--fab-${family}-soft`, '--fab-surface-soft', ground]),
+        [],
+        `${tone} on a card nested in a soft panel over ${ground}`
+      );
+    }
     assert.ok(
       GROUNDS.some((ground) => shortOn(resting, family, ground).length > 0),
       `${tone}: the muted ink falls short somewhere, which is why the secondary one is drawn`
     );
+  }
+});
+
+test('the Tool editor’s system-enabled card keeps its neutral fill and the resting muted sub ink, which clears 4.5:1 on that fill', () => {
+  const card =
+    '.fabricate-manager .manager-tool-system-enabled > .manager-recipe-status-card.is-enabled.is-on';
+  assert.equal(token(card, 'background'), '--fab-surface-soft');
+  assert.equal(token(card, 'border-color'), '--fab-border');
+  const ink = token(`${card} .manager-recipe-status-sub`, 'color');
+  assert.equal(ink, '--fab-text-muted');
+  for (const ground of GROUNDS) {
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-surface-soft', ground]), [], ground);
+  }
+});
+
+test('the tone rules declare no transition or animation of their own', () => {
+  const toned = sheet.filter((rule) =>
+    splitSelectorList(rule.selector).some(
+      (selector) =>
+        selector.includes('.fabricate-toggle-card') &&
+        /\.is-(enabled|locked|info)\b/u.test(selector)
+    )
+  );
+  assert.ok(toned.length >= 6, 'the card’s tone rules were found');
+  for (const rule of toned) {
+    const names = [...propertiesOf(rule).keys()].filter((name) =>
+      /^(transition|animation)/u.test(name)
+    );
+    assert.deepEqual(names, [], rule.selector);
   }
 });
 

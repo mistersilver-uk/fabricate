@@ -4376,7 +4376,7 @@ It tints the card while `on` is `true`: `enabled` in the success family, `locked
 `neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown.
 Choose it by what the setting means to your user, `enabled` for a preference that is switched on, `locked` for one that is enforced and `info` for an informational policy.
 The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, and a tone's edge falls short of 3:1 against the ground in some palettes, so never rely on the colour to say it.
-Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint has no motion of its own.
+Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint declares no transition of its own.
 A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe('ToggleCard').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
 Work out the new state from the `on` you last passed.

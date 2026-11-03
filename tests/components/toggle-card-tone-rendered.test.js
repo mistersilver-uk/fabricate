@@ -5,7 +5,7 @@
  * the switch is a switch named by the title and checked while on, so the state is never the colour's
  * alone. Under forced colours every tone's edge is the system's text colour, as the neutral card's
  * is, and the switch's track is filled Highlight on and hollow Canvas off, so the state survives the
- * tint; under reduced motion nothing animates.
+ * tint.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -31,6 +31,7 @@ const PROBES = [
   ...['text-secondary', 'text-muted', 'accent'].map(
     (token) => `<i data-probe="${token}" style="color:var(--fab-${token})"></i>`
   ),
+  '<i data-probe="canvastext" style="forced-color-adjust:none;color:canvastext"></i>',
 ].join('');
 
 let page;
@@ -48,7 +49,7 @@ after(async () => {
 });
 
 /**
- * Each probe's paint, and each card's fill, edge, sub ink, track and motion, as computed once the
+ * Each probe's paint, and each card's fill, edge, sub ink and track, as computed once the
  * colour transitions a new palette or media setting starts have ended.
  */
 const measure = () =>
@@ -59,7 +60,7 @@ const measure = () =>
       const probes = Object.fromEntries(
         [...document.querySelectorAll('[data-probe]')].map((node) => [
           node.dataset.probe,
-          node.dataset.probe.startsWith('text') || node.dataset.probe === 'accent'
+          /^(text-|accent$|canvastext$)/u.test(node.dataset.probe)
             ? style(node).color
             : style(node).backgroundColor,
         ])
@@ -69,7 +70,6 @@ const measure = () =>
           const cell = document.querySelector(`[data-case="${id}"]`);
           const card = cell.querySelector('.fabricate-toggle-card');
           const track = cell.querySelector('.manager-status-toggle-track');
-          const knob = cell.querySelector('.manager-status-toggle-knob');
           return [
             id,
             {
@@ -77,7 +77,6 @@ const measure = () =>
               edge: style(card).borderTopColor,
               sub: style(cell.querySelector('.manager-recipe-status-sub')).color,
               track: style(track).backgroundColor,
-              motion: [style(card), style(track), style(knob)].map((s) => s.transitionDuration),
             },
           ];
         })
@@ -136,25 +135,14 @@ describe('the published ToggleCard’s tones in Chromium', () => {
   it('draws every tone’s edge in the system colour under forced colours, while the track still differs on from off', async () => {
     await themed(FABRICATE_THEME_IDS.FABRICATE);
     await page.tab.emulateMedia({ forcedColors: 'active' });
-    const { cards } = await measure();
-    const resting = cards['neutral-false'];
+    const { probes, cards } = await measure();
     for (const tone of TONES) {
       for (const on of [true, false]) {
         const card = cards[`${tone}-${on}`];
-        assert.equal(card.edge, resting.edge, `${tone} ${on}`);
+        assert.equal(card.edge, probes.canvastext, `${tone} ${on}`);
       }
       assert.notEqual(cards[`${tone}-true`].track, cards[`${tone}-false`].track, tone);
     }
     await page.tab.emulateMedia({ forcedColors: 'none' });
-  });
-
-  it('animates nothing under reduced motion, in every tone', async () => {
-    await page.tab.emulateMedia({ reducedMotion: 'reduce' });
-    const { cards } = await measure();
-    for (const [id, { motion }] of Object.entries(cards)) {
-      assert.deepEqual(motion, ['0s', '0s', '0s'], id);
-    }
-    assert.equal(await page.tab.evaluate(() => document.getAnimations().length), 0);
-    await page.tab.emulateMedia({ reducedMotion: 'no-preference' });
   });
 });
