@@ -301,6 +301,9 @@ const LAYER_LIST =
   'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover';
 /** One option of a list, by the value the fixture passes. */
 const SELECT_OPTION = (list, value) => `${list} [data-popover-option="${value}"]`;
+/** The modal dialog of the `published-select-modal` specimen, and the list its select opens in it. */
+const SELECT_DIALOG = '[data-lab-select-dialog]';
+const DIALOG_LIST = `${SELECT_DIALOG} > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover`;
 
 /** Each trigger inside the ground, and the ground inside the window. */
 const SELECT_CONTAINMENT = Object.freeze([
@@ -1631,6 +1634,27 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-modal-dialog',
+    label:
+      'Specimen, mounted through the published seam — a select inside a dialog opened with showModal(), as a DialogV2 with modal: true is, after one step: a press on its trigger, which passed no overlay host, so its list opened on a standalone layer inside the dialog, drawn above the page in the browser’s top layer, where it takes the pointer, rather than under the dialog, where it would be inert. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order, and extends past the dialog’s own edge unclipped. The frame draws inside the manager window',
+    // Beyond the smoke: a companion mounts it through `api.ui` in its own modal dialog.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select-modal' },
+    steps: [{ selector: `${SELECT_DIALOG} ${SELECT_TRIGGER}` }],
+    // The list the press opened, on the layer inside the modal dialog, with nothing chosen yet.
+    expectSelector: `${SELECT_DIALOG}:modal > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover [data-popover-option="tier"]`,
+    expectCenterHit: SELECT_OPTION(DIALOG_LIST, 'tier'),
+    expectContained: [
+      { container: SELECT_DIALOG, target: `${SELECT_DIALOG} ${SELECT_TRIGGER}` },
+      { container: '.window-content', target: DIALOG_LIST },
+    ],
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: OPEN_PANEL_SOURCES,
   }),
   managerCase({
     id: 'manager-published-stage-bars-specimen',

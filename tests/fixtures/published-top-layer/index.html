@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Published overlays in a modal dialog</title>
+    <!--
+      Served by `tests/components/published-overlays-top-layer-rendered.test.js` from a Vite dev
+      server, so `mount.js` mounts each overlay entry through a fresh seam inside a `<dialog>`
+      opened with `showModal()`, as a Foundry DialogV2 with `modal: true` is.
+    -->
+    <link rel="stylesheet" href="/node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+    <link rel="stylesheet" href="/@top-layer-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: #0b0a13;
+        font-family: Arial, sans-serif;
+      }
+
+      /* A DialogV2's frame, transcribed: a clipped `<dialog>` with a header and its content. */
+      dialog.application {
+        width: 420px;
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid #3b3a48;
+        background: #17161f;
+        color: #e8e6f0;
+      }
+
+      dialog.application > header {
+        padding: 8px 12px;
+      }
+
+      .fixture-target {
+        display: flex;
+        margin: 12px;
+        height: 40px;
+      }
+
+      .fixture-host {
+        position: fixed;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/tests/fixtures/published-top-layer/mount.js"></script>
+  </body>
+</html>

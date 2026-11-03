@@ -4070,7 +4070,8 @@ An omitted slot draws no body or no footer band, so a dialog with neither draws 
 The dialog's height is capped, so scroll tall content inside one element of your own in the body, which you give `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
 Give your dialog at least one control of your own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
 `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+With `true`, a click of the primary button whose press goes down and comes up outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `click` fires, as does a tap, and so does Escape pressed while focus is outside both.
+A press with any other button, a press that goes down outside and comes up inside the dialog or such a panel, or the reverse, and a `click` with no pointer press, as a keyboard activation of a control outside makes, call nothing.
 In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; pass `closeOnOutsideClick: false`, stop Escape in your own listener, or move focus into the dialog first.
 A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so if your opener opens the dialog on every press, pass `false`, or ignore a `click` whose press began while the dialog was open.
 A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as the panel of a component with an overlay that you mount in a slot: a [`Select`](#select)'s list, an [`IconPicker`](#iconpicker)'s list and query field and an [`ActionMenu`](#actionmenu)'s menu.
@@ -4079,7 +4080,7 @@ Escape pressed while focus is in such a panel is left to that panel: the dialog 
 A `Modal` you mount in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
 An `overlayHost` you pass inside the slot draws your panel inside the dialog, which clips what overflows it.
 With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
-`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
+`onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a click or an Escape outside it.
 An Escape held down calls it again on each repeat.
 It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
 Fabricate does not close the dialog itself: it stays open until your `update` closes it or you call `destroy`, so to keep it open, as before a step that would lose work, do nothing; only while `target` is disconnected is the dialog not drawn, as [Overlays](#overlays) states.
@@ -4115,8 +4116,10 @@ The scrim is drawn in the dialog's host just before the dialog and at its `z-ind
 It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
 Over the four page grounds of every palette it never lowers the contrast of the dialog's 1px edge with the window behind and raises it to 3:1 in none, the edge measuring 1.66:1 to 2.51:1, so the dialog's own controls, not its boundary, carry its identification, and the dim sets the dialog apart by fading the window's content.
 It carries `aria-hidden="true"` and no role, so Chromium leaves it out of the accessibility tree, and it takes no focus and is never a Tab stop, but it covers no keyboard path: without `trapFocus`, Tab moves focus onto the dimmed controls behind the scrim, whose focus ring the scrim fades under 1.7:1, as Fabricate's accent ring measures 1.35:1 to 1.69:1 against the dimmed page grounds of every palette, and the dialog is not announced as modal, so pass `trapFocus` `true` whenever you pass `'dim'`.
-It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is; it is a press outside the dialog, so, whichever button it is, it calls `onClose` as its `mousedown` fires with `closeOnOutsideClick` `true` and calls nothing with `false`, and a drag that starts inside the dialog and ends on the scrim calls nothing.
-Where `onClose` closes the dialog, the scrim is gone before the press ends, so in Chromium the press's `mouseup` reaches whatever was behind the scrim and no `click` follows.
+It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is.
+It is outside the dialog, so with `closeOnOutsideClick` `true` a primary-button click that goes down and comes up on it calls `onClose` as its `click` fires, and with `false` calls nothing.
+A press with another button, a drag from the scrim into the dialog and a drag from the dialog onto the scrim call nothing.
+The press's `mouseup` and `click` land on the scrim, so where `onClose` closes the dialog nothing behind the scrim hears either.
 A wheel or a touch drag over the scrim does not scroll what is under it.
 For a dim of another colour or strength, over another box, or with a blur, pass `'none'` and draw your own layer, as the lines on its host below state.
 Each of `trapFocus`, `initialFocus`, `footerLayout`, `icon`, `size` and `scrim` was added at `version` 1, so a Fabricate that predates it refuses it with `"<key>" is not a prop of Modal`; read `describe('Modal').props` before you pass one.
@@ -4201,8 +4204,8 @@ function close() {
   dialog.update(props());
 }
 
-// A press on the opener while the dialog is open closes it as its `mousedown` fires, and its
-// `click` must not open it again.
+// A press on the opener while the dialog is open closes it as its `click` fires, before your own
+// `click` listener runs, which must not open it again.
 opener.addEventListener('pointerdown', () => {
   openAtPress = isOpen;
 });
@@ -4619,7 +4622,6 @@ Pass an `overlayHost` inside the same Fabricate window, or none, so the list tak
 The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
 Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
 The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; mount it in a dialog that is not modal.
 A row is at least 28px tall, so each is a 24px target.
 `Typeahead` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Typeahead`.
 Its field is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog; it fills the width of `target`, so give `target` `display: flex`.
@@ -4722,12 +4724,12 @@ Focus and keys:
 
 The panel is the component's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens, so `target`'s overflow does not clip it.
 It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so never mount a `Popover` in one without an `overlayHost` inside that dialog.
+In a `<dialog>` opened with `showModal()` that holds the anchor or `target`, it is drawn in that dialog, as [Overlays](#overlays) states, so it is not inert there.
 It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
 Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
 The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls you draw inside carry their own edges.
 `Popover` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Popover`.
-Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or a dialog that is not modal, on the standalone layer there.
+Its panel is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, modal or not, on the standalone layer there.
 An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach your controls in its slot.
 Whether a screen reader announces the panel as a dialog, and by which name, as it takes focus is the reader's; Fabricate's suites read Chromium's accessibility tree only.
 Its padding, gap, corner and type figures, its colours and placement beyond what this section states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks are private.
@@ -5073,23 +5075,24 @@ A component whose `describe(name).overlays` is `true` opens an overlay: a panel 
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
 1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
-2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
-3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
+2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer, unless it lies outside the top-layer element step 3 names;
+3. else, where the element the panel is placed against or `target` is inside an element in the browser's top layer, a `<dialog>` opened with `showModal()` as a DialogV2 with `modal: true` is, a fullscreen element or an open `popover`, a standalone layer Fabricate keeps inside the nearest such element while any overlay is open on it, themed as the one below, so the panel is that element's descendant: it is drawn above the page with it, it is not inert, it takes the pointer and it is in the accessibility tree;
+4. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its section states.
 A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s, `ActionMenu`'s, `Modal`'s and `Typeahead`'s do: keep it inside the same Fabricate window as `target`, and pass none where `target` has no Fabricate root.
 `Popover` accepts a host anywhere in `target`'s document, and its section states what one outside every Fabricate window changes.
-A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: do not mount `Popover`, or any component with an overlay, in one, or pass an `overlayHost` inside that dialog.
 The standalone layer Fabricate keeps for your panels spans the viewport of its window, the box they are measured against, and takes no pointer, so a panel on it is placed where it was measured and the page around the panel still takes input.
-Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
+Unless the panel's own section says it stops it, a press or a key in a panel on the standalone layer on `<body>` bubbles to the page's body and document and never through your window, target or any element of yours, so a listener of yours there hears none of it, and one in a panel on a layer inside a top-layer element bubbles through that element and its ancestors first, outside any `<form>` in it, so a listener of yours on your dialog element hears it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's section says so, as for an `IconPicker` list or an `ActionMenu` menu.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 Where its host is the standalone layer, that element states `pointer-events: auto` and a Fabricate window's typeface and size, `var(--font-body, var(--font-primary, sans-serif))` and `var(--font-size-14)`.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; mount it in a dialog that is not modal.
+An `overlayHost` you pass outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert, so in such a dialog pass one inside it, or none.
+In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless your own listener prevents that key.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.

@@ -88,7 +88,8 @@ function recordOpener(overlay, anchor) {
 /**
  * The host `overlay` portals into while open: under a registered published mount, the container
  * its chain holds for `overlay`, the same one until `releaseOverlayHost`; otherwise the class walk
- * from `anchor`. The nearest registered target above `anchor` wins.
+ * from `anchor`. The nearest registered target above `anchor` wins. The chain is told
+ * `options.anchor`, the element the panel is measured against, and `anchor` (issue 2884).
  */
 export function acquireOverlayHost(overlay, anchor, options) {
   const chain = chainAbove(anchor);
@@ -97,7 +98,7 @@ export function acquireOverlayHost(overlay, anchor, options) {
   recordOpener(overlay, anchor);
   if (!chain) return resolveOverlayHost(anchor, options);
   owners.set(overlay, chain);
-  return chain.acquire(overlay);
+  return chain.acquire(overlay, [options?.anchor, anchor]);
 }
 
 export function releaseOverlayHost(overlay) {
@@ -160,18 +161,50 @@ export function createOverlayContainer(host, chain) {
   return container;
 }
 
-/** A themed standalone layer on `doc.body`, carrying each of `attributes`. */
-export function createStandaloneOverlayLayer(doc, attributes = {}) {
+/** A themed standalone layer appended to `parent`, `doc.body` by default, carrying each of `attributes`. */
+export function createStandaloneOverlayLayer(doc, attributes = {}, parent = doc.body) {
   const layer = doc.createElement('div');
   layer.className = `fabricate ${STANDALONE_OVERLAY_HOST_CLASS}`;
   for (const [name, value] of Object.entries(attributes)) layer.setAttribute(name, value);
-  doc.body.append(layer);
+  parent.append(layer);
   return layer;
 }
 
-// One shared layer per document, created on the first acquire and removed on the last release. It
-// spans its window's viewport, the box `overlayHostRect` measures it as, so a panel placed by
-// `right` or `bottom` lands where it was measured; it takes no pointer, so the page stays usable.
+// An element in the browser's top layer: a `<dialog>` opened with `showModal()` or a fullscreen
+// element, both `:modal`, which make everything outside them inert, or an open `popover`.
+// A browser that cannot parse `:popover-open` throws on the pair, so `:modal` alone is tried next,
+// and one that parses neither has no top layer to find.
+const TOP_LAYER_SELECTORS = Object.freeze([':modal, :popover-open', ':modal']);
+
+function closestTopLayer(element) {
+  for (const selector of TOP_LAYER_SELECTORS) {
+    try {
+      return element.closest(selector);
+    } catch {
+      // An unparsed selector: try the next one.
+    }
+  }
+  return null;
+}
+
+/**
+ * The nearest top-layer element above the first of `nodes` that has one, through open shadow roots.
+ * A fullscreen document element counts as none, since nothing in its document is inert.
+ */
+export function topLayerAbove(nodes) {
+  for (const node of nodes) {
+    for (let at = node; at?.closest; at = at.getRootNode?.().host) {
+      const found = closestTopLayer(at);
+      if (found) return found === found.ownerDocument.documentElement ? null : found;
+    }
+  }
+  return null;
+}
+
+// One shared layer per parent, `<body>` or a top-layer element, created on the first acquire and
+// removed on the last release. It spans its window's viewport, so a panel placed by `right` or
+// `bottom` lands where it was measured; it takes no pointer, so the page stays usable. In a
+// top-layer element it is that element's descendant, so it is not inert and paints above the page.
 const sharedLayers = new WeakMap();
 
 function spanViewport(layer) {
@@ -179,11 +212,12 @@ function spanViewport(layer) {
   return layer;
 }
 
-export function acquireStandaloneOverlayLayer(doc, attributes) {
-  let shared = sharedLayers.get(doc);
+export function acquireStandaloneOverlayLayer(doc, attributes, parent = doc.body) {
+  let shared = sharedLayers.get(parent);
   if (!shared?.layer.isConnected) {
-    shared = { layer: spanViewport(createStandaloneOverlayLayer(doc, attributes)), count: 0 };
-    sharedLayers.set(doc, shared);
+    const layer = createStandaloneOverlayLayer(doc, attributes, parent);
+    shared = { layer: spanViewport(layer), count: 0 };
+    sharedLayers.set(parent, shared);
   }
   shared.count += 1;
   let released = false;
@@ -195,7 +229,7 @@ export function acquireStandaloneOverlayLayer(doc, attributes) {
       shared.count -= 1;
       if (shared.count > 0) return;
       shared.layer.remove();
-      if (sharedLayers.get(doc) === shared) sharedLayers.delete(doc);
+      if (sharedLayers.get(parent) === shared) sharedLayers.delete(parent);
     },
   };
 }
@@ -203,10 +237,13 @@ export function acquireStandaloneOverlayLayer(doc, attributes) {
 // Deliberately NO viewport fallback for an application root or an explicit host: a viewport-origin
 // rect under a panel that did not move is exactly the defect above, and zero degrades to the
 // callers' own `|| innerWidth` sizing guard. A seam container draws no box, so its host is
-// measured, and the standalone layer, fixed to its window's viewport, is that viewport.
+// measured, and the standalone layer on `<body>`, fixed to its window's viewport, is that viewport;
+// one in a top-layer element is measured, as that element may be the containing block of fixed content.
 export function overlayHostRect(host) {
   const box = containerChains.has(host) ? host.parentElement : host;
-  const view = box?.matches?.(`.${STANDALONE_OVERLAY_HOST_CLASS}`) && box.ownerDocument.defaultView;
+  const onBody = box?.parentElement === box?.ownerDocument?.body;
+  const view =
+    onBody && box.matches?.(`.${STANDALONE_OVERLAY_HOST_CLASS}`) && box.ownerDocument.defaultView;
   if (view) return { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
   return box?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
 }

@@ -18,6 +18,7 @@ import {
   waitForPrompt,
 } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
 import {
   ROLL_PROMPT_COMPILED_MODULES,
@@ -299,7 +300,7 @@ describe('mounted roll prompt', () => {
     const onWindowKey = (event) => seen.push(event.key);
     document.defaultView.addEventListener('keydown', onWindowKey);
     try {
-      root.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+      pressPointer(root);
       assert.ok(dialog.isConnected, 'a stray click does not cancel a roll');
       dialog.querySelector('input[name="situationalBonus"]')
         .dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));

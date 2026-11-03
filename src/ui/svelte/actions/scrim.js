@@ -1,4 +1,19 @@
-// The actions a `Modal` dialog's scrim takes (issue 2859).
+// The actions a `Modal` dialog's scrim takes (issue 2859), and what counts as inside a dialog.
+import { heldBy, overlaysOpenedFrom } from '../util/overlayHost.js';
+
+const SCRIM = '[data-manager-modal-scrim]';
+
+/** Every panel opened from inside `container`, wherever it is portaled, and the scrim just before one. */
+export function openedInside(container) {
+  return overlaysOpenedFrom(container).flatMap((panel) => {
+    const before = panel.previousElementSibling;
+    return before?.matches?.(SCRIM) ? [panel, before] : [panel];
+  });
+}
+
+/** True when `origin` is in a node `openedInside(container)` holds. */
+export const inPanelOpenedFrom = (container, origin) =>
+  openedInside(container).some((node) => heldBy(node, origin));
 
 // Places `node` just before `next` when the action runs and whenever `next` changes; it does not
 // follow a later move of `next`.

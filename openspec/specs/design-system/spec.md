@@ -2855,7 +2855,7 @@ The import flow — mapping folders, then reading the reference report — is th
 This is distinct from a one-shot confirmation, which stays `confirmDialog`, and from a Foundry-owned dialog, whose body is a cleaned HTML string rather than a mounted component.
 
 The modal portals into the application root, or into the host the overlay chain picks for a published mount, so it stacks above the window rather than beneath it, and its close control is named by `closeLabel`, which every Fabricate caller passes and the published entry requires, because it renders as an icon alone.
-It dismisses on an outside click and on Escape.
+It dismisses on an outside click, of the primary button, pressed down and released outside it, and on Escape; a press with another button or one dragged across its edge dismisses nothing.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.

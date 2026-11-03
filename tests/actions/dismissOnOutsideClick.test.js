@@ -1,8 +1,10 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { pressPointer as press } from '../helpers/pointerPress.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-const { dismissOnOutsideClick } = await import('../../src/ui/svelte/actions/dismissOnOutsideClick.js');
+const { dismissOnOutsideClick } =
+  await import('../../src/ui/svelte/actions/dismissOnOutsideClick.js');
 
 describe('dismissOnOutsideClick action', () => {
   before(() => setupDOM());
@@ -15,7 +17,9 @@ describe('dismissOnOutsideClick action', () => {
 
     let dismissCount = 0;
     const action = dismissOnOutsideClick(host, {
-      onDismiss: () => { dismissCount += 1; }
+      onDismiss: () => {
+        dismissCount += 1;
+      },
     });
 
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -32,7 +36,9 @@ describe('dismissOnOutsideClick action', () => {
 
     let dismissed = false;
     const action = dismissOnOutsideClick(host, {
-      onDismiss: () => { dismissed = true; }
+      onDismiss: () => {
+        dismissed = true;
+      },
     });
 
     inside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -47,7 +53,9 @@ describe('dismissOnOutsideClick action', () => {
 
     let dismissCount = 0;
     const action = dismissOnOutsideClick(host, {
-      onDismiss: () => { dismissCount += 1; }
+      onDismiss: () => {
+        dismissCount += 1;
+      },
     });
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -64,7 +72,9 @@ describe('dismissOnOutsideClick action', () => {
     let dismissCount = 0;
     const action = dismissOnOutsideClick(host, {
       enabled: false,
-      onDismiss: () => { dismissCount += 1; }
+      onDismiss: () => {
+        dismissCount += 1;
+      },
     });
 
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -72,7 +82,9 @@ describe('dismissOnOutsideClick action', () => {
 
     action.update({
       enabled: true,
-      onDismiss: () => { dismissCount += 1; }
+      onDismiss: () => {
+        dismissCount += 1;
+      },
     });
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
 
@@ -90,7 +102,9 @@ describe('dismissOnOutsideClick action', () => {
     let dismissed = false;
     const action = dismissOnOutsideClick(host, {
       additionalNodes: () => [popover],
-      onDismiss: () => { dismissed = true; }
+      onDismiss: () => {
+        dismissed = true;
+      },
     });
 
     popoverButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -370,5 +384,141 @@ describe('dismissOnOutsideClick onDetached (issue 2671)', () => {
     } finally {
       view.MutationObserver = MutationObserver;
     }
+  });
+});
+
+describe('dismissOnOutsideClick with dismissOn: click (issue 2879)', () => {
+  before(() => setupDOM());
+  after(() => teardownDOM());
+
+  function clickDismissed(options = {}) {
+    const dialog = document.createElement('div');
+    const field = document.createElement('input');
+    const scrim = document.createElement('div');
+    const panel = document.createElement('div');
+    dialog.append(field);
+    document.body.append(scrim, dialog, panel);
+    const calls = [];
+    const action = dismissOnOutsideClick(dialog, {
+      dismissOn: 'click',
+      onDismiss: (event) => {
+        calls.push(event.type);
+      },
+      ...options,
+    });
+    return { dialog, field, scrim, panel, calls, action };
+  }
+
+  it('calls onDismiss once, with the click, for a primary press that goes down and up outside', () => {
+    const { scrim, calls, action } = clickDismissed();
+    press(scrim);
+    assert.deepEqual(calls, ['click']);
+    action.destroy();
+  });
+
+  it('calls nothing at mousedown, so the release decides', () => {
+    const { scrim, calls, action } = clickDismissed();
+    scrim.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  for (const [name, button] of [
+    ['right', 2],
+    ['middle', 1],
+  ]) {
+    it(`calls nothing for a ${name}-button press outside`, () => {
+      const { scrim, calls, action } = clickDismissed();
+      press(scrim, scrim, { button });
+      assert.deepEqual(calls, []);
+      action.destroy();
+    });
+  }
+
+  it('calls nothing for a press outside dragged into the node, nor for one dragged out of it', () => {
+    const { scrim, field, calls, action } = clickDismissed();
+    press(scrim, field);
+    press(field, scrim);
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  it('calls nothing for a click with no press, as a keyboard activation outside makes', () => {
+    const { panel, calls, action } = clickDismissed();
+    panel.click();
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  /** `type` on `node` with the primary button and the `detail` of one pointer press. */
+  const fire = (node, type) =>
+    node.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, detail: 1 }));
+
+  it('calls nothing for a click() after a press that went down and up outside with no click', () => {
+    const { scrim, panel, calls, action } = clickDismissed();
+    fire(scrim, 'mousedown');
+    fire(scrim, 'mouseup');
+    panel.click();
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  it('forgets a press outside at a key, and when it is disabled and enabled again', () => {
+    const { scrim, calls, action } = clickDismissed();
+    fire(scrim, 'mousedown');
+    fire(scrim, 'mouseup');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fire(scrim, 'click');
+    const options = {
+      dismissOn: 'click',
+      onDismiss: (event) => {
+        calls.push(event.type);
+      },
+    };
+    fire(scrim, 'mousedown');
+    fire(scrim, 'mouseup');
+    action.update({ ...options, enabled: false });
+    action.update(options);
+    fire(scrim, 'click');
+    assert.deepEqual(calls, []);
+    action.destroy();
+  });
+
+  it('calls onDismiss once for a tap, the touch sequence Chromium ends with mouse events', () => {
+    const { scrim, calls, action } = clickDismissed();
+    const { TouchEvent = Event } = document.defaultView;
+    for (const type of ['touchstart', 'touchend']) {
+      scrim.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true }));
+    }
+    for (const type of ['mousedown', 'mouseup', 'click']) fire(scrim, type);
+    assert.deepEqual(calls, ['click']);
+    action.destroy();
+  });
+
+  it('judges the press and the release against additionalNodes, read at each', () => {
+    let extra = [];
+    const { scrim, panel, calls, action } = clickDismissed({ additionalNodes: () => extra });
+    extra = [panel];
+    press(panel, scrim);
+    press(scrim, panel);
+    assert.deepEqual(calls, []);
+    extra = [];
+    press(panel, scrim);
+    assert.deepEqual(calls, ['click']);
+    action.destroy();
+  });
+
+  it('still calls onDismiss for Escape, and the default still dismisses at mousedown', () => {
+    const { scrim, calls, action } = clickDismissed();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.deepEqual(calls, ['keydown']);
+    action.update({
+      onDismiss: (event) => {
+        calls.push(event.type);
+      },
+    });
+    scrim.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 }));
+    assert.deepEqual(calls, ['keydown', 'mousedown']);
+    action.destroy();
   });
 });
