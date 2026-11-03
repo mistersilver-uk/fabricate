@@ -297,7 +297,7 @@ const namedTextKeys = (entry) =>
 
 /**
  * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
- * key names it, white space alone, unless waived, or a `requiredWhen` one so while the data key it
+ * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
  * names is truthy (issue 2452). A waived key holding a blank string is dropped from the copy, so
  * the component draws its waived form (issue 2858).
  */
