@@ -491,7 +491,9 @@ describe('the published SelectionCheckbox’s decorative form (issue 2881)', () 
     await settle();
     assert.equal(handle.update(base({ checked: true })), true);
     await settle();
-    assert.ok(target.querySelector('label.fab-selection-checkbox input[type="checkbox"]'));
+    assert.ok(
+      target.querySelector(':scope > label.fab-selection-checkbox > input[type="checkbox"]')
+    );
     assert.equal(handle.update({ checked: true, decorative: true }), true);
     await settle();
     assert.equal(target.querySelectorAll('label, input').length, 0);
@@ -511,7 +513,9 @@ describe('the published SelectionCheckbox’s decorative form (issue 2881)', () 
   it('draws the labelled box for decorative "true" beside a name and onChange', async () => {
     const { target, handle } = mountBox({ decorative: 'true' });
     await settle();
-    assert.ok(target.querySelector('label.fab-selection-checkbox input[type="checkbox"]'));
+    assert.ok(
+      target.querySelector(':scope > label.fab-selection-checkbox > input[type="checkbox"]')
+    );
     handle.destroy();
   });
 
