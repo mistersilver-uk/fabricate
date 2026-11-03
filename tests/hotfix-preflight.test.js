@@ -94,6 +94,19 @@ test('hotfixPreflight fails closed when the base tag is not on origin', () => {
   assert.throws(() => hotfixPreflight('v1.5.0', lsRemote('v1.4.0')), /not on origin/);
 });
 
+test('run exits 2 — unverifiable, not a collision — without the release head or the base tag', () => {
+  assert.equal(run(['v1.5.0'], `${refLine(TAG_COMMIT, 'refs/tags/v1.5.0')}\n`, silentIo), 2);
+  assert.equal(run(['v1.5.0'], lsRemote('v1.4.0'), silentIo), 2);
+});
+
+test('hotfixPreflight compares object ids case-insensitively', () => {
+  const listing = `${[
+    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
+    refLine(TAG_COMMIT.toUpperCase(), 'refs/heads/release'),
+  ].join('\n')}\n`;
+  assert.equal(hotfixPreflight('v1.5.0', listing).ok, false);
+});
+
 test('run exits 1 while the release line still sits on the base tag', () => {
   const listing = `${[
     refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),

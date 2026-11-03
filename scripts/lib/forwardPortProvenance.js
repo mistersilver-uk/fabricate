@@ -242,6 +242,15 @@ function explainRefusal(associations, deps) {
   return associations.map((association) => describeDisqualification(association, deps)).join('; ');
 }
 
+/** Whether an association is a merged pull request of this repository against an accepted base. */
+function qualifies(association, deps) {
+  return (
+    association.mergedAt !== null &&
+    association.repository === deps.repository &&
+    deps.acceptedBases.includes(association.baseRef)
+  );
+}
+
 /** Decide one commit against the two acceptance rules. */
 function classifyCommit(commit, deps) {
   const described = { sha: commit.sha, subject: commit.subject, author: commit.author };
@@ -271,12 +280,7 @@ function classifyCommit(commit, deps) {
     readEvidence(deps.associationsFor, commit.sha, 'pull-request associations'),
     { perPage: deps.perPage }
   );
-  const qualifying = associations.find(
-    (association) =>
-      association.mergedAt !== null &&
-      association.repository === deps.repository &&
-      deps.acceptedBases.includes(association.baseRef)
-  );
+  const qualifying = associations.find((association) => qualifies(association, deps));
 
   if (qualifying) {
     return {
@@ -295,18 +299,13 @@ function classifyCommit(commit, deps) {
   };
 }
 
-/** The first association that qualifies under the accepted bases, or `undefined`. */
+/** The first association of `sha` that qualifies under the accepted bases, or `undefined`. */
 function qualifyingAssociation(sha, deps) {
   const associations = parseAssociations(
     readEvidence(deps.associationsFor, sha, 'pull-request associations'),
     { perPage: deps.perPage }
   );
-  return associations.find(
-    (association) =>
-      association.mergedAt !== null &&
-      association.repository === deps.repository &&
-      deps.acceptedBases.includes(association.baseRef)
-  );
+  return associations.find((association) => qualifies(association, deps));
 }
 
 /** Every commit of the range reachable from `starts` through parents that are themselves in it. */
