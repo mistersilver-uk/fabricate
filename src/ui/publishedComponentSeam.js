@@ -154,12 +154,31 @@ function isSoundWaiver(entry, spec, key) {
   );
 }
 
+/**
+ * Whether a key's `waivedWhen` is sound: on a `required` key of a conditional kind, naming another
+ * `data` key of the entry that is neither `required` nor `requiredWhen` itself (issue 2881).
+ */
+function isSoundWaivingFlag(entry, spec, key) {
+  const name = spec.waivedWhen;
+  const flag = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
+  return (
+    Boolean(flag) &&
+    name !== key &&
+    flag.kind === 'data' &&
+    flag.required !== true &&
+    flag.requiredWhen === undefined &&
+    CONDITIONAL_KINDS.has(spec.kind) &&
+    spec.required === true
+  );
+}
+
 /** Each conditional member a prop may state, and the test that member must pass at registration. */
 const MEMBER_SOUNDNESS = Object.freeze([
   ['requiredWhen', isSoundGuard],
   ['contains', isSoundContains],
   ['itemContains', isSoundItemContains],
   ['waivedBy', isSoundWaiver],
+  ['waivedWhen', isSoundWaivingFlag],
 ]);
 
 function assertKnownEntry(entry) {

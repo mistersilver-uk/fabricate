@@ -401,7 +401,7 @@ describe('what the published SelectionCheckbox refuses', () => {
     });
   }
 
-  for (const key of ['decorative', 'wrapper', 'input', 'class', 'value', 'name', 'aria-label']) {
+  for (const key of ['wrapper', 'input', 'class', 'value', 'name', 'aria-label']) {
     it(`refuses ${key}, which it does not publish, on mount and on update`, async () => {
       const tail = `"${key}" is not a data attribute`;
       assertRefused({ [key]: 'x' }, tail);
@@ -416,6 +416,161 @@ describe('what the published SelectionCheckbox refuses', () => {
       handle.destroy();
     });
   }
+});
+
+/** A decorative box mounted with `props` alone: no label, ariaLabel or onChange. */
+function mountDecorative(props = {}, under = 'fabricate') {
+  const target = fabricateTarget(targets, under);
+  const handle = ui().mount(NAME, {
+    target,
+    props: { checked: false, decorative: true, ...props },
+  });
+  return { target, handle, box: () => target.querySelector('.fab-selection-check') };
+}
+
+describe('the published SelectionCheckbox’s decorative form (issue 2881)', () => {
+  it('draws the box alone, hidden, with no label, input or focusable element, and needs no name or onChange', async () => {
+    const { target, handle, box } = mountDecorative({ checked: true });
+    await settle();
+    assert.equal(target.children.length, 1);
+    assert.ok(box() === target.firstElementChild, 'the box is the only element drawn');
+    assert.equal(box().getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(authoredClasses(box()).sort(byCodePoint), [
+      'fab-selection-check',
+      'is-checked',
+      'is-md',
+    ]);
+    assert.equal(target.querySelectorAll('label, input, button, a, [tabindex]').length, 0);
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+    assert.deepEqual(reports, []);
+  });
+
+  it('ignores label, ariaLabel, onChange, disabled, aria-describedby and rest keys, drawing none of them', async () => {
+    const change = recorder();
+    const { target, handle, box } = mountDecorative({
+      label: LABEL,
+      ariaLabel: LABEL,
+      onChange: change.record,
+      disabled: true,
+      'aria-describedby': 'hint',
+      'data-row': 'iron',
+    });
+    await settle();
+    assert.equal(target.children.length, 1);
+    assert.equal(box().textContent, '');
+    for (const name of ['aria-label', 'aria-describedby', 'data-row', 'disabled']) {
+      assert.ok(!target.querySelector(`[${name}]`), `${name} is drawn nowhere`);
+    }
+    box().click();
+    assert.deepEqual(change.calls, [], 'a press on the box reports nothing');
+    handle.destroy();
+  });
+
+  it('draws mixed and each density as the labelled box does', async () => {
+    const { handle, box } = mountDecorative({ indeterminate: true, density: 'compact' });
+    await settle();
+    assert.deepEqual(authoredClasses(box()).sort(byCodePoint), [
+      'fab-selection-check',
+      'is-indeterminate',
+      'is-sm',
+    ]);
+    assert.ok(box().querySelector('i.fa-minus'));
+    assert.equal(handle.update({ checked: true, decorative: true, density: 'comfortable' }), true);
+    await settle();
+    assert.deepEqual(authoredClasses(box()).sort(byCodePoint), [
+      'fab-selection-check',
+      'is-checked',
+      'is-lg',
+    ]);
+    handle.destroy();
+  });
+
+  it('moves between the decorative and the labelled form on update', async () => {
+    const { target, handle } = mountDecorative({ checked: true });
+    await settle();
+    assert.equal(handle.update(base({ checked: true })), true);
+    await settle();
+    assert.ok(target.querySelector('label.fab-selection-checkbox input[type="checkbox"]'));
+    assert.equal(handle.update({ checked: true, decorative: true }), true);
+    await settle();
+    assert.equal(target.querySelectorAll('label, input').length, 0);
+    handle.destroy();
+  });
+
+  for (const decorative of ['true', 1, false]) {
+    it(`reads decorative ${JSON.stringify(decorative)} as no decorative form, so a name and onChange stay required`, () => {
+      const target = fabricateTarget(targets);
+      assert.throws(() => ui().mount(NAME, { target, props: { checked: true, decorative } }), {
+        name: 'TypeError',
+        message: `${REFUSAL}${NAME} requires a non-empty "label"`,
+      });
+    });
+  }
+
+  it('draws the labelled box for decorative "true" beside a name and onChange', async () => {
+    const { target, handle } = mountBox({ decorative: 'true' });
+    await settle();
+    assert.ok(target.querySelector('label.fab-selection-checkbox input[type="checkbox"]'));
+    handle.destroy();
+  });
+
+  it('still refuses an absent checked and an onChange that is no function', () => {
+    const target = fabricateTarget(targets);
+    for (const [props, tail] of [
+      [{ decorative: true }, `${NAME} requires a non-empty "checked"`],
+      [{ checked: true, decorative: true, onChange: 'x' }, '"onChange" must be a function'],
+    ]) {
+      assert.throws(() => ui().mount(NAME, { target, props }), {
+        name: 'TypeError',
+        message: REFUSAL + tail,
+      });
+    }
+  });
+});
+
+describe('the published SelectionCheckbox’s tone (issue 2881)', () => {
+  it('marks a ticked success box, on the labelled and the decorative form, at every density', async () => {
+    for (const density of ['compact', 'default', 'comfortable']) {
+      const labelled = mountBox({ checked: true, tone: 'success', density });
+      const decorative = mountDecorative({ checked: true, tone: 'success', density });
+      await settle();
+      for (const { box } of [labelled, decorative]) {
+        assert.ok(box().classList.contains('is-success'), density);
+        assert.ok(box().querySelector('i.fa-check'), 'the tick still carries the state');
+      }
+      labelled.handle.destroy();
+      decorative.handle.destroy();
+    }
+  });
+
+  for (const [claim, props] of [
+    ['an empty box', { checked: false, tone: 'success' }],
+    ['a mixed box', { checked: true, indeterminate: true, tone: 'success' }],
+    ['the default tone', { checked: true, tone: 'default' }],
+    ['an absent tone', { checked: true }],
+    ['an unknown tone', { checked: true, tone: 'done' }],
+    ['a tone in another case', { checked: true, tone: 'Success' }],
+  ]) {
+    it(`draws no success face for ${claim}`, async () => {
+      const { handle, box } = mountBox(props);
+      await settle();
+      assert.ok(!box().classList.contains('is-success'));
+      handle.destroy();
+    });
+  }
+
+  it('moves the face with checked on update', async () => {
+    const held = mountBox({ checked: false, tone: 'success' });
+    await settle();
+    assert.equal(held.handle.update(base({ checked: true, tone: 'success' })), true);
+    await settle();
+    assert.ok(held.box().classList.contains('is-success'));
+    assert.equal(held.handle.update(base({ checked: true })), true);
+    await settle();
+    assert.ok(!held.box().classList.contains('is-success'));
+    held.handle.destroy();
+  });
 });
 
 describe('the published SelectionCheckbox in a companion’s own shell', () => {
