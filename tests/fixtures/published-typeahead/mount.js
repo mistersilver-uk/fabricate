@@ -3,7 +3,7 @@
  * `globalThis.__typeahead.open(scene)` builds one window, `app`, `manager`, `companion` or a
  * `detached` one in a same-origin frame, at `scene.box` with the field `offset` below its top and
  * `inset` from its sides, and mounts a typeahead whose companion filters `REWARDS` by the query it
- * holds; `calls` records what it reported.
+ * holds, the whole set for a blank one under `openOnEmpty`; `calls` records what it reported.
  */
 import {
   COMPONENTS,
@@ -95,9 +95,11 @@ async function detachedDocument({ left, top, width, height }) {
   return doc;
 }
 
-function filter(query) {
+// A blank query yields the whole set only for a companion that passes `openOnEmpty` (issue 2885).
+function filter(query, whole) {
   const needle = String(query).trim().toLowerCase();
-  return needle ? REWARDS.filter(({ label }) => label.toLowerCase().includes(needle)) : [];
+  if (!needle) return whole ? REWARDS : [];
+  return REWARDS.filter(({ label }) => label.toLowerCase().includes(needle));
 }
 
 /**
@@ -136,7 +138,7 @@ async function open({ kind = 'app', box = {}, props = {} } = {}) {
   const propsNow = () => ({
     ariaLabel: 'Find a reward',
     placeholder: 'Search rewards',
-    options: filter(query),
+    options: filter(query, extra.openOnEmpty === true),
     onChange: (value) => {
       calls.change.push(value);
     },

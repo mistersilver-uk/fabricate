@@ -3304,6 +3304,39 @@ export const CASES = Object.freeze([
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
+    id: 'manager-published-typeahead-open-on-empty',
+    label:
+      'Specimen, mounted through the published seam — the same five typeaheads after one step that presses into Scope, which passes openOnEmpty, while its query is empty: its 1px accent border lit and its placeholder Search parties still shown, and its list open beneath it at its width on --fab-bg-2 inside a 1px strong edge at radius 6, over Standing rule, reading The Ironwrights, Moonsilver Company and Ashen Wardens, each with a users glyph, no row active and none ticked. The frame draws inside the manager window; ArrowDown reopening the list after Escape, and the list staying shut for any value but true, are the mounted and rendered suites’',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-typeahead' },
+    steps: [{ selector: TYPEAHEAD_INPUT('scope') }],
+    // The whole set the empty query opened, with no row active.
+    expectSelector: `${TYPEAHEADS}:has(${TYPEAHEAD_SECTION('scope')} input[aria-expanded="true"]:placeholder-shown:not([aria-activedescendant])) > div > .fabricate-typeahead-list[role="listbox"]:has(> [role="option"]:nth-child(3)):not(:has([aria-selected="true"]))`,
+    expectCenterHit: [TYPEAHEAD_ROW(3)],
+    expectContained: [
+      { container: TYPEAHEADS, target: TYPEAHEAD_LIST },
+      { container: '.window-content', target: TYPEAHEADS },
+    ],
+    expectLayout: {
+      controls: [
+        {
+          selector: TYPEAHEAD_SHELL('scope'),
+          styles: 'height: 34px; border-radius: 9px; border-top-color: var(--fab-accent)',
+        },
+        {
+          selector: TYPEAHEAD_LIST,
+          styles: 'border-top-style: solid; border-top-width: 1px; border-radius: 6px',
+        },
+      ],
+    },
+    position: TYPEAHEAD_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Typeahead.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
     id: 'manager-published-popover-specimen',
     label:
       "Specimen, mounted through the published seam — a companion's ability grid on a 520px by 440px --fab-bg-2 pane that is also the overlay host, a top row of Strength 14, Dexterity 12 and Constitution 13 cells and, at the pane's foot, a bottom row of Intelligence 10, Wisdom 18 and Charisma 8, and two open nudges, both stating bottom-start. The Strength nudge opens below its cell, its left edge on the cell's; the Wisdom nudge has no room below its cell inside the pane, so it flips and opens above it, its bottom edge 6px over the cell's top. Each is a --fab-bg-0 panel with a 1px --fab-border-strong edge, radius 11 and the large shadow, headed by the ability's name in 13px serif, holding a Value field showing the score, a row of six 24px Buttons from −5 to +5 and a Reason field with a placeholder. The Wisdom nudge's +5 Button is disabled, at the cap of 20, beside an enabled +2 for comparison; the Wisdom value field holds keyboard focus, which the later popover moved into its first control, with its 1px inset accent ring. The frame cannot show the Escape, outside-press or focus-return behaviour, which the mounted and rendered suites read",

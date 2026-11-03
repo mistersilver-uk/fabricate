@@ -2325,6 +2325,17 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'height: 38px; border-radius: 9px; border-top-color: var(--fab-accent)',
     },
   ],
+  // The scope field lit on its empty query, and the whole set's list it opened (issue 2885).
+  'manager-published-typeahead-open-on-empty': [
+    {
+      selector: '[data-lab-typeahead-ground] [data-lab-typeahead="scope"] .fabricate-search',
+      styles: 'height: 34px; border-radius: 9px; border-top-color: var(--fab-accent)',
+    },
+    {
+      selector: '[data-lab-typeahead-ground] > div > .fabricate-typeahead-list',
+      styles: 'border-top-style: solid; border-top-width: 1px; border-radius: 6px',
+    },
+  ],
   // The published popover's two nudges (issue 2861); their palette variants measure the same controls.
   'manager-published-popover-specimen': POPOVER_CONTROLS,
   // The opener focus returned to after a close: its ring, by its shape.

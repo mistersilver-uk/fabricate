@@ -95,6 +95,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-typeahead-specimen',
     'manager-published-typeahead-no-match',
     'manager-published-typeahead-free-text',
+    'manager-published-typeahead-open-on-empty',
   ]),
   // The list and grid switch (issue 2412): the essence browser in each arrangement.
   'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([

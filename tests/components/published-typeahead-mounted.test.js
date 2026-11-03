@@ -481,7 +481,10 @@ describe('the published Typeahead openOnEmpty', () => {
     );
     focusOn(input());
     assert.ok(!listboxIn(), 'no listbox without a row');
-    assert.equal(document.querySelector('.fabricate-typeahead-note')?.textContent, 'No scopes yet.');
+    assert.equal(
+      document.querySelector('.fabricate-typeahead-note')?.textContent,
+      'No scopes yet.'
+    );
     assert.equal(target.querySelectorAll('[role="status"]')[1].textContent, 'No scopes yet.');
     const enter = press(input(), 'Enter');
     assert.ok(enter.defaultPrevented, 'allowFree still takes the key');
