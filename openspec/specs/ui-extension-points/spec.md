@@ -565,7 +565,7 @@ It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an 
 - A `data` key takes data (M10 to M12) and the component receives a snapshot copy.
 - A `text` key takes a string.
 Fabricate draws it as plain text inside the component and never reads it as HTML; the element Fabricate wraps it in is private.
-- A `text` key that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a `required` one refuses `''` (M9).
+- A `text` key that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a `required` one refuses `''`, or white space alone where a `contains` key names it (M9).
 - An `update` changes the text in place and remounts nothing.
 - A `slot` key is a content slot, a place where the component draws the companion's own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it; anything else is M15.
@@ -1153,7 +1153,7 @@ Each group states the accepted values of every key that entry publishes.
   - `children` is required and is the label, final display text, and the button's accessible name unless `ariaLabel` replaces it.
     The button hugs its label on one line while it has the room.
     Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
-    A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, `Button requires a non-empty "children"` (M9, issue 2882).
+    A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, `Button requires a non-empty "children"` (M9, issue 2882), even beside an `ariaLabel`, so the `ariaLabel` is never the only name a label-less button has.
   - `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
     The glyph never joins or replaces the name: a glyph-only button is `IconButton`.
   - `ariaLabel` is optional final display text that replaces the label as the button's accessible name, for a label too short to say its verb, as a visible "+7" named "Credit +7 days to Mira".
@@ -2473,7 +2473,7 @@ Each group states the accepted values of every key that entry publishes.
   - `title` is optional final display text drawn as the panel's level-3 heading, a level the companion cannot change, and the dialog's name where no `ariaLabel` is passed.
     One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` or white space alone and no `ariaLabel`, is refused with `Popover requires a non-empty "title"` (M9).
   - `ariaLabel` is optional final display text that names the dialog in place of the heading; beside a `title` it must hold the title's words, in order and as whole words, or the mount is refused (M22), so the spoken name starts from what is shown.
-    A name of white space alone leaves the panel with no name, so the companion never passes one.
+    An `ariaLabel` of white space alone, or that is not a string, is dropped and names nothing; the `title` names the panel.
   - `body` is a content slot whose element is a `<div>`, drawn below the heading in a padded column the panel spaces by `gap`, which scrolls when the panel's height is capped.
     The companion fills the slot before it opens the popover, or in the same task, because focus moves into the panel a microtask after it is drawn.
     The body takes focus where the slot holds no control, and while it overflows with no control in it, it is also a Tab stop, so the keyboard scrolls it with the arrow keys, Page Up, Page Down, Home and End; it then draws the window's accent ring 2px wide inside its own edge.

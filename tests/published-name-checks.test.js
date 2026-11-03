@@ -42,6 +42,14 @@ describe('the entries whose name the seam holds (issue 2882)', () => {
     }
   });
 
+  it('has no entry whose name key is also required, since the drop runs after M9', () => {
+    for (const entry of NAMED_ENTRIES) {
+      for (const [nameKey] of named(entry)) {
+        assert.notEqual(entry.props[nameKey].required, true, `${entry.name} ${nameKey}`);
+      }
+    }
+  });
+
   for (const entry of NAMED_ENTRIES) {
     for (const [nameKey, { contains: textKey }] of named(entry)) {
       describe(`${entry.name} ${nameKey} against ${textKey}`, () => {

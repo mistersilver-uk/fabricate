@@ -345,7 +345,8 @@ function assertItemsHold(key, items, pairs) {
  * (WCAG 2.5.3), and an array item's member an `itemContains` pairs with another of that item
  * (issue 2856). A
  * `contains` key holding a blank string or any other kind of value is dropped from the copy first,
- * so it writes no name and the label stays the name (issue 2882).
+ * so it writes no name and the label stays the name (issue 2882); the drop runs after M9, so a
+ * `contains` key is never `required`.
  */
 function assertContains(entry, copy) {
   for (const [key, { contains, itemContains }] of Object.entries(entry.props)) {

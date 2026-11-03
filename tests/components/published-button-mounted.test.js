@@ -215,6 +215,18 @@ describe('a press on the published Button', () => {
     handle.destroy();
   });
 
+  it('refuses an update to a label of white space, even beside an ariaLabel (M9), and keeps the earlier props', async () => {
+    const { handle, button } = mountButton();
+    await settle();
+    assert.throws(() => handle.update({ children: ' ', ariaLabel: 'Clear all', onclick() {} }), {
+      name: 'TypeError',
+      message: `${REFUSAL}Button requires a non-empty "children"`,
+    });
+    await settle();
+    assert.equal(button().textContent, LABEL, 'the earlier props stay rendered');
+    handle.destroy();
+  });
+
   it('refuses an update that omits onclick (M9), and the earlier function still answers', async () => {
     const { handle, calls, button } = mountButton();
     await settle();

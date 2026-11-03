@@ -2571,7 +2571,7 @@ const saved = fabUi.mount('Notice', {
 `children` is required and is the label, final display text, and the button's accessible name unless `ariaLabel` replaces it.
 The button hugs its label on one line while it has the room.
 Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: pass a short verb phrase and give the button the room for one line.
-A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, with `Button requires a non-empty "children"`.
+A label of white space alone names nothing, so `mount` and `update` refuse it as an empty one, with `Button requires a non-empty "children"`, even beside an `ariaLabel`, so the `ariaLabel` is never the only name a label-less button has.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology; absent, no glyph is drawn.
 The glyph never joins or replaces the name: a glyph-only button is [`IconButton`](#iconbutton).
 `ariaLabel` is optional final display text that replaces the label as the button's accessible name, for a label too short to say its verb, as a visible "+7" named "Credit +7 days to Mira".
@@ -4680,7 +4680,7 @@ While the anchor lies wholly outside its window's viewport or outside an ancesto
 `title` is optional final display text drawn as the panel's level-3 heading, a level you cannot change, and the dialog's name where no `ariaLabel` is passed.
 One of `title` and `ariaLabel` is required: a mount with neither, or with a `title` of `''` and no `ariaLabel`, is refused with `Popover requires a non-empty "title"`, and a `title` of white space alone counts as `''`.
 `ariaLabel` is optional final display text that names the dialog in place of the heading; beside a `title` it must hold the title's words, in order and as whole words, or the mount is refused, so the spoken name starts from what is shown.
-Never pass a name of white space alone, which leaves the panel with no name.
+An `ariaLabel` of white space alone, or that is not a string, is dropped and names nothing; the `title` names the panel.
 `body` is a content slot whose element is a `<div>`, drawn below the heading in a padded column the panel spaces by `gap`, which scrolls when the panel's height is capped.
 Fill the slot before you open the popover, or in the same task, because focus moves into the panel a microtask after it is drawn.
 The body takes focus where the slot holds no control, and while it overflows with no control in it, it is also a Tab stop, so the keyboard scrolls it with the arrow keys, Page Up, Page Down, Home and End; it then draws the window's accent ring 2px wide inside its own edge.
@@ -4873,7 +4873,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 - `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
-A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` (or white space alone where a `contains` key names it) where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 A required prop that its component's section lets be empty while other props hold text, as `Chip`'s `children` beside `icon` and `ariaLabel`, is refused with `<name> requires a non-blank "<other>" when "<key>" is empty` while only some of them do, naming the first that does not.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
