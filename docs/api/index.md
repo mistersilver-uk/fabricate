@@ -4432,7 +4432,7 @@ A press through the seam is measured in happy-dom and by one View Lab step, not 
 A box is drawn the same in the Manager, the player window and, under the standalone style root, your own window or dialog, and it is no wider than `target`.
 Its label and empty edge are inks of the dark scheme the standalone style root states, so on Foundry's light theme paint `--fab-bg-1` on `target`; that shortfall is inferred from those inks, not measured.
 A Fabricate that predates it does not list `SelectionCheckbox` in `components`, `describe` answers `null` for it, and `mount` refuses it with `"SelectionCheckbox" is not published`, so draw your own control there.
-A Fabricate that predates [issue #2881](https://github.com/mistersilver-uk/fabricate/issues/2881) refuses `decorative` and `tone` with `"decorative" is not a data attribute` and `"tone" is not a data attribute`, and its `describe` lists neither, so read `describe('SelectionCheckbox').props.decorative` first and draw your own box where it is absent.
+A Fabricate that predates `decorative` and `tone` refuses them with `"decorative" is not a data attribute` and `"tone" is not a data attribute`, and its `describe` lists neither, so read `describe('SelectionCheckbox').props.decorative` first and draw your own box where it is absent.
 Its gap, corner and type figures, its colours beyond what this section states, its `wrapper` and `input` props, and the hooks Fabricate's own callers use are private.
 
 A worked box follows: a flag of your own, named by the label it draws.
@@ -4461,7 +4461,7 @@ const box = fabUi.mount('SelectionCheckbox', { target, props: props() });
 A decorative box follows, in an objective row of your own that is its own pressable button.
 
 ```javascript
-// A Fabricate that predates issue #2881 describes no decorative form: draw your own box there.
+// A Fabricate that predates `decorative` describes no decorative form: draw your own box there.
 if (!fabUi?.describe?.('SelectionCheckbox')?.props.decorative) return;
 
 const row = document.createElement('button');
