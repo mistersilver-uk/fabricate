@@ -24,9 +24,9 @@ const OPTIONS = Object.freeze([
 const SIZES = Object.freeze(['form', 'inline', 'toolbar']);
 const WIDTHS = Object.freeze([160, 240, 360]);
 const FORMS = Object.freeze([
-  ['fill-flex', { fill: true }, 'flex'],
-  ['fill-block', { fill: true }, 'block'],
-  ['hug-flex', {}, 'flex'],
+  { name: 'fill-flex', extra: { fill: true }, display: 'flex' },
+  { name: 'fill-block', extra: { fill: true }, display: 'block' },
+  { name: 'hug-flex', extra: {}, display: 'flex' },
 ]);
 
 /** The shell the targets are drawn in: a Fabricate window's content, or a companion's own sheet. */
@@ -54,9 +54,9 @@ function build() {
   shell().append(cases);
   for (const size of SIZES) {
     for (const width of WIDTHS) {
-      for (const [form, extra, display] of FORMS) {
+      for (const { name, extra, display } of FORMS) {
         const target = document.createElement('div');
-        target.dataset.case = [String(form), size, width].join('-');
+        target.dataset.case = [name, size, width].join('-');
         Object.assign(target.style, { width: `${width}px`, display });
         cases.append(target);
         let handle = null;
