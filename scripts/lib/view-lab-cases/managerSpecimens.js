@@ -2277,7 +2277,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-tabs-specimen',
     label:
-      'Specimen, mounted through the published seam — one tab strip of three tabs, Inputs with a flask glyph, Outputs with a box glyph and Notes with none, across a 360px column on the window’s --fab-bg-1 ground, above the one tabpanel the companion draws, after one step: ArrowRight pressed on the selected Inputs, which moved keyboard focus to Outputs and then called onSelect, whose update drew Outputs selected and showed its panel, One iron ingot, and slag. So Outputs is drawn in the accent ink at weight 600 over its 2px accent underline and carries the accent keyboard ring, 2px wide with 2px of ground between ring and tab, and Inputs in the muted ink at weight 500 with no underline, 46px tall over the strip’s 1px rule',
+      'Specimen, mounted through the published seam — one tab strip of three tabs, Inputs with a flask glyph and a count of 2, named Inputs, 2, Outputs with a box glyph and a count of 2, named Outputs, 2, and Notes with neither, across a 360px column on the window’s --fab-bg-1 ground, above the one tabpanel the companion draws, after one step: ArrowRight pressed on the selected Inputs, which moved keyboard focus to Outputs and then called onSelect, whose update drew Outputs selected and showed its panel, One iron ingot, and slag. So Outputs is drawn in the accent ink at weight 600 over its 2px accent underline and carries the accent keyboard ring, 2px wide with 2px of ground between ring and tab, and Inputs in the muted ink at weight 500 with no underline, 46px tall over the strip’s 1px rule, each count a bare mono numeral in the muted ink at 10.5px after its label, on the selected tab as on the other',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each selection.
     reaches: 'beyond',
     smokeLabels: [],
@@ -2294,8 +2294,8 @@ export const CASES = Object.freeze([
     ],
     expectLayout: {
       controls: [
-        // The focused, selected tab's ring, ink and underline, the unselected tab at rest, and the
-        // strip's rule.
+        // The focused, selected tab's ring, ink and underline, the unselected tab at rest, the
+        // selected tab's count in the muted ink (issue 2896), and the strip's rule.
         {
           selector: `${OUTPUTS_TAB}:focus-visible`,
           styles:
@@ -2305,6 +2305,10 @@ export const CASES = Object.freeze([
           selector: INPUTS_TAB,
           styles:
             'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+        },
+        {
+          selector: `${OUTPUTS_TAB} > .manager-editor-tab-count`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
         },
         {
           selector: TABLIST,
