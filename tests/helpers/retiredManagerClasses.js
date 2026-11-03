@@ -52,68 +52,38 @@ export const RETIRED_CLASSES = Object.freeze({
 
 const REPLACED = 'records what a primitive replaced, and says the class is retired';
 const RETIRED_2540 = 'records the token issue 2540 retired, and says so';
-const WORKED = 'a worked re-rooting example written before the retirement, and says so';
+const WORKED = 'a worked re-rooting example of a compound naming a retired class';
 
 /** @type {ReadonlyArray<{ file: string, includes: string, tokens: number, why: string }>} */
 export const HISTORICAL_LINES = Object.freeze([
   {
     file: 'openspec/specs/design-system/library.html',
-    includes: 'hand-rolled <code>manager-icon-button</code> sites (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
-    file: 'openspec/specs/design-system/library.html',
-    includes:
-      '<code>.fabricate-manager .manager-button&hellip;</code> (a class issue 1507 retired)',
-    tokens: 1,
-    why: 'records what issue 1502 re-rooted, and says the class is retired',
-  },
-  {
-    file: 'openspec/specs/design-system/library.html',
-    includes: 'restyled <code>.manager-pagination</code> (a class issue 1507 retired) per caller',
-    tokens: 1,
-    why: 'records the player re-themes issue 1518 deleted, and says the class is retired',
-  },
-  {
-    file: 'openspec/specs/design-system/library.html',
-    includes: 'restyled <code>.manager-pagination</code> (a class issue 1507 retired) in their own',
+    includes: 'restyled <code>.manager-pagination</code> in their own',
     tokens: 1,
     why: 'records the ruled player pager re-themes, and says the class is retired',
   },
   {
-    file: 'openspec/specs/design-system/library.html',
-    includes: '<code>class="manager-inspector-card"</code> sections (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
-    file: 'openspec/specs/design-system/library.html',
-    includes: '<code>class="manager-toolbar"</code> sections (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
     file: 'openspec/specs/design-system/spec.md',
-    includes: 'written before issue 1507 retired `manager-button`',
-    tokens: 3,
-    why: WORKED,
-  },
-  {
-    file: 'openspec/specs/design-system/spec.md',
-    includes: 'written before issue 1507 retired `manager-search`',
+    includes:
+      'as in a compound such as `.manager-button.fab-manager-button[data-essence-sort-direction]`',
     tokens: 2,
     why: WORKED,
   },
   {
     file: 'openspec/specs/design-system/spec.md',
-    includes: 'As of issue 1507 nine primitives write no second family class',
+    includes: 'as in `.fabricate-manager [data-manager-tools-search] .manager-search`.',
+    tokens: 1,
+    why: WORKED,
+  },
+  {
+    file: 'openspec/specs/design-system/spec.md',
+    includes: 'Nine primitives write no second family class',
     tokens: 9,
     why: 'the requirement sentence that records the retirement names the nine classes it retired',
   },
   {
     file: 'openspec/specs/design-system/spec.md',
-    includes: 'As of issue 2543 `manager-modal` is retired',
+    includes: '`manager-modal` is retired too, a tenth token',
     tokens: 1,
     why: 'records what Modal replaced, and says the class is retired',
   },
@@ -154,33 +124,8 @@ export const HISTORICAL_LINES = Object.freeze([
     why: 'a smoke selector from the historical hit list of dropped selectors',
   },
   {
-    file: 'scripts/lib/designSystemPrimitives.json',
-    includes: '`class=\\"manager-icon-button\\"` sites (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
-    file: 'scripts/lib/designSystemPrimitives.json',
-    includes: '`class=\\"manager-inspector-card\\"` sections (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
-    file: 'scripts/lib/designSystemPrimitives.json',
-    includes: '`class=\\"manager-search\\"` labels (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
-    file: 'scripts/lib/designSystemPrimitives.json',
-    includes: '`class=\\"manager-toolbar\\"` sections (a class issue 1507 retired)',
-    tokens: 1,
-    why: REPLACED,
-  },
-  {
     file: 'openspec/specs/design-system/spec.md',
-    includes:
-      '`fab-manager-button` was retired at issue 2540 on the same one-class-for-one-class rule',
+    includes: '`fab-manager-button` is retired on the same one-class-for-one-class rule',
     tokens: 1,
     why: RETIRED_2540,
   },
@@ -255,7 +200,7 @@ export const COMPAT_LINES = Object.freeze([
   {
     ...COMPAT,
     file: 'openspec/specs/ui-extension-points/spec.md',
-    includes: 'and also `fab-manager-button`, a compat token deprecated at issue 2540',
+    includes: 'and also `fab-manager-button`, a deprecated compat token',
   },
   {
     ...COMPAT,

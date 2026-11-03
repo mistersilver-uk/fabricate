@@ -4,9 +4,8 @@
  *
  * Markdown puts one sentence on a line, `library.html` one block, list item or sentence, and a
  * `designSystemPrimitives.json` `why` is an array of sentences the loader joins with a space.
- * 1400 sits just above the longest line nothing can break without changing what it renders or
- * says: a `library.html` specimen button named by its own content (about 1340 characters), and a
- * single `records.md` mapping sentence (about 1290).
+ * 1400 sits just above the longest line nothing can break without changing what it renders: a
+ * `library.html` specimen button named by its own content (about 1340 characters).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -301,7 +301,7 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 24 · a dense row’s control, issue 1648",
+    "cap": "icon 24 · a dense row’s control",
     "draws": "button",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "props": {
