@@ -593,12 +593,16 @@ describe('the published Popover in a companion’s modal dialog', () => {
       assert.deepEqual(state, { closes: 1, dialogCloses: 0, open: true });
     }));
 
-  // A pinned known limit (issue 2884): with no overlayHost the panel is on the standalone layer,
-  // under the dialog's top layer, so the pointer cannot reach it; the docs forbid this mount.
-  it('known limit: with no overlayHost the panel is drawn under the modal dialog and takes no pointer', () =>
+  it('with no overlayHost draws the panel on a layer inside the modal dialog, where it takes the pointer (issue 2884)', () =>
     inFixture('host=dialog', async (page) => {
       const { host } = await boxes(page);
       assert.equal(host, 'fabricate fabricate-standalone-overlay');
-      assert.notEqual(await page.evaluate(hitAt, PANEL), 'popover');
+      const inDialog = await page.evaluate(() =>
+        document
+          .querySelector('[data-fixture-dialog]')
+          .contains(document.querySelector('.fabricate-popover'))
+      );
+      assert.equal(inDialog, true);
+      assert.equal(await page.evaluate(hitAt, PANEL), 'popover');
     }));
 });

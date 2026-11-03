@@ -7,6 +7,7 @@
  * hook no published key draws. Its trigger is a bare `button`, so it also takes the four module
  * rules a published `Button` does, `.fabricate-manager button`'s `font: inherit` under the Manager
  * alone, as every select of Fabricate's own does.
+ * `fill` (issue 2904) draws `fabricate-select-fill` on the picker root, which two family rules read.
  * Limit: the census takes on trust that no extension target sits under a pinned ancestor, reads a
  * component's selector only where `:global` reaches it, and counts every class a member of a
  * companion's `options` can draw as drawn, the private members' included.
@@ -50,6 +51,7 @@ const SELECT_DRAWN = new Set([
   'fabricate-picker',
   'manager-travel-picker',
   'fabricate-select',
+  'fabricate-select-fill',
   'fabricate-select-trigger',
   ...RUNGS.map((rung) => `fabricate-select-trigger-${rung}`),
   'manager-travel-picker-value',
@@ -185,6 +187,7 @@ const SELECT_FAMILY_RULES = Object.freeze([
   'styles/fabricate-select.css: .fabricate-select .fabricate-select-trigger-inline',
   'styles/fabricate-select.css: .fabricate-select .fabricate-select-trigger-toolbar',
   'styles/fabricate-select.css: .fabricate-select .fabricate-select-trigger:focus-visible',
+  'styles/fabricate-select.css: .fabricate-picker.fabricate-select-fill',
   'styles/fabricate-select.css: .fabricate-select-badge',
   'styles/fabricate-select.css: .fabricate-select-hint',
   'styles/fabricate-select.css: .fabricate-select-label',
@@ -196,6 +199,7 @@ const SELECT_FAMILY_RULES = Object.freeze([
   "styles/fabricate-select.css: .fabricate-select-popover .fabricate-select-option[aria-selected='true']",
   'styles/fabricate-select.css: .fabricate-select-popover [data-popover-group] > p',
   'styles/fabricate-select.css: .fabricate-select-popover-ticked [data-popover-group] > p',
+  'styles/fabricate-select.css: .fabricate-select-fill > .fabricate-select-trigger',
   'styles/fabricate-select.css: .fabricate-select-reason',
   'styles/fabricate-select.css: .fabricate-select-tick',
   'styles/fabricate-select.css: .fabricate-select-trigger',
@@ -350,7 +354,11 @@ describe('the module sheet and every component style against the published Selec
     const entry = entryNamed('Select');
     assert.deepEqual(
       [Object.keys(entry.props), gatedRoot(entry), entry.rest],
-      [['options', 'value', 'onChange', 'ariaLabel', 'placeholder', 'size'], 'fabricate', false],
+      [
+        ['options', 'value', 'onChange', 'ariaLabel', 'placeholder', 'size', 'fill'],
+        'fabricate',
+        false,
+      ],
       'a published label, mono, readonly, disabled, class, rest, or a gated root other than `fabricate` reopens the census'
     );
   });

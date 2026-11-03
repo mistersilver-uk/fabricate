@@ -894,7 +894,7 @@ test('(a) a Stepper change publishes its two frames, then the four specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) a Select change publishes its four frames, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Select.svelte';
   const frames = [
     'manager-recipes-bulk-edit-check-tier',
@@ -903,6 +903,8 @@ test('(a) a Select change publishes its four frames, then the two specimens that
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
+    'manager-published-select-fill-specimen',
+    'manager-published-select-modal-dialog',
     'published-standalone',
     'published-standalone-light',
     'published-standalone-select-open',
@@ -911,7 +913,7 @@ test('(a) a Select change publishes its four frames, then the two specimens that
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a StageBars change publishes its two run frames, then the two specimens that mount it through the seam', () => {
+test('(a) a StageBars change publishes its two run frames, then the three specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/StageBars.svelte';
   const frames = [
     'fabricate-journal-lifecycle-past-stage',
@@ -922,7 +924,7 @@ test('(a) a StageBars change publishes its two run frames, then the two specimen
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Field change publishes its twelve frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Field change publishes its twelve frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Field.svelte';
   const frames = [
     'manager-gathering-task-editor-normal',
@@ -946,7 +948,7 @@ test('(a) a Field change publishes its twelve frames, then the two specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Well change publishes its three frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Well change publishes its three frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Well.svelte';
   const frames = [
     'manager-checks-crafting-advantage-keep',
@@ -961,7 +963,7 @@ test('(a) a Well change publishes its three frames, then the two specimens that 
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Callout change publishes its four frames, then the two specimens that mount it through the seam', () => {
+test('(a) a Callout change publishes its four frames, then the three specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/Callout.svelte';
   const frames = [
     'manager-tool-parity-04-requirements-1280x720',
@@ -974,7 +976,7 @@ test('(a) a Callout change publishes its four frames, then the two specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an IconButton change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) an IconButton change publishes its two frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/IconButton.svelte';
   const frames = [
     'world-modifiers',
@@ -1071,7 +1073,7 @@ test('(a) a RadioCardGroup change publishes its six frames, then the specimen th
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a SegmentedControl change publishes its two frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a SegmentedControl change publishes its two frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/SegmentedControl.svelte';
   const frames = [
     'manager-recipe-edit-results-rolled',
@@ -1085,7 +1087,7 @@ test('(a) a SegmentedControl change publishes its two frames, then the two speci
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Pagination change publishes its four frames, then the two specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
+test('(a) a Pagination change publishes its four frames, then the three specimens that mount it through the seam, then the three that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/Pagination.svelte';
   const frames = [
     'player-inventory',
@@ -1133,7 +1135,7 @@ test('(a) a Modal change publishes its five frames, then the three specimens tha
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
+test('(a) an ActionMenu change publishes its six frames, then the three specimens that mount it through the seam, then the four that mount it with and without a Fabricate root', () => {
   const file = 'src/ui/svelte/components/ActionMenu.svelte';
   const frames = [
     'manager-environment-edit-automatic-force-add',

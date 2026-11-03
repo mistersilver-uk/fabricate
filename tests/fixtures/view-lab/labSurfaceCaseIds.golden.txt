@@ -50,6 +50,8 @@ manager-published-search-specimen
 manager-published-search-forms-specimen
 manager-published-select-specimen
 manager-published-select-layer
+manager-published-select-fill-specimen
+manager-published-select-modal-dialog
 manager-published-stage-bars-specimen
 manager-published-stage-bars-forms-specimen
 manager-published-fill-bar-bands-specimen
@@ -90,6 +92,7 @@ manager-published-modal-scrim-specimen
 manager-published-typeahead-specimen
 manager-published-typeahead-no-match
 manager-published-typeahead-free-text
+manager-published-typeahead-open-on-empty
 manager-published-popover-specimen
 manager-published-tint-swatches-specimen
 published-standalone

@@ -12,6 +12,8 @@ manager-published-search-specimen
 manager-published-search-forms-specimen
 manager-published-select-specimen
 manager-published-select-layer
+manager-published-select-fill-specimen
+manager-published-select-modal-dialog
 manager-published-stage-bars-specimen
 manager-published-stage-bars-forms-specimen
 manager-published-stage-bars-forms-specimen-foundry-native
@@ -76,6 +78,7 @@ manager-published-typeahead-specimen-foundry-native
 manager-published-typeahead-specimen-hearth-herb
 manager-published-typeahead-no-match
 manager-published-typeahead-free-text
+manager-published-typeahead-open-on-empty
 manager-published-popover-specimen
 manager-published-popover-specimen-foundry-native
 manager-published-popover-specimen-hearth-herb

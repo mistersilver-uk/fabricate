@@ -95,6 +95,15 @@
   margin-inline-start: auto;
 }
 
+/* `fill` (issue 2904): the picker root takes its slot's width and the trigger the root's, so a choice never changes the trigger's width. */
+.fabricate-picker.fabricate-select-fill {
+  width: 100%;
+}
+
+.fabricate-select-fill > .fabricate-select-trigger {
+  width: 100%;
+}
+
 /* THE PANEL. The specimen corners the option list at 11px, as `.fabricate-picker-popover.manager-travel-popover` does, which also floors it at 240px. */
 .fabricate-picker-popover.fabricate-select-popover {
   border-radius: 11px;

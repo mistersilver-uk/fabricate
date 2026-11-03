@@ -604,6 +604,45 @@ describe('the published Select refuses', () => {
   });
 });
 
+describe('the published Select’s fill (issue 2904)', () => {
+  const root = (target) => target.querySelector('.fabricate-select');
+  const filled = (target) => root(target).classList.contains('fabricate-select-fill');
+
+  it('describes fill as optional data at version 1', () => {
+    const description = ui().describe('Select');
+    assert.equal(description.version, 1);
+    assert.deepEqual(description.props.fill, { kind: 'data', required: false });
+  });
+
+  it('stretches the picker root for the literal true at every size, and drops it on update', async () => {
+    const { target, update, trigger } = mountSelect({ value: 10, fill: true });
+    await settle();
+    assert.ok(filled(target), 'the root is filled');
+    assert.ok(root(target).contains(trigger()), 'around the trigger');
+    for (const size of ['inline', 'toolbar', 'form']) {
+      assert.equal(update({ size }), true);
+      await settle();
+      assert.ok(filled(target), `filled at ${size}`);
+    }
+    assert.equal(update({ fill: false }), true);
+    await settle();
+    assert.ok(!filled(target), 'false draws the hugging trigger');
+  });
+
+  for (const fill of [undefined, false, 'true', 'false', 1]) {
+    it(`draws the hugging trigger for ${JSON.stringify(fill) ?? 'an absent fill'}, since nothing is coerced`, async () => {
+      const props = fill === undefined ? {} : { fill };
+      const { target } = mountSelect(props);
+      await settle();
+      assert.ok(!filled(target));
+      assert.deepEqual(
+        [...root(target).classList],
+        ['fabricate-picker', 'manager-travel-picker', 'fabricate-select']
+      );
+    });
+  }
+});
+
 describe('the published Select in a companion’s own shell', () => {
   it('draws its trigger in one standalone style root and its list on the standalone layer, and destroy leaves the shell empty', async () => {
     const target = companionTarget(shells);

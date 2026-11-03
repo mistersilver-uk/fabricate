@@ -1,8 +1,9 @@
 /**
- * The published `Stepper`'s `size` (issue 2841) on Fabricate's real Svelte runtime, through a fresh
- * seam registered with the adapter's own table, under a Fabricate window root: `26` and `'26'`
- * write the dense rung's one class, any other value writes none and nothing is coerced, the rung
- * outranks `comfortable`, it keeps `fill`, and an update that drops it draws the default again.
+ * The published `Stepper`'s `size` (issues 2841 and 2903) on Fabricate's real Svelte runtime, through
+ * a fresh seam registered with the adapter's own table, under a Fabricate window root: `26` and
+ * `'26'` write the dense rung's one class and `34` and `'34'` the toolbar rung's, any other value
+ * writes none and nothing is coerced, each rung outranks `comfortable`, keeps `fill`, and an update
+ * that drops or changes it draws that rung.
  * Limit: happy-dom computes no layout, so the rung's box and targets are `stepper-size-rendered`'s.
  */
 import assert from 'node:assert/strict';
@@ -26,12 +27,17 @@ describe('the published Stepper lists its size', () => {
 });
 
 describe('the published Stepper, size', () => {
-  for (const size of [26, '26']) {
-    it(`writes is-size-26 for ${JSON.stringify(size)}, and an update without it removes it`, async () => {
+  for (const [size, rung] of [
+    [26, 'is-size-26'],
+    ['26', 'is-size-26'],
+    [34, 'is-size-34'],
+    ['34', 'is-size-34'],
+  ]) {
+    it(`writes ${rung} for ${JSON.stringify(size)}, and an update without it removes it`, async () => {
       const { handle, root } = mountStepper({ size });
       await settle();
       const drawn = root();
-      assert.deepEqual(authoredClasses(drawn), ['fab-stepper', 'is-size-26']);
+      assert.deepEqual(authoredClasses(drawn), ['fab-stepper', rung]);
       assert.equal(handle.update(base()), true);
       await settle();
       assert.ok(root() === drawn, 'the same stepper');
@@ -40,7 +46,20 @@ describe('the published Stepper, size', () => {
     });
   }
 
-  for (const size of [24, 28, '27', ' 26', '26px', 26.5, '', true, null, [26], { size: 26 }]) {
+  const OFF_RUNG = [24, 28, '28', '27', ' 26', '26px', 26.5, '', true, null, [26], { size: 26 }];
+  for (const size of [
+    ...OFF_RUNG,
+    33,
+    35,
+    38,
+    '38',
+    ' 34',
+    '34 ',
+    '34px',
+    34.5,
+    [34],
+    { size: 34 },
+  ]) {
     it(`draws the default rung for ${JSON.stringify(size)}`, async () => {
       const { handle, root } = mountStepper({ size });
       await settle();
@@ -49,34 +68,81 @@ describe('the published Stepper, size', () => {
     });
   }
 
-  it('outranks comfortable, which an update dropping the rung draws again', async () => {
-    const { handle, root } = mountStepper({ size: 26, density: 'comfortable' });
-    await settle();
-    assert.deepEqual(authoredClasses(root()), ['fab-stepper', 'is-size-26']);
-    assert.equal(handle.update(base({ density: 'comfortable' })), true);
-    await settle();
-    assert.deepEqual(authoredClasses(root()), ['fab-stepper', 'is-comfortable']);
-    handle.destroy();
-  });
+  for (const [size, rung] of [
+    [26, 'is-size-26'],
+    ['34', 'is-size-34'],
+  ]) {
+    it(`${rung} outranks comfortable, which an update dropping the rung draws again`, async () => {
+      const { handle, root } = mountStepper({ size, density: 'comfortable' });
+      await settle();
+      assert.deepEqual(authoredClasses(root()), ['fab-stepper', rung]);
+      assert.equal(handle.update(base({ density: 'comfortable' })), true);
+      await settle();
+      assert.deepEqual(authoredClasses(root()), ['fab-stepper', 'is-comfortable']);
+      handle.destroy();
+    });
 
-  it('keeps fill and the disabled face beside it', async () => {
-    const { handle, root } = mountStepper({ size: '26', fill: true, disabled: true });
+    it(`${rung} keeps fill and the disabled face beside it`, async () => {
+      const { handle, root } = mountStepper({ size, fill: true, disabled: true });
+      await settle();
+      assert.deepEqual(
+        authoredClasses(root()).toSorted((a, b) => a.localeCompare(b)),
+        ['fab-stepper', 'is-disabled', 'is-fill', rung]
+      );
+      handle.destroy();
+    });
+  }
+
+  it('moves from the dense rung to the toolbar rung on an update, on the same stepper', async () => {
+    const { handle, root } = mountStepper({ size: 26, fill: true });
     await settle();
+    const drawn = root();
+    assert.equal(handle.update(base({ size: '34', fill: true })), true);
+    await settle();
+    assert.ok(root() === drawn, 'the same stepper');
     assert.deepEqual(
       authoredClasses(root()).toSorted((a, b) => a.localeCompare(b)),
-      ['fab-stepper', 'is-disabled', 'is-fill', 'is-size-26']
+      ['fab-stepper', 'is-fill', 'is-size-34']
     );
     handle.destroy();
   });
 
-  it('keeps the input and both buttons, their names and the stepping, at the rung', async () => {
-    const { handle, calls, input, decrement, increment } = mountStepper({ size: 26 });
+  for (const size of [26, '34']) {
+    it(`keeps the input and both buttons, their names and the stepping, at ${size}`, async () => {
+      const { handle, calls, input, decrement, increment } = mountStepper({ size });
+      await settle();
+      assert.equal(input().getAttribute('aria-label'), 'Days to credit');
+      assert.equal(decrement().getAttribute('aria-label'), 'Decrease days to credit');
+      increment().click();
+      await settle();
+      assert.deepEqual(calls, [[3]]);
+      handle.destroy();
+    });
+  }
+
+  it('keeps the formatted field, its stops and null endpoint, and an unset field at 34', async () => {
+    const formatted = mountStepper({
+      size: '34',
+      value: null,
+      format: 'signed',
+      stops: [-2, 0, 2],
+      nullLabel: 'Otherwise',
+    });
     await settle();
-    assert.equal(input().getAttribute('aria-label'), 'Days to credit');
-    assert.equal(decrement().getAttribute('aria-label'), 'Decrease days to credit');
-    increment().click();
+    assert.equal(formatted.input().getAttribute('role'), 'spinbutton');
+    assert.equal(formatted.input().value, 'Otherwise');
+    assert.equal(formatted.decrement().disabled, true);
+    formatted.increment().click();
     await settle();
-    assert.deepEqual(calls, [[3]]);
-    handle.destroy();
+    assert.deepEqual(formatted.calls, [[-2]]);
+    formatted.handle.destroy();
+    const unset = mountStepper({ size: 34, value: null, allowUnset: true, placeholder: 'Any' });
+    await settle();
+    assert.equal(unset.input().value, '');
+    assert.equal(unset.input().placeholder, 'Any');
+    unset.increment().click();
+    await settle();
+    assert.deepEqual(unset.calls, [[1]]);
+    unset.handle.destroy();
   });
 });

@@ -6,6 +6,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { assertTrapsFocus } from '../helpers/modalTrapContract.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -279,7 +280,7 @@ describe('ImportReportModal (mounted)', () => {
     }
     assert.equal(closed, 1, 'Escape on a control in the dialog closes once');
     assert.deepEqual(seen, [], 'and stops at the dialog');
-    document.body.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+    pressPointer(document.body);
     assert.equal(closed, 2, 'an outside click still dismisses the report');
     opener.remove();
   });
