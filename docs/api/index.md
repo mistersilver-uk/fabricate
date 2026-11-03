@@ -2064,7 +2064,7 @@ The published components, in publication order:
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required), `density`, `countLabel` (text) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `gap`, `track`, `ariaLabel` (required) | yes |
-| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid` | yes |
+| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align` | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot), `tone` | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot), `actionsPlacement` | yes |
 | `IconButton` | 1 | `any` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria), `description` | yes |
@@ -3255,10 +3255,13 @@ It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and agai
 The ladder's 44 is not a field rung, and a textarea keeps its own height at every `size`.
 `face` is `'sans'`, `'serif'` or `'mono'` and defaults to `'sans'`: `'sans'` keeps the face the control inherits from the column, `'serif'` draws the control's text in the design system's serif face, for a name, and `'mono'` in its mono face, for a formula or a figure; any other value draws `'sans'`.
 The face reaches a text-like input, a number input under `type` `'number'`, or a textarea in the slot, never your caption or hint, and the type size stays the column's 12.5px.
+`align` is `'start'`, `'center'` or `'end'` and defaults to `'start'`: it is the text alignment of a text-like input, a number input under `type` `'number'`, or a textarea in the slot, and of its placeholder, so `'center'` centres a figure such as a threshold; any other value, `'left'`, `'right'` and `'Center'` among them, draws `'start'`.
+`'start'` and `'end'` follow the control's own direction, so in a right-to-left document `'start'` draws the text against the right edge and `'end'` against the left; `'center'` is the same in either.
+The alignment never reaches a `<select>` you draw in the slot, which is not part of the field's chrome, or your caption or hint, and it moves no box, padding, keyboard ring or colour, so the control's height, ring and contrast stay those this section states at every `size` and `face`.
 `type` is `'text'` or `'number'` and defaults to `'text'`: `'number'` gives an `<input type="number">` you draw in the slot the field's chrome with no step buttons, the button-less numeric field; any other value draws `'text'`, and what the chrome draws on a number input then is private.
 The input keeps its own behaviour: the arrow keys step it by its `step` between its `min` and `max`, and a screen reader announces it as a spin button with its value, named by your caption as any control in the slot is.
 Chromium, and so Foundry's desktop app, still changes a focused number input when the mouse wheel turns over it, so read its value on `change` and hold it to your own bounds.
-Mount a published [`Stepper`](#stepper) where the user should see step buttons; a `Stepper` you mount in the slot keeps its own height, face and error state, because `size`, `face` and `invalid` never reach it.
+Mount a published [`Stepper`](#stepper) where the user should see step buttons; a `Stepper` you mount in the slot keeps its own height, face, alignment and error state, because `size`, `face`, `align` and `invalid` never reach it, and a published `Select` or `SearchField` there keeps its own alignment too.
 `invalid` is `true` or `false` and defaults to `false`: `true` draws the error state on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries `aria-invalid="true"`, a `--fab-danger-border` edge on a translucent `--fab-danger-soft` fill at the control's own height; any other value, or a control without that attribute, draws none.
 The field cannot reach your control's attributes, so keep the two signals together: set `aria-invalid="true"` on the control whenever you pass `invalid` `true`, and remove it when you pass `false`; a screen reader announces the control as invalid.
 Always draw a visible text message beneath an invalid control, ink it `--fab-danger-text`, give it an `id` and add that `id` to the control's `aria-describedby`, so the message is read with the control; an icon you draw beside it is decorative, so give it `aria-hidden="true"`.
@@ -3266,6 +3269,7 @@ Colour alone does not carry the error: the danger edge falls short of 3:1 agains
 The message's `--fab-danger-text` ink clears 4.5:1 on those four grounds in every palette, where `--fab-danger` does not.
 The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge while the control holds focus, clear 4.5:1 and 3:1 on the error fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
 A Fabricate that predates `size`, `face`, `type` and `invalid` refuses each with `"<key>" is not a data attribute`, and `describe('Field').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
+A Fabricate that predates `align` refuses it with `"align" is not a data attribute`, so check `describe('Field').props.align` before you pass it; adding it is additive, and the entry stays at `version` 1.
 Rest `data-*` attributes land on the column root.
 `Field`'s column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog.
 Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.

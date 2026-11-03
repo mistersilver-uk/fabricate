@@ -30,7 +30,7 @@ import {
 const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const STEPPER_CLASSES = new Set(['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct']);
 
-/** The sixteen selectors outside `Stepper.svelte` that name a part of it: eleven `:not()` exemptions, and five under a pinned ancestor. */
+/** The eighteen selectors outside `Stepper.svelte` that name a part of it: thirteen `:not()` exemptions, and five under a pinned ancestor. */
 const STEPPER_SELECTORS = Object.freeze([
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper)',
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper-input)',
@@ -40,7 +40,7 @@ const STEPPER_SELECTORS = Object.freeze([
   // The same selector list, written twice in the sheet: the field chrome's edge rule and its height rule.
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
-  // The published field's form rules, which keep the same exclusion (issue 2848).
+  // The published field's form rules, which keep the same exclusion (issues 2848 and 2900).
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-26 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-28 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-30 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
@@ -48,6 +48,8 @@ const STEPPER_SELECTORS = Object.freeze([
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-face-serif input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-face-mono input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-invalid input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[aria-invalid='true']",
+  "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-align-center input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
+  "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-align-end input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input)',
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-manager [data-salvage-dc-override] .fab-stepper',
 ]);
@@ -291,7 +293,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Stepper', () => {
-  it('names a part of the stepper outside its own file in sixteen selectors, none of which a published stepper takes', () => {
+  it('names a part of the stepper outside its own file in eighteen selectors, none of which a published stepper takes', () => {
     const census = stepperSelectors(everyStylesheet());
     assert.deepEqual(writtenOf(census), [...STEPPER_SELECTORS].sort(byName));
     assert.deepEqual(

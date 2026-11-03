@@ -10,6 +10,7 @@
   | `face` | `'sans'` \| `'serif'` \| `'mono'` | `'sans'` | The control's family: `sans` inherits, `serif` and `mono` are the type ladder's faces; any other value draws `sans`. |
   | `type` | `'text'` \| `'number'` | `'text'` | `number` draws a caller's `<input type="number">` with no step buttons; any other value draws `text`. |
   | `invalid` | boolean | `false` | Only `true` draws the danger edge and fill, and only on a control that also carries the caller's `aria-invalid="true"`. |
+  | `align` | `'start'` \| `'center'` \| `'end'` | `'start'` | The text-like control's logical text alignment, so `end` is the left edge right to left; any other value draws `start` (issue 2900). |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
   | `children` | snippet | `undefined` | Conventionally a `<span>` caption followed by the control. The sheet draws a first-child `<span>` as the kicker, below a caller's caption class, and the box carries the value type its control inherits (issue 2532). |
 
@@ -43,6 +44,7 @@
     face = 'sans',
     type = 'text',
     invalid = false,
+    align = 'start',
     class: extraClass = '',
     children = undefined,
     ...rest
@@ -60,9 +62,10 @@
     34: 'is-size-34',
   });
   const FACE_CLASSES = Object.freeze({ serif: 'is-face-serif', mono: 'is-face-mono' });
+  const ALIGN_CLASSES = Object.freeze({ center: 'is-align-center', end: 'is-align-end' });
 
   const RUNG_TYPES = Object.freeze(['number', 'string']);
-  const FACE_TYPES = Object.freeze(['string']);
+  const STRING_TYPES = Object.freeze(['string']);
 
   const classOf = (table, value, ofTypes) =>
     ofTypes.includes(typeof value) && Object.hasOwn(table, String(value)) ? table[value] : '';
@@ -72,9 +75,10 @@
     [
       'fabricate-field',
       classOf(SIZE_CLASSES, size, RUNG_TYPES),
-      classOf(FACE_CLASSES, face, FACE_TYPES),
+      classOf(FACE_CLASSES, face, STRING_TYPES),
       type === 'number' ? 'is-type-number' : '',
       invalid === true ? 'is-invalid' : '',
+      classOf(ALIGN_CLASSES, align, STRING_TYPES),
       extraClass,
     ]
       .filter(Boolean)
