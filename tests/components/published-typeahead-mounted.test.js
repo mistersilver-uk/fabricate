@@ -526,15 +526,15 @@ describe('the published Typeahead openOnEmpty', () => {
       flushSync();
       assert.equal(handle.value('query'), '', 'the companion emptied the query');
       assert.ok(!listboxIn(), 'and the whole set did not reopen');
-      assert.equal(document.activeElement, input(), 'with focus still in the field');
+      assert.ok(document.activeElement === input(), 'with focus still in the field');
       press(input(), 'ArrowDown');
       assert.ok(Boolean(listboxIn()), 'ArrowDown reopens it');
     });
   }
 
-  it('opens over an error, beside a count, at each density, the shell unchanged', () => {
-    for (const density of ['default', 'toolbar', 'inline']) {
-      const { input, target, handle } = mountTypeahead(
+  for (const density of ['default', 'toolbar', 'inline']) {
+    it(`opens over an error, beside a count, at the '${density}' density, the shell unchanged`, () => {
+      const { input, target } = mountTypeahead(
         {
           openOnEmpty: true,
           density,
@@ -554,12 +554,8 @@ describe('the published Typeahead openOnEmpty', () => {
       const shell = target.querySelector('.fabricate-search');
       assert.equal(shell.classList.contains('is-density-toolbar'), density === 'toolbar');
       assert.equal(shell.classList.contains('is-density-inline'), density === 'inline');
-      input().blur();
-      flushSync();
-      handle.destroy();
-      handles.splice(handles.indexOf(handle), 1);
-    }
-  });
+    });
+  }
 
   it('is refused by a Fabricate that predates it, which describes no openOnEmpty', () => {
     const older = seamOver(
