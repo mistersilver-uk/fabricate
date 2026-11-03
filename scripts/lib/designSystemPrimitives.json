@@ -635,7 +635,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 2901 extracts `TintPicker`'s inline strip into its own file and publishes it through `game.fabricate.api.ui` (issue 2791): a `radiogroup` of Fabricate's tints, each swatch a `radio` named by its tint, with one Tab stop and arrow, Home and End keys that move focus and choose. Two importers, `components/TintPicker.svelte`, whose `inline` layout the four essence surfaces draw, and `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter, for the premium companion's identity cards. Its styles are its own scoped block, rooted at `fabricate-tint-swatches`, so it draws alike under any root. Its library specimen reads `shipped`, and its broad-signal override names the frames that draw the strip and its specimen mounted through the seam."
+      "why": "`TintSwatches` is `TintPicker`'s inline strip, extracted into its own file and published through `game.fabricate.api.ui`: a `radiogroup` of Fabricate's tints, each swatch a `radio` named by its tint, with one Tab stop and arrow, Home and End keys that move focus and choose. Two importers, `components/TintPicker.svelte`, whose `inline` layout the four essence surfaces draw, and `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter, for the premium companion's identity cards. Its styles are its own scoped block, rooted at `fabricate-tint-swatches`, so it draws alike under any root. Its library specimen reads `shipped`, and its broad-signal override names the frames that draw the strip and its specimen mounted through the seam."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",

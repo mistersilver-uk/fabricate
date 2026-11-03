@@ -3639,7 +3639,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>Event contract:</b> <b>onChange</b>, default a no-op, receives the whole <code>{colorToken, customColor}</code> pair from a preset click and from a hex edit alike &middot; <b>onClear</b> function or <code>null</code>, default <code>null</code>, is the unset instruction, deliberately NOT folded into <code>onChange</code> as an empty token because that would make every existing consumer learn a new falsy case.
             A pick closes the popover and returns focus to the control that opened it, and No colour calls <b>onClear</b> and then closes.
             The popover is the picker&rsquo;s own panel, which measures, portals and dismisses itself, so there is no position or portal prop.</li>
-          <li><b>Accessible naming:</b> every cell is a real <code>&lt;button&gt;</code> whose localized label is written as BOTH <code>aria-label</code> and <code>title</code>, since a swatch has no text of its own, and is named by <b>presetGridLabel</b> with its siblings: inline, the strip is <code>&lt;TintSwatches&gt;</code>, each cell a <code>radio</code> carrying <code>aria-checked</code>, true on the selected cell alone, in a <code>radiogroup</code> (issue 2901); in the popover, each tile is an <code>option</code> carrying <code>aria-selected</code>, true on the selected tile alone, in a <code>listbox</code> inside a dialog of the same name.
+          <li><b>Accessible naming:</b> every cell is a real <code>&lt;button&gt;</code> whose localized label is written as BOTH <code>aria-label</code> and <code>title</code>, since a swatch has no text of its own, and is named by <b>presetGridLabel</b> with its siblings: inline, the strip is <code>&lt;TintSwatches&gt;</code>, each cell a <code>radio</code> carrying <code>aria-checked</code>, true on the selected cell alone, in a <code>radiogroup</code>; in the popover, each tile is an <code>option</code> carrying <code>aria-selected</code>, true on the selected tile alone, in a <code>listbox</code> inside a dialog of the same name.
             No colour, the strip&rsquo;s leading cell or the panel&rsquo;s footer action, renders only when the gate is open AND a handler was supplied, because a control that does nothing is worse than none.
             <b>customHexLabel</b> names the hex field and <b>noneLabel</b> No colour.
             The three labels default to their localized English through <code>localizeOr</code>, so a caller passing none still names the palette.</li>
@@ -3732,14 +3732,14 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Svelte API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>TintSwatches.svelte</code>&rsquo;s <code>$props()</code> at issue 2901.</li>
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>TintSwatches.svelte</code>&rsquo;s <code>$props()</code>.</li>
           <li><b>value</b> a tint key, matched exactly, default <code>&apos;&apos;</code> &mdash; any other value checks no swatch &middot; <b>tints</b> an array of tint keys, drawn in its order once each, an unknown key dropped; absent, or naming no tint, all ten &middot; <b>labels</b> <code>{ [tint]: text }</code>, final display text naming a swatch, else Fabricate&rsquo;s own tint name</li>
           <li><b>ariaLabel</b> string, the group&rsquo;s name, required by contract &middot; <b>noneLabel</b> and <b>noneChecked</b> &mdash; a leading No-colour radio, drawn only beside <b>onClear</b>, and whether it is checked</li>
           <li><b>Event contract:</b> <b>onChange</b>(token) when a swatch that is not checked is chosen &middot; <b>onClear</b>() when the No-colour radio is; the strip draws no state of its own</li>
         </ul>
       </div>
     </div>
-    <div class="delta ok"><b>Extracted from <code>&lt;TintPicker&gt;</code> and published as <code>TintSwatches</code> (issues 2901 and 2791).</b>
+    <div class="delta ok"><b>Extracted from <code>&lt;TintPicker&gt;</code> and published as <code>TintSwatches</code>.</b>
       The inline strip was a <code>group</code> of <code>aria-pressed</code> buttons inside <code>TintPicker.svelte</code>; it is its own file now, a radio group, which <code>TintPicker</code>&rsquo;s <code>inline</code> layout renders, so the four essence surfaces and a companion draw one strip.
       A companion mounts it through <code>game.fabricate.api.ui</code> at <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>tints</code> and <code>labels</code>, under the standalone style root in a window of its own.
       The palette is Fabricate&rsquo;s ten tints: a colour outside them is not offered, because the checked ring is measured against those ten alone.<span class="cite"><b>TintSwatches.svelte</b> &middot; <b>TintPicker.svelte</b> &middot; <b>managerColorTokens.js</b> <code>offeredTintKeys</code></span></div>
@@ -12593,7 +12593,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       </tr>
       <tr>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Tint picker group name</td>
-        <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">the preset grid is a <code>radiogroup</code> named by its localized label, and each cell is a <code>radio</code> carrying <code>aria-checked</code> (issue 2901)</td>
+        <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">the preset grid is a <code>radiogroup</code> named by its localized label, and each cell is a <code>radio</code> carrying <code>aria-checked</code></td>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">DONE: role="group" on the preset grid</b></td>
         <td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><code>TintPicker.svelte</code>&rsquo;s grid was a plain element carrying <code>presetGridLabel</code>, where the attribute named nothing; and settled with the selected mark, so a reader hears the group, each colour and which one is pressed.
             After captures <b>manager-gathering-biome-colour-popover</b>, <b>world-essence-entry-dirty</b></span></td>

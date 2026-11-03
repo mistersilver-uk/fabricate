@@ -459,7 +459,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `Disclosure`.
 - The published set continues with `Typeahead`.
 - The published set continues with `Popover`.
-- The published set continues with `TintSwatches` (issue 2901).
+- The published set continues with `TintSwatches`.
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -2505,13 +2505,13 @@ Each group states the accepted values of every key that entry publishes.
     An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach the companion's controls in its slot.
 - **Private:** `Popover`'s padding, gap, corner and type figures, its colours and placement beyond what its group states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks.
 
-### The issue 2901 components
+### TintSwatches
 
 Each group states the accepted values of every key that entry publishes.
 
 - **`TintSwatches`.**
   - It is the design system's swatch strip (`<TintSwatches>` in the library): a radio group of Fabricate's tint swatches, for one colour chosen from Fabricate's tints, as an activity's or a faction's colour.
-    It is the strip Fabricate's own essence editors draw, and Fabricate's tints are its whole palette: a colour outside them is not offered, because each tint is tuned for every palette and the checked swatch's ring is measured against those tints alone (issue 2791).
+    It is the strip Fabricate's own essence editors draw, and Fabricate's tints are its whole palette: a colour outside them is not offered, because each tint is tuned for every palette and the checked swatch's ring is measured against those tints alone.
     The group is one `role="radiogroup"` element, the only element Fabricate draws directly in `target`, inside the standalone style root in a target with no Fabricate root, and each swatch in it is a `<button type="button" role="radio">`, so a swatch never submits a form of the companion's.
     The swatches fill the width of `target` in rows of cells at least 44px wide and 28px tall, 6px apart, wrapping onto a second row where `target` is narrower than ten cells, so each is a 24px target and more (WCAG 2.2 §2.5.8).
   - `value` is the checked tint's key, a string matched exactly: `'sage'`, `'mist'`, `'lavender'`, `'rose'`, `'peach'`, `'butter'`, `'aqua'`, `'mauve'`, `'verdant'` or `'azure'`; while it names a swatch that is drawn, that swatch alone states `aria-checked="true"` and draws the checked ring, and every other states `aria-checked="false"`.
@@ -2534,7 +2534,7 @@ Each group states the accepted values of every key that entry publishes.
     Every swatch carries `data-keyboard-focus`, so Foundry runs no keybinding, a canvas pan among them, while one holds focus.
     An `update` keeps every swatch that is still drawn, so focus stays where it is while the check moves; `destroy` removes them, so where a swatch holds focus the companion moves focus first.
   - The checked swatch is marked by a 2px inset ring drawn inside its colour in `--fab-biome-icon-foreground`, which clears 3:1 on every tint in all seven palettes, 3.09:1 at the least, and by `aria-checked`, so colour never carries the choice alone.
-    The choice's non-visual carrier is `aria-checked`, and its visual mark is that dark ring, which is measured against the swatch's colour, not the ground around it, so on a near-black ground it reads only against the tint (issue 2923).
+    The choice's non-visual carrier is `aria-checked`, and its visual mark is that dark ring, which is measured against the swatch's colour, not the ground around it, so on a near-black ground it reads only against the tint.
     Keyboard focus draws the 2px accent outline inset by 2px on the swatch's edge, clear of its colour, so it shows beside the checked ring; it clears 3:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes, 5.19:1 at the least.
     Under the pointer a swatch draws the same accent as a 2px ring 1px clear outside its 1px border edge, never a fill, so a swatch's colour never changes; it draws in the frame the pointer arrives, under either `prefers-reduced-motion` setting, as the focus outline does.
     Each swatch's 1px `--fab-border` edge carries no state outside forced colours.

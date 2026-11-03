@@ -4796,7 +4796,7 @@ The strip draws no No-colour radio, because `allowNone` is not published, so onc
 - An `update` keeps every swatch that is still drawn, so focus stays where it is while the check moves; `destroy` removes them, so where a swatch holds focus, move focus first.
 
 The checked swatch is marked by a 2px inset ring drawn inside its colour in `--fab-biome-icon-foreground`, which clears 3:1 on every tint in all seven palettes, 3.09:1 at the least, and by `aria-checked`, so colour never carries the choice alone.
-The choice's non-visual carrier is `aria-checked`, and its visual mark is that dark ring, which is measured against the swatch's colour, not the ground around it, so on a near-black ground it reads only against the tint (issue 2923).
+The choice's non-visual carrier is `aria-checked`, and its visual mark is that dark ring, which is measured against the swatch's colour, not the ground around it, so on a near-black ground it reads only against the tint.
 Keyboard focus draws the 2px accent outline inset by 2px on the swatch's edge, clear of its colour, so it shows beside the checked ring; it clears 3:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in all seven palettes, 5.19:1 at the least.
 Under the pointer a swatch draws the same accent as a 2px ring 1px clear outside its 1px border edge, never a fill, so a swatch's colour never changes; it draws in the frame the pointer arrives, under either `prefers-reduced-motion` setting, as the focus outline does.
 Each swatch's 1px `--fab-border` edge carries no state outside forced colours.
