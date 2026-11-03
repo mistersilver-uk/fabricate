@@ -9,6 +9,7 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
@@ -296,7 +297,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
     }
   });
 
-  it("the strip's pressed cell alone rings, and no cell is outlined at rest", async () => {
+  it("the strip's checked radio alone rings, and no cell is outlined at rest", async () => {
     const page = await open({
       colorToken: 'rose',
       layout: 'inline',
@@ -319,7 +320,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
     }
   });
 
-  it("the strip's No-colour cell, when pressed, rings in the text ink", async () => {
+  it("the strip's No-colour radio, when checked, rings in the text ink", async () => {
     const page = await open({
       colorToken: '',
       layout: 'inline',
@@ -354,6 +355,47 @@ const buttonHarness = createMountedComponentHarness({
 const HOST_HEIGHT = '.fabricate-manager { height: 360px; }';
 
 const TRIGGER = '.fabricate-color-picker .manager-color-picker-trigger';
+
+describe('the View Lab world essence entry case over the inline strip', () => {
+  before(async () => {
+    await harness.setup();
+    browser = await chromium.launch();
+  });
+  after(async () => {
+    await browser?.close();
+    await harness.teardown();
+  });
+
+  it('finds the sage radio checked where world-essence-entry-dirty expects it', async () => {
+    const { expectAttributes, steps } = getCaseById('world-essence-entry-dirty');
+    const page = await open({
+      colorToken: 'sage',
+      layout: 'inline',
+      allowNone: true,
+      onClear() {},
+    });
+    try {
+      // The case's host, as `WorldEssenceEntryPage` writes it around the strip.
+      await page.evaluate(() => {
+        const host = document.createElement('div');
+        host.dataset.scopedEntryColour = '';
+        const root = document.querySelector('.fabricate');
+        host.append(...root.childNodes);
+        root.append(host);
+      });
+      const step = steps.find((each) => each.selector?.includes('color-token'));
+      assert.equal(await page.locator(step.selector).count(), 1, 'the step names one radio');
+      const [{ selector, name, value }] = expectAttributes;
+      assert.deepEqual(
+        [await page.getAttribute(selector, name), await page.getAttribute(selector, 'role')],
+        [value, 'radio'],
+        `${selector} ${name}`
+      );
+    } finally {
+      await page.close();
+    }
+  });
+});
 
 describe('the tint trigger and tiles, over a core button transition', () => {
   let chrome;

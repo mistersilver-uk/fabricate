@@ -914,11 +914,11 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
-    // The entry's sage cell is pressed (issue 2257).
+    // The entry's sage swatch is the checked radio (issues 2257, 2901).
     expectAttributes: [
       {
         selector: '[data-scoped-entry-colour] [data-manager-color-token="sage"]',
-        name: 'aria-pressed',
+        name: 'aria-checked',
         value: 'true',
       },
     ],
