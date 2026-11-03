@@ -314,6 +314,17 @@ const SELECT_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
 const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
 
+/** The select fill fixture's ground, one of its sections by key, and a part of that section's select. */
+const SELECT_FILL = '[data-lab-select-fill]';
+const SELECT_FILL_PART = (key, part) =>
+  `${SELECT_FILL} > [data-lab-select-fill-form="${key}"] ${part}`;
+const SELECT_FILL_KEYS = Object.freeze(['inline-long', 'toolbar', 'hug', 'form']);
+/** The list the ground hosts as every select's `overlayHost`, in the container the seam mounts there. */
+const SELECT_FILL_LIST = `${SELECT_FILL} > div > .fabricate-select-popover`;
+
+/** Sized to the fixture's 320px ground and its four sections, the last with room for its list. */
+const SELECT_FILL_WINDOW = Object.freeze({ width: 440, height: 600 });
+
 /** The stage bars fixture's ground, and one of its sections by key: relative to the ground, for inside its `:has()`, and from the document. */
 const STAGE_BARS_GROUND = '[data-lab-stage-bars-ground]';
 const STAGE_BARS_SECTION_IN_GROUND = (key) => `> [data-lab-stage-bars="${key}"]`;
@@ -1572,6 +1583,54 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: OPEN_PANEL_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-fill-specimen',
+    label:
+      "Specimen, mounted through the published seam — four selects in 240px columns on the window's --fab-bg-1 ground, each beneath the text that names it, after one step: a press on the last. Reading top to bottom: an inline select with fill, 30px tall and as wide as its column, its long choice Oak heartwood from the northern grove, seasoned three winters, ending in an ellipsis before the chevron at the trailing edge; a toolbar select with fill, 34px tall and as wide as its column, reading Yew; a form select without fill reading Ash, hugging its label well short of its column; and a form select with fill reading Ash, as wide as its column, whose list is open beneath it in the ground, as wide as the trigger, reading Ash ticked and filled as the chosen row, then the long label and Yew",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select-fill' },
+    steps: [{ selector: SELECT_FILL_PART('form', SELECT_TRIGGER) }],
+    // The list the press opened, in the ground, with the chosen row marked.
+    expectSelector: `${SELECT_FILL}:has(> [data-lab-select-fill-form="form"] ${SELECT_TRIGGER}[aria-expanded="true"]) > div > .fabricate-select-popover [data-popover-option="ash"][aria-selected="true"]`,
+    expectCenterHit: SELECT_OPTION(SELECT_FILL_LIST, 'yew'),
+    expectContained: [
+      ...SELECT_FILL_KEYS.map((key) => ({
+        container: SELECT_FILL,
+        target: SELECT_FILL_PART(key, SELECT_TRIGGER),
+      })),
+      { container: SELECT_FILL, target: SELECT_FILL_LIST },
+      { container: '.window-content', target: SELECT_FILL },
+    ],
+    expectLayout: {
+      controls: [
+        // Each filled trigger as wide as its 240px column at its rung's height, the long value's
+        // ellipsis, and the list as wide as the filled form trigger, the form rung's floor.
+        {
+          selector: SELECT_FILL_PART('inline-long', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 30px',
+        },
+        {
+          selector: SELECT_FILL_PART('inline-long', '.fabricate-select-value'),
+          styles: 'text-overflow: ellipsis; white-space: nowrap',
+        },
+        {
+          selector: SELECT_FILL_PART('toolbar', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 34px',
+        },
+        {
+          selector: SELECT_FILL_PART('form', SELECT_TRIGGER),
+          styles: 'width: 240px; height: 38px',
+        },
+        { selector: SELECT_FILL_LIST, styles: 'width: 240px; border-radius: 11px' },
+      ],
+    },
+    position: SELECT_FILL_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
     id: 'manager-published-stage-bars-specimen',

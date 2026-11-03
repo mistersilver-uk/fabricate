@@ -116,6 +116,7 @@ const INERT = Object.freeze([
   'select-form-chosen',
   'select-inline-chosen',
   'select-toolbar-placeholder',
+  'select-fill',
   'field-text-input',
   'field-textarea',
   'field-label-host',
