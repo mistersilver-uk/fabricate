@@ -2663,7 +2663,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>inputProps</b> &mdash; the input&rsquo;s attributes, under the holder&rsquo;s own; a holder handler passed here is dropped with a warning</li>
         <li><b>listClass</b> &middot; <b>listProps</b> &middot; <b>listMaxHeight</b> = 148 &middot; <b>optionClass</b> &middot; <b>optionHeight</b> = 28 &middot; <b>optionDataAttr</b></li>
         <li><b>class</b> &middot; a rest spread on the field&rsquo;s root</li>
-        <li><b>options</b> [{ value, label, icon?, detail? }] &mdash; the DATA FORM, drawn while <b>source</b> is absent: each row a glyph, its label over a second line, and a tick at its end on the row matching <b>value</b>; <b>onChange</b>(value) &middot; <b>allowFree</b> + <b>onFreeText</b>(text) for Enter with no row active &middot; <b>error</b> &mdash; the select&rsquo;s invalid face with its message beneath, the list opening below the message &middot; <b>countLabel</b> &mdash; the field&rsquo;s own polite count</li>
+        <li><b>options</b> [{ value, label, icon?, detail? }] &mdash; the DATA FORM, drawn while <b>source</b> is absent: each row a glyph, its label over a second line, and a tick at its end on the row matching <b>value</b>; <b>onChange</b>(value) &middot; <b>allowFree</b> + <b>onFreeText</b>(text) for Enter with no row active &middot; <b>error</b> &mdash; the select&rsquo;s invalid face with its message beneath, the list opening below the message &middot; <b>countLabel</b> &mdash; the field&rsquo;s own polite count &middot; <b>openOnEmpty</b> &mdash; only the literal <code>true</code>: focus or ArrowDown on a blank query lists every row</li>
       </ul>
       </div>
     </div>
@@ -2706,7 +2706,34 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         A choice closes the list until the query is edited; Escape closes an open list keeping the text, and empties the text only once nothing is shown.
         A query that matches nothing shows <b>emptyLabel</b> as the panel&rsquo;s one quiet line in the muted ink and writes it into a polite status region the field always draws.</span>
     </div>
-    <div class="delta ok"><code>Typeahead</code> is published through <code>game.fabricate.api.ui</code> in its data form: <code>options</code>, the <code>query</code> value and <code>onQueryChange</code>, <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>placeholder</code>, <code>emptyLabel</code>, <code>allowFree</code> and <code>onFreeText</code>, <code>density</code> (the seam withholds <code>compact</code>) and <code>error</code>, at the <code>any</code> root under the standalone style root, its list the entry&rsquo;s overlay.
+    <div class="unit">
+      <span class="cap">the data form with <code>openOnEmpty</code> &mdash; focus on the empty field lists the whole short set, no row active</span>
+      <div style="width:300px">
+        <div class="k-field focus">
+          <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+          <span class="ph">Choose a scope&hellip;</span>
+        </div>
+        <div style="margin-top:4px;border-radius:6px;background:var(--fab-bg-2);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-md);padding:var(--fab-space-1);display:grid;gap:var(--fab-space-2xs);font-size:12px;font-weight:500;line-height:1.4">
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>World</span>
+          </div>
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text);background:var(--fab-surface-active)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>Party</span>
+            <span style="color:var(--fab-accent);font-size:11px">&#10003;</span>
+          </div>
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:var(--fab-space-chip);min-height:28px;padding:var(--fab-space-1) var(--fab-space-2);border-radius:6px;color:var(--fab-text)">
+            <svg class="i" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>Character</span>
+          </div>
+        </div>
+      </div>
+      <span class="k-hint">Only the literal <code>true</code> opens a blank query; the companion passes the whole set for <code>''</code> and still filters by its own query once typing starts.
+        Opening names no active row, so the first ArrowDown reaches the first; the first Escape closes the list and is stopped, a second passes on; ArrowDown reopens a list Escape, a choice or an outside press closed.
+        Fabricate&rsquo;s own typeaheads never pass it.</span>
+    </div>
+    <div class="delta ok"><code>Typeahead</code> is published through <code>game.fabricate.api.ui</code> in its data form: <code>options</code>, the <code>query</code> value and <code>onQueryChange</code>, <code>value</code>, <code>onChange</code>, <code>ariaLabel</code>, <code>placeholder</code>, <code>emptyLabel</code>, <code>allowFree</code> and <code>onFreeText</code>, <code>density</code> (the seam withholds <code>compact</code>), <code>error</code> and, from issue 2885, <code>openOnEmpty</code>, at the <code>any</code> root under the standalone style root, its list the entry&rsquo;s overlay.
       The issue named it <code>Combobox</code>; the set already owns the meaning, so the published name is the component&rsquo;s own.
       The function props stay Fabricate&rsquo;s, and every rule the data form adds hangs on a class only it writes, so the four call sites above draw as before.</div>
     <div class="delta ok"><b>One shared control for the three typeahead comboboxes.</b>

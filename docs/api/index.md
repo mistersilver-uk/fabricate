@@ -2079,7 +2079,7 @@ The published components, in publication order:
 | `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria) | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
-| `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text) | no |
+| `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text), `openOnEmpty` | no |
 | `Popover` | 1 | `any` | `open`, `anchorId` (required), `placement`, `title` (text, required), `ariaLabel`, `closeOnOutsideClick`, `onClose` (callback, required), `body` (slot) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -4535,8 +4535,7 @@ card.slot('body').append(renderFactionDetails(faction));
 
 `Typeahead` draws the design system's typeahead: a search field whose list of suggestions the query drives, for one choice from a set too long to step through, which commits as it is made, and optionally for text of your own when nothing matches.
 It is an editable combobox: the input holds focus throughout and names the active row, and the list is an overlay.
-For a short set the user should see whole, use [`Select`](#select): an empty query lists nothing here, and the field never shows the current value's label, so draw your current value beside it.
-A list shown on focus before any typing is a named follow-up, `openOnEmpty`, and not part of version 1.
+An empty query lists nothing here unless you pass `openOnEmpty`, which shows a short set whole before any typing; the field never shows the current value's label, so draw your current value beside it.
 The input is the only focusable element Fabricate draws in `target`, so to return focus to the typeahead, focus `target.querySelector('input')`.
 `options` is required and lists the rows the current query yields, in drawn order, each `{ value, label, icon?, detail? }`: `value` is a string or a number, `label` is required final display text, `icon` is optional Font Awesome classes for a glyph drawn before the label and hidden from assistive technology, and `detail` is optional final display text drawn as a second line under the label; a row's accessible name is its label followed by its detail.
 Fabricate filters nothing: you hand the list the rows your own search yields for the query you hold, in your own order and number, so cap a long result yourself; Fabricate draws every row it is given inside the list's scroll.
@@ -4573,6 +4572,12 @@ Fabricate coerces nothing, so the string `'false'` turns it on, and only `true` 
 `onFreeText` is a callback, required while `allowFree` is truthy, called with one argument, the query with its leading and trailing white space removed, as your user's own text when no row is wanted.
 It is not called by a press, by Enter on an active row, by Enter on a blank query or inside a composition, or while `allowFree` is falsy.
 It changes nothing itself either: empty the field with `query: ''` in an `update` when you take the text, as the worked example does.
+`openOnEmpty` is `true` or `false`, and defaults to `false`: while it is `true`, focus on a blank query, or ArrowDown there after Escape, a choice or a press outside closed the list, opens the list with every row `options` passes, so pass the whole set for `''`; Fabricate still filters nothing, and the rows follow your `options` as the query changes.
+Only the literal `true` turns it on: Fabricate coerces nothing, so the string `'false'`, the string `'true'` and `1` leave it off, and only `true` and `false` are in the contract.
+Opening leaves no row active, so the first ArrowDown of an open list reaches the first row; the list opens on focus whether the press, Tab or a script moved focus there, and a press on an input that already holds focus does not reopen a list Escape or a choice closed, which ArrowDown or an edit does.
+While it is `true` and `options` draws no row for a blank query, `emptyLabel` shows there as it does for a query that matches nothing, and is said into the status region.
+Use it for a short set the user should see whole, as a picker among a handful of scopes; a set too long to read at a glance stays a typed search, and a set the user never searches is a [`Select`](#select).
+A Fabricate that predates `openOnEmpty` refuses it with `"openOnEmpty" is not a prop of Typeahead`, and its `describe('Typeahead')` omits it, so pass it only where `describe('Typeahead').props.openOnEmpty` is present.
 `density` is `'default'`, `'toolbar'` or `'inline'` and defaults to `'default'`: the field's shell at the heights [`SearchField`](#searchfield)'s `density` draws, 38px at radius 9, 34px at radius 9 and 30px at radius 7; any other value, `'compact'` included, draws `'default'`.
 `error` is optional final display text: while it is a non-blank string the field takes the error face, `Select`'s danger edge on the `--fab-danger-soft` fill, its input states `aria-invalid="true"`, and the text is drawn beneath the field in the `--fab-danger-text` ink and is the input's description through `aria-describedby`; absent, `''`, white space alone or not a string, none of them is drawn.
 While the input holds focus, the field's lit border is drawn in place of the danger edge, and the fill and the message stay.
@@ -4581,8 +4586,9 @@ While an error shows, the list opens below the message, so it never covers it.
 The message makes the field taller, so draw a field that can show an error at the `'default'` `density`, in a place that need not stay one height.
 A Fabricate that predates `Typeahead` does not list it in `components`, `describe('Typeahead')` answers `null`, and `mount` refuses it with `"Typeahead" is not published`, so draw your own field there.
 
-- The list is open only while the input holds focus, the query is not blank and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
+- The list is open only while the input holds focus, the query is not blank or `openOnEmpty` is `true`, and `options` draws a row or `emptyLabel` shows; a press outside the field and the list, or a choice, closes it until the query is edited, and focus coming back to the input after a press outside opens it again.
 - ArrowDown and ArrowUp move the active row and wrap at each end, ArrowDown from no active row to the first and ArrowUp to the last; each edit of the query leaves no row active, so a query typed again never brings a row back.
+- While nothing is shown, ArrowDown on a blank query opens the list with no row active and takes the key only while `openOnEmpty` is `true`; otherwise it passes to the page.
 - The input names the active row with `aria-activedescendant`, the row states `aria-selected="true"` and draws a 2px accent ring inside its edge, and the list scrolls it into view; focus stays in the input throughout.
 - Home and End move the caret in the field, and move the active row to the first or the last row only when the caret already stands at that end of the text; PageUp and PageDown leave the list alone.
 - Enter chooses the active row, leaves no row active and closes the list until the query is edited; with none active it chooses nothing, and while rows are listed it takes the key.

@@ -1073,7 +1073,8 @@
       "scope": "shared",
       "why": [
         "The one shared type-to-search control: a trigger-less query field whose suggestion list the query drives, each choice committing at once into a single slot, a filter or a short list the caller owns.",
-        "It is published, so it is shared."
+        "It is published, so it is shared.",
+        "With `openOnEmpty` set to the literal `true`, focus or ArrowDown at a blank query lists every option."
       ]
     }
   ],
@@ -1102,7 +1103,9 @@
       "path": "src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte",
       "library": null,
       "evidence": "targeted",
-      "callers": ["src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte"],
+      "callers": [
+        "src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte"
+      ],
       "why": [
         "The Downtime companion's tab strip.",
         "ONE caller, `src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte`, which puts it below the two-caller bar."
@@ -1133,7 +1136,9 @@
       "path": "src/ui/svelte/components/RouteSources.svelte",
       "library": "<RouteSources>",
       "evidence": "broad",
-      "callers": ["src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte"],
+      "callers": [
+        "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte"
+      ],
       "why": [
         "Library section 12's routing line: a routed result set's effective sources as positive row chips, stored assignments that do not route struck and removable, and \"Nothing — unreachable\" when nothing reaches the set.",
         "ONE caller, `RecipeResultGroupCard.svelte`, so it is below the two-caller bar."
@@ -1204,7 +1209,9 @@
       "path": "src/ui/svelte/apps/manager/BulkEditSelect.svelte",
       "library": null,
       "evidence": "targeted",
-      "callers": ["src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte"],
+      "callers": [
+        "src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte"
+      ],
       "why": [
         "The bulk panel's leave-unchanged select.",
         "ONE caller, `src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte`, so it is below the two-caller bar."
@@ -1264,7 +1271,9 @@
       "path": "src/ui/svelte/components/XrefList.svelte",
       "library": "<XrefList>",
       "evidence": "broad",
-      "callers": ["src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte"],
+      "callers": [
+        "src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte"
+      ],
       "why": [
         "The cross-reference list: a read-only list named by its own kicker, each row ListRow's dense row or its selectable dense form, with a caller-formatted detail at the trailing edge.",
         "ONE importer, `src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte`, is below the two-importer membership bar."
