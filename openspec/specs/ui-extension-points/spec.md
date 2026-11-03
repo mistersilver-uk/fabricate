@@ -535,7 +535,9 @@ A Fabricate that predates the `Medallion` values draws the tile as unset, one th
 - `StatBox`'s `children` and `Stepper`'s `size` were added to their entries at `version` 1, `children` as a content slot: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates each refuses it, with `"children" is not a data attribute` on `StatBox` and `"size" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`.
 - `StatBox`'s `children`, `Stepper`'s `size` and `IconPicker`'s `tint`, and `Button`'s `role` values `accent` and `urgent`, were added at `version` 1, `children` as a content slot: an added optional key or value is additive, so no entry's `version` changed; a Fabricate that predates a key refuses it, with `"children" is not a data attribute` on `StatBox` and `"<key>" is not a prop of <Entry>` on `Stepper` and `IconPicker`, which `describe` shows by leaving the key out of `props`, and one that predates the roles draws `neutral` and refuses nothing.
 - `Button`'s `role` value `confirm` was added at `version` 1: an added value is additive, so the entry's `version` did not change, and a Fabricate that predates it draws `neutral` and refuses nothing, which `describe` cannot show.
+- `Stepper`'s `size` value `34` was added at `version` 1: an added value is additive, so the entry's `version` did not change, and a Fabricate that publishes `size` but predates the value draws it as the default rung and refuses nothing.
 - `IconPicker`'s `iconOnly` was added to its entry at `version` 1 as a `data` key, and its captioned trigger's name took the caption it draws: an added optional key and a name that only gains the visible label are additive, so the entry's `version` did not change, and a Fabricate that predates them refuses `iconOnly` with `"iconOnly" is not a prop of IconPicker`, which `describe` shows by leaving the key out of `props`, and names a captioned trigger by `ariaLabel` alone.
+- `Select`'s `fill` was added to the entry at `version` 1: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates it refuses it with `"fill" is not a prop of Select`, which `describe` shows by leaving the key out of `props`.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
@@ -695,17 +697,18 @@ A `Modal` dialog is `position: fixed`, so its host's `position` does not make th
 On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ignored.
 - Each time an overlay opens, Fabricate picks its host from `target.ownerDocument` at that moment, and never from Fabricate's own `document`:
   1. `overlayHost`, while it is connected and in `target`'s document;
-  2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
-  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
+  2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`, unless it lies outside the top-layer element step 3 names;
+  3. else, where the element the panel is placed against or `target` is inside an element in the browser's top layer (`:modal`, which a `<dialog>` opened with `showModal()`, as a DialogV2 with `modal: true` is, and a fullscreen element match, or `:popover-open`), a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps inside the nearest such element, made and removed and themed as the one below, so the panel is that element's descendant: drawn above the page with it, not inert, hit-testable and in the accessibility tree;
+  4. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
 - An overlay that is open keeps its panel in the host it opened in while that host stays connected, so an `overlayHost` moved to another document while it is open leaves the panel in it, and the next overlay to open picks its host again.
 - The standalone layer Fabricate keeps for the seam's panels spans the viewport of its window, the box those panels are measured against, and takes no pointer, so a panel placed from either edge lands where it was measured and the page around the panel still takes input.
-- A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there: a companion does not mount `Popover`, or any overlay entry, in one, or it passes an `overlayHost` inside that dialog.
-- Unless the panel's own group says it stops it, a press or a key in a panel on the standalone layer bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's group says so, as for an `IconPicker` list or an `ActionMenu` menu.
+- A standalone layer inside a top-layer element is measured by its own box, so an element there that is the containing block of fixed content still places and clamps the panel; an `overlayHost` outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert.
+- Unless the panel's own group says it stops it, a press or a key in a panel on the standalone layer on `<body>` bubbles to the page's body and document and never through the companion's window, `target` or any element of the companion's, so a listener of the companion's there hears none of it, and one in a panel on a layer inside a top-layer element bubbles through that element and its ancestors first, outside any `<form>` in it; Escape pressed in it reaches Foundry's dismiss keybinding, which closes no window where the panel's group says so, as for an `IconPicker` list or an `ActionMenu` menu.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 The `<div>` carries `display: contents` and, where its host is the standalone layer, `pointer-events: auto`, `font-family: var(--font-body, var(--font-primary, sans-serif))` and `font-size: var(--font-size-14)`, and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-- An overlay entry does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`: the standalone layer is drawn under the browser's top layer, which makes everything outside the dialog inert, so the panel is neither seen nor pressed; the companion mounts it in a dialog that is not modal.
+- In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless the companion's own listener prevents that key.
 - An overlay's outside-press, focus-leave, Escape and scroll listeners, and the watch an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
 An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
@@ -1366,14 +1369,18 @@ Each group states the accepted values of every key that entry publishes.
     Without `allowUnset` a `value` of `null` is outside the contract, and what is drawn for it is private.
   - `fill` is `true` or `false`, and `false` when absent.
     `true` stretches the stepper across the width of `target` and the input takes the room the two buttons leave, so the companion gives `target` the width it wants filled; absent, the stepper hugs its content.
+    The filled stepper is 38px tall, or as tall as the `size` rung the companion states, 26px or 34px.
+    The input's own width never holds `target` wider, so in a flex row or a grid column a filled stepper narrows with the room it is given down to little more than its two buttons' width.
   - `density` is `default` or `comfortable`, and `default` when absent.
     `comfortable` paints the two buttons at 24 by 24 CSS pixels, where the default paints them 22 by 22 inside a 24 by 24 pointer target, so the stepper is a little taller and wider; every pointer target is at least 24 by 24 at either density.
     What the stepper draws for a value outside the set is private; today that is the default density.
-  - `size` is `26` or `'26'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
-    Any other value, `28`, `'27'`, `' 26'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
-    The rung outranks `density`, so `comfortable` beside it draws the same 26px stepper, and under `fill` it pins the stepper at 26px across `target`.
+  - `size` is `26`, `'26'`, `34` or `'34'`, a number or its string, and absent draws the default: `26` draws the dense rung, 26px tall and as wide as the default, with no padding inside the stepper's edge, so each step button fills a 24 by 24 cell to that edge, its own 24 by 24 pointer target, and the input a 24px-tall one (WCAG 2.2 success criterion 2.5.8).
+    `34` draws the toolbar rung, level with a `Field`, `Select`, `SearchField` or `SegmentedControl` at its 34px rung: 34px tall and as wide as the default, with the default 2px padding inside the stepper's edge and their 9px corner, the input filling the 28px row between the two buttons, and each button drawn 22 by 22 inside its 24 by 24 pointer target, as at the default rung.
+    Any other value, `28`, `'28'`, `'27'`, `' 26'`, `'34px'` and `true` among them, draws the default, 28px tall, and nothing is coerced; `density: 'comfortable'` draws 30px.
+    Each rung outranks `density`, so `comfortable` beside it draws the same 26px or 34px stepper, and under `fill` it sets the stepper's height across `target`, 26px or 34px, where a filled stepper with no rung stays 38px tall, so adding `34` changes nothing for a `fill` a companion mounts today.
     No rung below 26 is published, because one would draw a step button under its 24 by 24 target.
     A Fabricate that predates `size` refuses it with `"size" is not a prop of Stepper`, which `describe('Stepper').props` shows by leaving it out; adding it is additive, and the entry stays at `version` 1.
+    A Fabricate that publishes `size` but predates `34` draws `34` and `'34'` as the default rung, 28px tall or 38px under `fill`, and refuses nothing, so `describe` cannot tell the two apart; adding the value is additive, and the entry stays at `version` 1.
     The stepper steps by one `step` or one stop each way: a row of preset steps around a figure, as −5, −1, +1 and +5, is the companion's, drawn as published `Button`s beside a `Field`, because each of its presses is an action of its own rather than one value's step.
   - `placeholder` is optional text, shown in the input while it is empty.
     It shows only while the input is empty, which is a `null` value under `allowUnset`, and under `format` only where there is no `nullLabel`, because a `nullLabel` draws its words instead; the companion passes the text already localised and never relies on it as a name, because `ariaLabel` names the input and a placeholder does not.
@@ -1429,7 +1436,7 @@ Each group states the accepted values of every key that entry publishes.
     The companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
-  - The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, and inside the stepper's own outer edge in every case, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
+  - The keyboard ring is the accent, 2px wide, drawn at the part's own edge, or 1px outside it for the input under `fill` and for the buttons under `comfortable`, or straddling the part's edge by 1px at `size` `26`, where `size` `34` draws it as the default rung does, and inside the stepper's own outer edge in every case, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
 - **Private:** what the button draws for a `role` value outside its set.
   Its height, corner, padding, type size and weight.
   Each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in.
@@ -1500,6 +1507,11 @@ Each group states the accepted values of every key that entry publishes.
     The select draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the control with no name.
   - `placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
   - `size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
+  - `fill` is `true` or `false`, and `false` when absent: `true` stretches the trigger across the width of `target` at every `size`, so the companion gives `target` the column's width and the trigger keeps it whichever option is chosen; absent, the trigger hugs its label.
+    Under `fill` a label longer than the trigger ends in an ellipsis, the chevron stays at the trailing edge in either direction, and the list opens against the filled trigger as it opens against any.
+    Only `true` stretches the trigger: Fabricate coerces nothing, so `'true'` or `1` draws it hugging its label.
+    `fill` replaces a descendant rule of the companion's own wrapper, which names a part of the component and is outside the contract; no `width` is published, because the column's width is the companion's, on `target`.
+    The filled trigger's edge is `target`'s, so a keyboard focus mark drawn outside the trigger falls outside `target`, and the companion leaves room for it there, unclipped.
   - A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
     While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
@@ -1721,12 +1733,19 @@ Each group states the accepted values of every key that entry publishes.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the button on one of those four grounds.
 - **`EditorTabs`.**
   - It is the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels the companion draws.
-    It draws no panel, and no mark, padlock or description on a tab.
-  - `tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
+    It draws no panel, and on a tab no padlock, no description and no mark but the tab's `count`.
+  - `tabs` is required and is an array of `{ id, label, icon, count }` items, one tab each, drawn in that order.
     `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
-    `label` is required and is final display text, the tab's whole visible text and its accessible name; a label of white space alone leaves the tab with no name, so the companion never passes one.
+    `label` is required and is final display text, the tab's visible text and its accessible name, which a `count` follows; a label of white space alone leaves the tab with no name, so the companion never passes one.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+    `count` is optional and is a whole number of 0 or more, as `2`, drawn after the label as the strip's record count, a small muted numeral in the mono face, on the selected tab as on any other.
+    A tab with a `count` is named its label, a comma, a space and the count's digits, as "Factions, 2", and the numeral itself is hidden from assistive technology, so the count is read once; Fabricate adds no word, so the name reads alike in every language.
+    A `count` of 0 is drawn and named, so the companion omits `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped, up to `Number.MAX_SAFE_INTEGER`, above which a count draws nothing.
+    A `count` that is not a whole number from 0 to `Number.MAX_SAFE_INTEGER`, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
+    The numeral's muted ink clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, on a selected, an unselected and a hovered tab alike; under forced colours it is drawn in the system text colour, and it never marks the selection.
     An item's other members are private and Fabricate draws nothing from them; a function in one is M10.
+    Naming `count` is additive, and `EditorTabs`' `version` stays 1: before it `count` was a private member that drew nothing.
+    A Fabricate that predates it draws no count and refuses none, and `describe` names no item member, so a companion puts a count a reader must have in the panel too.
   - `activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
   - `onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
     The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so the companion makes that `update` from inside `onSelect`, before any `await`.
@@ -2080,7 +2099,8 @@ Each group states the accepted values of every key that entry publishes.
     The dialog's height is capped, so the companion scrolls tall content inside one element of its own in the body, which it gives `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
     A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
   - `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-    With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
+    With `true`, a click of the primary button whose press goes down and comes up outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `click` fires, as does a tap, and so does Escape pressed while focus is outside both.
+    A press with any other button, a press that goes down outside and comes up inside the dialog or such a panel, or the reverse, and a `click` with no pointer press, as a keyboard activation of a control outside makes, call nothing.
     In a DialogV2, with `true` and the opener still holding focus inside it, Escape calls `onClose` and also reaches the DialogV2's own Escape listener, so both close; the companion passes `false`, stops Escape in its own listener, or moves focus into the dialog first.
     A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
     A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as a `Select`'s list, an `IconPicker`'s list and query field and an `ActionMenu`'s menu that the companion mounts in a slot.
@@ -2089,7 +2109,7 @@ Each group states the accepted values of every key that entry publishes.
     A `Modal` the companion mounts in a slot counts as inside the dialog too, so a press or an Escape in its dialog, or a press on its scrim, calls only that dialog's `onClose`, and a panel opened from inside that `Modal` counts as inside both, so a press there calls neither and an Escape there closes the panel alone.
     An `overlayHost` inside the slot draws a panel inside the dialog, which clips what overflows it.
     With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
-  - `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
+  - `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a click or an Escape outside it.
     An Escape held down calls it again on each repeat.
     It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
     Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing; only while `target` is disconnected is the dialog not drawn, as Overlays states.
@@ -2121,8 +2141,10 @@ Each group states the accepted values of every key that entry publishes.
     It is drawn in the frame the dialog is drawn in, with no fade, so reduced motion changes nothing, and under forced colours Chromium draws it in the system's background colour at the same opacity, with the dialog's 1px edge in the system's text colour above it.
     Over the four page grounds of every palette it never lowers the contrast of the dialog's 1px edge with the window behind and raises it to 3:1 in none, the edge measuring 1.66:1 to 2.51:1, so the dialog's own controls, not its boundary, carry its identification, and the dim sets the dialog apart by fading the window's content.
     It carries `aria-hidden="true"` and no role, so Chromium leaves it out of the accessibility tree, and it takes no focus and is never a Tab stop, but it covers no keyboard path: without `trapFocus`, Tab moves focus onto the dimmed controls behind the scrim, whose focus ring the scrim fades under 1.7:1, as Fabricate's accent ring measures 1.35:1 to 1.69:1 against the dimmed page grounds of every palette, and the dialog is not announced as modal, so a companion passes `trapFocus` `true` whenever it passes `'dim'`.
-    It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is; it is a press outside the dialog, so, whichever button it is, it calls `onClose` as its `mousedown` fires with `closeOnOutsideClick` `true` and calls nothing with `false`, and a drag that starts inside the dialog and ends on the scrim calls nothing.
-    Where `onClose` closes the dialog, the scrim is gone before the press ends, so in Chromium the press's `mouseup` reaches whatever was behind the scrim and no `click` follows.
+    It takes every pointer press over the box it covers, so none reaches the window behind there, and a press on it keeps focus where it is.
+    It is outside the dialog, so with `closeOnOutsideClick` `true` a primary-button click that goes down and comes up on it calls `onClose` as its `click` fires, and with `false` calls nothing.
+    A press with another button, a drag from the scrim into the dialog and a drag from the dialog onto the scrim call nothing.
+    The press's `mouseup` and `click` land on the scrim, so where `onClose` closes the dialog nothing behind the scrim hears either.
     A wheel or a touch drag over the scrim does not scroll what is under it.
     For a dim of another colour or strength, over another box, or with a blur, the companion passes `'none'` and draws its own layer, as the lines on its host below state.
   - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
@@ -2441,7 +2463,6 @@ Each group states the accepted values of every key that entry publishes.
     The list opens beneath the field, and above it where its host has no room beneath; its placement, width and height inside the host are private.
     Its width has a 220px floor, so beside a field narrower than that in a narrow window it can overhang the window's edge.
     The list also closes, and its panel is removed, when `target` leaves its document while the mount is live, as when an `update` of a `Modal` whose content slot holds the mount closes the dialog, as Overlays states.
-    It does not work in a dialog opened with `showModal()`, a DialogV2 with `modal: true`, because the standalone layer is drawn under the top layer and is inert there; the companion mounts it in a dialog that is not modal.
     A row is at least 28px tall, so each is a 24px target.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its field is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it fills the width of `target`, which the companion gives `display: flex`.
@@ -2503,12 +2524,12 @@ Each group states the accepted values of every key that entry publishes.
     Escape pressed on an element inside the panel whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element, as an open `Select` list's is, so the next Escape closes the popover; Escape pressed while focus is elsewhere calls nothing.
   - The panel is the entry's overlay, so `describe('Popover').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states, so `target`'s overflow does not clip it.
     It is drawn at the popover family's stacking level, `z-index` 4000, above a `Modal` dialog, and a panel a control inside it opens is drawn above it.
-    A panel on the standalone layer is drawn under a modal `<dialog>` opened with `showModal()` and is inert there, so the companion never mounts a `Popover` in one without an `overlayHost` inside that dialog.
+    In a `<dialog>` opened with `showModal()` that holds the anchor or `target`, it is drawn in that dialog, as Overlays states, so it is not inert there.
   - It never animates, with or without a reduced-motion preference, and under forced colours its edge is the system text colour and its shadow is not drawn.
   - Its surface is `--fab-bg-0`, as the picker panel's is, with a 1px `--fab-border-strong` edge and the large shadow, and the title and the body's inherited ink are `--fab-text`, which clears 4.5:1 on that surface in every palette; the body's ring clears 3:1 on it.
     The edge carries no state and reads between 1.64:1 and 2.21:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, so the controls the companion draws inside carry their own edges.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-  - Its panel is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or a dialog that is not modal, on the standalone layer there.
+  - Its panel is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, modal or not, on the standalone layer there.
     An `overlayHost` outside every Fabricate window is accepted, and the panel then takes the palette the document's root names rather than a window's, and the Fabricate window's keyboard rings do not reach the companion's controls in its slot.
 - **Private:** `Popover`'s padding, gap, corner and type figures, its colours and placement beyond what its group states, the hidden element it keeps in `target`, and its `fabricate-popover*` classes and `data-popover-*` hooks.
 
@@ -2873,6 +2894,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **AND** Tab on the trigger with the list open closes it without calling `onChange`, and a `keydown` listener above `target` hears the Tab
 - **AND** a mount whose `options` hold `1` and `'1'` faults when its list opens, calling `onFault` once with the target empty
 - **AND** a mount that omits `options` throws M9, and one that passes a `data-*` key throws M8
+
+#### Scenario: A filled published select keeps its column
+
+- **WHEN** a companion mounts `Select` with `fill: true` into a `target` it gives a width, and the user chooses an option whose label is longer than the trigger
+- **THEN** the trigger is as wide as `target` before and after the choice, at every `size`
+- **AND** the chosen label ends in an ellipsis with the chevron at the trailing edge, and the list opens against the filled trigger
+- **AND** a mount with `fill: 'true'` draws the trigger hugging its label
 
 #### Scenario: A published stage group
 

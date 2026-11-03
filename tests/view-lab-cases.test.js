@@ -419,6 +419,8 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSearch.svelte',
   'tests/view-lab/fixtures/PublishedSearchForms.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
+  'tests/view-lab/fixtures/PublishedSelectFill.svelte',
+  'tests/view-lab/fixtures/PublishedSelectModal.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedStageBarsForms.svelte',
   'tests/view-lab/fixtures/PublishedFillBarBands.svelte',
@@ -895,6 +897,10 @@ const labSearchForm = (key, part) =>
   `[data-lab-search-forms] > [data-lab-search-form="${key}"] ${part}`;
 /** A part of one published select of the select fixture, by its section's key. */
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
+/** A part of one published select of the select fill fixture, by its section's key, and its trigger. */
+const labSelectFill = (key, part) =>
+  `[data-lab-select-fill] > [data-lab-select-fill-form="${key}"] ${part}`;
+const SELECT_TRIGGER = '.fabricate-select-trigger';
 /** The one section of the field fixture. */
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 /** The forms fixture's companion input in one section, by the section's key. */
@@ -961,6 +967,18 @@ const LAB_COMPANION_FACES = [
   {
     selector: labCompanionForm('stepper-default', '.fab-stepper'),
     styles: 'height: 28px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', '.fab-stepper'),
+    styles: 'height: 34px; padding-top: 2px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar', 'input'),
+    styles: 'height: 28px',
+  },
+  {
+    selector: labCompanionForm('stepper-toolbar-fill', '.fab-stepper'),
+    styles: 'width: 140px; height: 34px',
   },
   {
     selector: labCompanionForm('button-ghost', 'button'),
@@ -1749,6 +1767,24 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'border-radius: 11px',
     },
   ],
+  // The published select's fill (issue 2904): each filled trigger as wide as its 240px column at
+  // its rung's height, the long value's ellipsis, and the list as wide as the filled trigger.
+  'manager-published-select-fill-specimen': [
+    {
+      selector: labSelectFill('inline-long', SELECT_TRIGGER),
+      styles: 'width: 240px; height: 30px',
+    },
+    {
+      selector: labSelectFill('inline-long', '.fabricate-select-value'),
+      styles: 'text-overflow: ellipsis; white-space: nowrap',
+    },
+    { selector: labSelectFill('toolbar', SELECT_TRIGGER), styles: 'width: 240px; height: 34px' },
+    { selector: labSelectFill('form', SELECT_TRIGGER), styles: 'width: 240px; height: 38px' },
+    {
+      selector: '[data-lab-select-fill] > div > .fabricate-select-popover',
+      styles: 'width: 240px; border-radius: 11px',
+    },
+  ],
   // The published field (issue 2601): the caption span's flex box and its kicker type, the
   // companion input's chrome, and its inset keyboard ring over its own edge.
   'manager-published-field-specimen': [
@@ -2061,7 +2097,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
   // The published tab strip (issue 2601): the keyboard-reached, selected tab's ring, ink and
-  // underline, the unselected tab at rest, and the strip's rule.
+  // underline, the unselected tab at rest, the selected tab's count (issue 2896), and the strip's rule.
   'manager-published-tabs-specimen': [
     {
       selector: `${LAB_OUTPUTS_TAB}:focus-visible`,
@@ -2072,6 +2108,10 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: LAB_INPUTS_TAB,
       styles:
         'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+    },
+    {
+      selector: `${LAB_OUTPUTS_TAB} > .manager-editor-tab-count`,
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px; font-weight: 500',
     },
     {
       selector: LAB_TABLIST,
@@ -4671,6 +4711,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
   'manager-published-select-layer',
+  'manager-published-select-modal-dialog',
   'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
@@ -7667,6 +7708,42 @@ test('the select specimen cases act on what the select fixture mounts through th
     layered.expectSelector.includes('[data-lab-select="hosted"][data-lab-value="all"]') &&
       layered.expectSelector.includes('> .fabricate.fabricate-standalone-overlay >'),
     'the frame is taken once the choice was passed back and the list is open on the layer'
+  );
+});
+
+test('the select fill specimen case acts on the keys and hooks the select fill fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedSelectFill.svelte'
+  );
+  const nodes = [...walkNodes({ instance, fragment })];
+  const selects = nodes.find(
+    (node) => node.type === 'VariableDeclarator' && node.id?.name === 'SELECTS'
+  );
+  const keys = selects.init.arguments[0].elements.map((pair) => pair.elements[0].value);
+  const opened = getCaseById('manager-published-select-fill-specimen');
+  const named = new Set(
+    [
+      ...opened.steps.map(({ selector }) => selector),
+      ...opened.expectContained.map(({ target }) => target),
+    ].flatMap((selector) =>
+      [...selector.matchAll(/data-lab-select-fill-form="([a-z-]+)"/g)].map(([, key]) => key)
+    )
+  );
+  assert.deepEqual(
+    [...named].sort(byCodePoint),
+    [...keys].sort(byCodePoint),
+    'the case names every section'
+  );
+  for (const hook of ['data-lab-select-fill', 'data-lab-select-fill-form']) {
+    assert.ok(
+      nodes.some((node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  assert.deepEqual(
+    opened.steps.map(({ selector }) => selector),
+    [labSelectFill('form', SELECT_TRIGGER)],
+    'one press, on the last filled select, whose list has the room reserved beneath it'
   );
 });
 

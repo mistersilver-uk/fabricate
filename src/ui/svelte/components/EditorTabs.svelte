@@ -5,9 +5,10 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
+  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label, count }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
+  | tab `count` | safe integer ≥ 0 | absent | Drawn as a `count` mark ahead of any `badges` mark, hidden from assistive technology, and naming the tab "Factions, 2" (see Invariants); anything else, a numeric string or a count above `Number.MAX_SAFE_INTEGER` included, draws nothing. |
   | `annotated` | boolean | `false` | Reads each tab's `ariaLabel`, `tooltip` and `tierGated` below; off, a tab is drawn from its `id`, `icon` and `label` alone. |
-  | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here, and on a tab carrying a named `count` mark (see Invariants). |
+  | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here, and on a tab carrying its own `count` or a named `count` mark (see Invariants). |
   | tab `tooltip` | final text | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
   | `badges` | per tab id: one mark, or an array of them | `undefined`, no marks | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text, and on a `count` it is the phrase stating what the numeral counts ("3 linked recipes"), which the tab's own name then carries as "Contents, 3 linked recipes"; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
@@ -50,6 +51,9 @@
   - A named record count is spoken with its unit: a tab carrying a `count` mark with a `name`, and no `ariaLabel`
     of its own, takes the accessible name "Contents, 3 linked recipes" on its button, joined by the names of any
     named mark on the tab; the numeral stays the bare visible mark. A count with no `name` leaves the name to its content.
+  - A tab's own `count` names it "Factions, 2", label, comma, space and digits through no lang key, and any named
+    mark joins after it as above. An `annotated` tab's `ariaLabel` and the `validation` tab's severity name win
+    over it, leaving the hidden numeral out of the name; a published strip reaches neither.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
     `activeTab`. The hovered tab's description shows, else the focused tab's when none is hovered;
     a hovered tab that carries none shows none, and Escape hides it until that tab is next hovered
@@ -109,6 +113,7 @@
 
   // Each map is keyed by tab id, so a spread below reads a script-level derived, never a call.
   const marksByTab = $derived(byTab(markList));
+  const countsByTab = $derived(byTab(itemCount));
   const buttonHooks = $derived(byTab((tab) => hook(tabDataAttr, tab)));
   const tooltipHooks = $derived(byTab((tab) => hook(tooltipDataAttr, tab)));
   const markHooks = $derived(
@@ -241,6 +246,11 @@
     return values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable);
   }
 
+  // The tab's own record count as its digits, or null; a safe integer always prints in digits.
+  function itemCount({ count }) {
+    return Number.isSafeInteger(count) && count >= 0 ? String(count) : null;
+  }
+
   function badgeTone(tone) {
     if (tone === 'danger') return 'danger';
     if (tone === 'warning') return 'warning';
@@ -295,18 +305,24 @@
     );
   }
 
-  // A named record count states what its numeral counts; every other named mark on the tab joins
-  // it, because the tab's own name replaces the content that would otherwise carry theirs.
+  // A tab's own count joins its label as "<label>, <count>" through no lang key, so the name reads
+  // alike in every language; a named record count states what its numeral counts, and every named
+  // mark joins through the localizable template, because the tab's name replaces their content.
   function countName(tab) {
     const marks = marksByTab[tab.id];
-    if (!marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) return undefined;
-    const names = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
+    const own = countsByTab[tab.id];
+    if (own === null && !marks.some((mark) => mark.vehicle === 'count' && mark.name !== '')) {
+      return undefined;
+    }
+    const label = own === null ? tab.label : `${tab.label}, ${own}`;
+    const named = marks.filter((mark) => mark.name !== '').map((mark) => mark.name);
+    if (named.length === 0) return label;
     return severityText(
       'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts',
       '{label}, {counts}',
       {
-        label: tab.label,
-        counts: names.join(', '),
+        label,
+        counts: named.join(', '),
       }
     );
   }
@@ -386,7 +402,10 @@
       <span>{tab.label}</span>{#if annotated && tab.tierGated}<i
           class="fas fa-lock manager-editor-tab-lock"
           aria-hidden="true"
-        ></i>{/if}
+        ></i>{/if}{#if countsByTab[tab.id] !== null}<span
+          class="manager-editor-tab-count"
+          aria-hidden="true">{countsByTab[tab.id]}</span
+        >{/if}
       {#if badges}
         {#each marksByTab[tab.id] as mark, markIndex (`${tab.id}-${markIndex}`)}
           {#if mark.vehicle === 'count'}

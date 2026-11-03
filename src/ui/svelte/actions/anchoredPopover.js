@@ -89,6 +89,11 @@ function resolveBounds(bounds, hostRect, anchor) {
 // The caller's `opener`, an element or a resolver re-read on every pass, or `null`.
 const openerOf = ({ opener }) => (typeof opener === 'function' ? opener() : opener) ?? null;
 
+// `node`'s host, acquired from the opener or else `anchor`, the element it is measured against,
+// which the chain is also told (issue 2884).
+const acquireFrom = (node, options, anchor) =>
+  acquireOverlayHost(node, openerOf(options) ?? anchor, { ...options, anchor });
+
 function panelStyle(layout, { applyWidth, maxHeightCap }) {
   const parts = [];
 
@@ -239,7 +244,7 @@ export function anchoredPopover(node, params = {}) {
   }
 
   function portalToHost() {
-    host = acquireOverlayHost(node, openerOf(options) ?? anchorElement(), options);
+    host = acquireFrom(node, options, anchorElement());
     if (portalHandle) portalHandle.update(host);
     else portalHandle = portal(node, host);
   }

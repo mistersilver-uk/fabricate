@@ -13,6 +13,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+import { pressPointer } from '../helpers/pointerPress.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   PUBLISHED_ADAPTER,
@@ -104,12 +105,11 @@ function mountModal(props = {}) {
 const dialog = () => document.querySelector(DIALOG_HOOK);
 const scrims = () => [...document.querySelectorAll(SCRIM_HOOK)];
 
-/** A `mousedown` on `node` as a pointer press starts, and whether its default was prevented. */
-function press(node) {
-  const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
-  node.dispatchEvent(event);
+/** A pointer press from `node` to `to`, and whether its `mousedown`'s default was prevented. */
+function press(node, to = node, options = {}) {
+  const down = pressPointer(node, to, options);
   flushSync();
-  return event.defaultPrevented;
+  return down.defaultPrevented;
 }
 
 describe('the published Modal scrim key', () => {
@@ -183,6 +183,27 @@ describe('a press on the published Modal scrim', () => {
     assert.deepEqual(modal.closes.calls, []);
     press(document.body);
     assert.equal(modal.closes.calls.length, 1, 'an outside press is heard');
+  });
+
+  for (const [name, button] of [
+    ['right', 2],
+    ['middle', 1],
+  ]) {
+    it(`calls nothing for a ${name}-button press on it, and keeps focus (issue 2879)`, () => {
+      const modal = mountModal({ scrim: 'dim', trapFocus: true });
+      assert.equal(press(scrims()[0], scrims()[0], { button }), true);
+      assert.deepEqual(modal.closes.calls, []);
+    });
+  }
+
+  it('calls nothing for a drag from it into the dialog or from the dialog onto it (issue 2879)', () => {
+    const modal = mountModal({ scrim: 'dim' });
+    const header = dialog().querySelector('.manager-modal-header');
+    press(scrims()[0], header);
+    press(header, scrims()[0]);
+    assert.deepEqual(modal.closes.calls, []);
+    scrims()[0].click();
+    assert.deepEqual(modal.closes.calls, [], 'nor a click with no press, as a keyboard makes');
   });
 
   it('closes only the dimmed Modal mounted in another’s slot, not the one holding it', () => {
