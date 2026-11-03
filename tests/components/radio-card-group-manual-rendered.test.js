@@ -51,14 +51,12 @@ const active = () =>
   });
 
 /** Presses each key in turn, returning where focus is after each. */
-async function walk(keys) {
-  const reached = [];
-  for (const key of keys) {
+const walk = (keys) =>
+  keys.reduce(async (done, key) => {
+    const reached = await done;
     await page.keyboard.press(key);
-    reached.push(await active());
-  }
-  return reached;
-}
+    return [...reached, await active()];
+  }, Promise.resolve([]));
 
 describe('a manual RadioCardGroup on the keyboard, in Chromium', () => {
   it('moves focus on the arrow keys, skipping the disabled option and wrapping, and chooses nothing', async () => {
@@ -83,9 +81,7 @@ describe('a manual RadioCardGroup on the keyboard, in Chromium', () => {
 
   it('chooses nothing on an arrow key with Ctrl, Alt or Shift held', async () => {
     await page.focus(radioOf('manual', 'hold'));
-    for (const key of ['Control+ArrowRight', 'Alt+ArrowRight', 'Shift+ArrowRight']) {
-      await page.keyboard.press(key);
-    }
+    await walk(['Control+ArrowRight', 'Alt+ArrowRight', 'Shift+ArrowRight']);
     assert.deepEqual(await callsOf('manual'), []);
     assert.deepEqual(await checkedOf('manual'), ['hold']);
   });
