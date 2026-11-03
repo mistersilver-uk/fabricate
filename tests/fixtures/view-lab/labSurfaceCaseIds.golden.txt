@@ -75,6 +75,7 @@ manager-published-companion-forms-urgent-focus
 manager-published-button-roles-specimen
 manager-published-button-roles-confirm-focus
 manager-published-selection-checkbox-specimen
+manager-published-checkbox-rows-specimen
 manager-published-toggle-labels-specimen
 manager-published-disclosure-specimen
 manager-published-pagination-specimen

@@ -788,6 +788,24 @@ const CHECKBOX_KEYS = Object.freeze([
 /** Sized to the fixture's two columns and the first one's seventeen rows. */
 const CHECKBOXES_WINDOW = Object.freeze({ width: 740, height: 640 });
 
+/** The objective rows' ground, a row by its key, and the decorative box inside it (issue 2881). */
+const CHECKBOX_ROWS = '[data-lab-checkbox-rows]';
+const OBJECTIVE_ROW = (key) => `${CHECKBOX_ROWS} > [data-lab-checkbox-row="${key}"]`;
+const OBJECTIVE_BOX = (key) => `${OBJECTIVE_ROW(key)} .fab-selection-check`;
+const OBJECTIVE_KEYS = Object.freeze([
+  'done',
+  'open',
+  'pressed',
+  'compact',
+  'comfortable',
+  'accent',
+  'mixed',
+  'labelled',
+]);
+
+/** Sized to the fixture's 420px column and its eight rows. */
+const CHECKBOX_ROWS_WINDOW = Object.freeze({ width: 520, height: 460 });
+
 /** The labelled switches' ground, a row by its key, and the button and label it draws (issue 2902). */
 const TOGGLE_LABELS = '[data-lab-toggle-labels]';
 const TOGGLE_LABEL_ROW = (key) => `${TOGGLE_LABELS} > [data-lab-toggle-label="${key}"]`;
@@ -2725,6 +2743,47 @@ export const CASES = Object.freeze([
     // A checkbox's edge and fill against the ground are judged on three more palettes, ironblood-
     // forge holding the measured minima.
     themeVariants: ['foundry-native', 'hearth-herb', 'ironblood-forge'],
+    // `SelectionCheckbox.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-checkbox-rows-specimen',
+    label:
+      "Specimen, mounted through the published seam — eight objective rows in a 420px column on the window's --fab-bg-1 ground, 6px apart, each but the last a pressable button of the companion's own on --fab-bg-2 holding a decorative selection checkbox before its objective, the text struck through while done, after one step: a click on Quench the blade, whose companion update ticked its box. Reading top to bottom: Gather three iron ore done, a 20px box filled --fab-success inside its strong success edge with a dark tick; Smelt the ore into bars open, an empty box outlined in --fab-control-outline; Quench the blade, pressed to done, ticked in the success fill; Temper the edge done at the compact 16px box; Fit the hilt done at the comfortable 22px box; Sharpen the blade done in the default tone, its box filled accent; Polish the fittings mixed in the success tone, which keeps the accent dash on its soft fill; and as a baseline the labelled box Forge the blade, ticked in the success fill beside its label. The frame cannot show that each box is hidden from the accessibility tree while its row's button carries the name and pressed state, nor the forced-colours repaint, which the rendered suite reads and emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-checkbox-rows' },
+    steps: [{ selector: OBJECTIVE_ROW('pressed') }],
+    // The pressed row done by the companion's own update, its box ticked in the success face.
+    expectSelector: `${OBJECTIVE_ROW('pressed')}[data-lab-checkbox-row-done="true"][aria-pressed="true"] .fab-selection-check.is-checked.is-success`,
+    expectContained: [
+      ...OBJECTIVE_KEYS.map((key) => ({ container: CHECKBOX_ROWS, target: OBJECTIVE_ROW(key) })),
+      { container: '.window-content', target: CHECKBOX_ROWS },
+    ],
+    expectLayout: {
+      controls: [
+        // The success face's fill, edge and tick, the empty edge, the three rungs, the accent
+        // tone and the mixed box's accent edge.
+        {
+          selector: OBJECTIVE_BOX('done'),
+          styles:
+            'width: 20px; height: 20px; background-color: var(--fab-success); border-top-color: var(--fab-success-strong); color: var(--fab-on-success)',
+        },
+        {
+          selector: OBJECTIVE_BOX('open'),
+          styles: 'border-top-color: var(--fab-control-outline)',
+        },
+        { selector: OBJECTIVE_BOX('pressed'), styles: 'background-color: var(--fab-success)' },
+        { selector: OBJECTIVE_BOX('compact'), styles: 'width: 16px; height: 16px' },
+        { selector: OBJECTIVE_BOX('comfortable'), styles: 'width: 22px; height: 22px' },
+        { selector: OBJECTIVE_BOX('accent'), styles: 'background-color: var(--fab-accent)' },
+        { selector: OBJECTIVE_BOX('mixed'), styles: 'border-top-color: var(--fab-accent)' },
+        { selector: OBJECTIVE_BOX('labelled'), styles: 'background-color: var(--fab-success)' },
+      ],
+    },
+    position: CHECKBOX_ROWS_WINDOW,
+    kinds: ['manager', 'specimen'],
     // `SelectionCheckbox.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
