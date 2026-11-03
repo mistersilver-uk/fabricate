@@ -499,6 +499,9 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'tabs-second-active': tabs({}),
     'tabs-none-active': tabs({ activeTab: '' }),
     'tabs-active-panel-only': tabs({ activePanelOnly: true }),
+    'tabs-count': tabs({
+      tabs: TABS.map((tab, index) => ({ ...tab, count: [2, 0, 1250][index] })),
+    }),
   }),
   RadioCardGroup: Object.freeze({
     'cards-row': chosenCard({}),

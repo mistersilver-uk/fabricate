@@ -239,7 +239,8 @@
       "scope": "shared",
       "why": [
         "The editor tab strip, a real tablist with arrow-key selection whose tabs carry a record count or an issue badge.",
-        "`library.html`'s `<TabBar>` specifies it, and the manager's editors and the player application's detail tabs render it, so it is shared."
+        "`library.html`'s `<TabBar>` specifies it, and the manager's editors and the player application's detail tabs render it, so it is shared.",
+        "A tab item's `count` is a whole number from 0 to `Number.MAX_SAFE_INTEGER` drawn as the record-count vehicle, hidden from assistive technology and naming the tab `<label>, <count>`, the one mark the published strip draws."
       ]
     },
     {

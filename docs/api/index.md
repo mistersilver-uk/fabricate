@@ -3523,12 +3523,19 @@ const remove = fabUi.mount('IconButton', {
 ### EditorTabs
 
 `EditorTabs` draws the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels you draw.
-It draws no panel, and no mark, padlock or description on a tab.
-`tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
+It draws no panel, and on a tab no padlock, no description and no mark but the tab's `count`.
+`tabs` is required and is an array of `{ id, label, icon, count }` items, one tab each, drawn in that order.
 Each `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
-Each `label` is required and is final display text, the tab's whole visible text and its accessible name; a label of white space alone leaves the tab with no name, so never pass one.
+Each `label` is required and is final display text, the tab's visible text and its accessible name, which a `count` follows; a label of white space alone leaves the tab with no name, so never pass one.
 Each `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+Each `count` is optional and is a whole number of 0 or more, as `2`, drawn after the label as the strip's record count, a small muted numeral in the mono face, on the selected tab as on any other.
+A tab with a `count` is named its label, a comma, a space and the count's digits, as "Factions, 2", and the numeral itself is hidden from assistive technology, so the count is read once; Fabricate adds no word, so the name reads alike in every language.
+A `count` of 0 is drawn and named, so omit `count` on a tab with nothing to count; a large count is drawn in full, in digits with no grouping, as `1250`, and never capped, up to `Number.MAX_SAFE_INTEGER`, above which a count draws nothing.
+A `count` that is not a whole number from 0 to `Number.MAX_SAFE_INTEGER`, a numeric string such as `'2'`, a negative, a fraction, `NaN` and `Infinity` among them, draws nothing, adds nothing to the name and is not refused.
+The numeral's muted ink clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, on a selected, an unselected and a hovered tab alike; under forced colours it is drawn in the system text colour, and it never marks the selection.
 An item's other members are private and Fabricate draws nothing from them; a function in one is refused.
+Naming `count` is additive, and `EditorTabs`' `version` stays 1: before it `count` was a private member that drew nothing.
+A Fabricate that predates it draws no count and refuses none, and `describe` names no item member, so put a count a reader must have in the panel too.
 `activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
 `onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
 The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so make that `update` from inside `onSelect`, before any `await`.
@@ -3555,7 +3562,7 @@ The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reache
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the strip on one of those four grounds.
 Under forced colours the reader's colours repaint every tab's border in the text colour, so the selected tab's indicator is drawn in `Highlight` and 4px thick against the others' 2px, in a box of the same height, and the selected tab is told from the others by that indicator and not by its weight.
 Its padding, rule, type and colour figures beyond what this section states, and how Fabricate draws a tab strip in its own editors, are private.
-`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab never draws a mark, a padlock, a description or a name of its own.
+`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab draws no mark but its `count`, no padlock and no description, and takes no name but its label and its `count`.
 
 A worked strip follows: two sections of a reagent sheet you draw inside a Fabricate window, for example in an extension target, with one panel shown at a time.
 

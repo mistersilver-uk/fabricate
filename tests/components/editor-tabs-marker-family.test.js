@@ -563,3 +563,46 @@ describe('EditorTabs names what a record count counts (issue 2491)', () => {
     assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes tab');
   });
 });
+
+describe('EditorTabs names a tab by its own count (issue 2896)', () => {
+  const COUNTED = [TABS[0], { ...TABS[1], count: 2 }];
+  const localized = async () => {
+    const { APP_LOCALIZER } = await harness.loadRawModule('src/ui/svelte/util/appLocalizer.js');
+    const copy = { 'FABRICATE.Admin.Manager.TabCounts.TabNameWithCounts': '{label} : {counts}' };
+    return new Map([[APP_LOCALIZER, (key) => copy[key] ?? key]]);
+  };
+
+  it('joins the label and its own count through no lang key, under a localizer that rewrites the template', async () => {
+    const root = await harness.mount(
+      { tabs: COUNTED, activeTab: 'roll' },
+      { context: await localized() }
+    );
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes, 2');
+  });
+
+  it('joins a named mark after the own count, through the localizable template', async () => {
+    const badges = { outcomes: { vehicle: 'dot', name: '1 issue' } };
+    let root = await harness.mount({ tabs: COUNTED, activeTab: 'roll', badges });
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes, 2, 1 issue');
+    harness.remount();
+    root = await harness.mount(
+      { tabs: COUNTED, activeTab: 'roll', badges },
+      { context: await localized() }
+    );
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), 'Outcomes, 2 : 1 issue');
+  });
+
+  it('yields to an annotated tab’s own name, which leaves the hidden numeral out of it', async () => {
+    const root = await harness.mount({
+      tabs: [TABS[0], { ...COUNTED[1], ariaLabel: 'Outcomes tab' }],
+      activeTab: 'roll',
+      annotated: true,
+    });
+    const button = buttonFor(root, 'outcomes');
+    assert.equal(button.getAttribute('aria-label'), 'Outcomes tab');
+    assert.equal(
+      button.querySelector('.manager-editor-tab-count').getAttribute('aria-hidden'),
+      'true'
+    );
+  });
+});

@@ -1,6 +1,7 @@
 /**
  * The module sheet and every component style against the published `EditorTabs` (issue 2601): the
- * 18 selectors that name its root class, which of them a published strip can match, where those
+ * 18 selectors that name its root class, which of them a published strip can match (a tab's
+ * `count`, issue 2896, reaches the record-count rule), where those
  * sit and what they draw, the bare `button` rules its tabs also take, and the classes its file
  * spells on the root and on a tab.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, reads no
@@ -39,7 +40,7 @@ import {
 /**
  * The published strip's root: the container class its default writes beside it, no ancestor a
  * Fabricate rule redraws it under, and the classes its file spells that no published key draws,
- * the marks, the padlock and the descriptions, which props it does not publish draw.
+ * the dot, the issue chip, the padlock and the descriptions, which props it does not publish draw.
  */
 const STRIP = Object.freeze({
   root: 'fabricate-tabs',
@@ -48,7 +49,6 @@ const STRIP = Object.freeze({
   drawsChildren: true,
   disables: false,
   undrawn: new Set([
-    'manager-editor-tab-count',
     'manager-editor-tab-dot',
     'manager-editor-tab-badge',
     'manager-editor-tab-lock',
@@ -59,7 +59,7 @@ const STRIP = Object.freeze({
 /** A published tab: its default class and the state class `activeTab` writes. */
 const TAB = Object.freeze({ writable: new Set(['manager-editor-tab-button', 'is-active']) });
 
-/** The seven sheet rules that draw a published strip, each with nothing above its root's compound. */
+/** The eight sheet rules that draw a published strip, each with nothing above its root's compound. */
 const STRIP_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-tabs button',
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-tabs.manager-editor-tabs',
@@ -68,6 +68,7 @@ const STRIP_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-tabs .manager-editor-tab-button.is-active',
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-tabs button:focus',
   'styles/fabricate-manager-tool-editor-environments.css: .fabricate-tabs button:focus-visible',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-tabs .manager-editor-tab-count',
 ]);
 
 const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
@@ -82,9 +83,10 @@ const shippedBareButtons = () =>
   everyStylesheet().flatMap(([file, css]) => bareButtonSelectors(file, css, TAB, TAB_ANCESTORS));
 
 describe('the module sheet and every component style against the published EditorTabs', () => {
-  // The 18: the seven family rules; four on the environment vocabulary a Fabricate caller passes,
-  // which no published key writes; and seven on a mark, the padlock or a description.
-  it('reaches a published strip through its seven family rules, of 18 that name its root', () => {
+  // The 18: the eight family rules, a tab's count among them; four on the environment vocabulary a
+  // Fabricate caller passes, which no published key writes; and six on a mark, the padlock or a
+  // description.
+  it('reaches a published strip through its eight family rules, of 18 that name its root', () => {
     const shipped = census();
     assert.deepEqual(writtenOf(reachingOf(shipped)), [...STRIP_FAMILY_RULES].sort(byName));
     assert.equal(shipped.length, 18, 'the census of every selector naming the root');
@@ -162,7 +164,7 @@ describe('the editor tabs census, synthetic', () => {
 
   for (const [claim, selector] of [
     ['a container class no published key writes', '.fabricate-tabs.manager-environment-tabs'],
-    ['a mark below a tab', '.fabricate-tabs .manager-editor-tab-count'],
+    ['a mark below a tab', '.fabricate-tabs .manager-editor-tab-dot'],
     ['the padlock below a tab', '.fabricate-tabs .manager-editor-tab-lock'],
     ['a description beside the strip', '.fabricate-tabs ~ .fabricate-tabs-tooltip'],
     ['a classed child no closure spells', '.fabricate-tabs .manager-unspelled'],

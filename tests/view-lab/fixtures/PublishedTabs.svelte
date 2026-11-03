@@ -1,7 +1,7 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2601). It mounts one `EditorTabs` through
   the page-session seam `game.fabricate.api.ui` binds, as a companion does: three tabs of a reagent
-  sheet, two with a glyph, under `activePanelOnly`, and the one panel the companion draws beneath
+  sheet, two with a glyph and a `count` (issue 2896), under `activePanelOnly`, and the one panel the companion draws beneath
   the strip, labelled by the tab that shows it and a tab stop because it holds no control. Its
   `onSelect` passes the reached tab back as `activeTab` in its own `update`, before any `await`,
   and shows that tab's panel. Every word is a companion's final text, so none is localized.
@@ -17,8 +17,8 @@
   const STEM = 'lab-reagents';
   /** The three tabs, in order, and each panel's line. */
   const TABS = Object.freeze([
-    { id: 'inputs', label: 'Inputs', icon: 'fas fa-flask' },
-    { id: 'outputs', label: 'Outputs', icon: 'fas fa-box-open' },
+    { id: 'inputs', label: 'Inputs', icon: 'fas fa-flask', count: 2 },
+    { id: 'outputs', label: 'Outputs', icon: 'fas fa-box-open', count: 2 },
     { id: 'notes', label: 'Notes' },
   ]);
   const PANELS = Object.freeze({
