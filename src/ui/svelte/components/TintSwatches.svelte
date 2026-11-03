@@ -174,7 +174,7 @@
     position: absolute;
     inset: -3px;
     border: 2px solid var(--fab-accent);
-    border-radius: 10px;
+    border-radius: 11px;
     pointer-events: none;
   }
 
