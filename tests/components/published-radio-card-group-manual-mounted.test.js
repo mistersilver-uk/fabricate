@@ -245,11 +245,55 @@ describe('a manual RadioCardGroup', () => {
     const { target, handle, calls, radio } = mountGroup({ disabled: true });
     await settle();
     assert.ok(radio('hold').matches(':disabled'));
-    radio('hold').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-    );
-    assert.notEqual(target.ownerDocument.activeElement?.value, 'queue');
+    for (const key of ['ArrowRight', 'End', 'Enter']) {
+      radio('hold').dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      );
+    }
+    assert.ok(!target.contains(target.ownerDocument.activeElement), 'focus is outside the group');
     assert.deepEqual(calls, []);
+    handle.destroy();
+  });
+
+  it('chooses once for a held Enter, never on its repeats', async () => {
+    const { target, handle, calls, radio } = mountGroup();
+    await settle();
+    radio('hold').focus();
+    press(target, 'ArrowRight');
+    press(target, 'Enter');
+    assert.equal(press(target, 'Enter', { repeat: true }), true, 'a repeat submits no form');
+    press(target, 'Enter', { repeat: true });
+    assert.deepEqual(calls, [['queue']]);
+    handle.destroy();
+  });
+
+  it('reads activation, disabledOptions and options as an update leaves them, with a radio focused', async () => {
+    const mounted = mountGroup();
+    const { target, handle, radio, focused } = mounted;
+    const props = (overrides) => ({
+      options: OPTIONS,
+      value: 'hold',
+      legend: 'When a step is pending',
+      onChange() {},
+      disabledOptions: SOON,
+      activation: 'manual',
+      ...overrides,
+    });
+    await settle();
+    radio('hold').focus();
+    handle.update(props({ activation: 'automatic' }));
+    await settle();
+    assert.equal(press(target, 'ArrowRight'), false, 'an automatic update hands the keys back');
+    handle.update(props({ disabledOptions: [...SOON, { value: 'queue', reason: 'Full' }] }));
+    await settle();
+    assert.equal(focused(), 'hold', 'the update keeps focus on its radio');
+    press(target, 'ArrowRight');
+    assert.equal(focused(), 'drop', 'ArrowRight skips the option the update disabled');
+    handle.update(props({ options: [...OPTIONS, { value: 'defer', label: 'Defer' }] }));
+    await settle();
+    press(target, 'ArrowRight');
+    assert.equal(focused(), 'defer', 'ArrowRight reaches the option the update added');
+    assert.deepEqual(mounted.calls, []);
     handle.destroy();
   });
 });

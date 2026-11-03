@@ -123,6 +123,28 @@ describe('a manual RadioCardGroup on the keyboard, in Chromium', () => {
     assert.deepEqual(await callsOf('manual'), []);
   });
 
+  it('stops on the checked radio on Shift+Tab from a reached, unchecked one, then leaves the group', async () => {
+    await page.focus(radioOf('manual', 'hold'));
+    // Chromium's own stop: the checked radio stays in the backward order of a focused sibling.
+    assert.deepEqual(await walk(['ArrowRight', 'Shift+Tab', 'Shift+Tab']), [
+      'manual queue',
+      'manual hold',
+      'manual before',
+    ]);
+    assert.deepEqual(await callsOf('manual'), []);
+  });
+
+  it('chooses once for a held Enter, never on its repeats', async () => {
+    await page.focus(radioOf('manual', 'hold'));
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    assert.deepEqual(await callsOf('manual'), ['queue']);
+    assert.equal(await submitsOf('manual'), 0);
+  });
+
   it('is one Tab stop with no option chosen, first on the first enabled radio, then where focus left the group', async () => {
     await page.focus(`[data-case="unchosen"] [data-before]`);
     assert.deepEqual(await walk(['Tab', 'ArrowRight', 'Tab']), [

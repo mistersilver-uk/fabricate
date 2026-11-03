@@ -15,7 +15,7 @@
   | `disabledOptions` | `{ value, reason }[]` | `[]` | Each entry disables the option it names and draws its already-localized `reason` beneath the description; `reason` is required by contract and an empty one draws nothing. An entry naming no option is ignored. One entry per value: the first non-empty reason wins, and a later empty one does not erase an earlier one. |
   | `layout` | `'row'` \| `'stacked'` | `'row'` | Chip beside the text, or chip over it. The caller states it (`stacked` on three or more tracks); it is never derived from `columns`, and a reflowed card keeps it. |
   | `columns` | positive integer | `2` | Tracks per row; any other value draws `2`, so no string reaches the `style` attribute. The group reflows to one track when its `fabricate-option-host` (a card or panel that names itself, else the manager) is 620px wide or narrower. |
-  | `activation` | `'automatic'` \| `'manual'` | `'automatic'` | `'automatic'` leaves every key to the platform, whose arrow keys check the radio they reach. `'manual'` holds the arrow keys, Home and End from the platform and moves focus among the enabled radios alone (left and right swapped under `direction: rtl`), and Enter clicks the focused radio, so only Space, Enter or a press chooses. Any other value draws `'automatic'`. |
+  | `activation` | `'automatic'` \| `'manual'` | `'automatic'` | `'automatic'` leaves every key to the platform, whose arrow keys check the radio they reach. `'manual'` holds the arrow keys, Home and End from the platform and moves focus among the enabled radios alone (left and right swapped under `direction: rtl`), and Enter clicks the focused radio once per press, never on a held key's repeat, so only Space, Enter or a press chooses. Any other value draws `'automatic'`. |
 
   Snippets:
   - `optionBody(option)` — read-only content beneath the card's head: at the text column in a row
@@ -108,20 +108,20 @@
     ArrowLeft: (dir) => (dir === 'rtl' ? 1 : -1),
   });
 
-  /** A manual group's keys: focus moves and nothing is checked, and Enter clicks the focused radio. */
+  /** A manual group's keys: focus moves and nothing is checked, and Enter clicks the focused radio once per press. */
   function roam(event) {
     if (activation !== 'manual' || event.altKey || event.ctrlKey || event.metaKey) return;
     const radio = event.currentTarget;
     if (event.key === 'Enter') {
       event.preventDefault();
-      radio.click();
+      if (!event.repeat) radio.click();
       return;
     }
-    const step = STEPS[event.key];
+    const step = Object.hasOwn(STEPS, event.key) ? STEPS[event.key] : null;
     if (!step && event.key !== 'Home' && event.key !== 'End') return;
     event.preventDefault();
     const radios = [...radio.closest('fieldset').querySelectorAll('input[type="radio"]')].filter(
-      (node) => !node.disabled
+      (node) => !node.matches(':disabled')
     );
     const at = radios.indexOf(radio);
     const count = radios.length;
