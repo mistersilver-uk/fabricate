@@ -82,6 +82,7 @@ manager-published-selection-checkbox-specimen
 manager-published-checkbox-rows-specimen
 manager-published-toggle-labels-specimen
 manager-published-toggle-card-tones-specimen
+manager-published-medallion-text-specimen
 manager-published-disclosure-specimen
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen

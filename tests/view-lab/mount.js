@@ -833,6 +833,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-checkbox-rows': () => import('./fixtures/PublishedCheckboxRows.svelte'),
   // The published toggle card's closed tones while on, an off card and a press that turns one on.
   'published-toggle-card-tones': () => import('./fixtures/PublishedToggleCardTones.svelte'),
+  // The published medallion's text on four rungs and three tones, and its accent ink on a glyph.
+  'published-medallion-text': () => import('./fixtures/PublishedMedallionText.svelte'),
   // Issue 2902: the switch's label inside its button, a press on its words and a wrapping label.
   'published-toggle-labels': () => import('./fixtures/PublishedToggleLabels.svelte'),
   // Issue 2862: disclosure cards at rest, open, pressed open, focused and disabled, and a faction

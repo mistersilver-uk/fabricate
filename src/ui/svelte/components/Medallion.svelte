@@ -13,7 +13,8 @@
   | `tint` | bare `--fab-tag-*` key | `''` | Recolours the GLYPH and nothing else. Unset is byte-identical to the shipped render, because the glyph reads the token through a `var()` fallback. |
   | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
   | `tone` | `''` \| `'success'` \| `'danger'` \| `'accent'` \| `'warning'` \| `'info'` | `''` | Paints the edge, ground and glyph in that family's `-border`, `-soft` and `-text` tokens, as the library's toned `<IconChip>` specimens do; a rolled die face reads qualified or cancelled by it, and `accent` marks a chosen option's chip. `warning` and `info` have no in-app caller and serve the published seam (issue 2847). It outranks `tint`, and `variant` `'glyph-chip'` draws no edge. Anything else resolves to `''`. |
-  | `ink` | `''` \| `'success'` \| `'danger'` \| `'neutral'` \| `'warning'` \| `'info'` | `''` | Inks the GLYPH alone on the unchanged slate ground: a family's `-text` token, as the Checks simulator's result-card icon reads success or failure, or `--fab-text-secondary` for `neutral`. It outranks `tint`, and it outranks `tone` on the glyph. Anything else resolves to `''`. |
+  | `ink` | `''` \| `'success'` \| `'danger'` \| `'neutral'` \| `'accent'` \| `'warning'` \| `'info'` | `''` | Inks the GLYPH alone on the unchanged slate ground: a family's `-text` token, as the Checks simulator's result-card icon reads success or failure, or `--fab-text-secondary` for `neutral`. It outranks `tint`, and it outranks `tone` on the glyph. Anything else resolves to `''`. |
+  | `text` | a string of one to three letter, number, punctuation or symbol code points, or a finite number that writes as one | unset | Draws that text in the tile's mono face at the rung's glyph size, in place of the art and the glyph. Anything else draws the art or glyph as unset. The text is decoration, hidden from assistive technology, so the caller says it in words beside the tile. `tint` and `ink` recolour the glyph alone and never reach it. |
 
   Invariants:
   - FLAT BY CONTRACT: the surface is `--fab-bg-3`, or a `tone`'s flat `-soft` token, never a gradient
@@ -37,13 +38,25 @@
     variant = '',
     tone = '',
     ink = '',
+    text = '',
   } = $props();
 
   const TONES = ['success', 'danger', 'accent', 'warning', 'info'];
-  const INKS = ['success', 'danger', 'neutral', 'warning', 'info'];
+  const INKS = ['success', 'danger', 'neutral', 'accent', 'warning', 'info'];
 
   const safeTone = $derived(TONES.includes(tone) ? tone : '');
   const safeInk = $derived(INKS.includes(ink) ? ink : '');
+
+  // One to three code points, each a letter, number, punctuation or symbol that draws: marks,
+  // separators, controls and the default-ignorable and blank code points never do.
+  const DRAWN_TEXT = /^[\p{L}\p{N}\p{P}\p{S}]{1,3}$/u;
+  const BLANK_TEXT = /[\p{Default_Ignorable_Code_Point}\u2800]/u;
+  const safeText = $derived.by(() => {
+    const written = typeof text === 'number' && Number.isFinite(text) ? String(text) : text;
+    return typeof written === 'string' && DRAWN_TEXT.test(written) && !BLANK_TEXT.test(written)
+      ? written
+      : '';
+  });
 
   const isGlyphChip = $derived(String(variant ?? '') === 'glyph-chip');
 
@@ -83,13 +96,16 @@
   class:is-ink-success={safeInk === 'success'}
   class:is-ink-danger={safeInk === 'danger'}
   class:is-ink-neutral={safeInk === 'neutral'}
+  class:is-ink-accent={safeInk === 'accent'}
   class:is-ink-warning={safeInk === 'warning'}
   class:is-ink-info={safeInk === 'info'}
-  data-medallion={artPath ? 'image' : 'glyph'}
+  data-medallion={safeText ? 'text' : artPath ? 'image' : 'glyph'}
   data-medallion-tint={safeTint || undefined}
   style={boxStyle}
 >
-  {#if artPath}
+  {#if safeText}
+    <span class="fab-medallion-text" aria-hidden="true">{safeText}</span>
+  {:else if artPath}
     <img class="fab-medallion-img" src={artPath} {alt} />
   {:else}
     <i class={icon} aria-hidden="true"></i>
@@ -138,10 +154,18 @@
     background: var(--fab-success-soft);
   }
 
+  .fab-medallion.is-tone-success .fab-medallion-text {
+    color: var(--fab-success-text);
+  }
+
   .fab-medallion.is-tone-danger {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
     background: var(--fab-danger-soft);
+  }
+
+  .fab-medallion.is-tone-danger .fab-medallion-text {
+    color: var(--fab-danger-text);
   }
 
   .fab-medallion.is-tone-accent {
@@ -150,16 +174,28 @@
     background: var(--fab-accent-soft);
   }
 
+  .fab-medallion.is-tone-accent .fab-medallion-text {
+    color: var(--fab-accent-text);
+  }
+
   .fab-medallion.is-tone-warning {
     border-color: var(--fab-warning-border);
     color: var(--fab-warning-text);
     background: var(--fab-warning-soft);
   }
 
+  .fab-medallion.is-tone-warning .fab-medallion-text {
+    color: var(--fab-warning-text);
+  }
+
   .fab-medallion.is-tone-info {
     border-color: var(--fab-info-border);
     color: var(--fab-info-text);
     background: var(--fab-info-soft);
+  }
+
+  .fab-medallion.is-tone-info .fab-medallion-text {
+    color: var(--fab-info-text);
   }
 
   .fab-medallion.is-ink-success {
@@ -174,12 +210,24 @@
     color: var(--fab-text-secondary);
   }
 
+  .fab-medallion.is-ink-accent {
+    color: var(--fab-accent-text);
+  }
+
   .fab-medallion.is-ink-warning {
     color: var(--fab-warning-text);
   }
 
   .fab-medallion.is-ink-info {
     color: var(--fab-info-text);
+  }
+
+  .fab-medallion-text {
+    font-family: var(--fab-font-mono);
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--fab-text);
   }
 
   .fab-medallion-img {
