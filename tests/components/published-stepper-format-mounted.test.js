@@ -67,6 +67,20 @@ describe('the published Stepper, format signed', () => {
     plain.handle.destroy();
   });
 
+  it('asks for the text keypad, which has a minus key, where unlimited asks for the decimal one', async () => {
+    const modes = [];
+    for (const format of ['signed', 'unlimited']) {
+      const { handle, input } = mountStepper({ value: 2, format });
+      await settle();
+      modes.push([format, input().getAttribute('inputmode')]);
+      handle.destroy();
+    }
+    assert.deepEqual(modes, [
+      ['signed', 'text'],
+      ['unlimited', 'decimal'],
+    ]);
+  });
+
   it('reports a typed number only on Enter or blur, accepting a sign or a true minus', async () => {
     const { handle, calls, input } = mountStepper({ value: 2, format: 'signed' });
     await settle();

@@ -283,7 +283,9 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       // selectors AND pseudo-classes, then element names and pseudo-elements. `:hover` and
       // `[data-active-option='true']` both land in the middle bucket, which is why the caller's
       // deepened state rule and the shared outline are both (0,4,0) and settle on source order.
-      const specificityOf = (selector) => {
+      // `:where()` counts nothing, and neither does a `:not()` that holds only one.
+      const specificityOf = (written) => {
+        const selector = written.replaceAll(/:not\(:where\([^()]*\)\)|:where\([^()]*\)/g, ' ');
         const attributes = (selector.match(/\[[^\]]*\]/g) || []).length;
         const withoutAttributes = selector.replaceAll(/\[[^\]]*\]/g, ' ');
         const pseudoElements = (withoutAttributes.match(/::[\w-]+/g) || []).length;

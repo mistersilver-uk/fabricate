@@ -1399,7 +1399,7 @@ Each group states the accepted values of every key that entry publishes.
   - `format` is `signed` or `unlimited`, and absent for the plain number field.
     Either value draws a text field with the spinbutton role in place of the number field, and the field reports a number only when the user presses Enter or it loses focus, where the number field reports on every keystroke.
     A `signed` field draws a positive number with a leading plus, as `+5`, zero as `0` and a negative number with a hyphen-minus, as `-5`, and reads an optional plus, hyphen-minus or true minus sign followed by digits with an optional decimal point, as `1.5`, `.5` or `5.`; any other text, such as `1e3` or `5%`, is not a number.
-    The `signed` field asks the browser for its decimal keypad, `inputmode="decimal"`, which some touch keypads show without a minus key, so the companion offers the buttons too where negative numbers matter on touch.
+    The `signed` field asks the browser for its text keypad, `inputmode="text"`, because a decimal keypad shows no minus key on some touch devices, and an `unlimited` field asks for the decimal keypad, `inputmode="decimal"`.
     An `unlimited` field draws every number but zero as itself, with no plus, and draws `0` as the `nullLabel` words, as "No limit", for a quantity whose zero means there is none; it takes those words in any case, or `0`, as that endpoint, and reports the endpoint as `0`, never `null`.
     Without `nullLabel`, an `unlimited` field draws `0` as the number, and `allowUnset` is outside the contract.
     An `unlimited` field is meant for a `min` of `0`: a `min` above `0` is outside the contract, and with no `min` a negative number is reachable and the endpoint sits mid-range; a typed `0` selects the endpoint before `min` clamps it.
@@ -1442,7 +1442,8 @@ Each group states the accepted values of every key that entry publishes.
     Without `format`, in a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
     Under `format` Enter never submits, but the bubbling `change` the browser fires when the field loses focus after a typed edit still reaches such a form.
   - It takes no rest keys, so a `data-*` key, an `id` and a `title` are refused (M8).
-  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`, except for the box of the `format` field in a Fabricate Manager window, where the Manager's text-field rules reach it.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`.
+    The Manager's text-field baseline draws no box on the `format` field.
     A DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states.
     The companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
@@ -1453,7 +1454,7 @@ Each group states the accepted values of every key that entry publishes.
   Each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in.
   And how Fabricate redraws a button inside its own toolbars, rows and inspectors.
   And `StatusToggle`'s track and knob sizes, its button's width, its 78px cap on a switch without `label`, its label's line height, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards.
-  And `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, the box of the `format` field inside a Fabricate Manager window, and how Fabricate redraws a stepper in its own rows and cards.
+  And `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract, for a `density` outside its set or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards.
   The stepper's box is its own in every container, while core's line-height and transition still reach it.
 
 ### SearchField

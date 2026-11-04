@@ -283,7 +283,7 @@
   {#if isFormatted}
     <input
       type="text"
-      inputmode="decimal"
+      inputmode={builtIn === 'signed' ? 'text' : 'decimal'}
       role="spinbutton"
       class="fab-stepper-input"
       data-stepper-input
