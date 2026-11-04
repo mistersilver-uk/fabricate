@@ -433,6 +433,12 @@ export const STANDALONE_SPECIMENS = Object.freeze({
       slot: `${CAPTION}<input type="number" value="1250" aria-labelledby="standalone-field-caption">`,
       reach: reach('input', 'input', { inert: true }),
     },
+    // Issue 2938: the read-only value, its control carrying the attribute the face needs.
+    'field-readonly': {
+      props: { as: 'div', children: true, readOnly: true },
+      slot: `${CAPTION}<input type="text" value="Honoured" readonly aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
+    },
   }),
   Well: Object.freeze({
     'well-labelled': { props: { label: 'Chosen reagents', children: true }, reach: UNREACHABLE },

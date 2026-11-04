@@ -530,7 +530,8 @@
       "why": [
         "The labelled form field, the `.fabricate-field` column holding a kicker caption, the control and its hint.",
         "`library.html` heads its block `<Field> <Select> <Search>`, and both applications render it, so it is shared.",
-        "`align` (`center` or `end`) sets the control's logical text alignment, which reaches no select, `Select`, `SearchField` or `Stepper`."
+        "`align` (`center` or `end`) sets the control's logical text alignment, which reaches no select, `Select`, `SearchField` or `Stepper`.",
+        "`readOnly` draws a dashed edge on no fill on a control that also carries `readonly`, which keeps the control focusable and selectable."
       ]
     },
     {

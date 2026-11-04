@@ -101,6 +101,7 @@ const INERT = Object.freeze([
   'field-size-30-invalid',
   'field-size-34',
   'field-align-center',
+  'field-readonly',
   'icon-button-disabled',
   'cards-disabled',
   'pagination-persistent-single',

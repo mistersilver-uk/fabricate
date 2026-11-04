@@ -385,6 +385,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       type: Object.freeze({ kind: 'data' }),
       invalid: Object.freeze({ kind: 'data' }),
       align: Object.freeze({ kind: 'data' }),
+      readOnly: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
     root: 'any',

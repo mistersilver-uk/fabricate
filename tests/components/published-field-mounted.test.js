@@ -132,6 +132,7 @@ describe('the published Field draws its column', () => {
         type: { kind: 'data', required: false },
         invalid: { kind: 'data', required: false },
         align: { kind: 'data', required: false },
+        readOnly: { kind: 'data', required: false },
       },
       rest: true,
       root: 'any',

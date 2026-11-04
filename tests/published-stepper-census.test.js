@@ -43,13 +43,14 @@ const STEPPER_SELECTORS = Object.freeze([
   // The same selector list, written twice in the sheet: the field chrome's edge rule and its height rule.
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
-  // The published field's form rules, which keep the same exclusion (issues 2848 and 2900).
+  // The published field's form rules, which keep the same exclusion (issues 2848, 2900 and 2938).
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-26 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-28 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-30 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-size-34 input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-face-serif input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-face-mono input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
+  "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-readonly input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[readonly]",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-invalid input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[aria-invalid='true']",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-align-center input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",
   "styles/fabricate-manager-library.css: .fabricate-field.fabricate-field.is-align-end input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])",

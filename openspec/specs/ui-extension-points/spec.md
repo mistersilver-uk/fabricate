@@ -1632,8 +1632,19 @@ Each group states the accepted values of every key that entry publishes.
     Colour alone does not carry the error: the danger edge falls short of 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and forced-colors mode removes the fill and the edge's colour.
     The message's `--fab-danger-text` ink clears 4.5:1 on those four grounds in every palette, where `--fab-danger` does not.
     The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge while the control holds focus, clear 4.5:1 and 3:1 on the error fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+  - `readOnly` is `true` or `false` and defaults to `false`: `true` draws the read-only face on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries the `readonly` attribute, a dashed `--fab-border` edge on no fill, with the control's own height and ink; any other value, or a control without that attribute, draws none.
+    The field cannot reach the companion's control's attributes, so the companion keeps the two signals together: it sets `readonly` on the control whenever it passes `readOnly` `true`, and removes it when it passes `false`.
+    The `readonly` attribute makes the value read-only and the face only shows it: the control stays focusable and in the tab order, its text can be selected and copied, and typing or deleting changes nothing.
+    Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled, and states no read-only on a number input, only that its value cannot be set, so the companion draws a read-only figure in a text input.
+    The companion never uses `disabled` for a value the user may read, because a disabled control leaves the tab order.
+    The face is a dash and a missing fill, not a change of ink: the ink is `--fab-text` and clears 4.5:1, and the keyboard ring clears 3:1, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+    The edge is the editable control's own and falls short of 3:1 on those grounds in every palette, so the face is a hint and the announced state carries the meaning: where the user must know the value cannot be edited, the companion says so in a visible caption or hint.
+    The dash stays in forced-colors mode, where the system colours replace the rest.
+    `readOnly` keeps what `size`, `face`, `align` and `type` write, and with `invalid` the danger edge colour and fill are drawn over the dash.
+    It never reaches a published `Stepper`, `Select` or `SearchField`, or a `<select>`, in the slot.
   - A Fabricate that predates `size`, `face`, `type` and `invalid` refuses each with `"<key>" is not a data attribute`, and `describe('Field').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
     A Fabricate that predates `align` refuses it with `"align" is not a data attribute`, so the companion checks `describe('Field').props.align` before it passes it; adding it is additive, and the entry stays at `version` 1.
+    A Fabricate that predates `readOnly` refuses it with `"readOnly" is not a data attribute`, so the companion checks `describe('Field').props.readOnly` before it passes it; adding it is additive, and the entry stays at `version` 1.
   - Rest `data-*` attributes land on the column root.
   - The field never moves its content slot while it is requested.
   - Its column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
@@ -3023,6 +3034,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the input's value and its placeholder are drawn centred in the control, at the same height, edge, ring and colours as without `align`
 - **AND** an `update` with `align: 'end'` draws them against the inline end, the left edge in a right-to-left document, in the same column with focus kept
 - **AND** `align: 'right'` draws the default `'start'`, and a `<select>` in the slot keeps its own alignment
+
+#### Scenario: A published field draws a read-only value
+
+- **WHEN** a companion mounts `Field` with `as: 'div'`, `children: true` and `readOnly: true`, and draws a caption and a text `<input readonly>` in the content slot
+- **THEN** the input is drawn with a dashed edge on no fill, at the same height, ink and edge colour as without `readOnly`
+- **AND** the input stays focusable, its text can be selected and copied, typing changes nothing, and Chromium's accessibility tree states it as read-only
+- **AND** an `update` without `readOnly` draws the editable face in the same column with focus kept, and `readOnly: 'true'` draws it without throwing
 
 #### Scenario: A published well
 

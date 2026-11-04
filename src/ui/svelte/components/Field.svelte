@@ -11,6 +11,7 @@
   | `type` | `'text'` \| `'number'` | `'text'` | `number` draws a caller's `<input type="number">` with no step buttons; any other value draws `text`. |
   | `invalid` | boolean | `false` | Only `true` draws the danger edge and fill, and only on a control that also carries the caller's `aria-invalid="true"`. |
   | `align` | `'start'` \| `'center'` \| `'end'` | `'start'` | The text-like control's logical text alignment, so `end` is the left edge right to left; any other value draws `start` (issue 2900). |
+  | `readOnly` | boolean | `false` | Only `true` draws the read-only face, a dashed edge on no fill, and only on a control that also carries the caller's `readonly` attribute; any other value draws none (issue 2938). |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
   | `children` | snippet | `undefined` | Conventionally a `<span>` caption followed by the control. The sheet draws a first-child `<span>` as the kicker, below a caller's caption class, and the box carries the value type its control inherits (issue 2532). |
 
@@ -45,6 +46,7 @@
     type = 'text',
     invalid = false,
     align = 'start',
+    readOnly = false,
     class: extraClass = '',
     children = undefined,
     ...rest
@@ -79,6 +81,7 @@
       type === 'number' ? 'is-type-number' : '',
       invalid === true ? 'is-invalid' : '',
       classOf(ALIGN_CLASSES, align, STRING_TYPES),
+      readOnly === true ? 'is-readonly' : '',
       extraClass,
     ]
       .filter(Boolean)

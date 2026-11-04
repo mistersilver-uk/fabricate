@@ -2064,7 +2064,7 @@ The published components, in publication order:
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required), `density`, `countLabel` (text) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size`, `fill` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `gap`, `track`, `ariaLabel` (required) | yes |
-| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align` | yes |
+| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align`, `readOnly` | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot), `tone` | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot), `actionsPlacement` | yes |
 | `IconButton` | 1 | `any` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria), `description` | yes |
@@ -3289,8 +3289,20 @@ Always draw a visible text message beneath an invalid control, ink it `--fab-dan
 Colour alone does not carry the error: the danger edge falls short of 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and forced-colors mode removes the fill and the edge's colour.
 The message's `--fab-danger-text` ink clears 4.5:1 on those four grounds in every palette, where `--fab-danger` does not.
 The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge while the control holds focus, clear 4.5:1 and 3:1 on the error fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+`readOnly` is `true` or `false` and defaults to `false`: `true` draws the read-only face on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries the `readonly` attribute, a dashed `--fab-border` edge on no fill, with the control's own height and ink; any other value, or a control without that attribute, draws none.
+The field cannot reach your control's attributes, so keep the two signals together: set `readonly` on the control whenever you pass `readOnly` `true`, and remove it when you pass `false`.
+The `readonly` attribute makes the value read-only and the face only shows it: the control stays focusable and in the tab order, its text can be selected and copied, and typing or deleting changes nothing.
+Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled.
+It states no read-only on a number input, only that its value cannot be set, so draw a read-only figure in a text input.
+Never use `disabled` for a value the user may read, because a disabled control leaves the tab order.
+The face is a dash and a missing fill, not a change of ink: the ink is `--fab-text` and clears 4.5:1, and the keyboard ring clears 3:1, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+The edge is the editable control's own and falls short of 3:1 on those grounds in every palette, so the face is a hint and the announced state carries the meaning: where the user must know the value cannot be edited, say so in a visible caption or hint.
+The dash stays in forced-colors mode, where the system colours replace the rest.
+`readOnly` keeps what `size`, `face`, `align` and `type` write, and with `invalid` the danger edge colour and fill are drawn over the dash.
+It never reaches a published `Stepper`, `Select` or `SearchField`, or a `<select>`, in the slot.
 A Fabricate that predates `size`, `face`, `type` and `invalid` refuses each with `"<key>" is not a data attribute`, and `describe('Field').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 A Fabricate that predates `align` refuses it with `"align" is not a data attribute`, so check `describe('Field').props.align` before you pass it; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `readOnly` refuses it with `"readOnly" is not a data attribute`, so check `describe('Field').props.readOnly` before you pass it; adding it is additive, and the entry stays at `version` 1.
 Rest `data-*` attributes land on the column root.
 `Field`'s column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog.
 Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
