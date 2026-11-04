@@ -1,13 +1,16 @@
 /**
- * The published `ListRow`'s `trailing` slot holding several published controls, and its `'accent'`
- * tone, in Chromium on the markup the seam draws under the core and module sheets: the controls
- * sit on one line at the row's gap, 8px dense, in a card and on the bare row and 12px at the
- * default density, staying whole while the name narrows; Tab reaches the row's button and then
- * each control in order; each control is a button named by its own label in Chromium's tree and
- * the row's button holds none of them; a press between two controls lands on neither the controls
- * nor the row's button; the accent, positive and danger rows paint their wash and edge, forced
- * colours draw each wash in Canvas at its own alpha and the edge and the text in system colours,
- * the state word kept, and `selected` draws the selected face over an accent row.
+ * The published `ListRow`'s `trailing` slot holding several published controls, each mounted in a
+ * plain `<span>` appended to the slot element, and its tinted rows, in Chromium on the markup the
+ * seam draws under the core and module sheets: the controls sit on one line at the row's gap, 8px
+ * dense, in a card and on the bare row and 12px at the default density, never shrinking while the
+ * name narrows and wraps down to no width, and beneath a card's content; controls wider than a selectable row take a line of their own beneath it
+ * and run past its edge, and on a bare row the name keeps no width and they run past it too; Tab
+ * reaches the row's button and then each control in order; each control is named by its own label
+ * and the row's button holds none of them; a press between two controls presses nothing and one on
+ * the inset beyond the last presses the row; a disabled row dims its enabled controls; the accent,
+ * positive and danger rows paint their wash and edge, forced colours draw each wash in Canvas at
+ * its own alpha and the edge in CanvasText, the state word kept; `selected` draws the selected face
+ * over an accent row with the accent row's own edge, and the pointer the raised wash.
  * Limit: the page wires its own click counters in place of the seam's callbacks, which
  * `published-list-row-tone-trailing-mounted.test.js` holds.
  */
@@ -53,6 +56,9 @@ const STEPS = Object.freeze([
   icon('fas fa-trash', 'Remove Ember Court'),
 ]);
 const LABELS = STEPS.map(([, props]) => props.ariaLabel);
+const text = (children) => ['Button', { children, size: '24' }];
+/** Three text buttons, 212px with their gaps, wider than a 200px row's inner width. */
+const WORDS = Object.freeze([text('Edit'), text('Duplicate'), text('Remove')]);
 const NAME = 'Ember Court';
 const LONG = 'The Ember Court of the Deep Seam, sworn to the forge-wardens';
 /** Each case's id, its target's width, the row's props and the controls drawn in `trailing`. */
@@ -62,6 +68,11 @@ const CASES = Object.freeze([
   ['card', 200, { name: NAME, layout: 'card', onOpen: noop }, STEPS.slice(0, 2)],
   ['bare', 360, { name: NAME }, STEPS.slice(0, 2)],
   ['narrow', 200, { name: LONG, onOpen: noop }, STEPS],
+  ['mixed', 240, { name: LONG, onOpen: noop }, [text('Claim'), STEPS[2]]],
+  ['words', 200, { name: LONG, onOpen: noop }, WORDS],
+  ['words-wide', 260, { name: LONG, onOpen: noop }, WORDS],
+  ['bare-words', 200, { name: LONG }, WORDS],
+  ['disabled', 360, { name: NAME, onOpen: noop, disabled: true }, STEPS.slice(0, 2)],
   [
     'accent',
     360,
@@ -83,7 +94,7 @@ const TINTS = Object.freeze({
   positive: ['--fab-success-soft', '--fab-success-border', 'Claimed'],
   danger: ['--fab-danger-soft', '--fab-danger-border', 'Turned down'],
 });
-const GAPS = Object.freeze({ open: 8, default: 12, card: 8, bare: 8, narrow: 8 });
+const GAPS = Object.freeze({ open: 8, default: 12, card: 8, bare: 8, narrow: 8, mixed: 8 });
 
 const ROW = (id) => `[data-case="${id}"] .fabricate-list-row`;
 const ROW_BUTTON = (id) => `${ROW(id)} > button.fabricate-list-row-open`;
@@ -93,6 +104,7 @@ let browser;
 let tab;
 
 /** The red, green and blue channels of a computed `rgb()` or `rgba()`, its alpha dropped. */
+const alphaOf = (value) => Number(value.match(/[\d.]+/gu)[3] ?? 1);
 const rgbOf = (value) =>
   value
     .match(/[\d.]+/gu)
@@ -107,6 +119,7 @@ const readCase = (id) => {
     row: box(row),
     name: box(row.querySelector('.fabricate-list-row-name')),
     controls: [...row.querySelectorAll(':scope [data-control] button')].map(box),
+    opacity: globalThis.getComputedStyle(row).opacity,
   };
 };
 
@@ -125,7 +138,6 @@ before(async () => {
       const nested = controls.map(([name, control], at) => {
         const slot = row.slot('trailing');
         const host = slot.ownerDocument.createElement('span');
-        host.style.display = 'flex';
         host.dataset.control = String(at);
         slot.append(host);
         return ui.mount(name, { target: host, props: { ...control, onclick: noop } });
@@ -183,6 +195,54 @@ describe('the published ListRow’s trailing controls in Chromium', () => {
     );
     assert.ok(narrow.name.right <= narrow.controls[0].left, 'the name ends before the controls');
     assert.ok(narrow.name.height > wide.name.height, 'the long name wraps instead');
+  });
+
+  it('gives the name up to no width, a letter to a line, before a control shrinks', async () => {
+    const { name, controls } = await tab.evaluate(readCase, 'words-wide');
+    const open = await tab.evaluate(readCase, 'open');
+    assert.ok(name.width < 1, `the name keeps no width: ${name.width}`);
+    assert.ok(name.height > 20 * open.name.height, `a letter to a line: ${name.height}`);
+    assert.deepEqual(
+      controls.map(({ width }) => width),
+      (await tab.evaluate(readCase, 'words')).controls.map(({ width }) => width),
+      'each control at its own width'
+    );
+  });
+
+  it('draws a card’s controls on a line of their own beneath its content', async () => {
+    const { name, controls } = await tab.evaluate(readCase, 'card');
+    assert.ok(controls[0].top >= name.bottom, 'beneath the name');
+  });
+
+  it('moves controls wider than a selectable row to a line of their own, past the row’s edge', async () => {
+    const { row, name, controls } = await tab.evaluate(readCase, 'words');
+    assert.ok(
+      controls.every(({ top }) => top === controls[0].top),
+      'still one line'
+    );
+    assert.ok(controls[0].top >= name.bottom, 'beneath the name');
+    assert.ok(controls.at(-1).right > row.right, `past the row’s edge: ${controls.at(-1).right}`);
+  });
+
+  it('collapses the name to no width and runs the controls past the edge of a bare row too narrow for them', async () => {
+    const { row, name, controls } = await tab.evaluate(readCase, 'bare-words');
+    assert.ok(name.width < 1, `the name keeps no width: ${name.width}`);
+    assert.ok(
+      controls.every(({ top }) => top === controls[0].top),
+      'one line'
+    );
+    assert.ok(controls.at(-1).right > row.right, `past the row’s edge: ${controls.at(-1).right}`);
+  });
+
+  it('dims the disabled row and the enabled controls in it together', async () => {
+    const { opacity } = await tab.evaluate(readCase, 'disabled');
+    assert.equal(opacity, '0.62');
+    const enabled = await tab.evaluate(
+      (selector) =>
+        [...globalThis.document.querySelectorAll(selector)].map((node) => node.disabled),
+      `[data-case="disabled"] [data-control] button`
+    );
+    assert.deepEqual(enabled, [false, false]);
   });
 
   it('reaches the row’s button with Tab, then each control in the order appended', async () => {
@@ -247,6 +307,15 @@ describe('the published ListRow’s trailing controls in Chromium', () => {
     await tab.click(CONTROL('open', 2));
     assert.deepEqual(await tab.evaluate(() => [...globalThis.presses]), [LABELS[2]]);
   });
+
+  it('presses the row for a press on its inset beyond the last control', async () => {
+    await tab.evaluate(() => {
+      globalThis.presses.length = 0;
+    });
+    const last = await tab.locator(CONTROL('open', 2)).boundingBox();
+    await tab.mouse.click(last.x + last.width + 4, last.y + last.height / 2);
+    assert.deepEqual(await tab.evaluate(() => [...globalThis.presses]), ['row']);
+  });
 });
 
 describe('the published ListRow’s tinted rows in Chromium', () => {
@@ -265,6 +334,7 @@ describe('the published ListRow’s tinted rows in Chromium', () => {
           return value;
         };
         return {
+          accent: row.classList.contains('is-accent'),
           fill: style.backgroundColor,
           edge: style.borderTopColor,
           detail: globalThis.getComputedStyle(detail).color,
@@ -292,9 +362,11 @@ describe('the published ListRow’s tinted rows in Chromium', () => {
         assert.deepEqual(
           rgbOf(forced.fill),
           rgbOf(forced.system[1]),
-          `the wash is Canvas at the wash's own alpha: ${forced.fill}`
+          `the wash is Canvas: ${forced.fill}`
         );
-        assert.ok(forced.system.includes(forced.edge), `the edge to ${forced.edge}`);
+        assert.equal(alphaOf(forced.fill), alphaOf(rest.fill), 'at the wash’s own alpha');
+        assert.ok(alphaOf(rest.fill) < 1, 'which is translucent');
+        assert.equal(forced.edge, forced.system[0], 'the edge in CanvasText, not the ground');
         assert.ok(forced.system.includes(forced.detail), `the detail to ${forced.detail}`);
         assert.notEqual(forced.fill, rest.fill, 'the tinted wash is not drawn');
         assert.notEqual(forced.edge, rest.edge, 'nor the tinted edge');
@@ -305,8 +377,21 @@ describe('the published ListRow’s tinted rows in Chromium', () => {
     });
   }
 
-  it('draws the selected face over an accent row, as over a positive one', async () => {
+  it('draws the selected face over an accent row, its edge the accent row’s own', async () => {
     const paint = await paintOf('selected', ['--fab-surface-active', '--fab-accent-border']);
+    assert.ok(paint.accent, 'the selected row is an accent row');
     assert.deepEqual([paint.fill, paint.edge, paint.detail], paint.tokens);
+    const accent = await paintOf('accent', [TINTS.accent[0], TINTS.accent[1]]);
+    assert.equal(paint.edge, accent.edge, 'the same edge as an unselected accent row');
+  });
+
+  it('draws the raised wash on a pressable accent row under the pointer', async () => {
+    await tab.hover(`${ROW('accent')} .fabricate-list-row-name`);
+    try {
+      const paint = await paintOf('accent', ['--fab-surface-raised', TINTS.accent[1]]);
+      assert.deepEqual([paint.fill, paint.edge, paint.detail], paint.tokens);
+    } finally {
+      await tab.mouse.move(0, 0);
+    }
   });
 });

@@ -3,8 +3,10 @@
  * published row is mounted on, in all seven themes: each fill is translucent, so each ink is read
  * over the fill flattened onto each ground. The name and the row's ink clear 4.5:1 and the keyboard
  * ring 3:1; a muted name does not everywhere. A state word drawn as a published `Chip` in a tone
- * with no `emphasis` is read over the chip's fill over the row's: the neutral chip and a danger
- * chip on a positive row's `--fab-bg-2` fall short, and every other pairing clears 4.5:1.
+ * with no `emphasis`, or none, is read over the chip's fill over the row's: the neutral chip and a
+ * danger chip on a positive row's `--fab-bg-2` fall short, and every other pairing clears 4.5:1.
+ * An accent `Button` on the accent row clears 4.5:1 for its label, at rest and hovered, and 3:1
+ * for its edge.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -25,13 +27,25 @@ const token = tokenReader(corpus);
 
 const GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']);
 const TONES = Object.freeze(['positive', 'danger', 'accent']);
-const CHIP_TONES = Object.freeze(['positive', 'warning', 'danger', 'info', 'neutral', 'accent']);
+/** The tones `Chip` publishes, and none, which draws the default chip. */
+const CHIP_TONES = Object.freeze([
+  '',
+  'positive',
+  'warning',
+  'danger',
+  'info',
+  'neutral',
+  'accent',
+]);
+const ACCENT_ACTION = '.fabricate-button.fabricate-button.is-accent-action:not(:disabled)';
+const ACCENT_ACTION_HOVER =
+  ".fabricate-button.fabricate-button.is-accent-action:not(:disabled, [aria-disabled='true']):hover";
 const toneRule = (tone) => `.fabricate-list-row.is-${tone}`;
 const fillOf = (tone) => token(SHEET, toneRule(tone), 'background');
 /** A chip tone's ink and fill, the base chip's where the tone leaves one alone. */
 const chipPaint = (tone) =>
   ['color', 'background'].map((property) => {
-    const own = `.manager-chip.is-${tone}`;
+    const own = tone ? `.manager-chip.is-${tone}` : '.manager-chip';
     const declares = rulesIn(corpus[CHIP]).some(
       (rule) => splitSelectorList(rule.selector).includes(own) && propertiesOf(rule).has(property)
     );
@@ -81,3 +95,19 @@ for (const tone of TONES) {
     }
   });
 }
+
+test('clears 4.5:1 for an accent Button’s label and 3:1 for its edge on the accent row, at rest and hovered', () => {
+  const row = fillOf('accent');
+  const ink = token(SHEET, ACCENT_ACTION, 'color');
+  const edge = token(SHEET, ACCENT_ACTION, 'border-color');
+  const hovered = token(SHEET, ACCENT_ACTION_HOVER, 'background');
+  assert.deepEqual(
+    [ink, edge, hovered],
+    ['--fab-accent-text', '--fab-accent', '--fab-accent-soft']
+  );
+  for (const ground of GROUNDS) {
+    assert.deepEqual(shortfalls(themes, ink, [row, ground]), [], `label on ${ground}`);
+    assert.deepEqual(shortfalls(themes, edge, [row, ground], 3), [], `edge on ${ground}`);
+    assert.deepEqual(shortfalls(themes, ink, [hovered, row, ground]), [], `hovered on ${ground}`);
+  }
+});

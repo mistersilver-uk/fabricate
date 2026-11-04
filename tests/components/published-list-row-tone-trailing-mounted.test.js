@@ -2,7 +2,7 @@
  * The published `ListRow`'s `'accent'` tone and its `trailing` slot holding several controls: the
  * accent class on either form's root and its removal, every value outside the closed set drawing
  * the neutral row's markup byte for byte, and each control in `trailing` after the row's button in
- * document order, its own target, untouched by the row's `disabled` and never calling `onOpen`.
+ * document order, its own target, and never calling `onOpen`.
  * Limit: happy-dom lays nothing out, so the gap, the hit-test and the Tab order are
  * `list-row-tone-trailing-rendered.test.js`'s.
  */
@@ -71,6 +71,9 @@ describe('the published ListRow’s accent tone', () => {
     };
     const absent = await markupOf({});
     assert.ok(!absent.includes(ACCENT), 'no accent class is written');
+    const accent = await markupOf({ tone: 'accent' });
+    assert.notEqual(accent, absent, 'the accent tone draws other markup');
+    assert.equal(accent.replace(` ${ACCENT}`, ''), absent, 'and differs by its class alone');
     for (const tone of [
       'neutral',
       'Accent',
@@ -139,25 +142,14 @@ describe('the published ListRow’s trailing slot holding several controls', () 
     handle.destroy();
   });
 
-  it('disables the row’s button and none of the controls for the row’s disabled', async () => {
-    const { handle, button } = mountRow({ onOpen() {}, trailing: true, disabled: true });
-    await settle();
-    const controls = drawControls(handle);
-    assert.equal(button().disabled, true);
-    assert.deepEqual(
-      controls.map((control) => control.disabled),
-      [false, false, false]
-    );
-    handle.destroy();
-  });
-
   it('keeps every control in place, in order, across an update that adds the accent tone', async () => {
-    const { handle } = mountRow({ onOpen() {}, trailing: true });
+    const { handle, row } = mountRow({ onOpen() {}, trailing: true });
     await settle();
     const controls = drawControls(handle);
     const slot = handle.slot('trailing');
     assert.equal(handle.update({ name: NAME, onOpen() {}, trailing: true, tone: 'accent' }), true);
     await settle();
+    assert.ok(row().classList.contains(ACCENT), 'the update drew the accent row');
     assert.ok(handle.slot('trailing') === slot && slot.isConnected, 'the same slot, attached');
     assert.deepEqual([...slot.children], controls, 'the same controls, in order');
     handle.destroy();

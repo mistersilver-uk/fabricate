@@ -71,7 +71,6 @@ before(async () => {
     const fills = fixtureLiteral(FIXTURE, 'FILLS').map(([key, slot, hook, name, props]) => {
       const host = rows.get(key).handle.slot(slot);
       const target = host.ownerDocument.createElement('span');
-      target.style.display = 'flex';
       target.setAttribute('data-lab-list-row-fill', hook);
       host.append(target);
       return ui.mount(name, {

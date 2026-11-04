@@ -2229,9 +2229,13 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `'neutral'`, `'positive'`, `'danger'` or `'accent'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge, `'danger'` on the danger ones and `'accent'` on the accent ones, and any other value draws as `'neutral'` and is never refused.
     It adds no text or glyph, so the companion states what the tone means in the row's text as well, as a state word in `detail` or a published `Chip` in `badges`.
     Each tinted fill is translucent and replaces the row's own, and on it the name, and the row's ink that the detail and the quantity take, clear 4.5:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette; a `muted` name on it falls short of 4.5:1 on `--fab-bg-2` in some palette.
-    A published `Chip` with no `emphasis` in `badges` reads its label over its own fill over the row's: on each tinted row the `positive`, `warning`, `info` and `accent` chips clear 4.5:1 over those four grounds in every palette, and so does `danger` but for a `'positive'` row on `--fab-bg-2`, while the `neutral` chip falls short on every tinted row.
-    An `'accent'` row's edge is the selected face's, and `selected: true` draws the selected face over it, as it does over a `'positive'` row, so the companion says which the row is in its text.
-    Under forced colours Chromium draws each fill in the system's `Canvas` at the fill's own alpha and the edge in a system colour, so the tone is not seen there and the row's text carries it.
+    A published `Chip` with no `emphasis` in `badges` reads its label over its own fill over the row's: on each tinted row the default chip, with no `tone`, and the `positive`, `warning`, `info` and `accent` chips clear 4.5:1 over those four grounds in every palette, and so does `danger` but for a `'positive'` row on `--fab-bg-2`, while the `neutral` chip falls short on every tinted row.
+    So the companion draws a state word as one of the chips that clear, or as `detail`.
+    A published `Button` with the `accent` role in an `'accent'` row's `trailing` clears 4.5:1 for its label, at rest and hovered, and 3:1 for its edge over those grounds in every palette.
+    `selected: true` draws the selected face over an `'accent'` row, as over a `'positive'` one: the active wash replaces the accent wash and the edge stays the accent row's own, so a selected accent row and an unselected one look alike.
+    So the companion says in the row's text which row is selected, as the face is not announced without `onOpen`.
+    With `onOpen` the pointer over an `'accent'` row replaces the accent wash with the hovered fill, `--fab-surface-raised`.
+    Under forced colours Chromium draws each tinted fill in the system's `Canvas` at the fill's own alpha and the edge in `CanvasText`, so the tone is not seen there and the row's text carries it.
     A Fabricate that predates `'accent'` draws it as `'neutral'` and refuses nothing, which `describe('ListRow')` cannot show.
   - `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
   - `markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn.
@@ -2277,14 +2281,15 @@ Each group states the accepted values of every key that entry publishes.
   - `meta` is a content slot whose element is a `<span>`, drawn beneath the name and its badges, and with `onOpen` the button's `aria-describedby` names it too.
   - `trailing` is a content slot whose element is a `<span>`, drawn after the row's content at the row's end, beside the button and above the layer the button draws over the row.
     It is the one slot that may hold controls: the companion draws one or more compact controls there, each a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, a published `Button` or `IconButton` among them, and a press on one does not call `onOpen`.
-    The companion appends each control, or each mount target, as a child of the slot element: each child is a flex item spaced by the row's gap, 8px on a dense row and a card and 12px at the `'default'` density, all on one line that never wraps, so a row narrower than its content narrows and wraps the name, not the controls.
-    The companion draws no more controls than fit beside the name at the narrowest width it mounts the row at.
+    The companion appends each control, or a plain `<span>` mount target for each, as a child of the slot element: each child is a flex item spaced by the row's gap, 8px on a dense row and a card and 12px at the `'default'` density, all on one line that never wraps, and no control shrinks.
+    The name gives up its width first, wrapping onto more lines, down to no width at all, where it is drawn a letter to a line.
+    Where the controls are wider than the row's inner width, a row with `onOpen` moves them to a line of their own beneath the name, where they still run past the row's edge, and a row with no form keeps them beside a name of no width and runs them past its edge; in a card they always take a line of their own beneath the content.
+    So the companion measures its controls together with their gaps, and draws no more than leave the name a readable width at the narrowest width it mounts the row at.
     Each control is its own stop in the tab order: Tab reaches the row's button, then each control in the order the companion appended them, and none of them joins the button's accessible name.
     The companion gives each control an accessible name of its own that names the row's item, as `Remove Ember salt`, and chips go in `badges`.
     `disabled` dims the whole row and disables no control in `trailing`, so the companion sets each control's own `disabled`.
-    The dimmed row also dims an enabled control in `trailing`, and a press on the gap around or between the controls opens nothing.
+    The dimmed row also dims an enabled control in `trailing`, a press between two controls opens nothing, and one on the row's inset beyond the last control presses the row's button.
     The companion gives each control a target of at least 24 by 24 CSS pixels.
-    Every Fabricate that publishes `trailing` lays several controls out so, so holding more than one needs no check beyond `describe('ListRow').props.trailing`.
   - Requesting `leading`, `badges` or `meta` draws the row at the inset Fabricate gives a row with an aside, and `trailing` alone does not.
     The companion draws text and marks in `leading`, `badges` and `meta`, as a published `Chip`, and nothing focusable or pressable: with `onOpen` they lie inside the button, so a press on them presses it and calls `onOpen`, and an `update` that passes `onOpen` covers them without it.
     The companion draws only phrasing content there (text, `span`, an `i` or `img` that is `aria-hidden` or has an `alt`), because with `onOpen` the hosts sit inside a native `button`, which forbids blocks, lists and headings, and an `alt`, `aria-label` or `title` on that content joins the button's accessible name.

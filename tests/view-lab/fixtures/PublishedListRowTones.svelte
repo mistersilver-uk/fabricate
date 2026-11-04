@@ -56,10 +56,9 @@
 
   let targets = $state({});
 
-  /** A flex `<span>` the companion appends to `slot`, as a mount target for a published component. */
+  /** A plain `<span>` the companion appends to `slot`, as a mount target for a published component. */
   function targetIn(slot, hook) {
     const target = slot.ownerDocument.createElement('span');
-    target.style.display = 'flex';
     target.setAttribute('data-lab-list-row-fill', hook);
     slot.append(target);
     return target;
