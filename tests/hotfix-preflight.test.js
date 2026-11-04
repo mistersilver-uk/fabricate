@@ -3,19 +3,10 @@ import test from 'node:test';
 
 import { hotfixPreflight, nextPatchTag, run } from '../scripts/lib/hotfixPreflight.js';
 
-const TAG_COMMIT = '0123456789abcdef0123456789abcdef01234567';
-const MOVED_RELEASE = 'fedcba9876543210fedcba9876543210fedcba98';
-
-/** One `git ls-remote` line: `<object-id>\t<ref>`, exactly what the piped command emits. */
-const refLine = (objectId, ref) => `${objectId}\t${ref}`;
-
-// A realistic `git ls-remote --tags --heads origin` listing: every tag on one commit, and the
-// release line moved past it, which is the shape a hotfix line can mint from.
+// Build a realistic `git ls-remote --tags origin` listing from a set of tags: each line is
+// `<object-id>\trefs/tags/<tag>`, exactly what the piped command emits.
 const lsRemote = (...tags) =>
-  `${[
-    ...tags.map((tag) => refLine(TAG_COMMIT, `refs/tags/${tag}`)),
-    refLine(MOVED_RELEASE, 'refs/heads/release'),
-  ].join('\n')}\n`;
+  `${tags.map((tag) => `0123456789abcdef0123456789abcdef01234567\trefs/tags/${tag}`).join('\n')}\n`;
 const silentIo = { log() {}, error() {} };
 
 test('nextPatchTag computes the next patch of a public tag', () => {
@@ -43,8 +34,8 @@ test('hotfixPreflight refuses when the computed patch tag is present on stdin (s
   assert.match(result.message, /promote it to public first/);
 });
 
-test('hotfixPreflight passes when the computed patch tag is absent from stdin', () => {
-  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0'));
+test('hotfixPreflight passes when the patch tag is absent and a newer minor is soaking', () => {
+  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0', 'v1.6.0'));
   assert.equal(result.ok, true);
   assert.equal(result.code, 0);
   assert.equal(result.nextTag, 'v1.5.1');
@@ -62,59 +53,6 @@ test('hotfixPreflight also matches an annotated tag deref (^{}) ref', () => {
   assert.equal(result.code, 1);
 });
 
-test('hotfixPreflight refuses while the release line still sits on the base tag', () => {
-  const listing = `${[
-    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
-    refLine(TAG_COMMIT, 'refs/heads/release'),
-  ].join('\n')}\n`;
-  const result = hotfixPreflight('v1.5.0', listing);
-  assert.equal(result.ok, false);
-  assert.equal(result.code, 1);
-  assert.equal(result.nextTag, 'v1.5.1');
-  assert.match(result.message, /release line still sits on v1\.5\.0/);
-  assert.match(result.message, /reviewed pull request/);
-});
-
-test('hotfixPreflight reads an annotated base tag through its ^{} deref, not the tag object', () => {
-  const tagObject = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  const listing = `${[
-    refLine(tagObject, 'refs/tags/v1.5.0'),
-    refLine(TAG_COMMIT, 'refs/tags/v1.5.0^{}'),
-    refLine(TAG_COMMIT, 'refs/heads/release'),
-  ].join('\n')}\n`;
-  assert.equal(hotfixPreflight('v1.5.0', listing).ok, false);
-});
-
-test('hotfixPreflight fails closed when the listing carries no release head (tags only)', () => {
-  const tagsOnly = `${refLine(TAG_COMMIT, 'refs/tags/v1.5.0')}\n`;
-  assert.throws(() => hotfixPreflight('v1.5.0', tagsOnly), /refs\/heads\/release.*unverifiable/s);
-});
-
-test('hotfixPreflight fails closed when the base tag is not on origin', () => {
-  assert.throws(() => hotfixPreflight('v1.5.0', lsRemote('v1.4.0')), /not on origin/);
-});
-
-test('run exits 2 — unverifiable, not a collision — without the release head or the base tag', () => {
-  assert.equal(run(['v1.5.0'], `${refLine(TAG_COMMIT, 'refs/tags/v1.5.0')}\n`, silentIo), 2);
-  assert.equal(run(['v1.5.0'], lsRemote('v1.4.0'), silentIo), 2);
-});
-
-test('hotfixPreflight compares object ids case-insensitively', () => {
-  const listing = `${[
-    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
-    refLine(TAG_COMMIT.toUpperCase(), 'refs/heads/release'),
-  ].join('\n')}\n`;
-  assert.equal(hotfixPreflight('v1.5.0', listing).ok, false);
-});
-
-test('run exits 1 while the release line still sits on the base tag', () => {
-  const listing = `${[
-    refLine(TAG_COMMIT, 'refs/tags/v1.5.0'),
-    refLine(TAG_COMMIT, 'refs/heads/release'),
-  ].join('\n')}\n`;
-  assert.equal(run(['v1.5.0'], listing, silentIo), 1);
-});
-
 test('hotfixPreflight fails closed on empty stdin — the unfiltered listing is never empty', () => {
   assert.throws(() => hotfixPreflight('v1.5.0', ''), /unverifiable/i);
 });
@@ -127,8 +65,31 @@ test('run exits 1 on a collision', () => {
   assert.equal(run(['v1.5.0'], lsRemote('v1.5.0', 'v1.5.1'), silentIo), 1);
 });
 
-test('run exits 0 when the next patch tag is clear', () => {
-  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0'), silentIo), 0);
+test('run exits 0 when the next patch tag is clear and a newer minor is soaking', () => {
+  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0', 'v1.6.0'), silentIo), 0);
+});
+
+test('hotfixPreflight refuses when no stable version above the base exists — nothing is soaking', () => {
+  // Semantic-release would give the line the empty range >=1.5.0 <1.5.0.
+  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0', 'v1.6.0-beta.3'));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 1);
+  assert.equal(result.nextTag, 'v1.5.1');
+  assert.match(result.message, /no stable version above v1\.5\.0 exists/);
+  assert.match(result.message, /reviewed pull request/);
+});
+
+test('hotfixPreflight reads annotated tags through their ^{} deref names', () => {
+  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.0^{}', 'v1.6.0^{}')).ok, true);
+});
+
+test('hotfixPreflight fails closed when the base tag is not on origin', () => {
+  assert.throws(() => hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.6.0')), /not on origin/);
+});
+
+test('run exits 1 with nothing soaking, and 2 for a base tag not on origin', () => {
+  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0'), silentIo), 1);
+  assert.equal(run(['v1.5.0'], lsRemote('v1.6.0'), silentIo), 2);
 });
 
 test('run exits 2 on a non-stable base tag — a usage error, not a collision', () => {
