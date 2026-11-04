@@ -1,12 +1,13 @@
 <!--
-  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle. Its five
-  classes' rules are rooted at `fabricate-toggle-card`, so the card paints the same in a bare
+  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle. Its rules
+  are rooted at `fabricate-toggle-card`, so the card paints the same in a bare
   `<div>` as in the manager. String props are PRE-LOCALIZED, which keeps this a presentational leaf.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `variant` | class string | `''` | A visual variant appended to the card class, toning it when on. |
+  | `tone` | `'neutral'` \| `'enabled'` \| `'locked'` \| `'info'` | `'neutral'` | A CLOSED set naming the tint an ON card wears: `enabled` the success family, `locked` the accent family and `info` the info family, each as the `is-enabled`, `is-locked` and `is-info` class of `variant`. An off card and any other value draw the resting face. The switch and its `aria-pressed` or `aria-checked`, never the tint, carry the state. |
   | `icon` | Font Awesome classes | `'fas fa-circle'` | `''` renders NO glyph slot at all: a slot holding an empty `<i>` still reserves its column and left-indents the copy away from the cards around it. |
   | `title` / `sub` / `toggleLabel` | pre-localized strings | `''` | The heading, its second line, which describes the switch while non-blank, and the switch's accessible name, which falls back to the visible title. |
   | `on` / `disabled` | booleans | `false` | The switch's state and whether it is operable. |
@@ -44,8 +45,21 @@
     subDataAttr = '',
     toggleDataAttr = '',
     semantics = 'pressed',
+    tone = 'neutral',
     onToggle = () => {},
   } = $props();
+
+  const TONE_CLASSES = Object.freeze({
+    enabled: 'is-enabled',
+    locked: 'is-locked',
+    info: 'is-info',
+  });
+
+  const toneClass = $derived(
+    typeof tone === 'string' && Object.hasOwn(TONE_CLASSES, tone) ? TONE_CLASSES[tone] : ''
+  );
+
+  const tinted = $derived([variant, toneClass].filter(Boolean).join(' '));
 
   const subHook = $derived(subDataAttr ? { [subDataAttr]: '' } : {});
 
@@ -62,7 +76,7 @@
 </script>
 
 <div
-  class={`fabricate-toggle-card manager-recipe-status-card ${variant} ${on ? 'is-on' : 'is-off'}`}
+  class={`fabricate-toggle-card manager-recipe-status-card ${tinted} ${on ? 'is-on' : 'is-off'}`}
   data-recipe-section={section || undefined}
 >
   {#if icon}

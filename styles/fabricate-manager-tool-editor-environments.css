@@ -390,6 +390,11 @@
   background: var(--fab-surface-soft);
 }
 
+/* The neutral fill needs no stronger sub ink than the resting card's muted one, which the secondary ink of a toned fill would brighten past its neighbours. */
+.fabricate-manager .manager-tool-system-enabled > .manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-sub {
+  color: var(--fab-text-muted);
+}
+
 .fabricate-manager .manager-tool-system-label {
   display: grid;
   gap: var(--fab-space-1);

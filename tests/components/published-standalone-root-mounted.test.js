@@ -7,7 +7,7 @@
  * drawn side by side in one bare form keep their own names; and `destroy`, a fault and a
  * companion's re-render leave `target` as it was. The theme is read as the overlay layer reads it.
  * Limit: happy-dom resolves no cascade, so what the root draws is
- * `published-standalone-root-rendered.test.js`'s.
+ * the standalone root shards'.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';

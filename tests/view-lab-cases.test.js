@@ -412,6 +412,7 @@ const labHarnessSource = [
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
   'tests/view-lab/fixtures/PublishedCheckboxRows.svelte',
+  'tests/view-lab/fixtures/PublishedToggleCardTones.svelte',
   'tests/view-lab/fixtures/PublishedToggleLabels.svelte',
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedPopover.svelte',
@@ -1232,6 +1233,8 @@ const labObjectiveBox = (key) => `${labObjectiveRow(key)} .fab-selection-check`;
 const labToggleButton = (key) =>
   `[data-lab-toggle-labels] > [data-lab-toggle-label="${key}"] button.fabricate-toggle`;
 const labToggleName = (key) => `${labToggleButton(key)} > .manager-status-toggle-name`;
+const labToneCard = (key) =>
+  `[data-lab-toggle-card-tones] > [data-lab-toggle-card-tone="${key}"] .fabricate-toggle-card`;
 /** The published selection checkbox's specimen (issue 2836), alike on each of its palettes. */
 const CHECKBOX_CONTROLS = Object.freeze([
   {
@@ -2395,6 +2398,48 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: `${LAB_RING}; outline-color: var(--fab-accent)`,
     },
     { selector: labToggleButton('track'), styles: 'width: 38px' },
+  ],
+  // The published toggle card's tones: each tone's fill and edge while on, the resting face of the
+  // neutral and the off cards, and the second line's ink on a toned card against a resting one.
+  'manager-published-toggle-card-tones-specimen': [
+    {
+      selector: labToneCard('neutral'),
+      styles: 'background-color: var(--fab-surface-soft); border-top-color: var(--fab-border)',
+    },
+    {
+      selector: labToneCard('enabled'),
+      styles:
+        'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+    },
+    {
+      selector: labToneCard('locked'),
+      styles:
+        'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
+    },
+    {
+      selector: labToneCard('info'),
+      styles: 'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+    },
+    {
+      selector: labToneCard('off'),
+      styles: 'background-color: var(--fab-surface-soft); border-top-color: var(--fab-border)',
+    },
+    {
+      selector: labToneCard('pressed'),
+      styles: 'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+    },
+    {
+      selector: `${labToneCard('enabled')} .manager-recipe-status-sub`,
+      styles: 'color: var(--fab-text-secondary)',
+    },
+    {
+      selector: `${labToneCard('neutral')} .manager-recipe-status-sub`,
+      styles: 'color: var(--fab-text-muted)',
+    },
+    {
+      selector: `${labToneCard('off')} .manager-recipe-status-sub`,
+      styles: 'color: var(--fab-text-muted)',
+    },
   ],
   'manager-published-typeahead-specimen': TYPEAHEAD_SPECIMEN_CONTROLS,
   // The no-match note's ink, and the field lit while it keeps the free text.
@@ -8518,6 +8563,56 @@ test('the labelled switch specimen case clicks the words of a switch the fixture
   );
   assert.ok(
     expectSelector.includes('[data-lab-toggle-label-on="true"]'),
+    'the frame waits for the companion’s update the click asked for'
+  );
+});
+
+test('the toggle card tones specimen case presses a card the fixture mounts and measures the rows it mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedToggleCardTones.svelte'
+  );
+  for (const hook of [
+    'data-lab-toggle-card-tones',
+    'data-lab-toggle-card-tone',
+    'data-lab-toggle-card-tone-on',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.arguments.length === 1
+    ),
+    'the pressed card draws its new state through the companion’s own update'
+  );
+  const keys = [...walkNodes(instance.content)]
+    .filter((node) => node.type === 'ArrayExpression' && node.elements[0]?.type === 'Literal')
+    .map((node) => node.elements[0].value)
+    .filter((value) => typeof value === 'string' && /^[a-z-]+$/u.test(value));
+  const rowOf = (selector) => /data-lab-toggle-card-tone="([\w-]+)"/u.exec(selector)?.[1];
+  const { steps, expectLayout, expectSelector } = getCaseById(
+    'manager-published-toggle-card-tones-specimen'
+  );
+  assert.deepEqual(
+    expectLayout.controls
+      .map(({ selector }) => rowOf(selector))
+      .filter((key) => !keys.includes(key)),
+    [],
+    'each measured row is one the fixture mounts'
+  );
+  assert.deepEqual(
+    steps.map((step) => [rowOf(step.selector), step.press]),
+    [['pressed', undefined]],
+    'one click on the pressed card’s switch'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-toggle-card-tone-on="true"]'),
     'the frame waits for the companion’s update the click asked for'
   );
 });
