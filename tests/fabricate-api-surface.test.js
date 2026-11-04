@@ -435,7 +435,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       Kicker: {
         version: 1,
-        props: { as: optional, tone: optional, size: optional, children: requiredText },
+        props: {
+          as: optional,
+          tone: optional,
+          size: optional,
+          for: optional,
+          children: requiredText,
+        },
         rest: true,
         root: 'any',
         overlays: false,
@@ -630,6 +636,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           type: optional,
           invalid: optional,
           align: optional,
+          readOnly: optional,
         },
         rest: true,
         root: 'any',

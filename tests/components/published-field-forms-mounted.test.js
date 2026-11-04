@@ -1,6 +1,6 @@
 /**
- * The published `Field`'s `size`, `face`, `type` and `invalid` (issue 2848) and `align` (issue
- * 2900): each draws its class
+ * The published `Field`'s `size`, `face`, `type` and `invalid` (issue 2848), `align` (issue 2900)
+ * and `readOnly` (issue 2938): each draws its class
  * on the column, an update changes or removes it in the same column with the companion's control
  * and its focus kept, and a value outside its set draws the default.
  * Limit: happy-dom lays nothing out, so the drawn heights, corners, faces, step buttons and error
@@ -15,7 +15,7 @@ import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 
 const { ui, mountEntry } = publishedEntrySeam('fabricate-published-field-forms-');
 const COLUMN = Object.freeze({ as: 'div', children: true });
-const KEYS = Object.freeze(['size', 'face', 'type', 'invalid', 'align']);
+const KEYS = Object.freeze(['size', 'face', 'type', 'invalid', 'align', 'readOnly']);
 
 /** The control the field's chrome draws, its rung rule's subject, by the root class it needs. */
 const CHROME = (rootClass) =>
@@ -60,6 +60,10 @@ const FORMS = Object.freeze({
     ],
     defaulted: ['start', 'Center', 'centre', ' end', 'left', 'right', 'justify', 1, null, true],
   },
+  readOnly: {
+    drawn: [[true, 'is-readonly']],
+    defaulted: [false, 'true', 'readonly', 1, null, 'false'],
+  },
 });
 
 describe('the published Field describes its form keys', () => {
@@ -101,25 +105,60 @@ for (const [key, { drawn, defaulted }] of Object.entries(FORMS)) {
 }
 
 describe('the published Field updates a form key in place', () => {
-  it('moves the rung from 26 to 34, then adds the face, type, error state and alignment, in one column', async () => {
+  it('moves the rung from 26 to 34, then adds the face, type, error state, alignment and read-only face, in one column', async () => {
     const { handle, input, column } = await mountField({ size: 26 }, 'number');
     const root = column();
     assert.ok(input.matches(CHROME('is-size-26')), 'the 26 rung reaches the number input');
     assert.equal(handle.update({ ...COLUMN, size: 34 }), true);
     await settle();
     assert.equal(root.className, 'fabricate-field is-size-34');
-    const all = { ...COLUMN, size: 28, face: 'mono', type: 'number', invalid: true, align: 'end' };
+    const all = {
+      ...COLUMN,
+      size: 28,
+      face: 'mono',
+      type: 'number',
+      invalid: true,
+      align: 'end',
+      readOnly: true,
+    };
     assert.equal(handle.update(all), true);
     await settle();
     assert.ok(column() === root, 'the same column');
     assert.equal(
       root.className,
-      'fabricate-field is-size-28 is-face-mono is-type-number is-invalid is-align-end',
+      'fabricate-field is-size-28 is-face-mono is-type-number is-invalid is-align-end is-readonly',
       'each key writes its own class'
     );
     assert.ok(
       input.matches(".fabricate-field.fabricate-field.is-type-number input[type='number']")
     );
     handle.destroy();
+  });
+});
+
+describe('the published Field draws readOnly as a class and nothing else', () => {
+  it('differs from the column without the key by one class token, with no attribute on any element', async () => {
+    const without = await mountField({ size: 30 });
+    const withKey = await mountField({ size: 30, readOnly: true });
+    const [plain, read] = [without.column(), withKey.column()];
+    assert.equal(plain.getAttribute('class'), 'fabricate-field is-size-30');
+    assert.equal(read.getAttribute('class'), 'fabricate-field is-size-30 is-readonly');
+    assert.deepEqual(
+      [...read.attributes].map(({ name }) => name),
+      [...plain.attributes].map(({ name }) => name),
+      'the host gains no attribute'
+    );
+    assert.equal(withKey.input.outerHTML, without.input.outerHTML, 'the control is not touched');
+    assert.equal(withKey.input.hasAttribute('readonly'), false);
+    without.handle.destroy();
+    withKey.handle.destroy();
+  });
+
+  it('draws a column with readOnly false byte-identically to one without the key', async () => {
+    const without = await mountField({ size: 30 });
+    const withFalse = await mountField({ size: 30, readOnly: false });
+    assert.equal(withFalse.column().outerHTML, without.column().outerHTML);
+    without.handle.destroy();
+    withFalse.handle.destroy();
   });
 });

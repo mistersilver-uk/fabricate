@@ -2052,7 +2052,7 @@ The published components, in publication order:
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone`, `layout`, `note`, `children` (slot) | yes |
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
-| `Kicker` | 1 | `any` | `as`, `tone`, `size`, `children` (text, required) | yes |
+| `Kicker` | 1 | `any` | `as`, `tone`, `size`, `for`, `children` (text, required) | yes |
 | `Chip` | 1 | `any` | `tone`, `density`, `emphasis`, `icon`, `mono`, `struck`, `truncate`, `children` (text, required), `ariaLabel` | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `any` | `children` (slot), `tone`, `title` (text), `note` (text), `leading` (slot), `trailing` (slot) | yes |
@@ -2064,7 +2064,7 @@ The published components, in publication order:
 | `SearchField` | 1 | `any` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required), `density`, `countLabel` (text) | yes |
 | `Select` | 1 | `any` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size`, `fill` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `gap`, `track`, `ariaLabel` (required) | yes |
-| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align` | yes |
+| `Field` | 1 | `any` | `as` (required), `children` (slot), `size`, `face`, `type`, `invalid`, `align`, `readOnly` | yes |
 | `Well` | 1 | `any` | `label`, `children` (slot), `tone` | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot), `actionsPlacement` | yes |
 | `IconButton` | 1 | `any` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria), `description` | yes |
@@ -2314,7 +2314,18 @@ An `update` that changes `as` replaces the kicker's root element; the mount, its
 The 8px label is the smallest type Fabricate draws: keep it to a few words, and never let it alone carry a state or an instruction a user must act on.
 The size changes the type and never the ink, so the contrast figures below hold at every size.
 A Fabricate that predates `size` refuses it with `"size" is not a data attribute`, and `describe('Kicker').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
-Its text is its whole name, announced as written, so pass sentence case and never an upper-case literal.
+`for` is the `id` of a labelable control you draw, a non-blank string, and has no default: set, it draws the kicker as a `<label for>` in the kicker's type, whatever `as` says, so the caption names the control.
+Any other value, `''`, a blank string, a number or `true` among them, draws the `as` host with no `for`, and `as` is not read while `for` is a non-blank string.
+The `id` is yours: Fabricate draws no `id` and reads none of its own, so keep your `id` unique in the document, and a `for` that matches no labelable control names nothing and throws nothing.
+A label names an `<input>` that is not hidden, a `<select>`, a `<textarea>`, a `<button>`, a `<meter>`, an `<output>` or a `<progress>` that you draw, and it cannot point at one of Fabricate's published controls, which take no `id` and are named by their own `ariaLabel`.
+The label's text is the control's accessible name.
+A click on the caption does what a click on any `<label for>` does: it focuses a text input, a number input, a textarea or a select, and it activates a checkbox, a radio, a button input or a `<button>`, which toggles or presses it.
+So do not point a caption at a control that a stray click on the caption must not fire.
+A control that carries its own `aria-labelledby` or `aria-label` takes that name instead, so keep the visible caption in it: an `aria-label` contains the caption's text, which is the label-in-name rule.
+Drawn as a label it is an inline mark like `span`, so give its `target` `display: flex`.
+A Fabricate that predates `for` refuses it with `"for" is not a data attribute`, so check `describe('Kicker').props.for` before you pass it, and name the control with `aria-labelledby` where it is absent.
+Adding `for` is additive, and the entry stays at `version` 1.
+Its text is its whole name, which Chromium's accessibility tree states in upper case, as the kicker draws it, whichever host it is, so pass sentence case and never an upper-case literal.
 `h3` makes it a level-3 heading, so pass it only where the kicker heads the content beneath it.
 It takes no `id`: to name a control or group with it, put the `id` on `target` and point `aria-labelledby` there.
 `accent` is colour alone and says nothing.
@@ -3280,6 +3291,7 @@ bars.update(props());
 It draws no control, no caption and no text of its own: draw your caption and your control in its content slot.
 `as` is required and is `div`, the one host published at version 1; what it draws for any other value is private.
 A `div` field names no control, so give your caption an `id` and point the control's `aria-labelledby` at it.
+Or mount a published [`Kicker`](#kicker) with `for` set to the control's `id`, which draws the caption as a `<label for>` and so names the control.
 `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, in the order you append them: the caption first, the control beneath it.
 The column states `--fab-text` ink at 12.5px and weight 500, which your content inherits, and a text input or textarea there inherits its face from it unless `face` says otherwise.
 The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
@@ -3307,8 +3319,20 @@ Always draw a visible text message beneath an invalid control, ink it `--fab-dan
 Colour alone does not carry the error: the danger edge falls short of 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and forced-colors mode removes the fill and the edge's colour.
 The message's `--fab-danger-text` ink clears 4.5:1 on those four grounds in every palette, where `--fab-danger` does not.
 The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge while the control holds focus, clear 4.5:1 and 3:1 on the error fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+`readOnly` is `true` or `false` and defaults to `false`: `true` draws the read-only face on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries the `readonly` attribute, a dashed `--fab-border` edge on no fill, with the control's own height and ink; any other value, or a control without that attribute, draws none.
+The field cannot reach your control's attributes, so keep the two signals together: set `readonly` on the control whenever you pass `readOnly` `true`, and remove it when you pass `false`.
+The `readonly` attribute makes the value read-only and the face only shows it: the control stays focusable and in the tab order, its text can be selected and copied, and typing or deleting changes nothing.
+Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled.
+A number input takes the face too, but the tree states it only as a spin button whose value cannot be set and does not state it as read-only, so prefer a text input for a read-only figure.
+Never use `disabled` for a value the user may read, because a disabled control leaves the tab order.
+The face is a dash and a missing fill, not a change of ink: the ink is `--fab-text` and clears 4.5:1, and the keyboard ring clears 3:1, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
+The edge is the editable control's own and falls short of 3:1 on those grounds in every palette, so the face is a hint and the announced state carries the meaning: where the user must know the value cannot be edited, say so in a visible caption or hint.
+The dash stays in forced-colors mode, where the system colours replace the rest.
+`readOnly` keeps what `size`, `face`, `align` and `type` write, and with `invalid` the danger edge colour and fill are drawn over the dash.
+It never reaches a published `Stepper`, `Select` or `SearchField`, or a `<select>`, in the slot.
 A Fabricate that predates `size`, `face`, `type` and `invalid` refuses each with `"<key>" is not a data attribute`, and `describe('Field').props` shows whether the running one publishes them; adding them is additive, and the entry stays at `version` 1.
 A Fabricate that predates `align` refuses it with `"align" is not a data attribute`, so check `describe('Field').props.align` before you pass it; adding it is additive, and the entry stays at `version` 1.
+A Fabricate that predates `readOnly` refuses it with `"readOnly" is not a data attribute`, so check `describe('Field').props.readOnly` before you pass it; adding it is additive, and the entry stays at `version` 1.
 Rest `data-*` attributes land on the column root.
 `Field`'s column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog.
 Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.

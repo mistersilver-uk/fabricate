@@ -8,6 +8,7 @@
   | --- | --- | --- | --- |
   | `as` | `'p'` \| `'span'` \| `'h3'` | `'p'` | A micro-label is sometimes a heading and sometimes not. The union is MEASURED: 62 `<p>`, 3 `<span>` and 1 `<h3>` across `src/ui/svelte/**`. |
   | `size` | `''` \| `'8'` \| `'9'` | `''` | The type rung in px, named as a string like `Button`'s and `IconButton`'s, and read as one, so the number 8 or 9 draws its rung; `''` is the 8.5px scale. A CLOSED set: any other value draws the default. The rung sets the size and its tracking, never the ink. |
+  | `for` | string | `undefined` | The `id` of a labelable control the caller draws. A non-blank string draws the kicker as a `<label for>`, whatever `as` says, so the caption names the control; any other value draws the `as` host with no `for`. The component draws and reads no `id` of its own. |
   | `tone` / `children` | `'default'` \| `'accent'` / snippet | `'default'` / `undefined` | `accent` is `--fab-accent`, and the specimen states when: "Accent only when it names a whole section"; an unknown tone falls back to the default ink. `children` is the label text, already localized. |
 
   Rest spread:
@@ -30,13 +31,22 @@
     D21; `tests/components/kicker-face-rendered.test.js`).
 -->
 <script>
-  let { as = 'p', tone = 'default', size = '', children = undefined, ...rest } = $props();
+  let {
+    as = 'p',
+    tone = 'default',
+    size = '',
+    for: controlId = undefined,
+    children = undefined,
+    ...rest
+  } = $props();
 
   const HOSTS = new Set(['p', 'span', 'h3']);
 
   const FALLBACK_HOST = 'p';
 
-  const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
+  const names = $derived(typeof controlId === 'string' && controlId.trim() !== '');
+
+  const host = $derived(names ? 'label' : HOSTS.has(as) ? as : FALLBACK_HOST);
 
   const accent = $derived(tone === 'accent');
 
@@ -51,6 +61,7 @@
   class:is-accent={accent}
   class:is-size-8={rung === '8'}
   class:is-size-9={rung === '9'}
+  for={names ? controlId : undefined}
   {...rest}>{@render children?.()}</svelte:element
 >
 

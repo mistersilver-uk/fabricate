@@ -1814,9 +1814,9 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
   ],
-  // The published field's forms (issues 2848 and 2900): each section's input at its rung and
+  // The published field's forms (issues 2848, 2900 and 2938): each section's input at its rung and
   // corner, the number inputs drawn as text fields with no step buttons, the threshold's centred
-  // figure, and the focused error input's ring.
+  // figure, the read-only input's dashed, unfilled edge, and the focused error input's ring.
   'manager-published-field-forms-specimen': [
     ...[
       ['name', 34, 9],
@@ -1824,6 +1824,7 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       ['uses', 28, 7],
       ['threshold', 34, 9],
       ['tag', 26, 7],
+      ['standing', 30, 7],
       ['bonus', 30, 7],
     ].map(([key, height, corner]) => ({
       selector: labFieldForm(key),
@@ -1831,6 +1832,10 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     })),
     { selector: labFieldForm('uses'), styles: 'appearance: textfield' },
     { selector: labFieldForm('threshold'), styles: 'text-align: center; appearance: textfield' },
+    {
+      selector: labFieldForm('standing'),
+      styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+    },
     {
       selector: `${labFieldForm('bonus')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',

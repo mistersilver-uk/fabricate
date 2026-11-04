@@ -386,11 +386,12 @@ const FIELD_FORM_RUNGS = Object.freeze([
   ['uses', 28, 7],
   ['threshold', 34, 9],
   ['tag', 26, 7],
+  ['standing', 30, 7],
   ['bonus', 30, 7],
 ]);
 
-/** Sized to the fixture's 320px ground and the height of its six fields, about 430px, with room to spare. */
-const FIELD_FORMS_WINDOW = Object.freeze({ width: 440, height: 540 });
+/** Sized to the fixture's 320px ground and the height of its seven fields, about 495px, with room to spare. */
+const FIELD_FORMS_WINDOW = Object.freeze({ width: 440, height: 600 });
 
 /** The well fixture's ground, the published well inside its card, and the companion's element. */
 const WELL_GROUND = '[data-lab-well-ground]';
@@ -1924,14 +1925,14 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-field-forms-specimen',
     label:
-      'Specimen, mounted through the published seam — six fields at the forms Field publishes, in a 320px column on the --fab-bg-1 ground, each a caption over the companion’s own input. Reading top to bottom: Activity name, a 34px input at radius 9 holding Moonlit Glade in the serif face; Check formula, a 30px input at radius 7 holding 1d20 + 4 in the mono face; Uses, a 28px number input at radius 7 holding 3 in the mono face with no step buttons beside it; Threshold, a 34px number input at radius 9 holding 1250 centred in the control, with no step buttons; Tag, a 26px input at radius 7 holding Iron in the column’s face; and Bonus, a 30px input at radius 7 holding 1d20 + on the translucent danger fill, holding keyboard focus after one step that presses the right arrow in it, so the 1px accent ring is drawn inset over its danger edge, with the message Finish the formula beneath it in the danger text ink after a decorative warning glyph. The frame draws inside the manager window and is the evidence for it alone; the error state’s colours, the focus ring at each rung, the step buttons’ absence and the alignment’s drawn position, right to left included, are the rendered suites’',
+      'Specimen, mounted through the published seam — seven fields at the forms Field publishes, in a 320px column on the --fab-bg-1 ground, each a caption over the companion’s own input. Reading top to bottom: Activity name, a 34px input at radius 9 holding Moonlit Glade in the serif face; Check formula, a 30px input at radius 7 holding 1d20 + 4 in the mono face; Uses, a 28px number input at radius 7 holding 3 in the mono face with no step buttons beside it; Threshold, a 34px number input at radius 9 holding 1250 centred in the control, with no step buttons; Tag, a 26px input at radius 7 holding Iron in the column’s face; Standing, a 30px read-only input at radius 7 holding Honoured with a dashed edge on no fill; and Bonus, a 30px input at radius 7 holding 1d20 + on the translucent danger fill, holding keyboard focus after one step that presses the right arrow in it, so the 1px accent ring is drawn inset over its danger edge, with the message Finish the formula beneath it in the danger text ink after a decorative warning glyph. The frame draws inside the manager window and is the evidence for it alone; the error state’s colours, the focus ring at each rung, the step buttons’ absence, the alignment’s drawn position, right to left included, and the read-only face’s focus, typing, announcement, selection and forced-colours edge are the rendered suites’',
     // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-field-forms' },
     steps: [{ selector: FIELD_FORM_INPUT('bonus'), press: 'ArrowRight' }],
     // Every section's input the fixture's effect drew, the error one described by its message and focused.
-    expectSelector: `${FIELD_FORMS}:has(> [data-lab-field-form="name"] .fabricate-field.is-size-34.is-face-serif input):has(> [data-lab-field-form="uses"] .fabricate-field.is-type-number input[type="number"]):has(> [data-lab-field-form="threshold"] .fabricate-field.is-align-center input[type="number"]):has(> [data-lab-field-form="tag"] .fabricate-field.is-size-26 input) > [data-lab-field-form="bonus"] .fabricate-field.is-invalid input[aria-invalid="true"][aria-describedby]:focus`,
+    expectSelector: `${FIELD_FORMS}:has(> [data-lab-field-form="name"] .fabricate-field.is-size-34.is-face-serif input):has(> [data-lab-field-form="uses"] .fabricate-field.is-type-number input[type="number"]):has(> [data-lab-field-form="threshold"] .fabricate-field.is-align-center input[type="number"]):has(> [data-lab-field-form="tag"] .fabricate-field.is-size-26 input):has(> [data-lab-field-form="standing"] .fabricate-field.is-readonly input[readonly]) > [data-lab-field-form="bonus"] .fabricate-field.is-invalid input[aria-invalid="true"][aria-describedby]:focus`,
     expectContained: [
       ...FIELD_FORM_RUNGS.map(([key]) => ({
         container: FIELD_FORMS,
@@ -1951,6 +1952,11 @@ export const CASES = Object.freeze([
         {
           selector: FIELD_FORM_INPUT('threshold'),
           styles: 'text-align: center; appearance: textfield',
+        },
+        // The read-only input's dashed edge on no fill.
+        {
+          selector: FIELD_FORM_INPUT('standing'),
+          styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
         },
         // The focused error input's inset ring, drawn over its danger edge.
         {

@@ -3797,6 +3797,13 @@
   margin: 0;
 }
 
+/* Field's published read-only face (issue 2938): the editable chrome's edge drawn dashed on no fill, on a control that also says `readonly`; ink, ring, box and edge colour stay the chrome's, and the error state below keeps its colours over the dash. */
+.fabricate-field.fabricate-field.is-readonly input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[readonly],
+.fabricate-field.fabricate-field.is-readonly textarea[readonly] {
+  border-style: dashed;
+  background: transparent;
+}
+
 /* The error state, the select trigger's danger edge and fill, on a control that also says so; the keyboard ring is drawn over the edge. */
 .fabricate-field.fabricate-field.is-invalid input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])[aria-invalid='true'],
 .fabricate-field.fabricate-field.is-invalid textarea[aria-invalid='true'] {

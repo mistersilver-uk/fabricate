@@ -531,7 +531,8 @@
       "why": [
         "The labelled form field, the `.fabricate-field` column holding a kicker caption, the control and its hint.",
         "`library.html` heads its block `<Field> <Select> <Search>`, and both applications render it, so it is shared.",
-        "`align` (`center` or `end`) sets the control's logical text alignment, which reaches no select, `Select`, `SearchField` or `Stepper`."
+        "`align` (`center` or `end`) sets the control's logical text alignment, which reaches no select, `Select`, `SearchField` or `Stepper`.",
+        "`readOnly` draws a dashed edge on no fill on a control that also carries `readonly`, which keeps the control focusable and selectable."
       ]
     },
     {
@@ -586,7 +587,8 @@
       "scope": "shared",
       "why": [
         "The uppercase micro-label that names what follows.",
-        "`library.html` heads its block `<Kicker> <IconChip> <StatBox>` and states its API under Kicker API, and both applications render it, so it is shared."
+        "`library.html` heads its block `<Kicker> <IconChip> <StatBox>` and states its API under Kicker API, and both applications render it, so it is shared.",
+        "`for` draws the kicker as a `<label for>` that names the control it points at, in the kicker's own type."
       ]
     },
     {

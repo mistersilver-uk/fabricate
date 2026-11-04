@@ -997,6 +997,29 @@
     ]
   },
   {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label",
+      "readOnly": true
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Standing"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "text",
+          "value": "Honoured",
+          "readonly": true
+        }
+      }
+    ]
+  },
+  {
     "spec": "<Typeahead>",
     "cap": "open — the second suggestion active from the keyboard, the first under the pointer",
     "draws": ":scope > div",

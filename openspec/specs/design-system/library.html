@@ -183,6 +183,7 @@ a{color:var(--fab-accent)}
 .k-field.inline{height:30px;border-radius:7px;padding:0 var(--fab-space-3);font-size:11.5px;background:var(--fab-bg-2)}
 .k-field.mono{font-family:var(--fab-font-mono);font-size:11.5px}
 .k-field.center{justify-content:center}
+.k-field.readonly{background:transparent;border-style:dashed}
 .k-field.invalid{border-color:var(--fab-danger-border);background:var(--fab-danger-soft)}
 .k-field.focus{border-color:var(--fab-accent-border)}
 .k-field.ring{outline:2px solid var(--fab-accent);outline-offset:2px}
@@ -2458,6 +2459,11 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <span class="k-kicker">Threshold</span>
           <div class="k-field center">1250</div>
         </div>
+        <div class="k-lbl">
+          <span class="k-kicker">Standing</span>
+          <div class="k-field readonly">Honoured</div>
+          <span class="k-hint">takes focus, refuses edit</span>
+        </div>
       </div>
       <div class="unit">
         <span class="cap">the option list every select opens</span>
@@ -2545,6 +2551,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>search</b> the form rung, the glyph IN FLOW 8px before a borderless input that stretches to the shell; <code>compact</code> is the ruled 32px exception at four sites and never a rung</li>
           <li>Sets its own width against core's <code>input{width:100%}</code></li>
           <li><b>align</b> start · center · end &mdash; the text and placeholder of a field&rsquo;s text, number or textarea control, at logical edges, so <code>end</code> is the left one right to left; a figure field centres its number</li>
+          <li><b>readonly</b> a dashed edge on no fill, on a control that also carries <code>readonly</code>, so a value shown and not editable stays in the tab order and selectable; <code>disabled</code> is for a control that is off</li>
         </ul>
       </div>
       <div>
@@ -2571,6 +2578,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li class="k-hint"><b>&lt;Field&gt; SHIPPED</b> &mdash; read from <code>Field.svelte</code>&rsquo;s <code>$props()</code>.</li>
           <li><b>as</b> label | div | fieldset <span class="req">required</span> · <b>size</b> 26 | 28 | 30 | 34 | 38 · <b>face</b> sans | serif | mono · <b>type</b> text | number · <b>invalid</b></li>
           <li><b>align</b> start | center | end = start &mdash; any other value draws start; it never reaches a <code>&lt;select&gt;</code>, <code>Select</code>, <code>SearchField</code> or <code>Stepper</code></li>
+          <li><b>readOnly</b> true | false = false &mdash; a dashed edge on no fill, only on a text, number or textarea control that also carries <code>readonly</code>; it keeps the control&rsquo;s height, ink and edge colour, never reaches a <code>&lt;select&gt;</code>, <code>Select</code>, <code>SearchField</code> or <code>Stepper</code>, and the control stays focusable and selectable</li>
         </ul>
       </div>
     </div>
@@ -4196,6 +4204,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
             The 8px rung keeps <code>.11em</code> tracking and the 9px rung takes <code>.12em</code>; the ink never moves, so the muted tone&rsquo;s 4.5:1 holds at each.
             Any other value draws the default.
             No in-app caller passes it.</li>
+          <li><b>for</b> the <code>id</code> of a labelable control the caller draws &mdash; a non-blank string draws the kicker as a <code>&lt;label for&gt;</code> in the same type, whatever <code>as</code> says, so the caption names the control, and a click on it does what a click on any <code>&lt;label for&gt;</code> does.
+            Any other value draws the <code>as</code> host with no <code>for</code>, and the component draws and reads no <code>id</code> of its own.</li>
           <li><b>children</b> the label text, already localized by the caller.
             A nested child is legitimate and is how the recipe-item editor keeps its &ldquo;&middot; from linked item&rdquo; note, which declares no size and therefore inherits this one&rsquo;s 8.5px.</li>
           <li>a rest spread on the root &mdash; it carries the <code>data-*</code> hook a harness or a capture step selects on, so the attribute is genuinely ABSENT when unset.

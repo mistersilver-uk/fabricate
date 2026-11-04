@@ -33,7 +33,7 @@ import {
 
 /**
  * The published field's root: the classes its `size`, `face`, `type` and `invalid` write on it
- * (issue 2848) and its `align` (issue 2900), and the classes under which a rule redraws a field of Fabricate's own or the
+ * (issue 2848), its `align` (issue 2900) and its `readOnly` (issue 2938), and the classes under which a rule redraws a field of Fabricate's own or the
  * control inside it.
  */
 const FORM_CLASSES = Object.freeze({
@@ -42,6 +42,7 @@ const FORM_CLASSES = Object.freeze({
   type: ['is-type-number'],
   invalid: ['is-invalid'],
   align: ['is-align-center', 'is-align-end'],
+  readOnly: ['is-readonly'],
 });
 const FIELD = Object.freeze({
   root: 'fabricate-field',
@@ -96,7 +97,7 @@ const FIELD_SLOT_CHROME = Object.freeze([
   'styles/fabricate-manager-recipe-editor.css: .fabricate-field.fabricate-field small',
 ]);
 
-/** The seventeen rules the five form keys' classes draw on a control in the slot (issues 2848 and 2900). */
+/** The nineteen rules the six form keys' classes draw on a control in the slot (issues 2848, 2900 and 2938). */
 const NUMBER = ".fabricate-field.fabricate-field.is-type-number input[type='number']";
 const FIELD_FORM_CHROME = Object.freeze([
   ...FORM_CLASSES.size.map(
@@ -116,6 +117,9 @@ const FIELD_FORM_CHROME = Object.freeze([
     `${LIBRARY}: .fabricate-field.fabricate-field.${align} input${TEXT_LIKE_EXCLUSION}`,
     `${LIBRARY}: .fabricate-field.fabricate-field.${align} textarea`,
   ]),
+  // The read-only face needs the control's own `readonly` as well as the key.
+  `${LIBRARY}: .fabricate-field.fabricate-field.is-readonly input${TEXT_LIKE_EXCLUSION}[readonly]`,
+  `${LIBRARY}: .fabricate-field.fabricate-field.is-readonly textarea[readonly]`,
 ]);
 
 const writtenOf = (census) =>
@@ -125,18 +129,18 @@ const ringOf = (rows, written) =>
   rows.filter((row) => row.written === written).map(({ rule }) => declarationsOf(rule));
 
 describe('the module sheet and every component style against the published Field', () => {
-  // The 64: the two family rules, the seventeen slot-chrome rules and the seventeen form rules;
+  // The 66: the two family rules, the seventeen slot-chrome rules and the nineteen form rules;
   // fifteen caller rules under a pinned ancestor, four of them in components; and thirteen on a
   // class no published key writes, ten of them in components.
-  it('reaches a published field through its two family rules, seventeen slot-chrome rules and seventeen form rules, of 64 that name its root', () => {
+  it('reaches a published field through its two family rules, seventeen slot-chrome rules and nineteen form rules, of 66 that name its root', () => {
     const census = shippedCensus(FIELD, 'Field');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
       [...FIELD_FAMILY_RULES, ...FIELD_SLOT_CHROME, ...FIELD_FORM_CHROME].sort(byName)
     );
-    assert.equal(census.length, 64, 'the census of every selector naming the root');
+    assert.equal(census.length, 66, 'the census of every selector naming the root');
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
-    assert.equal(inPartials, 50, 'the partials were read');
+    assert.equal(inPartials, 52, 'the partials were read');
     assert.deepEqual(
       staleAncestors(FIELD, census, publishedManagerClasses()),
       [],
@@ -144,7 +148,7 @@ describe('the module sheet and every component style against the published Field
     );
     assert.deepEqual(
       [Object.keys(entryNamed('Field').props), gatedRoot(entryNamed('Field'))],
-      [['as', 'children', 'size', 'face', 'type', 'invalid', 'align'], 'fabricate'],
+      [['as', 'children', 'size', 'face', 'type', 'invalid', 'align', 'readOnly'], 'fabricate'],
       'a published class, caption, label host or wider root reopens the census'
     );
   });
