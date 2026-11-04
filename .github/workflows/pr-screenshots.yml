@@ -391,7 +391,10 @@ jobs:
             tests/components/component-edit-frame-rendered.test.js \
             tests/components/world-component-entry-frame-rendered.test.js \
             tests/components/kicker-face-rendered.test.js \
-            tests/components/published-standalone-root-rendered.test.js \
+            tests/components/published-standalone-root-rendered-1-of-4.test.js \
+            tests/components/published-standalone-root-rendered-2-of-4.test.js \
+            tests/components/published-standalone-root-rendered-3-of-4.test.js \
+            tests/components/published-standalone-root-rendered-4-of-4.test.js \
             tests/components/published-standalone-root-rendered-disclosure.test.js \
             tests/components/published-standalone-root-rendered-typeahead.test.js \
             tests/components/published-standalone-root-rendered-popover.test.js

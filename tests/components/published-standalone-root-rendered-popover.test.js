@@ -7,8 +7,8 @@
  * of it computes the same compared properties, pseudo elements and box, measured from the panel,
  * in both hosts at rest, under keyboard focus, under the pointer, under reduced motion and under
  * forced colours; its specimens draw every placement and each naming form.
- * It is a file of its own so `published-standalone-root-rendered.test.js` stays inside the
- * per-file timeout; it repeats that file's minimum, the target face, the core-min sheets, the
+ * It is a file of its own so the shards of `standaloneRootMeasurement.js` stay inside the
+ * per-file timeout; it repeats their minimum, the target face, the core-min sheets, the
  * per-element read and, where a harvest exists, its arm over Foundry 14.365's own sheet with the
  * hosts laid back in flow, which reaches the panel's heading where the core-min fixtures do not.
  * Limit: happy-dom lays nothing out, so each panel's placement is computed from a zero box in both
@@ -53,7 +53,7 @@ const CORE_MIN_SHEETS = Object.freeze([
   fixture('foundry-core-button-min.css'),
   fixture('foundry-core-input-min.css'),
 ]);
-/** The target face `published-standalone-root-rendered.test.js` writes on both hosts. */
+/** The target face `standaloneRootMeasurement.js` writes on both hosts. */
 const TARGET_FACE =
   'width: 280px; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px';
 /** The companion's own body content: a value input, a delta button and a reason input. */
