@@ -135,7 +135,7 @@ The routine forward-port is unchanged and free.
 Otherwise the script collects the range `origin/main..origin/release` (never `origin/main..HEAD` — by then `HEAD` is the bot's own merge commit, which comes from no pull request, so including it would guarantee a refusal), the per-commit merge-content verdicts, and each commit's associated pull requests, and hands them to `scripts/forward-port-provenance.mjs`.
 The evidence loop is driven by the same commit listing the verifier is given, so the set of commits decided and the set collected cannot diverge.
 The API read authenticates as the App installation token, never `GITHUB_TOKEN`; the job holds only `contents: read`.
-A commit is accounted for when either rule holds:
+A commit is accounted for when any rule holds:
 
 - **pull-request authored** — associated with a **merged** pull request whose base is `release`.
 Merged-ness is read from `merged_at`, because the REST payload carries no `merged` boolean and reports `state: "closed"` for a merged pull request and an abandoned one alike.
@@ -143,6 +143,9 @@ Being reviewed against a *different* line does not count: that review was never 
 - **content-free merge** — two parents whose re-merge reproduces the merge's own tree exactly, so it introduces nothing beyond what its parents already carry.
 This rule is a requirement rather than a loophole: `promote-to-early-access.yml` merges each beta tag into `release` with `--no-ff` under the App token, and that merge is associated with no pull request at all, so a gate demanding one would red every routine release.
 A merge that fails this rule is not refused outright — a merge commit closing a reviewed pull request based on `release` *was* reviewed, its resolution included — so it falls to the rule above, and a refusal then names both halves of why it was not accounted for.
+- **merged by a reviewed pull request** — a non-merge commit refused by both rules above, introduced by the merge commit of a merged pull request based on `release`: reachable from that merge's later parents and not its first, and the pull request's `merge_commit_sha` is that merge.
+GitHub's commit-to-pull-request lookup can list only an earlier pull request for a commit a later one also carried (for example a fix first opened against a hotfix line, then merged into `release`), so a commit's own associations are not the only evidence of its review.
+The `merge_commit_sha` pin is what makes this sound: the lookup also lists a pull request for every commit merely *on* its branch, and a back-merge of `release` onto that branch brings in commits from the base, outside the review.
 
 Anything else is refused by sha, with its subject, its author, and which rule it failed.
 

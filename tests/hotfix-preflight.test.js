@@ -34,8 +34,8 @@ test('hotfixPreflight refuses when the computed patch tag is present on stdin (s
   assert.match(result.message, /promote it to public first/);
 });
 
-test('hotfixPreflight passes when the computed patch tag is absent from stdin', () => {
-  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0'));
+test('hotfixPreflight passes when the patch tag is absent and a newer minor is soaking', () => {
+  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0', 'v1.6.0'));
   assert.equal(result.ok, true);
   assert.equal(result.code, 0);
   assert.equal(result.nextTag, 'v1.5.1');
@@ -44,7 +44,7 @@ test('hotfixPreflight passes when the computed patch tag is absent from stdin', 
 test('hotfixPreflight matches the WHOLE ref, so a longer superstring never counts', () => {
   // A soaking v1.5.10 must not satisfy a lookup for v1.5.1 — the match keys on the full
   // `refs/tags/<tag>` boundary, not a substring of the ref line.
-  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.10')).ok, true);
+  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.0', 'v1.5.10')).ok, true);
 });
 
 test('hotfixPreflight also matches an annotated tag deref (^{}) ref', () => {
@@ -65,8 +65,31 @@ test('run exits 1 on a collision', () => {
   assert.equal(run(['v1.5.0'], lsRemote('v1.5.0', 'v1.5.1'), silentIo), 1);
 });
 
-test('run exits 0 when the next patch tag is clear', () => {
-  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0'), silentIo), 0);
+test('run exits 0 when the next patch tag is clear and a newer minor is soaking', () => {
+  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0', 'v1.6.0'), silentIo), 0);
+});
+
+test('hotfixPreflight refuses when no stable version above the base exists — nothing is soaking', () => {
+  // Semantic-release would give the line the empty range >=1.5.0 <1.5.0.
+  const result = hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.5.0', 'v1.6.0-beta.3'));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 1);
+  assert.equal(result.nextTag, 'v1.5.1');
+  assert.match(result.message, /no stable version above v1\.5\.0 exists/);
+  assert.match(result.message, /reviewed pull request/);
+});
+
+test('hotfixPreflight reads annotated tags through their ^{} deref names', () => {
+  assert.equal(hotfixPreflight('v1.5.0', lsRemote('v1.5.0^{}', 'v1.6.0^{}')).ok, true);
+});
+
+test('hotfixPreflight fails closed when the base tag is not on origin', () => {
+  assert.throws(() => hotfixPreflight('v1.5.0', lsRemote('v1.4.0', 'v1.6.0')), /not on origin/);
+});
+
+test('run exits 1 with nothing soaking, and 2 for a base tag not on origin', () => {
+  assert.equal(run(['v1.5.0'], lsRemote('v1.5.0'), silentIo), 1);
+  assert.equal(run(['v1.5.0'], lsRemote('v1.6.0'), silentIo), 2);
 });
 
 test('run exits 2 on a non-stable base tag — a usage error, not a collision', () => {

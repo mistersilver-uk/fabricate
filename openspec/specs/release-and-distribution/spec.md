@@ -88,6 +88,8 @@ The route depends on what is soaking, and both routes satisfy that obligation.
 When a version carrying features is soaking, the hotfix MUST be built from a hotfix line cut from the public version's tag, and MUST carry nothing beyond the fix and the commits already public, because promoting the soak would ship those features.
 When the soaking version is a patch, it carries only fixes and performance changes by construction, so it is promoted first and a further hotfix is cut on top if one is still needed; what reaches `public` this way contains no unreleased feature work.
 A hotfix line MUST NOT be used against a soaking patch, because the version it would compute already exists on a different commit and has already been distributed; the attempt MUST be refused before any tag is minted.
+When nothing is soaking, no stable version newer than the public one exists, so the fix MUST be landed on the release line through a reviewed change and traverse `early-access` like any other stable version.
+A hotfix line MUST NOT be cut while no stable version newer than its base exists, because a hotfix line may only mint versions below the release line's lowest newer version, so none remains for it; the attempt MUST be refused before the line is cut.
 A hotfix line MUST accept fixes only; a change that would raise the minor or major version MUST fail rather than be released from it.
 A hotfix MUST NOT be published to any channel whose head is a version Foundry considers newer than it, because that would move the head backwards.
 A hotfix MUST NOT raise the module's declared minimum Foundry version, because Foundry refuses to install a package whose minimum exceeds the running core version, stranding exactly the users the hotfix is for.
@@ -106,6 +108,12 @@ The release line and the prerelease line MUST NOT be merged into a hotfix line.
 
 - **WHEN** a fix must reach the current public version while a patch version is soaking
 - **THEN** the soaking patch is promoted first (it carries no unreleased feature), and no hotfix line is cut, because the version it would compute already exists
+
+#### Scenario: hotfixing while nothing is soaking
+
+- **WHEN** a fix must reach the current public version while no stable version newer than it exists
+- **THEN** the fix is landed on the release line through a reviewed change and reaches `public` through `early-access`
+- **AND** cutting a hotfix line from the public version is refused before the line is cut, because the line could mint no version
 
 #### Scenario: a hotfix that would raise the declared minimum Foundry version
 
@@ -360,6 +368,8 @@ A prerelease promotion MAY advance the release line without a per-change review 
 
 When a forward-port would carry file content onto the prerelease line, it MUST establish mechanically that every commit it carries is attributable to a change reviewed **against the release line**, as **Release line change provenance** requires, and MUST NOT accept an operator's assertion that this is so.
 A change reviewed against a different line MUST NOT be treated as accounted for merely because that review took place and was merged.
+A non-merge commit is accounted for when it was introduced by the merge commit by which a change reviewed against the release line landed on it, meaning it is reachable from that merge's later parents and not from its first, because those are exactly the commits that review covered.
+A merge commit that a reviewed change merely contains, such as a back-merge of the release line onto the change's branch, does not account for what it brought in, because that came from the change's base, outside its review.
 A merge commit that introduces no content beyond what its parents already carry satisfies this without a review of its own; a merge commit that introduces content present in no parent does not.
 Whether a merge introduced content of its own MUST be established by reproducing the merge from its parents and comparing the result with what the merge recorded, never inferred from which files the merge touched, because a clean automatic merge and a merge carrying invented content touch exactly the same files.
 A forward-port that cannot establish change provenance MUST refuse, and MUST NOT treat an absence of evidence as an absence of unreviewed content.
@@ -376,6 +386,12 @@ A forward-port completed from a supplied resolution is subject to this requireme
 
 - **WHEN** it would carry a commit it cannot attribute to a change reviewed against the release line
 - **THEN** it fails, naming that commit, and does not offer the reader's own confirmation as the ordinary remedy
+
+#### Scenario: a commit carried into the release line by a reviewed merge
+
+- **WHEN** a commit's own recorded review is against another line, and it was introduced by the merge commit by which a change reviewed against the release line landed
+- **THEN** the commit is accounted for by that change's review, and the forward-port proceeds without an override
+- **AND** a commit that merge did not introduce, a merge commit, or a commit brought in by a merge the change merely contains is not accounted for this way
 
 #### Scenario: the forward-port's own merge introduces content
 
