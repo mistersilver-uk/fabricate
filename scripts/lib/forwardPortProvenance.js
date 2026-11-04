@@ -126,11 +126,14 @@ function toAssociation(entry, index) {
   }
   const mergedAt =
     typeof entry.merged_at === 'string' && entry.merged_at.trim() ? entry.merged_at : null;
+  const mergeCommitSha =
+    typeof entry.merge_commit_sha === 'string' ? entry.merge_commit_sha.toLowerCase() : null;
   return {
     number,
     baseRef,
     repository,
     mergedAt,
+    mergeCommitSha,
     state: typeof entry.state === 'string' ? entry.state : '',
   };
 }
@@ -299,13 +302,20 @@ function classifyCommit(commit, deps) {
   };
 }
 
-/** The first association of `sha` that qualifies under the accepted bases, or `undefined`. */
-function qualifyingAssociation(sha, deps) {
+/**
+ * The qualifying pull request that `sha` is the merge commit OF, or `undefined`. A pull request
+ * that merely contains `sha` (a back-merge on its branch) is not one: its review did not cover what
+ * that back-merge brought from the base.
+ */
+function landedPullRequest(sha, deps) {
   const associations = parseAssociations(
     readEvidence(deps.associationsFor, sha, 'pull-request associations'),
     { perPage: deps.perPage }
   );
-  return associations.find((association) => qualifies(association, deps));
+  return associations.find(
+    (association) =>
+      qualifies(association, deps) && association.mergeCommitSha === sha.toLowerCase()
+  );
 }
 
 /** Every commit of the range reachable from `starts` through parents that are themselves in it. */
@@ -322,13 +332,9 @@ function ancestorsInRange(starts, bySha) {
 }
 
 /**
- * Accept a refused non-merge commit that a reviewed pull request's merge commit introduced.
- *
- * `GET /commits/{sha}/pulls` can list only an earlier pull request for a commit that a later one
- * also carried, so a commit's own associations are not the only evidence of its review. A merge
- * commit in the range whose own association is a merged pull request against an accepted base
- * merged exactly the commits reachable from its later parents and not from its first, and that
- * pull request's review covered them. A refused merge commit is never credited this way.
+ * Accept a refused non-merge commit introduced by the merge commit of a qualifying pull request:
+ * reachable from that merge's later parents and not its first, which is exactly that pull request's
+ * commits. A merge commit is never credited this way.
  */
 function creditReviewedMerges(commits, verdicts, deps) {
   const refusedOrdinary = new Set(
@@ -346,7 +352,7 @@ function creditReviewedMerges(commits, verdicts, deps) {
     const brought = ancestorsInRange(laterParents, bySha);
     if ([...brought].every((sha) => !refusedOrdinary.has(sha))) continue;
 
-    const qualifying = qualifyingAssociation(merge.sha, deps);
+    const qualifying = landedPullRequest(merge.sha, deps);
     if (!qualifying) continue;
 
     const alreadyOnFirstParent = ancestorsInRange([firstParent], bySha);

@@ -133,6 +133,7 @@ test('the captured REST payload is read through its real field names', () => {
     baseRef: 'release',
     repository: REPOSITORY,
     mergedAt: '2026-09-01T07:48:19Z',
+    mergeCommitSha: MERGE_COMMIT,
     state: 'closed',
   });
 
@@ -366,6 +367,18 @@ function reviewedMergeRange() {
   ].join('\n');
 }
 
+/**
+ * The captured payload re-pointed so `sha` is the pull request's own merge commit.
+ * @param {string} sha The merge commit.
+ * @param {(pull: object) => void} [mutate] A further change, so a negative control varies one clause.
+ * @returns {string} The payload text.
+ */
+const landedPulls = (sha, mutate = () => {}) =>
+  derivedPulls((pull) => {
+    pull.merge_commit_sha = sha;
+    mutate(pull);
+  });
+
 /** The fix's own association: an earlier merged pull request against a hotfix line. */
 const hotfixLinePulls = () =>
   derivedPulls((pull) => {
@@ -376,7 +389,10 @@ test('a commit GitHub attributes only to a hotfix-line PR is accepted when a rev
   const { code, out } = verifyInMemory({
     commits: reviewedMergeRange(),
     merges: { [REVIEWED_MERGE.merge]: 'content-free\n', [REVIEWED_MERGE.fix]: 'parent-count 1\n' },
-    pulls: { [REVIEWED_MERGE.merge]: capturedPulls(), [REVIEWED_MERGE.fix]: hotfixLinePulls() },
+    pulls: {
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge),
+      [REVIEWED_MERGE.fix]: hotfixLinePulls(),
+    },
   });
 
   assert.equal(code, 0, out);
@@ -395,7 +411,7 @@ test('the merge only credits what it brought: a merge whose PR targets another l
     commits: reviewedMergeRange(),
     merges: { [REVIEWED_MERGE.merge]: 'content-free\n', [REVIEWED_MERGE.fix]: 'parent-count 1\n' },
     pulls: {
-      [REVIEWED_MERGE.merge]: derivedPulls((pull) => {
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge, (pull) => {
         pull.base.ref = 'main';
       }),
       [REVIEWED_MERGE.fix]: hotfixLinePulls(),
@@ -429,7 +445,7 @@ test("a commit on the reviewed merge's FIRST parent is not credited by it", () =
     commits,
     merges: { [REVIEWED_MERGE.merge]: 'content-free\n' },
     pulls: {
-      [REVIEWED_MERGE.merge]: capturedPulls(),
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge),
       [REVIEWED_MERGE.fix]: '[]',
       [REVIEWED_MERGE.releaseTip]: hotfixLinePulls(),
     },
@@ -456,7 +472,7 @@ test('a refused MERGE commit is never credited by a reviewed merge that brought 
       [CONSTRUCTED.loose]: 'parent-count 1\n',
     },
     pulls: {
-      [REVIEWED_MERGE.merge]: capturedPulls(),
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge),
       [CONSTRUCTED.evilMerge]: '[]',
       [CONSTRUCTED.loose]: '[]',
     },
@@ -495,7 +511,7 @@ test('a commit on BOTH parents of a reviewed merge is not credited — a straigh
     commits,
     merges: { [REVIEWED_MERGE.merge]: 'content-free\n' },
     pulls: {
-      [REVIEWED_MERGE.merge]: capturedPulls(),
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge),
       [straightPush]: '[]',
       [REVIEWED_MERGE.fix]: hotfixLinePulls(),
     },
@@ -529,7 +545,7 @@ for (const [label, mutate] of [
         [REVIEWED_MERGE.fix]: 'parent-count 1\n',
       },
       pulls: {
-        [REVIEWED_MERGE.merge]: derivedPulls(mutate),
+        [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge, mutate),
         [REVIEWED_MERGE.fix]: hotfixLinePulls(),
       },
     });
@@ -569,7 +585,10 @@ test('an octopus merge credits a commit it brought through ANY later parent', ()
   const { code, out } = verifyInMemory({
     commits,
     merges: { [REVIEWED_MERGE.merge]: 'content-free\n' },
-    pulls: { [REVIEWED_MERGE.merge]: capturedPulls(), [thirdParentCommit]: hotfixLinePulls() },
+    pulls: {
+      [REVIEWED_MERGE.merge]: landedPulls(REVIEWED_MERGE.merge),
+      [thirdParentCommit]: hotfixLinePulls(),
+    },
   });
 
   assert.equal(code, 0, out);
@@ -577,6 +596,49 @@ test('an octopus merge credits a commit it brought through ANY later parent', ()
     out,
     new RegExp(`accounted ${thirdParentCommit} — introduced by ${REVIEWED_MERGE.merge}`)
   );
+});
+
+test('a back-merge INSIDE a reviewed PR credits nothing: only the PR merge commit itself does', () => {
+  // U reached `release` unreviewed; the PR branch synced with `git merge release` (B), then landed
+  // as P. GitHub lists the PR for B because B is ON its branch, but B is not its merge commit, and
+  // U was already in the PR's base, outside its diff.
+  const [unreviewed, feature, backMerge, prMerge] = [
+    CONSTRUCTED.loose,
+    REVIEWED_MERGE.fix,
+    REVIEWED_MERGE.releaseTip,
+    REVIEWED_MERGE.merge,
+  ];
+  const commits = [
+    `${prMerge} ${unreviewed} ${backMerge}\tA Maintainer\tMerge pull request #2950`,
+    `${backMerge} ${feature} ${unreviewed}\tA Contributor\tMerge branch 'release' into feature`,
+    ordinaryCommitLine(feature, CONSTRUCTED.ordinaryParent, 'feat: reviewed work'),
+    ordinaryCommitLine(unreviewed, CONSTRUCTED.ordinaryParent, 'fix: pushed straight'),
+  ].join('\n');
+  const { code, err } = verifyInMemory({
+    commits,
+    merges: { [prMerge]: 'content-free\n', [backMerge]: 'content-free\n' },
+    pulls: {
+      [prMerge]: landedPulls(prMerge),
+      [backMerge]: landedPulls(prMerge),
+      [feature]: landedPulls(prMerge),
+      [unreviewed]: '[]',
+    },
+  });
+
+  assert.equal(code, 1);
+  assert.match(err, new RegExp(`REFUSED ${unreviewed}`));
+});
+
+test('a merge listed by a PR that is NOT its merge commit credits nothing it brought', () => {
+  const { code, err } = verifyInMemory({
+    commits: reviewedMergeRange(),
+    merges: { [REVIEWED_MERGE.merge]: 'content-free\n', [REVIEWED_MERGE.fix]: 'parent-count 1\n' },
+    // The captured payload's merge_commit_sha is #1421's own merge, not this one.
+    pulls: { [REVIEWED_MERGE.merge]: capturedPulls(), [REVIEWED_MERGE.fix]: hotfixLinePulls() },
+  });
+
+  assert.equal(code, 1);
+  assert.match(err, new RegExp(`REFUSED ${REVIEWED_MERGE.fix}`));
 });
 
 // ── 4. FAIL-CLOSED: EVERY UNVERIFIABLE INPUT EXITS 2 ────────────────────────────────────────────
