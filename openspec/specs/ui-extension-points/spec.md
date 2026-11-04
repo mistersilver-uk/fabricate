@@ -525,6 +525,8 @@ A Fabricate that predates the `Avatar` rungs `28` and `30` draws them as it draw
 A Fabricate that predates the `Medallion` values draws the tile as unset, one that predates `success` draws the `StatBox` figure in the `default` ink, and neither refuses anything; `accent` was the notice's own private tone before, so one that predates its publication draws it.
 - `ListRow`'s `markSize`, `density`, `layout`, `truncateName` and `detailAlign` were added to its entry at `version` 1 as `data` keys, with the mark rungs `28` and `34`: an added optional key is additive, so the entry's `version` did not change, and a Fabricate that predates each refuses it with `"<key>" is not a data attribute`; a value outside each key's set draws its default, so adding a value later is additive too.
 - `ListRow`'s `current` and `busy` were added to its entry at `version` 1 as `data` keys, and its `selected` draws the face without `onOpen`: an added optional key is additive, a Fabricate that predates each refuses it with `"<key>" is not a data attribute`, and one that predates them draws no face for a `selected` without `onOpen` and refuses nothing for it.
+- `ListRow`'s `tone` took `'accent'` at `version` 1: a widened value set is additive, so the entry's `version` did not change, and a Fabricate that predates it draws the neutral row and refuses nothing, which `describe` cannot show.
+  Its `trailing` holds one or more controls with no new key, so that changes no `version` either.
 - `Button`'s `size` took `'24'` and `'26'`, and `IconButton`'s `size` took `'20'` and `'22'`, at `version` 1: a widened value set is additive, so neither entry's `version` changed, and a Fabricate that predates a rung draws the default rung for it and refuses nothing, which `describe` cannot show.
 - `Button`'s `ariaLabel`, `tooltip` and `pressed`, its `role` value `info`, and `Stepper`'s `decrementTooltip` and `incrementTooltip` were added at `version` 1: an added optional key or value is additive, so neither entry's `version` changed; a Fabricate that predates a key refuses it, with `"<key>" is not a data attribute` on `Button` and `"<key>" is not a prop of Stepper`, which `describe` shows by leaving the key out of `props`, and one that predates `info` draws `neutral` and refuses nothing.
 - `Button`'s and `IconButton`'s `description` was added to each entry at `version` 1 as a `data` key: an added optional key is additive, so neither entry's `version` changed, and a Fabricate that predates it refuses it with `"description" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
@@ -2224,8 +2226,13 @@ Each group states the accepted values of every key that entry publishes.
   - `art` is an image path drawn as the row's mark, with no alternative text, and `''` or absence draws `icon` instead.
   - `icon` is a Font Awesome class string drawn as the mark where there is no `art` and hidden from assistive technology, and it defaults to `'fas fa-box'`.
   - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone, as `Medallion`'s does.
-  - `tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
-    It adds no text or glyph, so the companion states what the tone means in `detail` as well.
+  - `tone` is `'neutral'`, `'positive'`, `'danger'` or `'accent'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge, `'danger'` on the danger ones and `'accent'` on the accent ones, and any other value draws as `'neutral'` and is never refused.
+    It adds no text or glyph, so the companion states what the tone means in the row's text as well, as a state word in `detail` or a published `Chip` in `badges`.
+    Each tinted fill is translucent and replaces the row's own, and on it the name, and the row's ink that the detail and the quantity take, clear 4.5:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette; a `muted` name on it falls short of 4.5:1 on `--fab-bg-2` in some palette.
+    A published `Chip` with no `emphasis` in `badges` reads its label over its own fill over the row's: on each tinted row the `positive`, `warning`, `info` and `accent` chips clear 4.5:1 over those four grounds in every palette, and so does `danger` but for a `'positive'` row on `--fab-bg-2`, while the `neutral` chip falls short on every tinted row.
+    An `'accent'` row's edge is the selected face's, and `selected: true` draws the selected face over it, as it does over a `'positive'` row, so the companion says which the row is in its text.
+    Under forced colours Chromium draws each fill in the system's `Canvas` at the fill's own alpha and the edge in a system colour, so the tone is not seen there and the row's text carries it.
+    A Fabricate that predates `'accent'` draws it as `'neutral'` and refuses nothing, which `describe('ListRow')` cannot show.
   - `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
   - `markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn.
     While `busy` replaces `leading`, it sizes the spinner.
@@ -2257,7 +2264,7 @@ Each group states the accepted values of every key that entry publishes.
   - It takes rest keys, `data-*` attributes that land on the row's root, not on the button, so no rest name is reserved; Fabricate writes its own `data-list-row` there after them, so a key of that name is not written.
   - Its row, button and marks come from Fabricate's module sheet, rooted at `.fabricate-list-row`, so `target` needs a Fabricate window ancestor (`root: 'fabricate'`), and a target with none is refused (M16).
   - The button's keyboard ring is the window's accent ring, 2px wide and drawn 2px inside the row's edge on a layer that covers the row, in place of the ring the module draws around a button.
-    The row paints its own opaque fill, `--fab-bg-1`, or `--fab-bg-2` as a card, and the ring clears 3:1 against it in every palette; the selected, hovered, success and danger fills are translucent and replace it, so they sit over the ground beneath the row, and the ring clears 3:1 against each over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so the companion mounts the row on one of those grounds.
+    The row paints its own opaque fill, `--fab-bg-1`, or `--fab-bg-2` as a card, and the ring clears 3:1 against it in every palette; the selected, hovered, success, danger and accent fills are translucent and replace it, so they sit over the ground beneath the row, and the ring clears 3:1 against each over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so the companion mounts the row on one of those grounds.
   - `aside` is a content slot whose element is a `<div>`, drawn on a line of its own beneath the row's mark, name, detail and quantity, across the row's inner width; requesting it draws the row at the inset Fabricate gives a row with an aside.
     The row draws the content slot's children in normal flow, with no gap of its own, so the companion fills it with one element of its own that lays out its content; text there takes the row's ink and type, as the detail does.
     With `onOpen` the aside sits beneath the layer the button draws over the row, so a pointer press anywhere on it presses the button, and the button's `aria-describedby` names the element holding the slot, so the aside's text is read as the button's description.
@@ -2269,11 +2276,15 @@ Each group states the accepted values of every key that entry publishes.
   - `badges` is a content slot whose element is a `<span>`, drawn after the name on the name's line, and wrapping beneath a name that fills the line.
   - `meta` is a content slot whose element is a `<span>`, drawn beneath the name and its badges, and with `onOpen` the button's `aria-describedby` names it too.
   - `trailing` is a content slot whose element is a `<span>`, drawn after the row's content at the row's end, beside the button and above the layer the button draws over the row.
-    It is the one slot that may hold controls: the companion draws one compact control there, a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, and a press on it does not call `onOpen`.
-    The control follows the row's button in focus order, an icon-only control carries a label of its own for its item, and chips go in `badges`.
-    `disabled` dims the whole row and disables no control in `trailing`, so the companion sets that control's own `disabled`.
-    The dimmed row also dims an enabled control in `trailing`, and a press on the gap around the control opens nothing.
-    The companion gives that control a target of at least 24 by 24 CSS pixels.
+    It is the one slot that may hold controls: the companion draws one or more compact controls there, each a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, a published `Button` or `IconButton` among them, and a press on one does not call `onOpen`.
+    The companion appends each control, or each mount target, as a child of the slot element: each child is a flex item spaced by the row's gap, 8px on a dense row and a card and 12px at the `'default'` density, all on one line that never wraps, so a row narrower than its content narrows and wraps the name, not the controls.
+    The companion draws no more controls than fit beside the name at the narrowest width it mounts the row at.
+    Each control is its own stop in the tab order: Tab reaches the row's button, then each control in the order the companion appended them, and none of them joins the button's accessible name.
+    The companion gives each control an accessible name of its own that names the row's item, as `Remove Ember salt`, and chips go in `badges`.
+    `disabled` dims the whole row and disables no control in `trailing`, so the companion sets each control's own `disabled`.
+    The dimmed row also dims an enabled control in `trailing`, and a press on the gap around or between the controls opens nothing.
+    The companion gives each control a target of at least 24 by 24 CSS pixels.
+    Every Fabricate that publishes `trailing` lays several controls out so, so holding more than one needs no check beyond `describe('ListRow').props.trailing`.
   - Requesting `leading`, `badges` or `meta` draws the row at the inset Fabricate gives a row with an aside, and `trailing` alone does not.
     The companion draws text and marks in `leading`, `badges` and `meta`, as a published `Chip`, and nothing focusable or pressable: with `onOpen` they lie inside the button, so a press on them presses it and calls `onOpen`, and an `update` that passes `onOpen` covers them without it.
     The companion draws only phrasing content there (text, `span`, an `i` or `img` that is `aria-hidden` or has an `alt`), because with `onOpen` the hosts sit inside a native `button`, which forbids blocks, lists and headings, and an `alt`, `aria-label` or `title` on that content joins the button's accessible name.
@@ -3128,6 +3139,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, an `onOpen` and `trailing: true`, and appends a `<button type="button" data-keyboard-focus="true">` to `handle.slot('trailing')`
 - **THEN** a pointer press on the control reaches it and does not call `onOpen`, and the control follows the row's button in focus order
 - **AND** an `update` that changes `name`, `detail`, `quantity` or `selected` keeps the slot element in place
+
+#### Scenario: A published list row with several trailing controls
+
+- **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, an `onOpen` and `trailing: true`, and mounts three published `IconButton`s, each named for the row's item, in `<span>` targets it appends to `handle.slot('trailing')`
+- **THEN** the three sit on one line at the row's end, 8px apart on a dense row, and Tab reaches the row's button and then each of them in the order appended
+- **AND** each is a button named by its own `ariaLabel`, the row's button's name holds none of them, and a press between two of them calls neither them nor `onOpen`
+
+#### Scenario: A published accent-toned list row
+
+- **WHEN** a companion mounts `ListRow` under a Fabricate window with a `name`, `detail: 'Ready to claim'` and `tone: 'accent'`
+- **THEN** the row is drawn on the accent fill and edge, and its name and detail clear 4.5:1 on that fill over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette
+- **AND** a `tone` outside `'neutral'`, `'positive'`, `'danger'` and `'accent'` draws the neutral row and is not refused
 
 #### Scenario: A published list row's mark, density, layout and truncation
 

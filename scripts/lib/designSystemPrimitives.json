@@ -8,7 +8,8 @@
       "scope": "shared",
       "why": [
         "The shared list row: art or a glyph mark, a name, a detail and a quantity, in a dense read-only form, a selectable form whose content is one native button, and a card layout.",
-        "It draws the Journal's runs, the gathering environment, task and event rows, the crafting browser's recipe rows, the alchemy rows and the inventory grid's cards, so it is shared across both applications."
+        "It draws the Journal's runs, the gathering environment, task and event rows, the crafting browser's recipe rows, the alchemy rows and the inventory grid's cards, so it is shared across both applications.",
+        "Its `trailing` track holds one or more controls on one line at the row's gap, after the button in tab order, and its `tone` tints the row neutral, positive, danger or accent without adding text."
       ]
     },
     {

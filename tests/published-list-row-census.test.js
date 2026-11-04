@@ -1,5 +1,5 @@
 /**
- * The module sheet and every component style against the published `ListRow` (issue 2784): the 48
+ * The module sheet and every component style against the published `ListRow` (issue 2784): the 49
  * selectors that name its root, which of them a published row can match, where those sit and what
  * they draw, the bare `button` rules its whole-row button also takes, and the focus mark that
  * button draws in place of the module ring: an accent ring 2px wide inset 2px on the overlay that
@@ -47,6 +47,7 @@ const LIST_ROW = Object.freeze({
   writable: new Set([
     'is-positive',
     'is-danger',
+    'is-accent',
     'is-muted',
     'is-form',
     'is-default',
@@ -61,7 +62,7 @@ const LIST_ROW = Object.freeze({
   undrawn: new Set(['fabricate-list-row-children']),
 });
 
-/** The 45 rules that draw a published row, every one in its sheet. */
+/** The 46 rules that draw a published row, every one in its sheet. */
 const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row',
   '.fabricate-list-row .fabricate-list-row-name',
@@ -87,6 +88,7 @@ const LIST_ROW_FAMILY = Object.freeze([
   '.fabricate-list-row > .fabricate-list-row-aside',
   '.fabricate-list-row:not(.is-truncated) .fabricate-list-row-head > .fabricate-list-row-name',
   '.fabricate-list-row.is-danger',
+  '.fabricate-list-row.is-accent',
   ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
   ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
@@ -127,6 +129,7 @@ const ROW_GROUNDS = Object.freeze([
     '--fab-surface-raised',
     '--fab-success-soft',
     '--fab-danger-soft',
+    '--fab-accent-soft',
   ].flatMap((wash) =>
     ['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2'].map((ground) => [wash, ground])
   ),
@@ -141,9 +144,9 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published ListRow', () => {
-  it('reaches a published row through 45 of the 48 selectors that name its root', () => {
+  it('reaches a published row through 46 of the 49 selectors that name its root', () => {
     const shipped = census();
-    assert.equal(shipped.length, 48, 'the census of every selector naming the root');
+    assert.equal(shipped.length, 49, 'the census of every selector naming the root');
     assert.deepEqual(writtenOf(reachingOf(shipped)), inSheet(LIST_ROW_FAMILY));
     assert.deepEqual(
       staleAncestors(LIST_ROW, shipped, publishedManagerClasses()),

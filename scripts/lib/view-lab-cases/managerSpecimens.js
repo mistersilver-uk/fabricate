@@ -461,6 +461,13 @@ const FORM_MARKS = Object.freeze([
 /** Sized to the fixture's 480px ground and the height of its seven sections. */
 const FORMS_WINDOW = Object.freeze({ width: 600, height: 680 });
 
+/** The tones fixture's ground and one section's published row, by its key. */
+const TONES_GROUND = '[data-lab-list-row-tones]';
+const TONE_ROW = (key) => `${TONES_GROUND} > [data-lab-list-row-tone="${key}"] .fabricate-list-row`;
+
+/** Sized to the fixture's 360px ground and the height of its four rows. */
+const TONES_WINDOW = Object.freeze({ width: 480, height: 360 });
+
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
 const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
@@ -2288,6 +2295,57 @@ export const CASES = Object.freeze([
       ],
     },
     position: FORMS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-list-row-tones-specimen',
+    label:
+      'Specimen, mounted through the published seam — four list rows, 8px apart in a 360px column on the --fab-bg-2 ground. Reading top to bottom: Ember Court, a whole-row button with its Trusted detail and, at its end beside the button, three published 24px icon buttons 8px apart on one line, a minus, a plus and a trash; Signet of the Ember Court, a read-only row on the success wash and edge whose state word is a published positive Claimed chip after its name; Forge-warden’s writ, a read-only row on the danger wash and edge whose state word is its Turned down detail; and 50 gp, a whole-row button on the accent wash and edge with its Ready to claim detail and a published accent Claim button at its end. The frame draws inside the manager window and is the evidence for it alone; the gap at each density, the Tab order, each control’s name and a press between two controls are the rendered suite’s, the contrast of each ink on each wash is the contrast suite’s, and an unknown tone is the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own controls in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-list-row-tones' },
+    steps: [],
+    // The third icon button in the first row, the chip in the claimed row and the claim button.
+    expectSelector: `${TONES_GROUND}:has(> [data-lab-list-row-tone="controls"] .fabricate-list-row-trailing > span > span:nth-child(3) button):has(> [data-lab-list-row-tone="claimed"] .fabricate-list-row-badges .manager-chip) > [data-lab-list-row-tone="offer"] .fabricate-list-row.is-accent .fabricate-list-row-trailing button`,
+    expectContained: [
+      ...['controls', 'claimed', 'declined', 'offer'].map((key) => ({
+        container: TONES_GROUND,
+        target: TONE_ROW(key),
+      })),
+      {
+        container: TONE_ROW('controls'),
+        target: `${TONE_ROW('controls')} .fabricate-list-row-trailing`,
+      },
+      { container: '.window-content', target: TONES_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The trailing host's gap and line, and each tint's wash and edge.
+        {
+          selector: `${TONE_ROW('controls')} > .fabricate-list-row-trailing`,
+          styles: 'column-gap: 8px; flex-wrap: nowrap; position: relative; z-index: 2',
+        },
+        {
+          selector: TONE_ROW('claimed'),
+          styles:
+            'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+        },
+        {
+          selector: TONE_ROW('declined'),
+          styles:
+            'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+        },
+        {
+          selector: TONE_ROW('offer'),
+          styles:
+            'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border); color: var(--fab-text-secondary)',
+        },
+      ],
+    },
+    position: TONES_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

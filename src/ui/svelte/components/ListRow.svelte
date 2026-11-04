@@ -92,6 +92,7 @@
       'is-detail-end': detailAlign === 'end',
       'is-body-fill': bodyBasis === 'fill' && form,
       'is-danger': tone === 'danger',
+      'is-accent': tone === 'accent',
       'is-selected-face': selected === true && !onOpen,
       'is-busy': Boolean(busy),
     },
