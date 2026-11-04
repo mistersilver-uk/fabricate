@@ -233,6 +233,7 @@ describe('the entries the added values widen', () => {
       'variant',
       'tone',
       'ink',
+      'text',
     ]);
     assert.deepEqual(keys('StatBox'), [
       'value',

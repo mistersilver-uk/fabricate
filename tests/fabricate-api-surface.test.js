@@ -370,6 +370,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           variant: optional,
           tone: optional,
           ink: optional,
+          text: optional,
         },
         rest: false,
         root: 'any',

@@ -1,8 +1,9 @@
 /**
- * Issue 2847: each `Medallion` `tone` and `ink` inks its glyph with its family's token, and the
- * glyph's contrast in all seven themes is what the ui-extension-points "Medallion" group states:
- * a tone's glyph and an ink over a tone clear 4.5:1 over the four page grounds, and an ink on the
- * slate tile clears 3:1 with the named 4.5:1 shortfalls.
+ * Each `Medallion` `tone` and `ink` inks its glyph with its family's token, and the glyph's
+ * contrast in all seven themes is what the ui-extension-points "Medallion" group states: a tone's
+ * glyph and an ink over a tone clear 4.5:1 over the four page grounds, and an ink on the slate tile
+ * clears 3:1 with the named 4.5:1 shortfalls. A drawn `text` is small text, so it inks
+ * `--fab-text` on the slate tile and its tone's `-text` on a toned one, and clears 4.5:1 on both.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -27,6 +28,7 @@ const INKS = Object.freeze({
   success: '--fab-success-text',
   danger: '--fab-danger-text',
   neutral: '--fab-text-secondary',
+  accent: '--fab-accent-text',
   warning: '--fab-warning-text',
   info: '--fab-info-text',
 });
@@ -83,6 +85,7 @@ test('an ink on the slate tile clears 3:1 in every theme, and 4.5:1 but for the 
   assert.deepEqual(
     under.toSorted((a, b) => a.localeCompare(b)),
     [
+      'hearth-herb accent',
       'hearth-herb danger',
       'hearth-herb info',
       'hearth-herb neutral',
@@ -97,4 +100,36 @@ test('an ink on the slate tile clears 3:1 in every theme, and 4.5:1 but for the 
     )
   );
   assert.equal(weakest.toFixed(2), '3.50', 'the weakest, danger in hearth-herb');
+});
+
+test("a drawn text inks --fab-text on the slate tile and its tone's -text on a toned one", () => {
+  const text = '.fab-medallion-text';
+  assert.equal(token(text, 'color'), '--fab-text');
+  for (const tone of TONES) {
+    assert.equal(token(`.fab-medallion.is-tone-${tone} ${text}`, 'color'), `--fab-${tone}-text`);
+  }
+  for (const ink of Object.keys(INKS)) {
+    const rule = rules.filter((candidate) => candidate.selector.includes(`.is-ink-${ink} ${text}`));
+    assert.deepEqual(rule, [], `${ink} inks the glyph alone, so it reaches no text rule`);
+  }
+});
+
+test('a drawn text clears 4.5:1 on the slate tile and on every tone over the four page grounds in every theme', () => {
+  assert.deepEqual(shortfalls(themes, '--fab-text', ['--fab-bg-3']), []);
+  for (const tone of TONES) {
+    assert.deepEqual(toneShortfalls(`--fab-${tone}-text`, tone), [], tone);
+  }
+  const weakest = Math.min(
+    ...[...themes.values()].map((tokens) =>
+      contrast(tokens.get('--fab-text'), tokens.get('--fab-bg-3'))
+    )
+  );
+  assert.equal(weakest.toFixed(2), '4.90', 'the weakest, --fab-text on slate in hearth-herb');
+});
+
+test('the accent ink clears 3:1 on the slate tile and falls under 4.5:1 only in hearth-herb', () => {
+  assert.deepEqual(shortfalls(themes, '--fab-accent-text', ['--fab-bg-3'], 3), []);
+  assert.deepEqual(shortfalls(themes, '--fab-accent-text', ['--fab-bg-3']), [
+    'hearth-herb: --fab-accent-text on --fab-bg-3 4.15:1',
+  ]);
 });

@@ -413,6 +413,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSelectionCheckbox.svelte',
   'tests/view-lab/fixtures/PublishedCheckboxRows.svelte',
   'tests/view-lab/fixtures/PublishedToggleCardTones.svelte',
+  'tests/view-lab/fixtures/PublishedMedallionText.svelte',
   'tests/view-lab/fixtures/PublishedToggleLabels.svelte',
   'tests/view-lab/fixtures/PublishedTypeahead.svelte',
   'tests/view-lab/fixtures/PublishedPopover.svelte',
@@ -1235,6 +1236,8 @@ const labToggleButton = (key) =>
 const labToggleName = (key) => `${labToggleButton(key)} > .manager-status-toggle-name`;
 const labToneCard = (key) =>
   `[data-lab-toggle-card-tones] > [data-lab-toggle-card-tone="${key}"] .fabricate-toggle-card`;
+const labMedallionTile = (key) =>
+  `[data-lab-medallion-text] [data-lab-medallion-tile="${key}"] .fab-medallion`;
 /** The published selection checkbox's specimen (issue 2836), alike on each of its palettes. */
 const CHECKBOX_CONTROLS = Object.freeze([
   {
@@ -2440,6 +2443,24 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
       selector: `${labToneCard('off')} .manager-recipe-status-sub`,
       styles: 'color: var(--fab-text-muted)',
     },
+  ],
+  // The published medallion's text on four rungs and three tones, and its accent ink on a glyph.
+  'manager-published-medallion-text-specimen': [
+    { selector: labMedallionTile('rung-22'), styles: 'width: 22px; height: 22px' },
+    { selector: labMedallionTile('rung-44'), styles: 'width: 44px; height: 44px' },
+    {
+      selector: `${labMedallionTile('rung-26')} .fab-medallion-text`,
+      styles: 'color: var(--fab-text); font-size: 11px; font-weight: 500',
+    },
+    {
+      selector: `${labMedallionTile('tone-success')} .fab-medallion-text`,
+      styles: 'color: var(--fab-success-text)',
+    },
+    {
+      selector: `${labMedallionTile('tone-info')} .fab-medallion-text`,
+      styles: 'color: var(--fab-info-text)',
+    },
+    { selector: `${labMedallionTile('ink-accent')} i`, styles: 'color: var(--fab-accent-text)' },
   ],
   'manager-published-typeahead-specimen': TYPEAHEAD_SPECIMEN_CONTROLS,
   // The no-match note's ink, and the field lit while it keeps the free text.
@@ -8614,6 +8635,46 @@ test('the toggle card tones specimen case presses a card the fixture mounts and 
   assert.ok(
     expectSelector.includes('[data-lab-toggle-card-tone-on="true"]'),
     'the frame waits for the companion’s update the click asked for'
+  );
+});
+
+test('the medallion text specimen case measures the tiles the fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedMedallionText.svelte'
+  );
+  for (const hook of [
+    'data-lab-medallion-text',
+    'data-lab-medallion-text-row',
+    'data-lab-medallion-tile',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const mounted = [...walkNodes(instance.content)]
+    .filter(
+      (node) =>
+        node.type === 'ArrayExpression' &&
+        node.elements[0]?.type === 'Literal' &&
+        node.elements[1]?.type === 'ObjectExpression'
+    )
+    .map((node) => node.elements[0].value);
+  const tileOf = (selector) => /data-lab-medallion-tile="([\w-]+)"/u.exec(selector)?.[1];
+  const { expectLayout, expectContained, expectSelector } = getCaseById(
+    'manager-published-medallion-text-specimen'
+  );
+  assert.ok(mounted.length >= 10, 'the fixture mounts its tiles');
+  assert.deepEqual(
+    [...expectLayout.controls, ...expectContained.map(({ target }) => ({ selector: target }))]
+      .map(({ selector }) => tileOf(selector))
+      .filter((key) => key && !mounted.includes(key)),
+    [],
+    'each measured tile is one the fixture mounts'
+  );
+  assert.ok(
+    expectSelector.includes('[data-medallion="text"]'),
+    'the frame waits for a tile drawn as text'
   );
 });
 

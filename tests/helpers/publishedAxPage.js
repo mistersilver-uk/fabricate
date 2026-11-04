@@ -57,13 +57,22 @@ async function drawnCases(tmpPrefix, cases) {
   }
 }
 
-/** Opens the page; `before` is markup drawn ahead of the cells and `css` a sheet after the module's. */
-export async function publishedAxPage({ tmpPrefix, cases, before = '', css = '' }) {
+/**
+ * Opens the page; `before` is markup drawn ahead of the cells, `css` a sheet after the module's, and
+ * `components` the names whose scoped styles the page carries, for a component with a `<style>` block.
+ */
+export async function publishedAxPage({
+  tmpPrefix,
+  cases,
+  before = '',
+  css = '',
+  components = [],
+}) {
   const cells = await drawnCases(tmpPrefix, cases);
   const browser = await chromium.launch();
   const tab = await browser.newPage({ viewport: { width: 900, height: 1200 } });
   await tab.setContent(
-    `${renderedPageHead([])}<body class="game"><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">` +
+    `${renderedPageHead(components)}<body class="game"><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">` +
       `<style>[data-case]{display:flex;padding:8px}${css}</style>${before}${cells}</div></body></html>`,
     { waitUntil: 'load' }
   );
