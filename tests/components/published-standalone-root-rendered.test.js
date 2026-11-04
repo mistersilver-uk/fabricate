@@ -687,9 +687,9 @@ function readHost({ id, host, properties, pseudo }) {
       pseudo: Object.fromEntries(
         pseudos.map((which) => [which, pick(getComputedStyle(element, which), pseudo)])
       ),
-      // A `display: contents` element makes no box, so it has no offset to compare.
+      // A `display: contents` or `display: none` element makes no box, so it has no offset to compare.
       box:
-        style.display === 'contents'
+        style.display === 'contents' || style.display === 'none'
           ? null
           : [box.width, box.height, box.left - origin.left, box.top - origin.top].map(Math.round),
       ...(scope && { scope }),

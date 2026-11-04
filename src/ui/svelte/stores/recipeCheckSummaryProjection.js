@@ -9,14 +9,18 @@ import { checkTierUnit } from '../apps/manager/recipe/recipeOverviewSelectOption
 
 /**
  * The crafting check a recipe row's check pill resolves against, keyed off the
- * SYSTEM's resolution mode. `routedByCheck` authors its check on the `routed`
- * slot; `simple`, `alchemy` and `routedByIngredients` share the `simple`
- * pass/fail slot; `progressive` has its own.
+ * SYSTEM's resolution mode. `routedByCheck` and a `tiered` alchemy check author on the
+ * `routed` slot (issue 2891), as `resolveActiveCraftingCheckFormula` rolls them; `simple`,
+ * a `simple` alchemy check and `routedByIngredients` share the `simple` pass/fail slot;
+ * `progressive` has its own.
  * @private
  */
 function _recipeCheckConfig(system) {
   const mode = system?.resolutionMode || 'simple';
   if (mode === 'routedByCheck') return system?.craftingCheck?.routed || null;
+  if (mode === 'alchemy' && system?.alchemy?.checkMode === 'tiered') {
+    return system?.craftingCheck?.routed || null;
+  }
   if (mode === 'progressive') return system?.craftingCheck?.progressive || null;
   return system?.craftingCheck?.simple || null;
 }

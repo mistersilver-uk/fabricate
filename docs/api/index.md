@@ -2191,11 +2191,16 @@ The bar announces nothing and its inks never say good or bad: the neutral ink is
 So state the signed reading and its band as text beside the bar, as "+10, neutral".
 Under forced colours a bar whose `neutralBand` is above 0 draws its fill in the system text colour, solid beyond the band and as a hollow 1px ring within it, so the band is told by shape and the sign by side, never by colour alone.
 A fill only a few pixels wide has no room for the ring: in Chromium a reading of +2 on a 240px track, a fill about 2.4px wide, paints as a solid 2px mark, where +3, about 3.6px wide, shows its ring, so a reading that close to zero is told from one beyond the band by its width alone, and your text carries the reading.
-A `thin` bar whose `neutralBand` is above 0 also keeps a 1px edge in the system text colour, drawn outside its track, so its extent and midpoint stay visible.
-A centred bar with no band is left to the user agent, which in Chromium today repaints its fill to the forced ground, where it is not seen; that is current behaviour, not a contract.
 A Fabricate that predates `neutralBand` refuses it with `"neutralBand" is not a data attribute`, and `describe('FillBar').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `density` is `default`, `compact` or `thin`, an 8px, a 6px or a 4px track, and any other value draws `default`.
 `thin` draws no border and paints the track `--fab-bg-3` on any ground, so the fill is the whole 4px.
+Under forced colours the user agent paints every background to the ground, so a fill is drawn solid in the system text colour instead, a single fill, a stack of shares and a centred fill alike, but for a banded bar's fill within its band, which is a hollow ring.
+A caller's `color` is not drawn there.
+A `thin` track keeps a 1px edge in the system text colour, drawn as an outline outside its own box, so its extent and midpoint stay visible and its fill keeps the whole 4px.
+A parent that clips its overflow clips that outline, so the edge there is the parent's own.
+A stack of shares is one solid fill there, so state each share as text beside the bar.
+A bipolar bar draws no midpoint mark, in any mode: its fill always starts at the midpoint, so the side it grows to tells the sign without colour, and a reading of zero draws an empty track.
+Under forced colours a bipolar bar differs from a start-origin bar by the text beside it alone, because a reading of -100 draws the same pixels as a start-origin value of 50, so state the signed reading as text.
 Against `--fab-bg-3` twenty of the 112 readings of the sixteen tones in the seven palettes are under 3:1, in `foundry-native`, `hearth-herb`, `ironblood-forge` and `starglass-arcana`, and none is under 1.8:1, so never leave a reading to its colour.
 The weakest are `danger` and `slate` in `hearth-herb`, at 1.9:1.
 A Fabricate that predates `thin` draws the default track and refuses nothing, and `describe` cannot tell you which one is running; adding it is additive, and the entry stays at `version` 1.
@@ -2220,6 +2225,7 @@ A Fabricate that predates the tag names draws each `neutral`, and refuses nothin
 The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
 No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
 The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so always state each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
+Under forced colours the segments draw as one solid fill, as `FillBar`'s shares do, so the split is told by that text alone.
 A `segments` that is not an array (`null`, an object, a string or a number) is a fault: Fabricate logs it, empties `target` and the handle goes inert, as [for any published component that faults](#mounting-updating-and-destroying).
 Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1.
 A Fabricate that predates segments draws the whole fill in the first entry's paint and refuses nothing, and `describe` cannot tell you which one is running, so the text beside the meter carries the segments on either.
@@ -3208,7 +3214,9 @@ A Fabricate that predates `gap` refuses it with `"gap" is not a data attribute`,
 `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as [`FillBar`](#fillbar)'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.
 Against your ground the `thin` track itself is faint, 1.0:1 to 2.9:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in the seven palettes, and in `foundry-native` on `--fab-bg-2` an empty stage cannot be seen at all: `--fab-bg-3` there is a shade darker than `--fab-bg-2`, at 1.00:1, so pass `numbered` or state the stage count as text.
 Under forced colours the `thin` track keeps a 1px edge in the system text colour, as the `default` track's border is drawn there, so each bar's extent stays visible.
-Today the user agent also repaints the fill on either track, which in Chromium takes the page's ground and is not seen; that is current behaviour, not a contract, so state the reading as text.
+Under forced colours the fill on either track is drawn solid in the system text colour, as `FillBar`'s is, and each bar keeps the track's own 1px edge in that colour.
+The stage states, done, current and to do, and a stage's share split all draw the same solid fill there, so they are not told apart.
+So state each stage's state and reading as text beside the track.
 On the `thin` track the state paints read against `--fab-bg-3` as the thin `FillBar`'s tones do: the accent is under 3:1 in `hearth-herb` and `ironblood-forge`, the success in `foundry-native`, and the neutral in `hearth-herb`, `ironblood-forge` and `starglass-arcana`, the weakest the neutral in `hearth-herb` at 2.1:1, so `aria-current` and your text, never the colour, say which stage is current and which are done.
 A Fabricate that predates `track` refuses it with `"track" is not a data attribute`, and `describe('StageBars').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
@@ -3702,8 +3710,12 @@ Build it by inserting the label string itself, as `format('{label}, chosen by {n
 Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
 `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
 It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
-It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
-A `title` that is not a string, or is white space alone, draws no tooltip.
+Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
+A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
+Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
+A Fabricate that predates the description gives the hint to the pointer only.
+A `title` that is not a string, or is white space alone, draws no tooltip and no description.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
 `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -4076,7 +4088,7 @@ A component with an overlay that you mount in a slot closes its open panel when 
 Never pass a name of white space alone, which leaves its element with no name.
 `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
 It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the padding box of the nearest ancestor that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do, such as your `overlayHost` region or a Foundry window scaled with a `transform`, and otherwise the viewport of the browser window that holds it.
 A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
 `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
 `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which you make at most one primary.
@@ -4155,11 +4167,14 @@ The dialog is centred in the nearest element above it that makes itself the cont
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
 An `overlayHost` that is a region of your own, such as a pane inside your window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
 Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+In a region that is the containing block, the dialog's width is capped 48px short of the region's padding box, so it stays inside the region with a 24px margin on each side of that box, and its close control stays inside the region.
+A region wider than the browser window draws the dialog at the region's width, past the window's edge, and a region 48px wide or narrower draws it with no content width.
 With `scrim` `'none'`, Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
 With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so pass such a region to dim your own pane and nothing else, and the viewport where neither the region nor an element above it does, over a layer of yours whose `z-index` is below 100 either way.
 Pass a region that does not itself scroll, such as the root that holds your scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
 The way to dim your own window is that contained host, a non-scrolling root of yours such as your studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
 Its height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
 Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.
@@ -5334,7 +5349,7 @@ A published component draws a control only where its section says so, and each c
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each section states.
   The name a `ListRow` button holds carries its own text as a native `title`, and so does each `TintSwatches` swatch its name, as each section states.
-  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
+  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, and as the radio's accessible description, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.
