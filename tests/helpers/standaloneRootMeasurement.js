@@ -153,7 +153,10 @@ export function partitionEntries(table, count) {
   const shards = Array.from({ length: count }, () => ({ names: [], held: 0 }));
   const heaviest = Object.keys(table).sort((a, b) => weight(b) - weight(a) || byCodePoint(a, b));
   for (const name of heaviest) {
-    const lightest = shards.reduce((least, each) => (each.held < least.held ? each : least));
+    const lightest = shards.reduce(
+      (least, each) => (each.held < least.held ? each : least),
+      shards[0]
+    );
     lightest.names.push(name);
     lightest.held += weight(name);
   }
