@@ -871,6 +871,26 @@ const TONE_CARD_KEYS = Object.freeze(['neutral', 'enabled', 'locked', 'info', 'o
 /** Sized to the fixture's 420px column and its six cards. */
 const TONE_CARDS_WINDOW = Object.freeze({ width: 520, height: 520 });
 
+/** The medallion text fixture's ground, a tile's target by its key, and the tile and numeral in it. */
+const MEDALLION_TEXT = '[data-lab-medallion-text]';
+const MEDALLION_TILE_KEYS = Object.freeze([
+  'rung-22',
+  'rung-26',
+  'rung-30',
+  'rung-44',
+  'tone-success',
+  'tone-accent',
+  'tone-info',
+  'ink-accent',
+  'ink-none',
+  'named-3',
+]);
+const MEDALLION_TILE = (key) =>
+  `${MEDALLION_TEXT} [data-lab-medallion-tile="${key}"] .fab-medallion`;
+/** Sized to the fixture's 320px column and its four rows. */
+const MEDALLION_TEXT_WINDOW = Object.freeze({ width: 520, height: 420 });
+const MEDALLION_NUMERAL = (key) => `${MEDALLION_TILE(key)} .fab-medallion-text`;
+
 /** The disclosure fixture's ground, a row by its key, and the card, head, chevron and body it draws. */
 const DISCLOSURES = '[data-lab-disclosures]';
 const DISCLOSURE_ROW = (key) => `${DISCLOSURES} > [data-lab-disclosure="${key}"]`;
@@ -3063,6 +3083,54 @@ export const CASES = Object.freeze([
     position: TONE_CARDS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ToggleCard.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-medallion-text-specimen',
+    label:
+      "Specimen, mounted through the published seam — four rows in a 320px column on the window's --fab-bg-1 ground, each tile a published Medallion. Reading top to bottom: numbered tiles on the 22, 26, 30 and 44 rungs reading 1, 2, 12 and 99+, each a --fab-bg-3 tile with the numeral in the mono face at the rung's glyph size in --fab-text, centred inside its edge; the numerals 1, 2 and 3 on the success, accent and info tones, each on its --fab-*-soft ground inside its --fab-*-border edge with the numeral in that family's --fab-*-text; a coin glyph inked by --fab-accent-text beside one in the resting accent; and a numbered tile 3 beside the companion's words Stage 3, which the accessibility tree reports alone because the numeral is hidden from it. The frame cannot show the accessibility tree, the forced-colours repaint or the reduced-motion stilling, which the rendered suite emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-medallion-text' },
+    steps: [],
+    expectSelector: `${MEDALLION_TEXT} [data-lab-medallion-tile="named-3"] .fab-medallion[data-medallion="text"]`,
+    expectContained: [
+      ...MEDALLION_TILE_KEYS.map((key) => ({
+        container: MEDALLION_TEXT,
+        target: `${MEDALLION_TEXT} [data-lab-medallion-tile="${key}"]`,
+      })),
+      ...MEDALLION_TILE_KEYS.slice(0, 7).map((key) => ({
+        container: MEDALLION_TILE(key),
+        target: MEDALLION_NUMERAL(key),
+      })),
+      { container: '.window-content', target: MEDALLION_TEXT },
+    ],
+    expectLayout: {
+      controls: [
+        { selector: MEDALLION_TILE('rung-22'), styles: 'width: 22px; height: 22px' },
+        { selector: MEDALLION_TILE('rung-44'), styles: 'width: 44px; height: 44px' },
+        {
+          selector: MEDALLION_NUMERAL('rung-26'),
+          styles: 'color: var(--fab-text); font-size: 11px; font-weight: 500',
+        },
+        {
+          selector: MEDALLION_NUMERAL('tone-success'),
+          styles: 'color: var(--fab-success-text)',
+        },
+        {
+          selector: MEDALLION_NUMERAL('tone-info'),
+          styles: 'color: var(--fab-info-text)',
+        },
+        {
+          selector: `${MEDALLION_TILE('ink-accent')} i`,
+          styles: 'color: var(--fab-accent-text)',
+        },
+      ],
+    },
+    position: MEDALLION_TEXT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Medallion.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

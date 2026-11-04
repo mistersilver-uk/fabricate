@@ -309,6 +309,11 @@ The `<ListRow>` heading also names `<ListState>`, which is shipped.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
+`Medallion` draws a numeral through its closed `text` of one to three code points, in the mono face at the rung's glyph size, in place of its art and glyph.
+The numeral inks `--fab-text` on the slate tile and the tone's `-text` on a toned one, and `tint` and `ink` recolour the glyph alone and never reach it.
+Both inks clear 4.5:1 in all seven palettes on the slate tile and over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under a list row's selected fill, `--fab-surface-active`, over `--fab-bg-2` the `danger` numeral reads 4.39:1 in `hearth-herb`.
+The numeral is hidden from assistive technology as the glyph is, so the number is said in words beside the tile.
+`Medallion`'s `ink` takes `accent`, which inks the glyph alone in `--fab-accent-text`.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.

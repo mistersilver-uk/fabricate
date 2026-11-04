@@ -102,6 +102,12 @@ describe('Medallion: the glyph ink (R2)', () => {
       'fab-medallion',
       'is-glyph-chip',
       'is-corner-7',
+      'is-ink-accent',
+    ]);
+    assert.deepEqual(await classesFor({ ...base, ink: 'primary' }), [
+      'fab-medallion',
+      'is-glyph-chip',
+      'is-corner-7',
     ]);
   });
 });

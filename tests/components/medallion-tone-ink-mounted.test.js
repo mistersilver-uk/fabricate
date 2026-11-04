@@ -67,7 +67,7 @@ describe('Medallion (mounted) — tone accent and ink neutral', () => {
       { tone: 'Warning' },
       { ink: ' info' },
       { tone: 'neutral' },
-      { ink: 'accent' },
+      { ink: 'primary' },
     ];
     for (const props of outside) {
       const tile = await tileOf(props);

@@ -75,6 +75,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       variant: Object.freeze({ kind: 'data' }),
       tone: Object.freeze({ kind: 'data' }),
       ink: Object.freeze({ kind: 'data' }),
+      text: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',
