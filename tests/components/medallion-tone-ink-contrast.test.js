@@ -12,7 +12,9 @@ import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import {
   contrast,
   declaredToken,
+  propertiesOf,
   shortfalls,
+  stackGround,
   themePalettes,
 } from '../helpers/themePaletteContrast.js';
 
@@ -132,4 +134,42 @@ test('the accent ink clears 3:1 on the slate tile and falls under 4.5:1 only in 
   assert.deepEqual(shortfalls(themes, '--fab-accent-text', ['--fab-bg-3']), [
     'hearth-herb: --fab-accent-text on --fab-bg-3 4.15:1',
   ]);
+});
+
+test('a drawn text on a tone reads 5.85:1 at the weakest, danger in hearth-herb, over the four page grounds', () => {
+  const readings = TONES.flatMap((tone) =>
+    PAGE_GROUNDS.flatMap((ground) =>
+      [...themes].map(([theme, tokens]) => ({
+        name: `${theme} ${tone}`,
+        ratio: contrast(
+          tokens.get(`--fab-${tone}-text`),
+          stackGround(tokens, [`--fab-${tone}-soft`, ground])
+        ),
+      }))
+    )
+  );
+  const weakest = readings.reduce((low, next) => (next.ratio < low.ratio ? next : low));
+  assert.equal(weakest.name, 'hearth-herb danger');
+  assert.equal(weakest.ratio.toFixed(2), '5.85');
+});
+
+test("a tone's -text over a list row's selected or hovered fill clears 4.5:1 but for danger in hearth-herb on --fab-bg-2 under the selected fill", () => {
+  const under = (rowGround) =>
+    TONES.flatMap((tone) =>
+      PAGE_GROUNDS.flatMap((ground) =>
+        shortfalls(themes, `--fab-${tone}-text`, [`--fab-${tone}-soft`, rowGround, ground])
+      )
+    );
+  assert.deepEqual(under('--fab-surface-raised'), []);
+  assert.deepEqual(under('--fab-surface-active'), [
+    'hearth-herb: --fab-danger-text on --fab-danger-soft over --fab-surface-active over --fab-bg-2 4.39:1',
+  ]);
+});
+
+test('the tile declares no transition, no animation and no forced-colour opt-out', () => {
+  const declared = rules.flatMap((rule) => [...propertiesOf(rule).keys()]);
+  assert.deepEqual(
+    declared.filter((property) => /^(transition|animation|forced-color-adjust)/u.test(property)),
+    []
+  );
 });

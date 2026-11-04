@@ -103,9 +103,32 @@ describe('the published Medallion, text', () => {
     handle.destroy();
   });
 
-  it('leaves the tile as unset for a value outside the set, and throws nothing', async () => {
+  it('leaves the tile as unset for a data value outside the set', async () => {
     const unset = (await mounted({})).tile().outerHTML;
     for (const text of ['1234', '', ' ', 'a b', NaN, true, ['1'], null]) {
+      const { handle, tile } = await mounted({ text });
+      assert.equal(tile().outerHTML, unset, JSON.stringify(text));
+      handle.destroy();
+    }
+  });
+
+  it('refuses a function and a value that is not plain data, as it does for every data key', async () => {
+    const seam = ui();
+    for (const [text, message] of [
+      [() => '1', /"text" must not hold a function/u],
+      [new Date(0), /"text" must be data/u],
+      [{ toString: () => '1' }, /"text" must not hold a function/u],
+      [new (class Numeral {})(), /"text" must be data/u],
+    ]) {
+      const target = companionTarget(targets);
+      assert.throws(() => seam.mount('Medallion', { target, props: { ...TILE, text } }), message);
+      assert.equal(target.querySelector('.fab-medallion'), null, 'nothing is drawn');
+    }
+  });
+
+  it('draws a plain data value outside the set as unset', async () => {
+    const unset = (await mounted({})).tile().outerHTML;
+    for (const text of [{}, { value: '1' }, [], ['1']]) {
       const { handle, tile } = await mounted({ text });
       assert.equal(tile().outerHTML, unset, JSON.stringify(text));
       handle.destroy();

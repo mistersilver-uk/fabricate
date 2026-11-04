@@ -14,7 +14,7 @@
   | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
   | `tone` | `''` \| `'success'` \| `'danger'` \| `'accent'` \| `'warning'` \| `'info'` | `''` | Paints the edge, ground and glyph in that family's `-border`, `-soft` and `-text` tokens, as the library's toned `<IconChip>` specimens do; a rolled die face reads qualified or cancelled by it, and `accent` marks a chosen option's chip. `warning` and `info` have no in-app caller and serve the published seam (issue 2847). It outranks `tint`, and `variant` `'glyph-chip'` draws no edge. Anything else resolves to `''`. |
   | `ink` | `''` \| `'success'` \| `'danger'` \| `'neutral'` \| `'accent'` \| `'warning'` \| `'info'` | `''` | Inks the GLYPH alone on the unchanged slate ground: a family's `-text` token, as the Checks simulator's result-card icon reads success or failure, or `--fab-text-secondary` for `neutral`. It outranks `tint`, and it outranks `tone` on the glyph. Anything else resolves to `''`. |
-  | `text` | a string of one to three non-space characters, or a finite number that writes as one | unset | Draws that text in the tile's mono face at the rung's glyph size, in place of the art and the glyph. Anything else draws the art or glyph as unset. The text is decoration, hidden from assistive technology, so the caller says it in words beside the tile. `tint` and `ink` recolour the glyph alone and never reach it. |
+  | `text` | a string of one to three letter, number, punctuation or symbol code points, or a finite number that writes as one | unset | Draws that text in the tile's mono face at the rung's glyph size, in place of the art and the glyph. Anything else draws the art or glyph as unset. The text is decoration, hidden from assistive technology, so the caller says it in words beside the tile. `tint` and `ink` recolour the glyph alone and never reach it. |
 
   Invariants:
   - FLAT BY CONTRACT: the surface is `--fab-bg-3`, or a `tone`'s flat `-soft` token, never a gradient
@@ -47,9 +47,15 @@
   const safeTone = $derived(TONES.includes(tone) ? tone : '');
   const safeInk = $derived(INKS.includes(ink) ? ink : '');
 
+  // One to three code points, each a letter, number, punctuation or symbol that draws: marks,
+  // separators, controls and the default-ignorable and blank code points never do.
+  const DRAWN_TEXT = /^[\p{L}\p{N}\p{P}\p{S}]{1,3}$/u;
+  const BLANK_TEXT = /[\p{Default_Ignorable_Code_Point}\u2800]/u;
   const safeText = $derived.by(() => {
     const written = typeof text === 'number' && Number.isFinite(text) ? String(text) : text;
-    return typeof written === 'string' && /^\S{1,3}$/u.test(written) ? written : '';
+    return typeof written === 'string' && DRAWN_TEXT.test(written) && !BLANK_TEXT.test(written)
+      ? written
+      : '';
   });
 
   const isGlyphChip = $derived(String(variant ?? '') === 'glyph-chip');

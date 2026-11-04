@@ -649,7 +649,7 @@
       "why": [
         "The app's one art tile: a record's linked image drawn flat on `--fab-bg-3` with a glyph fallback.",
         "`library.html`'s `<IconChip>` specifies it, and both applications render it, so it is shared.",
-        "It publishes a closed `text` of one to three characters, drawn as a numeral in `--fab-text` or its tone's `-text`, and an `accent` ink for the glyph."
+        "It publishes a closed `text` of one to three code points, drawn as a numeral in `--fab-text` or its tone's `-text`, and an `accent` ink for the glyph."
       ]
     },
     {

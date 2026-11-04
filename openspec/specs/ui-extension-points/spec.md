@@ -845,17 +845,22 @@ Each group states the accepted values of every key that entry publishes.
     An `ink` on the untoned tile, whose ground is `--fab-bg-3` wherever the tile sits, clears the 3:1 non-text floor in every palette and not 4.5:1: `success`, `danger`, `info`, `neutral` and `accent` fall under it in `hearth-herb`, and `danger` and `neutral` in `ironblood-forge`, the weakest `danger` at 3.50:1.
     A `tone` or an `ink` is colour alone and is not announced, so the companion says the state it marks in text beside the tile.
   - The `ink` value `accent` is additive at `version` `1`: a Fabricate that predates it draws the tile as unset, and refuses nothing.
-  - `text` is a string of one to three characters with no whitespace, or a finite number that writes as one to three such characters, and it is unset by default.
+  - `text` is a string of one to three code points, or a finite number that writes as one to three, and it is unset by default.
+    Each code point is a letter, a number, a punctuation mark or a symbol that draws, so a space, a control or format character such as a zero-width space or joiner, a combining mark, a variation selector, and the blank Hangul, Braille and other default-ignorable code points are outside the set.
+    Code points are counted and not UTF-16 units: `😀` is one, a flag of two regional indicators is two, and an emoji sequence joined by a zero-width joiner or ending in a variation selector is outside the set.
     A tile with `text` draws it in the mono face at weight `500` and the rung's glyph size, centred in the tile, in place of `art` and `icon`.
     `text` outranks `art`, and no `alt` is then drawn.
-    A `text` outside its set draws the tile as unset, with `art` or `icon`, and throws nothing.
-    `text` is never truncated, so a four-character value draws the art or glyph and a count past `999` is the companion's to abbreviate.
-    The companion passes the rung's `glyph` with `text`, and a numeral of up to three characters fits inside every rung.
+    A `text` that is data but outside its set draws the tile as unset, with `art` or `icon`.
+    As for every `data` key, the seam refuses a function and a value that is not plain data, such as a `Date` or a class instance, with a `TypeError`.
+    The component never shortens `text`, so a four-code-point value draws the art or glyph and a count past `999` is the companion's to abbreviate.
+    The tile clips what is wider than it, so the companion passes the rung's `glyph` with `text`: the default glyph size of `0.9rem` can clip three characters on a small rung.
+    A numeral of up to three digits fits inside every rung at the rung's glyph size, measured in a monospace face.
   - The text draws in `--fab-text` on the untoned tile and in the `-text` token of its `tone` on a toned one, and `tint` and `ink` recolour the glyph alone and never reach it.
     The text is small text: `--fab-text` on `--fab-bg-3` clears 4.5:1 in every palette, the weakest 4.90:1 in `hearth-herb`, and a `tone`'s `-text` on its own ground clears 4.5:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, the weakest 5.85:1 for `danger` in `hearth-herb`.
-  - The text is hidden from assistive technology, as the glyph is, so a numbered tile carries no name: the companion always says the number in text beside it.
+    Under a list row's selected fill, `--fab-surface-active`, the same holds on every page ground but `--fab-bg-2`, where `danger` in `hearth-herb` reads 4.39:1.
+  - The text is hidden from assistive technology, as the glyph is, so a numbered tile carries no name and cannot be named in place, because `aria-label` and `role` are not published: the companion always says the number in text beside it, such as `Stage 3`, which it may hide visually where a visible duplicate is unwanted.
     Under forced colours the text draws in the system text colour on a ground of the system canvas colour, so a `tone` shows in neither.
-    The tile declares no transition or animation, so reduced motion changes nothing.
+    The tile declares no transition or animation, so reduced motion has nothing to change.
   - `text` is additive at `version` `1`: a Fabricate that predates it refuses it with `"text" is not a prop of Medallion`, which `describe(...).props` shows by leaving the key out.
   - The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
   - The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.

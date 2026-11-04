@@ -107,6 +107,7 @@ const measure = () =>
             ground: style(tile).backgroundColor,
             edge: style(tile).borderTopColor,
             textInk: text ? style(text).color : null,
+            adjust: [style(tile).forcedColorAdjust, text ? style(text).forcedColorAdjust : null],
             glyphInk: glyph ? style(glyph).color : null,
             fits: text
               ? inner.left >= box.left &&
@@ -225,15 +226,29 @@ describe('the published Medallion’s text and accent ink in Chromium', () => {
     assert.equal(await page.tab.locator('[data-case="glyph"]').ariaSnapshot(), '', 'as the glyph');
   });
 
-  it('draws the numeral in the system text colour on the system ground’s colour under forced colours', async () => {
-    await themed(FABRICATE_THEME_IDS.FABRICATE);
+  it('draws the numeral in the system text colour on the system ground’s colour under forced colours, which the palette alone would not', async () => {
+    const { tiles: palette } = await themed(FABRICATE_THEME_IDS.FABRICATE);
     await page.tab.emulateMedia({ forcedColors: 'active' });
     try {
       const { probes, tiles } = await measure();
       for (const id of ['plain', ...TONES.map((tone) => `tone-${tone}`)]) {
+        assert.deepEqual(tiles[id].adjust, ['auto', 'auto'], `${id} opts out of nothing`);
         assert.equal(tiles[id].textInk, probes.canvastext, id);
         assert.deepEqual(channelsOf(tiles[id].ground), channelsOf(probes.canvas), id);
         assert.equal(tiles[id].fits, true, id);
+      }
+      for (const tone of TONES) {
+        const id = `tone-${tone}`;
+        assert.notEqual(
+          palette[id].textInk,
+          tiles[id].textInk,
+          `${id}: the palette ink is replaced`
+        );
+        assert.notDeepEqual(
+          channelsOf(palette[id].ground),
+          channelsOf(tiles[id].ground),
+          `${id}: the palette ground is replaced`
+        );
       }
       assert.notEqual(probes.canvastext, probes.canvas);
     } finally {
