@@ -4204,6 +4204,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
             The 8px rung keeps <code>.11em</code> tracking and the 9px rung takes <code>.12em</code>; the ink never moves, so the muted tone&rsquo;s 4.5:1 holds at each.
             Any other value draws the default.
             No in-app caller passes it.</li>
+          <li><b>for</b> the <code>id</code> of a labelable control the caller draws &mdash; a non-blank string draws the kicker as a <code>&lt;label for&gt;</code> in the same type, whatever <code>as</code> says, so the caption names the control and a click on it focuses the control.
+            Any other value draws the <code>as</code> host with no <code>for</code>, and the component draws and reads no <code>id</code> of its own.</li>
           <li><b>children</b> the label text, already localized by the caller.
             A nested child is legitimate and is how the recipe-item editor keeps its &ldquo;&middot; from linked item&rdquo; note, which declares no size and therefore inherits this one&rsquo;s 8.5px.</li>
           <li>a rest spread on the root &mdash; it carries the <code>data-*</code> hook a harness or a capture step selects on, so the attribute is genuinely ABSENT when unset.

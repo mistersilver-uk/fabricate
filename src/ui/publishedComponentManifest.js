@@ -157,6 +157,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       as: Object.freeze({ kind: 'data' }),
       tone: Object.freeze({ kind: 'data' }),
       size: Object.freeze({ kind: 'data' }),
+      for: Object.freeze({ kind: 'data' }),
       children: Object.freeze({ kind: 'text', required: true }),
     }),
     rest: true,

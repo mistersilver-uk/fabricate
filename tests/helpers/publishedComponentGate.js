@@ -187,9 +187,10 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
     keys: ['as'],
     heldBy: "tests/components/published-field-mounted.test.js: Field's host element",
   },
+  // A non-blank `for` draws a `label`, whatever `as` says.
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
-    tags: ['h3', 'p', 'span'],
-    keys: ['as'],
+    tags: ['h3', 'label', 'p', 'span'],
+    keys: ['as', 'for'],
     heldBy: "tests/components/published-leaves-mounted.test.js: Kicker's host element",
   },
   // `onSubmit`, which draws a `<form>`, is not published.
