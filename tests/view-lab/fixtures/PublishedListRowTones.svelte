@@ -8,28 +8,59 @@
   `tests/view-lab/mount.js` mounts it for `?specimen=published-list-row-tones` only.
 
   The ground is one 360px column on `--fab-bg-2` that spaces its sections by 8px. A case addresses
-  the ground by `data-lab-list-row-tones` and a section by `data-lab-list-row-tone`.
+  the ground by `data-lab-list-row-tones`, a section by `data-lab-list-row-tone` and each mount
+  target it fills a slot with by `data-lab-list-row-fill`.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
 
-  /** Each section's row props, by its key. */
+  /** Each section's row props, by its key; `OPENS` names the rows that take an `onOpen`. */
   const ROWS = Object.freeze([
-    ['controls', { name: 'Ember Court', detail: 'Trusted', onOpen() {}, trailing: true }],
+    ['controls', { name: 'Ember Court', detail: 'Trusted', trailing: true }],
     ['claimed', { name: 'Signet of the Ember Court', tone: 'positive', badges: true }],
     ['declined', { name: 'Forge-warden’s writ', detail: 'Turned down', tone: 'danger' }],
-    [
-      'offer',
-      { name: '50 gp', detail: 'Ready to claim', tone: 'accent', onOpen() {}, trailing: true },
-    ],
+    ['offer', { name: '50 gp', detail: 'Ready to claim', tone: 'accent', trailing: true }],
   ]);
+  const OPENS = Object.freeze(['controls', 'offer']);
+  /**
+   * Each published component a row's slot holds, in mount order: the row's key, the slot, the
+   * `data-lab-list-row-fill` hook on its mount target, the component and its props; a `Button` or
+   * `IconButton` also takes an `onclick`.
+   */
+  const FILLS = Object.freeze([
+    [
+      'controls',
+      'trailing',
+      'lower',
+      'IconButton',
+      { icon: 'fas fa-minus', ariaLabel: 'Lower Ember Court standing', size: '24' },
+    ],
+    [
+      'controls',
+      'trailing',
+      'raise',
+      'IconButton',
+      { icon: 'fas fa-plus', ariaLabel: 'Raise Ember Court standing', size: '24' },
+    ],
+    [
+      'controls',
+      'trailing',
+      'remove',
+      'IconButton',
+      { icon: 'fas fa-trash', ariaLabel: 'Remove Ember Court', size: '24' },
+    ],
+    ['claimed', 'badges', 'claimed', 'Chip', { children: 'Claimed', tone: 'positive' }],
+    ['offer', 'trailing', 'claim', 'Button', { children: 'Claim', role: 'accent', size: '24' }],
+  ]);
+  const PRESSABLE = new Set(['Button', 'IconButton']);
 
   let targets = $state({});
 
   /** A flex `<span>` the companion appends to `slot`, as a mount target for a published component. */
-  function targetIn(slot) {
+  function targetIn(slot, hook) {
     const target = slot.ownerDocument.createElement('span');
     target.style.display = 'flex';
+    target.setAttribute('data-lab-list-row-fill', hook);
     slot.append(target);
     return target;
   }
@@ -37,24 +68,23 @@
   $effect(() => {
     if (ROWS.some(([key]) => !targets[key])) return undefined;
     const { mount } = publishedComponentSeam.publicApi;
-    const handles = ROWS.map(([key, props]) => mount('ListRow', { target: targets[key], props }));
-    const [controls, claimed, , offer] = handles;
-    const mounted = [];
-    const into = (handle, key, name, props) =>
-      mounted.push(mount(name, { target: targetIn(handle.slot(key)), props }));
-    const step = (icon, ariaLabel) => ({ icon, ariaLabel, size: '24', onclick() {} });
-    into(controls, 'trailing', 'IconButton', step('fas fa-minus', 'Lower Ember Court standing'));
-    into(controls, 'trailing', 'IconButton', step('fas fa-plus', 'Raise Ember Court standing'));
-    into(controls, 'trailing', 'IconButton', step('fas fa-trash', 'Remove Ember Court'));
-    into(claimed, 'badges', 'Chip', { children: 'Claimed', tone: 'positive' });
-    into(offer, 'trailing', 'Button', {
-      children: 'Claim',
-      role: 'accent',
-      size: '24',
-      onclick() {},
-    });
+    const rows = new Map(
+      ROWS.map(([key, props]) => [
+        key,
+        mount('ListRow', {
+          target: targets[key],
+          props: OPENS.includes(key) ? { ...props, onOpen() {} } : props,
+        }),
+      ])
+    );
+    const mounted = FILLS.map(([key, slot, hook, name, props]) =>
+      mount(name, {
+        target: targetIn(rows.get(key).slot(slot), hook),
+        props: PRESSABLE.has(name) ? { ...props, onclick() {} } : props,
+      })
+    );
     return () => {
-      for (const handle of [...mounted, ...handles]) handle.destroy();
+      for (const handle of [...mounted, ...rows.values()]) handle.destroy();
     };
   });
 </script>

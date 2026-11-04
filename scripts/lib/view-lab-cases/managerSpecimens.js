@@ -464,6 +464,9 @@ const FORMS_WINDOW = Object.freeze({ width: 600, height: 680 });
 /** The tones fixture's ground and one section's published row, by its key. */
 const TONES_GROUND = '[data-lab-list-row-tones]';
 const TONE_ROW = (key) => `${TONES_GROUND} > [data-lab-list-row-tone="${key}"] .fabricate-list-row`;
+/** One mount target the fixture fills a row's slot with, by its section's key and its hook. */
+const TONE_FILL = (key, hook) =>
+  `[data-lab-list-row-tone="${key}"] [data-lab-list-row-fill="${hook}"]`;
 
 /** Sized to the fixture's 360px ground and the height of its four rows. */
 const TONES_WINDOW = Object.freeze({ width: 480, height: 360 });
@@ -2308,17 +2311,18 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     query: { specimen: 'published-list-row-tones' },
     steps: [],
-    // The third icon button in the first row, the chip in the claimed row and the claim button.
-    expectSelector: `${TONES_GROUND}:has(> [data-lab-list-row-tone="controls"] .fabricate-list-row-trailing > span > span:nth-child(3) button):has(> [data-lab-list-row-tone="claimed"] .fabricate-list-row-badges .manager-chip) > [data-lab-list-row-tone="offer"] .fabricate-list-row.is-accent .fabricate-list-row-trailing button`,
+    // The three icon buttons in the first row, the chip in the claimed row, and the claim button
+    // on the accent row, each by the hook the fixture writes on its mount target.
+    expectSelector: `${TONES_GROUND}:has(> ${TONE_FILL('controls', 'lower')} button):has(> ${TONE_FILL('controls', 'raise')} button):has(> ${TONE_FILL('controls', 'remove')} button):has(> ${TONE_FILL('claimed', 'claimed')} .manager-chip) > [data-lab-list-row-tone="offer"] .fabricate-list-row.is-accent [data-lab-list-row-fill="claim"] button`,
     expectContained: [
       ...['controls', 'claimed', 'declined', 'offer'].map((key) => ({
         container: TONES_GROUND,
         target: TONE_ROW(key),
       })),
-      {
+      ...['lower', 'raise', 'remove'].map((hook) => ({
         container: TONE_ROW('controls'),
-        target: `${TONE_ROW('controls')} .fabricate-list-row-trailing`,
-      },
+        target: `${TONES_GROUND} > ${TONE_FILL('controls', hook)} button`,
+      })),
       { container: '.window-content', target: TONES_GROUND },
     ],
     expectLayout: {

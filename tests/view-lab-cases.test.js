@@ -72,6 +72,7 @@ import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { fixtureLiteral } from './helpers/labFixtureLiterals.js';
 import { walkNodes } from './helpers/moduleAst.js';
 import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
@@ -8294,8 +8295,19 @@ test('the list row tones specimen case measures the rows the tones fixture mount
     ],
     'a row holding several controls, then one row per tint'
   );
-  const { steps, expectLayout } = getCaseById('manager-published-list-row-tones-specimen');
+  const { steps, expectLayout, expectSelector } = getCaseById(
+    'manager-published-list-row-tones-specimen'
+  );
   assert.deepEqual(steps, [], 'a frame at rest');
+  const hooks = fixtureLiteral('tests/view-lab/fixtures/PublishedListRowTones.svelte', 'FILLS').map(
+    (fill) => fill[2]
+  );
+  for (const hook of hooks) {
+    assert.ok(
+      expectSelector.includes(`[data-lab-list-row-fill="${hook}"]`),
+      `the frame waits for the ${hook} mount`
+    );
+  }
   const keyOf = (selector) => /data-lab-list-row-tone="([\w-]+)"/u.exec(selector)?.[1];
   assert.deepEqual(
     expectLayout.controls.map(({ selector }) => keyOf(selector)),
