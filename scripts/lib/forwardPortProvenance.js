@@ -126,11 +126,14 @@ function toAssociation(entry, index) {
   }
   const mergedAt =
     typeof entry.merged_at === 'string' && entry.merged_at.trim() ? entry.merged_at : null;
+  const mergeCommitSha =
+    typeof entry.merge_commit_sha === 'string' ? entry.merge_commit_sha.toLowerCase() : null;
   return {
     number,
     baseRef,
     repository,
     mergedAt,
+    mergeCommitSha,
     state: typeof entry.state === 'string' ? entry.state : '',
   };
 }
@@ -242,6 +245,15 @@ function explainRefusal(associations, deps) {
   return associations.map((association) => describeDisqualification(association, deps)).join('; ');
 }
 
+/** Whether an association is a merged pull request of this repository against an accepted base. */
+function qualifies(association, deps) {
+  return (
+    association.mergedAt !== null &&
+    association.repository === deps.repository &&
+    deps.acceptedBases.includes(association.baseRef)
+  );
+}
+
 /** Decide one commit against the two acceptance rules. */
 function classifyCommit(commit, deps) {
   const described = { sha: commit.sha, subject: commit.subject, author: commit.author };
@@ -271,12 +283,7 @@ function classifyCommit(commit, deps) {
     readEvidence(deps.associationsFor, commit.sha, 'pull-request associations'),
     { perPage: deps.perPage }
   );
-  const qualifying = associations.find(
-    (association) =>
-      association.mergedAt !== null &&
-      association.repository === deps.repository &&
-      deps.acceptedBases.includes(association.baseRef)
-  );
+  const qualifying = associations.find((association) => qualifies(association, deps));
 
   if (qualifying) {
     return {
@@ -293,6 +300,81 @@ function classifyCommit(commit, deps) {
     rule: 'unaccounted',
     detail: `${mergeNote}${explainRefusal(associations, deps)}`,
   };
+}
+
+/**
+ * The qualifying pull request that `sha` is the merge commit OF, or `undefined`. A pull request
+ * that merely contains `sha` (a back-merge on its branch) is not one: its review did not cover what
+ * that back-merge brought from the base.
+ */
+function landedPullRequest(sha, deps) {
+  const associations = parseAssociations(
+    readEvidence(deps.associationsFor, sha, 'pull-request associations'),
+    { perPage: deps.perPage }
+  );
+  return associations.find(
+    (association) =>
+      qualifies(association, deps) && association.mergeCommitSha === sha.toLowerCase()
+  );
+}
+
+/** Every commit of the range reachable from `starts` through parents that are themselves in it. */
+function ancestorsInRange(starts, bySha) {
+  const reached = new Set();
+  const pending = starts.filter((sha) => bySha.has(sha));
+  while (pending.length > 0) {
+    const sha = pending.pop();
+    if (reached.has(sha)) continue;
+    reached.add(sha);
+    for (const parent of bySha.get(sha).parents) if (bySha.has(parent)) pending.push(parent);
+  }
+  return reached;
+}
+
+/**
+ * Accept a refused non-merge commit introduced by the merge commit of a qualifying pull request:
+ * reachable from that merge's later parents and not its first, which is exactly that pull request's
+ * commits. A merge commit is never credited this way.
+ */
+function creditReviewedMerges(commits, verdicts, deps) {
+  const refusedOrdinary = new Set(
+    verdicts
+      .filter((verdict, index) => !verdict.accepted && commits[index].parents.length < 2)
+      .map((verdict) => verdict.sha)
+  );
+  if (refusedOrdinary.size === 0) return verdicts;
+
+  const bySha = new Map(commits.map((commit) => [commit.sha, commit]));
+  const creditedBy = new Map();
+  for (const merge of commits) {
+    if (merge.parents.length < 2) continue;
+    const [firstParent, ...laterParents] = merge.parents;
+    const brought = ancestorsInRange(laterParents, bySha);
+    if ([...brought].every((sha) => !refusedOrdinary.has(sha))) continue;
+
+    const qualifying = landedPullRequest(merge.sha, deps);
+    if (!qualifying) continue;
+
+    const alreadyOnFirstParent = ancestorsInRange([firstParent], bySha);
+    for (const sha of brought) {
+      if (refusedOrdinary.has(sha) && !alreadyOnFirstParent.has(sha) && !creditedBy.has(sha)) {
+        creditedBy.set(sha, { merge: merge.sha, association: qualifying });
+      }
+    }
+  }
+
+  return verdicts.map((verdict) => {
+    const credit = creditedBy.get(verdict.sha);
+    if (!credit) return verdict;
+    return {
+      ...verdict,
+      accepted: true,
+      rule: 'merged by a reviewed pull request',
+      detail:
+        `introduced by ${credit.merge}, the merge of pull request #${credit.association.number} ` +
+        `reviewed against '${credit.association.baseRef}' (its own association: ${verdict.detail})`,
+    };
+  });
 }
 
 /** Reject a verification parameter that would make every verdict meaningless. */
@@ -335,7 +417,11 @@ export function verifyForwardPortProvenance(input) {
   }
 
   const deps = { mergeStatusFor, associationsFor, repository, acceptedBases, perPage };
-  const verdicts = commits.map((commit) => classifyCommit(commit, deps));
+  const verdicts = creditReviewedMerges(
+    commits,
+    commits.map((commit) => classifyCommit(commit, deps)),
+    deps
+  );
   const accepted = verdicts.filter((verdict) => verdict.accepted);
   const refused = verdicts.filter((verdict) => !verdict.accepted);
 

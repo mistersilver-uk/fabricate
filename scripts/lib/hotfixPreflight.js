@@ -1,6 +1,6 @@
 /** Pre-flight collision guard for cutting a hotfix line (issue #627, task 3.9). */
 import { parseReleaseTag } from './releaseTags.js';
-import { parseSemver } from './semver.js';
+import { compareSemver, parseSemver } from './semver.js';
 
 const USAGE =
   'Usage: git ls-remote --tags origin | node scripts/hotfix-preflight.mjs <base-public-tag>\n' +
@@ -79,6 +79,32 @@ export function hotfixPreflight(baseTag, lsRemoteOutput) {
       message:
         `${nextTag} already exists (it is soaking) — promote it to public first, then cut the ` +
         'hotfix on top if still needed.',
+    };
+  }
+
+  // Semantic-release caps a hotfix line below the lowest release-line version above its base, so
+  // with no stable tag above the base the line's range is empty and nothing on it can ever mint.
+  const tagNames = refs.map((ref) => ref.replace(/^refs\/tags\//, '').replace(/\^\{\}$/, ''));
+  if (!tagNames.includes(baseTag)) {
+    throw new Error(
+      `${baseTag} is not on origin, so it is not a published public version and no hotfix line ` +
+        'can be cut from it (fail closed).'
+    );
+  }
+  const { baseVersion } = nextPatchTag(baseTag);
+  const newerStable = tagNames.some((name) => {
+    const parsed = parseReleaseTag(name);
+    return parsed?.kind === 'stable' && compareSemver(parsed.version, baseVersion) > 0;
+  });
+  if (!newerStable) {
+    return {
+      ok: false,
+      code: 1,
+      nextTag,
+      message:
+        `no stable version above ${baseTag} exists, so nothing is soaking and a hotfix line cut ` +
+        `from it could never mint ${nextTag}. Land the fix on the release line through a ` +
+        `reviewed pull request instead; it ships as ${nextTag} through early-access.`,
     };
   }
 
