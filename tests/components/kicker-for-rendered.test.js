@@ -55,6 +55,12 @@ const CASES = Object.freeze([
     { children: 'Reward', for: 'c-by' },
     '<input id="c-by" type="text" aria-labelledby="c-other"><span id="c-other">Payout</span>',
   ],
+  ['checkbox', { children: 'Remember', for: 'c-check' }, '<input id="c-check" type="checkbox">'],
+  [
+    'button',
+    { children: 'Remove', for: 'c-button' },
+    '<button id="c-button" type="button">Remove</button>',
+  ],
   ['second', { children: 'Check formula', for: 'c-second' }, '<input id="c-second" type="text">'],
   ['dangling', { children: 'Nothing', for: 'c-nowhere' }, '<input id="c-dangling" type="text">'],
   ['blank', { children: 'Blank', for: ' ', as: 'span' }, '<input id="c-blank" type="text">'],
@@ -106,7 +112,7 @@ after(async () => {
   await browser?.close();
 });
 
-const controlOf = (id) => `[data-case="${id}"] :is(input, textarea, select)`;
+const controlOf = (id) => `[data-case="${id}"] :is(input, textarea, select, button)`;
 const captionOf = (id) => `[data-case="${id}"] .fab-kicker`;
 
 describe('the published Kicker, for, in Chromium', () => {
@@ -163,6 +169,25 @@ describe('the published Kicker, for, in Chromium', () => {
       assert.equal(await tab.evaluate(() => document.activeElement.id), 'c-text');
       await tab.click(captionOf('textarea'));
       assert.equal(await tab.evaluate(() => document.activeElement.id), 'c-area');
+    });
+
+    it('activates a checkbox and presses a button from their captions, as any label does', async () => {
+      await tab.$eval('#c-button', (button) => {
+        button.dataset.pressed = '0';
+        button.addEventListener('click', () => {
+          button.dataset.pressed = String(Number(button.dataset.pressed) + 1);
+        });
+      });
+      await tab.click(captionOf('checkbox'));
+      assert.equal(await tab.$eval('#c-check', (node) => node.checked), true, 'toggled');
+      await tab.click(captionOf('checkbox'));
+      assert.equal(await tab.$eval('#c-check', (node) => node.checked), false, 'toggled back');
+      await tab.click(captionOf('button'));
+      assert.equal(
+        await tab.$eval('#c-button', (button) => button.dataset.pressed),
+        '1',
+        'the button was pressed once'
+      );
     });
 
     it('focuses nothing from a caption with a blank for, or no for', async () => {

@@ -91,7 +91,11 @@ before(async () => {
   await tab.setContent(
     `${renderedPageHead([])}<body class="game">` +
       `<div class="fabricate fabricate-app" style="font-family:Arial,sans-serif">` +
-      `<input id="scratch" aria-label="scratch">${hosts.join('')}</div></body></html>`,
+      `<input id="scratch" aria-label="scratch">` +
+      '<i data-system style="color:CanvasText"></i><i data-system style="color:ButtonText"></i>' +
+      '<i data-system style="color:ButtonBorder"></i><i data-system style="color:FieldText"></i>' +
+      '<i data-system style="color:GrayText"></i><i data-system-ground style="color:Canvas"></i>' +
+      `${hosts.join('')}</div></body></html>`,
     { waitUntil: 'load' }
   );
   await tab.evaluate(() => {
@@ -338,7 +342,7 @@ describe('Field readOnly, rendered (issue 2938)', () => {
   });
 
   describe('forced colours', () => {
-    it('keeps the dashed edge and its width, drawn in a system colour, apart from the solid one', async () => {
+    it('keeps the dashed edge and its width, in a system colour that is not the ground, apart from the solid one', async () => {
       await tab.emulateMedia({ forcedColors: 'active' });
       try {
         const [read, edit, both] = [
@@ -348,6 +352,18 @@ describe('Field readOnly, rendered (issue 2938)', () => {
         ];
         assert.equal(read.edge[0], 'dashed');
         assert.equal(read.edge[1], '1px');
+        const system = await tab.$$eval('[data-system]', (probes) =>
+          probes.map((probe) => getComputedStyle(probe).color)
+        );
+        const ground = await tab.$eval(
+          '[data-system-ground]',
+          (probe) => getComputedStyle(probe).color
+        );
+        assert.ok(
+          system.includes(read.edge[2]),
+          `a system colour, not ${read.edge[2]} in ${system}`
+        );
+        assert.notEqual(read.edge[2], ground, 'not the ground it sits on');
         assert.equal(edit.edge[0], 'solid');
         assert.equal(both.edge[0], 'dashed', 'the error state keeps the dash');
         const node = await chromiumAxState(tab, control('readonly'));

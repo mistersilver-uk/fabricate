@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `as` | `'p'` \| `'span'` \| `'h3'` | `'p'` | A micro-label is sometimes a heading and sometimes not. The union is MEASURED: 62 `<p>`, 3 `<span>` and 1 `<h3>` across `src/ui/svelte/**`. |
   | `size` | `''` \| `'8'` \| `'9'` | `''` | The type rung in px, named as a string like `Button`'s and `IconButton`'s, and read as one, so the number 8 or 9 draws its rung; `''` is the 8.5px scale. A CLOSED set: any other value draws the default. The rung sets the size and its tracking, never the ink. |
-  | `for` | string | `undefined` | The `id` of a labelable control the caller draws. A non-blank string draws the kicker as a `<label for>`, whatever `as` says, so the caption names the control and a click on it focuses the control; any other value draws the `as` host with no `for`. The component draws and reads no `id` of its own. |
+  | `for` | string | `undefined` | The `id` of a labelable control the caller draws. A non-blank string draws the kicker as a `<label for>`, whatever `as` says, so the caption names the control; any other value draws the `as` host with no `for`. The component draws and reads no `id` of its own. |
   | `tone` / `children` | `'default'` \| `'accent'` / snippet | `'default'` / `undefined` | `accent` is `--fab-accent`, and the specimen states when: "Accent only when it names a whole section"; an unknown tone falls back to the default ink. `children` is the label text, already localized. |
 
   Rest spread:

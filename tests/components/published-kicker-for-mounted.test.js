@@ -133,6 +133,15 @@ describe('the published Kicker, for', () => {
     });
   }
 
+  for (const as of ['button', 'a', 'input', 'h1']) {
+    it(`draws a <p> for an as of ${JSON.stringify(as)} with no for, so neither key draws a control`, async () => {
+      const { handle, kicker } = mountKicker({ as });
+      await settle();
+      assert.equal(kicker().localName, 'p');
+      handle.destroy();
+    });
+  }
+
   it('draws a kicker without the key as it did, one class attribute and no for', async () => {
     const { handle, kicker } = mountKicker({ as: 'span' });
     await settle();

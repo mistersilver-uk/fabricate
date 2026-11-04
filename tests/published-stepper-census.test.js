@@ -30,7 +30,7 @@ import {
 const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const STEPPER_CLASSES = new Set(['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct']);
 
-/** The twenty selectors outside `Stepper.svelte` that name a part of it: fifteen `:not()` exemptions, and five under a pinned ancestor. */
+/** The twenty-one selectors outside `Stepper.svelte` that name a part of it: sixteen `:not()` exemptions, and five under a pinned ancestor. */
 const STEPPER_SELECTORS = Object.freeze([
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper)',
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper-input)',
@@ -301,7 +301,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Stepper', () => {
-  it('names a part of the stepper outside its own file in twenty selectors, none of which a published stepper takes', () => {
+  it('names a part of the stepper outside its own file in twenty-one selectors, none of which a published stepper takes', () => {
     const census = stepperSelectors(everyStylesheet());
     assert.deepEqual(writtenOf(census), [...STEPPER_SELECTORS].sort(byName));
     assert.deepEqual(

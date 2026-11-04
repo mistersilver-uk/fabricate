@@ -2296,16 +2296,18 @@ An `update` that changes `as` replaces the kicker's root element; the mount, its
 The 8px label is the smallest type Fabricate draws: keep it to a few words, and never let it alone carry a state or an instruction a user must act on.
 The size changes the type and never the ink, so the contrast figures below hold at every size.
 A Fabricate that predates `size` refuses it with `"size" is not a data attribute`, and `describe('Kicker').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
-`for` is the `id` of a labelable control you draw, a non-blank string, and has no default: set, it draws the kicker as a `<label for>` in the kicker's type, whatever `as` says, so the caption names the control and a click on it focuses the control.
+`for` is the `id` of a labelable control you draw, a non-blank string, and has no default: set, it draws the kicker as a `<label for>` in the kicker's type, whatever `as` says, so the caption names the control.
 Any other value, `''`, a blank string, a number or `true` among them, draws the `as` host with no `for`, and `as` is not read while `for` is a non-blank string.
 The `id` is yours: Fabricate draws no `id` and reads none of its own, so keep your `id` unique in the document, and a `for` that matches no labelable control names nothing and throws nothing.
 A label names an `<input>` that is not hidden, a `<select>`, a `<textarea>`, a `<button>`, a `<meter>`, an `<output>` or a `<progress>` that you draw, and it cannot point at one of Fabricate's published controls, which take no `id` and are named by their own `ariaLabel`.
-The label's text is the control's accessible name, and Chromium's accessibility tree states it in upper case, as the kicker draws it.
+The label's text is the control's accessible name.
+A click on the caption does what a click on any `<label for>` does: it focuses a text input, a number input, a textarea or a select, and it activates a checkbox, a radio, a button input or a `<button>`, which toggles or presses it.
+So do not point a caption at a control that a stray click on the caption must not fire.
 A control that carries its own `aria-labelledby` or `aria-label` takes that name instead, so keep the visible caption in it: an `aria-label` contains the caption's text, which is the label-in-name rule.
 Drawn as a label it is an inline mark like `span`, so give its `target` `display: flex`.
 A Fabricate that predates `for` refuses it with `"for" is not a data attribute`, so check `describe('Kicker').props.for` before you pass it, and name the control with `aria-labelledby` where it is absent.
 Adding `for` is additive, and the entry stays at `version` 1.
-Its text is its whole name, announced as written, so pass sentence case and never an upper-case literal.
+Its text is its whole name, which Chromium's accessibility tree states in upper case, as the kicker draws it, whichever host it is, so pass sentence case and never an upper-case literal.
 `h3` makes it a level-3 heading, so pass it only where the kicker heads the content beneath it.
 It takes no `id`: to name a control or group with it, put the `id` on `target` and point `aria-labelledby` there.
 `accent` is colour alone and says nothing.
@@ -3271,7 +3273,7 @@ bars.update(props());
 It draws no control, no caption and no text of its own: draw your caption and your control in its content slot.
 `as` is required and is `div`, the one host published at version 1; what it draws for any other value is private.
 A `div` field names no control, so give your caption an `id` and point the control's `aria-labelledby` at it.
-Or mount a published [`Kicker`](#kicker) with `for` set to the control's `id`, which draws the caption as a `<label for>` and so names the control and focuses it on a click.
+Or mount a published [`Kicker`](#kicker) with `for` set to the control's `id`, which draws the caption as a `<label for>` and so names the control.
 `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, in the order you append them: the caption first, the control beneath it.
 The column states `--fab-text` ink at 12.5px and weight 500, which your content inherits, and a text input or textarea there inherits its face from it unless `face` says otherwise.
 The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
@@ -3303,7 +3305,7 @@ The control's `--fab-text` ink and the keyboard ring, drawn over the danger edge
 The field cannot reach your control's attributes, so keep the two signals together: set `readonly` on the control whenever you pass `readOnly` `true`, and remove it when you pass `false`.
 The `readonly` attribute makes the value read-only and the face only shows it: the control stays focusable and in the tab order, its text can be selected and copied, and typing or deleting changes nothing.
 Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled.
-It states no read-only on a number input, only that its value cannot be set, so draw a read-only figure in a text input.
+A number input takes the face too, but the tree states it only as a spin button whose value cannot be set and does not state it as read-only, so prefer a text input for a read-only figure.
 Never use `disabled` for a value the user may read, because a disabled control leaves the tab order.
 The face is a dash and a missing fill, not a change of ink: the ink is `--fab-text` and clears 4.5:1, and the keyboard ring clears 3:1, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
 The edge is the editable control's own and falls short of 3:1 on those grounds in every palette, so the face is a hint and the announced state carries the meaning: where the user must know the value cannot be edited, say so in a visible caption or hint.

@@ -983,16 +983,18 @@ Each group states the accepted values of every key that entry publishes.
     The 8px label is the smallest type Fabricate draws: keep it to a few words, and never let it alone carry a state or an instruction a user must act on.
     The size changes the type and never the ink, so the contrast figures below hold at every size.
     A Fabricate that predates `size` refuses it with `"size" is not a data attribute`, and `describe('Kicker').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
-  - `for` is the `id` of a labelable control the companion draws, a non-blank string, and has no default: set, it draws the kicker as a `<label for>` in the kicker's type, whatever `as` says, so the caption names the control and a click on it focuses the control.
+  - `for` is the `id` of a labelable control the companion draws, a non-blank string, and has no default: set, it draws the kicker as a `<label for>` in the kicker's type, whatever `as` says, so the caption names the control.
     Any other value, `''`, a blank string, a number or `true` among them, draws the `as` host with no `for`, and `as` is not read while `for` is a non-blank string.
     The `id` is the companion's: Fabricate draws no `id` and reads none of its own, so the companion keeps its `id` unique in the document, and a `for` that matches no labelable control names nothing and throws nothing.
     A label names an `<input>` that is not hidden, a `<select>`, a `<textarea>`, a `<button>`, a `<meter>`, an `<output>` or a `<progress>` the companion draws, and it cannot point at one of Fabricate's published controls, which take no `id` and are named by their own `ariaLabel`.
-    The label's text is the control's accessible name, and Chromium's accessibility tree states it in upper case, as the kicker draws it.
+    The label's text is the control's accessible name.
+    A click on the caption does what a click on any `<label for>` does: it focuses a text input, a number input, a textarea or a select, and it activates a checkbox, a radio, a button input or a `<button>`, which toggles or presses it.
+    So the companion does not point a caption at a control that a stray click on the caption must not fire.
     A control that carries its own `aria-labelledby` or `aria-label` takes that name instead, so the companion keeps the visible caption in it: an `aria-label` contains the caption's text, which is the label-in-name rule.
     Drawn as a label it is an inline mark like `span`, so the companion gives its `target` `display: flex`.
     A Fabricate that predates `for` refuses it with `"for" is not a data attribute`, so the companion checks `describe('Kicker').props.for` before it passes it and names the control with `aria-labelledby` where it is absent.
     Adding `for` is additive, and the entry stays at `version` 1.
-  - Its text is its whole name, announced as written, so the companion passes sentence case and never an upper-case literal.
+  - Its text is its whole name, which Chromium's accessibility tree states in upper case, as the kicker draws it, whichever host it is, so the companion passes sentence case and never an upper-case literal.
     `h3` makes it a level-3 heading, so the companion passes it only where the kicker heads the content beneath it.
     It takes no `id`: to name a control or group with it, the companion puts the `id` on `target` and points `aria-labelledby` there.
     `accent` is colour alone and says nothing.
@@ -1616,7 +1618,7 @@ Each group states the accepted values of every key that entry publishes.
     It draws no control, no caption and no text of its own: the companion draws its caption and its control in its content slot.
   - `as` is required and is `div`, the one host published at version 1; what it draws for any other value is private.
     A `div` field names no control, so the companion gives its caption an `id` and points the control's `aria-labelledby` at it.
-    The companion may instead mount a published `Kicker` with `for` set to the control's `id`, which draws the caption as a `<label for>` and so names the control and focuses it on a click.
+    The companion may instead mount a published `Kicker` with `for` set to the control's `id`, which draws the caption as a `<label for>` and so names the control.
   - `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, in the order the companion appends them: the caption first, the control beneath it.
     The column states `--fab-text` ink at 12.5px and weight 500, which the content inherits, and a text input or textarea there inherits its face from it unless `face` says otherwise.
   - The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
@@ -1646,7 +1648,8 @@ Each group states the accepted values of every key that entry publishes.
   - `readOnly` is `true` or `false` and defaults to `false`: `true` draws the read-only face on a text-like input, a number input under `type` `'number'`, or a textarea in the slot that also carries the `readonly` attribute, a dashed `--fab-border` edge on no fill, with the control's own height and ink; any other value, or a control without that attribute, draws none.
     The field cannot reach the companion's control's attributes, so the companion keeps the two signals together: it sets `readonly` on the control whenever it passes `readOnly` `true`, and removes it when it passes `false`.
     The `readonly` attribute makes the value read-only and the face only shows it: the control stays focusable and in the tab order, its text can be selected and copied, and typing or deleting changes nothing.
-    Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled, and states no read-only on a number input, only that its value cannot be set, so the companion draws a read-only figure in a text input.
+    Chromium's accessibility tree states a text input or a textarea with `readonly` as read-only and not disabled.
+    A number input takes the face too, but the tree states it only as a spin button whose value cannot be set and does not state it as read-only, so the companion prefers a text input for a read-only figure.
     The companion never uses `disabled` for a value the user may read, because a disabled control leaves the tab order.
     The face is a dash and a missing fill, not a change of ink: the ink is `--fab-text` and clears 4.5:1, and the keyboard ring clears 3:1, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette.
     The edge is the editable control's own and falls short of 3:1 on those grounds in every palette, so the face is a hint and the announced state carries the meaning: where the user must know the value cannot be edited, the companion says so in a visible caption or hint.
@@ -3049,7 +3052,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 #### Scenario: A published kicker names the control it labels
 
 - **WHEN** a companion draws an `<input id="acme-name">` in a published `Field`'s content slot and mounts `Kicker` with `children: 'Recipe name'` and `for: 'acme-name'` into an element beside it
-- **THEN** the kicker is a `<label for="acme-name">` in the kicker's type, the control's accessible name is the label's text, and a click on the label focuses the input
+- **THEN** the kicker is a `<label for="acme-name">` in the kicker's type, the control's accessible name is the label's text, and a click on the label focuses the text input
 - **AND** an `update` without `for` draws the `as` host in the same mount, and `for: ''` or `for: 5` draws it with no `for`
 - **AND** a second kicker with another `for` names its own control, and neither kicker draws an `id`
 
