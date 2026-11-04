@@ -659,6 +659,10 @@ export const STANDALONE_SPECIMENS = Object.freeze({
     'card-off': button(card({ on: false })),
     'card-on': button(card({ on: true, icon: 'fa-solid fa-hammer' })),
     'card-switch': button(card({ on: true, semantics: 'switch' })),
+    'toggle-card-tone-enabled': button(card({ on: true, tone: 'enabled' })),
+    'toggle-card-tone-locked': button(card({ on: true, tone: 'locked' })),
+    'toggle-card-tone-info': button(card({ on: true, tone: 'info' })),
+    'toggle-card-tone-neutral': button(card({ on: true, tone: 'neutral' })),
     'card-no-icon': button(card({ on: false, icon: '' })),
     'card-long-title': button(
       card({

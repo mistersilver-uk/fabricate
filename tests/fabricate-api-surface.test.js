@@ -837,6 +837,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           on: required,
           semantics: optional,
           onToggle: { kind: 'callback', required: true },
+          tone: optional,
         },
         rest: false,
         root: 'any',

@@ -860,6 +860,17 @@ const TOGGLE_LABEL_KEYS = Object.freeze([
 /** Sized to the fixture's 420px column and its eight rows. */
 const TOGGLE_LABELS_WINDOW = Object.freeze({ width: 520, height: 420 });
 
+/** The toned cards' ground, a row by its key, and the card, sub line and switch it draws. */
+const TONE_CARDS = '[data-lab-toggle-card-tones]';
+const TONE_CARD_ROW = (key) => `${TONE_CARDS} > [data-lab-toggle-card-tone="${key}"]`;
+const TONE_CARD = (key) => `${TONE_CARD_ROW(key)} .fabricate-toggle-card`;
+const TONE_CARD_SUB = (key) => `${TONE_CARD(key)} .manager-recipe-status-sub`;
+const TONE_CARD_SWITCH = (key) => `${TONE_CARD(key)} button[role="switch"]`;
+const TONE_CARD_KEYS = Object.freeze(['neutral', 'enabled', 'locked', 'info', 'off', 'pressed']);
+
+/** Sized to the fixture's 420px column and its six cards. */
+const TONE_CARDS_WINDOW = Object.freeze({ width: 520, height: 520 });
+
 /** The disclosure fixture's ground, a row by its key, and the card, head, chevron and body it draws. */
 const DISCLOSURES = '[data-lab-disclosures]';
 const DISCLOSURE_ROW = (key) => `${DISCLOSURES} > [data-lab-disclosure="${key}"]`;
@@ -2994,6 +3005,64 @@ export const CASES = Object.freeze([
     position: TOGGLE_LABELS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-toggle-card-tones-specimen',
+    label:
+      "Specimen, mounted through the published seam — six toggle cards in a 420px column on the window's --fab-bg-1 ground, 8px apart, each a published ToggleCard whose switch announces as a switch beside a glyph, a title and the second line The ingredient is used up as the stage starts, after one step: a click on the switch of the last card, whose callback passed on true in its own update, so its info tint and its filled track appear together. Reading top to bottom: Spend when this stage begins on in the neutral tone, the resting --fab-surface-soft fill and --fab-border edge with the accent track filled; Advance with world time on in the enabled tone, a --fab-success-soft fill inside a --fab-success-border edge, its glyph in --fab-success-text; Keep the recipe locked on in the locked tone, an --fab-accent-soft fill inside an --fab-accent-border edge; Let players see the reagents on in the info tone, an --fab-info-soft fill inside an --fab-info-border edge, its glyph in --fab-info-text; Advance with world time again, off in the enabled tone, which draws the resting face with a hollow track because a tone tints an on card only; and Show the yield to players, pressed to on in the info tone. Each toned card's second line takes --fab-text-secondary, and the neutral and the off cards' keep --fab-text-muted. The frame cannot show the names and checked states the accessibility tree reports, nor the forced-colours repaint or the reduced-motion stilling, which the rendered suite emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-toggle-card-tones' },
+    steps: [{ selector: TONE_CARD_SWITCH('pressed') }],
+    // The pressed card turned on by the companion's own update, under the fixture's echo of the
+    // state, which only `onToggle` writes.
+    expectSelector: `${TONE_CARDS}:has(> [data-lab-toggle-card-tone="pressed"][data-lab-toggle-card-tone-on="true"] .fabricate-toggle-card.is-info.is-on button[aria-checked="true"])`,
+    expectContained: [
+      ...TONE_CARD_KEYS.map((key) => ({ container: TONE_CARDS, target: TONE_CARD_ROW(key) })),
+      { container: '.window-content', target: TONE_CARDS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each tone's fill and edge, the resting face of the neutral and the off cards, and the
+        // second line's ink on a toned card against a resting one.
+        {
+          selector: TONE_CARD('neutral'),
+          styles: 'background-color: var(--fab-surface-soft); border-top-color: var(--fab-border)',
+        },
+        {
+          selector: TONE_CARD('enabled'),
+          styles:
+            'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+        },
+        {
+          selector: TONE_CARD('locked'),
+          styles:
+            'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
+        },
+        {
+          selector: TONE_CARD('info'),
+          styles:
+            'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+        },
+        {
+          selector: TONE_CARD('off'),
+          styles: 'background-color: var(--fab-surface-soft); border-top-color: var(--fab-border)',
+        },
+        {
+          selector: TONE_CARD('pressed'),
+          styles:
+            'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+        },
+        { selector: TONE_CARD_SUB('enabled'), styles: 'color: var(--fab-text-secondary)' },
+        { selector: TONE_CARD_SUB('neutral'), styles: 'color: var(--fab-text-muted)' },
+        { selector: TONE_CARD_SUB('off'), styles: 'color: var(--fab-text-muted)' },
+      ],
+    },
+    position: TONE_CARDS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ToggleCard.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
