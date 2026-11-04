@@ -6059,6 +6059,12 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
   </div>
   <div class="delta ok"><code>ListRow</code> is published through <code>game.fabricate.api.ui</code>, its whole-row button reporting a press through an <code>onOpen</code> called with no argument.</div>
+  <div class="delta ok"><b>The published list row holds several trailing controls and an accent tone.</b>
+    Each control appended to <code>trailing</code> is a flex item at the row&rsquo;s gap, 8px dense and in a card and 12px at the default density, on one line that never wraps, so the name narrows first, down to no width, and controls wider than the row run past its edge; Tab reaches the row&rsquo;s button and then each control in order, each control is named by its own label, and a press between two controls opens nothing.
+    A selected accent row draws the selected face, whose edge is the accent row&rsquo;s own, so the two look alike and the row&rsquo;s text says which is selected.
+    <code>tone</code> takes <code>accent</code>, the <code>--fab-accent-soft</code> wash and <code>--fab-accent-border</code> edge in the <code>--fab-text-secondary</code> row ink, beside <code>positive</code> and <code>danger</code>.
+    On each tinted wash the name and the row ink clear 4.5:1 over the four grounds in all seven palettes and the keyboard ring clears 3:1, while a muted name and a <code>neutral</code> chip fall short, and a <code>danger</code> chip falls short on a positive row over <code>--fab-bg-2</code>.
+    The tint adds no text, and under forced colours the wash is drawn in <code>Canvas</code> and the edge in a system colour, so the row&rsquo;s state word carries the tone; an unknown <code>tone</code> draws the neutral row.<span class="cite"><b>ListRow.svelte</b> &middot; <b>styles/fabricate-list-primitives.css</b></span></div>
 
   </div>
 

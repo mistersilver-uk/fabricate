@@ -72,6 +72,7 @@ import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { fixtureLiteral } from './helpers/labFixtureLiterals.js';
 import { walkNodes } from './helpers/moduleAst.js';
 import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
@@ -438,6 +439,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedListRows.svelte',
   'tests/view-lab/fixtures/PublishedListRowSlots.svelte',
   'tests/view-lab/fixtures/PublishedListRowForms.svelte',
+  'tests/view-lab/fixtures/PublishedListRowTones.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedButtonForms.svelte',
   'tests/view-lab/fixtures/PublishedCompanionForms.svelte',
@@ -1095,6 +1097,9 @@ const labSegmentedForm = (key) =>
 /** The forms fixture's published row in one section, by the section's key and its place, first by default. */
 const labListRowForm = (key, place = 1) =>
   `[data-lab-list-row-forms] > [data-lab-list-row-form="${key}"] > div:nth-child(${place}) .fabricate-list-row`;
+/** The tones fixture's published row in one section, by the section's key. */
+const labListRowTone = (key) =>
+  `[data-lab-list-row-tones] > [data-lab-list-row-tone="${key}"] .fabricate-list-row`;
 /** The published note in one section of the callout fixture, by its key, and the actions host. */
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
@@ -2019,6 +2024,29 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labListRowForm('reward')} > .fabricate-list-row-open`,
       styles: 'cursor: progress',
+    },
+  ],
+  // The published list row's trailing host holding three controls, its gap and its one line, and
+  // each tinted row's wash and edge, the accent row's ink among them.
+  'manager-published-list-row-tones-specimen': [
+    {
+      selector: `${labListRowTone('controls')} > .fabricate-list-row-trailing`,
+      styles: 'column-gap: 8px; flex-wrap: nowrap; position: relative; z-index: 2',
+    },
+    {
+      selector: labListRowTone('claimed'),
+      styles:
+        'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+    },
+    {
+      selector: labListRowTone('declined'),
+      styles:
+        'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+    },
+    {
+      selector: labListRowTone('offer'),
+      styles:
+        'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border); color: var(--fab-text-secondary)',
     },
   ],
   // The published button's and icon button's small rungs (issue 2853): each box and corner, and
@@ -8260,6 +8288,53 @@ test('the list row forms specimen case measures the mark rung each section of th
     .map(({ styles }) => Number.parseFloat(/width: (\d+)px/u.exec(styles)[1]));
   assert.deepEqual(measured, rungs, 'each section’s mark is measured at the rung it mounts');
   assert.deepEqual(rungs, [26, 28, 30, 30, 34], 'the four rungs Premium draws, and a board');
+});
+
+test('the list row tones specimen case measures the rows the tones fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedListRowTones.svelte'
+  );
+  for (const hook of ['data-lab-list-row-tones', 'data-lab-list-row-tone']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rows = [...walkNodes(instance.content)]
+    .find((node) => node.type === 'VariableDeclarator' && node.id?.name === 'ROWS')
+    .init.arguments[0].elements.map(({ elements }) => [
+      elements[0].value,
+      elements[1].properties.find(({ key }) => key.name === 'tone')?.value.value ?? 'neutral',
+    ]);
+  assert.deepEqual(
+    rows,
+    [
+      ['controls', 'neutral'],
+      ['claimed', 'positive'],
+      ['declined', 'danger'],
+      ['offer', 'accent'],
+    ],
+    'a row holding several controls, then one row per tint'
+  );
+  const { steps, expectLayout, expectSelector } = getCaseById(
+    'manager-published-list-row-tones-specimen'
+  );
+  assert.deepEqual(steps, [], 'a frame at rest');
+  const hooks = fixtureLiteral('tests/view-lab/fixtures/PublishedListRowTones.svelte', 'FILLS').map(
+    (fill) => fill[2]
+  );
+  for (const hook of hooks) {
+    assert.ok(
+      expectSelector.includes(`[data-lab-list-row-fill="${hook}"]`),
+      `the frame waits for the ${hook} mount`
+    );
+  }
+  const keyOf = (selector) => /data-lab-list-row-tone="([\w-]+)"/u.exec(selector)?.[1];
+  assert.deepEqual(
+    expectLayout.controls.map(({ selector }) => keyOf(selector)),
+    ['controls', 'claimed', 'declined', 'offer'],
+    'each section the fixture mounts is measured'
+  );
 });
 
 test('the button forms specimen case measures the rung each row of the button forms fixture mounts', () => {

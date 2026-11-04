@@ -811,6 +811,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-list-row-slots': () => import('./fixtures/PublishedListRowSlots.svelte'),
   // Issue 2850: rows at the published mark rungs, density and layout, and a truncated board.
   'published-list-row-forms': () => import('./fixtures/PublishedListRowForms.svelte'),
+  // Several published controls in a row's trailing slot, and the tinted rows with their state words.
+  'published-list-row-tones': () => import('./fixtures/PublishedListRowTones.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
   // Issue 2853: buttons at the 24px and 26px rungs and icon buttons at the 20px and 22px rungs.
