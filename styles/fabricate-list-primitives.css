@@ -719,6 +719,12 @@
   color: var(--fab-text-secondary);
 }
 
+.fabricate-list-row.is-accent {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+  color: var(--fab-text-secondary);
+}
+
 .fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']),
 .fabricate-list-row.is-selected-face {
   border-color: var(--fab-accent-border);

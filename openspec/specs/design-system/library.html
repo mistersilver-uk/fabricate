@@ -4239,11 +4239,19 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>tone</b> <code>''</code>, <code>success</code>, <code>danger</code>, <code>accent</code>, <code>warning</code> or <code>info</code> &mdash; paints the edge, the ground and the glyph in that family&rsquo;s <code>-border</code>, <code>-soft</code> and <code>-text</code> tokens, as the toned specimens on this page do by hand, and it outranks <b>tint</b>.
             A <code>glyph-chip</code> variant draws no edge, so a tone shows its ground and glyph alone.
             The Checks Studio&rsquo;s rolled count dice read qualified or cancelled by it, and a chosen <code>&lt;OptionCards&gt;</code> chip is <code>accent</code>; <code>warning</code> and <code>info</code> have no in-app caller and serve the published seam; anything else resolves to <code>''</code>, which is byte-identical to what shipped.</li>
-          <li><b>ink</b> <code>''</code>, <code>success</code>, <code>danger</code>, <code>neutral</code>, <code>warning</code> or <code>info</code> &mdash; inks the GLYPH alone in that family&rsquo;s <code>-text</code> token, the ink a small mark takes, or in <code>--fab-text-secondary</code> for <code>neutral</code>, and leaves the edge and the slate ground as they are; it outranks <b>tint</b>.
+          <li><b>ink</b> <code>''</code>, <code>success</code>, <code>danger</code>, <code>neutral</code>, <code>accent</code>, <code>warning</code> or <code>info</code> &mdash; inks the GLYPH alone in that family&rsquo;s <code>-text</code> token, the ink a small mark takes, or in <code>--fab-text-secondary</code> for <code>neutral</code>, and leaves the edge and the slate ground as they are; it outranks <b>tint</b>.
             A resting <code>&lt;OptionCards&gt;</code> chip is <code>neutral</code>.
             The Checks Studio&rsquo;s rolled result card draws its success or failure icon with it on the shared 30px tile, with no variant; where <b>tone</b> already paints the glyph, the ink wins.
             On the slate ground an ink clears the 3:1 non-text floor in every palette and not 4.5:1, the weakest <code>danger</code> at 3.50:1 in <code>hearth-herb</code>; <code>warning</code> and <code>info</code> serve the published seam.
             Anything else resolves to <code>''</code>, which is byte-identical to what shipped.</li>
+          <li><b>text</b> a string of one to three code points, each a letter, number, punctuation mark or symbol that draws, or a finite number that writes as one to three &mdash; draws a numeral in the mono face at weight <code>500</code> and the rung&rsquo;s glyph size, centred, in place of the artwork and the glyph.
+            It inks <code>--fab-text</code> on the slate tile and the tone&rsquo;s <code>-text</code> on a toned one, because it is small text.
+            Both clear 4.5:1 in all seven palettes on the slate tile and over <code>--fab-bg-0</code>, <code>--fab-bg-1</code>, <code>--fab-surface</code> and <code>--fab-bg-2</code>, the weakest <code>--fab-text</code> on slate at 4.90:1 in <code>hearth-herb</code>, and under a list row&rsquo;s selected fill, <code>--fab-surface-active</code>, over <code>--fab-bg-2</code> the <code>danger</code> numeral reads 4.39:1 in <code>hearth-herb</code>.
+            <b>tint</b> and <b>ink</b> recolour the glyph alone and never reach it.
+            It is hidden from assistive technology as the glyph is, so the tile carries no name and the number is said in words beside it, and under forced colours it draws in the system text colour on the system canvas colour.
+            The tile clips a value wider than itself, so the rung&rsquo;s glyph size is passed with it.
+            A data value outside the set draws the tile as unset, and no published caller in the app passes it: it serves the published seam.
+            The <code>accent</code> ink clears 3:1 on the slate ground in every palette and falls under 4.5:1 only in <code>hearth-herb</code>, at 4.15:1.<span class="cite"><b>Medallion.svelte</b></span></li>
           <li class="k-hint"><b>TARGET</b> &mdash; none, and there is deliberately no <code>class</code>, no <code>style</code> and no rest spread.
             It is an IMPORT-FREE LEAF: the CALLER resolves the image and passes a plain string, because importing the shared art resolver here would propagate a required raw-module entry into every mount harness that compiles anything rendering this tile.</li>
         </ul>
@@ -6061,6 +6069,12 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
   </div>
   <div class="delta ok"><code>ListRow</code> is published through <code>game.fabricate.api.ui</code>, its whole-row button reporting a press through an <code>onOpen</code> called with no argument.</div>
+  <div class="delta ok"><b>The published list row holds several trailing controls and an accent tone.</b>
+    Each control appended to <code>trailing</code> is a flex item at the row&rsquo;s gap, 8px dense and in a card and 12px at the default density, on one line that never wraps, so the name narrows first, down to no width, and controls wider than the row run past its edge; Tab reaches the row&rsquo;s button and then each control in order, each control is named by its own label, and a press between two controls opens nothing.
+    A selected accent row draws the selected face, whose edge is the accent row&rsquo;s own, so the two look alike and the row&rsquo;s text says which is selected.
+    <code>tone</code> takes <code>accent</code>, the <code>--fab-accent-soft</code> wash and <code>--fab-accent-border</code> edge in the <code>--fab-text-secondary</code> row ink, beside <code>positive</code> and <code>danger</code>.
+    On each tinted wash the name and the row ink clear 4.5:1 over the four grounds in all seven palettes and the keyboard ring clears 3:1, while a muted name and a <code>neutral</code> chip fall short, and a <code>danger</code> chip falls short on a positive row over <code>--fab-bg-2</code>.
+    The tint adds no text, and under forced colours the wash is drawn in <code>Canvas</code> and the edge in a system colour, so the row&rsquo;s state word carries the tone; an unknown <code>tone</code> draws the neutral row.<span class="cite"><b>ListRow.svelte</b> &middot; <b>styles/fabricate-list-primitives.css</b></span></div>
 
   </div>
 

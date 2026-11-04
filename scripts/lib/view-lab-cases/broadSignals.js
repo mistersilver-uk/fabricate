@@ -210,6 +210,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-list-row-aside-specimen',
     'manager-published-list-row-slots-specimen',
     'manager-published-list-row-forms-specimen',
+    'manager-published-list-row-tones-specimen',
   ]),
   // A browse list's loading and error forms (issue 2548): the systems library loading, the
   // environment browser's failed load and the Knowledge roster loading.
@@ -301,6 +302,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Medallion.svelte': Object.freeze([
     'world-component-entry-essences',
     'manager-published-leaves-specimen',
+    'manager-published-medallion-text-specimen',
   ]),
   // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per
   // state. Then the three specimens that mount it through the published seam (issue 2452), and the

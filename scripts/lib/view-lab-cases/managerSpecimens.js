@@ -462,6 +462,16 @@ const FORM_MARKS = Object.freeze([
 /** Sized to the fixture's 480px ground and the height of its seven sections. */
 const FORMS_WINDOW = Object.freeze({ width: 600, height: 680 });
 
+/** The tones fixture's ground and one section's published row, by its key. */
+const TONES_GROUND = '[data-lab-list-row-tones]';
+const TONE_ROW = (key) => `${TONES_GROUND} > [data-lab-list-row-tone="${key}"] .fabricate-list-row`;
+/** One mount target the fixture fills a row's slot with, by its section's key and its hook. */
+const TONE_FILL = (key, hook) =>
+  `[data-lab-list-row-tone="${key}"] [data-lab-list-row-fill="${hook}"]`;
+
+/** Sized to the fixture's 360px ground and the height of its four rows. */
+const TONES_WINDOW = Object.freeze({ width: 480, height: 360 });
+
 /** The icon button fixture's ground, one row and its published button by key, and the notes. */
 const ICON_BUTTONS = '[data-lab-icon-buttons]';
 const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
@@ -871,6 +881,26 @@ const TONE_CARD_KEYS = Object.freeze(['neutral', 'enabled', 'locked', 'info', 'o
 
 /** Sized to the fixture's 420px column and its six cards. */
 const TONE_CARDS_WINDOW = Object.freeze({ width: 520, height: 520 });
+
+/** The medallion text fixture's ground, a tile's target by its key, and the tile and numeral in it. */
+const MEDALLION_TEXT = '[data-lab-medallion-text]';
+const MEDALLION_TILE_KEYS = Object.freeze([
+  'rung-22',
+  'rung-26',
+  'rung-30',
+  'rung-44',
+  'tone-success',
+  'tone-accent',
+  'tone-info',
+  'ink-accent',
+  'ink-none',
+  'named-3',
+]);
+const MEDALLION_TILE = (key) =>
+  `${MEDALLION_TEXT} [data-lab-medallion-tile="${key}"] .fab-medallion`;
+/** Sized to the fixture's 320px column and its four rows. */
+const MEDALLION_TEXT_WINDOW = Object.freeze({ width: 520, height: 420 });
+const MEDALLION_NUMERAL = (key) => `${MEDALLION_TILE(key)} .fab-medallion-text`;
 
 /** The disclosure fixture's ground, a row by its key, and the card, head, chevron and body it draws. */
 const DISCLOSURES = '[data-lab-disclosures]';
@@ -2299,6 +2329,58 @@ export const CASES = Object.freeze([
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
+    id: 'manager-published-list-row-tones-specimen',
+    label:
+      'Specimen, mounted through the published seam — four list rows, 8px apart in a 360px column on the --fab-bg-2 ground. Reading top to bottom: Ember Court, a whole-row button with its Trusted detail and, at its end beside the button, three published 24px icon buttons 8px apart on one line, a minus, a plus and a trash; Signet of the Ember Court, a read-only row on the success wash and edge whose state word is a published positive Claimed chip after its name; Forge-warden’s writ, a read-only row on the danger wash and edge whose state word is its Turned down detail; and 50 gp, a whole-row button on the accent wash and edge with its Ready to claim detail and a published accent Claim button at its end. The frame draws inside the manager window and is the evidence for it alone; the gap at each density, the Tab order, each control’s name and a press between two controls are the rendered suite’s, the contrast of each ink on each wash is the contrast suite’s, and an unknown tone is the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own controls in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-list-row-tones' },
+    steps: [],
+    // The three icon buttons in the first row, the chip in the claimed row, and the claim button
+    // on the accent row, each by the hook the fixture writes on its mount target.
+    expectSelector: `${TONES_GROUND}:has(> ${TONE_FILL('controls', 'lower')} button):has(> ${TONE_FILL('controls', 'raise')} button):has(> ${TONE_FILL('controls', 'remove')} button):has(> ${TONE_FILL('claimed', 'claimed')} .manager-chip) > [data-lab-list-row-tone="offer"] .fabricate-list-row.is-accent [data-lab-list-row-fill="claim"] button`,
+    expectContained: [
+      ...['controls', 'claimed', 'declined', 'offer'].map((key) => ({
+        container: TONES_GROUND,
+        target: TONE_ROW(key),
+      })),
+      ...['lower', 'raise', 'remove'].map((hook) => ({
+        container: TONE_ROW('controls'),
+        target: `${TONES_GROUND} > ${TONE_FILL('controls', hook)} button`,
+      })),
+      { container: '.window-content', target: TONES_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The trailing host's gap and line, and each tint's wash and edge.
+        {
+          selector: `${TONE_ROW('controls')} > .fabricate-list-row-trailing`,
+          styles: 'column-gap: 8px; flex-wrap: nowrap; position: relative; z-index: 2',
+        },
+        {
+          selector: TONE_ROW('claimed'),
+          styles:
+            'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+        },
+        {
+          selector: TONE_ROW('declined'),
+          styles:
+            'background-color: var(--fab-danger-soft); border-top-color: var(--fab-danger-border)',
+        },
+        {
+          selector: TONE_ROW('offer'),
+          styles:
+            'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border); color: var(--fab-text-secondary)',
+        },
+      ],
+    },
+    position: TONES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ListRow.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
     id: 'manager-published-icon-buttons-specimen',
     label:
       'Specimen, mounted through the published seam — ten icon buttons in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each a glyph alone beside a caption the companion draws, after two steps: a click on the last, the Batch notes disclosure, whose callback passed aria-expanded true in its own update and showed the companion’s notes line Quench each ingot before the next pour beneath it, the pointer still resting on that button’s raised tile; and Tab from the danger button, which put keyboard focus on the ghost-danger Remove Ember salt, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face, on its danger fill and ink. Reading top to bottom: a neutral pen on its 34px bordered face; a primary check in the success ink and edge; a ghost ellipsis 28px tall with no edge or fill; a danger trash in the danger ink and edge; the focused ghost-danger xmark; a second ghost-danger xmark that nothing focuses, 28px square with no edge or fill and the subtle ink, as a ghost rests; an xmark at size 24 and one at size 26, each a square of that side; and a disabled arrow at 62% opacity. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the hover text each button writes and the tooltip’s opening and closing are the mounted suite’s',
@@ -3069,6 +3151,54 @@ export const CASES = Object.freeze([
     position: TONE_CARDS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ToggleCard.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-medallion-text-specimen',
+    label:
+      "Specimen, mounted through the published seam — four rows in a 320px column on the window's --fab-bg-1 ground, each tile a published Medallion. Reading top to bottom: numbered tiles on the 22, 26, 30 and 44 rungs reading 1, 2, 12 and 99+, each a --fab-bg-3 tile with the numeral in the mono face at the rung's glyph size in --fab-text, centred inside its edge; the numerals 1, 2 and 3 on the success, accent and info tones, each on its --fab-*-soft ground inside its --fab-*-border edge with the numeral in that family's --fab-*-text; a coin glyph inked by --fab-accent-text beside one in the resting accent; and a numbered tile 3 beside the companion's words Stage 3, which the accessibility tree reports alone because the numeral is hidden from it. The frame cannot show the accessibility tree, the forced-colours repaint or the reduced-motion stilling, which the rendered suite emulates",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-medallion-text' },
+    steps: [],
+    expectSelector: `${MEDALLION_TEXT} [data-lab-medallion-tile="named-3"] .fab-medallion[data-medallion="text"]`,
+    expectContained: [
+      ...MEDALLION_TILE_KEYS.map((key) => ({
+        container: MEDALLION_TEXT,
+        target: `${MEDALLION_TEXT} [data-lab-medallion-tile="${key}"]`,
+      })),
+      ...MEDALLION_TILE_KEYS.slice(0, 7).map((key) => ({
+        container: MEDALLION_TILE(key),
+        target: MEDALLION_NUMERAL(key),
+      })),
+      { container: '.window-content', target: MEDALLION_TEXT },
+    ],
+    expectLayout: {
+      controls: [
+        { selector: MEDALLION_TILE('rung-22'), styles: 'width: 22px; height: 22px' },
+        { selector: MEDALLION_TILE('rung-44'), styles: 'width: 44px; height: 44px' },
+        {
+          selector: MEDALLION_NUMERAL('rung-26'),
+          styles: 'color: var(--fab-text); font-size: 11px; font-weight: 500',
+        },
+        {
+          selector: MEDALLION_NUMERAL('tone-success'),
+          styles: 'color: var(--fab-success-text)',
+        },
+        {
+          selector: MEDALLION_NUMERAL('tone-info'),
+          styles: 'color: var(--fab-info-text)',
+        },
+        {
+          selector: `${MEDALLION_TILE('ink-accent')} i`,
+          styles: 'color: var(--fab-accent-text)',
+        },
+      ],
+    },
+    position: MEDALLION_TEXT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Medallion.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({

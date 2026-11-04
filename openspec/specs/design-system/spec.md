@@ -49,6 +49,8 @@ With `onOpen`, the row's content MUST be one native button holding phrasing cont
 Without `onOpen`, a `selected` of true MUST draw the selected face on the row's own box and inset and write no `aria-pressed`; `current` writes `aria-current` and `busy` writes `aria-busy` and draws a spinning glyph in place of the mark, on the button with `onOpen` and on the root without it, and a busy button keeps its focus and refuses a press.
 The button is named by any `leading` text, then the item's name, then each state the row shows only visually.
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
+The `trailing` track MAY hold several controls, each a flex item at the row's gap on one line that never wraps, after the button in tab order and outside its name.
+ListRow's `tone` is `neutral`, `positive`, `danger` or `accent`: each tint is a translucent wash with its own edge, `accent` the accent wash and edge, and it adds no text, so the row's own text MUST state what the tone means.
 `<BrowseCard>` is merged into ListRow's `layout="card"`, which a browse card MUST render through.
 A ListRow given none of the selectable form's props MUST draw the dense output unchanged; a read-only `selected`, `current` or `busy` adds only its face, attribute or glyph to it.
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
@@ -82,7 +84,7 @@ Their default absent-snippet forms retain existing geometry and behavior.
 A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
 A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
 The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
-A `ListRow`'s quantity and detail inherit its ink, `--fab-text-muted` at rest and `--fab-text-secondary` on the positive tone's success wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes.
+A `ListRow`'s quantity and detail inherit its ink, `--fab-text-muted` at rest and `--fab-text-secondary` on the positive tone's success wash, the accent tone's accent wash and in its selected, hover and danger states, clearing 4.5:1 in all seven themes on the row's ground, the card layout's ground and those washes.
 
 #### Scenario: A player app draws its own selectable control
 
@@ -309,6 +311,11 @@ The `<ListRow>` heading also names `<ListState>`, which is shipped.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
+`Medallion` draws a numeral through its closed `text` of one to three code points, in the mono face at the rung's glyph size, in place of its art and glyph.
+The numeral inks `--fab-text` on the slate tile and the tone's `-text` on a toned one, and `tint` and `ink` recolour the glyph alone and never reach it.
+Both inks clear 4.5:1 in all seven palettes on the slate tile and over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under a list row's selected fill, `--fab-surface-active`, over `--fab-bg-2` the `danger` numeral reads 4.39:1 in `hearth-herb`.
+The numeral is hidden from assistive technology as the glyph is, so the number is said in words beside the tile.
+`Medallion`'s `ink` takes `accent`, which inks the glyph alone in `--fab-accent-text`.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.

@@ -811,6 +811,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-list-row-slots': () => import('./fixtures/PublishedListRowSlots.svelte'),
   // Issue 2850: rows at the published mark rungs, density and layout, and a truncated board.
   'published-list-row-forms': () => import('./fixtures/PublishedListRowForms.svelte'),
+  // Several published controls in a row's trailing slot, and the tinted rows with their state words.
+  'published-list-row-tones': () => import('./fixtures/PublishedListRowTones.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
   // Issue 2853: buttons at the 24px and 26px rungs and icon buttons at the 20px and 22px rungs.
@@ -831,6 +833,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-checkbox-rows': () => import('./fixtures/PublishedCheckboxRows.svelte'),
   // The published toggle card's closed tones while on, an off card and a press that turns one on.
   'published-toggle-card-tones': () => import('./fixtures/PublishedToggleCardTones.svelte'),
+  // The published medallion's text on four rungs and three tones, and its accent ink on a glyph.
+  'published-medallion-text': () => import('./fixtures/PublishedMedallionText.svelte'),
   // Issue 2902: the switch's label inside its button, a press on its words and a wrapping label.
   'published-toggle-labels': () => import('./fixtures/PublishedToggleLabels.svelte'),
   // Issue 2862: disclosure cards at rest, open, pressed open, focused and disabled, and a faction

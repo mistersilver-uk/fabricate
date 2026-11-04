@@ -2046,7 +2046,7 @@ The published components, in publication order:
 | --- | --- | --- | --- | --- |
 | `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
 | `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint`, `icon` | no |
-| `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
+| `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink`, `text` | no |
 | `FillBar` | 1 | `any` | `value`, `tone`, `color`, `shares`, `origin`, `neutralBand`, `density` | yes |
 | `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
 | `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
@@ -2142,14 +2142,32 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
 `tone` is `''`, `success`, `danger`, `accent`, `warning` or `info`, and it outranks `tint`.
-`ink` is `''`, `success`, `danger`, `neutral`, `warning` or `info`, it outranks `tint`, and it outranks `tone` on the glyph.
+`ink` is `''`, `success`, `danger`, `neutral`, `accent`, `warning` or `info`, it outranks `tint`, and it outranks `tone` on the glyph.
 A `tone` paints the edge, ground and glyph in its family's `-border`, `-soft` and `-text` tokens, as `accent` does in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`; an `ink` inks the glyph alone in its family's `-text` token, and `neutral` in `--fab-text-secondary`.
 A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
 A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
 The `tone` and `ink` values `warning` and `info` are additive at `version` `1`: a Fabricate that predates them draws the tile as unset, and refuses nothing.
 A `tone`'s glyph clears the 4.5:1 small-text floor on its own ground over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and not over `--fab-bg-3`; an `ink` over a `tone`'s ground clears it on the same four.
-An `ink` on the untoned tile, whose ground is `--fab-bg-3` wherever the tile sits, clears the 3:1 non-text floor in every palette and not 4.5:1: `success`, `danger`, `info` and `neutral` fall under it in `hearth-herb`, and `danger` and `neutral` in `ironblood-forge`, the weakest `danger` at 3.50:1.
+An `ink` on the untoned tile, whose ground is `--fab-bg-3` wherever the tile sits, clears the 3:1 non-text floor in every palette and not 4.5:1: `success`, `danger`, `info`, `neutral` and `accent` fall under it in `hearth-herb`, and `danger` and `neutral` in `ironblood-forge`, the weakest `danger` at 3.50:1.
 A `tone` or an `ink` is colour alone and is not announced, so say the state it marks in text beside the tile.
+The `ink` value `accent` is additive at `version` `1`: a Fabricate that predates it draws the tile as unset, and refuses nothing.
+`text` is a string of one to three code points, or a finite number that writes as one to three, and it is unset by default.
+Each code point is a letter, a number, a punctuation mark or a symbol that draws, so a space, a control or format character such as a zero-width space or joiner, a combining mark, a variation selector, and the blank Hangul, Braille and other default-ignorable code points are outside the set.
+Code points are counted and not UTF-16 units: `😀` is one, a flag of two regional indicators is two, and an emoji sequence joined by a zero-width joiner or ending in a variation selector is outside the set.
+A tile with `text` draws it in the mono face at weight `500` and the rung's glyph size, centred in the tile, in place of `art` and `icon`.
+`text` outranks `art`, and no `alt` is then drawn.
+A `text` that is data but outside its set draws the tile as unset, with `art` or `icon`.
+As for every `data` key, the seam refuses a function and a value that is not plain data, such as a `Date` or a class instance, with a `TypeError`.
+The component never shortens `text`, so a four-code-point value draws the art or glyph and a count past `999` is yours to abbreviate.
+The tile clips what is wider than it, so pass the rung's `glyph` with `text`: the default glyph size of `0.9rem` can clip three characters on a small rung.
+A numeral of up to three digits fits inside every rung at the rung's glyph size, measured in a monospace face.
+The text draws in `--fab-text` on the untoned tile and in the `-text` token of its `tone` on a toned one, and `tint` and `ink` recolour the glyph alone and never reach it.
+The text is small text: `--fab-text` on `--fab-bg-3` clears 4.5:1 in every palette, the weakest 4.90:1 in `hearth-herb`, and a `tone`'s `-text` on its own ground clears 4.5:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, the weakest 5.85:1 for `danger` in `hearth-herb`.
+Under a list row's selected fill, `--fab-surface-active`, the same holds on every page ground but `--fab-bg-2`, where `danger` in `hearth-herb` reads 4.39:1.
+The text is hidden from assistive technology, as the glyph is, so a numbered tile carries no name and cannot be named in place, because `aria-label` and `role` are not published: always say the number in text beside it, such as `Stage 3`, which may be visually hidden where a visible duplicate is unwanted.
+Under forced colours the text draws in the system text colour on a ground of the system canvas colour, so a `tone` shows in neither.
+The tile declares no transition or animation, so reduced motion has nothing to change.
+`text` is additive at `version` `1`: a Fabricate that predates it refuses it with `"text" is not a prop of Medallion`, which `describe(...).props` shows by leaving the key out.
 The tile's corner follows its rung: `6` at `22` and `24`, `7` from `26` to `32`, `9` from `34` to `38` and `11` at `44`.
 The rungs `24`, `28`, `32`, `34`, `36` and `44` are additive at `version` `1`: a Fabricate that predates one draws that size at its edge with the corner `9`, and refuses nothing.
 A `size` off the ladder draws at its edge with the corner `9` and is not published.
@@ -4294,8 +4312,17 @@ With `onOpen` the button's accessible name is its text in the order it is drawn:
 `art` is an image path drawn as the row's mark, with no alternative text, and `''` or absence draws `icon` instead.
 `icon` is a Font Awesome class string drawn as the mark where there is no `art` and hidden from assistive technology, and it defaults to `'fas fa-box'`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone, as `Medallion`'s does.
-`tone` is `'neutral'`, `'positive'` or `'danger'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge and `'danger'` on the danger ones, and any other value draws as `'neutral'`.
-It adds no text or glyph, so state what the tone means in `detail` as well.
+`tone` is `'neutral'`, `'positive'`, `'danger'` or `'accent'` and defaults to `'neutral'`: `'positive'` draws the row on the success fill and edge, `'danger'` on the danger ones and `'accent'` on the accent ones, and any other value draws as `'neutral'` and is never refused.
+It adds no text or glyph, so state what the tone means in the row's text as well, as a state word in `detail` or a published `Chip` in `badges`.
+Each tinted fill is translucent and replaces the row's own, and on it the name, and the row's ink that the detail and the quantity take, clear 4.5:1 over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette; a `muted` name on it falls short of 4.5:1 on `--fab-bg-2` in some palette.
+A published `Chip` with no `emphasis` in `badges` reads its label over its own fill over the row's: on each tinted row the default chip, with no `tone`, and the `positive`, `warning`, `info` and `accent` chips clear 4.5:1 over those four grounds in every palette, and so does `danger` but for a `'positive'` row on `--fab-bg-2`, while the `neutral` chip falls short on every tinted row.
+So draw a state word as one of the chips that clear, or as `detail`.
+A published `Button` with the `accent` role in an `'accent'` row's `trailing` clears 4.5:1 for its label, at rest and hovered, and 3:1 for its edge over those grounds in every palette.
+`selected: true` draws the selected face over an `'accent'` row, as over a `'positive'` one: the active wash replaces the accent wash and the edge stays the accent row's own, so a selected accent row and an unselected one look alike.
+So say in the row's text which row is selected, as the face is not announced without `onOpen`.
+With `onOpen` the pointer over an `'accent'` row replaces the accent wash with the hovered fill, `--fab-surface-raised`.
+Under forced colours Chromium draws each tinted fill in the system's `Canvas` at the fill's own alpha and the edge in `CanvasText`, so the tone is not seen there and the row's text carries it.
+A Fabricate that predates `'accent'` draws it as `'neutral'` and refuses nothing, which `describe('ListRow')` cannot show.
 `muted` is `true` or `false` and defaults to `false`, and `true` dashes the row's edge and draws the name in the muted ink.
 `markSize` is `22`, `26`, `28`, `30`, `34` or `38` and defaults to `22`: it is the mark's edge in CSS pixels, a rung of `Medallion`'s art ladder drawn at that rung's corner, and it sizes nothing while `leading` is drawn.
 While `busy` replaces `leading`, it sizes the spinner.
@@ -4335,11 +4362,16 @@ You draw a glyph or image of your own there, marked `aria-hidden="true"` where i
 `badges` is a content slot whose element is a `<span>`, drawn after the name on the name's line, and wrapping beneath a name that fills the line.
 `meta` is a content slot whose element is a `<span>`, drawn beneath the name and its badges, and with `onOpen` the button's `aria-describedby` names it too.
 `trailing` is a content slot whose element is a `<span>`, drawn after the row's content at the row's end, beside the button and above the layer the button draws over the row.
-It is the one slot that may hold controls: draw one compact control there, a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, and a press on it does not call `onOpen`.
-The control follows the row's button in focus order, an icon-only control carries a label of its own for its item, and chips go in `badges`.
-`disabled` dims the whole row and disables no control in `trailing`, so set that control's own `disabled`.
-The dimmed row also dims an enabled control in `trailing`, and a press on the gap around the control opens nothing.
-Give that control a target of at least 24 by 24 CSS pixels.
+It is the one slot that may hold controls: draw one or more compact controls there, each a `<button type="button" data-keyboard-focus="true">` that acts on the row's item, as an edit button, a published `Button` or `IconButton` among them, and a press on one does not call `onOpen`.
+Append each control, or a plain `<span>` mount target for each, as a child of the slot element: each child is a flex item spaced by the row's gap, 8px on a dense row and a card and 12px at the `'default'` density, all on one line that never wraps, and no control shrinks.
+The name gives up its width first, wrapping onto more lines, down to no width at all, where it is drawn a letter to a line.
+Where the controls are wider than the row's inner width, a row with `onOpen` moves them to a line of their own beneath the name, where they still run past the row's edge, and a row with no form keeps them beside a name of no width and runs them past its edge; in a card they always take a line of their own beneath the content.
+So measure your controls together with their gaps, and draw no more than leave the name a readable width at the narrowest width you mount the row at.
+Each control is its own stop in the tab order: Tab reaches the row's button, then each control in the order you appended them, and none of them joins the button's accessible name.
+Give each control an accessible name of its own that names the row's item, as `Remove Ember salt`, because an icon-only control beside its neighbours has no text of its own, and chips go in `badges`.
+`disabled` dims the whole row and disables no control in `trailing`, so set each control's own `disabled`.
+The dimmed row also dims an enabled control in `trailing`, a press between two controls opens nothing, and one on the row's inset beyond the last control presses the row's button.
+Give each control a target of at least 24 by 24 CSS pixels.
 Requesting `leading`, `badges` or `meta` draws the row at the inset Fabricate gives a row with an aside, and `trailing` alone does not.
 Draw text and marks in `leading`, `badges` and `meta`, as a published `Chip`, and nothing focusable or pressable: with `onOpen` they lie inside the button, so a press on them presses it and calls `onOpen`, and an `update` that passes `onOpen` covers them without it.
 Draw only phrasing content there (text, `span`, an `i` or `img` that is `aria-hidden` or has an `alt`), because with `onOpen` the hosts sit inside a native `button`, which forbids blocks, lists and headings, and an `alt`, `aria-label` or `title` on that content joins the button's accessible name.
@@ -4355,7 +4387,7 @@ No other published prop draws a control inside the row: `leading`, `badges` and 
 `ListRow` needs a Fabricate window ancestor, because its row, button and marks come from Fabricate's module sheet, rooted at `.fabricate-list-row`.
 Your own window or dialog carries no Fabricate root, so the row is refused there with `ListRow needs a Fabricate window ancestor`.
 The button's keyboard ring is the window's accent ring, 2px wide and drawn 2px inside the row's edge on a layer that covers the row, in place of the ring the module draws around a button.
-The row paints its own opaque fill, `--fab-bg-1`, or `--fab-bg-2` as a card, and the ring clears 3:1 against it in every palette; the selected, hovered, success and danger fills are translucent and replace it, so they sit over the ground beneath the row, and the ring clears 3:1 against each over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so mount the row on one of those grounds.
+The row paints its own opaque fill, `--fab-bg-1`, or `--fab-bg-2` as a card, and the ring clears 3:1 against it in every palette; the selected, hovered, success, danger and accent fills are translucent and replace it, so they sit over the ground beneath the row, and the ring clears 3:1 against each over `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so mount the row on one of those grounds.
 An `update` that keeps `onOpen` keeps the button, so focus stays on it; one that passes or omits `onOpen` where the last did not draws or removes the button in the same row, so where the button holds focus, move focus to an element of your own first.
 `destroy` removes the row.
 Its figures and its colours beyond what this section states, its `fabricate-list-row-*` classes beyond its root, its `data-list-row` hook, and how Fabricate draws a row in its own lists and headings are private.
