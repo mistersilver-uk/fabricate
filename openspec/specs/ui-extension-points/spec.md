@@ -2300,20 +2300,25 @@ Each group states the accepted values of every key that entry publishes.
     It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
     A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so a sentence that must be heard there belongs in `title`.
   - `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
-  - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+  - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow `on` only through `tone`.
     Fabricate coerces nothing, so only `true` and `false` are in the contract.
     The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when the companion's `update` passes it, which may be after the press returns.
     A companion that refuses the change passes `on` unchanged and says why in text of its own, so the card never shows a state the companion does not hold.
   - `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
     The design-system capability's rule on announcing a switch says which to pass.
+  - `tone` is `neutral`, `enabled`, `locked` or `info`, and defaults to `neutral`.
+    It tints the card while `on` is `true`: `enabled` in the success family, `locked` in the accent family and `info` in the info family, each an edge on a soft fill with the second line in the secondary ink so it still reads on the tint.
+    `neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown or coerced.
+    The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, so the colour is never the only sign of state, and a tone's edge may fall short of 3:1 against the ground.
+    Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint declares no transition of its own.
+    A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe` omits it.
   - `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
     The companion works out the new state from the `on` it last passed.
     It is not called by `mount`, `update` or `destroy`.
   - The switch has no unavailable state at version 1, as the `StatusToggle` group states, and the card takes no `disabled`.
   - A card is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it grows to the width of `target`.
-  - The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-- **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and tone classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
+- **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
 
 ### SelectionCheckbox
 

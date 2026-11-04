@@ -1201,24 +1201,26 @@ for (const palette of PALETTES) {
       measured = MEASURED[palette];
     });
 
-    it('draws a ToggleCard second line in the muted ink and no larger than its title, and a long title inside its target', async () => {
+    it('draws a ToggleCard second line in the muted ink, or the secondary ink on a toned, on card, and no larger than its title, and a long title inside its target', async () => {
       const cards = SPECIMENS.filter(({ name }) => name === 'ToggleCard');
       assert.ok(
         cards.some(({ id }) => id === 'card-long-title'),
         'a long-title card is drawn'
       );
-      for (const { id, width } of cards) {
+      for (const { id, width, props } of cards) {
+        const toned = props.on === true && ['enabled', 'locked', 'info'].includes(props.tone);
+        const subInk = toned ? 'var(--fab-text-secondary)' : 'var(--fab-text-muted)';
         for (const host of HOSTS) {
           const muted = await measured.tab.evaluate(
-            (selector) => {
+            ([selector, ink]) => {
               const probe = document.createElement('span');
-              probe.style.color = 'var(--fab-text-muted)';
+              probe.style.color = ink;
               document.querySelector(selector).firstElementChild.append(probe);
               const { color } = getComputedStyle(probe);
               probe.remove();
               return color;
             },
-            `${hostOf(id, host)} [data-target]`
+            [`${hostOf(id, host)} [data-target]`, subInk]
           );
           const drawn = measured.reads.rest[id][host];
           const [title, sub] = drawn.filter((element) => element.tag === 'p');

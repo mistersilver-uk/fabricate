@@ -628,6 +628,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       on: Object.freeze({ kind: 'data', required: true }),
       semantics: Object.freeze({ kind: 'data' }),
       onToggle: Object.freeze({ kind: 'callback', required: true }),
+      tone: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
     root: 'any',

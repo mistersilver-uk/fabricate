@@ -54,12 +54,19 @@ export const TOGGLE = Object.freeze({
 
 /**
  * The published `ToggleCard`'s root (issue 2775): the class its file writes beside the root and the
- * state classes `on` writes, the classes under which a sheet rule lays a status card out, no
- * extension target sitting in one. No published key writes `variant`, so the tone classes are not.
+ * state classes `on` writes and the tone classes `tone` writes, the classes under which a sheet rule
+ * lays a status card out, no extension target sitting in one. No published key writes `variant`.
  */
 export const TOGGLE_CARD = Object.freeze({
   root: 'fabricate-toggle-card',
-  writable: new Set(['manager-recipe-status-card', 'is-on', 'is-off']),
+  writable: new Set([
+    'manager-recipe-status-card',
+    'is-on',
+    'is-off',
+    'is-enabled',
+    'is-locked',
+    'is-info',
+  ]),
   ancestors: new Set([
     'manager-checks-flag-list',
     'manager-checks-breakage-trigger',
