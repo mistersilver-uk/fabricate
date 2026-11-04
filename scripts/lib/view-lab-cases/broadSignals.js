@@ -550,6 +550,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
     'manager-recipe-edit-normal',
     'manager-recipe-edit-results-failure-optin',
+    'manager-published-toggle-card-tones-specimen',
   ]),
   // The disclosure card (issue 2862), which no in-app frame draws: the specimen that mounts it
   // through the published seam, and the three that mount it with and without a Fabricate root

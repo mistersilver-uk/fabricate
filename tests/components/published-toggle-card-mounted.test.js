@@ -2,7 +2,7 @@
  * The published `ToggleCard` on Fabricate's real Svelte runtime (issue 2775), through a fresh seam
  * registered with the adapter's own table, under a Fabricate window root: the card it draws, its
  * `sub` and `icon`, the switch it composes and the name that switch takes from `title`, a press and
- * its `onToggle`, an update that keeps the node and its focus, the `semantics` closed set, every
+ * its `onToggle`, an update that keeps the node and its focus, the `semantics` and `tone` closed sets, every
  * refusal the entry adds, and the standalone style root it is drawn under in a companion's shell.
  * Limit: happy-dom activates no button from a key, so the View Lab's toggles case holds the Space
  * press, and no accessible name is computed here: this suite reads `aria-label` off the button.
@@ -340,6 +340,115 @@ describe('the semantics key of the published ToggleCard', () => {
       handle.destroy();
     });
   }
+});
+
+describe('the tone key of the published ToggleCard', () => {
+  const toneClasses = (node) =>
+    authoredClasses(node).filter((name) => ['is-enabled', 'is-locked', 'is-info'].includes(name));
+
+  for (const [tone, expected] of [
+    ['enabled', ['is-enabled']],
+    ['locked', ['is-locked']],
+    ['info', ['is-info']],
+    ['neutral', []],
+  ]) {
+    for (const on of [true, false]) {
+      it(`draws ${JSON.stringify(expected)} for tone "${tone}" while on is ${on}`, async () => {
+        const { handle, card, button } = mountCard({ tone, on });
+        await settle();
+        assert.deepEqual(toneClasses(card()), expected);
+        assert.deepEqual(
+          announced(button()),
+          [null, String(on), null],
+          'the switch says the state'
+        );
+        assert.equal(button().getAttribute('aria-label'), TITLE);
+        handle.destroy();
+        assert.deepEqual(reports, []);
+      });
+    }
+  }
+
+  it('draws no tone class when the key is omitted', async () => {
+    const { handle, card } = mountCard();
+    await settle();
+    assert.deepEqual(toneClasses(card()), []);
+    handle.destroy();
+  });
+
+  for (const value of [
+    'Enabled',
+    'danger',
+    'is-info',
+    'is-enabled info',
+    ' info',
+    '',
+    'constructor',
+    '__proto__',
+    'toString',
+    'hasOwnProperty',
+    true,
+    1,
+    0,
+    null,
+    ['info'],
+    { info: true },
+  ]) {
+    it(`draws the neutral card for the out-of-set value ${JSON.stringify(value)}`, async () => {
+      const { handle, card } = mountCard({ tone: value, on: true });
+      await settle();
+      assert.deepEqual(toneClasses(card()), []);
+      assert.deepEqual(authoredClasses(card()), [
+        'fabricate-toggle-card',
+        'manager-recipe-status-card',
+        'is-on',
+      ]);
+      assert.deepEqual(reports, []);
+      handle.destroy();
+    });
+  }
+
+  it('moves the same card between tones on update, and omitting the key is neutral', async () => {
+    const { handle, card, button } = mountCard({ tone: 'enabled', on: true });
+    await settle();
+    const root = card();
+    const node = button();
+    node.focus();
+    for (const [tone, expected] of [
+      ['info', ['is-info']],
+      ['locked', ['is-locked']],
+      [undefined, []],
+    ]) {
+      assert.equal(handle.update(base({ tone, on: true })), true);
+      await settle();
+      assert.ok(card() === root && button() === node, 'the same nodes');
+      assert.deepEqual(toneClasses(root), expected, String(tone));
+    }
+    assert.ok(document.activeElement === node, 'focus stays on the switch');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('keeps the tone through a press and an off state, naming the switch and its state alone', async () => {
+    let on = true;
+    const props = () =>
+      base({
+        tone: 'enabled',
+        on,
+        onToggle: () => {
+          on = !on;
+          held.handle.update(props());
+        },
+      });
+    const held = mountCard(props());
+    await settle();
+    held.button().click();
+    await settle();
+    assert.deepEqual(toneClasses(held.card()), ['is-enabled']);
+    assert.ok(held.card().classList.contains('is-off'));
+    assert.deepEqual(announced(held.button()), [null, 'false', null]);
+    held.handle.destroy();
+  });
 });
 
 describe('what the published ToggleCard refuses', () => {

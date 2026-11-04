@@ -63,11 +63,14 @@ function buildHost() {
     return scroller;
   }
 
+  // `?frameWidth=<px>` narrows the window and `?frameTransform=<css>` transforms it, as Foundry's
+  // scaling of a window does.
   const frameStyles = {
     left: `${frameLeft}px`,
     top: `${frameTop}px`,
-    width: '900px',
+    width: `${params.get('frameWidth') ?? 900}px`,
     height: '520px',
+    transform: params.get('frameTransform') ?? '',
   };
 
   if (hostKind === 'app') {
@@ -263,8 +266,12 @@ const COMPONENTS = {
   ],
 };
 
-// `?region=plain|contain|transform` hosts the dialog in a companion's region (issue 2818).
-if (params.get('region')) hostInRegion(target, mountPoint, params.get('region'));
+// `?region=plain|contain|transform` hosts the dialog in a companion's region (issue 2818), as wide as
+// `?regionWidth=<px>` when given.
+if (params.get('region')) {
+  const regionWidth = params.get('regionWidth');
+  hostInRegion(target, mountPoint, params.get('region'), regionWidth && `${regionWidth}px`);
+}
 if (componentKind === 'modal') stageScrim(params, target, mountPoint);
 
 // `?layer=<name>` measures the product cascade rather than the flat sheet.

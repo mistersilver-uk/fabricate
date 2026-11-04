@@ -829,6 +829,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-selection-checkbox': () => import('./fixtures/PublishedSelectionCheckbox.svelte'),
   // Issue 2881: decorative boxes in a companion's own objective rows, in the success tone.
   'published-checkbox-rows': () => import('./fixtures/PublishedCheckboxRows.svelte'),
+  // The published toggle card's closed tones while on, an off card and a press that turns one on.
+  'published-toggle-card-tones': () => import('./fixtures/PublishedToggleCardTones.svelte'),
   // Issue 2902: the switch's label inside its button, a press on its words and a wrapping label.
   'published-toggle-labels': () => import('./fixtures/PublishedToggleLabels.svelte'),
   // Issue 2862: disclosure cards at rest, open, pressed open, focused and disabled, and a faction

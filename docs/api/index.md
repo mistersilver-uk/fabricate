@@ -2076,7 +2076,7 @@ The published components, in publication order:
 | `ActionMenu` | 1 | `any` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
 | `Modal` | 1 | `any` | `open`, `title` (required), `subtitle`, `icon`, `size`, `closeLabel` (required), `closeOnOutsideClick`, `trapFocus`, `initialFocus`, `footerLayout`, `scrim`, `onClose` (callback, required), `body` (slot), `footer` (slot) | no |
 | `ListRow` | 1 | `fabricate` | `name` (required), `detail`, `quantity`, `art`, `icon`, `tint`, `tone`, `muted`, `selected`, `disabled`, `onOpen` (callback), `aside` (slot), `leading` (slot), `badges` (slot), `meta` (slot), `trailing` (slot), `markSize`, `density`, `layout`, `truncateName`, `detailAlign`, `current`, `busy` | yes |
-| `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required) | no |
+| `ToggleCard` | 1 | `any` | `title` (required), `sub`, `icon`, `on` (required), `semantics`, `onToggle` (callback, required), `tone` | no |
 | `SelectionCheckbox` | 1 | `any` | `checked` (required), `indeterminate`, `disabled`, `density`, `label` (text, required), `ariaLabel`, `onChange` (callback, required), `aria-describedby` (aria), `decorative`, `tone` | yes |
 | `Disclosure` | 1 | `any` | `open`, `onToggle` (callback, required), `level`, `disabled`, `head` (slot), `body` (slot) | yes |
 | `Typeahead` | 1 | `any` | `options` (required), `query` (value), `onQueryChange` (callback), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `emptyLabel`, `allowFree`, `onFreeText` (callback, required when `allowFree`), `density`, `error`, `countLabel` (text), `openOnEmpty` | no |
@@ -3711,8 +3711,12 @@ Build it by inserting the label string itself, as `format('{label}, chosen by {n
 Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
 `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
 It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
-It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
-A `title` that is not a string, or is white space alone, draws no tooltip.
+Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
+A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
+Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
+A Fabricate that predates the description gives the hint to the pointer only.
+A `title` that is not a string, or is white space alone, draws no tooltip and no description.
 `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
 `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
 `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -4085,7 +4089,7 @@ A component with an overlay that you mount in a slot closes its open panel when 
 Never pass a name of white space alone, which leaves its element with no name.
 `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
 It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+`size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the padding box of the nearest ancestor that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do, such as your `overlayHost` region or a Foundry window scaled with a `transform`, and otherwise the viewport of the browser window that holds it.
 A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
 `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
 `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which you make at most one primary.
@@ -4164,11 +4168,14 @@ The dialog is centred in the nearest element above it that makes itself the cont
 It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
 An `overlayHost` that is a region of your own, such as a pane inside your window, draws the dialog inside that region, centred in it where the region makes itself the containing block of fixed content, as `contain: layout` and a `transform` each do, and centred in the browser window's viewport, outside the region, where it does not, as a region that is only `position: relative` or only `container-type: inline-size` does not.
 Either also makes the region the stacking context and the containing block for its own fixed and absolute descendants.
+In a region that is the containing block, the dialog's width is capped 48px short of the region's padding box, so it stays inside the region with a 24px margin on each side of that box, and its close control stays inside the region.
+A region wider than the browser window draws the dialog at the region's width, past the window's edge, and a region 48px wide or narrower draws it with no content width.
 With `scrim` `'none'`, Fabricate draws no scrim: no layer covers the region behind the dialog, which keeps taking pointer input, and if you dim your region, draw a layer of your own in it, which the dialog is drawn over where that layer sets a `z-index` below 100.
 With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so pass such a region to dim your own pane and nothing else, and the viewport where neither the region nor an element above it does, over a layer of yours whose `z-index` is below 100 either way.
 Pass a region that does not itself scroll, such as the root that holds your scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
 The way to dim your own window is that contained host, a non-scrolling root of yours such as your studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
 Its height and placement are otherwise private.
 `Modal` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Modal`.
 Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), your own window or dialog, its dialog on the standalone layer there.
@@ -4374,20 +4381,26 @@ The name never states a position, so no "on", "off", "show" or "hide" at its sta
 It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
 A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so put a sentence that must be heard there in `title`.
 `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
-`on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+`on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow `on` only through `tone`.
 Fabricate coerces nothing, so only `true` and `false` are in the contract.
 The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when your `update` passes it, which may be after the press returns.
 To refuse the change, pass `on` unchanged and say why in text of your own, so the card never shows a state you do not hold.
 `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
 Pass `pressed` or `switch` as [StatusToggle](#statustoggle) states.
+`tone` is `neutral`, `enabled`, `locked` or `info`, and defaults to `neutral`.
+It tints the card while `on` is `true`: `enabled` in the success family, `locked` in the accent family and `info` in the info family, each an edge on a soft fill with the second line in the secondary ink so it still reads on the tint.
+`neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown.
+Choose it by what the setting means to your user, `enabled` for a preference that is switched on, `locked` for one that is enforced and `info` for an informational policy.
+The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, and a tone's edge falls short of 3:1 against the ground in some palettes, so never rely on the colour to say it.
+Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint declares no transition of its own.
+A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe('ToggleCard').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
 Work out the new state from the `on` you last passed.
 It is not called by `mount`, `update` or `destroy`.
 The switch has no unavailable state at version 1, as [StatusToggle](#statustoggle) states, and the card takes no `disabled`.
 A card is drawn the same in the Manager, the player window and, under the [standalone style root](#standalone-style-root), a companion's own window or dialog, and it grows to the width of `target`.
-The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
 It takes no rest props, so a `data-*` attribute is refused with `"<key>" is not a prop of ToggleCard`.
-Its padding, gap, corner, border and fill figures, its type figures, its colours beyond what this section and [StatusToggle](#statustoggle) state, and the hooks and tone classes Fabricate's own callers use are private.
+Its padding, gap, corner, border and fill figures, its type figures, its colours beyond what this section and [StatusToggle](#statustoggle) state, and the hooks and classes Fabricate's own callers use are private.
 
 A worked card follows: a setting of your own, named by the title the card draws.
 
@@ -5337,7 +5350,7 @@ A published component draws a control only where its section says so, and each c
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each section states.
   The name a `ListRow` button holds carries its own text as a native `title`, and so does each `TintSwatches` swatch its name, as each section states.
-  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its section states.
+  A `SegmentedControl` option's `title` is written as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, and as the radio's accessible description, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

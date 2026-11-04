@@ -5,7 +5,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { createServices as createSharedServices, makeSystem } from '../helpers/adminStoreServices.js';
+import {
+  createServices as createSharedServices,
+  makeSystem,
+} from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -251,15 +254,56 @@ describe('adminStore recipe check-pill projection', () => {
   it('resolves a routedByCheck system against the routed check slot', async () => {
     const row = await projectWith({
       resolutionMode: 'routedByCheck',
-      craftingCheck: { simple: { rollFormula: '1d20', dc: 5 }, routed: { rollFormula: '1d20', dc: 17 } },
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 5 },
+        routed: { rollFormula: '1d20', dc: 17 },
+      },
     });
     assert.deepEqual(row.checkSummary, { kind: 'dc', dc: 17 });
+  });
+
+  it("resolves a tiered alchemy system's recipe tier against the routed check slot", async () => {
+    // Tiered alchemy rolls the `routed` check, so the pill must read its tiers, not `simple`'s.
+    const system = {
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'tiered' },
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 5 },
+        routed: {
+          rollFormula: '1d20',
+          dc: 15,
+          tiers: [
+            { id: 't-easy', name: 'Easy', dc: 10 },
+            { id: 't-hard', name: 'Hard', dc: 25 },
+          ],
+        },
+      },
+    };
+    assert.deepEqual((await projectWith(system, { checkTierId: 't-hard' })).checkSummary, {
+      kind: 'dc',
+      dc: 25,
+    });
+    assert.deepEqual((await projectWith(system)).checkSummary, { kind: 'dc', dc: 15 });
+  });
+
+  it('resolves a simple alchemy system against the simple check slot', async () => {
+    const row = await projectWith({
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'simple' },
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 13 },
+        routed: { rollFormula: '1d20', dc: 21 },
+      },
+    });
+    assert.deepEqual(row.checkSummary, { kind: 'dc', dc: 13 });
   });
 
   it('reports a dynamic DC rather than inventing a number', async () => {
     const row = await projectWith({
       resolutionMode: 'simple',
-      craftingCheck: { simple: { ...USABLE_SIMPLE_CHECK, dcMode: 'dynamic', macroUuid: 'Macro.x' } },
+      craftingCheck: {
+        simple: { ...USABLE_SIMPLE_CHECK, dcMode: 'dynamic', macroUuid: 'Macro.x' },
+      },
     });
     assert.deepEqual(row.checkSummary, { kind: 'dynamic', dc: null });
   });
@@ -314,7 +358,9 @@ describe('adminStore recipe I/O projection', () => {
         { id: 'g2', results: [{ id: 'x3' }] },
       ],
     });
-    const store = createAdminStore(createServices({ recipes: [recipe], updateRecipe: async () => {} }));
+    const store = createAdminStore(
+      createServices({ recipes: [recipe], updateRecipe: async () => {} })
+    );
     await store.refresh();
 
     const row = rowFor(store, 'r1');

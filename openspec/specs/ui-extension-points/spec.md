@@ -804,7 +804,7 @@ Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fa
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
   A `Button` given `tooltip` and a `Stepper` button given `decrementTooltip` or `incrementTooltip` show that hint the same way, under the pointer and keyboard focus alike, as each group states.
   The `IconPicker` trigger and its rows are the other exception: each carries a native `title`, as its group states, and so do the name a `ListRow` button holds and each `TintSwatches` swatch.
-  A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, as its group states.
+  A `SegmentedControl` option's `title` is the last: Fabricate writes it as that segment's `data-tooltip-text`, which Foundry's hover listener shows on the pointer alone, and as the radio's accessible description, as its group states.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1860,8 +1860,12 @@ Each group states the accepted values of every key that entry publishes.
     Chromium's own accessibility tree names each radio by its `ariaLabel`, or by its `label` without one, and Playwright's accessibility snapshot of the focused radio shows that name as the arrow keys reach it; no screen reader was tested.
     `title` is optional text, final display text, a hint about the option; Fabricate writes it as the segment's `data-tooltip-text`, never as a native `title`, so Foundry's own hover listener shows it as plain text, never read as HTML, after a delay while the pointer rests on the segment.
     It is never the radio's accessible name, which stays `label`, and it changes nothing about the radiogroup's roles, states or keys.
-    It is shown to the pointer only: Fabricate opens it under no keyboard focus, so a hint that a keyboard user needs goes in `label` or in text beside the control.
-    A `title` that is not a string, or is white space alone, draws no tooltip.
+    Fabricate also writes it as the radio's accessible description: the radio carries `aria-describedby` naming a hidden node outside the label that holds the hint, with an id built from the mount and the option's position.
+    A screen reader is meant to announce the hint after the name, so a keyboard, touch or screen-reader user reaches it.
+    Chromium's own accessibility tree gives each hinted radio the hint as its description and leaves its name as it was, and no screen reader was tested.
+    Fabricate opens no tooltip under keyboard focus, so a sighted keyboard or touch user is not shown it: a hint such a user needs goes in `label` or in text beside the control.
+    A Fabricate that predates the description gives the hint to the pointer only.
+    A `title` that is not a string, or is white space alone, draws no tooltip and no description.
     `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
     `variant` is optional and is `'info'`, which draws that option's segment in the info tint while it is the selected one, in a control with no `tone` or with an `'accent'` or `'accent-soft'` one; under `tone: 'info'` the selected segment is solid info either way, and any other value is private.
     `disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
@@ -2117,7 +2121,7 @@ Each group states the accepted values of every key that entry publishes.
     A name of white space alone leaves its element with no name, so the companion never passes one.
   - `icon` is optional Font Awesome classes for a glyph drawn in the header band before the title, hidden from assistive technology and inked in the accent; absent, or `''`, no glyph is drawn.
     It names nothing, so `title` stays the dialog's accessible name, and a class absent from the running Foundry's Font Awesome build draws an empty box.
-  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the browser window that holds it.
+  - `size` is `'sm'`, `'md'` or `'lg'` and defaults to `'md'`: a dialog 500px, 560px or 620px wide, each clamped to 48px short of the width of the box it is centred in, which is the padding box of the nearest ancestor that makes itself the containing block of fixed content, as `contain: layout` and a `transform` do, such as your `overlayHost` region or a Foundry window scaled with a `transform`, and otherwise the viewport of the browser window that holds it.
     A value outside the set, a number included, draws `'md'`, and the dialog states no inline style for any of them.
   - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
     `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a footer band, spaced by `gap` and laid out as `footerLayout` states, of which the companion makes at most one primary.
@@ -2191,7 +2195,9 @@ Each group states the accepted values of every key that entry publishes.
     With `'dim'`, the scrim covers the box the dialog is centred in: the region alone where the region makes itself the containing block of fixed content, so a companion passes such a region to dim its own pane and nothing else, and the viewport where neither the region nor an element above it does, over a companion layer whose `z-index` is below 100 either way.
     A companion passes a region that does not itself scroll, such as the root that holds its scroller; in a region that scrolls, the scrim and the dialog scroll with its content.
     The way for a companion to dim its own window is that contained host, a non-scrolling root of its own such as its studio's root that makes itself the containing block of fixed content, with `trapFocus` `true`; dimming the viewport, with no such region, is the fallback.
-    The dialog's width and height are capped by the browser window's width and height, never by the region's, so a region narrower or shorter than the dialog clips it only where the region is its containing block and clips overflow.
+    The dialog's width is capped by the width of the box it is centred in, which is the region's where the region is its containing block and the browser window's otherwise.
+    A region wider than the browser window draws it at the region's width, and a region 48px wide or narrower draws it with no content width.
+    Its height is capped by the browser window's height, never by the region's, so a region shorter than the dialog clips it only where the region is its containing block and clips overflow.
     Its height and placement are otherwise private.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - Its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, its dialog on the standalone layer there.
@@ -2295,20 +2301,25 @@ Each group states the accepted values of every key that entry publishes.
     It is not part of the switch's name: while it is a non-blank string it is the switch's description, which Fabricate ties to it through `aria-describedby`, so a screen reader reads it after the name when the switch takes focus; absent, blank or not a string, the switch carries no `aria-describedby`.
     A Fabricate that predates this draws the second line and describes nothing by it, refuses nothing, and `describe` cannot show it, so a sentence that must be heard there belongs in `title`.
   - `icon` is optional Font Awesome classes for the glyph drawn before the title, hidden from assistive technology; absent, a circle glyph is drawn, and `''` draws no glyph and gives the copy the glyph's width.
-  - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow neither, as no tone is published.
+  - `on` is `true` or `false`, and is required: `true` draws the switch on, `false` off, and the card's own edge and fill follow `on` only through `tone`.
     Fabricate coerces nothing, so only `true` and `false` are in the contract.
     The card changes nothing itself: a press reports through `onToggle`, and the switch shows the new state when the companion's `update` passes it, which may be after the press returns.
     A companion that refuses the change passes `on` unchanged and says why in text of its own, so the card never shows a state the companion does not hold.
   - `semantics` is `pressed` or `switch`, and defaults to `pressed`: `pressed` exposes the state with `aria-pressed` and states no `role`, and `switch` states `role="switch"` and exposes it with `aria-checked`; a value outside the set draws `pressed`.
     The design-system capability's rule on announcing a switch says which to pass.
+  - `tone` is `neutral`, `enabled`, `locked` or `info`, and defaults to `neutral`.
+    It tints the card while `on` is `true`: `enabled` in the success family, `locked` in the accent family and `info` in the info family, each an edge on a soft fill with the second line in the secondary ink so it still reads on the tint.
+    `neutral`, a card whose `on` is `false` and a value outside the set draw the resting face, and nothing is thrown or coerced.
+    The tint only decorates: the switch's `aria-pressed` or `aria-checked` and its track say whether the card is on, so the colour is never the only sign of state, and a tone's edge may fall short of 3:1 against the ground.
+    Under forced colours the system draws the card's edge in its text colour and the switch's track is still filled when on and hollow when off, and the tint declares no transition of its own.
+    A Fabricate that predates `tone` refuses it with `"tone" is not a prop of ToggleCard`, and `describe` omits it.
   - `onToggle` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
     The companion works out the new state from the `on` it last passed.
     It is not called by `mount`, `update` or `destroy`.
   - The switch has no unavailable state at version 1, as the `StatusToggle` group states, and the card takes no `disabled`.
   - A card is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, and it grows to the width of `target`.
-  - The card draws no tone: it is neutral whether `on` is `true` or `false`, and Fabricate's own tones, which tint an enabled, locked or informational card when it is on, are not published.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-- **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and tone classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
+- **Private:** `ToggleCard`'s padding, gap, corner, border and fill figures, its type figures, its colours beyond what its group and the `StatusToggle` group state, the hooks and classes Fabricate's own callers use, and how Fabricate draws a card in its own windows.
 
 ### SelectionCheckbox
 
@@ -3060,7 +3071,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `SegmentedControl` with `options`, `value`, `ariaLabel` and `onChange` inside a Fabricate window and the user presses ArrowRight on the checked radio
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
-- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and not as its radio's name
+- **AND** a mount that passes `tone: 'info'` draws the selected segment solid in the info colour, one that passes `density: 'compact'` or `'field'` draws the `--fab-bg-1` track of smaller, equal segments, and an option that passes `title` carries it as the segment's `data-tooltip-text` and as its radio's accessible description, and not as its radio's name
 - **AND** a mount that passes `surface: 'panel'` fills the track with `--fab-bg-0`, one that passes `size: 34` draws a 34px track, and an option whose `ariaLabel` contains its `label` names its radio, while one whose `ariaLabel` does not throws M22
 - **AND** a mount that passes `groupName` throws M13
 - **AND** a mount that omits `ariaLabel` throws M9
@@ -3148,6 +3159,8 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Modal` with an `overlayHost` that is a pane of its own inside a Fabricate window, over a layer of its own in that pane
 - **THEN** the dialog is drawn inside the pane, centred in it where the pane makes itself the containing block of fixed content and centred in the browser window's viewport where it does not
 - **AND** the dialog is drawn over the companion's layer and no layer of Fabricate's covers the pane
+- **AND** where the pane makes itself the containing block, a pane whose padding box is 420px wide holds a dialog of every `size` at most 372px wide, 24px from each side of that box and with its close control inside it, and a pane whose padding box is 720px wide leaves each rung at its own width
+- **AND** a pane wider than the browser window draws the dialog at the pane's width, past the window's edge
 
 #### Scenario: A dimmed published dialog
 
