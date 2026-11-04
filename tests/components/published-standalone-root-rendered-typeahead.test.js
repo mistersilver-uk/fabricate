@@ -8,8 +8,8 @@
  * Every element of the field and of the open list computes the same compared properties, pseudo
  * elements and border box in both hosts at rest, under keyboard focus or the pointer, under
  * reduced motion and under forced colours. The harvested arm repeats the comparison over Foundry's
- * own sheet and Font Awesome. It is a file of its own so `published-standalone-root-rendered.test.js`
- * stays inside the per-file timeout, and repeats that file's minimum, the target face, the
+ * own sheet and Font Awesome. It is a file of its own so the shards of `standaloneRootMeasurement.js`
+ * stay inside the per-file timeout, and repeats their minimum, the target face, the
  * core-min sheets and the per-element read.
  * Limit: happy-dom lays nothing out, so the list's inline placement is the one it computed, alike in
  * both hosts; its placement in a laid-out page is `typeahead-published-rendered.test.js`'s.
@@ -54,7 +54,7 @@ const CORE_MIN_SHEETS = Object.freeze([
   fixture('foundry-core-button-min.css'),
   fixture('foundry-core-input-min.css'),
 ]);
-/** The target face `published-standalone-root-rendered.test.js` writes on both hosts. */
+/** The target face `standaloneRootMeasurement.js` writes on both hosts. */
 const targetFace = (width) =>
   `display: flex; width: ${width}px; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px`;
 
