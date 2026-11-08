@@ -4,12 +4,12 @@
  * forwarded `onChange` arguments and the DOM, and an unreachable one is asserted absent.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from 'svelte';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   INGREDIENT_KINDS,
   KIND_ORDER,
@@ -1432,10 +1432,7 @@ describe('PickerRow: every match of a search is reachable (issue 2960)', () => {
   }
 
   it('the suggestion panel stays bounded and scrolls rather than growing', () => {
-    const css = readFileSync(
-      resolve(import.meta.dirname, '../../styles/fabricate-manager-recipe-editor.css'),
-      'utf8'
-    );
+    const css = readStylesheet();
     const rule = css.match(
       /\.fabricate-manager \.manager-recipe-option-suggestions \{([^}]*)\}/u
     )?.[1];
