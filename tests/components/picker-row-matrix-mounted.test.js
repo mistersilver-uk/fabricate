@@ -4,6 +4,7 @@
  * forwarded `onChange` arguments and the DOM, and an unreachable one is asserted absent.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
@@ -1342,4 +1343,117 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
       'the trigger keeps its own name'
     );
   });
+});
+
+describe('PickerRow: every match of a search is reachable (issue 2960)', () => {
+  const GEMS = Array.from({ length: 24 }, (_, i) => ({
+    id: `c-gem-${String(i + 1).padStart(2, '0')}`,
+    label: `Powdered gem ${String(i + 1).padStart(2, '0')}`,
+    icon: 'fas fa-gem',
+  }));
+  const LONG_CATALOGUE = Object.freeze({
+    ...CATALOGUE,
+    component: [...CATALOGUE.component, ...GEMS],
+  });
+  const LAST = GEMS.at(-1);
+  const suggestionIds = (target) =>
+    [...target.ownerDocument.querySelectorAll('[data-recipe-option-suggestion]')].map((node) =>
+      node.getAttribute('data-recipe-option-suggestion')
+    );
+  const key = (field, name) =>
+    field.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: name, bubbles: true })
+    );
+
+  for (const surface of ['recipe ingredient', 'recipe result']) {
+    const config = SURFACES[surface];
+
+    it(`${surface}: lists all matches in catalogue order, past the seventh`, async () => {
+      const { target } = await mountRow(config, unnamed('component'), {
+        catalogue: LONG_CATALOGUE,
+      });
+      await type(target.querySelector('[data-recipe-option-search]'), 'powdered');
+      assert.deepEqual(
+        suggestionIds(target),
+        GEMS.map((gem) => gem.id),
+        'every match is in the DOM, the last included'
+      );
+      const listbox = target.ownerDocument.querySelector('[role="listbox"]');
+      assert.equal(listbox.querySelectorAll('[role="option"]').length, GEMS.length);
+    });
+
+    it(`${surface}: a pointer press on a match after the seventh writes that component`, async () => {
+      const start = unnamed('component');
+      const { target, applied } = await mountRow(config, start, { catalogue: LONG_CATALOGUE });
+      await type(target.querySelector('[data-recipe-option-search]'), 'POWDERED');
+      await click(
+        target.ownerDocument.querySelector(`[data-recipe-option-suggestion="${LAST.id}"]`)
+      );
+      assert.deepEqual(await applied('pointer'), { ...start, id: LAST.id });
+    });
+
+    it(`${surface}: the keyboard walks to the last match, announces it, and Enter writes it`, async () => {
+      const start = unnamed('component');
+      const { target, applied } = await mountRow(config, start, { catalogue: LONG_CATALOGUE });
+      const field = target.querySelector('[data-recipe-option-search]');
+      await type(field, 'powdered');
+      for (let step = 0; step < GEMS.length; step += 1) {
+        key(field, 'ArrowDown');
+        await settle();
+      }
+      const options = [...target.ownerDocument.querySelectorAll('[role="option"]')];
+      const selected = options.filter((node) => node.getAttribute('aria-selected') === 'true');
+      assert.deepEqual(selected, [options.at(-1)], 'only the last match is active');
+      assert.equal(field.getAttribute('aria-activedescendant'), options.at(-1).id);
+      assert.equal(field.getAttribute('aria-expanded'), 'true');
+      key(field, 'Enter');
+      await settle();
+      assert.deepEqual(await applied('keyboard'), { ...start, id: LAST.id });
+    });
+
+    it(`${surface}: a refined search still filters, and no match still says so`, async () => {
+      const { target } = await mountRow(config, unnamed('component'), {
+        catalogue: LONG_CATALOGUE,
+      });
+      const field = target.querySelector('[data-recipe-option-search]');
+      await type(field, 'powdered gem 2');
+      assert.deepEqual(
+        suggestionIds(target),
+        GEMS.filter((gem) => gem.label.startsWith('Powdered gem 2')).map((gem) => gem.id),
+        'only the twenties remain'
+      );
+      await type(field, 'zzz');
+      assert.deepEqual(suggestionIds(target), []);
+      assert.ok(
+        Boolean(target.ownerDocument.querySelector('[data-recipe-option-no-matches]')),
+        'the empty state is reported'
+      );
+    });
+  }
+
+  it('the suggestion panel stays bounded and scrolls rather than growing', () => {
+    const css = readFileSync(
+      resolve(import.meta.dirname, '../../styles/fabricate-manager-recipe-editor.css'),
+      'utf8'
+    );
+    const rule = css.match(
+      /\.fabricate-manager \.manager-recipe-option-suggestions \{([^}]*)\}/u
+    )?.[1];
+    assert.ok(rule, 'the panel rule exists');
+    assert.match(rule, /max-height:\s*232px/u);
+    assert.match(rule, /overflow:\s*auto/u);
+    assert.match(
+      css.match(/\.manager-recipe-option-suggestion \{([^}]*)\}/u)?.[1] ?? '',
+      /flex:\s*0 0 auto/u,
+      'rows keep their height instead of shrinking into the bound'
+    );
+  });
+
+  for (const kind of ['essence', 'currency', 'knowledge']) {
+    it(`${kind}: the other pickers still suggest their one match`, async () => {
+      const { target } = await mountRow(SURFACES['recipe ingredient'], unnamed(kind));
+      await type(target.querySelector('[data-recipe-option-search]'), PICK[kind].query);
+      assert.deepEqual(suggestionIds(target), [PICK[kind].id]);
+    });
+  }
 });
