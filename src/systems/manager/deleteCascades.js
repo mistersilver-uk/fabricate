@@ -81,10 +81,17 @@ async function pruneComponentMemberships(io, systemId, removedIds) {
   // ratchet-exempt(world-scope): destructive-basis, the prune asks what the persisted record holds
   const held = new Set((saved?.components ?? []).map((component) => String(component?.id ?? '')));
   const entityIds = removedIds.filter((id) => !held.has(id));
-  const store = io.scopeStores().component;
-  const { count, error } = await removeScopedMemberships(store, { systemId, entityIds });
-  if (error) console.error('Fabricate | component membership prune failed', systemId, error);
-  return count;
+  try {
+    const { count, error } = await removeScopedMemberships(io.scopeStores().component, {
+      systemId,
+      entityIds,
+    });
+    if (error) throw error;
+    return count;
+  } catch (error) {
+    console.error('Fabricate | component membership prune failed', systemId, error);
+    return 0;
+  }
 }
 
 /**
