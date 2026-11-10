@@ -85,7 +85,12 @@ test('1773 V&A 3: a reward write that fails leaves the confirmed credit a credit
     { resultId: 'c1', unit: 'gp', amount: 3, unitName: 'gp' },
   ]);
 
-  const evidence = new RunJournalBuilder({})._nativeRecoveryEvidence(run, true);
+  const { recoveryEvidence: evidence } = new RunJournalBuilder({})._recoveryProjection({
+    run,
+    runType: 'crafting',
+    terminal: false,
+    evidenceEntitled: true,
+  });
   const awards = evidence.effects.find((effect) => effect.kind === 'awardItems');
   assert.deepEqual(
     awards.receipt.items.map((item) => item.name),
