@@ -9,6 +9,7 @@ import { get } from 'svelte/store';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
 import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { resolveScopedEntityRead } from '../../src/systems/scopedEntityReads.js';
+import { createComponentScopeStore } from '../../src/systems/worldScopeStores.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import {
   buildComponentEditorState,
@@ -87,6 +88,12 @@ function installSanctionedComponentDelete(harness, { failAt } = {}) {
     },
     _stripComponentsFromRecipes: proto._stripComponentsFromRecipes,
     _deleteComponentSet: proto._deleteComponentSet,
+    // The cascade's own membership prune reaches the same scope store the family writes, and
+    // reads the system as persisted once `save` resolves.
+    _componentScopeStore: () => harness.services.getComponentScopeStore?.() ?? null,
+    _repository: {
+      readReplicatedSnapshot: () => structuredClone(harness.systemManager.getSystems()),
+    },
   };
   const calls = [];
   harness.systemManager.deleteComponents = async (systemId, componentIds) => {
@@ -228,6 +235,47 @@ test('1371: removing a component deletes BOTH halves', async () => {
     componentsOf(harness).map((record) => record.id),
     [],
     'and so is the in-system record'
+  );
+});
+
+test('removing a component parts its membership in the sanctioned delete, so the family write is a no-op', async () => {
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const { store, scope } = await openStore(harness, [LINKED]);
+  installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+  scope.payload.membership[membershipKey('ingot', 'sys2')] = {
+    entityId: 'ingot',
+    systemId: 'sys2',
+    inherit: {},
+  };
+  const saves = [];
+  let deleting = false;
+  const save = scope.store.save;
+  scope.store.save = async (next) => {
+    saves.push(deleting ? 'cascade' : 'family');
+    return save(next);
+  };
+  const installed = harness.systemManager.deleteComponents;
+  harness.systemManager.deleteComponents = async (...args) => {
+    deleting = true;
+    try {
+      return await installed(...args);
+    } finally {
+      deleting = false;
+    }
+  };
+
+  assert.equal(await store.worldScope.component.removeFromSystem('ingot', 'sys1'), true);
+
+  assert.deepEqual(
+    Object.keys(scope.payload.membership),
+    [membershipKey('ingot', 'sys2')],
+    'the other system keeps its record'
+  );
+  assert.deepEqual(
+    saves,
+    ['cascade'],
+    'one membership write, the cascade’s; the family’s finds none'
   );
 });
 
@@ -592,12 +640,16 @@ test('1371: a delete that throws BEFORE its persist leaves the membership record
   );
 });
 
-test('1371: and so does one that throws AFTER it — the store cannot tell the two windows apart', async () => {
+test('1371: one that throws AFTER it has already parted the membership — the store answers both windows alike', async () => {
   // WINDOW TWO, and THE MEASUREMENT THAT SETTLES THE DESIGN.
   const before = await driveRemovalFailure('persist');
   const after = await driveRemovalFailure('reconcile');
 
-  assert.deepEqual(after.membership, ['ingot'], 'the membership record survives here too');
+  assert.deepEqual(
+    after.membership,
+    [],
+    'the sanctioned delete prunes the membership once its write lands, before the reconcile throws'
+  );
   assert.equal(after.errors.length, 1, 'and the GM is told, once');
   assert.deepEqual(
     after.rows,
@@ -656,6 +708,42 @@ test('1371: a membership write that throws leaves only the INERT half, and still
       'ghost on the rules list, still COUNTED by the world screens until the removal is ' +
       're-issued or the ghost row`s Add recovers the row'
   );
+  assert.equal(harness.notifications.error.length, 1, 'the GM is told, once');
+});
+
+test('a refused membership setting write through the real scope store leaves the inert record', async () => {
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const setting = { value: { entities: [LINKED], defaults: {}, membership: {} }, refuse: false };
+  const scopeStore = createComponentScopeStore({
+    getSetting: () => structuredClone(setting.value),
+    setSetting: async (_key, value) => {
+      if (setting.refuse) throw new Error('The component scope setting could not be saved.');
+      setting.value = structuredClone(value);
+    },
+  });
+  harness.services.getComponentScopeStore = () => scopeStore;
+  const store = createAdminStore(harness.services);
+  await store.selectSystem('sys1');
+  installSanctionedComponentDelete(harness);
+  await store.worldScope.component.addToSystem('ingot', 'sys1');
+  setting.refuse = true;
+  harness.notifications.error.length = 0;
+  const consoleError = console.error;
+  console.error = () => {};
+  let answer;
+  try {
+    answer = await store.worldScope.component.removeFromSystem('ingot', 'sys1');
+  } finally {
+    console.error = consoleError;
+  }
+
+  assert.equal(answer, true, 'the row is gone, so the screen re-projects');
+  assert.deepEqual(
+    componentsOf(harness).map((record) => record.id),
+    [],
+    'the row delete landed'
+  );
+  assert.deepEqual(Object.keys(setting.value.membership), [membershipKey('ingot', 'sys1')]);
   assert.equal(harness.notifications.error.length, 1, 'the GM is told, once');
 });
 
