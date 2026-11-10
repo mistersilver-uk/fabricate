@@ -115,6 +115,33 @@ test('an Item already gone before dispatch is refused definitely and nothing is 
   assert.deepEqual(item.calls, [], 'no write was dispatched');
 });
 
+test('an unreadable live quantity is refused definitely before any dispatch', async () => {
+  const actor = liveActor();
+  const item = liveItem(actor, 'ore', 3);
+  item._source.system.quantity = 'several';
+  const error = await rejectsWith(confirmItemConsumption(item, 1), REFUSED);
+  assert.match(error.message, /"Item ore": its quantity is unreadable/);
+  assert.deepEqual(item.calls, [], 'no write was dispatched');
+});
+
+test('a null from fromUuidSync is not absence: the parent collection confirms the write', async (t) => {
+  Object.defineProperty(globalThis, 'fromUuidSync', {
+    value: () => null,
+    configurable: true,
+    writable: true,
+  });
+  t.after(() => delete globalThis.fromUuidSync);
+  const actor = liveActor();
+  const item = liveItem(actor, 'ore', 5);
+  const write = item.update;
+  item.update = async function silent(payload) {
+    await write.call(this, payload);
+    return undefined;
+  };
+  assert.equal(await confirmItemConsumption(item, 2), 2);
+  assert.equal(quantityOf(item), 3);
+});
+
 for (const [label, update] of [
   ['a module veto', async () => undefined],
   ['a no-op diff the schema discarded', async () => undefined],
@@ -176,7 +203,7 @@ test('a delete that resolves undefined with the Item gone stays uncertain', asyn
   await rejectsWith(confirmItemConsumption(item, 1), UNCERTAIN);
 });
 
-test('a stale planning instance whose live quantity already equals the target is not confirmed', async () => {
+test('a write that landed on a detached copy, with live unchanged and a non-null result, stays uncertain', async () => {
   const actor = liveActor();
   const live = liveItem(actor, 'ore', 4);
   // The plan counted 5 on a detached copy, so its own target of 4 is already the live value.
@@ -264,11 +291,11 @@ test('the predicate admits the stack-path guard and nothing uncertain', () => {
 
 // craft(): a Definite Effect Refusal on the legacy commit path leaves the stage retryable.
 
-function installCraftWorld() {
+function installCraftWorld(system = { id: 'sys-1', tools: [] }) {
   Object.assign(globalThis, {
     game: {
       fabricate: {
-        getCraftingSystemManager: () => ({ getSystem: () => ({ id: 'sys-1', tools: [] }) }),
+        getCraftingSystemManager: () => ({ getSystem: () => system }),
         getResolutionModeService: () => null,
       },
       user: { id: 'user-1', isGM: true },
@@ -278,8 +305,15 @@ function installCraftWorld() {
 }
 
 /** One recipe over one live ingredient, an optional tool, and a scripted check. */
-function craftFixture({ runManager, checkSucceeds = true, tool = false, stepCount = 1 }) {
-  installCraftWorld();
+function craftFixture({
+  runManager,
+  checkSucceeds = true,
+  tool = false,
+  stepCount = 1,
+  timeRequirement = null,
+  system,
+}) {
+  installCraftWorld(system);
   const source = liveActor('a1');
   const ingredient = liveItem(source, 'ing-1', 3);
   const toolItem = tool ? liveItem(source, 'tool-1', 1) : null;
@@ -309,7 +343,7 @@ function craftFixture({ runManager, checkSucceeds = true, tool = false, stepCoun
         ingredientSets: [ingredientSet],
         resultGroups: [],
         toolIds: [],
-        timeRequirement: null,
+        timeRequirement,
       })),
     validate: () => ({ valid: true, errors: [] }),
     toJSON() {
@@ -347,9 +381,16 @@ function vetoOnce(item) {
 
 test('craft(): a refusal discards the run it created, and the same recipe crafts again', async () => {
   const runManager = nativeCraftRunManager();
-  const { ingredient, craft } = craftFixture({ runManager });
+  // The run's own user may record stage history, and the system's check gives it a real kind.
+  runManager.inspectRun().userId = 'user-1';
+  const system = { id: 'sys-1', tools: [], features: { craftingChecks: true } };
+  const { ingredient, craft } = craftFixture({ runManager, system });
   vetoOnce(ingredient);
   await rejectsWith(craft(), REFUSED);
+  assert.ok(
+    runManager.inspectUpdates().some((update) => update.steps[0].resolutionSnapshot),
+    'the attempt persisted a resolution snapshot'
+  );
   assert.equal(runManager.inspectDiscarded(), true, 'the phantom run was discarded');
   const stage = runManager.inspectRun().steps[0];
   assert.ok(!Object.hasOwn(stage, 'historySettlement'), 'the stage settlement was removed');
@@ -389,6 +430,43 @@ test('craft(): a refusal on a reused run restores the stage, keeping the earlier
   const retried = await craft({ runId: run.id });
   assert.equal(retried.success, true, retried.message);
   assert.ok(succeeded, 'the retried stage completed');
+});
+
+test('craft(): a refused timed START discards the run it created, and the retry arms', async () => {
+  const runManager = nativeCraftRunManager();
+  const { ingredient, craft } = craftFixture({ runManager, timeRequirement: { hours: 1 } });
+  vetoOnce(ingredient);
+  await rejectsWith(craft(), REFUSED);
+  assert.equal(runManager.inspectDiscarded(), true, 'the phantom run was discarded');
+  assert.ok(!Object.hasOwn(runManager.inspectRun().steps[0], 'historySettlement'));
+  assert.equal(quantityOf(ingredient), 3);
+
+  const retried = await craft();
+  assert.equal(retried.disposition, 'timed-start', retried.message);
+  assert.equal(quantityOf(ingredient), 2);
+});
+
+test('craft(): a refused timed START on a reused run keeps the stage retryable', async () => {
+  const runManager = nativeCraftRunManager({ stepCount: 2, stepIndex: 1 });
+  const run = runManager.inspectRun();
+  const earlier = { consumption: 'complete', awards: 'complete' };
+  Object.assign(run.steps[0], { status: 'succeeded', historySettlement: { ...earlier } });
+  const { ingredient, craft } = craftFixture({
+    runManager,
+    stepCount: 2,
+    timeRequirement: { hours: 1 },
+  });
+  vetoOnce(ingredient);
+  await rejectsWith(craft({ runId: run.id }), REFUSED);
+  assert.equal(runManager.inspectDiscarded(), false, 'a reused run is never discarded');
+  assert.deepEqual(run.steps[0].historySettlement, earlier);
+  assert.ok(!Object.hasOwn(run.steps[1], 'historySettlement'), 'the stage settlement was removed');
+  const persisted = runManager.inspectUpdates().at(-1).steps[1];
+  assert.ok(!Object.hasOwn(persisted, 'historySettlement'), 'the restore persisted');
+
+  const retried = await craft({ runId: run.id });
+  assert.equal(retried.disposition, 'timed-start', retried.message);
+  assert.equal(quantityOf(ingredient), 2);
 });
 
 test('craft(): a refused consume-on-fail still breaks tools and settles complete-empty', async () => {

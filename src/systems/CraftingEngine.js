@@ -1375,6 +1375,15 @@ export class CraftingEngine {
     return consumed;
   }
 
+  /** Open a timed START stage and consume its plan; a Definite Effect Refusal restores it. */
+  async _consumeTimedStart(plan, stageArgs) {
+    const restore = await this._beginNativeStage({ ...stageArgs, timedStart: true });
+    return this._consumeNativeIngredients(plan, stageArgs).catch(async (error) => {
+      if (isDefiniteEffectRefusal(error)) await restore?.();
+      throw error;
+    });
+  }
+
   async _saveNativeConsumption(consumed, { craftingActor, run, runManager, stepIndex }) {
     if (!run || !runManager || getRunLifecycleContract(run) !== 'legacy') return;
     const stage = run.steps[stepIndex];
@@ -3144,7 +3153,7 @@ export class CraftingEngine {
     }
 
     // Items first, then currency; both gates have passed.
-    await this._beginNativeStage({
+    const consumedItems = await this._consumeTimedStart(craftSelection.plan, {
       craftingActor,
       run,
       runManager,
@@ -3152,13 +3161,6 @@ export class CraftingEngine {
       recipe: executionRecipe,
       step,
       componentSourceActors,
-      timedStart: true,
-    });
-    const consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
-      craftingActor,
-      run,
-      runManager,
-      stepIndex,
     });
     // The deduction never aborts or rolls back, so the run records what settled, not what was
     // planned; otherwise a cancel refunds currency never paid.
