@@ -115,6 +115,12 @@ function sameStation(current, next) {
   );
 }
 
+/** A facade command the active GM runs; an absent facade answers the authority-unavailable refusal. */
+function activeGmCommand(name) {
+  return (opts = {}) =>
+    game?.fabricate?.[name]?.(opts) ?? Promise.resolve(authorityUnavailableRefusal());
+}
+
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = typeof ref.sceneId === 'string' ? ref.sceneId : null;
@@ -326,14 +332,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getJournalRunAuthorityAvailability: () =>
         game?.fabricate?.getJournalRunAuthorityAvailability?.()
         ?? authorityUnavailableAvailability(),
-      // Active-GM manual disposition of a retained execution claim (issue 1648). The
-      // authority itself refuses a non-active-GM caller, so this seam adds no authorization.
-      reconcileJournalRunAuthority: (opts = {}) =>
-        game?.fabricate?.reconcileJournalRunAuthority?.(opts)
-        ?? Promise.resolve(authorityUnavailableRefusal()),
-      reconcileUncertainJournalRun: (opts = {}) =>
-        game?.fabricate?.reconcileUncertainJournalRun?.(opts)
-        ?? Promise.resolve(authorityUnavailableRefusal()),
+      // Active-GM manual dispositions of a retained claim (issue 1648) and of an uncertain legacy
+      // run. Each command refuses a non-active-GM caller, so these seams add no authorization.
+      reconcileJournalRunAuthority: activeGmCommand('reconcileJournalRunAuthority'),
+      reconcileUncertainJournalRun: activeGmCommand('reconcileUncertainJournalRun'),
       advanceCraftingRun: (opts = {}) =>
         game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
