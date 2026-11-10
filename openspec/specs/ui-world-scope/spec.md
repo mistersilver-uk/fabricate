@@ -780,7 +780,7 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     The screen therefore states what to do INSTEAD, naming the first few systems to remove it from.
     An inert membership (a record whose system holds no row) is not named and does not refuse; the world delete removes it with every record naming the entity.
     The note, the confirm guard and the bulk plan read one list.
-    The refusal names the control to use: `Remove from this system` under `Systems using this component`, the bulk panel's `Remove from` direction, or `Delete component` in the system's own editor.
+    The refusal names the control to use: the entry's names `Remove from this system` under `Systems using this component`, and the bulk refusal names the bulk panel's `Remove from` direction.
     **THE REFUSAL BINDS A BULK CONTROL TOO, AND IT REFUSES PER RECORD RATHER THAN PER INSTRUCTION** (issue 1371, revision 9).
     Revision 8 shipped the world Component catalogue's bulk delete calling the unrefusing write path once per selected record, so a GM told on the entry to remove the component from each system first could take the same action in one click one route away; that divergence is closed rather than absorbed, and this requirement is what it was closed against.
     **A MIXED SELECTION PROCEEDS FOR THE RECORDS THAT ARE FREE.** One held record does not withhold the whole instruction, because a GM who ticked twelve rows and meant the eight unused ones is served by deleting eight and being told about the four; refusing all twelve teaches them only that the control does not work.
