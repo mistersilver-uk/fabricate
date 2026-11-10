@@ -345,8 +345,10 @@ Either choice moves the run to history.
 Neither repeats, undoes or refunds anything, and no item changes; they differ only in what the record says.
 The prompt defaults to **Not yet**, which closes nothing.
 
-The closed entry keeps its receipts, still marked uncertain, and names the GM who closed it.
-A note can be recorded only through `game.fabricate.reconcileUncertainJournalRun`.
+The closed entry keeps its receipts, still marked uncertain, and shows **Closed by** with the GM who closed it and the choice they made.
+The prompt has no field for a note.
+A macro can record one through the [Run Manager API]({% link api/run-manager.md %}).
+A recorded note shows beside **GM note** on the closed entry.
 The note is stored on the actor and readable by every user permitted on it, so it is not a GM-private field.
 
 ### Hidden identity and private checks

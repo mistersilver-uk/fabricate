@@ -295,6 +295,10 @@ GM only.
 Deleting a system emits one summary notification naming the crafting system and counting related entities deleted with it.
 It does not emit one notification per deleted recipe.
 
+Deleting a system also removes the scoped membership records that name it, in the component, essence, and tool scopes.
+That prune runs after the system's removal is saved and only for records whose row the saved systems no longer hold.
+A failure in one scope is logged and does not stop the others.
+
 Deletion is resilient to a recipe that cannot be removed.
 If an individual recipe deletion fails, that failure is logged to the console with the recipe id, the remaining recipes are still deleted, and the system itself is still removed.
 In that case the summary is a warning that also reports how many recipes could not be auto-deleted and may need manual removal.
@@ -611,6 +615,29 @@ When a component is deleted, any essence definitions that had their `sourceItemU
 Their `sourceItemUuid` is set to `null`.
 
 **Returns:** `Promise<boolean>`
+
+### deleteComponents(systemId, componentIds)
+
+Removes several components from the system in one `craftingSystems` write and one `recipes` write.
+GM only.
+
+Recipes that name a removed component are rewritten once each, and a recipe left without a usable ingredient set or result is disabled.
+Essence definitions that pointed at a removed component have those links cleared.
+
+Once the system save resolves, the call also removes this system's membership records for the removed components.
+Another system's membership for the same component is kept.
+The prune reads the persisted systems after the write and removes a record only when that snapshot no longer holds the component's row.
+A snapshot that still holds the row, an unreadable snapshot, or a failed membership save removes nothing and is logged, and the delete itself still succeeds.
+
+**Returns:** `Promise<{deleted, componentIds, recipesUpdated, recipesDisabled, membershipsParted}>`
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `deleted` | `number` | Components removed from the system. |
+| `componentIds` | `string[]` | Their ids. |
+| `recipesUpdated` | `number` | Recipes rewritten. |
+| `recipesDisabled` | `number` | Recipes this call took from enabled to disabled. |
+| `membershipsParted` | `number` | This system's membership records removed. `0` when nothing was pruned. |
 
 ---
 

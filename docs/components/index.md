@@ -249,6 +249,10 @@ At the foot of the entry, a danger card names how many crafting systems currentl
 
 If no crafting system has rules for this component, confirming removes it for good, along with the world record.
 If one or more crafting systems have rules for it, the card explains that first, and the confirm control itself reads **Cannot delete** instead of letting you proceed.
+A system counts only when it still holds the component, meaning it has both a record of the component and its rules.
+The refusal names the control to use, which is **Remove from this system** under **Systems using this component**, for each system it lists.
+Deleting the component from inside a system with the Crafting Admin panel removes that system's record as well, so the system no longer holds back a world delete.
+Deleting a crafting system does the same for every component it held.
 Remove the component from each of those systems first, using the systems card above.
 Because the world-scope upgrade gives every pre-existing component a full set of system rules, this refusal is the normal state for most components on an upgraded world, not an edge case.
 It is also the normal state for a component you imported, because the system you imported it into holds it.
