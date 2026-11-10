@@ -105,7 +105,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
     'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
-    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/RecoveryEvidence.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     // The run-type multi-select and the box its rows draw (issue 1644).
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/journal/JournalKindFilter.svelte',

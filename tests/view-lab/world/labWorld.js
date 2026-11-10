@@ -1175,7 +1175,9 @@ export async function bootLabRuntime(world, journalCaseState = null) {
   world.shim = shim;
   // The authority-unavailable case starts without a ledger, which is what blocks its actions.
   if (journalCaseState !== 'authority-unavailable') {
-    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
+    const ledger = createLabRunAuthorityLedger(
+      ['claim-retained', 'native-recovery-claim'].includes(journalCaseState)
+    );
     const journal = globalThis.game.journal;
     const get = journal.get;
     journal.contents.push(ledger);

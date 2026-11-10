@@ -102,6 +102,11 @@ fabricate-journal-lifecycle-future-routed-stage
 fabricate-journal-lifecycle-kind-toggles
 fabricate-journal-lifecycle-kind-filter-open
 fabricate-journal-lifecycle-history-settling
+fabricate-journal-native-recovery-gm
+fabricate-journal-native-recovery-gm-narrow
+fabricate-journal-native-recovery-player
+fabricate-journal-native-recovery-gm-claim
+fabricate-journal-native-recovery-dialog
 fabricate-journal-history-batch-full-1240
 fabricate-journal-history-batch-partial-1240
 fabricate-journal-history-batch-empty-1240
@@ -131,6 +136,8 @@ fabricate-journal-history-data-salvage-1024
 player-journal-reward-awards
 player-journal-reward-awards-multi
 player-journal-reward-just-resolved
+fabricate-journal-native-reconciled-1240
+fabricate-journal-native-reconciled-1024
 player-journal-award-choice
 player-journal-award-choice-hearth-herb
 player-journal-award-choice-ceiling
