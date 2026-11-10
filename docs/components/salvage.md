@@ -297,6 +297,7 @@ This is the same **Chat output** feature that governs crafting cards, set on the
 
 When the component carries a time requirement, the press starts a run rather than finishing the salvage.
 The tab then shows the run's waiting message instead of a ribbon, and the materials arrive as world time advances.
+If a salvage stops before Fabricate can confirm every material it consumed or awarded, the run stays in the Journal until the active GM records its outcome, as [Stuck or uncertain runs]({% link player-app/journal.md %}#stuck-or-uncertain-runs) describes.
 
 ### Broken Tools
 
