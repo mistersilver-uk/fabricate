@@ -1840,7 +1840,7 @@ Public crafting preserves one-call execution when the stage is ready and all cho
 **Execution Journal** is durable evidence of an ordered operation, not an atomic transaction or a promise of rollback.
 Its effects distinguish `planned`, `applying` and `applied`: confirmed effects form a prefix, followed by at most one uncertain applying effect and then unstarted effects.
 An ambiguous effect or an unpersisted receipt requires manual recovery; it is never replayed automatically.
-Versioned ingredient consumption requires the delete/update operation to return the matching Item document before recording confirmed spending or allowing later awards; a partially applied batch remains uncertain rather than being retried or rolled back.
+Versioned and native ingredient consumption is confirmed from the consumed Item's live post-write state, never from the returned object's identity, before recording spending or allowing awards; a Definite Effect Refusal (nothing written, or a write Foundry answered without changing the Item, with nothing earlier in the batch consumed) settles nothing uncertain and stays retryable, while a partially applied batch remains uncertain.
 Gathering persists terminal history with the planned journal before terminal side effects and records receipts in that same history entry.
 Its versioned historical awards come from the applied result-creation receipt, including permitted failure awards, rather than the pre-effect plan.
 Versioned gathering preserves start-time stamina, node/reservation, blind-store and runtime/economy behavior while adding manual collection and eligible automatic completion.
