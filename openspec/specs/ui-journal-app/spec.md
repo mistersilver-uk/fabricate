@@ -146,8 +146,8 @@ Materials used, Crafted and Tools used MUST use the same dense ListRow anatomy i
 Tools used MUST appear once for the attempted stages, including matching transient history, and MUST group only recorded actor-qualified physical Item identity.
 Each occurrence MUST retain its stage association, recorded quantity and affirmative broken, virtual, spared and immune evidence; repeated use MUST NOT be summed or described as consumed tools, and absent breakage evidence MUST NOT be called intact.
 Virtual and ambiguous identities MUST remain separate occurrence cards, and omitted tool evidence MUST NOT assert that no tools were used.
-A run closed by GM disposition uses its own closed guidance: the GM recorded it as checked or abandoned, and nothing was repeated, undone or refunded.
-Its uncertain receipts stay shown as uncertain, with who closed it and any note, and are never listed as recorded results.
+A run closed by GM disposition uses its own closed guidance: a GM closed it without repeating or undoing anything, and anything marked uncertain stays uncertain.
+It shows its receipts, uncertain ones as uncertain, who closed it as checked or abandoned, and any note, and never lists them under Crafted, Recovered or Brought back.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.
