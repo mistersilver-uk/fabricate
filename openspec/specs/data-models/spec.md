@@ -3406,6 +3406,9 @@ Reconciliation releases the authority claim only; the prior request remains non-
 A retained claim can block other versioned runs, and its availability reason MUST remain visible.
 The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
 A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and no viewer who may not reconcile is ever offered one.
+Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim.
+Unlike claim reconciliation, it ends that run's recovery-required state while its settlement stays `uncertain`.
+The retained-claim affordance is unchanged.
 
 A published availability answer is a cached derivation, not a fact a surface may hold indefinitely.
 A refusal is true while it holds and MAY be published freely, but when it LIFTS the authority MUST announce the lift, because that is the moment every reading taken of it became false.
@@ -3895,12 +3898,13 @@ RunModel = {
   completionMode: "manual" | "worldTime",
   pauseState: { pausedAt: number, remainingSeconds: number } | null,
   pausedDurationSeconds: number,
-  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, chooseAward, disabledReason },
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, chooseAward, reconcileUncertain, disabledReason },
   awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
   awardChoicePending: boolean,           // the run still owes an unsettled award choice; false when it owes none.
   awardChoices: AwardChoiceModel[],      // each owed choice for an entitled viewer; [] for one not entitled; absent when none is owed
   awardChoiceBlocker: string | null,     // why this viewer may not settle now: notOwner, notEntitled, an authority reason, recoveryRequired, executionInProgress
-  recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
+  recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null, // status adds "gmClosed" for a Native Reconciliation
+  gmReconciliation: { disposition, userName, note } | null, // a run closed by Native Reconciliation, for a history-entitled viewer
   status: string,                        // the native persisted status, passed through verbatim
   derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
   craftingSystemId: string | null,
@@ -4068,6 +4072,8 @@ StepModel = {
    `actions.chooseAward` is offered on a crafting run that still owes an award choice, to a GM or to the actor's owner when entitled to the run's evidence, while the authority is available and neither of the run's journals is recovery-required or planned, so one settle runs at a time.
    A settle interrupted between its journal writes is resolved when the GM reconciles it or boot recovery runs: its plan is discarded when nothing applied, so the choice can be sent again under any request, and it becomes recovery-required otherwise.
    A terminal run that still owes a choice is listed and counted under `activeRuns` and is not dismissible, unless its settle is recovery-required, which the run's `recoveryEvidence` then reports.
+   `actions.reconcileUncertain` is offered only to the active GM, on a live legacy crafting or salvage run whose native settlement holds `uncertain` on any stage; the projection's predicate fails closed.
+   A history entry closed by Native Reconciliation reports `recoveryEvidence.status` `gmClosed` with `required: false`, keeping its uncertain receipts from the closed stage, and a malformed record reads as absent.
 
 4. **Stage browsing is not execution.**
    Browsing MUST NOT mutate the persisted step index or selections.

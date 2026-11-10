@@ -60,6 +60,7 @@ function createRunJournalBuilder(facade, recipeManager, presentTools = null) {
     getResultItem: (itemUuid) => facade._resolveJournalResultItem(itemUuid),
     getComponent: (systemId, componentId) => facade._resolveJournalComponent(systemId, componentId),
     getViewer: () => game.user,
+    isActiveGM: isActiveJournalGM,
     localize: (key, data) => localizeGathering(key, data),
     nowWorldTime: () => facade.getWorldTime(),
     // Unread here, but the snapshot must match every other pass's (issue 1228).

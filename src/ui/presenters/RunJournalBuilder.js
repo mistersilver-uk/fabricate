@@ -74,6 +74,7 @@ import {
 } from './runJournalChoiceAvailability.js';
 import { d100PreviewEntries } from './runJournalD100Preview.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
+import { nativeRecoveryProjection } from './runJournalNativeRecovery.js';
 import {
   ingredientNeed,
   ingredientOptionName,
@@ -291,6 +292,7 @@ export class RunJournalBuilder {
     affordCurrencySpends = null,
     getAwardChoiceClaimability = null,
     gatheringToolsMissing = null,
+    isActiveGM = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -328,6 +330,7 @@ export class RunJournalBuilder {
     this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
     this._gatheringToolsMissing =
       typeof gatheringToolsMissing === 'function' ? gatheringToolsMissing : () => false;
+    this._isActiveGM = typeof isActiveGM === 'function' ? isActiveGM : () => false;
   }
 
   /**
@@ -2508,12 +2511,8 @@ export class RunJournalBuilder {
     authority = null,
   }) {
     const lifecycleContract = getRunLifecycleContract(run);
-    const recoveryEvidence =
-      this._recoveryEvidence(
-        inFlightAwardJournal(run) ?? run?.executionJournal,
-        evidenceEntitled,
-        stringOrNull(run?.craftingSystemId)
-      ) ?? this._nativeRecoveryEvidence(run, evidenceEntitled);
+    const recovery = this._recoveryProjection({ run, runType, terminal, evidenceEntitled });
+    const { recoveryEvidence } = recovery;
     const blockedReason = terminal
       ? null
       : this._mutationBlockedReason({
@@ -2565,6 +2564,7 @@ export class RunJournalBuilder {
     return {
       ...runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleContract }),
       recoveryEvidence,
+      gmReconciliation: recovery.gmReconciliation,
       awaitingChoice: choiceRequired,
       stageStart: projectedStageStart(stageStart),
       actions: this._runActions({
@@ -2586,6 +2586,7 @@ export class RunJournalBuilder {
         awaitingStageStart,
         blockedReason,
         recoveryClaim,
+        reconcileUncertain: recovery.reconcileUncertain,
       }),
     };
   }
@@ -2647,6 +2648,7 @@ export class RunJournalBuilder {
     awaitingStageStart,
     blockedReason,
     recoveryClaim,
+    reconcileUncertain,
   }) {
     // The stage-start boundary is a SEPARATE fact from whether the begin control is
     // enabled (M15). `atStageStart` alone decides which control renders — the begin
@@ -2681,6 +2683,7 @@ export class RunJournalBuilder {
       dismiss: terminal,
       disabledReason:
         blockedReason ?? stageBlocker ?? (awaitingStageStart ? 'stageNotStarted' : null),
+      reconcileUncertain,
       ...(recoveryClaim && { recoveryClaim }),
     };
   }
@@ -2721,45 +2724,21 @@ export class RunJournalBuilder {
     };
   }
 
-  _nativeRecoveryEvidence(run, entitled) {
-    if (getRunLifecycleContract(run) !== 'legacy') return null;
-    const owner = run.historySettlement ? run : run.steps?.[run.currentStepIndex];
-    const settlement = owner?.historySettlement;
-    if (Object.values(settlement ?? {}).every((state) => !['pending', 'uncertain'].includes(state)))
-      return null;
-    const required = Object.values(settlement).includes('uncertain');
-    const effects = ['consumption', 'awards']
-      .filter((key) => settlement[key])
-      .map((key, index) => ({
-        index,
-        kind: key === 'consumption' ? 'consumeItems' : 'awardItems',
-        phase: {
-          complete: 'applied',
-          pending: 'applying',
-          uncertain: 'applying',
-          notApplicable: 'notApplicable',
-        }[settlement[key]],
-        hasReceipt: true,
-        receipt: entitled
-          ? this._receiptProjection(
-              key === 'consumption'
-                ? normalizeList(owner.consumedIngredients ?? owner.consumedComponents)
-                : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(
-                    normalizeList
-                  ),
-              run.craftingSystemId,
-              { resolveMetadata: false }
-            )
-          : null,
-      }));
-    return {
-      status: required ? 'recoveryRequired' : 'planned',
-      required,
-      appliedEffectCount: effects.filter((effect) => effect.phase === 'applied').length,
-      effectCount: effects.length,
-      effects,
-      uncertainEffectIndex: effects.find((effect) => effect.phase === 'applying')?.index ?? null,
-    };
+  /** The versioned journal's evidence, else the native settlement's, plus Native Reconciliation. */
+  _recoveryProjection({ run, runType, terminal, evidenceEntitled }) {
+    const systemId = stringOrNull(run?.craftingSystemId);
+    const native = nativeRecoveryProjection({
+      run,
+      runType,
+      live: !terminal,
+      entitled: evidenceEntitled,
+      activeGM: this._isActiveGM() === true,
+      project: (entries) =>
+        this._receiptProjection(entries, run.craftingSystemId, { resolveMetadata: false }),
+    });
+    const journal = inFlightAwardJournal(run) ?? run?.executionJournal;
+    const versioned = this._recoveryEvidence(journal, evidenceEntitled, systemId);
+    return { ...native, recoveryEvidence: versioned ?? native.recoveryEvidence };
   }
 
   _nativeHistoryEntitled({ actor, viewer, run }) {

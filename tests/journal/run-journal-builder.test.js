@@ -240,6 +240,7 @@ function makeBuilder({
   getJournalActionAvailability = null,
   resolutionModeService = null,
   getTool = null,
+  isActiveGM = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -277,6 +278,7 @@ function makeBuilder({
     getJournalActionAvailability,
     localize,
     nowWorldTime: () => worldTime,
+    isActiveGM,
   });
 }
 
@@ -4134,4 +4136,106 @@ test('a routed gathering count roll line states the task successes needed', () =
     }],
   }).buildListing({ actor: ACTOR, viewer: GM }).history[0].gatheringYield?.check;
   assert.equal(formatRoll({ ...check(countRouted('over')), formula: '' }, countLineEnglish), '4 successes, 1 needed');
+});
+
+const NATIVE_RECEIPT = { actorUuid: ACTOR.uuid, itemUuid: `${ACTOR.uuid}.Item.hide`, quantity: 1, name: 'Hide', img: null };
+const CLOSED = { disposition: 'reconciled', userId: 'gm-1', userName: 'Morgan', note: 'Counted the hides' };
+
+function uncertainSalvageRun(overrides = {}) {
+  return {
+    id: 'salvage-native',
+    craftingSystemId: 'sys-1',
+    componentId: 'ore',
+    status: 'waitingTime',
+    timeGate: { requiredSeconds: 60, availableAt: 300 },
+    consumedComponents: [NATIVE_RECEIPT],
+    historySettlement: { consumption: 'complete', awards: 'uncertain' },
+    ...overrides,
+  };
+}
+
+function uncertainCraftingRun(overrides = {}) {
+  const run = activeCraftingRun(overrides);
+  run.steps[0].consumedIngredients = [NATIVE_RECEIPT];
+  run.steps[0].historySettlement = { consumption: 'uncertain', awards: 'pending' };
+  return run;
+}
+
+const nativeActor = { ...ACTOR, isOwner: true };
+
+test('Native Reconciliation: the default builder seam fails closed', () => {
+  const run = makeBuilder({ salvageActive: [uncertainSalvageRun()] })
+    .buildListing({ actor: nativeActor, viewer: GM }).activeRuns[0];
+  assert.equal(run.recoveryEvidence.required, true);
+  assert.equal(run.actions.reconcileUncertain, false);
+});
+
+test('Native Reconciliation: only the active GM is offered the outcome on a live legacy run', () => {
+  const previousGame = globalThis.game;
+  const facade = Object.assign(Object.create(journalFacade), {
+    recipeManager: { getRecipe: () => null },
+    salvageRunManager: { getActiveRuns: () => [uncertainSalvageRun()], getRunHistory: () => [] },
+    craftingRunManager: { getActiveRuns: () => [uncertainCraftingRun()], getRunHistory: () => [] },
+    getWorldTime: () => 200,
+    getDismissedJournalRunKeys: () => new Set(),
+    getJournalRunAuthorityAvailability: () => ({ available: true }),
+  });
+  try {
+    Reflect.set(globalThis, 'game', { user: GM, users: { activeGM: { id: GM.id } } });
+    const offered = facade._getRunJournalBuilder().buildListing({ actor: nativeActor, viewer: GM }).activeRuns;
+    assert.deepEqual(offered.map((run) => [run.runType, run.actions.reconcileUncertain]), [['crafting', true], ['salvage', true]]);
+    Reflect.set(globalThis, 'game', { user: GM, users: { activeGM: { id: 'gm-2' } } });
+    const other = facade._getRunJournalBuilder().buildListing({ actor: nativeActor, viewer: GM }).activeRuns;
+    assert.ok(other.every((run) => run.actions.reconcileUncertain === false), 'a GM who is not the active GM');
+    Reflect.set(globalThis, 'game', { user: PLAYER, users: { activeGM: { id: GM.id } } });
+    const player = facade._getRunJournalBuilder().buildListing({ actor: nativeActor, viewer: PLAYER }).activeRuns;
+    assert.ok(player.every((run) => run.actions.reconcileUncertain === false), 'a player');
+  } finally {
+    Reflect.set(globalThis, 'game', previousGame);
+  }
+});
+
+test('Native Reconciliation: a crafting run is offered for an uncertain stage that is not the current one', () => {
+  const run = makeBuilder({ active: [uncertainCraftingRun()], isActiveGM: () => true })
+    .buildListing({ actor: nativeActor, viewer: GM }).activeRuns[0];
+  assert.equal(run.actions.reconcileUncertain, true);
+  assert.equal(run.recoveryEvidence.status, 'recoveryRequired');
+  assert.equal(run.recoveryEvidence.effects[0].receipt.items[0].name, 'Hide');
+});
+
+test('Native Reconciliation: neither a live legacy gathering run nor a current-contract run is offered', () => {
+  const gathering = { id: 'gather-native', craftingSystemId: 'sys-1', taskId: 'task', status: 'inProgress',
+    historySettlement: { consumption: 'complete', awards: 'uncertain' } };
+  const listing = makeBuilder({
+    gatheringActive: [gathering],
+    salvageActive: [uncertainSalvageRun({ lifecycleVersion: 1 })],
+    isActiveGM: () => true,
+  }).buildListing({ actor: nativeActor, viewer: GM });
+  assert.equal(listing.activeRuns.length, 2);
+  assert.ok(listing.activeRuns.every((run) => run.actions.reconcileUncertain === false));
+});
+
+test('Native Reconciliation: closed crafting and salvage records project gmClosed with their uncertain receipts', () => {
+  const crafting = uncertainCraftingRun({ id: 'craft-closed', status: 'cancelled', finishedAt: 190, currentStepIndex: null,
+    gmReconciliation: { ...CLOSED, stepIndex: 0 } });
+  const salvage = uncertainSalvageRun({ status: 'cancelled', finishedAt: 195, gmReconciliation: CLOSED });
+  const listing = makeBuilder({ history: [crafting], salvageHistory: [salvage], isActiveGM: () => true })
+    .buildListing({ actor: nativeActor, viewer: GM });
+  for (const run of listing.history) {
+    assert.equal(run.recoveryEvidence.status, 'gmClosed', run.runType);
+    assert.equal(run.recoveryEvidence.required, false, run.runType);
+    assert.ok(run.recoveryEvidence.effects.some((effect) => effect.phase === 'applying'), run.runType);
+    assert.ok(run.recoveryEvidence.effects.some((effect) => effect.receipt?.items[0]?.name === 'Hide'), run.runType);
+    assert.deepEqual(run.gmReconciliation, { disposition: 'reconciled', userName: 'Morgan', note: 'Counted the hides' });
+    assert.equal(run.actions.reconcileUncertain, false);
+  }
+});
+
+test('Native Reconciliation: a malformed crafting record projects as absent', () => {
+  for (const gmReconciliation of [CLOSED, { ...CLOSED, stepIndex: -1 }, { ...CLOSED, disposition: 'refunded', stepIndex: 0 }]) {
+    const run = uncertainCraftingRun({ id: 'craft-malformed', status: 'cancelled', finishedAt: 190, currentStepIndex: null, gmReconciliation });
+    const model = makeBuilder({ history: [run] }).buildListing({ actor: nativeActor, viewer: GM }).history[0];
+    assert.equal(model.gmReconciliation, null, JSON.stringify(gmReconciliation));
+    assert.equal(model.recoveryEvidence, null, JSON.stringify(gmReconciliation));
+  }
 });
