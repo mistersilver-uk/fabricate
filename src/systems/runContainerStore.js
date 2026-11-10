@@ -6,11 +6,14 @@ import {
   runContainerBaseline,
 } from './runContainerCoherence.js';
 import {
+  gmReconciliationRecord,
   historyEvidenceFields,
+  holdsUncertainSettlement,
   itemReceipt,
   preserveSettledHistory,
   writeAcknowledgedRunContainer,
 } from './runHistoryEvidence.js';
+import { getRunLifecycleContract } from './runLifecycleState.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -26,9 +29,13 @@ const HISTORY_LIMIT = 50;
  * container normalizer is actor-aware, and it keys by actor uuid rather than `actor.id`.
  */
 export class RunContainerManagerBase {
-  /** `flagKey` is the container flag, `'craftingRuns'` or `'salvageRuns'`. */
-  constructor({ flagKey }) {
+  /**
+   * `flagKey` is the container flag, `'craftingRuns'` or `'salvageRuns'`. `settlementOwners` lists
+   * the records of a run that carry a native settlement, in stage order: the run itself by default.
+   */
+  constructor({ flagKey, settlementOwners = (run) => [run] }) {
     this._flagKey = flagKey;
+    this._settlementOwners = settlementOwners;
     this._cache = new Map(); // actorId -> container
     // actorId -> the `{ activeKeys, historyIds }` last observed, so `_persist` removes only what
     // THIS writer dropped, never another client's concurrent run (see runContainerCoherence).
@@ -111,6 +118,38 @@ export class RunContainerManagerBase {
     }
     await this._persist(actor, container);
     return structuredClone(run);
+  }
+
+  /** Each subclass archives its own record shape: the archived run, or `run` when not active. */
+  async completeRun() {
+    throw new Error('completeRun is implemented by each run manager');
+  }
+
+  /**
+   * Native Reconciliation: archive an active legacy run whose settlement holds `uncertain` as
+   * `cancelled` with its `gmReconciliation`, in the one `completeRun` write, leaving settlement and
+   * receipts unchanged. Answers `{ status: 'archived', run }`, else `missing`, `certain` or `invalid`.
+   */
+  async reconcileUncertainRun(actor, runId, reconciliation = {}) {
+    this.invalidateCache(actor.id);
+    const run = this.getActiveRun(actor, runId);
+    if (!run) return { status: 'missing' };
+    const owners = getRunLifecycleContract(run) === 'legacy' ? this._settlementOwners(run) : [];
+    const stepIndex = owners.findIndex(holdsUncertainSettlement);
+    if (stepIndex === -1) return { status: 'certain' };
+    const record = gmReconciliationRecord(
+      { ...reconciliation, stepIndex },
+      { staged: owners[stepIndex] !== run }
+    );
+    if (!record) return { status: 'invalid' };
+    const archived = await this.completeRun(
+      actor,
+      { ...run, gmReconciliation: record },
+      'cancelled'
+    );
+    return archived?.status === 'cancelled'
+      ? { status: 'archived', run: archived }
+      : { status: 'missing' };
   }
 
   invalidateCache(actorId = null) {

@@ -265,3 +265,101 @@ test('SalvageRunManager: retention cap holds across completeRun, cancelRun, and 
     assertCappedMostRecentFirst(assert, history, insertedIds);
   }
 });
+
+async function uncertainSalvageRun(manager, actor, overrides = {}) {
+  const run = await manager.createRun(actor, {
+    craftingSystemId: 'system-1',
+    componentId: 'component-1',
+    consumedComponents: [{ actorUuid: actor.uuid, itemUuid: `${actor.uuid}.Item.hide`, quantity: 1, name: 'Hide', img: null }],
+    historySettlement: { consumption: 'complete', awards: 'uncertain' },
+    ...overrides
+  });
+  return manager.markRunWaitingForTime(actor, run, { minutes: 1 });
+}
+
+const reconcileOptions = { disposition: 'reconciled', userId: 'gm-1', userName: 'GM', note: ' counted ' };
+
+test('SalvageRunManager: Native Reconciliation archives an uncertain run cancelled without changing its evidence', async () => {
+  const actor = new FakeActor('Native Salvager');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+  const run = await uncertainSalvageRun(manager, actor);
+  const before = JSON.parse(JSON.stringify(manager.getActiveRun(actor, run.id)));
+  let itemWrites = 0;
+  actor.createEmbeddedDocuments = async () => { itemWrites += 1; };
+  actor.updateEmbeddedDocuments = async () => { itemWrites += 1; };
+
+  const result = await manager.reconcileUncertainRun(actor, run.id, reconcileOptions);
+
+  assert.equal(result.status, 'archived');
+  assert.equal(itemWrites, 0);
+  const [entry] = new SalvageRunManager().getRunHistory(actor);
+  assert.equal(entry.status, 'cancelled');
+  assert.equal(entry.finishedAt, 1000);
+  assert.deepEqual(entry.historySettlement, before.historySettlement);
+  assert.deepEqual(entry.consumedComponents, before.consumedComponents);
+  assert.deepEqual(entry.gmReconciliation, { disposition: 'reconciled', userId: 'gm-1', userName: 'GM', note: 'counted' });
+  assert.equal(manager.getActiveRuns(actor).length, 0);
+});
+
+test('SalvageRunManager: Native Reconciliation refuses a run without native uncertainty or a bad disposition', async () => {
+  const actor = new FakeActor('Native Refusals');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+  const certain = await uncertainSalvageRun(manager, actor, { historySettlement: { consumption: 'complete', awards: 'complete' } });
+  const pending = await uncertainSalvageRun(manager, actor, { historySettlement: { consumption: 'complete', awards: 'pending' } });
+  const versioned = await uncertainSalvageRun(manager, actor, { lifecycleVersion: 1 });
+  const uncertain = await uncertainSalvageRun(manager, actor);
+
+  for (const run of [certain, pending, versioned]) {
+    assert.deepEqual(await manager.reconcileUncertainRun(actor, run.id, reconcileOptions), { status: 'certain' });
+  }
+  assert.deepEqual(
+    await manager.reconcileUncertainRun(actor, uncertain.id, { ...reconcileOptions, disposition: 'refunded' }),
+    { status: 'invalid' }
+  );
+  assert.equal(manager.getActiveRuns(actor).length, 4);
+  assert.equal(manager.getRunHistory(actor).length, 0);
+});
+
+test('SalvageRunManager: a repeated or stale-cache reconcile answers missing with one history entry', async () => {
+  const actor = new FakeActor('Native Repeat');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+  const run = await uncertainSalvageRun(manager, actor);
+  const stale = new SalvageRunManager();
+  assert.ok(stale.getActiveRun(actor, run.id));
+  stale._cache.set(actor.id, structuredClone(stale._getContainer(actor)));
+
+  assert.equal((await manager.reconcileUncertainRun(actor, run.id, reconcileOptions)).status, 'archived');
+  const first = manager.getRunHistory(actor)[0];
+  assert.deepEqual(await manager.reconcileUncertainRun(actor, run.id, { ...reconcileOptions, disposition: 'abandoned' }), { status: 'missing' });
+  assert.deepEqual(await stale.reconcileUncertainRun(actor, run.id, reconcileOptions), { status: 'missing' });
+  const history = new SalvageRunManager().getRunHistory(actor);
+  assert.equal(history.length, 1);
+  assert.deepEqual(history[0], first);
+});
+
+test('SalvageRunManager: after reconcile the component salvages again and world time resumes other runs', async () => {
+  const actor = new FakeActor('Native Resume');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+  const stuck = await uncertainSalvageRun(manager, actor);
+  const ready = await manager.markRunWaitingForTime(
+    actor,
+    await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-2' }),
+    { minutes: 1 }
+  );
+  await assert.rejects(manager.processWorldTime(2000), { code: 'HISTORY_EFFECT_UNCERTAIN' });
+
+  await manager.reconcileUncertainRun(actor, stuck.id, reconcileOptions);
+
+  assert.equal(manager.findActiveRunForComponent(actor, 'system-1', 'component-1'), null);
+  const resumed = [];
+  await manager.processWorldTime(2000, async (_actor, run) => {
+    resumed.push(run.id);
+  });
+  assert.deepEqual(resumed, [ready.id]);
+  const again = await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-1' });
+  assert.equal(manager.findActiveRunForComponent(actor, 'system-1', 'component-1').id, again.id);
+});

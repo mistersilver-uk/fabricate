@@ -3453,6 +3453,9 @@ CraftingRun = {
 
   // The recipe and crafting-check terms the run accepted at start; see requirement 5.
   termsSnapshot?: { recipe: object, craftingCheck: object | null },
+
+  // Native Reconciliation's record; see requirement 6.
+  gmReconciliation?: { disposition, userId, userName, note?, stepIndex: number },
 }
 ```
 
@@ -3466,6 +3469,10 @@ CraftingRun = {
    It is written once, at run creation, and is never updated by a later edit to the live recipe or system.
    It is absent for a recipe that could not serialize itself and for any run begun before this field existed, and resolution for such a run falls back to the live recipe (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms).
    It is removed from the run record when the run completes, before the record is archived to history, so a history entry never carries it.
+6. `gmReconciliation` is written only by Native Reconciliation of an uncertain legacy stage, only on a `cancelled` history entry.
+   Its `disposition` is `reconciled` or `abandoned`, `userName` is `null` when unknown, and `note` is trimmed, at most 500 characters and omitted when blank.
+   `stepIndex` names the stage whose uncertain settlement was closed, because archiving nulls `currentStepIndex`.
+   A record without a valid `stepIndex` reads as absent.
 
 ## CraftingRunStepState
 

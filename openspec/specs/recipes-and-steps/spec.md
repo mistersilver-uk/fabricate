@@ -252,6 +252,9 @@ A fizzle record MAY carry permitted `consumedIngredients` and `createdResults` a
 A genuinely unattempted fact — a consume-on-failure policy that consumes nothing, a stage armed and waiting — is `notApplicable`, which is neither unknown nor zero.
 A confirmed prefix is retained separately from an uncertain remainder; `pending` and `uncertain` prove no award and authorize no replay, rollback or automatic compensation.
 A further invocation on the same native run MUST refuse while an invoked effect is pending or uncertain or a settlement has failed, through the existing lifecycle and signatures; ordinary timed waiting is not an invoked pending effect.
+A settlement holding `uncertain` qualifies for Native Reconciliation even if its other field is `pending`, because uncertainty is recorded only after the operation has ended.
+The active GM MAY close such a legacy run by recording a `reconciled` or `abandoned` disposition.
+It archives the run `cancelled` with `gmReconciliation`, its settlement and receipts unchanged, and replays, refunds or rolls back nothing.
 - **Five distinct states.** Unknown, withheld, not applicable, complete-empty and uncertain are five separate states, decided per row and per field.
 Missing evidence MUST NOT be rendered as a confirmed no-check resolution, as zero, or as an award.
 Withheld evidence MUST NOT be encoded as a complete empty receipt.
@@ -883,6 +886,14 @@ SalvageRun = {
     name?: string | null, // captured at award time; absent on pre-capture historical records
     img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
+
+  // Native Reconciliation's record, present only on history; a malformed value is dropped on read.
+  gmReconciliation?: {
+    disposition: "reconciled" | "abandoned",
+    userId: string,
+    userName: string | null,
+    note?: string, // trimmed, at most 500 characters, omitted when blank
+  },
 }
 ```
 

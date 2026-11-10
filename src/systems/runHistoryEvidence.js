@@ -159,13 +159,50 @@ export function historyEvidenceFields(source = {}, options = {}) {
   return evidence;
 }
 
+const dispositions = new Set(['reconciled', 'abandoned']);
+const NOTE_LIMIT = 500;
+
+/** Whether a record's settlement holds `uncertain`, whatever its other field holds. */
+export function holdsUncertainSettlement(record) {
+  return Object.values(record?.historySettlement ?? {}).includes('uncertain');
+}
+
+/** Trimmed, at most 500 UTF-16 units, never ending inside a surrogate pair; `null` when blank. */
+function reconciliationNote(value) {
+  if (typeof value !== 'string') return null;
+  let note = value.trim().slice(0, NOTE_LIMIT);
+  if (/[\uD800-\uDBFF]$/.test(note)) note = note.slice(0, -1);
+  return note.trimEnd() || null;
+}
+
+/**
+ * A Native Reconciliation record, or `null` when malformed. A `staged` (crafting) record must name
+ * the closed stage's `stepIndex`, since archiving nulls `currentStepIndex`; any other carries none.
+ */
+export function gmReconciliationRecord(value, { staged = false } = {}) {
+  if (!dispositions.has(value?.disposition) || !text(value.userId)) return null;
+  const { stepIndex } = value;
+  if (staged && !(Number.isSafeInteger(stepIndex) && stepIndex >= 0)) return null;
+  const note = reconciliationNote(value.note);
+  return {
+    disposition: value.disposition,
+    userId: value.userId,
+    userName: text(value.userName),
+    ...(note && { note }),
+    ...(staged && { stepIndex }),
+  };
+}
+
 export function nativeHistoryRecord(record) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
   const value = structuredClone(record);
   if (Object.hasOwn(value, 'lifecycleVersion')) return value;
   delete value.historySettlement;
   delete value.resolutionSnapshot;
+  delete value.gmReconciliation;
   Object.assign(value, historyEvidenceFields(record));
+  const reconciliation = gmReconciliationRecord(record.gmReconciliation);
+  if (reconciliation) value.gmReconciliation = reconciliation;
   for (const key of ['consumedComponents', 'consumedIngredients', 'createdResults']) {
     if (Array.isArray(record[key])) value[key] = record[key].map(itemReceipt);
   }
