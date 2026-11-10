@@ -2113,8 +2113,20 @@ describe('RunDetail Native Reconciliation', () => {
 
   const GM = { id: 'gm-1', isGM: true };
   const PLAYER = { id: 'player-1', isGM: false };
-  const CLAIM = { claimId: 'claim-3', requestKind: 'command', failureReason: null, failureMessage: null, claimedAt: 1 };
-  const receipt = (name) => ({ actorUuid: 'Actor.native', itemUuid: `Actor.native.Item.${name}`, quantity: 1, name, img: null });
+  const CLAIM = {
+    claimId: 'claim-3',
+    requestKind: 'command',
+    failureReason: null,
+    failureMessage: null,
+    claimedAt: 1,
+  };
+  const receipt = (name) => ({
+    actorUuid: 'Actor.native',
+    itemUuid: `Actor.native.Item.${name}`,
+    quantity: 1,
+    name,
+    img: null,
+  });
 
   function nativeRun({ activeGM = true, viewer = GM, claim = null, closed = null } = {}) {
     const record = {
@@ -2200,17 +2212,38 @@ describe('RunDetail Native Reconciliation', () => {
   it('records the chosen disposition once, then notifies and re-reads the Journal', async () => {
     const { bag, calls } = gmServices();
     await withDialog(press('reconciled'), async (dialogs) => {
-      const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
-      const control = target.querySelector(':scope [data-journal-recovery-evidence] [data-journal-native-outcome]');
+      const target = await harness.mount({
+        run: nativeRun(),
+        now: 200,
+        services: bag,
+        journal: bag.journal,
+      });
+      const control = target.querySelector(
+        ':scope [data-journal-recovery-evidence] [data-journal-native-outcome]'
+      );
       assert.match(control.textContent, /NativeRecovery\.Action/);
       await recordOutcome(target);
       assert.equal(dialogs.length, 1);
-      assert.deepEqual(dialogs[0].buttons.map((button) => button.action), ['reconciled', 'abandoned', 'cancel']);
+      assert.deepEqual(
+        dialogs[0].buttons.map((button) => button.action),
+        ['reconciled', 'abandoned', 'cancel']
+      );
       assert.equal(dialogs[0].buttons.find((button) => button.default)?.action, 'cancel');
       assert.match(dialogs[0].content, /NativeRecovery\.Effect/);
       assert.deepEqual(calls, [
-        ['reconcile', { actorUuid: 'Actor.native', runType: 'salvage', runId: 'salvage-native', disposition: 'reconciled' }],
-        ['notify', 'FABRICATE.App.Journal.NativeRecovery.Closed:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.reconciled"}'],
+        [
+          'reconcile',
+          {
+            actorUuid: 'Actor.native',
+            runType: 'salvage',
+            runId: 'salvage-native',
+            disposition: 'reconciled',
+          },
+        ],
+        [
+          'notify',
+          'FABRICATE.App.Journal.NativeRecovery.Closed:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.reconciled"}',
+        ],
         ['load', true],
       ]);
     });
@@ -2219,7 +2252,12 @@ describe('RunDetail Native Reconciliation', () => {
   it('notifies a refusal by its localized reason and re-reads the Journal', async () => {
     const { bag, calls } = gmServices({ success: false, reason: 'run-not-uncertain' });
     await withDialog(press('abandoned'), async () => {
-      const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+      const target = await harness.mount({
+        run: nativeRun(),
+        now: 200,
+        services: bag,
+        journal: bag.journal,
+      });
       await recordOutcome(target);
       assert.equal(calls[0][1].disposition, 'abandoned');
       assert.deepEqual(calls.slice(1), [
@@ -2230,14 +2268,22 @@ describe('RunDetail Native Reconciliation', () => {
   });
 
   for (const [label, respond] of [
-    ['Enter, which presses the default', (options) => options.buttons.find((button) => button.default)?.callback?.()],
+    [
+      'Enter, which presses the default',
+      (options) => options.buttons.find((button) => button.default)?.callback?.(),
+    ],
     ['Cancel', press('cancel')],
     ['closing the window', (options) => options.close?.()],
   ]) {
     it(`records nothing on ${label}`, async () => {
       const { bag, calls } = gmServices();
       await withDialog(respond, async (dialogs) => {
-        const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+        const target = await harness.mount({
+          run: nativeRun(),
+          now: 200,
+          services: bag,
+          journal: bag.journal,
+        });
         await recordOutcome(target);
         assert.equal(dialogs.length, 1);
         assert.deepEqual(calls, []);
@@ -2257,7 +2303,12 @@ describe('RunDetail Native Reconciliation', () => {
     await withDialog(
       (options) => (answer = options),
       async (dialogs) => {
-        const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+        const target = await harness.mount({
+          run: nativeRun(),
+          now: 200,
+          services: bag,
+          journal: bag.journal,
+        });
         const control = target.querySelector('[data-journal-native-outcome]');
         control.click();
         control.click();
@@ -2279,16 +2330,26 @@ describe('RunDetail Native Reconciliation', () => {
   });
 
   it('offers no control to a player or to a GM who is not the active GM', async () => {
-    for (const run of [nativeRun({ activeGM: false, viewer: PLAYER }), nativeRun({ activeGM: false })]) {
+    for (const run of [
+      nativeRun({ activeGM: false, viewer: PLAYER }),
+      nativeRun({ activeGM: false }),
+    ]) {
       const target = await harness.mount({ run, now: 200, services: services() });
-      assert.ok(Boolean(target.querySelector('[data-journal-recovery-evidence]')), 'the receipts still show');
+      assert.ok(
+        Boolean(target.querySelector('[data-journal-recovery-evidence]')),
+        'the receipts still show'
+      );
       assert.ok(!target.querySelector('[data-journal-native-outcome]'), 'but no control');
       harness.remount();
     }
   });
 
   it('keeps Release claim… in the notice and Record outcome… at the receipts foot', async () => {
-    const target = await harness.mount({ run: nativeRun({ claim: CLAIM }), now: 200, services: services() });
+    const target = await harness.mount({
+      run: nativeRun({ claim: CLAIM }),
+      now: 200,
+      services: services(),
+    });
     const notice = target.querySelector(':scope [data-journal-recovery] [data-notice-action]');
     assert.match(notice?.textContent ?? '', /Recovery\.Action/);
     const evidence = target.querySelector('[data-journal-recovery-evidence]');
@@ -2297,7 +2358,12 @@ describe('RunDetail Native Reconciliation', () => {
   });
 
   it('renders a closed history entry with its uncertain receipts, who closed it and the note', async () => {
-    const closed = { disposition: 'abandoned', userId: 'gm-1', userName: 'Morgan', note: 'Counted the scrap' };
+    const closed = {
+      disposition: 'abandoned',
+      userId: 'gm-1',
+      userName: 'Morgan',
+      note: 'Counted the scrap',
+    };
     const run = nativeRun({ closed });
     assert.equal(run.recoveryEvidence.status, 'gmClosed');
     const target = await harness.mount({ run, now: 200, services: services() });
@@ -2307,20 +2373,34 @@ describe('RunDetail Native Reconciliation', () => {
     const awards = evidence.querySelector('[data-effect-phase="applying"]');
     assert.match(awards.textContent, /Scrap/, 'the uncertain award keeps its receipt');
     assert.match(awards.textContent, /Notice\.Effect/);
-    assert.ok(!history.querySelector('[data-history-items="produced"]'), 'never listed as recovered');
+    assert.ok(
+      !history.querySelector('[data-history-items="produced"]'),
+      'never listed as recovered'
+    );
     assert.ok(!target.querySelector('[data-journal-recovery]'), 'and no recovery notice');
     assert.ok(!target.querySelector('[data-journal-native-outcome]'));
     assert.match(evidence.textContent, /NativeRecovery\.ClosedBy/);
-    assert.match(evidence.textContent, /Morgan · FABRICATE\.App\.Journal\.Recovery\.Disposition\.abandoned/);
+    assert.match(
+      evidence.textContent,
+      /Morgan · FABRICATE\.App\.Journal\.Recovery\.Disposition\.abandoned/
+    );
     assert.match(evidence.textContent, /NativeRecovery\.GmNote[\s\S]*Counted the scrap/);
-    assert.match(target.querySelector('[data-journal-guidance]').textContent, /History\.ClosedGmReconciled/);
+    assert.match(
+      target.querySelector('[data-journal-guidance]').textContent,
+      /History\.ClosedGmReconciled/
+    );
   });
 
   it('names an unknown closer as a GM and omits an absent note', async () => {
-    const run = nativeRun({ closed: { disposition: 'reconciled', userId: 'gm-1', userName: null } });
+    const run = nativeRun({
+      closed: { disposition: 'reconciled', userId: 'gm-1', userName: null },
+    });
     const target = await harness.mount({ run, now: 200, services: services() });
     const evidence = target.querySelector('[data-journal-recovery-evidence]');
-    assert.match(evidence.textContent, /NativeRecovery\.ClosedByUnknown · FABRICATE\.App\.Journal\.Recovery\.Disposition\.reconciled/);
+    assert.match(
+      evidence.textContent,
+      /NativeRecovery\.ClosedByUnknown · FABRICATE\.App\.Journal\.Recovery\.Disposition\.reconciled/
+    );
     assert.doesNotMatch(evidence.textContent, /NativeRecovery\.GmNote/);
   });
 });
