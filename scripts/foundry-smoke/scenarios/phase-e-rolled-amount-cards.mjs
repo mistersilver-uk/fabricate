@@ -651,33 +651,40 @@ async function seedRefusalShard(page, forge, crafterId) {
       const type = types.includes('loot') ? 'loot' : types[0] || 'loot';
       const img = 'icons/commodities/gems/gem-fragments-blue.webp';
       const [shard] = await Item.createDocuments([{ name, type, img }]);
-      const componentId = (await csm.addItemFromUuid(systemId, shard.uuid)).item.id;
-      const system = csm.getSystem(systemId);
-      const check = system.salvageCraftingCheck ?? {};
-      await csm.updateSystem(systemId, {
-        features: { ...system.features, salvage: true },
-        salvageResolutionMode: 'simple',
-        salvageCraftingCheck: {
-          ...check,
-          enabled: false,
-          simple: { ...check.simple, rollFormula: '' },
-        },
-      });
-      await csm.updateItem(systemId, componentId, {
-        salvage: {
-          enabled: true,
-          ingredientQuantity: 1,
-          resultGroups: [
-            { name: 'Charm', results: [{ componentId: charmComponentId, quantity: 1 }] },
-          ],
-        },
-      });
-      const [stack] = await game.actors
-        .get(crafterId)
-        .createEmbeddedDocuments('Item', [
-          { name, type, img, system: { quantity: 3 }, flags: { core: { sourceId: shard.uuid } } },
-        ]);
-      return { worldItemId: shard.id, componentId, stackId: stack.id };
+      // The step registers the world Item for cleanup only once this resolves, so a failure
+      // after its creation deletes it here.
+      try {
+        const componentId = (await csm.addItemFromUuid(systemId, shard.uuid)).item.id;
+        const system = csm.getSystem(systemId);
+        const check = system.salvageCraftingCheck ?? {};
+        await csm.updateSystem(systemId, {
+          features: { ...system.features, salvage: true },
+          salvageResolutionMode: 'simple',
+          salvageCraftingCheck: {
+            ...check,
+            enabled: false,
+            simple: { ...check.simple, rollFormula: '' },
+          },
+        });
+        await csm.updateItem(systemId, componentId, {
+          salvage: {
+            enabled: true,
+            ingredientQuantity: 1,
+            resultGroups: [
+              { name: 'Charm', results: [{ componentId: charmComponentId, quantity: 1 }] },
+            ],
+          },
+        });
+        const [stack] = await game.actors
+          .get(crafterId)
+          .createEmbeddedDocuments('Item', [
+            { name, type, img, system: { quantity: 3 }, flags: { core: { sourceId: shard.uuid } } },
+          ]);
+        return { worldItemId: shard.id, componentId, stackId: stack.id };
+      } catch (error) {
+        await shard.delete().catch(() => {});
+        throw error;
+      }
     },
     {
       crafterId,
