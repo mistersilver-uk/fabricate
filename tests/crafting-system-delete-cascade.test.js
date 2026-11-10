@@ -233,6 +233,28 @@ test('deleteSystem still prunes the other scopes when one membership write fails
   assert.equal(notifications.length, 1, 'and the delete still completes');
 });
 
+test('deleteSystem prunes no membership when the persisted setting cannot be read', async () => {
+  notifications.length = 0;
+  const calls = [];
+  const scope = recordingScopeStore(calls, 'component', [member('c1', 'sys-delete')]);
+  installGame({ getComponentScopeStore: () => scope.store });
+  const CraftingSystemManager = await importManager();
+  const manager = new CraftingSystemManager(fakeRecipeManager());
+  manager.initialized = true;
+  manager.save = async () => {};
+  manager._repository = {
+    readReplicatedSnapshot: () => {
+      throw new Error('unreadable');
+    },
+  };
+  manager.systems.set('sys-delete', manager._normalizeSystem({ id: 'sys-delete', name: 'X' }));
+
+  await manager.deleteSystem('sys-delete');
+
+  assert.deepEqual(calls, [], 'an unreadable setting prunes nothing');
+  assert.deepEqual(Object.keys(scope.payload.membership), ['c1|sys-delete']);
+});
+
 test('deleteSystem prunes no membership while the persisted setting still holds the system', async () => {
   notifications.length = 0;
   const calls = [];
