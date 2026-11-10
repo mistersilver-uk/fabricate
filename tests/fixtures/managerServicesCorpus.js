@@ -182,6 +182,7 @@ export const PLAYER_SERVICE_KEYS = Object.freeze([
   'notify',
   'progressiveOrderRevertMessage',
   'reconcileJournalRunAuthority',
+  'reconcileUncertainJournalRun',
   'restockGatheringNode',
   'salvageComponent',
   'salvageComponents',

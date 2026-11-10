@@ -29,6 +29,12 @@ import {
 } from './gatheringRuntime.js';
 import { gatheringRunToolsMissing } from './journalGatheringTools.js';
 
+/** The active-GM predicate Native Reconciliation's command and projection share; fails closed. */
+export function isActiveJournalGM() {
+  const userId = game.user?.id;
+  return Boolean(userId) && userId === game.users?.activeGM?.id;
+}
+
 /**
  * The Journal projector's seams, over `recipeManager`: the shared one or a station view. A
  * gathering run's Tool readiness consults the same `presentTools` the station view carries.
@@ -159,6 +165,18 @@ export const journalFacade = {
   reconcileJournalRunAuthority(options) {
     return (
       this.journalRunCommands?.reconcileJournalRunAuthority(options) ??
+      Promise.resolve(authorityUnavailableRefusal())
+    );
+  },
+
+  /**
+   * Native Reconciliation, as the active GM: archive an uncertain legacy crafting or salvage run
+   * `cancelled` with a `reconciled` or `abandoned` disposition and an optional note readable by
+   * everyone permitted on the actor. It replays, undoes and refunds nothing.
+   */
+  reconcileUncertainJournalRun(options) {
+    return (
+      this.journalRunReconciliation?.reconcileUncertainJournalRun(options) ??
       Promise.resolve(authorityUnavailableRefusal())
     );
   },

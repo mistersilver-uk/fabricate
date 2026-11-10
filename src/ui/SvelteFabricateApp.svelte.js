@@ -331,6 +331,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       reconcileJournalRunAuthority: (opts = {}) =>
         game?.fabricate?.reconcileJournalRunAuthority?.(opts)
         ?? Promise.resolve(authorityUnavailableRefusal()),
+      reconcileUncertainJournalRun: (opts = {}) =>
+        game?.fabricate?.reconcileUncertainJournalRun?.(opts)
+        ?? Promise.resolve(authorityUnavailableRefusal()),
       advanceCraftingRun: (opts = {}) =>
         game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,

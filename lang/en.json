@@ -1649,7 +1649,8 @@
           "LedgerCreateFailed": "Fabricate could not set up its run record. Try again, and tell your GM if it keeps happening.",
           "LedgerUnsettled": "Fabricate is still settling its run record. Try again in a moment.",
           "ReconstructionFailed": "The GM’s Journal recovery check could not complete. Ask your GM to inspect the retained execution claim before this run changes again.",
-          "ReconstructionUnavailable": "Fabricate’s Journal recovery service is unavailable on the GM’s client. Ask your GM to reload Foundry."
+          "ReconstructionUnavailable": "Fabricate’s Journal recovery service is unavailable on the GM’s client. Ask your GM to reload Foundry.",
+          "RunNotUncertain": "This run has no uncertain effect to close."
         },
         "Tips": {
           "Title": "Tips",

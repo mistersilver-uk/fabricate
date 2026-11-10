@@ -35,6 +35,7 @@ class Fabricate {
   craftingRunManager = null;
   salvageRunManager = null;
   journalRunCommands = null;
+  journalRunReconciliation = null;
   companionOperations = null;
   gatheringEnvironmentStore = null;
   gatheringNodeDepletionWriter = null;

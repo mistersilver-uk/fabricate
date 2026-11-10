@@ -66,6 +66,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'award-choice-settled': 'FABRICATE.App.Journal.Reason.AwardChoiceSettled',
   'actor-not-found': 'FABRICATE.App.Journal.Reason.ActorNotFound',
   'run-not-found': 'FABRICATE.App.Journal.Actions.NoRun',
+  'run-not-uncertain': 'FABRICATE.App.Journal.Reason.RunNotUncertain',
   'stale-run': 'FABRICATE.App.Journal.Reason.StaleRun',
   'stale-stage': 'FABRICATE.App.Journal.Reason.StaleStage',
   'unsupported-version': 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle',
