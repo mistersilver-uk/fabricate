@@ -8,6 +8,7 @@ import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProje
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   componentCorpus,
+  componentRosterHolding,
   componentScopeFor,
   createComponentScopeHarness,
   drainMicrotasks,
@@ -1124,7 +1125,7 @@ describe('world Component entry editor (issue 1371)', () => {
       const { target, calls } = await open('resin');
       assert.match(
         target.querySelector('[data-scoped-entry-delete-note]').textContent,
-        /nothing else is affected/
+        /No system holds this component/
       );
       deleteControl(target).click();
       await drain();
@@ -1133,6 +1134,38 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.deepEqual(
         calls.filter((call) => call.verb === 'deleteEntity'),
         [{ verb: 'deleteEntity', args: ['resin'] }]
+      );
+    });
+
+    it('and an inert membership, a record whose system holds no row, neither refuses nor is named', async () => {
+      // `ingot` keeps both records, but only Forge holds the in-system row.
+      const roster = componentRosterHolding(componentCorpus()).map((system) =>
+        system.id === 'sys-alchemy' ? { ...system, components: [] } : system
+      );
+      const held = await open('ingot', undefined, null, {
+        scope: componentScopeFor(undefined, roster),
+      });
+      const heldNote = held.target.querySelector('[data-scoped-entry-delete-note]').textContent;
+      assert.match(heldNote, /1 system has rules/);
+      assert.match(heldNote, /for Forge\./);
+      assert.doesNotMatch(heldNote, /Alchemy/, 'the inert membership is not named');
+
+      const inertRoster = roster.map((system) => ({ ...system, components: [] }));
+      const { target, calls } = await open('ingot', undefined, null, {
+        scope: componentScopeFor(undefined, inertRoster),
+      });
+      assert.match(
+        target.querySelector('[data-scoped-entry-delete-note]').textContent,
+        /No system holds this component/
+      );
+      deleteControl(target).click();
+      await drain();
+      deleteControl(target).click();
+      await drain();
+      assert.deepEqual(
+        calls.filter((call) => call.verb === 'deleteEntity'),
+        [{ verb: 'deleteEntity', args: ['ingot'] }],
+        'and confirming deletes, the guard reading the same list as the note'
       );
     });
 

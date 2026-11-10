@@ -1555,7 +1555,7 @@ describe('world Component Catalogue (issue 1371)', () => {
         'the note states a refusal rather than a consequence'
       );
       assert.match(note.textContent, /none of them can be deleted/);
-      assert.match(note.textContent, /Remove them from those systems first/);
+      assert.match(note.textContent, /Use the “Remove from” direction first\./);
       // THE CONTROL STAYS ENABLED, and that is `ui-world-scope/spec.md` § Scoped entity editor
       // patterns requirement 16 rather than an oversight: "a disabled button satisfies any
       // assertion that the delete did not happen while leaving the GM no explanation at all".
