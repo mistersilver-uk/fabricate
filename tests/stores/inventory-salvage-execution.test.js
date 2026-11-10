@@ -261,6 +261,47 @@ describe('createSalvageExecution', () => {
     assert.deepEqual(log.at(-1), ['notify', 'no tools']);
   });
 
+  it('surfaces a definite consumption refusal as one toast and no panel state', async () => {
+    const message = 'Could not consume "Iron Ore": the write left the item unchanged.';
+    const { execution, log } = setup({ result: { success: false, refused: true, message } });
+    const returned = await execution.salvage('sys', 'c1');
+    flushSync();
+
+    assert.equal(returned.refused, true, 'the facade result is returned verbatim');
+    assert.ok(!execution.salvageResult, 'no ribbon or failure box');
+    assert.ok(!execution.heldItem, 'nothing is held');
+    assert.deepEqual(
+      log.filter(([kind]) => kind === 'notify'),
+      [['notify', message]]
+    );
+  });
+
+  it('logs a thrown salvage with its cause before toasting the message', async () => {
+    const thrown = new Error('Consumption requires reconciliation');
+    const { execution, log } = setup({
+      result: () => {
+        throw thrown;
+      },
+    });
+    const logged = [];
+    const original = console.error;
+    console.error = (...args) => {
+    logged.push(args);
+  };
+    let returned;
+    try {
+      returned = await execution.salvage('sys', 'c1');
+    } finally {
+      console.error = original;
+    }
+    flushSync();
+
+    assert.deepEqual(logged, [['Fabricate | Salvage failed:', thrown]]);
+    assert.deepEqual(returned, { success: false, message: thrown.message });
+    assert.deepEqual(log.at(-1), ['notify', thrown.message], 'the toast is unchanged');
+    assert.ok(!execution.salvageResult);
+  });
+
   it('shows a failure box with the executed check when a rolled salvage fails (issue 2092)', async () => {
     const check = Object.freeze({ evidence: { total: 9, target: 8, margin: -1 } });
     const { execution, log } = setup({
