@@ -809,7 +809,8 @@ One residual is accepted: when two runs overlap over one system and one saves be
 
 A registration that CREATES the entity writes a record that inherits every section and carries the row's `enabled`, plus a Tool's `repairRequirements`.
 A registration that ADOPTS an existing entity writes a record that overrides only the sections whose world default would change the row, which departs from the fully overriding `1.30.0` shape on purpose.
-A record whose `systemId` names no current system is a membership of a deleted system, reported at `1.36.0` and never deleted.
+A record whose `systemId` names no current system is a membership of a deleted system, reported by the `1.36.0` pass and never deleted by it.
+`deleteSystem` removes the records naming the system it deletes, so only records that predate it remain.
 
 Canonical mapping: `normalizeMemberships` / `resolveScopedDefinition` (`src/systems/scopedDefinitions.js`).
 `unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`) versus `CraftingSystemManager._scopeEntityBasis`.
