@@ -182,6 +182,7 @@ The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage E
   A duplicate target is therefore reported rather than silently executed twice.
 - The outcome vocabulary is `succeeded | failed | waiting | misconfigured | refused | skipped | notPermitted | cancelled | error`, where `notPermitted` is the facade's own outcome and the rest are the service's.
   A `refused` row is a definite consumption refusal that changed nothing, never a rolled failure.
+  The bulk report and the aggregate chat card label it `Not consumed`, and the report counts it as neither recovered nor empty-handed.
   One item's failure never aborts the run: a thrown call becomes an `error` row and the run continues.
 - Targets are classified **before** the engine is called, with a first-match `skipReason` of `bulkLimit`, `unknownSystem`, `featureDisabled`, `unknownComponent`, `salvageDisabled`, `duplicate`.
   That pre-flight is advisory only and the engine stays authoritative, so a target that passes it can still fail for a reason only the engine can see (not enough units, an unavailable tool, a time gate).
