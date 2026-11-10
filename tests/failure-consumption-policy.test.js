@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
+import { nativeCraftRunManager } from './helpers/native-run-manager.js';
+
 // Globals required for the module to load
 
 function getProperty(object, path) {
@@ -295,7 +297,12 @@ test('craft() does NOT consume ingredients AND does NOT break tools on check fai
 
 // Test Group 3: Failure consumption on check result validation failure
 
-async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToolsOnFail }) {
+async function runValidationFailureScenario({
+  consumeIngredientsOnFail,
+  breakToolsOnFail,
+  runManager = null,
+  vetoFirstUpdate = false
+}) {
   setupGame({ consumeIngredientsOnFail, breakToolsOnFail });
 
   const ingredientItem = buildFakeItem('ing-2', 3);
@@ -327,7 +334,7 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
     getMode() { return 'simple'; }
   };
 
-  const engine = new CraftingEngine(mockRecipeManager, null, mockResolutionService);
+  const engine = new CraftingEngine(mockRecipeManager, runManager, mockResolutionService);
   // The check itself succeeds — only the validateCheckResult call fails
   stubCraftingCheck(engine, { success: true, outcome: 'pass', value: 10, data: {} });
 
@@ -336,6 +343,16 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
 
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
+  if (vetoFirstUpdate) {
+    // A live collection proves the vetoed write left the Item unchanged.
+    sourceActor.items.get = (id) => sourceActor.items.find((item) => item.id === id);
+    ingredientItem.parent = sourceActor;
+    const write = ingredientItem.update;
+    ingredientItem.update = async () => {
+      ingredientItem.update = write;
+      return undefined;
+    };
+  }
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -363,6 +380,31 @@ test('craft() does not consume when policy is false/false and check result valid
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
   assert.equal(ingredientItem.updateCalled, false, 'ingredient should NOT have been updated');
   assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
+});
+
+test('craft(): a refused validation-failure consumption still breaks tools, consuming nothing', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  let failure = null;
+  const runManager = nativeCraftRunManager({
+    onFailure: (payload) => {
+      failure = payload;
+    }
+  });
+  const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
+    consumeIngredientsOnFail: true,
+    breakToolsOnFail: true,
+    runManager,
+    vetoFirstUpdate: true
+  });
+  assert.equal(result.success, false);
+  assert.match(result.message, /resolution mode requirements/i);
+  assert.equal(toolUsed.value, true, 'breakage still applied');
+  assert.equal(ingredientItem.system.quantity, 3, 'the vetoed write changed nothing');
+  const stage = runManager.inspectRun().steps[0];
+  assert.equal(stage.historySettlement.consumption, 'complete');
+  assert.deepEqual(stage.consumedIngredients, []);
+  assert.deepEqual(failure.consumedIngredients, []);
+  assert.equal(logged.mock.callCount(), 1, 'the refusal was logged once');
 });
 
 // Test Group 4: Edge cases
