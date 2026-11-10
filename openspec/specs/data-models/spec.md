@@ -3704,7 +3704,7 @@ Legacy records gain no retrospective mode, presentation or contribution data fro
 New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
 New historical enrichments require an affirmative current-viewer access evaluation or an explicit GM viewer; absent, throwing or indeterminate evaluators MUST withhold them, and actor ownership is not disclosure authority.
 Versioned consumption MUST confirm each delete or update from the consumed Item's persisted post-write state before recording positive receipts or allowing awards.
-A Definite Effect Refusal, a veto or refused write that provably left the Item unchanged with no earlier write in the batch, records nothing uncertain; any other unconfirmed write, and any failure after a confirmed prefix, leaves the batch uncertain and recovery-required without replay or automatic rollback.
+A Definite Effect Refusal, a consumption that dispatched nothing or whose write provably left the Item unchanged with no earlier write in the batch, records nothing uncertain; any other unconfirmed write, and any failure after a confirmed prefix, leaves the batch uncertain and recovery-required without replay or automatic rollback.
 Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
 Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
 

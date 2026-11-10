@@ -1364,6 +1364,13 @@ The misconfigured answer a check gives, before any roll, spend or award, when it
 
 [Notes](docs/domain/terms.md#target-refusal)
 
+#### Definite Effect Refusal
+
+A consumption Foundry provably did not apply (nothing dispatched, or a write answered with the Item unchanged), with nothing earlier in its batch consumed.
+It records nothing uncertain and stays retryable.
+
+[Notes](docs/domain/terms.md#definite-effect-refusal)
+
 #### Executed Check Evidence
 
 The recorded arithmetic meaning of a rolled check, including ordered evidence for separately evaluated modifiers when present, separate from its authored evaluation and from any forced outcome.
