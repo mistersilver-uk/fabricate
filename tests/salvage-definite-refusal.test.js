@@ -151,6 +151,41 @@ test('a refused consume-on-failure still breaks the tool and awards the failure 
   assert.equal(logged.length, 1);
 });
 
+const pathRefusal = () =>
+  Object.assign(new Error('The configured item stack-quantity path resolves an object'), {
+    code: 'STACK_QUANTITY_PATH_REFUSED',
+  });
+
+test('a path-guard refusal of the consumption is prefixed with the salvaged component', async () => {
+  const { probe, ore } = world();
+  probe.engine._consumeComponentItems = async () => {
+    throw pathRefusal();
+  };
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const refused = await probe.salvage();
+  assert.equal(refused.refused, true);
+  assert.match(
+    refused.message,
+    /^Could not salvage "Iron Ore": The configured item stack-quantity/
+  );
+  assert.deepEqual(activeRuns(probe), []);
+  assert.equal(ore.system.quantity, 3);
+});
+
+test('a path-guard refusal from the awards after a real decrement is not a refusal', async () => {
+  const { probe, ore } = world();
+  probe.engine._awardSalvageResultGroups = async () => {
+    throw pathRefusal();
+  };
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const outcome = await probe.salvage();
+  assert.notEqual(outcome?.refused, true, 'a real consumption never reads as nothing-changed');
+  assert.equal(ore.system.quantity, 2, 'the component was consumed');
+  const runs = activeRuns(probe);
+  assert.equal(runs.length, 1, 'the run keeps its uncertainty');
+  assert.equal(runs[0].historySettlement.awards, 'uncertain');
+});
+
 test('an uncertain consumption still poisons the run, so the refusal rule is not a catch-all', async () => {
   const { probe, ore } = world();
   ore.update = async function landedThenThrew(payload) {
