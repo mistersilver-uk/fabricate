@@ -806,6 +806,7 @@
           "OutcomeSkipped": "Skipped",
           "OutcomeNotPermitted": "Actor unavailable",
           "OutcomeCancelled": "Cancelled",
+          "OutcomeRefused": "Not consumed",
           "OutcomeError": "Something went wrong"
         },
         "Salvage": {
@@ -2098,6 +2099,7 @@
       "BulkSalvageOutcomeMisconfigured": "Not configured",
       "BulkSalvageOutcomeSkipped": "Skipped",
       "BulkSalvageOutcomeCancelled": "Cancelled",
+      "BulkSalvageOutcomeRefused": "Not consumed",
       "BulkSalvageOutcomeError": "Something went wrong",
       "TierStepUp": "Stepped up {steps} tier(s)",
       "TierStepDown": "Stepped down {steps} tier(s)",
