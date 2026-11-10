@@ -296,7 +296,7 @@ Deleting a system emits one summary notification naming the crafting system and 
 It does not emit one notification per deleted recipe.
 
 Deleting a system also removes the scoped membership records that name it, in the component, essence, and tool scopes.
-That prune runs after the system's removal is saved and only for records whose row the saved systems no longer hold.
+That prune runs after the system's removal is saved, and only once the saved systems no longer include that system.
 A failure in one scope is logged and does not stop the others.
 
 Deletion is resilient to a recipe that cannot be removed.
@@ -627,7 +627,7 @@ Essence definitions that pointed at a removed component have those links cleared
 Once the system save resolves, the call also removes this system's membership records for the removed components.
 Another system's membership for the same component is kept.
 The prune reads the persisted systems after the write and removes a record only when that snapshot no longer holds the component's row.
-A snapshot that still holds the row, an unreadable snapshot, or a failed membership save removes nothing and is logged, and the delete itself still succeeds.
+A snapshot that still holds the row or cannot be read removes nothing, a failed membership save is logged, and in every case the delete itself still succeeds.
 
 **Returns:** `Promise<{deleted, componentIds, recipesUpdated, recipesDisabled, membershipsParted}>`
 

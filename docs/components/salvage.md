@@ -283,9 +283,10 @@ It reports the same "Invalid salvage configuration" message as any other unfinis
 A timed salvage that resumes after the character's data changed, so that a result can no longer be rolled, is failed with that reason rather than left running.
 
 When Fabricate can prove that taking the component from the character changed nothing, the salvage is refused.
-This happens when Foundry or another module vetoes the change, the character lacks permission, or the item has already left the character.
-The message reads **Could not consume** followed by the item's name and the reason, ending with **Nothing was changed.**
-The item stays in the pack, no materials are awarded, and no stuck run is left behind, so the player can try the salvage again.
+This happens when Foundry or another module vetoes the change, the character lacks permission, the item has already left the character, its quantity cannot be read, or the configured stack-quantity field cannot hold the new count.
+The message names the item and the reason, and most read **Could not consume** … **Nothing was changed.**
+The item stays in the pack and no materials are awarded.
+A run this attempt started is discarded, and a resumed run is closed as failed, so no stuck run is left behind and the player can try the salvage again.
 A refusal does not block later salvages of that component.
 When Fabricate cannot tell whether the change happened, it does not guess.
 That case is a recovery case for the GM, described under [Stuck or uncertain runs]({% link player-app/journal.md %}#stuck-or-uncertain-runs).
