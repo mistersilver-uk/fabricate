@@ -74,13 +74,13 @@ import {
 } from './runJournalChoiceAvailability.js';
 import { d100PreviewEntries } from './runJournalD100Preview.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
-import { nativeRecoveryProjection } from './runJournalNativeRecovery.js';
 import {
   ingredientNeed,
   ingredientOptionName,
   ingredientOverrideIndex,
   selectedIngredientIndex,
 } from './runJournalIngredientOptions.js';
+import { nativeRecoveryProjection } from './runJournalNativeRecovery.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';

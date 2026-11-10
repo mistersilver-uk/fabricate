@@ -39,7 +39,7 @@ function ownerReceipts(owner, key) {
 function recoveryEvidence(owner, { closed, entitled, project }) {
   const settlement = owner?.historySettlement;
   const states = Object.values(settlement ?? {});
-  if (!states.some((state) => state === 'pending' || state === 'uncertain')) return null;
+  if (states.every((state) => state !== 'pending' && state !== 'uncertain')) return null;
   const required = !closed && states.includes('uncertain');
   const effects = ['consumption', 'awards']
     .filter((key) => settlement[key])
