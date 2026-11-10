@@ -1814,8 +1814,8 @@ New evidence requires affirmative initiating-viewer entitlement before persisten
 **History Settlement** records whether captured consumption and awards are settled on their native owner: `pending`, `complete`, `uncertain` or `notApplicable`.
 Legacy and native records carry it; versioned records keep the Execution Journal as their sole effect authority rather than a parallel settlement object.
 It states what is known and never what may be repeated: `pending` and `uncertain` authorize no replay, rollback or automatic refund, and a confirmed prefix is retained separately from an uncertain remainder.
-The active GM may close an uncertain legacy run by Native Reconciliation; it records `gmReconciliation` and archives the run `cancelled` without changing its settlement or receipts.
 Its absence is not modern acknowledgment, and existing legacy reported arrays keep their existing meaning and known values.
+The active GM may close an uncertain legacy run by Native Reconciliation; it records `gmReconciliation` and archives the run `cancelled` without changing its settlement or receipts.
 Native gathering persists terminal history first with pending awards, runs its existing effects in their existing order, and settles the actual receipts into that same record by run id; the response, chat card and completion publication then report the settlement rather than the plan.
 No persistence path may append a second terminal record, lose concurrently written history, or overwrite settled evidence with a stale pending copy.
 The Terminal Attempt Resolution pipeline's `commit` stage answers `commitReceipt`, a commit receipt distinct from and unrelated to this persisted enum; the name exists to keep the two apart.

@@ -340,6 +340,16 @@ test('SalvageRunManager: a repeated or stale-cache reconcile answers missing wit
   assert.deepEqual(history[0], first);
 });
 
+test('SalvageRunManager: Native Reconciliation answers missing when the archive write does not cancel', async () => {
+  const actor = new FakeActor('Native Unarchived');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+  const run = await uncertainSalvageRun(manager, actor);
+  manager.completeRun = async (_actor, input) => input;
+
+  assert.deepEqual(await manager.reconcileUncertainRun(actor, run.id, reconcileOptions), { status: 'missing' });
+});
+
 test('SalvageRunManager: after reconcile the component salvages again and world time resumes other runs', async () => {
   const actor = new FakeActor('Native Resume');
   setupGlobals(1000, [actor]);

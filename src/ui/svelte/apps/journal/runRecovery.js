@@ -76,11 +76,7 @@ export async function reconcileRetainedClaim({ claim, disposition, services, loc
   };
 }
 
-/**
- * Native Reconciliation's `choiceDialog` descriptor. Cancel is the default, so Enter closes nothing,
- * and `choiceDialog` rather than `confirmDialog` because it is a three-way choice outside the
- * manager scope, as `retainedClaimPrompt` is.
- */
+/** Native Reconciliation's `choiceDialog` descriptor. Cancel is the default, so Enter closes nothing. */
 export function nativeOutcomePrompt(localize) {
   const paragraphs = [
     'FABRICATE.App.Journal.NativeRecovery.Detail',

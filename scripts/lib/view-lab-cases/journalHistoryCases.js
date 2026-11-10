@@ -200,7 +200,7 @@ const NATIVE_RECONCILED_CASES = [1240, 1024].map((width) =>
     expectSelector:
       '[data-journal-history-detail]' +
       ':has([data-journal-recovery-evidence] [data-effect-phase="applying"] [data-list-row])' +
-      ':has([data-journal-recovery-evidence] .is-prose)' +
+      ':has([data-journal-recovery-evidence] .recovery-evidence-closed .is-keyed + .is-prose)' +
       ':has([data-journal-guidance])' +
       ':not(:has([data-history-items="produced"]))',
     kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],

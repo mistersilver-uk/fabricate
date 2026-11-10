@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { setGatheringEngine } from '../../src/bootstrap/gatheringRuntime.js';
-import { journalFacade } from '../../src/bootstrap/journalFacade.js';
+import { isActiveJournalGM, journalFacade } from '../../src/bootstrap/journalFacade.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
@@ -4237,5 +4237,36 @@ test('Native Reconciliation: a malformed crafting record projects as absent', ()
     const model = makeBuilder({ history: [run] }).buildListing({ actor: nativeActor, viewer: GM }).history[0];
     assert.equal(model.gmReconciliation, null, JSON.stringify(gmReconciliation));
     assert.equal(model.recoveryEvidence, null, JSON.stringify(gmReconciliation));
+  }
+});
+
+test('Native Reconciliation: a closed crafting record takes its receipts from the recorded stage', () => {
+  const run = uncertainCraftingRun({ id: 'craft-stage', status: 'cancelled', finishedAt: 190, currentStepIndex: null,
+    gmReconciliation: { ...CLOSED, stepIndex: 1 } });
+  run.steps[1].consumedIngredients = [{ ...NATIVE_RECEIPT, name: 'Tempered Ore' }];
+  run.steps[1].historySettlement = { consumption: 'uncertain', awards: 'pending' };
+  const model = makeBuilder({ history: [run] }).buildListing({ actor: nativeActor, viewer: GM }).history[0];
+  assert.equal(model.recoveryEvidence.status, 'gmClosed');
+  assert.equal(model.recoveryEvidence.effects[0].receipt.items[0].name, 'Tempered Ore');
+});
+
+test('Native Reconciliation: a viewer without history entitlement sees no closer and no receipts', () => {
+  const salvage = uncertainSalvageRun({ status: 'cancelled', finishedAt: 195, gmReconciliation: CLOSED });
+  const actor = { ...nativeActor, testUserPermission: () => false };
+  const model = makeBuilder({ salvageHistory: [salvage] }).buildListing({ actor, viewer: PLAYER }).history[0];
+  assert.equal(model.gmReconciliation, null);
+  assert.ok(model.recoveryEvidence.effects.every((effect) => effect.receipt === null));
+});
+
+test('Native Reconciliation: no user id and no active GM is not the active GM', () => {
+  const previousGame = globalThis.game;
+  try {
+    Reflect.set(globalThis, 'game', { user: {}, users: {} });
+    assert.equal(isActiveJournalGM(), false);
+    const run = makeBuilder({ salvageActive: [uncertainSalvageRun()], isActiveGM: isActiveJournalGM })
+      .buildListing({ actor: nativeActor, viewer: GM }).activeRuns[0];
+    assert.equal(run.actions.reconcileUncertain, false);
+  } finally {
+    Reflect.set(globalThis, 'game', previousGame);
   }
 });

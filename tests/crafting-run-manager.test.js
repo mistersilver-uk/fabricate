@@ -1467,6 +1467,27 @@ test('CraftingRunManager: Native Reconciliation closes a run whose uncertain sta
   assert.equal(manager.findActiveRunForRecipe(actor, 'recipe-native').id, next.id);
 });
 
+test('CraftingRunManager: Native Reconciliation records the uncertain stage, not the current one', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Native Locator');
+  actor.id = 'native-locator';
+  const manager = new CraftingRunManager();
+  const recipe = {
+    ...twoStageRecipe('recipe-three'),
+    getExecutionSteps: () => ['one', 'two', 'three'].map((id) => ({ id, name: id })),
+  };
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1');
+  run.steps[0].status = 'succeeded';
+  run.steps[0].historySettlement = { consumption: 'complete', awards: 'complete' };
+  run.steps[1].status = 'succeeded';
+  run.steps[1].historySettlement = { consumption: 'uncertain', awards: 'pending' };
+  run.currentStepIndex = 2;
+  await manager.updateRun(actor, run);
+
+  assert.equal((await manager.reconcileUncertainRun(actor, run.id, nativeOptions)).status, 'archived');
+  assert.equal(new CraftingRunManager().getRunHistory(actor)[0].gmReconciliation.stepIndex, 1);
+});
+
 test('CraftingRunManager: Native Reconciliation refuses pending-only, versioned and repeated runs', async () => {
   setupGlobals();
   const actor = new FakeActor('Native Crafting Refusals');

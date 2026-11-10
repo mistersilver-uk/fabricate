@@ -43,9 +43,16 @@ function nativeRecoveryCases() {
       'gm-claim',
       { viewer: 'gm', journalCaseState: 'native-recovery-claim' },
       1240,
-      `[data-journal-detail]:has([data-journal-recovery] [data-notice-action]):has(${evidence} ${control})`,
+      '[data-journal-detail]:has([data-journal-recovery] [data-notice-action])' +
+        `:has([data-journal-recovery-evidence] ${control})`,
     ],
-    ['dialog', { viewer: 'gm', dialog: 'open' }, 1240, '.application.dialog'],
+    [
+      'dialog',
+      { viewer: 'gm', dialog: 'open' },
+      1240,
+      '.application.dialog:has(button[data-action="cancel"][autofocus])' +
+        ':has(button[data-action="reconciled"]):has(button[data-action="abandoned"])',
+    ],
   ];
   return variants.map(([variant, query, width, expectSelector]) =>
     playerCase({

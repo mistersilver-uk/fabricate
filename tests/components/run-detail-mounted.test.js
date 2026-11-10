@@ -2241,10 +2241,42 @@ describe('RunDetail Native Reconciliation', () => {
         await recordOutcome(target);
         assert.equal(dialogs.length, 1);
         assert.deepEqual(calls, []);
-        assert.equal(target.querySelector('[data-journal-native-outcome]').disabled, false);
+        assert.ok(!target.querySelector('[data-journal-native-outcome]').hasAttribute('aria-busy'));
       });
     });
   }
+
+  it('opens one dialog for a double click and shows the control busy while recording', async () => {
+    let answer = null;
+    let release = null;
+    const { bag, calls } = gmServices();
+    bag.reconcileUncertainJournalRun = (options) => {
+      calls.push(['reconcile', options]);
+      return new Promise((settle) => (release = () => settle({ success: true })));
+    };
+    await withDialog(
+      (options) => (answer = options),
+      async (dialogs) => {
+        const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+        const control = target.querySelector('[data-journal-native-outcome]');
+        control.click();
+        control.click();
+        await new Promise((settle) => setTimeout(settle, 0));
+        assert.equal(dialogs.length, 1, 'the second click opens no second dialog');
+        press('reconciled')(answer);
+        await new Promise((settle) => setTimeout(settle, 0));
+        assert.equal(control.getAttribute('aria-busy'), 'true');
+        assert.match(control.textContent, /Actions\.Working/);
+        control.click();
+        release();
+        await new Promise((settle) => setTimeout(settle, 0));
+        await new Promise((settle) => setTimeout(settle, 0));
+        assert.equal(dialogs.length, 1);
+        assert.equal(calls.filter(([kind]) => kind === 'reconcile').length, 1);
+        assert.ok(!control.hasAttribute('aria-busy'));
+      }
+    );
+  });
 
   it('offers no control to a player or to a GM who is not the active GM', async () => {
     for (const run of [nativeRun({ activeGM: false, viewer: PLAYER }), nativeRun({ activeGM: false })]) {

@@ -26,6 +26,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { createLabDialogV2 } from '../view-lab/foundryDialog.js';
 import { buildLabActors } from '../view-lab/world/labActors.js';
 import {
   buildLabContent,
@@ -324,6 +325,7 @@ function makeBuilder(
     content = null,
     actor = ACTOR,
     viewer = { id: 'user-1', isGM: false },
+    isActiveGM = undefined,
   } = {}
 ) {
   const recipeById = new Map(recipes.map((entry) => [entry.id, entry]));
@@ -380,6 +382,7 @@ function makeBuilder(
     resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
     getDismissedRunKeys: () => dismissed,
     getJournalActionAvailability: () => authority,
+    isActiveGM,
   });
 }
 
@@ -535,6 +538,39 @@ async function mountPrototypeState(state, builderOptions = {}) {
   mounted.store.select(mounted.store.activeRuns.find((entry) => entry.id === `lab-v1-${state}`));
   flushSync();
   return mounted;
+}
+
+const NATIVE_RECOVERY_WITNESS = {
+  'native-recovery-claim': [
+    '[data-journal-detail] [data-journal-recovery] [data-notice-action]',
+    '[data-journal-detail] [data-journal-recovery-evidence] [data-journal-native-outcome]',
+  ],
+  'history-native-reconciled': [
+    '[data-journal-history-detail] [data-journal-recovery-evidence] [data-effect-phase="applying"] [data-list-row]',
+    '[data-journal-recovery-evidence] .recovery-evidence-closed .is-keyed + .is-prose',
+  ],
+};
+
+/**
+ * Installs the View Lab's DialogV2, answering nothing as `dialog: 'open'` does, until `t` ends.
+ * Its class extends the global `EventTarget` when built, so happy-dom's, `Node`'s base, stands in.
+ */
+function standOpenDialogs(t) {
+  const prior = globalThis.foundry;
+  const nodeEventTarget = globalThis.EventTarget;
+  Reflect.set(globalThis, 'EventTarget', Object.getPrototypeOf(globalThis.Node.prototype).constructor);
+  let dialogs;
+  try {
+    dialogs = createLabDialogV2({ localize: (key) => key });
+  } finally {
+    Reflect.set(globalThis, 'EventTarget', nodeEventTarget);
+  }
+  dialogs.setAnswer('open');
+  Reflect.set(globalThis, 'foundry', { ...prior, applications: { api: { DialogV2: dialogs.DialogV2 } } });
+  t.after(() => {
+    for (const element of dialogs.openDialogs()) element.remove();
+    Reflect.set(globalThis, 'foundry', prior);
+  });
 }
 
 async function settleAction() {
@@ -1798,11 +1834,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
     (entry) =>
       entry.id.startsWith('fabricate-journal-lifecycle-') ||
       entry.id.startsWith('fabricate-journal-history-batch-') ||
-      entry.id.startsWith('fabricate-journal-history-data-')
+      entry.id.startsWith('fabricate-journal-history-data-') ||
+      entry.id.startsWith('fabricate-journal-native-')
   )) {
     const suffix = capture.id.replace('fabricate-journal-lifecycle-', '');
-    it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async () => {
+    it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async (t) => {
       const state = capture.query.journalCaseState;
+      if (capture.query.dialog === 'open') standOpenDialogs(t);
       const content = buildLabContent({ journalCaseState: state });
       const actor = buildLabActors(content)[0];
       await stockJournalPrototype(actor, content, state);
@@ -1813,7 +1851,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const authority =
         state === 'authority-unavailable'
           ? { available: false, reason: 'active-gm-missing' }
-          : state === 'claim-retained'
+          : ['claim-retained', 'native-recovery-claim'].includes(state)
             ? { available: false, reason: 'recovery-required', retained: LAB_RETAINED_CLAIM }
             : { available: true, reason: null };
       const mounted = await mountState(state, {
@@ -1825,6 +1863,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
           authority,
           visible: state !== 'history-redacted',
           viewer: { id: 'user-lab-player', isGM: capture.query.viewer === 'gm' },
+          isActiveGM: () => capture.query.viewer === 'gm',
         },
         prepare({ services }) {
           if (state === 'loading') services.listJournalForActor = () => new Promise(() => {});
@@ -1942,6 +1981,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
         const begin = mounted.target.querySelector('[data-run-action="begin"]');
         assert.ok(begin, 'the begin control still renders instead of the primary');
         assert.equal(begin.disabled, true);
+      }
+      // The same `:has(A B)` caveat: each native-recovery witness is queried plainly too.
+      for (const selector of NATIVE_RECOVERY_WITNESS[state] ?? []) {
+        assert.ok(mounted.target.querySelector(selector), `${suffix} emits ${selector}`);
       }
       if (state === 'authority-unavailable') {
         assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);

@@ -1378,7 +1378,7 @@
           "ClosedRedacted": "A closed run. Protected details are hidden; this entry retains the timing and status you may view.",
           "ClosedMissing": "A closed run. Only recorded evidence is shown; missing details do not establish what was spent or produced.",
           "ClosedRecovery": "This run needs reconciliation. Confirmed, uncertain and unstarted effects are distinguished above; no uncertain effect is replayed or automatically rolled back.",
-          "ClosedGmReconciled": "Your GM closed this run without repeating or undoing anything. The receipts above are what Fabricate recorded; anything marked uncertain stays uncertain.",
+          "ClosedGmReconciled": "A GM closed this run without repeating or undoing anything. The receipts above are what Fabricate recorded; anything marked uncertain stays uncertain.",
           "Dismiss": "Hide {name} from this Journal",
           "Sort": {
             "Label": "Sort",
