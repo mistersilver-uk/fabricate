@@ -103,6 +103,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RunDetail.svelte',
     'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
+    'src/ui/svelte/apps/journal/RecoveryEvidence.svelte',
     'src/ui/svelte/apps/journal/ThisRun.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/journal/RunDetail.svelte',
@@ -2102,5 +2103,192 @@ describe('RunDetail award face (issue 1773)', () => {
     assert.equal(confirmButton(target).disabled, true);
     const blocker = target.querySelector('[data-award-blocker="active-gm-missing"]');
     assert.match(blocker.textContent, /Actions\.AuthorityUnavailable/);
+  });
+});
+
+describe('RunDetail Native Reconciliation', () => {
+  before(() => harness.setup());
+  afterEach(() => harness.remount());
+  after(() => harness.teardown());
+
+  const GM = { id: 'gm-1', isGM: true };
+  const PLAYER = { id: 'player-1', isGM: false };
+  const CLAIM = { claimId: 'claim-3', requestKind: 'command', failureReason: null, failureMessage: null, claimedAt: 1 };
+  const receipt = (name) => ({ actorUuid: 'Actor.native', itemUuid: `Actor.native.Item.${name}`, quantity: 1, name, img: null });
+
+  function nativeRun({ activeGM = true, viewer = GM, claim = null, closed = null } = {}) {
+    const record = {
+      id: 'salvage-native',
+      craftingSystemId: 'sys-1',
+      componentId: 'ore',
+      status: closed ? 'cancelled' : 'waitingTime',
+      startedAt: 100,
+      ...(closed && { finishedAt: 190, gmReconciliation: closed }),
+      timeGate: { requiredSeconds: 60, initiatedAt: 100, availableAt: 160 },
+      consumedComponents: [receipt('Hide')],
+      createdResults: [receipt('Scrap')],
+      historySettlement: { consumption: 'complete', awards: 'uncertain' },
+    };
+    const listing = new RunJournalBuilder({
+      salvageRunManager: {
+        getActiveRuns: () => (closed ? [] : [record]),
+        getRunHistory: () => (closed ? [record] : []),
+      },
+      isActiveGM: () => activeGM,
+      getJournalActionAvailability: () => ({ available: true, ...(claim && { retained: claim }) }),
+      nowWorldTime: () => 200,
+    }).buildListing({ actor: { id: 'native', uuid: 'Actor.native', isOwner: true }, viewer });
+    return closed ? listing.history[0] : listing.activeRuns[0];
+  }
+
+  /** Installs a DialogV2 that answers each render with `respond(options)`, and records them. */
+  async function withDialog(respond, body) {
+    const dialogs = [];
+    const priorFoundry = globalThis.foundry;
+    Reflect.set(globalThis, 'foundry', {
+      utils: { deepClone: (value) => ({ ...value }) },
+      applications: {
+        api: {
+          DialogV2: class {
+            constructor(options) {
+              this.options = options;
+            }
+            render() {
+              dialogs.push(this.options);
+              respond(this.options);
+            }
+          },
+        },
+      },
+    });
+    try {
+      await body(dialogs);
+    } finally {
+      Reflect.set(globalThis, 'foundry', priorFoundry);
+    }
+  }
+
+  function gmServices(answer = { success: true }) {
+    const calls = [];
+    const bag = {
+      ...services(),
+      notify: (message) => {
+        calls.push(['notify', message]);
+      },
+      reconcileUncertainJournalRun: (options) => {
+        calls.push(['reconcile', options]);
+        return Promise.resolve(answer);
+      },
+    };
+    bag.journal.load = (quiet) => {
+      calls.push(['load', quiet]);
+    };
+    return { bag, calls };
+  }
+
+  const press = (action) => (options) =>
+    options.buttons.find((button) => button.action === action)?.callback?.();
+
+  async function recordOutcome(target) {
+    const control = target.querySelector('[data-journal-native-outcome]');
+    assert.ok(Boolean(control), 'the active GM is offered Record outcome…');
+    control.click();
+    await new Promise((settle) => setTimeout(settle, 0));
+    await new Promise((settle) => setTimeout(settle, 0));
+  }
+
+  it('records the chosen disposition once, then notifies and re-reads the Journal', async () => {
+    const { bag, calls } = gmServices();
+    await withDialog(press('reconciled'), async (dialogs) => {
+      const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+      const control = target.querySelector(':scope [data-journal-recovery-evidence] [data-journal-native-outcome]');
+      assert.match(control.textContent, /NativeRecovery\.Action/);
+      await recordOutcome(target);
+      assert.equal(dialogs.length, 1);
+      assert.deepEqual(dialogs[0].buttons.map((button) => button.action), ['reconciled', 'abandoned', 'cancel']);
+      assert.equal(dialogs[0].buttons.find((button) => button.default)?.action, 'cancel');
+      assert.match(dialogs[0].content, /NativeRecovery\.Effect/);
+      assert.deepEqual(calls, [
+        ['reconcile', { actorUuid: 'Actor.native', runType: 'salvage', runId: 'salvage-native', disposition: 'reconciled' }],
+        ['notify', 'FABRICATE.App.Journal.NativeRecovery.Closed:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.reconciled"}'],
+        ['load', true],
+      ]);
+    });
+  });
+
+  it('notifies a refusal by its localized reason and re-reads the Journal', async () => {
+    const { bag, calls } = gmServices({ success: false, reason: 'run-not-uncertain' });
+    await withDialog(press('abandoned'), async () => {
+      const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+      await recordOutcome(target);
+      assert.equal(calls[0][1].disposition, 'abandoned');
+      assert.deepEqual(calls.slice(1), [
+        ['notify', 'FABRICATE.App.Journal.Reason.RunNotUncertain'],
+        ['load', true],
+      ]);
+    });
+  });
+
+  for (const [label, respond] of [
+    ['Enter, which presses the default', (options) => options.buttons.find((button) => button.default)?.callback?.()],
+    ['Cancel', press('cancel')],
+    ['closing the window', (options) => options.close?.()],
+  ]) {
+    it(`records nothing on ${label}`, async () => {
+      const { bag, calls } = gmServices();
+      await withDialog(respond, async (dialogs) => {
+        const target = await harness.mount({ run: nativeRun(), now: 200, services: bag, journal: bag.journal });
+        await recordOutcome(target);
+        assert.equal(dialogs.length, 1);
+        assert.deepEqual(calls, []);
+        assert.equal(target.querySelector('[data-journal-native-outcome]').disabled, false);
+      });
+    });
+  }
+
+  it('offers no control to a player or to a GM who is not the active GM', async () => {
+    for (const run of [nativeRun({ activeGM: false, viewer: PLAYER }), nativeRun({ activeGM: false })]) {
+      const target = await harness.mount({ run, now: 200, services: services() });
+      assert.ok(Boolean(target.querySelector('[data-journal-recovery-evidence]')), 'the receipts still show');
+      assert.ok(!target.querySelector('[data-journal-native-outcome]'), 'but no control');
+      harness.remount();
+    }
+  });
+
+  it('keeps Release claim… in the notice and Record outcome… at the receipts foot', async () => {
+    const target = await harness.mount({ run: nativeRun({ claim: CLAIM }), now: 200, services: services() });
+    const notice = target.querySelector(':scope [data-journal-recovery] [data-notice-action]');
+    assert.match(notice?.textContent ?? '', /Recovery\.Action/);
+    const evidence = target.querySelector('[data-journal-recovery-evidence]');
+    assert.ok(Boolean(evidence.querySelector('[data-journal-native-outcome]')));
+    assert.ok(!evidence.querySelector('[data-notice-action]'));
+  });
+
+  it('renders a closed history entry with its uncertain receipts, who closed it and the note', async () => {
+    const closed = { disposition: 'abandoned', userId: 'gm-1', userName: 'Morgan', note: 'Counted the scrap' };
+    const run = nativeRun({ closed });
+    assert.equal(run.recoveryEvidence.status, 'gmClosed');
+    const target = await harness.mount({ run, now: 200, services: services() });
+    const history = target.querySelector('[data-journal-history-detail]');
+    const evidence = history.querySelector('[data-journal-recovery-evidence]');
+    assert.ok(Boolean(evidence), 'the receipts render on the history face');
+    const awards = evidence.querySelector('[data-effect-phase="applying"]');
+    assert.match(awards.textContent, /Scrap/, 'the uncertain award keeps its receipt');
+    assert.match(awards.textContent, /Notice\.Effect/);
+    assert.ok(!history.querySelector('[data-history-items="produced"]'), 'never listed as recovered');
+    assert.ok(!target.querySelector('[data-journal-recovery]'), 'and no recovery notice');
+    assert.ok(!target.querySelector('[data-journal-native-outcome]'));
+    assert.match(evidence.textContent, /NativeRecovery\.ClosedBy/);
+    assert.match(evidence.textContent, /Morgan · FABRICATE\.App\.Journal\.Recovery\.Disposition\.abandoned/);
+    assert.match(evidence.textContent, /NativeRecovery\.GmNote[\s\S]*Counted the scrap/);
+    assert.match(target.querySelector('[data-journal-guidance]').textContent, /History\.ClosedGmReconciled/);
+  });
+
+  it('names an unknown closer as a GM and omits an absent note', async () => {
+    const run = nativeRun({ closed: { disposition: 'reconciled', userId: 'gm-1', userName: null } });
+    const target = await harness.mount({ run, now: 200, services: services() });
+    const evidence = target.querySelector('[data-journal-recovery-evidence]');
+    assert.match(evidence.textContent, /NativeRecovery\.ClosedByUnknown · FABRICATE\.App\.Journal\.Recovery\.Disposition\.reconciled/);
+    assert.doesNotMatch(evidence.textContent, /NativeRecovery\.GmNote/);
   });
 });

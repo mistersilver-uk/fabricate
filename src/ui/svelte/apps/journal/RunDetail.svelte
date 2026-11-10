@@ -22,7 +22,6 @@
   import { stageHeadingName } from './stageHeading.js';
   import {
     applyPersonalizedDrops,
-    effectPhaseText,
     formatRoll,
     ladderRuleKey,
     numberOrNaN,
@@ -38,8 +37,9 @@
   import StepDetails from './StepDetails.svelte';
   import TimeRemainingBox from './TimeRemainingBox.svelte';
   import HistoricalRunDetail from './HistoricalRunDetail.svelte';
+  import RecoveryEvidence from './RecoveryEvidence.svelte';
   import ThisRun from './ThisRun.svelte';
-  import { presentReceiptFacts, presentStage } from './historyPresentation.js';
+  import { presentStage } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
@@ -427,29 +427,7 @@
     <RunAwardChoice {run} {journal} />
   </section>
 
-  {#if stateNotice?.evidence}
-    <section data-journal-recovery-evidence>
-      {#each run.recoveryEvidence.effects ?? [] as effect (effect.index)}
-        <div data-journal-effect={effect.index} data-effect-phase={effect.phase}>
-          <JournalFactRow
-            label={localize('FABRICATE.App.Journal.Notice.Effect', { index: effect.index + 1 })}
-            value={effectPhaseText(effect.phase, localize)}
-            danger={effect.phase === 'applying'}
-          />
-          {#each effect.receipt?.items ?? [] as item, index (index)}
-            <ListRow
-              art={item.img ?? ''}
-              name={item.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
-              quantity={quantityText(item.quantity, localize)}
-            />
-          {/each}
-          {#each presentReceiptFacts(effect.receipt, localize) as fact, index (index)}
-            <JournalFactRow label={fact.label} value={fact.value} />
-          {/each}
-        </div>
-      {/each}
-    </section>
-  {/if}
+  {#if stateNotice?.evidence}<RecoveryEvidence {run} {services} {journal} />{/if}
 
   {#if commandError}
     <Notice
