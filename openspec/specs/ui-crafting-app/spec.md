@@ -150,7 +150,8 @@ Stated as its own section, a sibling of §Craft Execution, because the outcome s
 - Salvage runs through the `salvageComponent` facade seam, which takes an **`actorId`** and never an actor uuid.
   The engine's `salvage` performs **no ownership check of its own** — it resolves the uuid and mutates that actor's Items directly — so the facade's actor resolution is the only ownership gate on this path.
   A uuid accepted from a UI would bypass it, and a stale or foreign one reaches the server and **throws** rather than returning a message.
-- The seam **returns** rather than throwing for every ordinary failure (actor / system / component not found, feature disabled, salvage disabled, validation failure), so a failed salvage surfaces its message.
+- The seam **returns** rather than throwing for every ordinary failure (actor / system / component not found, feature disabled, salvage disabled, validation failure, a definite consumption refusal, which surfaces as a toast only, with no ribbon or panel state), so a failed salvage surfaces its message.
+- A salvage that throws is logged to the console with its cause before the surface toasts its message — in single salvage, and in the bulk run's whole-run catch (per-row throws are already logged by the service).
 - **`cancelled` is distinct from `success: false`.**
   A dismissed roll prompt returns `{ success: false, cancelled: true, results: null }` with **guaranteed zero mutation** — no component consumed, no tool breakage — and discards a run created by that call.
   It is a user's choice, not a failure, and MUST NOT be reported as an error.
@@ -179,7 +180,8 @@ The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage E
   Tool breakage at item _k_ must be visible at item _k+1_; stack depletion is shared between rows resolving to the same owned documents; and each salvage run record is a read-modify-write actor `setFlag` with no compare-and-set anywhere in the run store.
   Safety against double-consumption comes from that sequencing plus each `salvage()` call's own availability check, which re-derives the owned documents at call time — **not** from the caller handing over a disjoint document set.
   A duplicate target is therefore reported rather than silently executed twice.
-- The outcome vocabulary is `succeeded | failed | waiting | misconfigured | skipped | notPermitted | cancelled | error`, where `notPermitted` is the facade's own outcome and the rest are the service's.
+- The outcome vocabulary is `succeeded | failed | waiting | misconfigured | refused | skipped | notPermitted | cancelled | error`, where `notPermitted` is the facade's own outcome and the rest are the service's.
+  A `refused` row is a definite consumption refusal that changed nothing, never a rolled failure.
   One item's failure never aborts the run: a thrown call becomes an `error` row and the run continues.
 - Targets are classified **before** the engine is called, with a first-match `skipReason` of `bulkLimit`, `unknownSystem`, `featureDisabled`, `unknownComponent`, `salvageDisabled`, `duplicate`.
   That pre-flight is advisory only and the engine stays authoritative, so a target that passes it can still fail for a reason only the engine can see (not enough units, an unavailable tool, a time gate).

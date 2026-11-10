@@ -192,7 +192,7 @@ Several stale selections MAY be repaired incrementally, but execution MUST wait 
 The selected authored-requirement snapshot MUST be resolved by the authority from the actual selected set, not accepted as client-supplied evidence.
 It includes route, component, tag, essence and currency requirements and remains distinct from actual spending receipts in history.
 - Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
-Versioned physical-item consumption MUST receive the matching Item document from delete/update before recording confirmed spending or proceeding to awards; a non-throwing unconfirmed return is insufficient.
+Versioned physical-item consumption MUST be confirmed by the consumed Item's persisted post-write state — read from the write's returned document when its UUID matches, otherwise from the Item resolved live by UUID: absent after a delete it dispatched, or its `_source` stack quantity reduced by exactly the planned amount from its live pre-write value after an update — before recording confirmed spending or proceeding to awards; the identity of the returned object is neither required nor sufficient, and a write that threw is never confirmed.
 Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
 History distinguishes authored requirements, actual spending, actual rolls and actual awards.
 Successful and failed stage finalization MUST retain the optional permitted historical evidence defined in `data-models/spec.md`, including captured purpose, executed resolution meaning, carrier contributions and settled currency amounts.
@@ -243,8 +243,9 @@ The evidence records what that write actually did, so deleting the recipe, compo
 - **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
 An executed versioned crafting `kind: "check"` snapshot additionally retains validated `product: "sum"` and the executed `direction` (`"over"` or `"under"`) from the check result; neither field is inferred from authored future configuration or copied onto no-check, ingredient-routed, fizzle, legacy or gathering d100 records.
 A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
-- **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
+- **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment for awards, confirm each consumption write from the consumed Item's persisted post-write state, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
 A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.
+A Definite Effect Refusal — a consumption that dispatched nothing, or whose write Foundry answered without changing the Item, with nothing earlier in its batch consumed — records no `pending` or `uncertain` consumption: a terminal stage records it complete-empty, and an active stage restores its pre-attempt settlement and stays retryable.
 Native salvage `consumedComponents` additionally carry `actorUuid`, `name` and `img` while preserving their existing `itemUuid`, `quantity`, lifecycle and public signatures.
 A fizzle record MAY carry permitted `consumedIngredients` and `createdResults` and its explicit no-match, no-check meaning, without a synthetic crafting stage, recipe id or signature.
 - **Settlement state.** `historySettlement.consumption` and `historySettlement.awards` each take `pending`, `complete`, `uncertain` or `notApplicable`, as defined in `data-models/spec.md`.
@@ -716,6 +717,9 @@ A target refusal, a progressive `sum/under` check included, aborts as misconfigu
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
 5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.
+A Definite Effect Refusal aborts the salvage, returning `{ success: false, refused: true, message }` that names the item and the reason.
+It discards a run created by that call, completes a reused run `failed` with consumption complete-empty (a time-gated run forfeits its wait), and never blocks a later salvage.
+On the consume-on-failure path, tool breakage still applies and consumption records complete-empty.
 6. **Create**: Create result items on the actor.
 7. **Complications**: fire the component complications a committed PROGRESSIVE award earned (see § Component Complications (progressive salvage) below).
 8. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
