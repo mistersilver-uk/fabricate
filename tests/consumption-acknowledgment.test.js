@@ -142,6 +142,55 @@ test('a null from fromUuidSync is not absence: the parent collection confirms th
   assert.equal(quantityOf(item), 3);
 });
 
+/** A different document answering to the consumed Item's UUID, as an origin world Item may. */
+const impostors = [
+  ['a different id', (item) => ({ ...otherInstance(item), id: 'origin' })],
+  ['a different parent', (item) => ({ ...otherInstance(item), parent: liveActor('a2') })],
+];
+
+for (const [label, impostor] of impostors) {
+  test(`a fromUuidSync document with the Item's UUID but ${label} is ignored`, async (t) => {
+    const actor = liveActor();
+    const item = liveItem(actor, 'ore', 5);
+    const other = { ...impostor(item), _source: { system: { quantity: 9 } } };
+    Object.defineProperty(globalThis, 'fromUuidSync', {
+      value: (uuid) => (uuid === item.uuid ? other : null),
+      configurable: true,
+      writable: true,
+    });
+    t.after(() => delete globalThis.fromUuidSync);
+    assert.equal(await confirmItemConsumption(item, 2), 2);
+    assert.equal(quantityOf(item), 3);
+    assert.equal(quantityOf(other), 9, 'the other document was never read as the Item');
+  });
+
+  test(`a write returning a document with the Item's UUID but ${label} is ignored`, async () => {
+    const actor = liveActor();
+    const item = liveItem(actor, 'ore', 5);
+    const write = item.update;
+    item.update = async function returnsImpostor(payload) {
+      await write.call(this, payload);
+      return { ...impostor(this), _source: { system: { quantity: 5 } } };
+    };
+    assert.equal(await confirmItemConsumption(item, 2), 2);
+  });
+}
+
+test('a fromUuidSync instance of the Item under another copy of its parent is accepted', async (t) => {
+  const actor = liveActor();
+  const item = liveItem(actor, 'ore', 5);
+  // Shares `_source`, so it reads the write; the parent copy shares only the UUID.
+  const resolved = { ...item, parent: { uuid: actor.uuid } };
+  Object.defineProperty(globalThis, 'fromUuidSync', {
+    value: () => resolved,
+    configurable: true,
+    writable: true,
+  });
+  t.after(() => delete globalThis.fromUuidSync);
+  actor.items.length = 0;
+  assert.equal(await confirmItemConsumption(item, 2), 2);
+});
+
 for (const [label, update] of [
   ['a module veto', async () => undefined],
   ['a no-op diff the schema discarded', async () => undefined],
