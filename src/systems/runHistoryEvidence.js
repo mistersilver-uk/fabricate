@@ -228,6 +228,16 @@ export function isDefiniteEffectRefusal(error) {
   return error?.code === 'HISTORY_EFFECT_REFUSED' || error?.code === 'STACK_QUANTITY_PATH_REFUSED';
 }
 
+/** Whether `doc` is the consumed embedded Item itself: its `id` under the same parent. Another
+ *  document answering to the Item's UUID, such as the origin Item it was copied from, is not. */
+function sameEmbeddedItem(doc, item) {
+  if (!doc || doc.id !== item.id) return false;
+  return (
+    doc.parent === item.parent ||
+    Boolean(item.parent?.uuid && doc.parent?.uuid === item.parent.uuid)
+  );
+}
+
 /** The live Item by UUID, else from its parent's collection: `null` when the collection lacks it,
  *  `undefined` when neither answers, leaving the returned object's identity as the only evidence.
  *  A `null` from `fromUuidSync` is not absence, since an unresolvable address answers it too. */
@@ -235,7 +245,7 @@ function liveItem(item) {
   if (item?.uuid && typeof globalThis.fromUuidSync === 'function') {
     try {
       const resolved = globalThis.fromUuidSync(item.uuid, { strict: false });
-      if (resolved) return resolved;
+      if (sameEmbeddedItem(resolved, item)) return resolved;
     } catch {
       // An unresolvable address falls through to the parent collection.
     }
@@ -244,10 +254,10 @@ function liveItem(item) {
   return typeof items?.get === 'function' ? (items.get(item.id) ?? null) : undefined;
 }
 
-/** The written Item's post-write document: a returned other instance with its UUID, else the live
+/** The written Item's post-write document: a returned other instance of it, else the live
  *  Item, else the planning instance when the write returned it; `undefined` means unknowable. */
 function writtenItem(item, result, resolvable, deleted) {
-  if (result && typeof result === 'object' && result !== item && result.uuid === item.uuid)
+  if (result !== item && result?.uuid === item.uuid && sameEmbeddedItem(result, item))
     return deleted ? null : result;
   if (resolvable) return liveItem(item);
   return result === item ? (deleted ? null : item) : undefined;
