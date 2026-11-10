@@ -172,17 +172,32 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
 
 /**
  * The world-scope projection over {@link componentCorpus}, which every mounted assertion in both
- * world-component suites is driven from.
+ * world-component suites is driven from. By default every membership pair holds its in-system row.
  *
  * @param {object} [overrides] passed straight to `componentCorpus`.
+ * @param {object[]} [systems] the raw roster, for a case seeding an inert membership.
  * @returns {object} the projected scope.
  */
-export function componentScopeFor(overrides) {
+export function componentScopeFor(overrides, systems) {
+  const corpus = componentCorpus(overrides);
   return projectWorldScopeEntity({
     entityType: 'component',
-    corpus: componentCorpus(overrides),
-    systems: COMPONENT_SYSTEMS,
+    corpus,
+    systems: systems ?? componentRosterHolding(corpus),
   });
+}
+
+/** {@link COMPONENT_SYSTEMS} with an in-system row for each of the corpus's membership pairs. */
+export function componentRosterHolding(corpus) {
+  const records = Array.isArray(corpus?.membership)
+    ? corpus.membership
+    : Object.values(corpus?.membership ?? {});
+  return COMPONENT_SYSTEMS.map((system) => ({
+    ...system,
+    components: records
+      .filter((record) => record?.systemId === system.id)
+      .map((record) => ({ id: record.entityId })),
+  }));
 }
 
 /** Drain the microtask queue the sequential write loops await through. */

@@ -319,6 +319,33 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // The bulk panel's held note: Coal alone is selected and Smithing holds it, so the note refuses and names the direction that frees it.
+    id: 'world-component-catalogue-bulk-delete-held',
+    label: 'Manager — World Component catalogue, bulk delete refused',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-select="sm-coal"]' },
+      { selector: '[data-world-component-bulk-delete-note]', scroll: true },
+    ],
+    expectView: 'world-components',
+    expectSelector: '[data-world-component-bulk-delete-note="refused"]',
+    expectContained: [
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-delete-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+    ],
+  }),
+  managerCase({
     // The entry editor's definition tab (issue 1371), reached the way a GM reaches it: through the catalogue row's pen.
     id: 'world-component-entry-definition',
     label: 'Manager — World Component entry',
@@ -504,6 +531,34 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntrySystemsCard\.svelte$/],
+  }),
+  managerCase({
+    // The entry's delete refusal on Coal, which Smithing holds: a membership and its in-system row, and the control that frees it.
+    id: 'world-component-entry-delete-held',
+    label: 'Manager — World Component entry, delete refused',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-delete-card]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-delete-card="sm-coal"]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-delete-card="sm-coal"]',
+        target: '[data-scoped-entry-delete-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+    ],
   }),
   managerCase({
     // The validation tab on `lab-unbound-salt`, seeded with no source uuid, so its unlinked source blocks.
