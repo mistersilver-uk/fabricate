@@ -323,29 +323,21 @@ describe('createBulkActions', () => {
   });
 
   for (const mode of ['salvage', 'destroy']) {
-    it(`logs a thrown bulk ${mode} with its cause and keeps the reported message`, async () => {
+    it(`logs a thrown bulk ${mode} with its cause and keeps the reported message`, async (t) => {
       const { bulk } = setup({
         rows: [listingRow('c1', 'Iron')],
         results: { salvageThrows: true, destroyThrows: true },
       });
       bulk.toggleBulkSelection('sys:c1');
       flushSync();
-      const logged = [];
-      const original = console.error;
-      console.error = (...args) => {
-    logged.push(args);
-  };
-      let outcome;
-      try {
-        outcome = mode === 'salvage' ? await bulk.bulkSalvage() : await bulk.bulkDestroy({});
-      } finally {
-        console.error = original;
-      }
+      const logged = t.mock.method(console, 'error', () => {});
+      const outcome = mode === 'salvage' ? await bulk.bulkSalvage() : await bulk.bulkDestroy({});
       flushSync();
 
-      assert.equal(logged.length, 1);
-      assert.equal(logged[0][0], `Fabricate | Bulk ${mode} failed:`);
-      assert.equal(logged[0][1].message, 'the engine blew up');
+      assert.equal(logged.mock.callCount(), 1);
+      const [label, cause] = logged.mock.calls[0].arguments;
+      assert.equal(label, `Fabricate | Bulk ${mode} failed:`);
+      assert.equal(cause.message, 'the engine blew up');
       assert.equal(outcome.error, 'the engine blew up', 'the surfaced message is unchanged');
       assert.equal(bulk.bulkReport.error, 'the engine blew up');
     });

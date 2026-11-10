@@ -276,27 +276,21 @@ describe('createSalvageExecution', () => {
     );
   });
 
-  it('logs a thrown salvage with its cause before toasting the message', async () => {
+  it('logs a thrown salvage with its cause before toasting the message', async (t) => {
     const thrown = new Error('Consumption requires reconciliation');
     const { execution, log } = setup({
       result: () => {
         throw thrown;
       },
     });
-    const logged = [];
-    const original = console.error;
-    console.error = (...args) => {
-    logged.push(args);
-  };
-    let returned;
-    try {
-      returned = await execution.salvage('sys', 'c1');
-    } finally {
-      console.error = original;
-    }
+    const logged = t.mock.method(console, 'error', () => {});
+    const returned = await execution.salvage('sys', 'c1');
     flushSync();
 
-    assert.deepEqual(logged, [['Fabricate | Salvage failed:', thrown]]);
+    assert.deepEqual(
+      logged.mock.calls.map((call) => call.arguments),
+      [['Fabricate | Salvage failed:', thrown]]
+    );
     assert.deepEqual(returned, { success: false, message: thrown.message });
     assert.deepEqual(log.at(-1), ['notify', thrown.message], 'the toast is unchanged');
     assert.ok(!execution.salvageResult);
