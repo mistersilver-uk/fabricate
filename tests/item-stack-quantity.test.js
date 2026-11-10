@@ -218,15 +218,15 @@ const SITE_MAPPING = [
     // rather than the stored one: the consumption plan counted this document with
     // `readStackQuantity`, so a stack stored at `0` was planned as one unit and must settle as one
     // unit.
-    site: 'CraftingEngine._consumeItemQuantity whole-document delete delta (#1648)',
-    file: 'src/systems/CraftingEngine.js',
+    site: 'runHistoryEvidence.confirmItemConsumption whole-document delete delta (#1648)',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    anchors: ['const whole = readStackQuantity(item?._source ?? item, path);'],
+    anchors: ['const whole = readStackQuantity(planned._source ?? planned, path);'],
   },
   {
-    site: 'CraftingEngine._consumeItemQuantity shared decrement write (#1648)',
-    file: 'src/systems/CraftingEngine.js',
+    site: 'runHistoryEvidence.confirmItemConsumption shared decrement write (#1648)',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'updateStackQuantity',
     sites: 1,
     deleteSites: 1,
@@ -523,7 +523,7 @@ describe('the per-site accessor mapping', () => {
     const counts = countAccessorCallSites();
     const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
     assert.ok(total >= 30, `expected the routed call sites, counted ${total}`);
-    assert.ok(counts.has('src/systems/CraftingEngine.js::readStackQuantity'));
+    assert.ok(counts.has('src/systems/runHistoryEvidence.js::readStackQuantity'));
   });
 
   it('names exactly three read semantics, and no fourth', () => {
@@ -578,8 +578,7 @@ describe('the per-site accessor mapping', () => {
       asSortedPairs(
         new Map([
           ['src/systems/companionComponentAward.js', 1],
-          ['src/systems/CraftingEngine.js', 1],
-          ['src/systems/runHistoryEvidence.js', 2],
+          ['src/systems/runHistoryEvidence.js', 3],
         ])
       ),
       'post-write measurements remain unknown when the quantity field is absent'
@@ -613,12 +612,11 @@ describe('the per-site accessor mapping', () => {
       );
     }
     // Each delete site has an `await (underrun ? item.delete() : updateStackQuantity(...))`
-    // partner, so the engine's write count must equal its delete-site count.
-    const engineWrites = SITE_MAPPING.filter(
-      (entry) =>
-        entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
+    // partner, so the boundary's write count must equal its delete-site count.
+    const boundaryWrites = SITE_MAPPING.filter(
+      (entry) => entry.deleteSites > 0 && entry.accessor === 'updateStackQuantity'
     ).reduce((sum, entry) => sum + entry.sites, 0);
-    assert.equal(engineWrites, 1);
+    assert.equal(boundaryWrites, 1);
   });
 });
 

@@ -13,6 +13,7 @@ import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftC
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
   assertNativeEffectsUninvoked,
+  isDefiniteEffectRefusal,
   itemReceipt,
   mapConsumedIngredientRef,
 } from './runHistoryEvidence.js';
@@ -284,24 +285,65 @@ export function settleSalvageRoll(ctx) {
   return settleCardRolls(ctx.cardRolls);
 }
 
+/** The component's consumption; a Definite Effect Refusal is kept on `ctx` for the settlement. */
+async function consumeSalvageComponents(engine, ctx) {
+  try {
+    return await engine._consumeComponentItems(
+      ctx.actor,
+      ctx.componentItems,
+      ctx.ingredientQuantity
+    );
+  } catch (error) {
+    if (isDefiniteEffectRefusal(error)) ctx.consumptionRefusal = error;
+    throw error;
+  }
+}
+
+/**
+ * A salvage whose consumption was refused definitely changed nothing: a run this call created is
+ * discarded, a reused one completes `failed` with consumption complete-empty, and nothing blocks a
+ * later salvage. Answers `null` for any other error.
+ */
+export async function settleSalvageRefusal(ctx, error) {
+  if (!isDefiniteEffectRefusal(error) || ctx.consumptionRefusal !== error) return null;
+  console.error('Fabricate | Salvage consumption was refused:', error);
+  const { actor, component, componentId, salvageRun, salvageRunManager } = ctx;
+  const message =
+    error.code === 'HISTORY_EFFECT_REFUSED'
+      ? error.message
+      : `Could not salvage "${component.name || componentId}": ${error.message}`;
+  let run = null;
+  if (salvageRunManager && salvageRun && ctx.salvageRunCreatedThisCall) {
+    await salvageRunManager.discardRun(actor, salvageRun.id);
+  } else if (salvageRunManager && salvageRun) {
+    run = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+      failureReason: message,
+      historySettlement: { consumption: 'complete', awards: 'notApplicable' },
+      consumedComponents: [],
+    });
+  }
+  return salvageRefusal(message, { refused: true, salvageRun: run });
+}
+
 /**
  * A failed salvage check: the policy's consumption and breakage, then the reserved failure award
  * (issue 1098), which runs after both so the reserved output sees what the attempt spent.
  */
 export async function resolveSalvageFailure(engine, ctx) {
-  const { actor, checkResult, component, componentItems, failurePolicy } = ctx;
-  const { ingredientQuantity, salvageRun, salvageRunManager } = ctx;
+  const { actor, checkResult, component, failurePolicy, salvageRun, salvageRunManager } = ctx;
   const { syntheticRecipe, system, toolValidation } = ctx;
   if (checkResult.success) return null;
   let consumedOnFail = [];
   let usedTools = [];
   try {
     if (failurePolicy.consumeComponentOnFail) {
-      consumedOnFail = await engine._consumeComponentItems(
-        actor,
-        componentItems,
-        ingredientQuantity
-      );
+      consumedOnFail = await consumeSalvageComponents(engine, ctx).catch((error) => {
+        // The attempt still happened, so breakage applies and consumption settles complete-empty.
+        if (ctx.consumptionRefusal !== error) throw error;
+        console.error('Fabricate | Salvage failure-path consumption was refused:', error);
+        delete ctx.consumptionRefusal;
+        return [];
+      });
       await engine._recordSalvageConsumption(actor, salvageRunManager, salvageRun, consumedOnFail);
     }
     if (failurePolicy.breakToolsOnFail) {
@@ -419,7 +461,7 @@ export async function publishSalvageFailure(engine, ctx) {
 /** The award: the resolved groups, the consumption, the breakage, the created items, and the
  * interim receipt the run carries until it completes. */
 export async function commitSalvage(engine, ctx) {
-  const { actor, checkResult, component, componentItems, ingredientQuantity } = ctx;
+  const { actor, checkResult, component } = ctx;
   const { salvageRun, salvageRunManager, syntheticRecipe, system, toolValidation } = ctx;
   const resultGroups = engine._resolveSalvageResultGroups(
     component,
@@ -436,11 +478,7 @@ export async function commitSalvage(engine, ctx) {
     checkResult,
     salvageRun
   );
-  const consumedItems = await engine._consumeComponentItems(
-    actor,
-    componentItems,
-    ingredientQuantity
-  );
+  const consumedItems = await consumeSalvageComponents(engine, ctx);
   ctx.consumedItems = consumedItems;
   await engine._recordSalvageConsumption(actor, salvageRunManager, salvageRun, consumedItems);
   // Salvage parity (issue 419): the SUCCESS path always applies breakage (no

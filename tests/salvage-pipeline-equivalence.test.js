@@ -1032,7 +1032,7 @@ const SCENARIOS = [
       ["run.updateRun","Actor:Salvager","Run:rid-3 husk inProgress 1c/0t/1r check:simple complete/pending"],
       ["run.completeRun","Actor:Salvager","Run:rid-3 husk inProgress 1c/0t/1r check:simple complete/pending","succeeded",{"consumedComponents":[{"actorUuid":"Actor.Salvager","itemUuid":"Item.husk","name":"Dry Husk","img":"icons/husk.png","quantity":1}],"historySettlement":{"consumption":"complete","awards":"complete"},"usedTools":[],"createdResults":[{"actorUuid":"Actor.Salvager","itemUuid":"Actor.Salvager.Item.made-1","name":"Shard","img":"icons/src-shard.png","quantity":2,"componentId":"shard","resultRowId":"sg-1:sr-1:0","sourceItemUuid":"Item.src-shard"}],"checkResult":{"success":true,"outcome":"pass","value":17,"data":{"dc":10,"formula":"1d20","resolvedFormula":null,"total":17,"product":"sum","direction":"over","comparison":"meet","target":10,"margin":7,"successes":null,"cancelled":null,"diceGroups":[{"groupId":0,"group":"1d20","sum":17,"results":[17]}]}},"failureReason":null}],
       ["chat.bulk",{"text":"FABRICATE.Chat.BulkSalvageSuccess FABRICATE.Chat.SalvageActor: Salvager FABRICATE.Chat.BulkSalvageSummary FABRICATE.Chat.BulkSalvageSubjects Iron Ore — FABRICATE.Chat.BulkSalvageOutcomeSucceeded FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 Bent Scrap — FABRICATE.Chat.BulkSalvageOutcomeSucceeded FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 Dry Husk — FABRICATE.Chat.BulkSalvageOutcomeSucceeded FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 FABRICATE.Chat.SalvageRecovered 6× Shard FABRICATE.Chat.SalvageConsumed Bent Scrap Dry Husk Iron Ore"}],
-      ["bulk.returned",{"counts":{"total":3,"succeeded":3,"failed":0,"waiting":0,"misconfigured":0,"skipped":0,"cancelled":0,"error":0},"posted":true}],
+      ["bulk.returned",{"counts":{"total":3,"succeeded":3,"failed":0,"waiting":0,"misconfigured":0,"refused":0,"skipped":0,"cancelled":0,"error":0},"posted":true}],
     ],
   },
   {
@@ -1059,6 +1059,41 @@ const SCENARIOS = [
       ["run.completeRun","Actor:Salvager","Run:rid-1 ore inProgress 1c/0t/1r check:simple complete/pending","succeeded",{"consumedComponents":[{"actorUuid":"Actor.Salvager","itemUuid":"Item.ore","name":"Iron Ore","img":"icons/ore.png","quantity":1}],"historySettlement":{"consumption":"complete","awards":"complete"},"usedTools":[],"createdResults":[{"actorUuid":"Actor.Salvager","itemUuid":"Actor.Salvager.Item.made-1","name":"Shard","img":"icons/src-shard.png","quantity":2,"componentId":"shard","resultRowId":"sg-1:sr-1:0","sourceItemUuid":"Item.src-shard"}],"checkResult":{"success":true,"outcome":"pass","value":17,"data":{"dc":10,"formula":"1d20","resolvedFormula":null,"total":17,"product":"sum","direction":"over","comparison":"meet","target":10,"margin":7,"successes":null,"cancelled":null,"diceGroups":[{"groupId":0,"group":"1d20","sum":17,"results":[17]}]}},"failureReason":null}],
       ["chat.create",{"alias":"Salvager","rolls":0,"text":"FABRICATE.Chat.SalvageSuccess FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 FABRICATE.Chat.SalvageRecovered 2× Shard FABRICATE.Chat.SalvageConsumed Iron Ore"}],
       ["returned",{"success":true,"results":["Item:made-1"],"message":"Successfully salvaged Iron Ore","value":17,"salvageRun":"Run:rid-1 ore succeeded 1c/0t/1r check:simple complete/complete"}],
+    ],
+  },
+  {
+    name: "a definite consumption refusal discards the run it created",
+    async run() {
+      const world = salvageRunProbe({
+        salvageCraftingCheck: { simple: PASS_FAIL },
+        targets: [target()],
+        awards: SHARD_AWARD,
+      });
+      // A live collection, so the vetoed write is provably unchanged rather than unknowable.
+      const { items } = world.actor;
+      items.get = (id) => items.find((item) => item.id === id && !item.deleted) ?? null;
+      items[0].update = async function veto(payload) {
+        world.journal.push('item.update', this, payload);
+        return undefined;
+      };
+      stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+      const original = console.error;
+      console.error = () => {};
+      try {
+        await world.salvage();
+      } finally {
+        console.error = original;
+      }
+      return world.journal.entries;
+    },
+    journal: [
+      ["run.findActiveRunForComponent","Actor:Salvager","sys-salvage","ore"],
+      ["run.createRun","Actor:Salvager",{"actorUuid":"Actor.Salvager","craftingSystemId":"sys-salvage","componentId":"ore","componentName":"Iron Ore","status":"inProgress","startedAt":0,"usedTools":[],"resultOrder":null}],
+      ["run.markRunInProgress","Actor:Salvager","Run:rid-1 ore inProgress 0c/0t/0r"],
+      ["run.updateRun","Actor:Salvager","Run:rid-1 ore inProgress 0c/0t/0r check:simple pending/pending"],
+      ["item.update","Item:ore",{"system.quantity":2}],
+      ["run.discardRun","Actor:Salvager","rid-1"],
+      ["returned",{"success":false,"results":null,"message":"Could not consume \"Iron Ore\": the write left the item unchanged (a module veto, permissions, or a stack-quantity path the item's schema discards). Nothing was changed.","salvageRun":null,"refused":true}],
     ],
   },
 ];
