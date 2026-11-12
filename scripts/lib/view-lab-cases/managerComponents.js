@@ -1205,7 +1205,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Component complications check trigger (Runework)',
     reaches: 'beyond',
     smokeLabels: [],
-    query: { system: 'lab-runework', w: '1280', h: '820' },
+    query: { system: 'lab-runework', runeworkCheckMode: 'salvage-triggers', w: '1280', h: '820' },
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '.manager-component-row[data-component-id="rw-bar"] [data-component-edit]' },
@@ -1230,7 +1230,7 @@ export const CASES = Object.freeze([
     // The resting clause: the authored trigger named in the Select's face, its panel shut.
     reaches: 'beyond',
     smokeLabels: [],
-    query: { system: 'lab-runework', w: '1280', h: '820' },
+    query: { system: 'lab-runework', runeworkCheckMode: 'salvage-triggers', w: '1280', h: '820' },
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '.manager-component-row[data-component-id="rw-bar"] [data-component-edit]' },

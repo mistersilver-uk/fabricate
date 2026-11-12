@@ -80,3 +80,27 @@ test('each world-shaping flag builds the world it claims, against the default wo
     );
   });
 });
+
+test('the salvage-triggers Runework state gives the component editor progressive triggers (issue 1865)', async () => {
+  await withFabricateLifecycleReplay(async ({ world: control, loadModule }) => {
+    const { buildLabWorld } = await loadModule('/tests/view-lab/world/labWorld.js');
+    const triggersOf = (world) =>
+      world.fabricate.craftingSystemManager
+        .getSystem('lab-runework')
+        .salvageCraftingCheck?.progressive?.checkBreakage?.triggers?.map(({ id }) => id) ?? [];
+    assert.deepEqual(
+      triggersOf(control),
+      [],
+      'the default Runework names none on a progressive block'
+    );
+
+    const shaped = await buildLabWorld({ runeworkCheckMode: 'salvage-triggers' });
+    try {
+      const system = shaped.fabricate.craftingSystemManager.getSystem('lab-runework');
+      assert.equal(system.salvageResolutionMode, 'progressive');
+      assert.deepEqual(triggersOf(shaped), ['rw-trig-step-target', 'rw-trig-step-up']);
+    } finally {
+      shaped.shim.restore();
+    }
+  });
+});

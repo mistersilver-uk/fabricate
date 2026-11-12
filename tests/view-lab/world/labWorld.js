@@ -570,9 +570,25 @@ function seedSubjectModifierPicks(content, state) {
  * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006), and
  * `routed-count-unordered` needs three from tiers authored out of order (issue 2135).
  */
-function seedRuneworkCheckMode(content, mode) {
+export function seedRuneworkCheckMode(content, mode) {
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
   const routed = system?.craftingCheck?.routed;
+  if (system && routed && mode === 'salvage-triggers') {
+    // Issue 1865: the component editor lists complication triggers from a PROGRESSIVE check block,
+    // and draws its complications section only when some activity is progressive. Runework
+    // authors its triggers on the ROUTED block, so neither holds until salvage is progressive.
+    system.salvageResolutionMode = 'progressive';
+    system.salvageCraftingCheck = {
+      ...system.salvageCraftingCheck,
+      progressive: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        thresholds: { success: 10 },
+        awardMode: 'equal',
+        checkBreakage: structuredClone(routed.checkBreakage),
+      },
+    };
+    return;
+  }
   if (routed && mode?.startsWith('routed-count')) {
     const unordered = mode === 'routed-count-unordered';
     const extra = unordered
