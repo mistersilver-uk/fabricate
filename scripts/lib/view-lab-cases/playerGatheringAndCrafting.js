@@ -1458,7 +1458,10 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-alternatives'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Forge Longsword' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' },
+    ],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
@@ -1747,6 +1750,7 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
+      { selector: '.crafting-browser-search input', fill: 'Forge a Pattern-Welded Blade' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
       // Scroll to the second step to show its own coal-only cost rather than step 1's Steel Ingot and Coal.
       { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },

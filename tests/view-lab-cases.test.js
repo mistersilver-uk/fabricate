@@ -4547,6 +4547,54 @@ test('system Travel Map no-regions evidence reaches its world through the lab fl
   assert.match(worldSource, /!noSceneRegions && worldHasInteractableSources/);
 });
 
+test('an unfiltered crafting row click targets a recipe provably on the first page', () => {
+  // The Crafting tab pages at `DEFAULT_PAGE_SIZE` rows sorted by name, so a recipe added to the lab
+  // world that sorts ahead of a target pushes it onto page 2 and the case fails in `capture`
+  // (issue 1911, which #1908 hit twice). A step that narrows the list first is immune. The rank is
+  // taken over EVERY enabled lab recipe, which can only overstate the position the actor's own
+  // visible list gives it, so the check never passes a row that could sink.
+  const storeSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/stores/craftingStore.svelte.js'),
+    'utf8'
+  );
+  const pageSize = Number(/const DEFAULT_PAGE_SIZE = (\d+);/.exec(storeSource)?.[1]);
+  assert.ok(pageSize > 0, 'the crafting store no longer declares DEFAULT_PAGE_SIZE as a literal');
+  const rankById = new Map(
+    content.recipes
+      .filter((recipe) => recipe.enabled !== false)
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((recipe, index) => [recipe.id, index + 1])
+  );
+
+  const sunk = [];
+  let checked = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (viewCase.baseCaseId) continue;
+    let narrowed = false;
+    for (const step of viewCase.steps ?? []) {
+      if (typeof step !== 'object') continue;
+      if (step.selector?.includes('.crafting-browser-search input') && step.fill !== undefined) {
+        narrowed = true;
+      }
+      const recipeId = /\.crafting-recipe-row\[data-recipe-id="([^"]+)"\]/.exec(
+        step.selector ?? ''
+      )?.[1];
+      if (!recipeId || narrowed) continue;
+      checked += 1;
+      const rank = rankById.get(recipeId);
+      if (!(rank <= pageSize)) sunk.push(`${viewCase.id}: ${recipeId} ranks ${rank ?? 'nowhere'}`);
+      break;
+    }
+  }
+  assert.ok(checked > 50, 'the sweep must reach the unfiltered crafting rows, not pass on none');
+  assert.deepEqual(
+    sunk,
+    [],
+    `these cases click a crafting row that can fall past page one (${pageSize} rows) — fill ` +
+      'the crafting search with the recipe name first, as the filtered cases do'
+  );
+});
+
 test('every crafting case claims exactly the resolution-mode body it renders', () => {
   // The crafting cases carry a per-MODE `sourceMatches` pattern so that editing
   // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That
