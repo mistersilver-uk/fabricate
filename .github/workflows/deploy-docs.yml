@@ -6,6 +6,12 @@ on:
       - main
     paths:
       - 'docs/**'
+  # Issue 1734: a docs PR builds the site so a break fails before merge. It never deploys: the
+  # upload step and the deploy job are both gated to a push, and the build job holds read scope only.
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/deploy-docs.yml'
 
 jobs:
   build:
@@ -21,14 +27,18 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: docs
+      # Without --strict_front_matter a page whose front matter fails to parse builds green and
+      # silently loses its layout and navigation entry.
       - name: Build Jekyll site
-        run: cd docs && bundle exec jekyll build
-      - uses: actions/upload-pages-artifact@v4
+        run: cd docs && bundle exec jekyll build --strict_front_matter
+      - if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs/_site
 
   deploy:
     needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Only this job publishes, so only this job carries the write scopes.
     permissions:
       contents: read
