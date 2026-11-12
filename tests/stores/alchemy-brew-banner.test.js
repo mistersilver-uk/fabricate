@@ -75,7 +75,6 @@ const cases = [
     {
       success: false,
       results: null,
-      message: 'FABRICATE.Alchemy.FailureResult',
       disposition: 'failed',
     },
     'check-failed',
