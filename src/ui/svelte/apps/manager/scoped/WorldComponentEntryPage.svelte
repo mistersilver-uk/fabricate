@@ -26,6 +26,7 @@
   import ScopedEntrySystemsCard from './ScopedEntrySystemsCard.svelte';
   import {
     componentDeleteNote,
+    componentHoldingSystemNames,
     componentDuplicateSourceCount,
     componentEntryHeaderSubtitle,
     componentEntryPreviewGroups,
@@ -257,10 +258,7 @@
   $effect(() => () => onSublineChange(''));
 
   const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
-  const memberRows = $derived(systemRows.filter((row) => row?.member === true));
-  const memberNames = $derived(
-    memberRows.map((row) => String(row?.systemName || row?.systemId || ''))
-  );
+  const holdingNames = $derived(componentHoldingSystemNames(systemRows));
   // THE STAGED VALUES, WHICH THE WHOLE SCREEN READS (M34): every control previews the draft, and
   // `null` — the baseline's spelling of an absent value — reads as empty here.
   const stagedDefault = (section) => draft?.defaults?.[section] ?? persisted.defaults[section];
@@ -401,7 +399,7 @@
     const value = Object.keys(next).length === 0 && !authored ? null : next;
     draft = withScopedEntryDefault(draft ?? persisted, 'essences', value);
   }
-  const deleteNote = $derived(componentDeleteNote(memberNames, phrase));
+  const deleteNote = $derived(componentDeleteNote(holdingNames, phrase));
   const previewGroups = $derived(entry ? componentEntryPreviewGroups(entry, text) : []);
 
   const validation = $derived(
@@ -483,7 +481,7 @@
     armedToken = '';
     // THE REFUSAL. `deleteEntity` does not refuse, so the guard is here and on the CALL rather
     // than on a disabled attribute, which would satisfy any assertion while explaining nothing.
-    if (memberNames.length > 0) return;
+    if (holdingNames.length > 0) return;
     const deleted = await actions?.deleteEntity?.(entry?.id ?? '');
     if (deleted !== false) onBackToCatalogue();
   }

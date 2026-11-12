@@ -1352,6 +1352,36 @@ test('a definite write refusal abandons its plan instead of demanding recovery',
   assert.equal(runManager.getRunHistory(actor).length, 0);
 });
 
+test('a vetoed consumption write is a Definite Effect Refusal that abandons its plan', async () => {
+  const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+  const actor = new FakeActor('vetoed');
+  const source = new FakeActor('vetoed-stock');
+  const set = new IngredientSet({ id: 'set-1', ingredientGroups: [
+    { id: 'only', options: [{ quantity: 1, match: { type: 'component', componentId: 'only' } }] },
+  ] });
+  recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] }];
+  recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+  let writes = 0;
+  const stock = { id: 'only', name: 'Ore', uuid: `${source.uuid}.Item.only`, parent: source,
+    system: { quantity: 2 }, _source: { system: { quantity: 2 } },
+    async delete() { writes += 1; return this; },
+    // A `preUpdateItem` veto: Foundry resolves `undefined` and writes nothing.
+    async update() { writes += 1; return undefined; },
+  };
+  source.items = Object.assign([stock], { get: (id) => (id === stock.id ? stock : undefined) });
+
+  const refused = await startReadyVersionedRun({ engine, recipe, actor, source,
+    selectionPlan: { selectedIngredientSetId: set.id } });
+
+  assert.equal(refused.success, false, 'the start refuses rather than throwing recovery');
+  assert.match(refused.message, /^Could not consume "Ore": the write left the item unchanged/,
+    'the refusal itself, never a recovery demand');
+  assert.equal(writes, 1, 'the vetoed write was attempted exactly once');
+  assert.deepEqual(new CraftingRunManager().getActiveRuns(actor), [], 'and left no run behind');
+  assert.equal(stock._source.system.quantity, 2, 'the stock is untouched');
+  assert.equal(runManager.getRunHistory(actor).length, 0);
+});
+
 test('abandoning a plan is refused once an effect has applied', () => {
   const planned = transitionExecutionJournal(null, { type: 'plan', plan: {
     operationId: 'op-1', requestId: 'req-1', baseRunRevision: 0, intent: null,

@@ -103,6 +103,11 @@ describe('classifySalvageOutcome reads the discriminators in the ONE total order
       result: { success: true, waiting: true, results: null },
       outcome: 'waiting',
     },
+    {
+      label: 'a definite consumption refusal (success: false beside the flag)',
+      result: { success: false, refused: true, results: null },
+      outcome: 'refused',
+    },
     { label: 'an awarded success', result: { success: true, results: [] }, outcome: 'succeeded' },
     { label: 'a rolled failure', result: { success: false, results: null }, outcome: 'failed' },
     { label: 'a null return', result: null, outcome: 'failed' },
@@ -122,6 +127,29 @@ describe('classifySalvageOutcome reads the discriminators in the ONE total order
 
   it('reads misconfigured BEFORE the failure default, so a GM gap is not a failed roll', () => {
     assert.equal(classifySalvageOutcome({ success: false, misconfigured: true }), 'misconfigured');
+  });
+
+  it('reads refused BEFORE success and the failure default, so a refusal is never a rolled row', () => {
+    assert.equal(classifySalvageOutcome({ success: true, refused: true }), 'refused');
+    assert.equal(classifySalvageOutcome({ success: false, refused: true }), 'refused');
+  });
+
+  it('a refused row consumes nothing and keeps the message naming the item', async (t) => {
+    silenceErrors(t);
+    const message = 'Could not consume "Iron Ore": it is no longer on the actor.';
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({ success: false, refused: true, results: null, message }),
+    });
+    const result = await service.run({
+      targets: [bulkTarget({ componentId: 'comp-ore' })],
+      interactive: false,
+    });
+    assert.equal(result.items[0].outcome, 'refused');
+    assert.equal(result.items[0].message, message);
+    assert.deepEqual(result.items[0].consumed, []);
+    assert.equal(result.counts.refused, 1);
+    assert.equal(result.counts.failed, 0, 'not a rolled failure');
   });
 });
 
@@ -264,6 +292,12 @@ describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
     },
     'comp-gem': { success: false, misconfigured: true, results: null, message: 'Not configured' },
     'comp-ash': { success: false, cancelled: true, results: null },
+    'comp-flint': {
+      success: false,
+      refused: true,
+      results: null,
+      message: 'Could not consume "Flint": the write left the item unchanged.',
+    },
   };
   const NAMES = {
     'comp-ore': 'Iron Ore',
@@ -271,6 +305,7 @@ describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
     'comp-bone': 'Cave Bone',
     'comp-gem': 'Raw Gem',
     'comp-ash': 'Grey Ash',
+    'comp-flint': 'Flint',
   };
   const COMPONENTS = Object.keys(RETURNS).map((id) => bulkComponent({ id, name: NAMES[id] }));
 
@@ -308,6 +343,7 @@ describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
         'comp-bone=waiting',
         'comp-gem=misconfigured',
         'comp-ash=cancelled',
+        'comp-flint=refused',
         'comp-off=skipped',
         // An unknown component never reaches the engine, so the throw comes from the
         // pre-flight's own classification rather than from the seam.
@@ -319,11 +355,12 @@ describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
   it('counts every outcome, always reporting the whole vocabulary', async (t) => {
     const { result } = await runAllOutcomes(t);
     assert.deepEqual(result.counts, {
-      total: 7,
+      total: 8,
       succeeded: 1,
       failed: 1,
       waiting: 1,
       misconfigured: 1,
+      refused: 1,
       skipped: 2,
       cancelled: 1,
       error: 0,

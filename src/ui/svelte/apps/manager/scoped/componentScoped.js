@@ -1,15 +1,9 @@
 /**
- * The pure presentation model behind the four COMPONENT screens of epic 1357 (issue 1371). It
- * decides nothing about persistence, renders nothing, and reads no Foundry global; every string
- * is built through a caller-supplied localizer.
- *
- * A category note branches on the WORLD VALUE and never on the switch: `applyInheritedSections`
- * applies an unauthored world default to nothing, so a switch-first note would describe a value
- * that does not exist. Shared-system counts clamp at zero.
- *
- * IT IMPORTS ONE LEAF AND MUST KEEP DOING SO: every mounted suite rendering `ComponentEditView`
- * copies this graph into a hand-rolled manifest, where an omission reads as `# cancelled`, never
- * `# fail`. `tests/components/scoped-shell-prop-contract.test.js` pins the import list.
+ * The pure presentation model behind the four component screens of epic 1357: no persistence, no
+ * render, no Foundry global, and every string through a caller-supplied localizer. A category note
+ * branches on the world value, never the switch, since an unauthored world default applies
+ * nothing; shared-system counts clamp at zero. It imports one leaf, because mounted suites copy
+ * this graph into manifests; `tests/components/scoped-shell-prop-contract.test.js` pins the list.
  */
 
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
@@ -570,7 +564,16 @@ export function componentAttributionNote({ surface, memberCount, systemName = ''
   );
 }
 
-/** The delete control's sentence; the IN-USE branch refuses and names what to do instead. */
+/** The names of the systems holding a component, a membership and its in-system row: the one
+ * list the entry's delete note, its confirm guard and the bulk plan read. */
+export function componentHoldingSystemNames(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row?.member === true && row?.holdsRow === true)
+    .map((row) => String(row?.systemName || row?.systemId || ''))
+    .filter(Boolean);
+}
+
+/** The delete control's sentence; the held branch refuses and names the control to use. */
 export function componentDeleteNote(systemNames, phrase) {
   const names = (Array.isArray(systemNames) ? systemNames : []).map((name) => String(name ?? ''));
   if (names.length === 0) {
@@ -578,7 +581,7 @@ export function componentDeleteNote(systemNames, phrase) {
       refused: false,
       text: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.DeleteFree',
-        'No system has rules for this entry, so nothing else is affected.'
+        'No system holds this component, so deleting it changes no system’s rules.'
       ),
     };
   }
@@ -598,19 +601,20 @@ export function componentDeleteNote(systemNames, phrase) {
         ? 'FABRICATE.Admin.Manager.Scoped.Component.DeleteRefusedOne'
         : 'FABRICATE.Admin.Manager.Scoped.Component.DeleteRefused',
       names.length === 1
-        ? '{count} system has rules for this component, so it cannot be deleted yet. Remove it from that system first: {systems}.'
-        : '{count} systems have rules for this component, so it cannot be deleted yet. Remove it from each system first: {systems}.',
-      { count: names.length, systems: list }
+        ? '{count} system has rules for this component, so it cannot be deleted yet. Use “{remove}” under “{systemsTitle}” for {systems}.'
+        : '{count} systems have rules for this component, so it cannot be deleted yet. Use “{remove}” under “{systemsTitle}” for each of: {systems}.',
+      {
+        count: names.length,
+        systems: list,
+        remove: phrase('FABRICATE.Admin.Manager.Scoped.Component.Entry.RemoveFromSystem', 'Remove from this system'),
+        systemsTitle: phrase('FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsTitle', 'Systems using this component'),
+      }
     ),
   };
 }
 
-/**
- * WHICH OF A BULK SELECTION CAN ACTUALLY BE DELETED, and which systems hold the rest. The panel
- * refuses the same members the entry does (epic decision 7), INDIVIDUALLY rather than refusing the
- * instruction, so the plan says what will go and what was skipped and by whom. Membership is read
- * off the JOIN ROWS, since the refusal has to NAME the systems and a count cannot.
- */
+/** Which of a bulk selection can be deleted, and which systems hold the rest: the entry's own
+ * refusal (epic decision 7), applied per record and read off the join rows so it names them. */
 export function componentBulkDeletePlan(entries, entityIds) {
   const wanted = new Set((Array.isArray(entityIds) ? entityIds : []).map((id) => String(id ?? '')));
   const deletable = [];
@@ -618,10 +622,7 @@ export function componentBulkDeletePlan(entries, entityIds) {
   for (const entry of Array.isArray(entries) ? entries : []) {
     const id = String(entry?.id ?? '');
     if (!id || !wanted.has(id)) continue;
-    const systemNames = (Array.isArray(entry?.systems) ? entry.systems : [])
-      .filter((row) => row?.member === true)
-      .map((row) => String(row?.systemName || row?.systemId || ''))
-      .filter(Boolean);
+    const systemNames = componentHoldingSystemNames(entry?.systems);
     if (systemNames.length === 0) {
       deletable.push(id);
     } else {
@@ -635,11 +636,8 @@ export function componentBulkDeletePlan(entries, entityIds) {
   return { deletable, blocked };
 }
 
-/**
- * The bulk delete's consequence note, in the plan's three states. The held cases name the skipped
- * components and their systems, because "some were skipped" says the instruction failed without
- * saying what to do; capped at three, for {@link componentDeleteNote}'s reason.
- */
+/** The bulk delete's note in the plan's three states; a held case names the skipped components,
+ * their systems (capped at three) and the control that frees them. */
 export function componentBulkDeleteNote(plan, phrase) {
   const deletable = Array.isArray(plan?.deletable) ? plan.deletable : [];
   const blocked = Array.isArray(plan?.blocked) ? plan.blocked : [];
@@ -670,13 +668,14 @@ export function componentBulkDeleteNote(plan, phrase) {
           { names: shown, count: remainder }
         )
       : shown;
+  const removeFrom = phrase('FABRICATE.Admin.Manager.Scoped.Component.BulkRemoveFrom', 'Remove from');
   if (deletable.length === 0) {
     return {
       refused: true,
       text: phrase(
         'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteAllHeld',
-        'Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Remove them from those systems first.',
-        { detail }
+        'Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Use the “{removeFrom}” direction first.',
+        { detail, removeFrom }
       ),
     };
   }
@@ -684,12 +683,13 @@ export function componentBulkDeleteNote(plan, phrase) {
     refused: false,
     text: phrase(
       'FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteSkipping',
-      'Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Remove them from those systems first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.',
+      'Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Use the “{removeFrom}” direction first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.',
       {
         deletable: deletable.length,
         count: deletable.length + blocked.length,
         skipped: blocked.length,
         detail,
+        removeFrom,
       }
     ),
   };

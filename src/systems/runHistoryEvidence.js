@@ -3,6 +3,7 @@ import { isSafeFlagKeySegment, markForcedDeletion } from '../config/flags.js';
 import {
   hasStackQuantity,
   itemStackQuantityPath,
+  readStackQuantity,
   readStoredStackQuantity,
   updateStackQuantity,
 } from './itemStackQuantity.js';
@@ -178,6 +179,114 @@ export function unconfirmedHistoryError(message, receipts = [], cause = null) {
   return error;
 }
 
+/** A Definite Effect Refusal: a consumption Foundry provably did not apply, so nothing is uncertain. */
+export function definiteEffectRefusal(message, cause = null) {
+  const error = new Error(message, cause ? { cause } : undefined);
+  error.code = 'HISTORY_EFFECT_REFUSED';
+  return error;
+}
+
+/** Whether a failure proves nothing changed; the stack-path guard refuses before any write. */
+export function isDefiniteEffectRefusal(error) {
+  return error?.code === 'HISTORY_EFFECT_REFUSED' || error?.code === 'STACK_QUANTITY_PATH_REFUSED';
+}
+
+/** Whether `doc` is the consumed embedded Item itself: its `id` under the same parent. Another
+ *  document answering to the Item's UUID, such as the origin Item it was copied from, is not. */
+function sameEmbeddedItem(doc, item) {
+  if (!doc || doc.id !== item.id) return false;
+  return (
+    doc.parent === item.parent ||
+    Boolean(item.parent?.uuid && doc.parent?.uuid === item.parent.uuid)
+  );
+}
+
+/** The live Item by UUID, else from its parent's collection: `null` when the collection lacks it,
+ *  `undefined` when neither answers, leaving the returned object's identity as the only evidence.
+ *  A `null` from `fromUuidSync` is not absence, since an unresolvable address answers it too. */
+function liveItem(item) {
+  if (item?.uuid && typeof globalThis.fromUuidSync === 'function') {
+    try {
+      const resolved = globalThis.fromUuidSync(item.uuid, { strict: false });
+      if (sameEmbeddedItem(resolved, item)) return resolved;
+    } catch {
+      // An unresolvable address falls through to the parent collection.
+    }
+  }
+  const items = item?.parent?.items;
+  return typeof items?.get === 'function' ? (items.get(item.id) ?? null) : undefined;
+}
+
+/** The written Item's post-write document: a returned other instance of it, else the live
+ *  Item, else the planning instance when the write returned it; `undefined` means unknowable. */
+function writtenItem(item, result, resolvable, deleted) {
+  if (result !== item && result?.uuid === item.uuid && sameEmbeddedItem(result, item))
+    return deleted ? null : result;
+  if (resolvable) return liveItem(item);
+  return result === item ? (deleted ? null : item) : undefined;
+}
+
+/**
+ * Consume `quantity` from one Item and confirm it from the Item's persisted state, returning the
+ * amount consumed. Throws a Definite Effect Refusal when nothing was written (the Item is gone or
+ * unreadable before dispatch, or the write left it unchanged), otherwise an uncertain error.
+ */
+export async function confirmItemConsumption(item, quantity, path = itemStackQuantityPath()) {
+  const name = item?.name ?? 'item';
+  const live = liveItem(item);
+  if (live === null)
+    throw definiteEffectRefusal(
+      `Could not consume "${name}": it is no longer on the actor. Nothing was changed.`
+    );
+  const planned = live ?? item;
+  const before = sourceItemQuantity(planned, { path });
+  if (before === null || receiptQuantity(quantity) === null)
+    throw definiteEffectRefusal(
+      `Could not consume "${name}": its quantity is unreadable. Nothing was changed.`
+    );
+  const deleted = quantity >= before;
+  // A whole-document delete yields what the plan counted, and plans read capacity with
+  // `readStackQuantity`, which refuses a stored-`0` stack.
+  const whole = readStackQuantity(planned._source ?? planned, path);
+  let result;
+  let thrown = null;
+  try {
+    result = await (deleted
+      ? item.delete()
+      : updateStackQuantity(item, before - quantity, path, { throwOnRefusal: true }));
+  } catch (error) {
+    if (error?.code === 'STACK_QUANTITY_PATH_REFUSED') throw error;
+    thrown = error;
+  }
+  const after = writtenItem(item, result, live !== undefined, deleted);
+  const now = after ? sourceItemQuantity(after, { path, absentDefault: null }) : null;
+  if (!thrown && result != null && after === null && deleted) return whole;
+  if (!thrown && after && !deleted && now === before - quantity) return quantity;
+  if ((thrown || result == null) && after && sourceItemQuantity(after, { path }) === before) {
+    throw definiteEffectRefusal(
+      `Could not consume "${name}": the write left the item unchanged (a module veto, ` +
+        `permissions, or a stack-quantity path the item's schema discards). Nothing was changed.`,
+      thrown
+    );
+  }
+  if (!thrown && after && now !== null && now < before)
+    throw unconfirmedHistoryError('Partial consumption decrement', [
+      { ...mapConsumedIngredientRef({ item, quantity }), quantity: before - now },
+    ]);
+  throw unconfirmedHistoryError('Consumption decrement is uncertain', [], thrown);
+}
+
+/** A fizzle's settlement once its consumption threw: a Definite Effect Refusal consumed nothing,
+ *  and any other failure leaves consumption uncertain with its confirmed prefix. */
+export function failedFizzleSettlement(error, consumed) {
+  const refused = isDefiniteEffectRefusal(error);
+  const receipts = error?.historyField === 'consumption' ? error.receipts : consumed;
+  return {
+    consumedIngredients: refused ? [] : receipts,
+    historySettlement: { consumption: refused ? 'complete' : 'uncertain', awards: 'complete' },
+  };
+}
+
 export function requireDocumentAcknowledgment(expected, returned) {
   if (!expected || returned !== expected) {
     throw unconfirmedHistoryError('The matching document did not acknowledge its write');
@@ -329,6 +438,24 @@ function sameHistoryValue(left, right) {
     keys.length === Object.keys(right).filter((key) => right[key] !== undefined).length &&
     keys.every((key) => Object.hasOwn(right, key) && sameHistoryValue(left[key], right[key]))
   );
+}
+
+/** Restores and persists the settlement and snapshot keys `_beginNativeStage` replaced once the
+ *  stage's consumption is refused definitely, deleting those it lacked, so it stays retryable. */
+export function nativeStageRestorer(stage, snapshotKeys, persist) {
+  const saved = [...snapshotKeys, 'historySettlement'].map((key) => [
+    key,
+    Object.hasOwn(stage, key),
+    structuredClone(stage[key]),
+  ]);
+  return async () => {
+    if (stage.historySettlement?.consumption !== 'pending') return;
+    for (const [key, had, value] of saved) {
+      if (had) stage[key] = value;
+      else delete stage[key];
+    }
+    await persist();
+  };
 }
 
 export function assertNativeEffectsUninvoked(run) {

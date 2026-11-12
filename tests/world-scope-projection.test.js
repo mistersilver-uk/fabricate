@@ -234,6 +234,39 @@ test('a component row states the essence map THIS system resolves, and which lay
   assert.equal('resolvedEssences' in toolRow, false);
 });
 
+test('a component row says whether this system holds an in-system row, and no other type does', () => {
+  const roster = [
+    { id: 'sys-forge', name: 'Forge', components: [{ id: ' ash-salt ' }] },
+    { id: 'sys-empty', name: 'Empty', components: [] },
+  ];
+  const corpus = {
+    entities: [{ id: 'ash-salt', name: 'Ash Salt' }],
+    defaults: [],
+    membership: [
+      { entityId: 'ash-salt', systemId: 'sys-forge', inherit: {} },
+      { entityId: 'ash-salt', systemId: 'sys-empty', inherit: {} },
+    ],
+  };
+  const entry = projectWorldScopeEntity({ entityType: 'component', corpus, systems: roster })
+    .entries[0];
+  assert.deepEqual(
+    entry.systems.map((row) => [row.systemId, row.member, row.holdsRow]),
+    [
+      ['sys-forge', true, true],
+      ['sys-empty', true, false],
+    ],
+    'the empty system holds an inert membership'
+  );
+  for (const entityType of ['essence', 'tool']) {
+    const row = projectWorldScopeEntity({
+      entityType,
+      corpus: { entities: [{ id: 'ash-salt' }], defaults: [], membership: [] },
+      systems: roster,
+    }).entries[0].systems[0];
+    assert.equal('holdsRow' in row, false, `${entityType} rows keep their keys`);
+  }
+});
+
 test('a non-member system still produces a row, so membership is the gate', () => {
   const state = projectWorldScopeEntity({
     entityType: 'tool',

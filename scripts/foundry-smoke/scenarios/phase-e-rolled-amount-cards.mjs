@@ -3,8 +3,9 @@
  * recipe editor, and whose token's salvage result is put on Rolled in the component editor, crafted,
  * gathered and salvaged with d4s set to manual entry, so an award that rolled interactively would
  * open a RollResolver. Each editor's refusals, the awards and the roll on their cards, a rolled
- * gathering yield, and a craft and a salvage refused before they consume anything are asserted in
- * every profile; nothing is captured.
+ * gathering yield, a craft and a salvage refused before they consume anything, and a salvage whose
+ * consumption a `preUpdateItem` veto refuses without leaving a run are asserted in every profile;
+ * nothing is captured.
  */
 
 import { summarizeCraftCard, pickCraftCardMessage } from '../../lib/craftChatCardSummary.js';
@@ -249,9 +250,10 @@ async function assertNoResolver(page, what) {
 
 /**
  * Run `action`, then wait for one console error matching each of `patterns` and move exactly those
- * to the waived list: a refused save logs them by design, and any other error stays gating.
+ * to the waived list: a refused save or consumption logs them by design, and any other error stays
+ * gating. `reason` names the refusal in the waiver.
  */
-async function expectConsoleErrors(ctx, patterns, action) {
+async function expectConsoleErrors(ctx, patterns, action, reason = 'refused save') {
   const start = ctx.consoleErrors.length;
   await action();
   const deadline = Date.now() + 20_000;
@@ -269,10 +271,10 @@ async function expectConsoleErrors(ctx, patterns, action) {
     await ctx.page.waitForTimeout(250);
   } while (Date.now() < deadline);
   const missing = patterns.filter((_, at) => found[at] === -1);
-  if (missing.length > 0) throw new Error(`the refused save never logged ${missing.join(', ')}`);
+  if (missing.length > 0) throw new Error(`the ${reason} never logged ${missing.join(', ')}`);
   for (const index of found.toSorted((a, b) => b - a)) {
     const [text] = ctx.consoleErrors.splice(index, 1);
-    ctx.waivedConsoleErrors.push(`expected (issue 1516, a refused save): ${text}`);
+    ctx.waivedConsoleErrors.push(`expected (a ${reason}): ${text}`);
   }
 }
 
@@ -524,14 +526,25 @@ async function messagesPostedBy(page, action) {
   return { result, posted: (await ids()).filter((id) => !before.has(id)) };
 }
 
-/** Salvage one forge token through the facade, as the player app does. */
-function salvageToken(page, forge, crafterId) {
+/** Salvage one forge component (the token by default) through the facade, as the player app does. */
+function salvageToken(page, forge, crafterId, componentId = forge.tokenComponentId) {
   return page.evaluate(
     ({ crafterId, systemId, componentId }) =>
       game.fabricate
         .salvageComponent({ actorId: crafterId, systemId, componentId })
-        .then(({ success, message }) => ({ success, message })),
-    { crafterId, systemId: forge.systemId, componentId: forge.tokenComponentId }
+        .then(({ success, message, refused }) => ({ success, message, refused })),
+    { crafterId, systemId: forge.systemId, componentId }
+  );
+}
+
+/** The id of the crafter's active salvage run for `componentId`, or null. */
+async function activeSalvageRunId(page, forge, crafterId, componentId) {
+  return await page.evaluate(
+    ({ crafterId, systemId, componentId }) =>
+      game.fabricate
+        .getSalvageRunManager()
+        .findActiveRunForComponent(game.actors.get(crafterId), systemId, componentId)?.id ?? null,
+    { crafterId, systemId: forge.systemId, componentId }
   );
 }
 
@@ -570,6 +583,8 @@ async function proveRolledSalvage(ctx, forge) {
   const increase = after[forge.charmName] - before[forge.charmName];
   if (spent !== 1) throw new Error(`the salvage spent ${spent} tokens, not 1`);
   if (increase < 2 || increase > 5) throw new Error(`the charms rose by ${increase}, not 2 to 5`);
+  const leftRun = await activeSalvageRunId(page, forge, crafterId, forge.tokenComponentId);
+  if (leftRun !== null) throw new Error(`the deleting salvage left run ${leftRun} active`);
   await assertNoResolver(page, 'the salvage');
   const rolled = [];
   for (const id of posted) {
@@ -618,6 +633,153 @@ async function proveSalvageCharacterRefusal(ctx, forge) {
   return { refusal: result.message };
 }
 
+const REFUSAL_SHARD = 'Smoke Refusal Shard';
+const REFUSED_CONSUMPTION_LOGS = Object.freeze([/^Fabricate \| Salvage consumption was refused/]);
+
+/**
+ * A world Item, its own component on the forge with a fixed one-charm simple salvage, and one
+ * embedded stack of three, so the vetoed salvage after the first still takes the update path;
+ * resolves to the world Item's id, the component id and the embedded Item's id.
+ */
+async function seedRefusalShard(page, forge, crafterId) {
+  const seeded = await page.evaluate(
+    async ({ crafterId, systemId, name, charmName }) => {
+      const csm = game.fabricate.getCraftingSystemManager();
+      const charmComponentId = csm.getItems(systemId).find((item) => item?.name === charmName)?.id;
+      if (!charmComponentId) throw new Error('the forge has no charm');
+      const types = [...(game.documentTypes?.Item ?? [])];
+      const type = types.includes('loot') ? 'loot' : types[0] || 'loot';
+      const img = 'icons/commodities/gems/gem-fragments-blue.webp';
+      const [shard] = await Item.createDocuments([{ name, type, img }]);
+      // The step registers the world Item for cleanup only once this resolves, so a failure
+      // after its creation deletes it here.
+      try {
+        const componentId = (await csm.addItemFromUuid(systemId, shard.uuid)).item.id;
+        const system = csm.getSystem(systemId);
+        const check = system.salvageCraftingCheck ?? {};
+        await csm.updateSystem(systemId, {
+          features: { ...system.features, salvage: true },
+          salvageResolutionMode: 'simple',
+          salvageCraftingCheck: {
+            ...check,
+            enabled: false,
+            simple: { ...check.simple, rollFormula: '' },
+          },
+        });
+        await csm.updateItem(systemId, componentId, {
+          salvage: {
+            enabled: true,
+            ingredientQuantity: 1,
+            resultGroups: [
+              { name: 'Charm', results: [{ componentId: charmComponentId, quantity: 1 }] },
+            ],
+          },
+        });
+        const [stack] = await game.actors
+          .get(crafterId)
+          .createEmbeddedDocuments('Item', [
+            { name, type, img, system: { quantity: 3 }, flags: { core: { sourceId: shard.uuid } } },
+          ]);
+        return { worldItemId: shard.id, componentId, stackId: stack.id };
+      } catch (error) {
+        await shard.delete().catch(() => {});
+        throw error;
+      }
+    },
+    {
+      crafterId,
+      systemId: forge.systemId,
+      name: REFUSAL_SHARD,
+      charmName: forge.charmName,
+    }
+  );
+  return seeded;
+}
+
+/** The embedded stack's stored quantity, or null once it is gone. */
+async function stackQuantity(page, crafterId, stackId) {
+  return await page.evaluate(
+    ({ crafterId, stackId }) =>
+      game.actors.get(crafterId)?.items?.get(stackId)?._source?.system?.quantity ?? null,
+    { crafterId, stackId }
+  );
+}
+
+/** Throw the joined reasons for every check that is not `true`. */
+function assertAll(checks) {
+  const failures = checks.filter((entry) => entry !== true);
+  if (failures.length > 0) throw new Error(failures.join('; '));
+}
+
+/** A decrement salvage takes the stack from 3 to 2, keeps it, and leaves no run. */
+async function proveDecrementSalvage(ctx, forge, shard) {
+  const { page } = ctx;
+  const { crafterId } = ctx.shared.cleanup;
+  await closeOpenApplications(page);
+  const result = await salvageToken(page, forge, crafterId, shard.componentId);
+  const quantity = await stackQuantity(page, crafterId, shard.stackId);
+  const run = await activeSalvageRunId(page, forge, crafterId, shard.componentId);
+  assertAll([
+    result.success === true || `the salvage failed: ${result.message}`,
+    quantity === 2 || `the stack holds ${quantity}, not 2`,
+    run === null || `run ${run} is still active`,
+  ]);
+  return { quantity };
+}
+
+/** A `preUpdateItem` veto refuses the salvage, changes nothing, leaves no run, and blocks no retry. */
+async function proveVetoedSalvage(ctx, forge, shard) {
+  const { page } = ctx;
+  const { crafterId } = ctx.shared.cleanup;
+  await closeOpenApplications(page);
+  let refused;
+  await expectConsoleErrors(
+    ctx,
+    REFUSED_CONSUMPTION_LOGS,
+    async () => {
+      refused = await page.evaluate(
+        async ({ crafterId, systemId, componentId, stackId }) => {
+          const hookId = Hooks.on('preUpdateItem', (item) =>
+            item.id === stackId ? false : undefined
+          );
+          try {
+            const result = await game.fabricate.salvageComponent({
+              actorId: crafterId,
+              systemId,
+              componentId,
+            });
+            return { success: result.success, message: result.message, refused: result.refused };
+          } finally {
+            Hooks.off('preUpdateItem', hookId);
+          }
+        },
+        {
+          crafterId,
+          systemId: forge.systemId,
+          componentId: shard.componentId,
+          stackId: shard.stackId,
+        }
+      );
+    },
+    'vetoed consumption'
+  );
+  const quantity = await stackQuantity(page, crafterId, shard.stackId);
+  const run = await activeSalvageRunId(page, forge, crafterId, shard.componentId);
+  assertAll([
+    refused.success === false || `the vetoed salvage answered success ${refused.success}`,
+    refused.refused === true || `the vetoed salvage was not a refusal: "${refused.message}"`,
+    quantity === 2 || `the vetoed salvage moved the stack to ${quantity}`,
+    run === null || `the vetoed salvage left run ${run} active`,
+  ]);
+  const retried = await salvageToken(page, forge, crafterId, shard.componentId);
+  const after = await stackQuantity(page, crafterId, shard.stackId);
+  assertAll([
+    retried.success === true || `the retry failed: ${retried.message}`,
+    after === 1 || `the retry left the stack at ${after}, not 1`,
+  ]);
+  return { refusal: refused.message };
+}
+
 export async function runRolledAmountCards(ctx) {
   const { page } = ctx;
   const { cleanup, craftingSetup, executionFixtures } = ctx.shared;
@@ -661,6 +823,20 @@ export async function runRolledAmountCards(ctx) {
     await runStep(ctx, 'rolled-amount-salvage-refusal', () =>
       proveSalvageCharacterRefusal(ctx, forge)
     );
+    let shard = null;
+    await runStep(ctx, 'definite-refusal-seed', async () => {
+      shard = await seedRefusalShard(page, forge, cleanup.crafterId);
+      cleanup.executionItemIds = [...(cleanup.executionItemIds || []), shard.worldItemId];
+      return {};
+    });
+    if (shard) {
+      await runStep(ctx, 'definite-refusal-salvage-decrement', () =>
+        proveDecrementSalvage(ctx, forge, shard)
+      );
+      await runStep(ctx, 'definite-refusal-salvage-veto', () =>
+        proveVetoedSalvage(ctx, forge, shard)
+      );
+    }
   } catch (error) {
     ctx.results.steps.push({ step: 'rolled-amount-arm', passed: false, error: error.message });
   } finally {

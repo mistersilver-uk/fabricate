@@ -768,7 +768,7 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
     A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.
-16. **DELETING A WORLD ENTITY ANY SYSTEM HAS A MEMBERSHIP RECORD FOR IS REFUSED, and the refusal NAMES the affected systems.**
+16. **DELETING A WORLD COMPONENT A SYSTEM HOLDS — A MEMBERSHIP RECORD AND ITS IN-SYSTEM ROW — IS REFUSED, and the refusal NAMES those systems.**
     The write path does not refuse: it removes the entity, its world defaults and every membership record naming it, unconditionally.
     The refusal is therefore AUTHORED BY THE SCREEN, and the armed control stays ENABLED — a disabled button satisfies any assertion that the delete did not happen while leaving the GM no explanation at all.
     **ON THE COMPONENT ENTRY IT IS A DANGER CARD AT THE FOOT OF THE TAB, NOT A HEADER-BAND CONTROL**, which is where the prototype draws it and is the placement the maintainer's parity ruling settles.
@@ -778,6 +778,9 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     Neither is a defect of the other: each entry follows its own reference, and requirement 14's action pair governs Back and Save alone.
     **On a migrated world the refusal is the NORMAL state rather than an edge case**, because the `1.30.0` migration writes a membership record for every definition in every contributing system — so every entity a GM can reach is a member somewhere.
     The screen therefore states what to do INSTEAD, naming the first few systems to remove it from.
+    An inert membership (a record whose system holds no row) is not named and does not refuse; the world delete removes it with every record naming the entity.
+    The note, the confirm guard and the bulk plan read one list.
+    The refusal names the control to use: the entry's names `Remove from this system` under `Systems using this component`, and the bulk refusal names the bulk panel's `Remove from` direction.
     **THE REFUSAL BINDS A BULK CONTROL TOO, AND IT REFUSES PER RECORD RATHER THAN PER INSTRUCTION** (issue 1371, revision 9).
     Revision 8 shipped the world Component catalogue's bulk delete calling the unrefusing write path once per selected record, so a GM told on the entry to remove the component from each system first could take the same action in one click one route away; that divergence is closed rather than absorbed, and this requirement is what it was closed against.
     **A MIXED SELECTION PROCEEDS FOR THE RECORDS THAT ARE FREE.** One held record does not withhold the whole instruction, because a GM who ticked twelve rows and meant the eight unused ones is served by deleting eight and being told about the four; refusing all twelve teaches them only that the control does not work.

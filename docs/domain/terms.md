@@ -1340,6 +1340,7 @@ Spec reference: openspec/specs/recipe-visibility/spec.md, openspec/specs/ui-syst
 Item-based access filters on `timesUsed >= maxUses` alone and never reads the flag, so raising `maxUses` leaves a copy simultaneously `inert: true` and craftable, while lowering it below a copy's `timesUsed` makes that copy **Spent** while carrying no `inert` flag it can ever acquire.
 `inert` is therefore projected as an INDEPENDENT row fact, never folded into the uses chip and never a gate on the GM Expend action (disabling there would apply a gate the engine does not).
 Contrast `toolBroken`, which shares the escape-hatch shape but IS a real gate.
+Do not confuse it with an inert membership, a **System Membership Record** whose system holds no in-system row (see `unresolvedMemberships` in the `1.36.0` report).
 No Fabricate writer clears it — a merge write cannot remove a key — so it is sticky until force-deleted (V13 `-=`, V14 operator); a GM clears it through the Foundry flag editor pending a repair flow (known gap, issue 785).
 
 Canonical mapping: `RecipeVisibilityService._markRecipeItemInert`; `projectOwnedCopyRow` in `src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js`; `KnowledgeOwnedCopyRow.svelte`
@@ -1954,6 +1955,28 @@ A **Standalone Check Roll** instead answers `targetUnresolved`, or `evaluationIn
 Canonical mapping: `CHECK_TARGET_REFUSALS`/`checkTargetRefusal`/`checkRefusalMessage`/`refusalData`/`progressiveTargetRefusal` in `src/systems/checkTarget.js`; `misconfiguredCheckResult` in `src/systems/craftPipeline.js`; `FABRICATE.Check.TargetRefusal.*` in `lang/en.json`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Definite Effect Refusal
+
+It is the error `definiteEffectRefusal` builds, with code `HISTORY_EFFECT_REFUSED`.
+`isDefiniteEffectRefusal` also accepts the stack-path guard's `STACK_QUANTITY_PATH_REFUSED`, which refuses before any write.
+Before dispatch it refuses an Item no longer on the actor, or one whose quantity is unreadable, and writes nothing.
+After dispatch it refuses a write that threw or resolved nothing while the live Item still holds its pre-write stack quantity.
+Confirmation reads the live Item's `_source`, never the returned object's identity alone.
+A returned document or a `fromUuidSync` resolution counts only when it is the same embedded Item, its id under the same parent, so an origin Item answering to the UUID is ignored.
+A `null` from `fromUuidSync` is not absence, and only the parent's `items` collection proves the Item gone.
+A short decrement, a delete that resolved nothing, and any failure after an earlier item of the batch was consumed stay uncertain, as `HISTORY_EFFECT_UNCERTAIN`.
+A terminal stage records the refused consumption complete-empty, and an active stage, at a timed start or at commit, restores its pre-attempt settlement.
+Salvage returns `{ success: false, refused: true, message }` naming the item, discards a run that call created, and completes a reused run `failed`.
+A bulk salvage row reports the `refused` outcome, labelled "Not consumed" on the report and the chat card, and the report counts it as neither recovered nor empty-handed.
+On a consume-on-failure path the attempt still happened, so tool breakage, and on a crafting path the currency spend, still apply.
+Contrast **Target Refusal**, a check that cannot grade its target, and an uncertain consumption, which blocks the run until a GM recovers it.
+The accepted risk is a socket disconnect after the server commits a write, which can read as definite.
+
+Canonical mapping: `definiteEffectRefusal` / `isDefiniteEffectRefusal` / `confirmItemConsumption` / `failedFizzleSettlement` in `src/systems/runHistoryEvidence.js`.
+Also `CraftingLifecycleExecutor.isDefiniteRefusal` and `BulkSalvageService.classifySalvageOutcome`.
+
+Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-crafting-app/spec.md
 
 ## Executed Check Evidence
 

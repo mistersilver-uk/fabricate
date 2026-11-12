@@ -325,6 +325,27 @@ When a GM can see that a claim is no longer live, meaning no other operation is 
 The prompt explains what releasing it does and does not do, then asks the GM to record whether they checked the actor's items and currency first or are abandoning that check, before releasing the claim.
 While a claim is still live, meaning another operation is genuinely in progress, the Journal asks you to wait instead of offering the control.
 
+### Stuck or uncertain runs
+
+The Run Authority journal entry is automatic.
+Fabricate creates and maintains it, it is blank by design, and you should leave it alone.
+Older-lifecycle crafting and salvage runs never use it, because those runs live in the actor's flags.
+
+Such a run can stop after Fabricate confirmed some of its effects but could not tell whether the rest happened.
+It then shows **This run needs GM attention** with its receipts, and it cannot be repeated, cancelled or resumed.
+For a stuck salvage run, the next timed salvage on the world clock can also wait behind it.
+
+Check the actor's items and currency against the receipts first, and grant anything that was not awarded by hand.
+Then the GM can clear a stuck salvage run from the browser console:
+
+```js
+const mgr = game.fabricate.getSalvageRunManager();
+for (const actor of game.actors) for (const run of mgr.getActiveRuns(actor))
+  if (Object.values(run.historySettlement ?? {}).includes('uncertain')) await mgr.discardRun(actor, run.id);
+```
+
+Clearing a run removes it without a history entry, and repeats, undoes or refunds nothing.
+
 ### Hidden identity and private checks
 
 A hidden crafting recipe or blind gathering task keeps its protected details out of your Journal view.

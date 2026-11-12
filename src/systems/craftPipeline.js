@@ -13,7 +13,11 @@ import {
 } from './craftCardFields.js';
 import { checkCurrencySpends } from './currencyAffordance.js';
 import { awardHistory } from './resultKindAward.js';
-import { assertNativeEffectsUninvoked, mapConsumedIngredientRef } from './runHistoryEvidence.js';
+import {
+  assertNativeEffectsUninvoked,
+  isDefiniteEffectRefusal,
+  mapConsumedIngredientRef,
+} from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { selectedIngredientItems } from './stageReadiness.js';
 
@@ -355,6 +359,21 @@ export async function routeAlchemySimpleFailure(engine, ctx, craftInputs) {
 }
 
 /**
+ * A failure path's consumption, or `null` when it was refused definitely: the attempt still
+ * happened, so the caller's breakage and spend still run while consumption settles complete-empty.
+ */
+export async function consumeUnlessRefused(engine, plan, native) {
+  try {
+    return await engine._consumeNativeIngredients(plan, native);
+  } catch (error) {
+    if (!isDefiniteEffectRefusal(error)) throw error;
+    console.error('Fabricate | Failure-path consumption was refused:', error);
+    await engine._saveNativeConsumption([], native);
+    return null;
+  }
+}
+
+/**
  * A rolled check failure: the policy's consumption and breakage, then the failure award (issue
  * 1098), which runs after both so the reserved output transfers the essences the attempt spent.
  */
@@ -369,12 +388,8 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
   let usedToolsOnFail = [];
   try {
     if (failurePolicy.consumeIngredientsOnFail) {
-      consumedOnFail = await engine._consumeNativeIngredients(craftSelection.plan, {
-        craftingActor,
-        run,
-        runManager,
-        stepIndex,
-      });
+      const native = { craftingActor, run, runManager, stepIndex };
+      consumedOnFail = (await consumeUnlessRefused(engine, craftSelection.plan, native)) ?? [];
       // Currency is consumed alongside items on the failure path only when the
       // policy consumes ingredients on failure (it is a chosen ingredient).
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
@@ -494,12 +509,9 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
   let usedToolsOnValidationFail = [];
   try {
     if (validationFailurePolicy.consumeIngredientsOnFail) {
-      consumedOnValidationFail = await engine._consumeNativeIngredients(craftSelection.plan, {
-        craftingActor,
-        run,
-        runManager,
-        stepIndex,
-      });
+      const native = { craftingActor, run, runManager, stepIndex };
+      consumedOnValidationFail =
+        (await consumeUnlessRefused(engine, craftSelection.plan, native)) ?? [];
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
     }
     if (validationFailurePolicy.breakToolsOnFail) {

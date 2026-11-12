@@ -19,8 +19,10 @@ import { recipeReferencesEssence } from '../../utils/recipeEssenceReferences.js'
 import { ALL_INVALIDATION_DOMAINS } from '../invalidationDomains.js';
 import { runGatedMutationCleanup } from '../mutationCleanupComposition.js';
 import { resolvedComponentEssencesById } from '../resolvedComponentEssences.js';
+import { removeScopedMemberships } from '../scopedMembershipPrune.js';
 
 import { baseCollaborators, ESSENCE_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
+import { resolveStoreSeam } from './scopeStoreSeams.js';
 
 /** This cluster's `io` bag: the base thunks plus the manager members these bodies reach. */
 export function deleteCascadesCollaborators(manager) {
@@ -48,7 +50,66 @@ export function deleteCascadesCollaborators(manager) {
     getRecipeVisibilityService: () => manager._getRecipeVisibilityService(),
     stripEssenceFromSets: (sets, essenceId) => manager._stripEssenceFromSets(sets, essenceId),
     resolvedEssencesById: (systemId) => resolvedComponentEssencesById(manager, systemId),
+    scopeStores: () => ({
+      component: resolveStoreSeam(manager._componentScopeStore),
+      essence: resolveStoreSeam(manager._essenceScopeStore),
+      tool: resolveStoreSeam(manager._toolScopeStore),
+    }),
+    persistedSystems: () => manager._repository.readReplicatedSnapshot(),
   };
+}
+
+/** The persisted `craftingSystems` snapshot, or `null` when it cannot be read. */
+function persistedSystemsOrNull(io) {
+  try {
+    const systems = io.persistedSystems();
+    return Array.isArray(systems) ? systems : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove this system's component memberships for the removed ids the persisted setting no longer
+ * holds a row for, after the `craftingSystems` write; an unreadable setting prunes nothing. A
+ * failure is logged, never thrown, and answers 0.
+ */
+async function pruneComponentMemberships(io, systemId, removedIds) {
+  const persisted = persistedSystemsOrNull(io);
+  if (!persisted) return 0;
+  const saved = persisted.find((system) => system?.id === systemId);
+  // ratchet-exempt(world-scope): destructive-basis, the prune asks what the persisted record holds
+  const held = new Set((saved?.components ?? []).map((component) => String(component?.id ?? '')));
+  const entityIds = removedIds.filter((id) => !held.has(id));
+  try {
+    const { count, error } = await removeScopedMemberships(io.scopeStores().component, {
+      systemId,
+      entityIds,
+    });
+    if (error) throw error;
+    return count;
+  } catch (error) {
+    console.error('Fabricate | component membership prune failed', systemId, error);
+    return 0;
+  }
+}
+
+/**
+ * Remove every membership naming a deleted system, one write per scope holding one, once the
+ * persisted setting no longer holds it. Each scope is read when its turn comes, and a failure in
+ * one is logged and the others still run.
+ */
+async function pruneDeletedSystemMemberships(io, systemId) {
+  const persisted = persistedSystemsOrNull(io);
+  if (!persisted || persisted.some((system) => system?.id === systemId)) return;
+  for (const [scope, store] of Object.entries(io.scopeStores())) {
+    try {
+      const { error } = await removeScopedMemberships(store, { systemId });
+      if (error) throw error;
+    } catch (error) {
+      console.error(`Fabricate | ${scope} membership cleanup failed for system`, systemId, error);
+    }
+  }
 }
 
 /**
@@ -116,7 +177,7 @@ export async function deleteSystem(io, systemId) {
 /** Cascade cleanup across every store keyed by `systemId`, skipping unavailable services.
  * Learned-recipe flags are cleaned once after recipes and the system are gone. Only the
  * learned-recipe and preference sweeps are corpus-derived and gated on a Valid Id Basis (issue
- * 1226); the rest name the deleted system. */
+ * 1226); the rest, the membership prune last, name the deleted system. */
 export async function cleanupSystemScopedState(io, systemId, { removedRecipeIds = [] } = {}) {
   const environmentStore = io.getGatheringEnvironmentStore();
   if (environmentStore?.cleanupByCraftingSystem) {
@@ -199,6 +260,8 @@ export async function cleanupSystemScopedState(io, systemId, { removedRecipeIds 
   } catch (error) {
     console.error('Fabricate | preference cleanup failed for system', systemId, error);
   }
+
+  await pruneDeletedSystemMemberships(io, systemId);
 }
 
 /**
@@ -314,7 +377,13 @@ export async function deleteComponents(io, systemId, componentIds) {
   io.assertGM('delete components');
   const outcome = await io.deleteComponentSet(systemId, componentIds);
   if (outcome.deleted === 0) {
-    return { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 };
+    return {
+      deleted: 0,
+      componentIds: [],
+      recipesUpdated: 0,
+      recipesDisabled: 0,
+      membershipsParted: 0,
+    };
   }
 
   io.notifySystemsChanged();
@@ -332,6 +401,7 @@ export async function deleteComponents(io, systemId, componentIds) {
     componentIds: outcome.componentIds,
     recipesUpdated: outcome.recipesUpdated,
     recipesDisabled: outcome.recipesDisabled,
+    membershipsParted: outcome.membershipsParted,
   };
 }
 
@@ -341,6 +411,7 @@ export async function deleteComponents(io, systemId, componentIds) {
  * before the save, safe only because the activation blocker is `_validateRecipeForActivation`, not
  * `_validateRecipeForPersistence`. A surviving component's salvage result naming a deleted
  * component is left dangling, since the bulk panel's impact statement claims no salvage coverage.
+ * This system's memberships for the removed ids are pruned once that write lands.
  */
 export async function deleteComponentSet(io, systemId, componentIds) {
   const system = io.getSystem(systemId);
@@ -356,6 +427,7 @@ export async function deleteComponentSet(io, systemId, componentIds) {
       removedNames: [],
       recipesUpdated: 0,
       recipesDisabled: 0,
+      membershipsParted: 0,
       system,
     };
   }
@@ -390,6 +462,8 @@ export async function deleteComponentSet(io, systemId, componentIds) {
   }
 
   await io.saveSystems({ put: system, domains: ESSENCE_FACTS });
+  // Planned after the write resolves, so a membership written during it is read too.
+  const membershipsParted = await pruneComponentMemberships(io, systemId, removedIds);
 
   return {
     deleted: removedIds.length,
@@ -397,6 +471,7 @@ export async function deleteComponentSet(io, systemId, componentIds) {
     removedNames: removed.map((component) => String(component?.name ?? '')),
     recipesUpdated,
     recipesDisabled,
+    membershipsParted,
     system,
   };
 }

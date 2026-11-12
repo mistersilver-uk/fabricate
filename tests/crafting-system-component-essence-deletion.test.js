@@ -650,10 +650,22 @@ test('deleteComponents ignores unknown ids and is a no-op for an empty selection
   const manager = makeManager(recipeManager);
 
   const empty = await manager.deleteComponents('sys', []);
-  assert.deepEqual(empty, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
+  assert.deepEqual(empty, {
+    deleted: 0,
+    componentIds: [],
+    membershipsParted: 0,
+    recipesUpdated: 0,
+    recipesDisabled: 0,
+  });
 
   const unknown = await manager.deleteComponents('sys', ['nope', 'also-nope']);
-  assert.deepEqual(unknown, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
+  assert.deepEqual(unknown, {
+    deleted: 0,
+    componentIds: [],
+    membershipsParted: 0,
+    recipesUpdated: 0,
+    recipesDisabled: 0,
+  });
   assert.equal(recipeManager.updateCalls.length, 0, 'nothing is written for a no-op');
 });
 
@@ -1065,12 +1077,13 @@ test('1129: deleteComponents returns the exact field names its callers read by n
   // A SEAM, not a redundant shape check.
   assert.deepEqual(
     Object.keys(result).sort(),
-    ['componentIds', 'deleted', 'recipesDisabled', 'recipesUpdated'],
+    ['componentIds', 'deleted', 'membershipsParted', 'recipesDisabled', 'recipesUpdated'],
     'the returned field names are a published contract, not an implementation detail'
   );
   assert.equal(typeof result.deleted, 'number');
   assert.equal(typeof result.recipesUpdated, 'number');
   assert.equal(typeof result.recipesDisabled, 'number');
+  assert.equal(typeof result.membershipsParted, 'number');
   assert.ok(Array.isArray(result.componentIds));
 
   // The no-op return travels a different code path and must carry the same names, or a delete

@@ -346,7 +346,7 @@ ONE world setting, `fabricate.worldVocabulary`, holding THREE INDEPENDENT vocabu
 #### System Membership Record
 
 **LIVE** (modelled at issue 1358, persisted at issue 1359, written by the `1.30.0` migration of issue 1363, read through the **Scoped Entity Read Seam** since issue 1370, and deciding which layer answers a section since issue 1372): its presence is the membership filter, and its `inherit` map selects the world default or the in-system record per section.
-HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue, a component import (issue 2218) and Essence or Tool registration CREATING its entity (issue 2554) write one that inherits every section, the import with the two exceptions its notes state, and registration ADOPTING an entity overrides only the sections whose world default would change the row; a record whose `systemId` names no current system is a membership of a deleted system (`orphanedSystemMemberships` at `1.36.0`), reported and never deleted.
+HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue, a component import (issue 2218) and Essence or Tool registration CREATING its entity (issue 2554) write one that inherits every section, the import with the two exceptions its notes state, and registration ADOPTING an entity overrides only the sections whose world default would change the row; a record whose `systemId` names no current system is a membership of a deleted system (`orphanedSystemMemberships`), reported by the `1.36.0` pass and never deleted by it, while `deleteSystem` removes the records naming the system it deletes, so only records that predate it remain.
 The third layer of `## Scoped Entity Definitions`: one record per `(entity, system)` carrying `{ entityId, systemId, inherit, <overrides>, enabled? }`.
 
 [Notes](docs/domain/records.md#system-membership-record)
@@ -1364,6 +1364,13 @@ The misconfigured answer a check gives, before any roll, spend or award, when it
 
 [Notes](docs/domain/terms.md#target-refusal)
 
+#### Definite Effect Refusal
+
+A consumption Foundry provably did not apply (nothing dispatched, or a write answered with the Item unchanged), with nothing earlier in its batch consumed.
+It records nothing uncertain and stays retryable.
+
+[Notes](docs/domain/terms.md#definite-effect-refusal)
+
 #### Executed Check Evidence
 
 The recorded arithmetic meaning of a rolled check, including ordered evidence for separately evaluated modifiers when present, separate from its authored evaluation and from any forced outcome.
@@ -1818,7 +1825,7 @@ Public crafting preserves one-call execution when the stage is ready and all cho
 **Execution Journal** is durable evidence of an ordered operation, not an atomic transaction or a promise of rollback.
 Its effects distinguish `planned`, `applying` and `applied`: confirmed effects form a prefix, followed by at most one uncertain applying effect and then unstarted effects.
 An ambiguous effect or an unpersisted receipt requires manual recovery; it is never replayed automatically.
-Versioned ingredient consumption requires the delete/update operation to return the matching Item document before recording confirmed spending or allowing later awards; a partially applied batch remains uncertain rather than being retried or rolled back.
+Versioned and native ingredient consumption is confirmed from the consumed Item's live post-write state, never from the returned object's identity, before recording spending or allowing awards; a Definite Effect Refusal (nothing written, or a write Foundry answered without changing the Item, with nothing earlier in the batch consumed) settles nothing uncertain and stays retryable, while a partially applied batch remains uncertain.
 Gathering persists terminal history with the planned journal before terminal side effects and records receipts in that same history entry.
 Its versioned historical awards come from the applied result-creation receipt, including permitted failure awards, rather than the pre-effect plan.
 Versioned gathering preserves start-time stamina, node/reservation, blind-store and runtime/economy behavior while adding manual collection and eligible automatic completion.
