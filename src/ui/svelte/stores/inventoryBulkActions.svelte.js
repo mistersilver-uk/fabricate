@@ -265,6 +265,12 @@ function buildBulkReport(mode, snapshot, result) {
   };
 }
 
+/** A whole-run throw, logged with its cause; the message is what the surface reports. */
+function loggedRunFailure(mode, error) {
+  console.error(`Fabricate | Bulk ${mode} failed:`, error);
+  return error?.message ?? String(error);
+}
+
 /**
  * @param {object} deps
  * @param {() => Array<object>} deps.rows the live listing rows.
@@ -522,7 +528,7 @@ export function createBulkActions({
       bulkReport = buildBulkReport(mode, snapshot, result);
       return { failed: false, result: result ?? null };
     } catch (error) {
-      const message = error?.message ?? String(error);
+      const message = loggedRunFailure(mode, error);
       bulkReport = buildBulkReport(mode, snapshot, { items: [], error: message });
       return { failed: true, message };
     } finally {

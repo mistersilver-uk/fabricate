@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `kind` | a known kind | `'component'` | Picks the placeholder and empty hint, and the `data-recipe-option-<kind>` marker on a currency, essence or knowledge field. |
   | `chosen` | catalogue entry \| `null` | `null` | The named subject; `null` draws the search. |
-  | `entries` | `[{ id, label, icon, img, offered }]` | `[]` | The kind's catalogue; suggestions list the entries whose `offered` is not `false`. |
+  | `entries` | `[{ id, label, icon, img, offered }]` | `[]` | The kind's catalogue; suggestions list every entry whose `offered` is not `false` and whose label contains the query, in catalogue order, scrolling inside a bounded panel. |
   | `tone` | tone suffix | `'component'` | The `is-<tone>` tint on every mark. |
   | `clearable` / `disabled` | booleans | `true` / `false` | The subject cell's clear; and every control off. |
   | `clearName` | string | `''` | The clear's accessible name. |
@@ -27,9 +27,9 @@
   import { typeaheadPanel } from '../actions/typeaheadPanel.js';
   import { createTypeaheadCombobox } from '../util/typeaheadCombobox.svelte.js';
 
-  // How many suggestions the list offers, and the height of that many rows with the panel's own
-  // padding and border, so a full list never slices its last row.
-  const MAX_SUGGESTIONS = 7;
+  // The height the suggestion panel is bounded at: seven rows with the panel's own padding and
+  // border, so a full viewport never slices its last row. Every match is listed, never a count of
+  // them; a longer list scrolls inside this height and the keyboard-active option scrolls into view.
   const SUGGESTIONS_HEIGHT = 232;
 
   let {
@@ -76,13 +76,11 @@
 
   const normalizedQuery = $derived(query.trim().toLowerCase());
   const suggestions = $derived(
-    offered
-      .filter((entry) =>
-        String(entry.label || '')
-          .toLowerCase()
-          .includes(normalizedQuery)
-      )
-      .slice(0, MAX_SUGGESTIONS)
+    offered.filter((entry) =>
+      String(entry.label || '')
+        .toLowerCase()
+        .includes(normalizedQuery)
+    )
   );
 
   function choose(id) {

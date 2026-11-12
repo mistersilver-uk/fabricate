@@ -846,12 +846,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-light',
     'published-standalone-in-window',
   ]),
-  // The arm-then-confirm control (issue 2563): the three bulk-delete cards and a knowledge row, armed.
+  // The arm-then-confirm control (issue 2563): the three bulk-delete cards and a knowledge row,
+  // armed, then the world component entry and bulk panel beside a refused delete note.
   'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze([
     'manager-recipes-bulk-delete-armed',
     'manager-components-bulk-delete-armed',
     'manager-essences-bulk-delete-armed',
     'manager-knowledge-delete-armed',
+    'world-component-entry-delete-held',
+    'world-component-catalogue-bulk-delete-held',
   ]),
   // The pager's two player forms (the inventory's persistent bar and the recipe browser's threshold
   // one), its manager footer on a second page, and the journal's compact pager.

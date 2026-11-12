@@ -1,6 +1,7 @@
 import { cloneJson } from '../utils/scalars.js';
 
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
+import { isDefiniteEffectRefusal } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 
 export class CraftingLifecycleExecutionError extends Error {
@@ -265,13 +266,9 @@ export class CraftingLifecycleExecutor {
   }
 }
 
-/**
- * Whether an effect's failure established that NOTHING reached the database. Only the stack-path
- * guard answers this today: it refuses before dispatching, which is the distinction
- * `StackQuantityPathRefusal` exists to carry and which recovery must not swallow.
- */
+/** Whether an effect's failure proves nothing changed: a Definite Effect Refusal. */
 function isDefiniteRefusal(error) {
-  return error?.code === 'STACK_QUANTITY_PATH_REFUSED';
+  return isDefiniteEffectRefusal(error);
 }
 
 function assertResumableOperation(journal, executable, operationId, requestId) {

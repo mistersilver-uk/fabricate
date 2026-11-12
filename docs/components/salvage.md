@@ -255,6 +255,10 @@ The roll prompt is skipped entirely when nothing in the batch has a check to rol
 When the batch finishes, the panel shows a report: a banner summarising how the batch went, a line-by-line list of what happened to each item, everything that was added to your pack, and everything that was not recovered.
 The run also posts one chat card for the whole batch, naming every item whose own crafting system has the **Chat output** feature on, instead of one card per item.
 Nothing is posted when no item in the batch belongs to a system with Chat output on.
+An item whose consumption Fabricate proves changed nothing is listed as **Not consumed**.
+It stays in the pack, the rest of the batch carries on, and it can be salvaged again.
+An item whose outcome Fabricate cannot confirm is not reported as **Not consumed**.
+It becomes a GM recovery case, as [Stuck or uncertain runs]({% link player-app/journal.md %}#stuck-or-uncertain-runs) describes.
 Dismissing the roll prompt cancels the whole batch: nothing is consumed, no tool breaks, and no chat card is posted.
 The report still opens, telling you the prompt was dismissed and nothing was broken down.
 Each item salvaged this way adds an entry to your character's salvage history in the [Journal]({% link player-app/journal.md %}), and history keeps only your most recent runs, so a large batch can push older salvage entries out of it.
@@ -277,6 +281,15 @@ There is no reroll and no separate confirmation step.
 A salvage result that cannot be rolled for the salvaging character refuses the salvage, and nothing is consumed.
 It reports the same "Invalid salvage configuration" message as any other unfinished salvage setup.
 A timed salvage that resumes after the character's data changed, so that a result can no longer be rolled, is failed with that reason rather than left running.
+
+When Fabricate can prove that taking the component from the character changed nothing, the salvage is refused.
+This happens when Foundry or another module vetoes the change, the character lacks permission, the item has already left the character, its quantity cannot be read, or the configured stack-quantity field cannot hold the new count.
+The message names the item and the reason, and most read **Could not consume** … **Nothing was changed.**
+The item stays in the pack and no materials are awarded.
+A run this attempt started is discarded, and a resumed run is closed as failed, so no stuck run is left behind and the player can try the salvage again.
+A refusal does not block later salvages of that component.
+When Fabricate cannot tell whether the change happened, it does not guess.
+That case is a recovery case for the GM, described under [Stuck or uncertain runs]({% link player-app/journal.md %}#stuck-or-uncertain-runs).
 
 Dismissing the prompt cancels the attempt.
 Nothing is consumed, no tool breaks, and no message is shown.

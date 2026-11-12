@@ -806,6 +806,7 @@
           "OutcomeSkipped": "Skipped",
           "OutcomeNotPermitted": "Actor unavailable",
           "OutcomeCancelled": "Cancelled",
+          "OutcomeRefused": "Not consumed",
           "OutcomeError": "Something went wrong"
         },
         "Salvage": {
@@ -2080,6 +2081,7 @@
       "BulkSalvageOutcomeMisconfigured": "Not configured",
       "BulkSalvageOutcomeSkipped": "Skipped",
       "BulkSalvageOutcomeCancelled": "Cancelled",
+      "BulkSalvageOutcomeRefused": "Not consumed",
       "BulkSalvageOutcomeError": "Something went wrong",
       "TierStepUp": "Stepped up {steps} tier(s)",
       "TierStepDown": "Stepped down {steps} tier(s)",
@@ -7912,9 +7914,9 @@
             "DeleteConfirm": "Confirm delete",
             "DeleteBlocked": "Cannot delete",
             "DeleteAria": "Delete {name} from the world catalogue",
-            "DeleteFree": "No system has rules for this entry, so nothing else is affected.",
-            "DeleteRefused": "{count} systems have rules for this component, so it cannot be deleted yet. Remove it from each system first: {systems}.",
-            "DeleteRefusedOne": "{count} system has rules for this component, so it cannot be deleted yet. Remove it from that system first: {systems}.",
+            "DeleteFree": "No system holds this component, so deleting it changes no system’s rules.",
+            "DeleteRefused": "{count} systems have rules for this component, so it cannot be deleted yet. Use “{remove}” under “{systemsTitle}” for each of: {systems}.",
+            "DeleteRefusedOne": "{count} system has rules for this component, so it cannot be deleted yet. Use “{remove}” under “{systemsTitle}” for {systems}.",
             "DeleteReachMore": "{names} and {count} more",
             "EntryMissingTitle": "No component chosen",
             "EntryMissingHint": "This entry is open on a component the world corpus no longer holds. Return to the catalogue and choose one.",
@@ -8123,8 +8125,8 @@
             "BulkDeleteBusy": "Deleting…",
             "BulkDeleteNote": "This removes the world record, its world defaults and every system’s rules for it. Recipes that reference it stop resolving.",
             "BulkDeleteHeldEntry": "{name} ({systems})",
-            "BulkDeleteSkipping": "Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Remove them from those systems first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.",
-            "BulkDeleteAllHeld": "Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Remove them from those systems first."
+            "BulkDeleteSkipping": "Deletes {deletable} of {count}. {skipped} are skipped because systems still have rules for them: {detail}. Use the “{removeFrom}” direction first. What is deleted goes with its world defaults and every system’s rules for it, and recipes that reference it stop resolving.",
+            "BulkDeleteAllHeld": "Every selected component still has rules in at least one system, so none of them can be deleted: {detail}. Use the “{removeFrom}” direction first."
           },
           "Essence": {
             "BackToCatalogue": "Back to the catalogue",

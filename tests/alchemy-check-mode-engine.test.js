@@ -16,6 +16,7 @@ globalThis.foundry = globalThis.foundry || {
 globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { nativeCraftRunManager } = await import('./helpers/native-run-manager.js');
 
 function stubRoll(total, dice = []) {
   globalThis.Roll = class {
@@ -198,4 +199,57 @@ test('the timed twin with an EMPTY failure group replies a plain failed disposit
   assert.equal(outcome.result.disposition, 'failed');
   assert.equal(outcome.result.results, null, 'an empty failure group produces no items');
   assert.equal(calls.learn, 1, 'still learns at FINISH');
+});
+
+test('a refused simple-failure consumption still breaks tools and skips the extras', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const { engine } = failureHarness();
+  delete engine._consumeIngredients;
+  const broken = [{ itemUuid: 'Actor.a1.Item.tool', broken: true }];
+  engine._getFailureConsumptionPolicy = () => ({ breakToolsOnFail: true });
+  engine._applyToolBreakage = async () => broken;
+  const extras = t.mock.method(engine, '_consumeAlchemyExtraItems', async () => {});
+  let produced = null;
+  engine._produceAlchemyFailureResults = async (payload) => {
+    produced = payload;
+    return { resolved: true, result: { success: false } };
+  };
+  // The owner's collection answers `get`, so the vetoed write is provably unchanged.
+  const items = [];
+  const get = (id) => items.find((item) => item.id === id);
+  const owner = { id: 'a1', uuid: 'Actor.a1', items: Object.assign(items, { get }) };
+  const herb = {
+    id: 'herb',
+    uuid: 'Actor.a1.Item.herb',
+    name: 'Herb',
+    parent: owner,
+    system: { quantity: 2 },
+    update: async () => undefined,
+  };
+  items.push(herb);
+  const runManager = nativeCraftRunManager();
+  await engine._resolveAlchemySimpleFailure({
+    craftingActor: owner,
+    componentSourceActors: [owner],
+    recipe: RECIPE,
+    executionRecipe: RECIPE,
+    step: {},
+    stepIndex: 0,
+    ingredientSet: { id: 'set-1' },
+    craftSelection: { plan: [{ item: herb, quantity: 1, ingredient: { quantity: 1 } }] },
+    currencySpends: [],
+    toolValidation: { tools: [] },
+    checkResult: { success: false, outcome: 'fail', message: 'Failed', data: {} },
+    options: {},
+    runManager,
+    run: runManager.inspectRun(),
+  });
+  assert.equal(extras.mock.callCount(), 0, 'no extras after a refused main plan');
+  assert.deepEqual(produced.usedTools, broken, 'breakage still applied');
+  assert.deepEqual(produced.consumedItems, []);
+  const stage = runManager.inspectRun().steps[0];
+  assert.equal(stage.historySettlement.consumption, 'complete');
+  assert.deepEqual(stage.consumedIngredients, []);
+  assert.equal(herb.system.quantity, 2);
+  assert.equal(logged.mock.callCount(), 1, 'the refusal was logged once');
 });
