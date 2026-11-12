@@ -496,4 +496,22 @@
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
+
+  /* Forced colours repaint every segment in the reader's palette, so the chosen one would differ by
+     weight alone, and an idle pill segment shares even that. The chosen segment is painted
+     Highlight behind HighlightText, opting out of the repaint as the switch does (issue 2492), in
+     every density, tone, shape and variant; `!important` is the only way past the tone and variant
+     rules above, which out-specify this one. */
+  @media (forced-colors: active) {
+    .manager-segmented .manager-segment.is-active {
+      forced-color-adjust: none;
+      border-color: Highlight !important;
+      background: Highlight !important;
+      color: HighlightText !important;
+    }
+
+    .manager-segmented .manager-segment.is-active .manager-segment-count {
+      color: inherit !important;
+    }
+  }
 </style>
