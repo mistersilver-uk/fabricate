@@ -80,6 +80,7 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
 
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
+const LAB_CANVAS_STATION_PATH = 'tests/view-lab/labCanvasStation.js';
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
 /** The broad-signal table, as a diff names it. Attributed by override entry — see below. */
@@ -553,6 +554,8 @@ const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSou
  */
 const MOUNT_REGIONS = Object.freeze({
   'player-extension-params': rendersInPlayerWindow,
+  // The `canvasStation` param: only the frames that name a station read it (issue 2277).
+  'player-canvas-station': (viewCase) => Boolean(viewCase.query?.canvasStation),
   'lab-player-provider': rendersInPlayerWindow,
   'player-settle-stores': rendersInPlayerWindow,
   'mount-player-app': rendersInPlayerWindow,
@@ -1022,6 +1025,10 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     sourceLines: mountSourceLines,
     regions: mountLineRegions,
     selectsRegion: (region) => MOUNT_REGIONS[region],
+  }),
+  Object.freeze({
+    path: LAB_CANVAS_STATION_PATH,
+    selects: (viewCase) => Boolean(viewCase.query?.canvasStation),
   }),
   Object.freeze({
     path: LAB_INTERACTABLES_PATH,

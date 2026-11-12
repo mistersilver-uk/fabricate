@@ -51,14 +51,15 @@ test('a query names a station, and an unknown or absent one names none', () => {
 test('every case that opens a station names one, and the frames cover both chip faces and the gate', () => {
   assert.ok(stationCases.length >= 3);
   for (const viewCase of stationCases) {
-    assert.ok(labCanvasStation(viewCase.query.canvasStation), viewCase.id);
+    const { canvasStation } = viewCase.query;
+    assert.ok(canvasStation === 'none' || labCanvasStation(canvasStation), viewCase.id);
     assert.equal(viewCase.app, 'fabricate-app', `${viewCase.id} mounts the player window`);
   }
   assert.deepEqual(
     [...new Set(stationCases.map((viewCase) => viewCase.query.canvasStation))].sort((a, b) =>
       a.localeCompare(b)
     ),
-    ['named', 'unnamed']
+    ['named', 'none', 'unnamed']
   );
   assert.ok(stationCases.some((viewCase) => viewCase.query.tab === 'journal'));
 });

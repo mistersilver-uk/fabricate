@@ -80,6 +80,7 @@ const CANVAS_STATION_SOURCES = Object.freeze([
   // The progressive body, which Distil Antitoxin's system renders around that table.
   CRAFTING_PROGRESSIVE,
   /^src\/gatheringToolRuntime\.js$/,
+  /^src\/systems\/stationPresence\.js$/,
   /^src\/canvas\/(?:interactableGrant|regions\/interactableRegionActivation)\.js$/,
 ]);
 const ANTITOXIN_STEPS = Object.freeze([
@@ -823,7 +824,8 @@ export const CASES = Object.freeze([
       'Player app — the same recipe with no station, for comparison: no chip in the actor bar, and the Tool row unsatisfied because the actor holds no alembic',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'crafting' },
+    // `none` names no station: the frame opens bare, and still reads the station module.
+    query: { tab: 'crafting', canvasStation: 'none' },
     steps: ANTITOXIN_STEPS,
     expectSelector: `.fabricate-app:not(:has(.actor-bar-tool-chip)):has(${TOOL_ROW('false')})`,
     kinds: ['player', 'crafting'],

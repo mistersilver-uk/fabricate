@@ -4983,6 +4983,34 @@ test('the player top bar routes to the frame that opens its picker, not only to 
   );
 });
 
+test('a change to a canvas-station source selects the station frames that read it', () => {
+  const CRAFTING = [
+    'player-crafting-station-tool-absent',
+    'player-crafting-station-tool-available',
+    'player-crafting-station-tool-unnamed',
+  ];
+  const JOURNAL = 'player-journal-gathering-station-tool';
+  const NEEDS_TOOLS = 'player-journal-gathering-needs-tools';
+  const expected = {
+    'src/systems/stationPresence.js': [...CRAFTING, JOURNAL],
+    'src/ui/presenters/RunJournalBuilder.js': [JOURNAL, NEEDS_TOOLS],
+    'src/bootstrap/journalFacade.js': [JOURNAL],
+    'tests/view-lab/labCanvasStation.js': [...CRAFTING, JOURNAL],
+  };
+  for (const [file, ids] of Object.entries(expected)) {
+    const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+    for (const id of ids) assert.ok(selected.has(id), `${file} selects ${id}`);
+  }
+  const stationOnly = mapChangedFilesToCases(['tests/view-lab/labCanvasStation.js']).map(
+    (viewCase) => viewCase.id
+  );
+  assert.deepEqual(
+    stationOnly.sort((a, b) => a.localeCompare(b)),
+    [...CRAFTING, JOURNAL],
+    'the station module selects the four station frames and no others'
+  );
+});
+
 // The NEW `.js` modules this change adds under the checks tree, and the frames a change confined to
 // each of them must still select (issue 1095, C2). STATED AS A POSITIVE PIN, not as a
 // `FALLBACK_CASE_ID` probe.
@@ -7182,11 +7210,27 @@ const SPECIMEN_MOUNT_REGION_ANCHORS = [
 ];
 
 /** Every marked region in the mount page, whatever its readership. */
+const STATION_MOUNT_REGION_ANCHORS = [
+  ['player-canvas-station', "    canvasStation: params.get('canvasStation'),"],
+];
 const ALL_MOUNT_REGION_ANCHORS = [
   ...MOUNT_REGION_ANCHORS,
+  ...STATION_MOUNT_REGION_ANCHORS,
   ...CANVAS_MOUNT_REGION_ANCHORS,
   ...SPECIMEN_MOUNT_REGION_ANCHORS,
 ];
+
+test('a mount.js patch confined to the canvas station param selects the station frames alone', () => {
+  const patches = labMountPatches([
+    labMountLineOf("    canvasStation: params.get('canvasStation'),"),
+  ]);
+  assert.deepEqual(
+    selectedIds([LAB_MOUNT_PATH], patches).sort((a, b) => a.localeCompare(b)),
+    VIEW_LAB_CASES.filter((viewCase) => viewCase.query?.canvasStation)
+      .map((viewCase) => viewCase.id)
+      .sort((a, b) => a.localeCompare(b))
+  );
+});
 
 test('a mount.js patch confined to a player region selects every player frame and only those', () => {
   const players = playerCaseIds();
@@ -9123,7 +9167,7 @@ test('every specimen case names a LAB_SPECIMENS key, and every key has a case', 
   assert.deepEqual([...new Set(named)].sort(byCodePoint), keys.sort(byCodePoint));
 });
 
-test('the seven mount.js regions the selector keys on are still marked in the file', () => {
+test('the eight mount.js regions the selector keys on are still marked in the file', () => {
   // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
   // selected — which is correct and invisible: the only symptom would be a capture job quietly
   // back at twenty minutes. So it has to fail LOUDLY here too.

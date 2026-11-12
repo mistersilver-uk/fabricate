@@ -202,13 +202,15 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
-    // The canvas station the window opens with (issue 2277): `named` or `unnamed`, else none.
-    canvasStation: params.get('canvasStation'),
     // A stand-in companion's interactive count roll, prompting on the standalone overlay; the
     // `count-additional` request also offers additional dice (issue 2008).
     companionRoll: ['count', 'count-additional'].includes(params.get('companionRoll'))
       ? params.get('companionRoll')
       : null,
+    // view-lab-region:end
+    // view-lab-region:player-canvas-station
+    // The canvas station the window opens with (issue 2277): `named` or `unnamed`, else none.
+    canvasStation: params.get('canvasStation'),
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).

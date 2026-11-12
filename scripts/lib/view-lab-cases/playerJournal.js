@@ -280,7 +280,11 @@ export const CASES = Object.freeze([
       ':has([data-journal-detail] [data-run-attention="tools"])' +
       ':has([data-journal-detail] [data-run-action="primary"]:disabled)',
     kinds: ['player', 'journal', 'gathering'],
-    sourceMatches: [JOURNAL_SOURCES, /^src\/bootstrap\/journalGatheringTools\.js$/],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalGatheringTools\.js$/,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+    ],
   }),
   // Issue 2277: the same run with the Glass Alembic station active, which supplies the Tool.
   playerCase({
@@ -304,6 +308,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
       /^src\/gatheringToolRuntime\.js$/,
+      /^src\/systems\/stationPresence\.js$/,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+      /^src\/bootstrap\/journalFacade\.js$/,
     ],
   }),
   // Issue 2006: a Journal-prompted count check opens the same count prompt, its faces named.
