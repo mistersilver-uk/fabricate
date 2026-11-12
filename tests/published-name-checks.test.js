@@ -156,9 +156,7 @@ describe('the required name keys with no contains partner (issue 2924)', () => {
           it(`M9: refuses ${JSON.stringify(value)}, which would write no name or a wrong one`, () => {
             assert.throws(
               () => copyProps(entry, { ...required(entry), [key]: value }),
-              typeof value === 'string'
-                ? refusing(`${entry.name} requires a non-blank string "${key}"`)
-                : (error) => error instanceof TypeError && error.message.startsWith(PREFIX)
+              refusing(`${entry.name} requires a non-blank string "${key}"`)
             );
           });
         }
