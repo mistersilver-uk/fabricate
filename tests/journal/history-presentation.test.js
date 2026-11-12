@@ -81,6 +81,16 @@ describe('recorded Journal presentation', () => {
       'a legacy cancellation is unaffected by the plural split');
   });
 
+  it('gives a run a GM closed its own guidance ahead of the cancelled copy', () => {
+    const gmReconciliation = { disposition: 'reconciled', userName: 'Morgan', note: null };
+    const closed = (run) => presentHistory({ status: 'cancelled', lifecycleContract: 'legacy',
+      steps: [{ stepId: 's0', index: 0, attempted: true }], ...run }, text).closed;
+    assert.equal(closed({ gmReconciliation }), 'ClosedGmReconciled{"count":1}');
+    assert.equal(closed({ gmReconciliation: null }), 'ClosedLegacyCancelled{"count":1}');
+    assert.match(closed({ gmReconciliation, redacted: true }), /^ClosedRedacted/,
+      'a protected run keeps its redacted guidance');
+  });
+
   it('keeps the real reloaded writer evidence and actor-qualified shared carriers', async () => {
     const { model } = await createPersistedCraftingHistory({ failLast: true });
     const account = presentHistory(model, text);

@@ -4,6 +4,7 @@
 
 import { JOURNAL_SOURCES } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
+import { NATIVE_RECOVERY_SOURCES } from './journalLifecycleCases.js';
 
 /** Additive TP10 witnesses, with identical local and CI navigation over persisted fixtures. */
 export function journalHistoryBatchCases() {
@@ -185,8 +186,30 @@ const REWARD_JUST_RESOLVED_CASE = playerCase({
   sourceMatches: [JOURNAL_SOURCES, /^src\/systems\/resultKindAward\.js$/],
 });
 
+/** A history entry a GM closed by Native Reconciliation: its uncertain receipts, closer and note. */
+const NATIVE_RECONCILED_CASES = [1240, 1024].map((width) =>
+  playerCase({
+    id: `fabricate-journal-native-reconciled-${width}`,
+    label: `Player Journal — a run a GM closed by native reconciliation at ${width}px`,
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'history-native-reconciled' },
+    position: { width, height: 880 },
+    steps: [{ selector: '[data-history-run-id="lab-native-reconciled"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-history-detail]' +
+      ':has([data-journal-recovery-evidence] [data-effect-phase="applying"] [data-list-row])' +
+      ':has([data-journal-recovery-evidence] .recovery-evidence-closed .is-keyed + .is-prose)' +
+      ':has([data-journal-guidance])' +
+      ':not(:has([data-history-items="produced"]))',
+    kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
+    sourceMatches: [JOURNAL_SOURCES, ...NATIVE_RECOVERY_SOURCES],
+  })
+);
+
 /** Sixteen full-window history-data witnesses (eight persisted states at both Journal widths),
- *  then the three reward-award witnesses. */
+ *  then the three reward-award witnesses and the two native-reconciled ones. */
 export function journalHistoryDataCases() {
   const states = [1240, 1024].flatMap((width) =>
     Object.entries(JOURNAL_HISTORY_DATA_EVIDENCE).map(([state, evidence]) =>
@@ -218,5 +241,11 @@ export function journalHistoryDataCases() {
       })
     )
   );
-  return [...states, REWARD_AWARDS_CASE, REWARD_AWARDS_MULTI_CASE, REWARD_JUST_RESOLVED_CASE];
+  return [
+    ...states,
+    REWARD_AWARDS_CASE,
+    REWARD_AWARDS_MULTI_CASE,
+    REWARD_JUST_RESOLVED_CASE,
+    ...NATIVE_RECONCILED_CASES,
+  ];
 }

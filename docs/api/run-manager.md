@@ -83,6 +83,25 @@ Consumed items from completed steps are not returned.
 
 **Returns:** `Promise<object>`
 
+### reconcileUncertainRun(actor, runId, reconciliation)
+
+Closes an active older-lifecycle run whose stage holds an `uncertain` effect, by Native Reconciliation.
+The same method exists on the salvage run manager, where the run itself carries the uncertainty.
+It archives the run as `cancelled` with a `gmReconciliation` record in one write.
+The settlement and receipts stay unchanged, and no item, currency or refund is written.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `reconciliation` | `object` | `{ disposition, userId, userName, note }`, where `disposition` is `"reconciled"` or `"abandoned"` |
+
+The note is trimmed, capped at 500 characters and omitted when blank.
+A crafting record also stores the closed stage's `stepIndex`.
+
+**Returns:** `Promise<{ status, run? }>`, where `status` is `"archived"`, `"missing"` (no such active run), `"certain"` (nothing uncertain to close) or `"invalid"` (a bad disposition or user).
+
+This method performs no permission check.
+Call `game.fabricate.reconcileUncertainJournalRun({ actorUuid, runType, runId, disposition, note })` instead, which only the active GM may use and which answers a localized refusal reason.
+
 ---
 
 ## Step Progression

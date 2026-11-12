@@ -151,6 +151,12 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte': 1 },
   ],
   [
+    'a composition of the Button and ListRow members and the app-local JournalFactRow, extracted ' +
+      "from RunDetail and reused by HistoricalRunDetail's GM-closed face rather than offered as a " +
+      'vocabulary member',
+    { 'src/ui/svelte/apps/journal/RecoveryEvidence.svelte': 1 },
+  ],
+  [
     'ProgressiveStageRow is a new shared member at target, because the crafting and salvage ' +
       "progressive bodies both render it as SortableList's row (issue 2381)",
     { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte': 1 },

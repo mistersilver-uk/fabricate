@@ -11,6 +11,7 @@
   import EssencePool from '../../components/EssencePool.svelte';
   import YieldScale from '../../components/YieldScale.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
+  import RecoveryEvidence from './RecoveryEvidence.svelte';
   import ThisRun from './ThisRun.svelte';
   import { presentCurrencySpends, presentHistory } from './historyPresentation.js';
 
@@ -19,6 +20,8 @@
   const showTransient = $derived(transient && !account.settling);
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
+  // A run a GM closed shows only its receipts, which stay uncertain rather than read as awarded.
+  const gmClosed = $derived(run?.recoveryEvidence?.status === 'gmClosed');
   const text = (key, data) => localize(`FABRICATE.App.Journal.History.${key}`, data);
   // The scale heading may not assert ONE roll over a per-row record: `shared` evidence has a
   // single cut to describe, while `perRow`/`unknown` records carry an independent roll per row.
@@ -154,7 +157,7 @@
 {/snippet}
 
 <div class="journal-history-detail" data-journal-history-detail>
-  {#if !recovery}
+  {#if gmClosed}<RecoveryEvidence {run} {services} />{:else if !recovery}
     {#if account.settling}
       <Notice tone="info" title={text('SettlementTitle')} data-journal-settling="" />
     {:else if showTransient || account.failed}

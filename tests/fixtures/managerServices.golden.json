@@ -751,6 +751,9 @@
     "reconcileJournalRunAuthority": {
       "answeredBy": "reconcileJournalRunAuthority"
     },
+    "reconcileUncertainJournalRun": {
+      "answeredBy": "reconcileUncertainJournalRun"
+    },
     "restockGatheringNode": {
       "answeredBy": "restockGatheringNode"
     },
@@ -986,6 +989,12 @@
     ],
     [
       "fabricate.reconcileJournalRunAuthority",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.reconcileUncertainJournalRun",
       {
         "actorId": "pc-arden"
       }

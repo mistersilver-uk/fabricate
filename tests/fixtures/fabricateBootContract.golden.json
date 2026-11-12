@@ -372,6 +372,14 @@
       "length": null
     },
     {
+      "name": "journalRunReconciliation",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
       "name": "ready",
       "enumerable": true,
       "writable": true,
@@ -1279,6 +1287,14 @@
     },
     {
       "name": "reconcileJournalRunAuthority",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "reconcileUncertainJournalRun",
       "enumerable": false,
       "writable": true,
       "configurable": true,

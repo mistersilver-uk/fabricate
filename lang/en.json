@@ -1378,6 +1378,7 @@
           "ClosedRedacted": "A closed run. Protected details are hidden; this entry retains the timing and status you may view.",
           "ClosedMissing": "A closed run. Only recorded evidence is shown; missing details do not establish what was spent or produced.",
           "ClosedRecovery": "This run needs reconciliation. Confirmed, uncertain and unstarted effects are distinguished above; no uncertain effect is replayed or automatically rolled back.",
+          "ClosedGmReconciled": "A GM closed this run without repeating or undoing anything. The receipts above are what Fabricate recorded; anything marked uncertain stays uncertain.",
           "Dismiss": "Hide {name} from this Journal",
           "Sort": {
             "Label": "Sort",
@@ -1515,6 +1516,22 @@
             "abandoned": "abandoned"
           }
         },
+        "NativeRecovery": {
+          "Action": "Record outcome…",
+          "ActionHint": "Closes this run as a record. Nothing is repeated, undone or refunded.",
+          "Title": "Record this run's outcome",
+          "Detail": "Fabricate stopped before it could confirm every effect of this run and cannot tell whether the rest happened.",
+          "Inspect": "Check the actor's items and currency against the receipts before you decide.",
+          "Effect": "Either choice closes the run and moves it to history. Neither repeats, undoes nor refunds anything, and no item changes. They differ only in what the record says.",
+          "Reconciled": "I checked it — close",
+          "Abandoned": "Abandon it — close",
+          "Cancel": "Not yet",
+          "Closed": "The run was closed and recorded as {disposition}.",
+          "CloseFailed": "The run could not be closed. Check that you are the active GM and try again.",
+          "ClosedBy": "Closed by",
+          "ClosedByUnknown": "A GM",
+          "GmNote": "GM note"
+        },
         "Verdict": {
           "succeeded": "Run completed",
           "failed": "Run failed",
@@ -1650,7 +1667,8 @@
           "LedgerCreateFailed": "Fabricate could not set up its run record. Try again, and tell your GM if it keeps happening.",
           "LedgerUnsettled": "Fabricate is still settling its run record. Try again in a moment.",
           "ReconstructionFailed": "The GM’s Journal recovery check could not complete. Ask your GM to inspect the retained execution claim before this run changes again.",
-          "ReconstructionUnavailable": "Fabricate’s Journal recovery service is unavailable on the GM’s client. Ask your GM to reload Foundry."
+          "ReconstructionUnavailable": "Fabricate’s Journal recovery service is unavailable on the GM’s client. Ask your GM to reload Foundry.",
+          "RunNotUncertain": "This run has no uncertain effect to close."
         },
         "Tips": {
           "Title": "Tips",

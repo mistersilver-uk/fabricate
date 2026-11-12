@@ -338,16 +338,18 @@ Such a run can stop after Fabricate confirmed some of its effects but could not 
 It then shows **This run needs GM attention** with its receipts, and it cannot be repeated, cancelled or resumed.
 For a stuck salvage run, the next timed salvage on the world clock can also wait behind it.
 
-Check the actor's items and currency against the receipts first, and grant anything that was not awarded by hand.
-Then the GM can clear a stuck salvage run from the browser console:
+The active GM sees **Record outcome…** beneath the receipts of such a run.
+Check the actor's items and currency against the receipts first.
+Then choose **I checked it — close** or **Abandon it — close**.
+Either choice moves the run to history.
+Neither repeats, undoes or refunds anything, and no item changes; they differ only in what the record says.
+The prompt defaults to **Not yet**, which closes nothing.
 
-```js
-const mgr = game.fabricate.getSalvageRunManager();
-for (const actor of game.actors) for (const run of mgr.getActiveRuns(actor))
-  if (Object.values(run.historySettlement ?? {}).includes('uncertain')) await mgr.discardRun(actor, run.id);
-```
-
-Clearing a run removes it without a history entry, and repeats, undoes or refunds nothing.
+The closed entry keeps its receipts, still marked uncertain, and shows **Closed by** with the GM who closed it and the choice they made.
+The prompt has no field for a note.
+A macro can record one through the [Run Manager API]({% link api/run-manager.md %}).
+A recorded note shows beside **GM note** on the closed entry.
+The note is stored on the actor and readable by every user permitted on it, so it is not a GM-private field.
 
 ### Hidden identity and private checks
 

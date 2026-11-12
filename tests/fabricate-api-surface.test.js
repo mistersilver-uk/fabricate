@@ -67,6 +67,7 @@ const PUBLIC_MEMBERS = Object.freeze([
   member('getJournalRunAuthorityAvailability', 0),
   member('setupJournalRunAuthority', 0),
   member('reconcileJournalRunAuthority', 1),
+  member('reconcileUncertainJournalRun', 1),
   member('getGatheringEnvironmentStore', 0),
   member('getGatheringRunManager', 0),
   member('getGatheringGateAndCheckEvaluator', 0),

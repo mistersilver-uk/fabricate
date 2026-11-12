@@ -564,6 +564,7 @@ This narrows the bullet above: the write's own return is the evidence, but only 
   - **A rejected delete of an item that already vanished is not evidence of your own delete.** A strict `collection.get` or a delete of a vanished id rejects, so the throw alone cannot say who removed the item, and the classification asks the live state.
   - **A `preUpdate<Type>` hook veto leaves a `console.debug` line and nothing else.** The write resolves `undefined` and no error reaches the caller, so a veto is told apart from a success only by the unchanged `_source`.
     This reading comes from the issue's Foundry review and is not checked against V13 or V14 source in this repository.
+- **Archiving a crafting run nulls `currentStepIndex`, so evidence about a closed stage needs a persisted locator.** `gmReconciliationRecord` in `src/systems/runHistoryEvidence.js` therefore requires a staged record to carry the closed stage's `stepIndex`, and the Journal reads it back for a closed run.
 - **A keybinding registered at `ready` is silently dead.**
 `ClientKeybindings#register` throws once `Game#initializeKeyboard` has run, and that happens between `setup` and `ready` on both V13 and V14, so a keybinding must register at `init` or `setup`, never at `ready`.
 `InteractableManager.registerKeybinding` (`src/canvas/InteractableManager.js`) is therefore called from the `init` hook in `src/bootstrap/hooks.js`, and a registration that still throws is logged with `console.warn` rather than swallowed (issues #1835, #1881).

@@ -97,6 +97,11 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
   'claim-retained': 'lab-v1-claim-retained',
+  // A legacy salvage run with an uncertain award, which the active GM may close by Native
+  // Reconciliation; the claim variant also leaves `LAB_RETAINED_CLAIM` on the ledger.
+  'native-recovery': 'lab-native-recovery',
+  'native-recovery-claim': 'lab-native-recovery',
+  'history-native-reconciled': 'lab-native-reconciled',
   // Issue 1773: a finished craft owing the player a pick, and the same craft once it was settled.
   'award-choice': 'lab-v1-award-choice',
   'award-choice-history': 'lab-v1-award-choice-history',
@@ -678,6 +683,11 @@ function journalCaseFactories(context) {
           pausedDurationSeconds: HOUR,
         })
       ),
+    'native-recovery': () => emptyRunContainers({ salvageActive: [nativeSalvageCase(context)] }),
+    'native-recovery-claim': () =>
+      emptyRunContainers({ salvageActive: [nativeSalvageCase(context)] }),
+    'history-native-reconciled': () =>
+      emptyRunContainers({ salvageHistory: [nativeSalvageCase(context, { closed: true })] }),
     wide: () => wideContainers(context, multi()),
     narrow: () => wideContainers(context, multi()),
     'award-choice': () => finished(awardChoiceCase(context, single(), {})),
@@ -1712,6 +1722,46 @@ function versionedSalvageCase(context) {
   };
 }
 
+/**
+ * A legacy salvage whose first award landed and whose second is uncertain, waiting for time; closed,
+ * the same record as the history entry Native Reconciliation archives, with the GM's note.
+ */
+function nativeSalvageCase(context, { closed = false } = {}) {
+  const {
+    firedComplications: _fired,
+    finishedAt: _finished,
+    ...base
+  } = buildResolvedProgressiveSalvageRun(context);
+  const [vial] = base.createdResults;
+  return {
+    ...base,
+    id: closed ? 'lab-native-reconciled' : 'lab-native-recovery',
+    status: closed ? 'cancelled' : 'waitingTime',
+    updatedAt: NOW - HOUR,
+    ...(closed && { finishedAt: NOW - HOUR }),
+    timeGate: { requiredSeconds: HOUR, initiatedAt: NOW - 2 * HOUR, availableAt: NOW - HOUR },
+    consumedComponents: [
+      {
+        actorUuid: context.actorUuid,
+        itemUuid: `${context.actorUuid}.Item.hb-cracked-alembic`,
+        quantity: 1,
+        name: 'Cracked Alembic',
+        img: null,
+      },
+    ],
+    createdResults: [{ ...vial, actorUuid: context.actorUuid }],
+    historySettlement: { consumption: 'complete', awards: 'uncertain' },
+    ...(closed && {
+      gmReconciliation: {
+        disposition: 'reconciled',
+        userId: 'user-lab-gm',
+        userName: 'Lab GM',
+        note: 'One Empty Vial is in the pack; the Ground Reagent never arrived.',
+      },
+    }),
+  };
+}
+
 function recoveryCase(context, recipe) {
   return versionedCraftingRun(context, recipe, {
     id: 'lab-v1-recovery-required',
@@ -1861,7 +1911,8 @@ function stagePreconditionFailure({ run, command, recipes, now }) {
     (value) => Number(value) > 0
   );
   if (command.action === 'beginStep') {
-    if (started) return fixtureFailure('lifecycle-refused', 'This crafting stage has already started.');
+    if (started)
+      return fixtureFailure('lifecycle-refused', 'This crafting stage has already started.');
     return needsStart
       ? null
       : fixtureFailure('lifecycle-refused', 'This crafting stage has no separate start.');
@@ -1929,7 +1980,11 @@ function applyFixtureCommand({ command, container, run, recipes, state, now }) {
           essenceEnabled: {},
           consumedSummary: [],
         };
-        step.timeGate ??= { requiredSeconds: seconds, initiatedAt: now, availableAt: now + seconds };
+        step.timeGate ??= {
+          requiredSeconds: seconds,
+          initiatedAt: now,
+          availableAt: now + seconds,
+        };
         step.status = 'waitingTime';
         run.status = 'waitingTime';
       }

@@ -1423,3 +1423,88 @@ test('createRun snapshots empty requirements for a step with no ingredient sets'
   const run = await manager.createRun(actor, recipe, [actor], 'user-1');
   assert.deepEqual(run.steps[0].requirements, []);
 });
+
+function twoStageRecipe(id = 'recipe-native') {
+  return {
+    id,
+    craftingSystemId: 'system-native',
+    getExecutionSteps: () => [
+      { id: 'stage-1', name: 'Stage One' },
+      { id: 'stage-2', name: 'Stage Two' },
+    ],
+  };
+}
+
+async function uncertainCraftingRun(manager, actor, settlement = { consumption: 'uncertain', awards: 'pending' }) {
+  const run = await manager.createRun(actor, twoStageRecipe(), [actor], 'user-1');
+  run.steps[0].status = 'succeeded';
+  run.steps[0].consumedIngredients = [{ actorUuid: actor.uuid, itemUuid: `${actor.uuid}.Item.ore`, quantity: 2, name: 'Ore', img: null }];
+  run.steps[0].historySettlement = settlement;
+  run.currentStepIndex = 1;
+  return manager.updateRun(actor, run);
+}
+
+const nativeOptions = { disposition: 'abandoned', userId: 'gm-1', userName: null };
+
+test('CraftingRunManager: Native Reconciliation closes a run whose uncertain stage is not the current one', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Native Crafter');
+  actor.id = 'native-crafter';
+  const manager = new CraftingRunManager();
+  const run = await uncertainCraftingRun(manager, actor);
+  const before = JSON.parse(JSON.stringify(manager.getActiveRun(actor, run.id).steps));
+
+  const result = await manager.reconcileUncertainRun(actor, run.id, nativeOptions);
+
+  assert.equal(result.status, 'archived');
+  const [entry] = new CraftingRunManager().getRunHistory(actor);
+  assert.equal(entry.status, 'cancelled');
+  assert.equal(entry.currentStepIndex, null);
+  assert.deepEqual(entry.steps, before);
+  assert.deepEqual(entry.gmReconciliation, { disposition: 'abandoned', userId: 'gm-1', userName: null, stepIndex: 0 });
+  assert.equal(manager.findActiveRunForRecipe(actor, 'recipe-native'), null);
+  const next = await manager.createRun(actor, twoStageRecipe(), [actor], 'user-1');
+  assert.equal(manager.findActiveRunForRecipe(actor, 'recipe-native').id, next.id);
+});
+
+test('CraftingRunManager: Native Reconciliation records the uncertain stage, not the current one', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Native Locator');
+  actor.id = 'native-locator';
+  const manager = new CraftingRunManager();
+  const recipe = {
+    ...twoStageRecipe('recipe-three'),
+    getExecutionSteps: () => ['one', 'two', 'three'].map((id) => ({ id, name: id })),
+  };
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1');
+  run.steps[0].status = 'succeeded';
+  run.steps[0].historySettlement = { consumption: 'complete', awards: 'complete' };
+  run.steps[1].status = 'succeeded';
+  run.steps[1].historySettlement = { consumption: 'uncertain', awards: 'pending' };
+  run.currentStepIndex = 2;
+  await manager.updateRun(actor, run);
+
+  assert.equal((await manager.reconcileUncertainRun(actor, run.id, nativeOptions)).status, 'archived');
+  assert.equal(new CraftingRunManager().getRunHistory(actor)[0].gmReconciliation.stepIndex, 1);
+});
+
+test('CraftingRunManager: Native Reconciliation refuses pending-only, versioned and repeated runs', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Native Crafting Refusals');
+  actor.id = 'native-crafting-refusals';
+  const manager = new CraftingRunManager();
+  const pending = await uncertainCraftingRun(manager, actor, { consumption: 'complete', awards: 'pending' });
+  assert.deepEqual(await manager.reconcileUncertainRun(actor, pending.id, nativeOptions), { status: 'certain' });
+  await manager.discardRun(actor, pending.id);
+
+  const versioned = await manager.createRun(actor, twoStageRecipe('recipe-v1'), [actor], 'user-1', { lifecycleVersion: 1 });
+  versioned.steps[0].historySettlement = { consumption: 'uncertain', awards: 'pending' };
+  await manager.updateRun(actor, versioned);
+  assert.equal(manager.getActiveRun(actor, versioned.id).steps[0].historySettlement.consumption, 'uncertain');
+  assert.deepEqual(await manager.reconcileUncertainRun(actor, versioned.id, nativeOptions), { status: 'certain' });
+
+  const uncertain = await uncertainCraftingRun(manager, actor);
+  assert.equal((await manager.reconcileUncertainRun(actor, uncertain.id, nativeOptions)).status, 'archived');
+  assert.deepEqual(await manager.reconcileUncertainRun(actor, uncertain.id, nativeOptions), { status: 'missing' });
+  assert.equal(manager.getRunHistory(actor).filter((entry) => entry.id === uncertain.id).length, 1);
+});

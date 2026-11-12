@@ -46,7 +46,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * real `activeGM` check (load-bearing).
    */
   constructor({ isPrimaryGM = () => true } = {}) {
-    super({ flagKey: 'craftingRuns' });
+    super({ flagKey: 'craftingRuns', settlementOwners: (run) => run.steps ?? [] });
     this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 

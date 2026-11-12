@@ -204,6 +204,7 @@ function closedKey(run, stages, results) {
   if (run?.recoveryEvidence?.status === 'planned') return 'SettlementPending';
   if (run?.awardChoicePending) return 'ClosedAwardPending';
   if (run?.redacted) return 'ClosedRedacted';
+  if (run?.gmReconciliation) return 'ClosedGmReconciled';
   if (run?.status === 'cancelled') return cancelledClosedKey(run, stages);
   if (run?.status === 'failed') {
     if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))

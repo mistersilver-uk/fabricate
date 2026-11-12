@@ -44,6 +44,7 @@ import { GatheringRealmStore } from '../systems/GatheringRealmStore.js';
 import { GatheringRichStateService } from '../systems/GatheringRichStateService.js';
 import { GatheringRunManager } from '../systems/GatheringRunManager.js';
 import { installGatheringJournalRunAuthority } from '../systems/journalRunCommands.js';
+import { createJournalRunReconciliation } from '../systems/journalRunReconciliation.js';
 import { Pf2eInventoryCoinAdapter } from '../systems/Pf2eInventoryCoinAdapter.js';
 import { registerRecipeItemLearningHook } from '../systems/RecipeItemLearningHook.js';
 import { RecipeManager } from '../systems/RecipeManager.js';
@@ -81,6 +82,7 @@ import {
   setGatheringEngine,
 } from './gatheringRuntime.js';
 import { applyItemStackQuantityPathSetting } from './hooks.js';
+import { isActiveJournalGM } from './journalFacade.js';
 import {
   createJournalAuthorityForFabricate,
   createJournalCommandsForFabricate,
@@ -239,6 +241,12 @@ function buildCoreManagers(fabricate) {
   );
   const journalAuthority = createJournalAuthorityForFabricate(fabricate);
   fabricate.journalRunCommands = createJournalCommandsForFabricate(fabricate, journalAuthority);
+  fabricate.journalRunReconciliation = createJournalRunReconciliation({
+    isActiveGM: isActiveJournalGM,
+    currentUser: () => game.user,
+    resolveActor: (uuid) => fromUuid(uuid),
+    runManagers: { crafting: fabricate.craftingRunManager, salvage: fabricate.salvageRunManager },
+  });
   fabricate.companionOperations = createCompanionOperationsForFabricate({
     authority: journalAuthority,
   });

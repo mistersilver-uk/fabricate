@@ -401,7 +401,7 @@ test('every case claiming a gathering/travel leaf also claims the rail that rend
 });
 
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
-const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
+const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content', 'autofocus']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the

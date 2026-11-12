@@ -146,6 +146,8 @@ Materials used, Crafted and Tools used MUST use the same dense ListRow anatomy i
 Tools used MUST appear once for the attempted stages, including matching transient history, and MUST group only recorded actor-qualified physical Item identity.
 Each occurrence MUST retain its stage association, recorded quantity and affirmative broken, virtual, spared and immune evidence; repeated use MUST NOT be summed or described as consumed tools, and absent breakage evidence MUST NOT be called intact.
 Virtual and ambiguous identities MUST remain separate occurrence cards, and omitted tool evidence MUST NOT assert that no tools were used.
+A run closed by GM disposition uses its own closed guidance: a GM closed it without repeating, undoing or refunding anything, and anything marked uncertain stays uncertain.
+It shows its receipts, uncertain ones as uncertain, who closed it as checked or abandoned, and any note, and never lists them under Crafted, Recovered or Brought back.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.
@@ -197,6 +199,10 @@ Truthful variants cover actual failure awards, legacy refunds, redaction and mis
 Recovery takes precedence over ordinary closed success or failure, and retains confirmed, uncertain and unstarted distinctions without claiming every planned result reached inventory.
 Versioned gathering awards MUST come from an applied createGatheredResults receipt rather than the terminal record's pre-effect plan.
 An uncertain effect MUST NOT replay or trigger automatic rollback; guidance directs manual reconciliation under the authority contract.
+For a live legacy run with native uncertainty, the active GM is offered Record outcome… beneath the recovery receipts.
+It records `reconciled` or `abandoned` after a DialogV2 choice defaulting to cancel, and closes the run by Native Reconciliation.
+Players and other GMs see no control, and the Notice's action slot keeps the retained-claim release.
+The note Native Reconciliation accepts through the API is stored on the actor and readable by every user permitted on it; it is not a GM-private field.
 
 #### A pending award choice is settled in the Journal
 
@@ -235,6 +241,7 @@ Every authority refusal MUST instead be reported as a readable localized reason 
 A refusal reports the result's own message when it has one, then its localized reason, then the caller's generic failure text.
 An unmapped reason MUST fall through to that generic rather than render its own slug.
 Every surface that can mint a refusal reason keeps that vocabulary as its single home, including the module edges that report an absent command service, so the drift guard that re-derives the vocabulary can see every code a player may read.
+Native Reconciliation's `run-not-uncertain`, a run with no uncertain effect to close, joins that vocabulary.
 An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
 
 #### A failed check is an outcome, not a refusal

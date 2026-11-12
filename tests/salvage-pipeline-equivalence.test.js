@@ -1127,7 +1127,7 @@ const SCENARIOS = [
       const world = salvageRunProbe({
         salvageCraftingCheck: { simple: PASS_FAIL },
         targets: [target()],
-        awards: [{ id: 'shard', name: 'Shard' }],
+        awards: SHARD_AWARD,
       });
       // A live collection, so the vetoed write is provably unchanged rather than unknowable.
       const { items } = world.actor;

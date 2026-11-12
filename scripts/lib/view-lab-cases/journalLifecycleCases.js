@@ -21,6 +21,62 @@ const RUN_KICKER_CLAIMS = Object.freeze({
   ],
 });
 
+/** Native Reconciliation's render sources, beyond the Journal's own. */
+export const NATIVE_RECOVERY_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/journal\/(?:RecoveryEvidence\.svelte|runRecovery\.js)$/,
+  /^src\/ui\/presenters\/runJournalNativeRecovery\.js$/,
+]);
+
+/**
+ * Native Reconciliation on a live legacy salvage run: the active GM's control beneath the receipts
+ * at both widths, a player's view without it, the control beside a retained claim, and its dialog.
+ */
+function nativeRecoveryCases() {
+  const evidence = '[data-journal-detail] [data-journal-recovery-evidence]';
+  const control = '[data-journal-native-outcome]';
+  const receipts = '[data-journal-effect="1"][data-effect-phase="applying"] [data-list-row]';
+  const variants = [
+    ['gm', { viewer: 'gm' }, 1240, `${evidence}:has(${receipts}):has(${control}:not(:disabled))`],
+    ['gm-narrow', { viewer: 'gm' }, 1024, `${evidence}:has(${control}:not(:disabled))`],
+    ['player', { viewer: 'player' }, 1240, `${evidence}:has(${receipts}):not(:has(${control}))`],
+    [
+      'gm-claim',
+      { viewer: 'gm', journalCaseState: 'native-recovery-claim' },
+      1240,
+      '[data-journal-detail]:has([data-journal-recovery] [data-notice-action])' +
+        `:has([data-journal-recovery-evidence] ${control})`,
+    ],
+    [
+      'dialog',
+      { viewer: 'gm', dialog: 'open' },
+      1240,
+      '.application.dialog:has(button[data-action="cancel"][autofocus])' +
+        ':has(button[data-action="reconciled"]):has(button[data-action="abandoned"])',
+    ],
+  ];
+  return variants.map(([variant, query, width, expectSelector]) =>
+    playerCase({
+      id: `fabricate-journal-native-recovery-${variant}`,
+      label: `Player Journal — native recovery ${variant.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { tab: 'journal', journalCaseState: 'native-recovery', ...query },
+      position: { width, height: 880 },
+      steps:
+        variant === 'dialog'
+          ? [{ selector: control }]
+          : variant === 'player'
+            ? []
+            : [{ selector: control, scroll: true }],
+      expectTab: 'journal',
+      expectSelector,
+      ...(['gm', 'gm-narrow', 'gm-claim'].includes(variant) && { expectCenterHit: control }),
+      kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
+      sourceMatches: [JOURNAL_SOURCES, ...NATIVE_RECOVERY_SOURCES],
+    })
+  );
+}
+
 /** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
 export function journalLifecycleCases() {
   const states = [
@@ -730,7 +786,7 @@ export function journalLifecycleCases() {
     'future-routed-stage': '[data-stage-nav-return]',
     'history-just-resolved': '[data-history-run-id="lab-v1-history-just-resolved"]',
   };
-  return states.map((state) =>
+  const lifecycle = states.map((state) =>
     playerCase({
       id: `fabricate-journal-lifecycle-${state}`,
       label: `Player Journal — ${state.replaceAll('-', ' ')}`,
@@ -786,4 +842,5 @@ export function journalLifecycleCases() {
       ],
     })
   );
+  return [...lifecycle, ...nativeRecoveryCases()];
 }

@@ -2004,7 +2004,7 @@ A terminal stage records the refused consumption complete-empty, and an active s
 Salvage returns `{ success: false, refused: true, message }` naming the item, discards a run that call created, and completes a reused run `failed`.
 A bulk salvage row reports the `refused` outcome, labelled "Not consumed" on the report and the chat card, and the report counts it as neither recovered nor empty-handed.
 On a consume-on-failure path the attempt still happened, so tool breakage, and on a crafting path the currency spend, still apply.
-Contrast **Target Refusal**, a check that cannot grade its target, and an uncertain consumption, which blocks the run until a GM recovers it.
+Contrast **Target Refusal**, a check that cannot grade its target, and an uncertain consumption, which blocks the run until **Native Reconciliation** or manual recovery closes it.
 The accepted risk is a socket disconnect after the server commits a write, which can read as definite.
 
 Canonical mapping: `definiteEffectRefusal` / `isDefiniteEffectRefusal` / `confirmItemConsumption` / `failedFizzleSettlement` in `src/systems/runHistoryEvidence.js`.

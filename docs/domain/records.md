@@ -189,6 +189,8 @@ Spec reference: openspec/specs/gathering-and-harvesting/spec.md
 
 ## Crafting Run
 
+A legacy crafting run whose stage settlement holds `uncertain` can be closed by Native Reconciliation: `reconcileUncertainRun` archives it `cancelled` with `gmReconciliation`, whose `stepIndex` names the closed stage because archiving nulls `currentStepIndex`.
+
 Canonical mapping: `CraftingRunManager`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md
@@ -231,6 +233,7 @@ Spec reference: openspec/specs/data-models/spec.md
 It also carries the **Player Result Order** captured at start (`resultOrder`, a list of result ids) plus the `userId` of the user who started it — see **Result Order Asymmetry**.
 The capture is **live**: the player Inventory tab's salvage panel is a UI caller of `CraftingEngine.salvage`, and its store writes the `salvage:<systemId>:<componentId>` order the run captures — so `resultOrder` carries a real order on a player run.
 Capturing at start keeps that surface clear of the resume race.
+A legacy salvage run whose own settlement holds `uncertain` can be closed by Native Reconciliation, which archives it `cancelled` with `gmReconciliation`; a malformed record is dropped on read.
 
 Canonical mapping: `SalvageRunManager`
 
