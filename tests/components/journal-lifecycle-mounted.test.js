@@ -979,6 +979,9 @@ function craftingPreviewFixture(mode, checkMode = 'none') {
   };
 }
 
+/** The states whose fixture names an authored task or recipe of the seeded world, not the suite's stand-ins. */
+const LAB_SEEDED_WORLD_STATES = ['gathering-needs-tools'];
+
 describe('Journal versioned lifecycle (mounted)', () => {
   before(async () => {
     await harness.setup();
@@ -2086,7 +2089,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const fixtureContent =
         Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) ||
         LAB_HISTORY_DATA_STATES.includes(state) ||
-        state === 'gathering-needs-tools'
+        LAB_SEEDED_WORLD_STATES.includes(state)
           ? buildLabContent({ journalCaseState: state })
           : null;
       const containers = buildLabRunStates({
