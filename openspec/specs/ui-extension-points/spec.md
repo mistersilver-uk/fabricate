@@ -576,7 +576,8 @@ It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an 
 ### Prop kinds
 
 - A `data` key takes data (M10 to M12) and the component receives a snapshot copy.
-- A `required` `data` key named `ariaLabel`, `label`, `title` or `legend` that no `contains` key names and that states no `waivedBy` or `waivedWhen`, as `Select`'s and `SegmentedControl`'s `ariaLabel`, `Modal`'s `title` and `Meter`'s `label`, refuses a value that is not a string, or is white space alone, with `<Entry> requires a non-blank string "<key>"` (M9); `''` and absence are refused as before, and the key list is read from the manifest (issue 2924). This is not a narrowing under the versioning rule: each such key's group states it as final display text naming the control, so a non-string or a string of white space alone was already outside its accepted values.
+- A `required` `data` key named `ariaLabel`, `label`, `title` or `legend` that no `contains` key names and that states no `waivedBy` or `waivedWhen`, as `Select`'s and `SegmentedControl`'s `ariaLabel`, `Modal`'s `title` and `Meter`'s `label`, refuses a value that is not a string, or is white space alone, with `<Entry> requires a non-blank string "<key>"` (M9); `''` and absence are refused as before, and the key list is read from the manifest (issue 2924).
+This is not a narrowing under the versioning rule: each such key's group states it as final display text naming the control, so a non-string or a string of white space alone was already outside its accepted values.
 - A `text` key takes a string.
 Fabricate draws it as plain text inside the component and never reads it as HTML; the element Fabricate wraps it in is private.
 - A `text` key that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a `required` one refuses `''`, or white space alone where a `contains` key names it (M9).
