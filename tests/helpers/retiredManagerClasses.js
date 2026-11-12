@@ -51,7 +51,8 @@ export const RETIRED_CLASSES = Object.freeze({
 
 const REPLACED = 'records what a primitive replaced, and says the class is retired';
 const RETIRED_2540 = 'records the token issue 2540 retired, and says so';
-const RETIRED_2569 = 'records the token issue 2569 removed from the header-action seam, and says so';
+const RETIRED_2569 =
+  'records the token issue 2569 removed from the header-action seam, and says so';
 const WORKED = 'a worked re-rooting example of a compound naming a retired class';
 
 /** @type {ReadonlyArray<{ file: string, includes: string, tokens: number, why: string }>} */
