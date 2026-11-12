@@ -84,11 +84,10 @@ function createCorpus({ viewState, selectedSystemId, selectedEssenceForInspector
   // only when no vocabulary store is registered, so the world has no vocabulary to read.
   const worldComponentTags = $derived.by(() => {
     const vocabulary = worldScopeState.vocabulary;
+    const vocabularyTags = Array.isArray(vocabulary?.componentTags) ? vocabulary.componentTags : [];
     const names =
       vocabulary?.available === true
-        ? (Array.isArray(vocabulary.componentTags) ? vocabulary.componentTags : []).map(
-            (entry) => entry?.name ?? entry?.id
-          )
+        ? vocabularyTags.map((entry) => entry?.name ?? entry?.id)
         : (worldScopeState.component?.entries ?? []).flatMap((entry) =>
             Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
           );
