@@ -1411,7 +1411,7 @@ const STATE_TINTS = Object.freeze([
     'under forced colours a pressed toggle is the reader’s Highlight at rest and under the pointer',
   ],
   [
-    MODULE_SHEET,
+    `${COMPONENTS}/SegmentedControl.svelte`,
     '.manager-segmented .manager-segment.is-active, .manager-segmented .manager-segment.is-active .manager-segment-count',
     'highlight',
     'under forced colours the chosen segment is the reader’s Highlight (issue 2872)',

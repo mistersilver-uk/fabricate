@@ -496,4 +496,20 @@
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
+
+  /* Forced colours: the chosen segment is the reader's Highlight behind HighlightText, out of the
+     repaint's reach, and its ring canvastext; `!important` outranks the tone and variant rules. */
+  @media (forced-colors: active) {
+    .manager-segmented .manager-segment.is-active,
+    .manager-segmented .manager-segment.is-active .manager-segment-count {
+      forced-color-adjust: none;
+      border-color: highlight !important;
+      background: highlight !important;
+      color: highlighttext !important;
+    }
+
+    .manager-segmented .manager-segment.is-active:has(:focus-visible) {
+      outline-color: canvastext;
+    }
+  }
 </style>
