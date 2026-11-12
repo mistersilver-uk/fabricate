@@ -412,7 +412,12 @@
   onkeydowncapture={toFooter}
   use:dismissOnOutsideClick={{
     enabled: open,
-    onDismiss: () => close(),
+    onDismiss: (event) => {
+      // An Escape that closes the panel is the panel's, so a modal dialog around it stays open
+      // (issue 2917), as `Popover`'s does.
+      if (event?.key === 'Escape') event.preventDefault();
+      close();
+    },
     onDetached: anchored ? undefined : () => close({ restoreFocus: false }),
     onFocusLeave: () => close({ restoreFocus: false }),
     additionalNodes: () => [popoverRoot, anchorNode()],

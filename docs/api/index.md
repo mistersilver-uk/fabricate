@@ -5295,7 +5295,7 @@ The standalone layer, its class and its `data-fabricate-theme` copy are private 
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 An `overlayHost` you pass outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert, so in such a dialog pass one inside it, or none.
-In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless your own listener prevents that key.
+In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover`, a `Typeahead`, a `Select`, an `IconPicker` and an `ActionMenu` prevent the Escape that closes their panel, so the dialog stays open and a second Escape, with no panel open, closes it.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.

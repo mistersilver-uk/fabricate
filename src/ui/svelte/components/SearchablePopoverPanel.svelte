@@ -133,6 +133,7 @@
   onmousedown={keepFocusOnHolder}
   onkeydown={(event) => {
     if (event.key === 'Escape') {
+      event.preventDefault();
       stop(event);
       close();
       return;

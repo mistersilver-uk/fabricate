@@ -196,6 +196,7 @@
       return;
     }
     if (key === 'Escape') {
+      event.preventDefault();
       stop(event);
       return;
     }
@@ -258,7 +259,12 @@
   bind:this={menuRoot}
   use:dismissOnOutsideClick={{
     enabled: open,
-    onDismiss: (event) => close({ restoreFocus: event?.key === 'Escape' }),
+    onDismiss: (event) => {
+      // An Escape that closes the panel is the panel's, so a modal dialog around it stays open
+      // (issue 2917), as `Popover`'s does.
+      if (event?.key === 'Escape') event.preventDefault();
+      close({ restoreFocus: event?.key === 'Escape' });
+    },
     onDetached: () => close({ restoreFocus: false }),
     additionalNodes: () => [panelRoot],
   }}
