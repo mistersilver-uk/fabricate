@@ -75,7 +75,10 @@ const rendersSelect = (template) =>
   /<select[\s>]/u.test(template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' '));
 const acceptsChildren = (template) => /@render\s+children|<slot\b/u.test(template);
 
-/** The component name a file's default import carries: its basename, which is the convention here. */
+/**
+ * The component name a file's default import carries: its basename, which is the convention here.
+ * An import aliased to another local name is not matched, so its tag would read as not rendered.
+ */
 const componentName = (file) => file.slice(file.lastIndexOf('/') + 1).replace(/\.svelte$/u, '');
 
 /**
