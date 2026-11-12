@@ -7,7 +7,6 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import { choosePageSize, pageSizeValues } from '../helpers/page-size-control.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 // The raw `.js` closure of `SearchablePopover`.
@@ -20,6 +19,7 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
@@ -32,18 +32,7 @@ let mounted;
 let target;
 
 
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected'
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
+const { writeCompiledSvelte } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 function environment(overrides = {}) {
   return {

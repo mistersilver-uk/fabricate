@@ -38,9 +38,10 @@
     only literal, which `re-rooted-controls-host-independence.test.js` reads. No scoped `<style>`.
 -->
 <script>
-  import { getContext, onDestroy } from 'svelte';
+  import { getContext } from 'svelte';
 
   import { APP_TOOLTIPS } from '../util/appLocalizer.js';
+  import { createFocusTooltip } from '../util/focusTooltip.svelte.js';
 
   let {
     ariaLabel = '',
@@ -113,43 +114,30 @@
 
   const tooltipText = $derived(callerTooltip ? '' : (tooltip ?? ariaLabel));
 
-  // The text the focus tooltip opened with, until it closes; no markup reads it.
-  let shownText = null;
-
-  function dismissOwnTooltip() {
-    shownText = null;
-    tooltips?.hide(element);
-  }
+  const tip = createFocusTooltip(tooltips, {
+    current: () => ({ text: tooltipText, off: disabled }),
+    rest: () => element,
+  });
 
   function showOnKeyboardFocus(event) {
     onfocus?.(event);
-    if (!tooltipText || !event.currentTarget.matches(':focus-visible')) return;
-    shownText = tooltipText;
-    tooltips?.show(event.currentTarget, tooltipText);
+    tip.open(event);
   }
 
   function hideOnBlur(event) {
     onblur?.(event);
-    dismissOwnTooltip();
+    tip.close();
   }
 
   function hideOnEscape(event) {
     onkeydown?.(event);
-    if (event.key === 'Escape') dismissOwnTooltip();
+    if (event.key === 'Escape') tip.close();
   }
 
   function press(event) {
-    dismissOwnTooltip();
+    tip.close();
     onclick(event);
   }
-
-  // Both are read before any test short-circuits, so a change to either re-runs it.
-  $effect(() => {
-    const [text, off] = [tooltipText, disabled];
-    if (shownText !== null && (text !== shownText || off)) dismissOwnTooltip();
-  });
-
-  onDestroy(dismissOwnTooltip);
 </script>
 
 <button

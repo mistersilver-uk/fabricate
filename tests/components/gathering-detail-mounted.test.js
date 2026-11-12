@@ -4,11 +4,9 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSyn
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
@@ -19,6 +17,7 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -37,18 +36,7 @@ let GatheringTaskDetail;
 let mounted;
 let target;
 
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected',
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
+const { writeCompiledSvelte } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 function taskModel(overrides = {}) {
   return {
