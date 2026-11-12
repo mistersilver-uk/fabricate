@@ -20,8 +20,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
-import { buildLabContent } from '../view-lab/world/labContent.js';
-import { seedRuneworkCheckMode } from '../view-lab/world/labWorld.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
@@ -41,6 +39,8 @@ import {
   selectTriggerText,
 } from '../helpers/select-control.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
+import { seedRuneworkCheckMode } from '../view-lab/world/labWorld.js';
 
 const TRIGGER_PICKER = '[data-complication-trigger]';
 const COMPARATOR = '[data-complication-roll-condition-cmp]';
