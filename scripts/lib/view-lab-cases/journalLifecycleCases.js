@@ -62,7 +62,12 @@ function nativeRecoveryCases() {
       reaches: 'beyond',
       query: { tab: 'journal', journalCaseState: 'native-recovery', ...query },
       position: { width, height: 880 },
-      steps: variant === 'dialog' ? [{ selector: control }] : [],
+      steps:
+        variant === 'dialog'
+          ? [{ selector: control }]
+          : variant === 'player'
+            ? []
+            : [{ selector: control, scroll: true }],
       expectTab: 'journal',
       expectSelector,
       ...(['gm', 'gm-narrow', 'gm-claim'].includes(variant) && { expectCenterHit: control }),
