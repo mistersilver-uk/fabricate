@@ -9,7 +9,7 @@
   The picker is `SearchablePopover` (issue 1475), whose panel is PORTALED into the player window's
   ApplicationV2 frame (`.fabricate-app`) and placed against its trigger by the primitive's own
   layout pass, so no popover rules live in this file. `tests/components/overlay-portal-host-position.test.js`
-  measures that landing in a real browser, because the markup is identical whether the portal lands.
+  measures that landing in a real browser, because the markup is identical whether the portal lands or not.
 
   What stays here is the TRIGGER's chrome: a 40px portrait in a 64px bar, not the primitive's 32px
   manager-row portrait. Those rules are `:global()` because the button is `SearchablePopover`'s
