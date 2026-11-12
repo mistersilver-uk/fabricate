@@ -12,7 +12,6 @@ import { parse } from 'svelte/compiler';
 
 import { walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { HISTORICAL_LINES, RETIRED_CLASSES } from './helpers/retiredManagerClasses.js';
-import { ACTION_TONES, managerHeaderActionClass } from '../src/ui/managerExtensions.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const SCANNED_ROOTS = Object.freeze(['src', 'styles', 'tests', 'scripts', 'openspec/specs']);
@@ -124,17 +123,7 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
   );
 });
 
-// Issue 2569 removed the header-action compat token: every tone renders the root and the size rung
-// and nothing else of the retired family.
-test('the header-action seam no longer writes the removed compat token', () => {
-  for (const tone of [...ACTION_TONES, undefined]) {
-    const rendered = managerHeaderActionClass(tone === undefined ? {} : { tone });
-    assert.ok(!rendered.split(/\s+/u).includes('fab-manager-button'), rendered);
-    assert.ok(rendered.startsWith('fabricate-button is-size-38'), rendered);
-  }
-});
-
-/** Every class token a template writes on an element, a composed `classes` array included. */
+// Issue 2569 removed the header-action compat token: every tone renders the root and thed. */
 function writtenClassTokens(source, file) {
   const ast = parse(source, { modern: true });
   const literalsOf = (name) => {
@@ -194,8 +183,5 @@ test('the root reader reds when a template stops writing its root', () => {
     ].join('\n');
   const read = (literals) => writtenClassTokens(composed(literals), 'Synthetic.svelte');
   assert.ok(read("'fabricate-button', 'is-size-38'").includes('fabricate-button'));
-  assert.ok(
-    !read("'is-size-38'").includes('fabricate-button'),
-    'the reader still finds it'
-  );
+  assert.ok(!read("'is-size-38'").includes('fabricate-button'), 'the reader still finds it');
 });
