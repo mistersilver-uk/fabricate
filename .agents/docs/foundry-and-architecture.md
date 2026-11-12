@@ -585,7 +585,10 @@ Code that resolves a macro reference synchronously — the additional-dice readi
 Every write is read-then-`update`, so two clients writing the same path at nearly the same moment can both read the pre-write value, and one decrement is lost.
 The additional-dice spend queue (`additionalDice.js`, keyed by actor UUID plus path, or by the spend-macro UUID alone) only serializes spends issued from ONE client.
 It cannot, and does not claim to, serialize across clients, which is a documented and accepted limitation rather than a defect (issue 2008).
-- **The shared `Modal`'s `initialFocus` is a single selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in** (`src/ui/svelte/components/Modal.svelte`).
+- **The shared `Modal` has two initial-focus props, and they resolve in a fixed order** (`src/ui/svelte/components/Modal.svelte`, `src/ui/svelte/util/modalFocus.js`).
+`initialFocus` names a `data-initial-focus` value, compared as text: with `trapFocus`, focus goes to the first control at or inside the first element whose `data-initial-focus` equals it, in document order.
+`initialFocusSelector` is a selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in.
+Focus takes the `data-initial-focus` match first, then the `initialFocusSelector` match, and otherwise the first focusable control.
 A selector meant as a fallback must already sit later in the markup than the control it falls back from, or it wins first regardless of where it sits in the comma-separated selector list.
 - **Core `Macro#execute` binds `speaker`, `actor`, `token` and `character` locals in addition to `scope`; Fabricate's shared `MacroExecutor` (`src/utils/MacroExecutor.js`) binds only `scope`, `context` and `args`, all identical by reference.**
 A macro ported from ordinary Foundry use that reads a bare `actor` or `token` is `undefined` on every Fabricate-run path, the Additional Dice Macro Contract (`data-models/spec.md` § Additional Dice Macro Contract) included, so such a macro must read everything from its payload argument instead.
