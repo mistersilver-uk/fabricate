@@ -474,7 +474,7 @@ function probeInputs({ properties }) {
   };
 }
 
-/** For each scoped hash class: whether a rule names it, and how many elements of the page carry it. */
+/** For each scoped hash class: whether a rule of the page names it. */
 function scopedPresence({ hashes }) {
   const named = new Set();
   const walk = (rules) => {
@@ -484,10 +484,7 @@ function scopedPresence({ hashes }) {
     }
   };
   for (const sheet of document.styleSheets) walk(sheet.cssRules);
-  return hashes.map((hash) => ({
-    named: named.has(hash),
-    anywhere: document.querySelectorAll(`.${hash}`).length,
-  }));
+  return hashes.map((hash) => ({ named: named.has(hash) }));
 }
 
 /** Whether the pager in each host lays its parts on more than one row. */
