@@ -12,9 +12,9 @@
 import { dirname, posix } from 'node:path';
 
 /** Capture a maximal `FABRICATE.<seg>(.<seg>)*` dotted literal. */
-export const REFERENCE = /FABRICATE\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g;
+export const REFERENCE = /FABRICATE\.\w+(?:\.\w+)*/g;
 
-const RELATIVE_IMPORT = /(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g;
+const RELATIVE_IMPORT = /(?:from|import)\s*(?:\(\s*)?['"](\.{1,2}\/[^'"]+)['"]/g;
 
 /** The literal run that follows the first `${...}` at `open` (its balanced close), or `''`. */
 function tailAfterInterpolation(text, open) {
@@ -25,7 +25,7 @@ function tailAfterInterpolation(text, open) {
     if (text[index] === '{') depth += 1;
     else if (text[index] === '}' && --depth === 0) break;
   }
-  return /^[A-Za-z0-9_]*/.exec(text.slice(index + 1))[0];
+  return /^\w*/.exec(text.slice(index + 1))[0];
 }
 
 /** How a reference ends: `segment` (`.${`, `.'`), `partial` (`${` straight after a segment), or a leaf. */
@@ -128,7 +128,7 @@ export function unreferencedLeaves(leaves, files, readFile) {
   const orphans = leaves.filter((leaf) => {
     if (isCoveredBy(exact, leaf)) return false;
     return composed.every(
-      (reference) => !(produces(reference, leaf, visible(reference.file)) === true)
+      (reference) => produces(reference, leaf, visible(reference.file)) !== true
     );
   });
   return {
