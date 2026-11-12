@@ -1,20 +1,36 @@
 /** Scoped-component CSS for the real-browser computed-CSS gates (issue 883). */
 import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+
 import { compile } from 'svelte/compiler';
 
+import { STYLE_PARTS } from './splitComponentStyles.js';
+
+const repoRoot = resolve(import.meta.dirname, '../..');
+
+function compiledCss(componentPath) {
+  const source = readFileSync(componentPath, 'utf8');
+  return compile(source, { filename: componentPath, css: 'external' }).css?.code || '';
+}
+
 /**
- * Compiles a `.svelte` file and returns its scoped CSS with the hash class Svelte generated.
+ * Compiles a `.svelte` file and returns its scoped CSS with the hash class Svelte generated, and
+ * a style part's too (`splitComponentStyles.js`), whose hash replaces it.
  *
  * @param {string} componentPath absolute path to the component
  * @returns {{ css: string, hashClass: string }} the emitted CSS and its `svelte-<hash>` class
  */
 export function scopedComponentCss(componentPath) {
-  const source = readFileSync(componentPath, 'utf8');
-  const { css } = compile(source, { filename: componentPath, css: 'external' });
-  const code = css?.code || '';
-  const hashClass = code.match(/\.(svelte-[a-z0-9]+)\b/)?.[1] || '';
+  let code = compiledCss(componentPath);
+  let hashClass = code.match(/\.(svelte-[a-z0-9]+)\b/)?.[1] || '';
   if (!code || !hashClass) {
     throw new Error(`${componentPath} emitted no scoped CSS — the gate would prove nothing`);
+  }
+  // A style part brings its own rules and hash, and its hash is the one a fixture's root wears.
+  for (const part of STYLE_PARTS[relative(repoRoot, componentPath).replaceAll('\\', '/')] ?? []) {
+    const partCss = compiledCss(resolve(repoRoot, part));
+    code += `\n${partCss}`;
+    hashClass = partCss.match(/\.(svelte-[a-z0-9]+)\b/)?.[1] || hashClass;
   }
   return { css: code, hashClass };
 }
