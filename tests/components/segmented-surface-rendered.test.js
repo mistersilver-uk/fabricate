@@ -314,6 +314,35 @@ describe('the published SegmentedControl surface in Chromium', () => {
   });
 });
 
+describe('the published SegmentedControl keyboard ring under forced colours (issue 2872)', () => {
+  it('names the chosen segment’s ring canvastext, as the opt-out from the repaint would otherwise leave the accent', async () => {
+    await tab.emulateMedia({ forcedColors: 'active' });
+    try {
+      const canvasText = await tab.evaluate(() => {
+        const probe = document.createElement('i');
+        probe.style.cssText = 'color:CanvasText;forced-color-adjust:none';
+        document.body.append(probe);
+        const { color } = getComputedStyle(probe);
+        probe.remove();
+        return color;
+      });
+      for (const id of ['panel-default', 'own-compact', 'panel-pill']) {
+        await tab.focus(`${trackOf(id)} input[value="ash"]`);
+        await tab.keyboard.press('ArrowLeft');
+        const ring = await tab.$eval(`${trackOf(id)} input:focus`, (radio) => {
+          const label = radio.closest('label');
+          const style = getComputedStyle(label);
+          return [label.classList.contains('is-active'), style.outlineStyle, style.outlineColor];
+        });
+        assert.deepEqual(ring, [true, 'solid', canvasText], id);
+        await tab.$eval('input:focus', (radio) => radio.blur());
+      }
+    } finally {
+      await tab.emulateMedia({ forcedColors: 'none' });
+    }
+  });
+});
+
 describe('the published SegmentedControl option names in Chromium', () => {
   /** The focused radio's role, name and checked state, in Playwright's accessibility snapshot. */
   const focusedNode = async () =>

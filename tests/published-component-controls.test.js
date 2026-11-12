@@ -1562,12 +1562,17 @@ const SCOPED_RINGS = Object.freeze({
         selector: '.manager-segmented.is-tag .manager-segment:has(:focus-visible)',
         declarations: [['outline-offset', '-2px']],
       },
+      // Under forced colours the chosen segment opts out of the repaint, so its ring is named (issue 2872).
+      {
+        selector: '.manager-segmented .manager-segment.is-active:has(:focus-visible)',
+        declarations: [['outline-color', 'canvastext']],
+      },
     ],
   },
 });
 
 /** What a scoped ring pin may declare: the module ring's outline, an offset, and a colour. */
-const RING_PROPERTIES = new Set(['outline', 'outline-offset', 'color']);
+const RING_PROPERTIES = new Set(['outline', 'outline-offset', 'outline-color', 'color']);
 
 /** A rule's whole selector list as its stylesheet writes it. */
 const writtenPrelude = (css, rule) =>

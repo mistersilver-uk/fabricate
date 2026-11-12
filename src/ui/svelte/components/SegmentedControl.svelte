@@ -505,13 +505,19 @@
   @media (forced-colors: active) {
     .manager-segmented .manager-segment.is-active {
       forced-color-adjust: none;
-      border-color: Highlight !important;
-      background: Highlight !important;
-      color: HighlightText !important;
+      border-color: highlight !important;
+      background: highlight !important;
+      color: highlighttext !important;
     }
 
     .manager-segmented .manager-segment.is-active .manager-segment-count {
       color: inherit !important;
+    }
+
+    /* The opt-out above also reaches the keyboard ring, which would otherwise take the accent
+       custom property, so the ring is named canvastext as the switch's is (issue 2872). */
+    .manager-segmented .manager-segment.is-active:has(:focus-visible) {
+      outline-color: canvastext;
     }
   }
 </style>
