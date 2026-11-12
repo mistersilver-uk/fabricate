@@ -55,7 +55,6 @@ import {
   CHECK_TO_ISSUES as RECIPE_CHECK_TO_ISSUES,
   evaluateRecipeReadiness,
 } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
-import { CRAFTING_DEFAULT_PAGE_SIZE } from '../src/ui/svelte/stores/craftingPaging.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import {
   CHECK_READINESS_ISSUE_IDS,
@@ -69,6 +68,7 @@ import {
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 import { ACTION_TONES, managerHeaderActionClass } from '../src/ui/managerExtensions.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { CRAFTING_DEFAULT_PAGE_SIZE } from '../src/ui/svelte/stores/craftingPaging.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
