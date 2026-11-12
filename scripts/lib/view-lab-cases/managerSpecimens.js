@@ -2574,7 +2574,10 @@ export const CASES = Object.freeze([
     steps: [{ selector: optionRadio('breakable'), press: 'ArrowRight' }],
     // The reached card chosen by the companion's own update, its radio checked and keyboard-focused,
     // and the fixture's echo of the value, which only `onChange` writes.
-    expectSelector: `${CARDS_GROUND}[data-lab-option-cards-chosen="immune"]${optionCard('immune').slice(CARDS_GROUND.length)}.is-active input[type="radio"]:checked:focus-visible`,
+    expectSelector:
+      `${CARDS_GROUND}[data-lab-option-cards-chosen="immune"]${optionCard('immune').slice(CARDS_GROUND.length)}.is-active input[type="radio"]:checked:focus-visible` +
+      `:has(${optionCard('breakable')} [data-radio-card-badge]:text-is("Default"))` +
+      `:has(${optionCard('breakable')} [data-radio-card-example]:text-is("A failed check can snap the blade."))`,
     expectCenterHit: optionCard('immune'),
     expectContained: [
       { container: CARDS_GROUND, target: CARDS_TARGET },
@@ -2609,7 +2612,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-option-cards-manual',
     label:
-      'Specimen, mounted through the published seam — the same option card group of Breakable, Immune and Limited uses, disabled with its reason Coming soon, mounted beneath the first with activation manual (issue 2889), after one step: ArrowRight pressed on its checked Breakable radio, which Fabricate held from the platform and moved focus alone to the next enabled radio, Immune, so nothing was chosen and onChange was not called. So the Immune card stays at rest, its radio unchecked with the accent keyboard ring, 2px wide with 2px of ground between ring and radio, while Breakable keeps the accent border, the surface-soft ground and the 4px radio edge of the choice',
+      'Specimen, mounted through the published seam — the same option card group of Breakable, with its accent Default badge and its example line A failed check can snap the blade., Immune and Limited uses, disabled with its reason Coming soon, mounted beneath the first with activation manual (issue 2889), after one step: ArrowRight pressed on its checked Breakable radio, which Fabricate held from the platform and moved focus alone to the next enabled radio, Immune, so nothing was chosen and onChange was not called. So the Immune card stays at rest, its radio unchecked with the accent keyboard ring, 2px wide with 2px of ground between ring and radio, while Breakable keeps the accent border, the surface-soft ground and the 4px radio edge of the choice',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told only of a choice.
     reaches: 'beyond',
     smokeLabels: [],
