@@ -547,6 +547,8 @@ const CARDS_TARGET = `${CARDS_GROUND} > [data-lab-option-cards-target]`;
 const CARDS_FIELDSET = `${CARDS_TARGET} > fieldset`;
 const CARDS_LEGEND = `${CARDS_FIELDSET} > legend`;
 const optionCard = (value) => `${CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+/** A card selector made relative to `CARDS_GROUND`, for a `:has()` hung off the ground. */
+const within = (selector) => `> ${selector.slice(CARDS_GROUND.length + 3)}`;
 const optionRadio = (value) => `${optionCard(value)} input[type="radio"]`;
 /** The manual group's ground, target and fieldset beneath it (issue 2889), and a card and radio. */
 const MANUAL_GROUND = '[data-lab-option-cards-manual]';
@@ -2575,9 +2577,10 @@ export const CASES = Object.freeze([
     // The reached card chosen by the companion's own update, its radio checked and keyboard-focused,
     // and the fixture's echo of the value, which only `onChange` writes.
     expectSelector:
-      `${CARDS_GROUND}[data-lab-option-cards-chosen="immune"]${optionCard('immune').slice(CARDS_GROUND.length)}.is-active input[type="radio"]:checked:focus-visible` +
-      `:has(${optionCard('breakable')} [data-radio-card-badge]:text-is("Default"))` +
-      `:has(${optionCard('breakable')} [data-radio-card-example]:text-is("A failed check can snap the blade."))`,
+      `${CARDS_GROUND}[data-lab-option-cards-chosen="immune"]` +
+      `:has(${within(optionCard('immune'))}.is-active input[type="radio"]:checked:focus-visible)` +
+      `:has(${within(optionCard('breakable'))} [data-radio-card-badge]:text-is("Default"))` +
+      `:has(${within(optionCard('breakable'))} [data-radio-card-example]:text-is("A failed check can snap the blade."))`,
     expectCenterHit: optionCard('immune'),
     expectContained: [
       { container: CARDS_GROUND, target: CARDS_TARGET },

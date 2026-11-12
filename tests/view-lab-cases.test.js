@@ -4983,6 +4983,18 @@ test('the player top bar routes to the frame that opens its picker, not only to 
   );
 });
 
+test('no expectSelector hangs a :has() off a void element, which has no descendants to match', () => {
+  const VOID_HAS =
+    /(?:^|[\s>+~(,])(?:input|img|br|hr)(?:\[[^\]]*\]|[.#:][\w-]+(?:\([^()]*\))?)*:has\(/u;
+  assert.ok(VOID_HAS.test('.a input[type="radio"]:checked:has(.b)'), 'the probe sees a bad one');
+  assert.ok(!VOID_HAS.test('.a:has(input[type="radio"]:checked)'), 'and passes a good one');
+  const bad = VIEW_LAB_CASES.filter((viewCase) => VOID_HAS.test(viewCase.expectSelector ?? ''));
+  assert.deepEqual(
+    bad.map((viewCase) => viewCase.id),
+    []
+  );
+});
+
 test('a change to a canvas-station source selects the station frames that read it', () => {
   const CRAFTING = [
     'player-crafting-station-tool-absent',
