@@ -4607,8 +4607,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    142,
-    `expected the 142 crafting-path cases to be examined, saw ${examined.length}`
+    139,
+    `expected the 139 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -4975,9 +4975,9 @@ test('the player top bar routes to the frame that opens its picker, not only to 
       'fabricate-app-shell',
       'player-actor-picker',
       // The station chip it draws (issue 2277), in the frames that open a recipe and a Journal run.
-      'player-crafting-station-tool-absent',
-      'player-crafting-station-tool-available',
-      'player-crafting-station-tool-unnamed',
+      'player-gathering-station-tool-absent',
+      'player-gathering-station-tool-available',
+      'player-gathering-station-tool-unnamed',
       'player-journal-gathering-station-tool',
     ]
   );
@@ -4996,18 +4996,18 @@ test('no expectSelector hangs a :has() off a void element, which has no descenda
 });
 
 test('a change to a canvas-station source selects the station frames that read it', () => {
-  const CRAFTING = [
-    'player-crafting-station-tool-absent',
-    'player-crafting-station-tool-available',
-    'player-crafting-station-tool-unnamed',
+  const GATHERING = [
+    'player-gathering-station-tool-absent',
+    'player-gathering-station-tool-available',
+    'player-gathering-station-tool-unnamed',
   ];
   const JOURNAL = 'player-journal-gathering-station-tool';
   const NEEDS_TOOLS = 'player-journal-gathering-needs-tools';
   const expected = {
-    'src/systems/stationPresence.js': [...CRAFTING, JOURNAL],
+    'src/systems/stationPresence.js': [...GATHERING, JOURNAL],
     'src/ui/presenters/RunJournalBuilder.js': [JOURNAL, NEEDS_TOOLS],
     'src/bootstrap/journalFacade.js': [JOURNAL],
-    'tests/view-lab/labCanvasStation.js': [...CRAFTING, JOURNAL],
+    'tests/view-lab/labCanvasStation.js': [...GATHERING, JOURNAL],
   };
   for (const [file, ids] of Object.entries(expected)) {
     const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
@@ -5018,7 +5018,7 @@ test('a change to a canvas-station source selects the station frames that read i
   );
   assert.deepEqual(
     stationOnly.sort((a, b) => a.localeCompare(b)),
-    [...CRAFTING, JOURNAL],
+    [...GATHERING, JOURNAL],
     'the station module selects the four station frames and no others'
   );
 });

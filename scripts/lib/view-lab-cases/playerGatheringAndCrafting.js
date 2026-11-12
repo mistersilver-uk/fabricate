@@ -74,20 +74,21 @@ const CHAT_SOURCES = [
 
 /** What a canvas station changes: the chip, the station-aware Tool match and the grant that sets it (issue 2277). */
 const CANVAS_STATION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/gathering\//,
   /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
   /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
-  /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
-  // The progressive body, which herbalism system renders around that table.
-  CRAFTING_PROGRESSIVE,
+  /^src\/ui\/presenters\/GatheringListingBuilder\.js$/,
   /^src\/gatheringToolRuntime\.js$/,
   /^src\/systems\/stationPresence\.js$/,
   /^src\/canvas\/(?:interactableGrant|regions\/interactableRegionActivation)\.js$/,
 ]);
-const ANTITOXIN_STEPS = Object.freeze([
-  { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
-  { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+/** The Cut Icecap Fronds task, which needs the alembic the lab actor lacks, selected in its inspector. */
+const ICECAP_STEPS = Object.freeze([
+  { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+  { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
 ]);
-const TOOL_ROW = (satisfied) => `[data-io-group="tools"] [data-io-satisfied="${satisfied}"]`;
+const TOOL_STATE = (state) =>
+  `[data-gathering-task-detail] [data-gathering-tool][data-tool-state="${state}"]`;
 const STATION_CHIP = (text) =>
   `:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("${text}"))`;
 
@@ -795,40 +796,40 @@ export const CASES = Object.freeze([
   }),
   // Issue 2277: the player window opened with a Tool-station grant, which the lab never set before.
   playerCase({
-    id: 'player-crafting-station-tool-available',
+    id: 'player-gathering-station-tool-available',
     label:
-      'Player app — Reduce a Stillroom Batch opened with the Mortar & Pestle station active: the chip Station tool: Mortar & Pestle in the actor bar, and the recipe’s Tool row satisfied by the station although the actor holds no mortar',
+      'Player app — Cut Icecap Fronds opened with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, and the inspector’s Glass Alembic row Available although the actor holds no alembic',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'crafting', canvasStation: 'named' },
-    steps: ANTITOXIN_STEPS,
-    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Mortar & Pestle')}:has(${TOOL_ROW('true')})`,
-    kinds: ['player', 'crafting'],
+    query: { tab: 'gathering', canvasStation: 'named' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Glass Alembic')}:has(${TOOL_STATE('present')})`,
+    kinds: ['player', 'gathering'],
     sourceMatches: CANVAS_STATION_SOURCES,
   }),
   playerCase({
-    id: 'player-crafting-station-tool-unnamed',
+    id: 'player-gathering-station-tool-unnamed',
     label:
-      'Player app — the same recipe with a station that carries no Tool name: the chip falls back to Station tool: Active station tool, and the Tool row is satisfied',
+      'Player app — the same task with a station that carries no Tool name: the chip falls back to Station tool: Active station tool, and the alembic row is Available',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'crafting', canvasStation: 'unnamed' },
-    steps: ANTITOXIN_STEPS,
-    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Active station tool')}:has(${TOOL_ROW('true')})`,
-    kinds: ['player', 'crafting'],
+    query: { tab: 'gathering', canvasStation: 'unnamed' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Active station tool')}:has(${TOOL_STATE('present')})`,
+    kinds: ['player', 'gathering'],
     sourceMatches: CANVAS_STATION_SOURCES,
   }),
   playerCase({
-    id: 'player-crafting-station-tool-absent',
+    id: 'player-gathering-station-tool-absent',
     label:
-      'Player app — the same recipe with no station, for comparison: no chip in the actor bar, and the Tool row unsatisfied because the actor holds no mortar',
+      'Player app — the same task with no station, for comparison: no chip in the actor bar, and the alembic row Missing because the actor holds no alembic',
     smokeLabels: [],
     reaches: 'beyond',
     // `none` names no station: the frame opens bare, and still reads the station module.
-    query: { tab: 'crafting', canvasStation: 'none' },
-    steps: ANTITOXIN_STEPS,
-    expectSelector: `.fabricate-app:not(:has(.actor-bar-tool-chip)):has(${TOOL_ROW('false')})`,
-    kinds: ['player', 'crafting'],
+    query: { tab: 'gathering', canvasStation: 'none' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app:not(:has(.actor-bar-tool-chip)):has(${TOOL_STATE('missing')})`,
+    kinds: ['player', 'gathering'],
     sourceMatches: CANVAS_STATION_SOURCES,
   }),
   playerCase({

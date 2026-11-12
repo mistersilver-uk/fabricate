@@ -293,7 +293,7 @@ export const CASES = Object.freeze([
       'Player Journal — the same Cut Icecap Fronds run with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, no Needs tools on its row or in its header, and the resolve control enabled',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'journal', journalCaseState: 'gathering-needs-tools', canvasStation: 'alembic' },
+    query: { tab: 'journal', journalCaseState: 'gathering-needs-tools', canvasStation: 'named' },
     steps: [{ selector: '[data-run-id="lab-v1-gathering-needs-tools"]' }],
     expectTab: 'journal',
     expectSelector:

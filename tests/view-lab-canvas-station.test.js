@@ -16,7 +16,6 @@ const content = buildLabContent();
 const stationCases = VIEW_LAB_CASES.filter((viewCase) => viewCase.query?.canvasStation);
 
 const [actor] = buildLabActors(content);
-const learned = Object.keys(actor.flags.fabricate.fabricate.learnedRecipes);
 
 test('a station names a Tool of the herbalism system that the lab actor does not hold', () => {
   for (const [name, station] of Object.entries(LAB_CANVAS_STATIONS)) {
@@ -30,26 +29,28 @@ test('a station names a Tool of the herbalism system that the lab actor does not
   }
 });
 
-test("each crafting station frame's recipe is listed for the actor and needs the Tool its station supplies", () => {
-  const crafting = stationCases.filter((viewCase) => viewCase.query.tab === 'crafting');
-  assert.equal(crafting.length, 3);
-  for (const viewCase of crafting) {
-    const [, rowStep] = viewCase.steps;
-    const id = /data-recipe-id="([^"]+)"/.exec(rowStep.selector)[1];
-    const recipe = content.recipes.find((entry) => entry.id === id);
-    assert.ok(recipe, `${viewCase.id}: ${id} is seeded`);
-    assert.ok(learned.includes(id), `${viewCase.id}: the actor knows ${id}, so its row is listed`);
-    assert.equal(viewCase.steps[0].fill, recipe.name.slice(0, viewCase.steps[0].fill.length));
+test("each gathering station frame opens the task its station's Tool is needed by", () => {
+  const frames = stationCases.filter((viewCase) => viewCase.query.tab === 'gathering');
+  assert.equal(frames.length, 3);
+  const task = content.gatheringConfig.tasks.find((entry) => entry.id === 'hb-task-icecap');
+  const environment = content.environments.find((entry) => entry.id === 'hb-env-ridge');
+  assert.equal(environment.craftingSystemId, task.craftingSystemId);
+  for (const viewCase of frames) {
+    const clicked = viewCase.steps.map((step) => step.selector).join(' ');
+    assert.ok(clicked.includes('data-environment-id="hb-env-ridge"'), viewCase.id);
+    assert.ok(clicked.includes('data-task-id="hb-task-icecap"'), viewCase.id);
     const station = labCanvasStation(viewCase.query.canvasStation);
-    assert.ok(recipe.toolIds.includes(station?.toolId ?? LAB_CANVAS_STATIONS.named.toolId), id);
+    assert.ok(
+      task.toolIds.includes(station?.toolId ?? LAB_CANVAS_STATIONS.named.toolId),
+      viewCase.id
+    );
   }
 });
 
-test('the Journal station frame names a Tool of the task its run is seeded on', () => {
-  const task = content.gatheringConfig.tasks.find((entry) => entry.id === 'hb-task-icecap');
-  assert.ok(task.toolIds.includes(LAB_CANVAS_STATIONS.alembic.toolId));
+test("the Journal station frame's run is seeded on a task its station's Tool serves", () => {
   const journal = stationCases.find((viewCase) => viewCase.query.tab === 'journal');
-  assert.equal(journal.query.canvasStation, 'alembic');
+  const task = content.gatheringConfig.tasks.find((entry) => entry.id === 'hb-task-icecap');
+  assert.ok(task.toolIds.includes(labCanvasStation(journal.query.canvasStation).toolId));
 });
 
 test('the station names differ by their label alone, so the chip shows both of its faces', () => {
@@ -68,7 +69,7 @@ test('a query names a station, and an unknown or absent one names none', () => {
 });
 
 test('every case that opens a station names one, and the frames cover both chip faces and the gate', () => {
-  assert.ok(stationCases.length >= 3);
+  assert.ok(stationCases.length >= 4);
   for (const viewCase of stationCases) {
     const { canvasStation } = viewCase.query;
     assert.ok(canvasStation === 'none' || labCanvasStation(canvasStation), viewCase.id);
@@ -78,7 +79,7 @@ test('every case that opens a station names one, and the frames cover both chip 
     [...new Set(stationCases.map((viewCase) => viewCase.query.canvasStation))].sort((a, b) =>
       a.localeCompare(b)
     ),
-    ['alembic', 'named', 'none', 'unnamed']
+    ['named', 'none', 'unnamed']
   );
   assert.ok(stationCases.some((viewCase) => viewCase.query.tab === 'journal'));
 });
