@@ -4607,8 +4607,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    139,
-    `expected the 139 crafting-path cases to be examined, saw ${examined.length}`
+    142,
+    `expected the 142 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -4971,7 +4971,15 @@ test('the player top bar routes to the frame that opens its picker, not only to 
 
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
-    ['fabricate-app-shell', 'player-actor-picker']
+    [
+      'fabricate-app-shell',
+      'player-actor-picker',
+      // The station chip it draws (issue 2277), in the frames that open a recipe and a Journal run.
+      'player-crafting-station-tool-absent',
+      'player-crafting-station-tool-available',
+      'player-crafting-station-tool-unnamed',
+      'player-journal-gathering-station-tool',
+    ]
   );
 });
 

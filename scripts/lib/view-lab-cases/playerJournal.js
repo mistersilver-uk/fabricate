@@ -282,6 +282,30 @@ export const CASES = Object.freeze([
     kinds: ['player', 'journal', 'gathering'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/bootstrap\/journalGatheringTools\.js$/],
   }),
+  // Issue 2277: the same run with the Glass Alembic station active, which supplies the Tool.
+  playerCase({
+    id: 'player-journal-gathering-station-tool',
+    label:
+      'Player Journal — the same Cut Icecap Fronds run with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, no Needs tools on its row or in its header, and the resolve control enabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'gathering-needs-tools', canvasStation: 'named' },
+    steps: [{ selector: '[data-run-id="lab-v1-gathering-needs-tools"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("Station tool: Glass Alembic"))' +
+      ':has([data-run-id="lab-v1-gathering-needs-tools"])' +
+      ':not(:has([data-run-attention="tools"]))' +
+      ':has([data-journal-detail] [data-run-action="primary"]:not(:disabled))',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalGatheringTools\.js$/,
+      /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+      /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+      /^src\/gatheringToolRuntime\.js$/,
+    ],
+  }),
   // Issue 2006: a Journal-prompted count check opens the same count prompt, its faces named.
   playerCase({
     id: 'player-journal-check-roll-prompt-count',

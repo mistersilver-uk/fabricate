@@ -9,6 +9,7 @@ import { mountWithLocalizer } from '../../src/ui/svelte/util/appLocalizer.js';
 import { foundryTooltips, localize } from '../../src/ui/svelte/util/foundryBridge.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
 import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
+import { labCanvasStation } from './labCanvasStation.js';
 import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
@@ -201,6 +202,8 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // The canvas station the window opens with (issue 2277): `named` or `unnamed`, else none.
+    canvasStation: params.get('canvasStation'),
     // A stand-in companion's interactive count roll, prompting on the standalone overlay; the
     // `count-additional` request also offers additional dice (issue 2008).
     companionRoll: ['count', 'count-additional'].includes(params.get('companionRoll'))
@@ -366,10 +369,11 @@ async function mountPlayerApp(content, params) {
   }
 
   const activeTab = params.tab ?? 'crafting';
+  const activeCanvasTool = labCanvasStation(params.canvasStation);
   const app = borrowInstance(SvelteFabricateApp, {
     _activeTab: activeTab,
     _services: null,
-    _activeCanvasTool: null,
+    _activeCanvasTool: activeCanvasTool,
     _scopedInteractableRef: null,
     _scopedEnvironmentId: null,
     _scopedTaskId: null,
@@ -386,7 +390,7 @@ async function mountPlayerApp(content, params) {
     showAlchemy: isAlchemyTabAvailable(services),
     onSelectTab: () => {},
     services,
-    activeCanvasTool: null,
+    activeCanvasTool,
     scopedEnvironmentId: null,
     scopedTaskId: null,
     scopedActorId: null,

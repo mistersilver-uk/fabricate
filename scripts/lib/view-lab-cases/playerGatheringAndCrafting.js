@@ -72,6 +72,24 @@ const CHAT_SOURCES = [
   /^src\/systems\/craftCardFields\.js$/,
 ];
 
+/** What a canvas station changes: the chip, the station-aware Tool match and the grant that sets it (issue 2277). */
+const CANVAS_STATION_SOURCES = Object.freeze([
+  /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+  /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+  // The progressive body, which Distil Antitoxin's system renders around that table.
+  CRAFTING_PROGRESSIVE,
+  /^src\/gatheringToolRuntime\.js$/,
+  /^src\/canvas\/(?:interactableGrant|regions\/interactableRegionActivation)\.js$/,
+]);
+const ANTITOXIN_STEPS = Object.freeze([
+  { selector: '.crafting-browser-search input', fill: 'Distil Antitoxin' },
+  { selector: '.crafting-recipe-row[data-recipe-id="hb-r-antitoxin"]' },
+]);
+const TOOL_ROW = (satisfied) => `[data-io-group="tools"] [data-io-satisfied="${satisfied}"]`;
+const STATION_CHIP = (text) =>
+  `:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("${text}"))`;
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
@@ -773,6 +791,43 @@ export const CASES = Object.freeze([
     },
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  }),
+  // Issue 2277: the player window opened with a Tool-station grant, which the lab never set before.
+  playerCase({
+    id: 'player-crafting-station-tool-available',
+    label:
+      'Player app — Distil Antitoxin opened with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, and the recipe’s Tool row satisfied by the station although the actor holds no alembic',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', canvasStation: 'named' },
+    steps: ANTITOXIN_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Glass Alembic')}:has(${TOOL_ROW('true')})`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CANVAS_STATION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-station-tool-unnamed',
+    label:
+      'Player app — the same recipe with a station that carries no Tool name: the chip falls back to Station tool: Active station tool, and the Tool row is satisfied',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', canvasStation: 'unnamed' },
+    steps: ANTITOXIN_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Active station tool')}:has(${TOOL_ROW('true')})`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CANVAS_STATION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-station-tool-absent',
+    label:
+      'Player app — the same recipe with no station, for comparison: no chip in the actor bar, and the Tool row unsatisfied because the actor holds no alembic',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: ANTITOXIN_STEPS,
+    expectSelector: `.fabricate-app:not(:has(.actor-bar-tool-chip)):has(${TOOL_ROW('false')})`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CANVAS_STATION_SOURCES,
   }),
   playerCase({
     id: 'player-gathering-tool-blocked',
