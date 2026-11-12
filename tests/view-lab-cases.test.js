@@ -6077,7 +6077,8 @@ test("a patch inside any case file attributes to that file's own case, and nothi
     for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
       assert.deepEqual(
         selectedIds([path], file.patches([caseIdLine(id)])),
-        [id],
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id)).map((entry) => entry.id),
         `a one-line patch at "${id}" in ${path} must select that case alone`
       );
       attributed.add(id);

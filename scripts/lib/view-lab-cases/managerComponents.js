@@ -1200,6 +1200,55 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // Issue 1865: the one system that authors `checkBreakage.triggers`, so the clause is available and its scoped rules render.
+    id: 'manager-component-complications-check-trigger-runework',
+    label: 'Manager — Component complications check trigger (Runework)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework', w: '1280', h: '820' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '.manager-component-row[data-component-id="rw-bar"] [data-component-edit]' },
+      { selector: '[data-complication="rw-comp-cross-thread"] [data-complication-disclosure]' },
+      { selector: '[data-complication="rw-comp-cross-thread"] [data-complication-trigger]' },
+    ],
+    expectView: 'component-edit',
+    // The clause is live (not `.is-unavailable`) and its Select's panel is open.
+    expectSelector:
+      '.fabricate-manager [data-complication="rw-comp-cross-thread"] ' +
+      '[data-complication-trigger-clause]:not(.is-unavailable) ' +
+      '[data-complication-trigger][aria-expanded="true"]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-component-complications-check-trigger-runework-closed',
+    label: 'Manager — Component complications check trigger (Runework, closed)',
+    // The resting clause: the authored trigger named in the Select's face, its panel shut.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework', w: '1280', h: '820' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '.manager-component-row[data-component-id="rw-bar"] [data-component-edit]' },
+      { selector: '[data-complication="rw-comp-cross-thread"] [data-complication-disclosure]' },
+      { selector: '[data-complication-roll-condition]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-complication="rw-comp-cross-thread"] ' +
+      '[data-complication-trigger-clause]:not(.is-unavailable) ' +
+      '[data-complication-trigger][aria-expanded="false"]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-component-complications-salvage-stage-strip',
     label: 'Manager — Component complications salvage stage strip',
     // The read-only complication list nested in a progressive salvage stage row (issue 2445).
