@@ -6,8 +6,7 @@ on:
       - main
     paths:
       - 'docs/**'
-  # Issue 1734: a docs PR builds the site so a break fails before merge. It never deploys: the
-  # upload step and the deploy job are both gated to a push, and the build job holds read scope only.
+  # Issue 1734: a docs PR builds the site so a break fails before merge.
   pull_request:
     paths:
       - 'docs/**'
