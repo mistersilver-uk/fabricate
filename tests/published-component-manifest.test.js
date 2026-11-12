@@ -497,14 +497,14 @@ const EMPTY = Object.freeze({
     'journal-detail-pane',
     'manager-scoped-list-inspector-scroll',
   ]),
-  drawsChildren: true,
+  drawsChildren: 'caller',
 });
 /** `is-accent` is writable because a private `tone` value still writes it. */
 const NOTICE = Object.freeze({
   root: 'fab-notice',
   writable: new Set(['is-danger', 'is-warning', 'is-info', 'is-success', 'is-accent']),
   ancestors: new Set(),
-  drawsChildren: true,
+  drawsChildren: 'caller',
 });
 
 /**
@@ -3562,6 +3562,12 @@ describe('the module sheet and every component style against the published Empty
 
   const unsafe = (css) => unsafeOf(syntheticCensus(EMPTY, css));
 
+  it('counts a rule on the glyph a companion classes as matchable, since icon writes those classes', () => {
+    assert.deepEqual(unsafe('.manager-empty .manager-foo { gap: 0 }'), [
+      'sheet.css: .manager-empty .manager-foo',
+    ]);
+  });
+
   for (const [claim, selector] of [
     ['a state class no published key writes', '.manager-empty.is-field'],
     [
@@ -3668,6 +3674,12 @@ describe('the module sheet and every component style against the published Notic
   });
 
   const unsafe = (css) => unsafeOf(syntheticCensus(NOTICE, css));
+
+  it('counts a rule on the glyph a companion classes as matchable, since icon writes those classes', () => {
+    assert.deepEqual(unsafe('.fab-notice .manager-foo { gap: 0 }'), [
+      'sheet.css: .fab-notice .manager-foo',
+    ]);
+  });
 
   it('admits a selector that needs a state class no published key writes', () => {
     assert.equal(syntheticCensus(NOTICE, '.fab-notice.is-compact { gap: 0 }').length, 1);
