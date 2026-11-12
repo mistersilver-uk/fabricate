@@ -115,10 +115,9 @@
 
   function expendTitle(row) {
     if (row.canExpend) {
-      return fill(
-        text('FABRICATE.Admin.Manager.Knowledge.ExpendLabel', 'Expend use of {name}'),
-        { name: row.name }
-      );
+      return fill(text('FABRICATE.Admin.Manager.Knowledge.ExpendLabel', 'Expend use of {name}'), {
+        name: row.name,
+      });
     }
     if (row.spent) {
       return text('FABRICATE.Admin.Manager.Knowledge.ExpendSpent', 'This copy is already spent.');

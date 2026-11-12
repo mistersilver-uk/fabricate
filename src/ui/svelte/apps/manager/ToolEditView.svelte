@@ -268,10 +268,7 @@
             'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
             'Back to Tool Rules list'
           )}
-          title={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
-            'Back to Tool Rules list'
-          )}
+          title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tool Rules list')}
           onclick={onBack}
           disabled={saving}
           ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
@@ -282,7 +279,10 @@
           role="primary"
           size="38"
           data-tool-editor-save
-          ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save rules for this Tool')}
+          ariaLabel={text(
+            'FABRICATE.Admin.Manager.Tools.Editor.SaveLabel',
+            'Save rules for this Tool'
+          )}
           onclick={onSave}
           disabled={!dirty || !validation.valid || saving}
           title={validation.valid
