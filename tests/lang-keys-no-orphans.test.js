@@ -84,7 +84,8 @@ const GUIDANCE =
   'Reference the key from src/**.js or .svelte (even a trivial usage), or delete it from ' +
   'lang/en.json if the feature it named is gone. This family has no ratchet-exempt marker: ' +
   'lang/en.json is loaded as strict JSON at runtime, so it cannot carry the comment, and there is ' +
-  'no other file whose identity is stable enough across an unrelated refactor to hold it safely.';
+  'no other file whose identity is stable enough across an unrelated refactor to hold it safely. If the key is produced by a composed `FABRICATE.X.${…}` reference, keep its ' +
+  'suffix spelled in the composing file or a direct relative import, or add it to DATA_DRIVEN_LEAVES.';
 
 test('no lang key is newly orphaned, and the scan floor holds', (t) => {
   const listed = [];
@@ -277,9 +278,9 @@ test('a composed base also resolves a trailing-dot constant, a partial segment a
   ].join('\n');
   const full = {
     Area: {
-      Mode: { Fact: 'a', Dead: 'b' },
+      Mode: { Fact: 'a', FactTitle: 'i', Dead: 'b' },
       Tab: { CheckAmmo: 'c', CheckDead: 'd' },
-      Ev: { BiomeAny: 'f', WeatherAny: 'g' },
+      Ev: { BiomeAny: 'f', BiomeXyz: 'h', WeatherAny: 'g' },
     },
   };
   const repo = langRepo({ [LANG_FILE]: langOf({ Area: {} }), 'src/a.js': sources });
@@ -287,8 +288,10 @@ test('a composed base also resolves a trailing-dot constant, a partial segment a
   assert.deepEqual(
     repo.compare().failures.sort((a, b) => (a < b ? -1 : Number(a > b))),
     [
+      `${LANG_FILE}: FABRICATE.Area.Ev.BiomeXyz is new (1)`,
       `${LANG_FILE}: FABRICATE.Area.Ev.WeatherAny is new (1)`,
       `${LANG_FILE}: FABRICATE.Area.Mode.Dead is new (1)`,
+      `${LANG_FILE}: FABRICATE.Area.Mode.FactTitle is new (1)`,
       `${LANG_FILE}: FABRICATE.Area.Tab.CheckDead is new (1)`,
     ]
   );
