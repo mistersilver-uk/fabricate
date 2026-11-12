@@ -46,6 +46,10 @@ player-gathering-realm-locked
 player-gathering-stacked
 player-crafting-simple
 player-crafting-results-kinds
+player-crafting-currency-affordable
+player-crafting-currency-unaffordable
+player-crafting-currency-unresolvable
+player-crafting-currency-repeated
 player-crafting-results-choice-group
 player-crafting-results-rolled-group
 player-crafting-outcome-award-pending

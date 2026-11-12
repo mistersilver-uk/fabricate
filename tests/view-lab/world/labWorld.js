@@ -73,6 +73,31 @@ function seedCurrencyGeneratedId(content) {
   });
 }
 
+/**
+ * Issue 1526's three player-side currency states: Bend Horseshoe costs `amount` gp, under a
+ * Smithing that takes part in currency. Every lab actor holds 45 gp, so 10 is affordable and 500
+ * is not. `unresolvable` blanks the gold unit's `actorPath`, which is a world currency profile the
+ * spend strategy cannot read a balance off, so the cost carries no verdict at all.
+ */
+function seedCurrencyCost(state, { amount, unresolvable = false }) {
+  return (content) => {
+    const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', state);
+    system.requirements = { ...system.requirements, currency: { enabled: true } };
+    if (unresolvable) {
+      content.currencyConfig.units = content.currencyConfig.units.map((unit) => {
+        if (unit.id !== 'gp') return unit;
+        const unreadable = { ...unit };
+        delete unreadable.actorPath;
+        return unreadable;
+      });
+    }
+    recipe.ingredientSets[0].ingredientGroups.push({
+      id: 's1-currency',
+      options: [{ match: { type: 'currency', unit: 'gp', amount } }],
+    });
+  };
+}
+
 /** `reward-craft`: the `reward-kinds` horseshoe under a knowledge-visibility Smithing, so the craft
  *  clears the pre-flight, also re-teaching itself, which Brenna knows (`seedRewardCraftLearned`). */
 function seedRewardCraft(content) {
@@ -393,6 +418,12 @@ const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
   'currency-generated-id': seedCurrencyGeneratedId,
+  'currency-affordable': seedCurrencyCost('currency-affordable', { amount: 10 }),
+  'currency-unaffordable': seedCurrencyCost('currency-unaffordable', { amount: 500 }),
+  'currency-unresolvable': seedCurrencyCost('currency-unresolvable', {
+    amount: 10,
+    unresolvable: true,
+  }),
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
   'reward-duplicate': seedRewardDuplicate,
@@ -965,7 +996,9 @@ function stripAuthoredWorldComponents(content) {
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result,
- *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id, `reward-craft`
+ *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id,
+ *   `currency-affordable`, `currency-unaffordable` or `currency-unresolvable` for it costing gold the
+ *   crafter can pay, cannot pay, or that the world's currency profile cannot read (issue 1526), `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
  *   holds, `reward-duplicate` for its first result listed twice, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
