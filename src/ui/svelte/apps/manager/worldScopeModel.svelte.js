@@ -80,15 +80,22 @@ function createCorpus({ viewState, selectedSystemId, selectedEssenceForInspector
       enabled: entry.worldEnabled !== false,
     }))
   );
-  const worldComponentTags = $derived(
-    [
-      ...new Set(
-        (worldScopeState.component?.entries ?? []).flatMap((entry) =>
-          Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
-        )
-      ),
-    ].sort((left, right) => String(left).localeCompare(String(right)))
-  );
+  // The repair route's tag list is the world's authored tag vocabulary. Component defaults stand in
+  // only when no vocabulary store is registered, so the world has no vocabulary to read.
+  const worldComponentTags = $derived.by(() => {
+    const vocabulary = worldScopeState.vocabulary;
+    const names =
+      vocabulary?.available === true
+        ? (Array.isArray(vocabulary.componentTags) ? vocabulary.componentTags : []).map(
+            (entry) => entry?.name ?? entry?.id
+          )
+        : (worldScopeState.component?.entries ?? []).flatMap((entry) =>
+            Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
+          );
+    return [...new Set(names.filter((name) => String(name ?? '').trim() !== ''))].sort(
+      (left, right) => String(left).localeCompare(String(right))
+    );
+  });
   // The world Tool repair adder's count: world catalogue components authoring each tag as a default.
   const worldComponentTagCounts = $derived(
     countComponentsByTag(
