@@ -314,7 +314,7 @@ const isBareNameKey = (key, spec, named) =>
  * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
  * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
  * names is truthy (issue 2452). A bare `required` name key (`ariaLabel`, `label`, `title`,
- * `legend`) also refuses white space alone and any non-string (issue 2924). A waived key holding a
+ * `legend`) also refuses a blank string and any non-string (issue 2924). A waived key holding a
  * blank string is dropped from the copy, so the component draws its waived form (issue 2858). A
  * key whose `waivedWhen` names a key holding `true` is never refused as empty.
  */
