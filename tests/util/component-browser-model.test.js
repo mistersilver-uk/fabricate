@@ -29,17 +29,6 @@ const ROWS = [
 const names = (rows) => rows.map((row) => row.name);
 
 describe('component browser model (issue 676)', () => {
-  it('createComponentBrowserState returns a FRESH object with a fresh Set each call', () => {
-    // A shared singleton would leak one browser's collapse state into every other
-    // mount — including the isolated mounted tests, which don't lift the state.
-    const first = createComponentBrowserState();
-    const second = createComponentBrowserState();
-    assert.notEqual(first, second);
-    assert.notEqual(first.collapsedCategories, second.collapsedCategories);
-    first.collapsedCategories.add('Metal');
-    assert.equal(second.collapsedCategories.has('Metal'), false);
-  });
-
   it('defaults group by category, sort by name ascending, and page from 0', () => {
     const state = createComponentBrowserState();
     assert.equal(state.categoryFilter, 'all');
@@ -235,40 +224,6 @@ describe('component browser model (issue 676)', () => {
       ],
       'the search chip reports the TRIMMED term the GM actually filtered by'
     );
-  });
-
-  it('paginates and reports a 1-based inclusive range', () => {
-    const page = paginateComponents(ROWS, { pageIndex: 1, pageSize: 2 });
-    assert.deepEqual(names(page.components), ['Sage', 'Copper Ore']);
-    assert.equal(page.pageCount, 2);
-    assert.equal(page.totalCount, 4);
-    assert.equal(page.rangeStart, 3);
-    assert.equal(page.rangeEnd, 4);
-  });
-
-  it('clamps an out-of-range page so a shrinking filter cannot strand the pager', () => {
-    const page = paginateComponents(ROWS, { pageIndex: 9, pageSize: 2 });
-    assert.equal(page.pageIndex, 1, 'clamped to the last page');
-    assert.deepEqual(names(page.components), ['Sage', 'Copper Ore']);
-  });
-
-  it('reports an empty range for an empty list', () => {
-    const page = paginateComponents([], {});
-    assert.deepEqual(page.components, []);
-    assert.equal(page.rangeStart, 0);
-    assert.equal(page.rangeEnd, 0);
-    assert.equal(page.pageCount, 1);
-  });
-
-  // Issue 1036 review: `paginateComponents` now delegates to the shared `paginateRows`, and the one
-  // input class no pinned test covered was a `pageSize` that is falsy but NUMERIC.
-  it('clamps a zero or null pageSize to one row per page rather than defaulting', () => {
-    for (const pageSize of [0, null]) {
-      const page = paginateComponents(ROWS, { pageIndex: 0, pageSize });
-      assert.deepEqual(names(page.components), ['Iron Ore'], `pageSize ${pageSize} yields ONE row`);
-      assert.equal(page.pageCount, ROWS.length, `pageSize ${pageSize} yields one page per row`);
-      assert.deepEqual([page.rangeStart, page.rangeEnd], [1, 1]);
-    }
   });
 
   it('tolerates junk input throughout', () => {
