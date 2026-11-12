@@ -207,11 +207,3 @@ export function countBlockedRecipeEnables(rows, status) {
   const selected = Array.isArray(rows) ? rows : [];
   return selected.filter((row) => row?.enableBlocked === true && row?.enabled === false).length;
 }
-
-/** The shared selection helpers, re-exported under recipe-flavoured names. */
-export {
-  describeBulkSelection as describeRecipeSelection,
-  toggleBulkSelection as toggleRecipeSelection,
-  setBulkSelection as setRecipeSelection,
-  pruneBulkSelection as pruneRecipeSelection,
-} from '../../utils/bulkSelectionModel.js';
