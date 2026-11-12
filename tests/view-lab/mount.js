@@ -862,6 +862,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-tint-swatches': () => import('./fixtures/PublishedTintSwatches.svelte'),
   // Issue 2859: two open dialogs over busy panes, without a scrim and with the dim one.
   'published-modal-scrim': () => import('./fixtures/PublishedModalScrim.svelte'),
+  // Issue 2840: three open dialogs, one per width rung, each with its icon and a subtitle.
+  'published-modal-sizes': () => import('./fixtures/PublishedModalSizes.svelte'),
   // Issues 2456, 2679, 2680, 2775, 2836, 2862, 2860, 2861 and 2901: the twenty-two entries that state a
   // standalone style root, in targets with no Fabricate root and under one.
   'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),

@@ -65,8 +65,6 @@ export const SCOPED = SCOPED_PATHS.map((path) => basename(path, '.svelte'));
 /** The hash class each of those components' rules carry, in the same order. */
 export const scopedHashes = () =>
   SCOPED_PATHS.map((path) => scopedComponentCss(resolve(repoRoot, path)).hashClass);
-/** A scoped component no published key draws, with the key that would: none of its elements is drawn. */
-export const UNDRAWN_SCOPED = Object.freeze({});
 
 /**
  * The entries whose specimens draw an element with a resting transition under the root, in table
@@ -1103,11 +1101,8 @@ export function defineStandaloneRootShard(index) {
           const hashes = scopedHashes();
           const presence = await measured.tab.evaluate(scopedPresence, { hashes });
           for (const [at, name] of SCOPED.entries()) {
-            const { named, anywhere } = presence[at];
+            const { named } = presence[at];
             assert.ok(named, `a rule in the page names ${name}'s ${hashes[at]}`);
-            if (Object.hasOwn(UNDRAWN_SCOPED, name)) {
-              assert.equal(anywhere, 0, `${name} is drawn only for ${UNDRAWN_SCOPED[name]}`);
-            }
           }
         });
 

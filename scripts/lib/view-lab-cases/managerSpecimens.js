@@ -556,7 +556,7 @@ const manualCard = (value) => `${MANUAL_FIELDSET} [data-radio-card-option="${val
 const manualRadio = (value) => `${manualCard(value)} input[type="radio"]`;
 
 /** Sized to the fixture's two 420px grounds, each of two rows of cards, one above the other. */
-const CARDS_WINDOW = Object.freeze({ width: 540, height: 560 });
+const CARDS_WINDOW = Object.freeze({ width: 540, height: 600 });
 
 /** The segmented fixture's filter ground and target, and a filter segment and its radio, by value. */
 const SEGMENTED_GROUND = '[data-lab-segmented-ground="filter"]';
@@ -977,6 +977,15 @@ const MODAL_SCRIM_LAYER = (scrim) => `${MODAL_SCRIM_PANE(scrim)} [data-manager-m
 
 /** Sized to the fixture's 704px ground and its two 320px panes. */
 const MODAL_SCRIM_WINDOW = Object.freeze({ width: 760, height: 740 });
+
+/** The sizes fixture's ground, a pane by its `size`, and that pane's dialog, its glyph and its title block. */
+const MODAL_SIZES = '[data-lab-modal-sizes]';
+const MODAL_SIZE_DIALOG = (size) =>
+  `${MODAL_SIZES} > [data-lab-modal-size="${size}"] .fabricate-modal`;
+const MODAL_SIZE_HEADER = (size) => `${MODAL_SIZE_DIALOG(size)} .manager-modal-header`;
+
+/** Sized to the fixture's 704px ground and its three 240px panes. */
+const MODAL_SIZES_WINDOW = Object.freeze({ width: 760, height: 860 });
 
 /** The popover fixture's ground, a nudge's panel by its ability's name, and its delta Buttons. */
 const POPOVER_GROUND = '[data-lab-popover-ground]';
@@ -2557,7 +2566,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-option-cards-specimen',
     label:
-      'Specimen, mounted through the published seam — one option card group of three cards, Breakable with a hammer chip, Immune with a lock chip and Limited uses with an hourglass chip, disabled with its reason Coming soon, in two tracks across a 420px column on the --fab-bg-2 ground, its legend When the tool breaks visually hidden, after one step: ArrowRight pressed on the checked Breakable radio, which the platform moved to the next enabled radio, Immune, and checked, so Fabricate called onChange, whose update drew Immune chosen. So the Immune card carries the accent border over its surface-soft ground and its radio the accent keyboard ring, 2px wide with 2px of ground between ring and radio, and Breakable is drawn at rest',
+      'Specimen, mounted through the published seam — one option card group of three cards, Breakable with a hammer chip, an accent Default badge beside its title, the description The check may break it. and the example line A failed check can snap the blade. beneath it, Immune with a lock chip and Limited uses with an hourglass chip, disabled with its reason Coming soon, in two tracks across a 420px column on the --fab-bg-2 ground, its legend When the tool breaks visually hidden, after one step: ArrowRight pressed on the checked Breakable radio, which the platform moved to the next enabled radio, Immune, and checked, so Fabricate called onChange, whose update drew Immune chosen. So the Immune card carries the accent border over its surface-soft ground and its radio the accent keyboard ring, 2px wide with 2px of ground between ring and radio, and Breakable is drawn at rest',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each choice.
     reaches: 'beyond',
     smokeLabels: [],
@@ -3620,6 +3629,37 @@ export const CASES = Object.freeze([
     // foundry-native, where the dim brings a --fab-bg-2 ground nearest the dialog's surface;
     // hearth-herb, a second palette; mythwright, the one whose overlay is not its --fab-bg-0.
     themeVariants: ['foundry-native', 'hearth-herb', 'mythwright'],
+  }),
+  managerCase({
+    id: 'manager-published-modal-sizes-specimen',
+    label:
+      "Specimen, mounted through the published seam — three open Add a contributor dialogs stacked on the --fab-bg-0 ground, one per size rung, each with a user-plus glyph before its title, the Forge the guild hall bell subtitle beneath the title and a body paragraph, each centred in its own 240px pane of the companion's on --fab-bg-1 that is its overlay host and, by contain: layout, the box it is centred in. The top dialog passes size sm and is 500px wide, the middle one md and 560px, the bottom one lg and 620px, so the three edges step out by 60px each way at their centres. In each header band the glyph is centred against the title and subtitle block together, not against the title alone, with the close glyph at the band's far end. No scrim is drawn and no control takes focus",
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-modal-sizes' },
+    steps: [],
+    expectSelector: `${MODAL_SIZES}:has(> [data-lab-modal-size="sm"] .fabricate-modal.is-size-sm):has(> [data-lab-modal-size="lg"] .fabricate-modal.is-size-lg):not(:has([data-manager-modal-scrim])) > [data-lab-modal-size="md"] .fabricate-modal`,
+    expectCenterHit: MODAL_SIZE_DIALOG('md'),
+    expectContained: [
+      { container: `${MODAL_SIZES} > [data-lab-modal-size="sm"]`, target: MODAL_SIZE_DIALOG('sm') },
+      { container: `${MODAL_SIZES} > [data-lab-modal-size="md"]`, target: MODAL_SIZE_DIALOG('md') },
+      { container: `${MODAL_SIZES} > [data-lab-modal-size="lg"]`, target: MODAL_SIZE_DIALOG('lg') },
+      { container: '.window-content', target: MODAL_SIZES },
+    ],
+    expectLayout: {
+      controls: [
+        // Each rung's width, and the header band's flex centring of the glyph against its text block.
+        { selector: MODAL_SIZE_DIALOG('sm'), styles: 'width: 500px' },
+        { selector: MODAL_SIZE_DIALOG('md'), styles: 'width: 560px' },
+        { selector: MODAL_SIZE_DIALOG('lg'), styles: 'width: 620px' },
+        { selector: MODAL_SIZE_HEADER('sm'), styles: 'display: flex; align-items: center' },
+      ],
+    },
+    position: MODAL_SIZES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
     id: 'manager-published-typeahead-specimen',

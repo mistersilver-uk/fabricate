@@ -456,6 +456,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
   'tests/view-lab/fixtures/PublishedModal.svelte',
   'tests/view-lab/fixtures/PublishedModalScrim.svelte',
+  'tests/view-lab/fixtures/PublishedModalSizes.svelte',
   'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
   'tests/view-lab/fixtures/publishedStandaloneSpecimen.js',
@@ -2535,6 +2536,18 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-published-modal-scrim-specimen-foundry-native': MODAL_SCRIM_CONTROLS,
   'manager-published-modal-scrim-specimen-hearth-herb': MODAL_SCRIM_CONTROLS,
   'manager-published-modal-scrim-specimen-mythwright': MODAL_SCRIM_CONTROLS,
+  // The published dialog's three width rungs (issue 2840), and the header band centring its glyph.
+  'manager-published-modal-sizes-specimen': [
+    ...['sm', 'md', 'lg'].map((size, at) => ({
+      selector: `[data-lab-modal-sizes] > [data-lab-modal-size="${size}"] .fabricate-modal`,
+      styles: `width: ${[500, 560, 620][at]}px`,
+    })),
+    {
+      selector:
+        '[data-lab-modal-sizes] > [data-lab-modal-size="sm"] .fabricate-modal .manager-modal-header',
+      styles: 'display: flex; align-items: center',
+    },
+  ],
 });
 // And each theme variant of a case above, which measures the same controls under another palette
 // (issue 2837), keyed by its own id.
@@ -8783,6 +8796,28 @@ test('the modal scrim specimen case measures the two panes the scrim fixture mou
       (theme) => getCaseById(`manager-published-modal-scrim-specimen-${theme}`)?.theme
     ),
     ['foundry-native', 'hearth-herb', 'mythwright']
+  );
+});
+
+test('the modal sizes specimen case measures the three rungs the sizes fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedModalSizes.svelte'
+  );
+  for (const hook of ['data-lab-modal-sizes', 'data-lab-modal-size']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const declared = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id?.name === 'SIZES'
+  );
+  const sizes = declared.init.arguments[0].elements.map((element) => element.value);
+  assert.deepEqual(sizes, ['sm', 'md', 'lg'], 'one pane per width rung');
+  const { controls } = getCaseById('manager-published-modal-sizes-specimen').expectLayout;
+  assert.deepEqual(
+    controls.slice(0, 3).map(({ selector }) => /data-lab-modal-size="(\w+)"/u.exec(selector)[1]),
+    sizes
   );
 });
 
