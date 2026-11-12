@@ -618,6 +618,20 @@ export default [
             'Do not hand a DOM node to an equality assertion: a failure walks the element tree ' +
             'until the heap dies. Use `assert.ok(document.activeElement === node, why)`.',
         },
+        // happy-dom: a failing `assert.equal(el, null)` never returns (the diff walks a ~117k
+        // character inspect string), so a regression surfaces as `# cancelled`, not `# fail`.
+        // The base-count lint gate grandfathers the existing sites; a file may only lose them.
+        {
+          selector:
+            "CallExpression[callee.object.name='assert']" +
+            '[callee.property.name=/^(equal|strictEqual|notEqual|notStrictEqual)$/]' +
+            ":has(> Literal.arguments[raw='null'])" +
+            ':has(> :matches(CallExpression[callee.property.name=/^(querySelector|getElementById|closest)$/],' +
+            ' ChainExpression[expression.callee.property.name=/^(querySelector|getElementById|closest)$/]).arguments)',
+          message:
+            'Do not compare a DOM query result to null with `assert.equal`: a failure hangs ' +
+            'instead of failing. Use `assert.ok(el === null, why)` or `assert.ok(el !== null, why)`.',
+        },
       ],
     },
   },
