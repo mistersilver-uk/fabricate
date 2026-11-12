@@ -1235,7 +1235,10 @@ export const CASES = Object.freeze([
       { selector: '#manager-nav-component-rules' },
       { selector: '.manager-component-row[data-component-id="rw-bar"] [data-component-edit]' },
       { selector: '[data-complication="rw-comp-cross-thread"] [data-complication-disclosure]' },
-      { selector: '[data-complication-roll-condition]', scroll: true },
+      {
+        selector: '[data-complication="rw-comp-cross-thread"] [data-complication-roll-condition]',
+        scroll: true,
+      },
     ],
     expectView: 'component-edit',
     expectSelector:
