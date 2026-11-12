@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
@@ -15,7 +16,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const chipPath = resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte');
 export const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 export const css = readStylesheet();
-const chipSource = readFileSync(chipPath, 'utf8');
 
 // Only the scoped `<style>` block.
 const STYLE_OPEN = '\n<style>\n';
@@ -26,7 +26,10 @@ export function scopedStyles(componentSource) {
   if (start < 0 || end <= start) return '';
   return componentSource.slice(start + STYLE_OPEN.length, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
-export const chipStyles = scopedStyles(chipSource);
+// The root's rules live in `ChipFrame`, beside the child rules `Chip` keeps (issue 2317).
+export const chipStyles = styleSourcesOf('src/ui/svelte/components/Chip.svelte')
+  .map((path) => scopedStyles(readFileSync(resolve(__dirname, '../..', path), 'utf8')))
+  .join('\n');
 
 // "This name must not survive" assertions read component SOURCE.
 export function withoutComments(source) {

@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+import { STYLE_PART_PATHS } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   contrast,
@@ -234,9 +235,10 @@ const mutedSelectorsOf = (file) =>
 test('each ledgered file composes exactly the components the ledger answers for', () => {
   for (const file of Object.keys(DANGER_FILLS)) {
     const source = readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8');
-    const imported = [...source.matchAll(/import \w+ from '\.\/(\w+)\.svelte'/gu)].map(
-      ([, name]) => `${COMPONENTS}/${name}.svelte`
-    );
+    // A style part's rules ride its owner's corpus entry, so it is not a separate composition.
+    const imported = [...source.matchAll(/import \w+ from '\.\/(\w+)\.svelte'/gu)]
+      .map(([, name]) => `${COMPONENTS}/${name}.svelte`)
+      .filter((path) => !STYLE_PART_PATHS.has(path));
     assert.deepEqual(imported, COMPOSED[file] ?? [], file);
   }
 });

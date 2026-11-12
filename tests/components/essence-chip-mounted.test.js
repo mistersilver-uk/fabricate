@@ -13,6 +13,7 @@ import {
   componentScopeFor,
   createComponentScopeHarness,
 } from '../helpers/componentScopeMountModules.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -21,9 +22,11 @@ const CHIP_PATH = 'src/ui/svelte/components/Chip.svelte';
 const ESSENCE_CHIP_PATH = 'src/ui/svelte/apps/manager/components/EssenceChip.svelte';
 const MEDALLION_PATH = 'src/ui/svelte/components/Medallion.svelte';
 
-const chipSource = readFileSync(resolve(repoRoot, CHIP_PATH), 'utf8');
 /** The REAL style block, sliced at the tag on its own line (see the chip characterization suite). */
-const chipStyleBlock = chipSource.slice(chipSource.search(/^<style>$/m));
+const chipStyleBlock = styleSourcesOf(CHIP_PATH)
+  .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+  .map((source) => source.slice(source.search(/^<style>$/m)))
+  .join('\n');
 
 function ruleFor(selector) {
   const open = chipStyleBlock.indexOf(`${selector} {`);
@@ -93,7 +96,13 @@ const card = createMountedComponentHarness({
 });
 
 const FIRE = { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'peach', quantity: 2 };
-const EARTH = { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'sage', quantity: 1 };
+const EARTH = {
+  id: 'earth',
+  name: 'Earth',
+  icon: 'fas fa-mountain',
+  colorToken: 'sage',
+  quantity: 1,
+};
 /** No icon and no colour: the state the lab world seeds on purpose (`labContent.js`'s `air`). */
 const AIR = { id: 'air', name: 'Air', quantity: 3 };
 
@@ -155,7 +164,11 @@ describe('Chip — the `tint` prop (issue 1371 r18-colour, M29)', () => {
   it('states the reference face: the colour on the INK over the quiet surface behind the plain hairline', () => {
     // `proto:5502`: `background: var(--surface-soft); border: 1px solid var(--border); color: e.color`.
     const rule = ruleFor('.manager-chip.has-tint');
-    assert.match(rule, /(?:^|[^-])color:\s*var\(--fab-chip-color\)/, 'the ink is the chip’s own colour');
+    assert.match(
+      rule,
+      /(?:^|[^-])color:\s*var\(--fab-chip-color\)/,
+      'the ink is the chip’s own colour'
+    );
     assert.match(rule, /background:\s*var\(--fab-surface-soft\)/, 'over the soft surface');
     assert.match(rule, /border-color:\s*var\(--fab-border\)/, 'behind the plain hairline');
     assert.ok(
@@ -167,7 +180,16 @@ describe('Chip — the `tint` prop (issue 1371 r18-colour, M29)', () => {
   it('is written AFTER every tone and BEFORE the outlined plate, so a tint wins the family and a plate still wins the fill', () => {
     const tint = ruleIndex('.manager-chip.has-tint');
     assert.ok(tint > 0, 'the tint has a rule');
-    for (const tone of ['is-active', 'is-info', 'is-danger', 'is-neutral', 'is-secondary', 'is-accent', 'is-muted', 'is-tag']) {
+    for (const tone of [
+      'is-active',
+      'is-info',
+      'is-danger',
+      'is-neutral',
+      'is-secondary',
+      'is-accent',
+      'is-muted',
+      'is-tag',
+    ]) {
       assert.ok(ruleIndex(`.manager-chip.${tone}`) < tint, `${tone} is written before the tint`);
     }
     assert.ok(ruleIndex('.manager-chip.is-outlined') > tint, 'the plate is written after it');
@@ -227,13 +249,23 @@ describe('EssenceChip — the essence-to-chip mapping, owned once (issue 1371 r1
     assert.equal(node.querySelector('.fab-essence-chip-name').textContent, 'Earth');
     assert.equal(node.querySelector('.fab-essence-chip-count').textContent, '1');
     assert.ok(node.classList.contains('is-inspector'), 'the density reaches the chip');
-    assert.ok(node.classList.contains('manager-essence-compact-chip'), 'the caller class reaches it');
-    assert.equal(node.getAttribute('data-component-essence'), 'earth', 'the rest spread reaches it');
+    assert.ok(
+      node.classList.contains('manager-essence-compact-chip'),
+      'the caller class reaches it'
+    );
+    assert.equal(
+      node.getAttribute('data-component-essence'),
+      'earth',
+      'the rest spread reaches it'
+    );
     essenceChip.remount();
   });
 
   it('omits the count when the essence carries none, so a roster chip is a name alone', async () => {
-    const root = await essenceChip.mount({ essence: { id: 'water', name: 'Water', colorToken: 'aqua' }, showName: true });
+    const root = await essenceChip.mount({
+      essence: { id: 'water', name: 'Water', colorToken: 'aqua' },
+      showName: true,
+    });
     const node = root.querySelector('.manager-chip');
     assert.ok(!node.querySelector('.fab-essence-chip-count'), 'no count span');
     assert.equal(node.getAttribute('title'), 'Water');
@@ -255,7 +287,9 @@ describe('ComponentRow — the badges carry the essence colour (M29 site a)', ()
       editLabel: 'Edit rules',
       editNamedLabel: 'Edit rules for Coal',
     });
-    const chips = [...root.querySelectorAll(':scope .manager-component-essence-dots [data-essence-chip]')];
+    const chips = [
+      ...root.querySelectorAll(':scope .manager-component-essence-dots [data-essence-chip]'),
+    ];
     assert.deepEqual(
       chips.map((node) => node.getAttribute('data-essence-chip')),
       ['fire', 'air'],
@@ -264,7 +298,10 @@ describe('ComponentRow — the badges carry the essence colour (M29 site a)', ()
     assert.equal(chips[0].getAttribute('data-chip-tint'), 'peach', 'the fire chip is inked peach');
     assert.ok(!chips[1].hasAttribute('data-chip-tint'), 'and the uncoloured air chip is not');
     for (const node of chips) {
-      assert.ok(node.classList.contains('manager-essence-compact-chip'), 'the sheet’s row hook survives');
+      assert.ok(
+        node.classList.contains('manager-essence-compact-chip'),
+        'the sheet’s row hook survives'
+      );
     }
     assert.equal(chips[0].getAttribute('title'), 'Fire 2');
     assert.equal(chips[0].querySelector('.manager-chip-name').textContent, 'Fire 2');
@@ -325,7 +362,10 @@ describe('ComponentBrowserInspector — the essence run under the subline (M29 s
     const run = root.querySelector('[data-component-essence-list]');
     assert.ok(Boolean(run), 'and the run below it draws them');
     const chips = [...run.querySelectorAll('[data-essence-chip]')];
-    assert.deepEqual(chips.map((node) => node.getAttribute('data-essence-chip')), ['fire', 'earth']);
+    assert.deepEqual(
+      chips.map((node) => node.getAttribute('data-essence-chip')),
+      ['fire', 'earth']
+    );
     assert.deepEqual(
       chips.map((node) => node.getAttribute('data-chip-tint')),
       ['peach', 'sage'],
@@ -351,12 +391,31 @@ describe('EssenceQuantityCard — the tile is the shared glyph chip in the essen
   after(() => card.teardown());
 
   it('draws the tile as `Medallion variant="glyph-chip"` at 22px, tinted by the colour token', async () => {
-    const root = await card.mount({ id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'peach', quantity: 2 });
-    const tile = root.querySelector(':scope .manager-component-essence-identity [data-medallion="glyph"]');
+    const root = await card.mount({
+      id: 'fire',
+      name: 'Fire',
+      icon: 'fas fa-fire',
+      colorToken: 'peach',
+      quantity: 2,
+    });
+    const tile = root.querySelector(
+      ':scope .manager-component-essence-identity [data-medallion="glyph"]'
+    );
     assert.ok(Boolean(tile), 'the identity row leads with the shared medallion');
-    assert.ok(tile.classList.contains('is-glyph-chip'), 'as the borderless glyph chip the bulk rows draw');
-    assert.equal(tile.getAttribute('data-medallion-tint'), 'peach', 'inked in the essence’s colour');
-    assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the reference’s 22px (`proto:5717`)');
+    assert.ok(
+      tile.classList.contains('is-glyph-chip'),
+      'as the borderless glyph chip the bulk rows draw'
+    );
+    assert.equal(
+      tile.getAttribute('data-medallion-tint'),
+      'peach',
+      'inked in the essence’s colour'
+    );
+    assert.match(
+      tile.getAttribute('style'),
+      /width:\s*22px;\s*height:\s*22px/,
+      'at the reference’s 22px (`proto:5717`)'
+    );
     assert.ok(tile.querySelector('i.fa-fire'), 'carrying the essence’s glyph');
     assert.equal(root.querySelector('.manager-component-essence-name').textContent, 'Fire');
     card.remount();

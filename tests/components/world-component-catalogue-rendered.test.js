@@ -16,6 +16,7 @@ import {
   createWorldComponentCatalogueHarness,
   drainMicrotasks,
 } from '../helpers/componentScopeMountModules.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readStylesheet();
@@ -42,7 +43,7 @@ const MIN_SCOPED_BLOCKS = 12;
 function collectScopedCss() {
   const parts = [];
   const hashes = [];
-  for (const modulePath of compiledModules) {
+  for (const modulePath of compiledModules.flatMap(styleSourcesOf)) {
     const filename = resolve(repoRoot, modulePath);
     const { css } = compile(readFileSync(filename, 'utf8'), { filename, css: 'external' });
     if (!css?.code) continue;
@@ -303,13 +304,9 @@ function measureBulkGeometry() {
     danger: box('[data-world-component-bulk-danger] button'),
     segmentActive: box('[data-world-component-bulk-mode] .manager-segment.is-active'),
     segmentIdle: box('[data-world-component-bulk-mode] .manager-segment:not(.is-active)'),
-    systemRow: box(
-      '[data-bulk-inset="systems"] [data-world-component-bulk-option]'
-    ),
+    systemRow: box('[data-bulk-inset="systems"] [data-world-component-bulk-option]'),
     systemBox: box('[data-bulk-inset="systems"] .fab-selection-check'),
-    categoryRow: box(
-      '[data-bulk-inset="category"] [data-world-component-bulk-option]'
-    ),
+    categoryRow: box('[data-bulk-inset="category"] [data-world-component-bulk-option]'),
     tagRow: box('[data-bulk-inset="tags"] [data-world-component-bulk-option]'),
     tagChip: box('[data-world-component-bulk-tag-chip]'),
     insetPager: box('[data-bulk-inset="systems"] .fab-bulk-inset-pager'),
@@ -436,7 +433,9 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         .click();
       await drainMicrotasks();
       target
-        .querySelector(':scope [data-world-component-bulk-essence="flame"] [data-stepper-increment]')
+        .querySelector(
+          ':scope [data-world-component-bulk-essence="flame"] [data-stepper-increment]'
+        )
         .click();
       await drainMicrotasks();
       const danger = target.querySelector(':scope [data-world-component-bulk-danger] button');
@@ -473,10 +472,9 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       leadRow = await page.evaluate(measureLeadRow);
       bulkGeometry = await page.evaluate(measureBulkGeometry);
       honest = await page.evaluate(measurePointerTargets, TARGETS);
-      await page.setContent(
-        cataloguePage(rendered.markup, rendered.scoped.css, OVERLAY_CONTROL),
-        { waitUntil: 'load' }
-      );
+      await page.setContent(cataloguePage(rendered.markup, rendered.scoped.css, OVERLAY_CONTROL), {
+        waitUntil: 'load',
+      });
       overlaid = await page.evaluate(measurePointerTargets, TARGETS);
       await page.setContent(cataloguePage(rendered.pagedMarkup, rendered.scoped.css, ''), {
         waitUntil: 'load',
@@ -602,7 +600,14 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     // literals, then pinned to the rung so two selects that both resolved to nothing cannot pass.
     assert.ok(leadRow.source.found, 'NON-VACUITY: the source select renders');
     assert.ok(leadRow.essence.found, 'and so does the essence select');
-    const face = ({ height, borderTopLeftRadius, fontSize, fontWeight, backgroundColor, borderTopColor }) => ({
+    const face = ({
+      height,
+      borderTopLeftRadius,
+      fontSize,
+      fontWeight,
+      backgroundColor,
+      borderTopColor,
+    }) => ({
       height,
       borderTopLeftRadius,
       fontSize,
@@ -703,7 +708,11 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     // THE COLUMN IS THE PANE'S WHOLE LEFT TRACK. Before M21 the column itself was already the
     // track; what the maintainer saw was the inset INSIDE it, so the pane edge is the reference
     // every child is measured against below, not the column's padding edge.
-    assert.equal(Math.round(column.left), Math.round(frame.left), 'the column starts at the pane`s left edge');
+    assert.equal(
+      Math.round(column.left),
+      Math.round(frame.left),
+      'the column starts at the pane`s left edge'
+    );
     assert.equal(Math.round(column.top), Math.round(frame.top), 'and at its top');
     assert.equal(Math.round(column.bottom), Math.round(frame.bottom), 'and reaches its bottom');
     for (const [name, child] of [
@@ -850,7 +859,10 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   it('makes the whole 28px search well the control, not a strip inside it (issue 1371 r17-b)', () => {
     // FOUND BY THE HIT-TEST, not by a geometry read.
     const { searchWell, searchInput } = bulkGeometry;
-    assert.ok(Boolean(searchWell) && Boolean(searchInput), 'NON-VACUITY: the well and its input render');
+    assert.ok(
+      Boolean(searchWell) && Boolean(searchInput),
+      'NON-VACUITY: the well and its input render'
+    );
     assert.equal(Math.round(searchWell.height), 28, '`proto:1139`: the well is 28px');
     assert.ok(
       searchInput.height >= 24,
@@ -870,7 +882,11 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     // The adjunct draws `proto:1207`'s 22px square on a 6px corner; its box is 24px, the extra pixel on
     // each side being the hit-area padding (issue 1523), and the 7px corner is what leaves the
     // content-box background its 6. `hit-areas-rendered.test.js` pins the painted 22.
-    assert.equal(Math.round(essenceStep.width), 24, '`proto:1207`: the shared Stepper`s 22px adjunct, plus its hit padding…');
+    assert.equal(
+      Math.round(essenceStep.width),
+      24,
+      '`proto:1207`: the shared Stepper`s 22px adjunct, plus its hit padding…'
+    );
     assert.equal(Math.round(essenceStep.height), 24);
     assert.equal(essenceStep.radius, '7px', '…on a 6px drawn corner, 7 outset by that padding');
     // `proto:5628`'s value column is a 26px LABEL; the shared `Stepper`'s is a typeable input.

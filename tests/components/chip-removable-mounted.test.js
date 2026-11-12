@@ -33,6 +33,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -46,7 +47,10 @@ const librarySource = readFileSync(
 );
 
 /** The real `<style>` block, sliced at the tag on its own line — see the characterization suite. */
-const styleBlock = chipSource.slice(chipSource.search(/^<style>$/m));
+const styleBlock = styleSourcesOf(CHIP_PATH)
+  .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+  .map((source) => source.slice(source.search(/^<style>$/m)))
+  .join('\n');
 
 /** @param {string} text @returns {string} the text with block and line comments removed */
 function withoutComments(text) {
@@ -379,7 +383,7 @@ describe('1515 Chip — the geometry the specimen publishes', () => {
         'would be pushed out of the visible box while staying in the DOM and in the tab order'
     );
     assert.match(
-      ruleFor('.manager-chip.is-truncated .manager-chip-label'),
+      ruleFor(':global(.manager-chip.is-truncated) .manager-chip-label'),
       /min-width:\s*0/u,
       'and the LABEL is what gives way: without this its automatic minimum size is its content ' +
         'width, so the label pushes rather than clips'
