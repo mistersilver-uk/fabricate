@@ -21,6 +21,7 @@ import {
   FALLBACK_CASE_ID,
   LAB_SURFACE_CASES,
   LAB_SURFACE_CASE_IDS,
+  WORLD_SHAPING_LAB_FLAGS,
   VIEW_LAB_CASES,
   VIEW_LAB_CASE_FILES,
   caseIds,
@@ -5537,10 +5538,8 @@ test('every lab input the registry cannot attribute selects surface coverage', (
   // The genuinely global inputs, plus a file nobody has ever heard of: the fail-safe is the
   // DEFAULT, so an input added under `tests/view-lab/` tomorrow is covered before anyone maps it.
   for (const file of [
-    'tests/view-lab/world/labContent.js',
     'tests/view-lab/world/labFlags.js',
     'tests/view-lab/world/labActors.js',
-    'tests/view-lab/world/labWorld.js',
     'tests/view-lab/foundry/installFoundryShim.js',
     'tests/view-lab/mount.js',
     'tests/view-lab/index.html',
@@ -5568,7 +5567,7 @@ test('every lab input the registry cannot attribute selects surface coverage', (
   }
 
   // The regression the whole rule exists to prevent, asserted as itself.
-  assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labContent.js']), []);
+  assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labFlags.js']), []);
   // …and the other direction, which is the point of coverage: it is a real narrowing, not the
   // corpus wearing a new name.
   assert.ok(coverage < publishableCases().length / 3, 'coverage must be a fraction of the corpus');
@@ -5772,8 +5771,8 @@ test('widening unions with what was already attributed, at every level it can ha
 
   // Two lab inputs in one change: one attributable, one not. (`selectAllLabInputCases`.)
   for (const order of [
-    [file.path, 'tests/view-lab/world/labContent.js'],
-    ['tests/view-lab/world/labContent.js', file.path],
+    [file.path, 'tests/view-lab/world/labFlags.js'],
+    ['tests/view-lab/world/labFlags.js', file.path],
   ]) {
     assert.deepEqual(
       selectedIds(order, file.patches([inside])),
@@ -5949,13 +5948,36 @@ test('no carrier quotes a registry count', () => {
 test('a lab-input-only change selects frames while leaving the evidence gate unarmed', () => {
   // The two answers are deliberately different, and the asymmetry looks like a bug in isolation —
   // which is why it is pinned.
-  const fixtureOnly = ['tests/view-lab/world/labContent.js'];
+  const fixtureOnly = ['tests/view-lab/world/labFlags.js'];
 
   assert.equal(hasUiChanges(fixtureOnly), false, 'a fixture-only change must not arm the gate');
   assert.deepEqual(
     selectedIds(fixtureOnly),
     coverageIds(),
     'and it must still select the frames the capture job verifies'
+  );
+});
+
+test('a fixture content edit selects coverage and every case built on a world-shaping flag', () => {
+  // Issue 1543: a flag builds a world that LACKS something the default fixture holds, so an edit
+  // that fills the gap breaks a case no surface frame would catch.
+  const flagged = publishableCases()
+    .filter((viewCase) => WORLD_SHAPING_LAB_FLAGS.some((flag) => viewCase.query?.[flag]))
+    .map((viewCase) => viewCase.id);
+  for (const flag of WORLD_SHAPING_LAB_FLAGS) {
+    assert.ok(
+      publishableCases().some((viewCase) => viewCase.query?.[flag]),
+      `no publishable case sets ${flag}, so it is a flag nothing photographs`
+    );
+  }
+  const expected = caseIds.filter((id) => [...LAB_SURFACE_CASE_IDS, ...flagged].includes(id));
+  for (const file of ['tests/view-lab/world/labContent.js', 'tests/view-lab/world/labWorld.js']) {
+    assert.deepEqual(selectedIds([file]), expected, file);
+    assert.equal(hasUiChanges([file]), false, `${file} must not arm the gate`);
+  }
+  assert.ok(
+    flagged.some((id) => !LAB_SURFACE_CASE_IDS.includes(id)),
+    'at least one flagged case sits outside coverage, or this widening adds nothing'
   );
 });
 

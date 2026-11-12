@@ -83,6 +83,23 @@ const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
 const LAB_CANVAS_STATION_PATH = 'tests/view-lab/labCanvasStation.js';
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
+/** The fixture content and the assembler that shapes it, as a diff names them (issue 1543). */
+const LAB_FIXTURE_PREMISE_PATHS = Object.freeze([
+  'tests/view-lab/world/labContent.js',
+  'tests/view-lab/world/labWorld.js',
+]);
+
+/**
+ * The world-shaping lab flags (issue 1543): each builds a world that LACKS something the default
+ * fixture holds, so a frame that sets one asserts an absence a fixture edit can quietly fill.
+ */
+export const WORLD_SHAPING_LAB_FLAGS = Object.freeze([
+  'noTools',
+  'noParties',
+  'longTravelLabels',
+  'noAuthoredWorldComponents',
+]);
+
 /** The broad-signal table, as a diff names it. Attributed by override entry — see below. */
 const BROAD_SIGNALS_PATH = 'scripts/lib/view-lab-cases/broadSignals.js';
 
@@ -1002,6 +1019,15 @@ const BROAD_SIGNAL_ATTRIBUTION = Object.freeze({
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
   ...CASE_FILE_INPUTS,
+  // Surface coverage PLUS every case built on a world-shaping flag: a fixture edit can break the
+  // premise such a case photographs, and no surface frame would notice it (issue 1543).
+  ...LAB_FIXTURE_PREMISE_PATHS.map((path) =>
+    Object.freeze({
+      path,
+      selects: (viewCase) =>
+        LAB_SURFACE_CASE_ID_SET.has(viewCase.id) || dependsOnFixturePremise(viewCase),
+    })
+  ),
   Object.freeze({
     path: LAYOUT_ASSERTION_PATH,
     selects: (viewCase) => Boolean(viewCase.expectLayout),
@@ -1047,6 +1073,13 @@ function casesSelecting(selects) {
       .filter((viewCase) => selects(viewCase))
       .map((viewCase) => viewCase.id)
   );
+}
+
+const LAB_SURFACE_CASE_ID_SET = new Set(LAB_SURFACE_CASE_IDS);
+
+/** Whether a case builds the lab world with one of the {@link WORLD_SHAPING_LAB_FLAGS}. */
+function dependsOnFixturePremise(viewCase) {
+  return WORLD_SHAPING_LAB_FLAGS.some((flag) => Boolean(viewCase.query?.[flag]));
 }
 
 /** The cases a change to one case file selects, given the PR's patch for it. */

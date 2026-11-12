@@ -933,7 +933,7 @@ export function seedSettings(content, actors, managedSystemId, experimentalFeatu
  *
  * @param {object} content the built lab content, mutated in place.
  */
-function stripTools(content) {
+export function stripTools(content) {
   content.tools = [];
   for (const system of content.systems ?? []) {
     if (system && typeof system === 'object') system.tools = [];
@@ -967,8 +967,24 @@ function stripTools(content) {
  *
  * @param {object} content the built lab content, mutated in place.
  */
-function stripAuthoredWorldComponents(content) {
+export function stripAuthoredWorldComponents(content) {
   content.componentScope = { entities: [], defaults: {} };
+}
+
+/** The shipped travel tab label the `longTravelLabels` flag swaps for a long one. */
+export const LONG_TRAVEL_LABEL_KEY = 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks';
+export const LONG_TRAVEL_LABEL = 'Map Region Links Across the Active Scene';
+
+/**
+ * The lab's localizer: the shipped strings, except that `longTravelLabels` lengthens one tab label.
+ *
+ * @param {(key: string) => string} shippedLocalize The shipped-string resolver.
+ * @param {boolean} longTravelLabels Whether to lengthen the Map Region Links tab label.
+ * @returns {(key: string) => string} The lab's resolver.
+ */
+export function labLocalizer(shippedLocalize, longTravelLabels) {
+  return (key) =>
+    longTravelLabels && key === LONG_TRAVEL_LABEL_KEY ? LONG_TRAVEL_LABEL : shippedLocalize(key);
 }
 
 /**
@@ -1074,10 +1090,7 @@ export async function buildLabWorld({
   const documents = buildDocumentIndex(content, actors);
   registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();
-  const localize = (key) =>
-    longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
-      ? 'Map Region Links Across the Active Scene'
-      : shippedLocalize(key);
+  const localize = labLocalizer(shippedLocalize, longTravelLabels);
 
   const world = {
     seed,
