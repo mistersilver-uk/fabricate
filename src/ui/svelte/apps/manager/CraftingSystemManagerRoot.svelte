@@ -5121,7 +5121,6 @@
             {currentView}
             displayedGatheringTab={gathering.displayedGatheringTab}
             {isWorldTravelRoute}
-            activeGatheringInspectorTab={gathering.activeGatheringInspectorTab}
             selectedGatheringTask={gathering.selectedGatheringTask}
             editingGatheringTask={gathering.editingGatheringTask}
             selectedGatheringDrop={gathering.selectedGatheringDrop}
