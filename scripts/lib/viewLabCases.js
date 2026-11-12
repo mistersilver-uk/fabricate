@@ -98,6 +98,10 @@ export const WORLD_SHAPING_LAB_FLAGS = Object.freeze([
   'noParties',
   'longTravelLabels',
   'noAuthoredWorldComponents',
+  'noInteractables',
+  'noSceneRegions',
+  // No crafting system at all, which every system-scoped fixture edit is a premise of.
+  'clearSystem',
 ]);
 
 /** The broad-signal table, as a diff names it. Attributed by override entry — see below. */
