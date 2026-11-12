@@ -91,7 +91,16 @@ function createUtils(randomID) {
     return true;
   };
 
-  const deepClone = (value) => (value === undefined ? value : structuredClone(value));
+  // Foundry's `deepClone`: plain objects and arrays are copied, a Date is re-made, and anything else
+  // (a function, a class instance) passes through as itself, so a dialog's button callbacks survive.
+  const deepClone = (value) => {
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Date) return new Date(value);
+    if (Array.isArray(value)) return value.map(deepClone);
+    if (Object.getPrototypeOf(value) !== Object.prototype) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, deepClone(entry)]));
+  };
+  const duplicate = (value) => (value === undefined ? value : structuredClone(value));
 
   const mergeObject = (original, other = {}, { insertKeys = true, overwrite = true } = {}) => {
     const result = deepClone(original) ?? {};
@@ -118,7 +127,7 @@ function createUtils(randomID) {
     hasProperty: (object, path) => getProperty(object, path) !== undefined,
     deepClone,
     mergeObject,
-    duplicate: deepClone,
+    duplicate,
     isEmpty: (value) => value == null || Object.keys(value).length === 0,
     expandObject: (flat) => {
       const out = {};
