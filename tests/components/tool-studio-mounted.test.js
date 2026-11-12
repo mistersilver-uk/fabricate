@@ -397,8 +397,7 @@ describe('Tool Studio editor (mounted)', () => {
       'Rules in The Herbalist · identity comes from the world Tool'
     );
     assert.equal(root.querySelector('[data-tool-editor-status]'), null);
-    // Judged on the two header buttons: the Remove and Preview buttons beside them are not yet held to it.
-    assertButtonsHoldTheirLabels(assert, root, '[data-tool-editor-back],[data-tool-editor-save]');
+    assertButtonsHoldTheirLabels(assert, root);
     assert.equal(
       root
         .querySelector('[data-tool-editor-back][aria-label="Back to Tool Rules list"]')
@@ -487,7 +486,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(Boolean(root.querySelector(PREVIEW_ACTOR)), 'the actor selector renders');
     assert.equal(
       assertSelectHasResolvedName(root, PREVIEW_ACTOR),
-      'Preview as actor',
+      'No actor, Preview as actor',
       'the kicker above it is a paragraph, so the trigger keeps its own name string'
     );
     assert.equal(selectTriggerText(root, PREVIEW_ACTOR), 'No actor');

@@ -354,14 +354,14 @@
   </p>
   <section class="fab-stack" data-gap="2" data-tool-actor-preview>
     <!-- The kicker above is a `<p>` rather than a caption, so the trigger keeps its own
-         `aria-label`; `class` rides the picker root, where the sheet hangs the rail width. -->
+         `aria-label`, which opens with the actor the trigger draws (WCAG 2.5.3, issue 2869); `class` rides the picker root, where the sheet hangs the rail width. -->
     <Select
       size="toolbar"
       class="manager-tool-actor-select"
       value={previewActorUuid}
       options={previewActorOptions}
       showTick={false}
-      ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewAsLabel', 'Preview as actor')}
+      ariaLabel={`${previewActorName || text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoActor', 'No actor')}, ${text('FABRICATE.Admin.Manager.Tools.Editor.PreviewAsLabel', 'Preview as actor')}`}
       triggerProps={{ 'data-tool-preview-actor': '' }}
       onChange={(next) => choosePreviewActor(next)}
     />

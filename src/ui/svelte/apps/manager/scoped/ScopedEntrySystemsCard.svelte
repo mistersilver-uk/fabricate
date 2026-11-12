@@ -196,13 +196,13 @@
                 title={openRulesAria(row) ||
                   phrase(
                     'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                    'View system rules for this component in {system}',
+                    'View system rules in {system}',
                     { system: row.systemName }
                   )}
                 ariaLabel={openRulesAria(row) ||
                   phrase(
                     'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                    'View system rules for this component in {system}',
+                    'View system rules in {system}',
                     { system: row.systemName }
                   )}
                 onclick={() => onOpenSystemRules(entryId, row.systemId)}

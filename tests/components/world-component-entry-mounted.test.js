@@ -1413,9 +1413,6 @@ describe('world Component entry editor (issue 1371)', () => {
 
   describe('the per-system card filters, searches and counts what it draws', () => {
     // E.5 / D-9. Round 1 shipped an unfiltered, unsearchable.
-    // Judged on the card's own buttons: the entry's other controls are not yet held to the rule.
-    const CARD_BUTTONS = '[data-scoped-entry-system-rules],[data-scoped-membership-add]';
-
     it('states how many of the total it is showing', async () => {
       const { target } = await open('ingot');
       const count = target.querySelector('[data-scoped-entry-system-count]');
@@ -1423,7 +1420,7 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.match(count.textContent, /2 of 2/);
       // The View system rules button's name holds its visible text (issue 2869).
       assert.ok(Boolean(target.querySelector('[data-scoped-entry-system-rules]')));
-      assertButtonsHoldTheirLabels(assert, target, CARD_BUTTONS);
+      assertButtonsHoldTheirLabels(assert, target);
     });
 
     it('and the membership filter NARROWS the rows, carrying its own counts', async () => {
@@ -1431,7 +1428,7 @@ describe('world Component entry editor (issue 1371)', () => {
       const { target } = await open('resin');
       // The Add to system button's name holds its visible text (issue 2869).
       assert.ok(Boolean(target.querySelector('[data-scoped-membership-add]')));
-      assertButtonsHoldTheirLabels(assert, target, CARD_BUTTONS);
+      assertButtonsHoldTheirLabels(assert, target);
       const segments = [...target.querySelectorAll('[data-scoped-entry-system-filter]')].map(
         (segment) => [
           segment.getAttribute('data-scoped-entry-system-filter'),

@@ -792,7 +792,7 @@
                 openRulesAria={(row) =>
                   format(
                     'FABRICATE.Admin.Manager.Scoped.Essence.OpenSystemRulesAria',
-                    'View system rules for this essence in {system}',
+                    'View system rules in {system}',
                     { system: systemLabel(row) }
                   )}
                 removeLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')}
