@@ -308,6 +308,7 @@ test('real tree: a dead key re-added under a composed namespace is an orphan, a 
   const live = unreferencedLeaves(leaves, files, (file) => corpus[file]);
   assert.deepEqual(live.orphans, ['FABRICATE.Admin.Manager.Recipe.Validation.ThisKeyIsDead']);
   assert.ok(
+    // ratchet-exempt(source-pin): asserts the scan lists the composed namespace as unverified, not how code is written.
     live.unverified.includes('FABRICATE.Admin.Manager.Recipe.Validation'),
     'the composed namespace is listed by name as unverified'
   );
