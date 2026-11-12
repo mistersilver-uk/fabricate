@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, test } from 'node:test';
 
+import { unreferencedLeaves } from './helpers/langKeyReferences.js';
 import { compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
@@ -28,8 +29,16 @@ const LEAF_FLOOR = 5000;
 // needs, but "did anything in src/ or lang/ change" is answered by the whole of both.
 const inCorpus = (file) => file.startsWith('src/') || file.startsWith('lang/');
 
-/** Capture a maximal `FABRICATE.<seg>(.<seg>)*` dotted literal. */
-const REFERENCE = /FABRICATE\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g;
+/**
+ * Leaves a composed reference produces from DATA the source never spells, so the scan cannot read
+ * them. Each names the composing site and why; an entry the scan can verify itself is redundant.
+ */
+const DATA_DRIVEN_LEAVES = new Map([
+  [
+    'FABRICATE.App.Journal.Yields.AwardModes.exceed',
+    'RunDetail.svelte composes `AwardModes.${awardMode}`; `exceed` is a stored progressive award mode (adminStore TASK_PROGRESSIVE_AWARD_MODES), never a literal in the composing file',
+  ],
+]);
 
 /** Every STRING leaf's dotted path under `FABRICATE`, by an explicit stack walk (no namespace nodes). */
 function declaredStringLeaves(fabricate) {
@@ -46,27 +55,18 @@ function declaredStringLeaves(fabricate) {
   return leaves;
 }
 
-function isCoveredBy(prefixes, leaf) {
-  for (const prefix of prefixes) {
-    if (leaf === prefix || leaf.startsWith(`${prefix}.`)) return true;
-  }
-  return false;
-}
-
 /** Every `FABRICATE.*` leaf `lang/en.json` declares that no `.js`/`.svelte` file's text references. */
-function measureLangOrphans(readFile, listFiles) {
+function measureLangOrphans(readFile, listFiles, onUnverified = () => {}) {
   const langText = readFile(LANG_FILE);
   if (langText === undefined) return [];
   const leaves = declaredStringLeaves(JSON.parse(langText).FABRICATE ?? {});
-  const prefixes = new Set();
-  for (const file of listFiles()) {
-    if (file === LANG_FILE || !(file.endsWith('.js') || file.endsWith('.svelte'))) continue;
-    const text = readFile(file);
-    if (text === undefined) continue;
-    for (const match of text.matchAll(REFERENCE)) prefixes.add(match[0]);
-  }
-  return leaves
-    .filter((leaf) => !isCoveredBy(prefixes, leaf))
+  const sources = listFiles().filter(
+    (file) => file !== LANG_FILE && (file.endsWith('.js') || file.endsWith('.svelte'))
+  );
+  const { orphans, unverified } = unreferencedLeaves(leaves, sources, readFile);
+  onUnverified(unverified);
+  return orphans
+    .filter((leaf) => !DATA_DRIVEN_LEAVES.has(leaf))
     .map((leaf) => ({ file: LANG_FILE, id: leaf }));
 }
 
@@ -88,16 +88,25 @@ const GUIDANCE =
 
 test('no lang key is newly orphaned, and the scan floor holds', (t) => {
   const listed = [];
+  let unverified = [];
   const measure = (readFile, listFiles) => {
     const files = listFiles();
     listed.push(files.length);
-    return measureLangOrphans(readFile, () => files);
+    return measureLangOrphans(
+      readFile,
+      () => files,
+      (bases) => {
+        unverified = bases;
+      }
+    );
   };
   const result = reportComparison(t, compareLangOrphans({ measure }), GUIDANCE);
   if (!result.compared) return;
   t.diagnostic(
     `compared ${listed.join(' and ')} corpus files with base ${result.base.slice(0, 12)}`
   );
+  // Each composed base is a namespace the scan reads only through its composing site (issue 1639).
+  t.diagnostic(`UNVERIFIED composed bases (${unverified.length}): ${unverified.join(', ')}`);
   assert.ok(
     Math.min(...listed) >= SCAN_FLOOR,
     `expected at least ${SCAN_FLOOR} corpus files on each side; scanned ${listed.join(' and ')}`
@@ -221,4 +230,91 @@ test('a ratchet-exempt(lang-orphan) marker has no effect, and an empty one still
     'src/a.js:1 has a ratchet-exempt(lang-orphan) marker with no reason; write why the regression ' +
       'is legitimate after the colon',
   ]);
+});
+
+const COMPOSER = [
+  'const META = { pass: ["StatusPass", "Pass"] };',
+  'export const label = (m) => text(`FABRICATE.Area.Validation.${m[0]}`, m[1]);',
+  '',
+].join('\n');
+
+test('a composed base credits only the leaves its composing site can produce (issues 1631, 1639)', () => {
+  const repo = langRepo({
+    [LANG_FILE]: langOf({ Area: { Validation: { StatusPass: 'ok' } } }),
+    'src/a.js': COMPOSER,
+  });
+  repo.write({ 'src/a.js': `${COMPOSER}export const touched = 1;\n` });
+  assert.deepEqual(repo.compare().failures, []);
+  // A dead key re-added under the composed namespace is no longer swallowed by the base.
+  repo.write({
+    [LANG_FILE]: langOf({ Area: { Validation: { StatusPass: 'ok', StatusDead: 'x' } } }),
+  });
+  assert.deepEqual(repo.compare().failures, [
+    `${LANG_FILE}: FABRICATE.Area.Validation.StatusDead is new (1)`,
+  ]);
+  // The composing table is what produces a key: renaming its row orphans the key it named.
+  repo.write({ 'src/a.js': COMPOSER.replace('StatusPass', 'StatusOther') });
+  assert.deepEqual(
+    repo.compare().failures,
+    [
+      `${LANG_FILE}: FABRICATE.Area.Validation.StatusDead is new (1)`,
+      `${LANG_FILE}: FABRICATE.Area.Validation.StatusPass is new (1)`,
+    ],
+    'deleting a table row orphans the key that row produced'
+  );
+});
+
+test('a composed base also resolves a trailing-dot constant, a partial segment and a tail', () => {
+  const sources = [
+    "const NS = 'FABRICATE.Area.Mode.';",
+    'export const k = (e) => `${NS}${e[0]}`;',
+    "export const table = [['Fact', 'Fact']];",
+    'export const c = (id) => `FABRICATE.Area.Tab.Check${id}`;',
+    "export const ids = ['Ammo'];",
+    'export const a = (f) => `FABRICATE.Area.Ev.${f}Any`;',
+    "export const fields = ['Biome'];",
+    '',
+  ].join('\n');
+  const full = {
+    Area: {
+      Mode: { Fact: 'a', Dead: 'b' },
+      Tab: { CheckAmmo: 'c', CheckDead: 'd' },
+      Ev: { BiomeAny: 'f', WeatherAny: 'g' },
+    },
+  };
+  const repo = langRepo({ [LANG_FILE]: langOf({ Area: {} }), 'src/a.js': sources });
+  repo.write({ [LANG_FILE]: langOf(full) });
+  assert.deepEqual(
+    repo.compare().failures.sort((a, b) => (a < b ? -1 : Number(a > b))),
+    [
+      `${LANG_FILE}: FABRICATE.Area.Ev.WeatherAny is new (1)`,
+      `${LANG_FILE}: FABRICATE.Area.Mode.Dead is new (1)`,
+      `${LANG_FILE}: FABRICATE.Area.Tab.CheckDead is new (1)`,
+    ]
+  );
+});
+
+test('real tree: a dead key re-added under a composed namespace is an orphan, a live one is not', () => {
+  // ratchet-exempt(source-pin): reads every lang key reference to prove a composed base does not cover its subtree.
+  const corpus = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js', '.svelte'] });
+  const files = Object.keys(corpus);
+  const leaves = [
+    'FABRICATE.Admin.Manager.Recipe.Validation.StatusPass',
+    'FABRICATE.Admin.Manager.Recipe.Validation.ThisKeyIsDead',
+  ];
+  const live = unreferencedLeaves(leaves, files, (file) => corpus[file]);
+  assert.deepEqual(live.orphans, ['FABRICATE.Admin.Manager.Recipe.Validation.ThisKeyIsDead']);
+  assert.ok(
+    live.unverified.includes('FABRICATE.Admin.Manager.Recipe.Validation'),
+    'the composed namespace is listed by name as unverified'
+  );
+});
+
+test('every data-driven allowlist entry names a leaf lang/en.json still declares, with a reason', () => {
+  const langText = readFileSync(resolve(repoRoot, LANG_FILE), 'utf8');
+  const declared = new Set(declaredStringLeaves(JSON.parse(langText).FABRICATE ?? {}));
+  for (const [leaf, reason] of DATA_DRIVEN_LEAVES) {
+    assert.ok(declared.has(leaf), `${leaf} is allowlisted but no longer declared`);
+    assert.ok(reason.length > 20, `${leaf} needs a reason`);
+  }
 });
