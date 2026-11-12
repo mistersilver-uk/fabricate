@@ -1,9 +1,9 @@
 /* In a real browser: disabling the focused delete control blurs it, and its busy face does not (issue 1132). */
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { before, describe, it } from 'node:test';
 
+import { chromium } from '../helpers/playwrightChromium.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

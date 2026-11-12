@@ -67,9 +67,13 @@ _Art by [Joseph J Ramirez](https://josephjramirez.carbonmade.com/) and [Anika Ro
 
 ```bash
 npm install
+npm run test:foundry:install   # Download Playwright's Chromium once
 npm test         # Run test suite
 npm run build    # Vite build to /dist
 ```
+
+The rendered-style suites launch Chromium, which `npm install` does not download.
+Without it they fail at load with an error naming `npm run test:foundry:install`.
 
 Canonical specifications live under `openspec/specs/`.
 Non-trivial work is planned as an OpenSpec change delta in the work's GitHub issue (see `openspec/README.md`), not as versioned files.

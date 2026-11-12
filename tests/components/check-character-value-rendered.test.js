@@ -7,9 +7,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { CHECKS_TREE_RAW_MODULES } from '../helpers/checksHarnessModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 

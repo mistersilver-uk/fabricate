@@ -9,9 +9,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { APP_LOCALIZER_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { renderedPageHead } from '../helpers/renderedPageHead.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';

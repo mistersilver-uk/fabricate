@@ -10,8 +10,6 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import {
   ROOT,
   cascadeMembers,
@@ -19,6 +17,7 @@ import {
   openCascadePage,
   probeMembers,
 } from '../helpers/buttonCascadeProbe.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 /**
  * The classes each carrier writes at rest, which `armed-danger-button-mounted.test.js` and

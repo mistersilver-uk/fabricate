@@ -6,9 +6,8 @@ import { dirname } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 const { anchoredPopover, hostRelativePopoverLayout } = await import(

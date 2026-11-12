@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 // ratchet-exempt(source-pin): the leaf is executed in Chromium, which imports no module from disk; never asserted

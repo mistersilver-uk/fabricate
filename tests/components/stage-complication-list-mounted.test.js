@@ -7,13 +7,12 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 

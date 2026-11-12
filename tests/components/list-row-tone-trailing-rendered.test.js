@@ -19,9 +19,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { chromiumAxNode } from '../helpers/chromiumAxNode.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,

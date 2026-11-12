@@ -18,9 +18,9 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
+
 
 const sheet = readStylesheet();
 

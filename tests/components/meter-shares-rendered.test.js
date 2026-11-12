@@ -8,10 +8,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { SEMANTIC_TONES, TAG_TONES } from '../fixtures/published-components/fillBarTones.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';

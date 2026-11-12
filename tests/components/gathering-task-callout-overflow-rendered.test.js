@@ -9,10 +9,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { GATHERING_TASK_ROW_HARNESS } from '../helpers/gatheringTaskRowHarness.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

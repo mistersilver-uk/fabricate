@@ -7,11 +7,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { chromium } from 'playwright';
 
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
 

@@ -5,8 +5,7 @@
  */
 import { resolve } from 'node:path';
 
-import { chromium } from 'playwright';
-
+import { chromium } from './playwrightChromium.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,

@@ -9,9 +9,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { FABRICATE_THEME_ATTRIBUTE, FABRICATE_THEME_IDS } from '../../src/ui/theme.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { renderedPageHead } from '../helpers/renderedPageHead.js';
 
 /** Each caller's id, the ancestor classes it draws under, its tone class, and its expected paint. */

@@ -8,9 +8,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import {
   collectStyleCorpus,
   declarationsIn,

@@ -15,11 +15,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test, { after, before } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { walkNodes } from '../helpers/moduleAst.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { attributeValue } from '../helpers/svelteStructureContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

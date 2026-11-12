@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
@@ -16,6 +15,7 @@ import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js'
 import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { RUN_KICKER_CONTAINERS } from '../helpers/runKickerGround.js';
 import {
   OUTCOME_LADDER_RAW_MODULES,

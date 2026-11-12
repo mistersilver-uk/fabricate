@@ -622,6 +622,23 @@ export default [
     },
   },
 
+  // 7a. Tests reach Playwright's `chromium` only through `tests/helpers/playwrightChromium.js`,
+  //     which fails the suite at load, naming the install command, when the browser is missing
+  //     (issue 1277). `tests/playwright-browser-preflight.test.js` covers the `import()` spelling.
+  {
+    files: ['tests/**/*.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          name: 'playwright',
+          message:
+            "Import { chromium } from tests/helpers/playwrightChromium.js, which fails loudly when the browser isn't installed.",
+        },
+      ],
+    },
+  },
+
   // 8. Svelte components (Svelte 5 runes). This block IS gated, twice over as of
   //    issue 1660: `npm run lint` lints `.`, and `**/*.svelte` below is what
   //    makes ESLint SELECT that extension at all during directory expansion — a

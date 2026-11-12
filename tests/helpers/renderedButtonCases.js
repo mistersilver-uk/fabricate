@@ -3,8 +3,7 @@
  * seam draws it, under the module sheet, in a `.fabricate` root a suite re-themes, beside a probe
  * per token whose `color` resolves that token in the root's palette.
  */
-import { chromium } from 'playwright';
-
+import { chromium } from './playwrightChromium.js';
 import { settle } from './publishedComponentModules.js';
 import { renderedPageHead } from './renderedPageHead.js';
 

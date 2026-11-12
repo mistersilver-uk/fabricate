@@ -7,14 +7,13 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 import {
   CHECK_EDITOR_COMPILED_MODULES,
   CHECK_EDITOR_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { COUNT_POOL_COMPILED_MODULES } from '../helpers/countPoolHarnessModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { staticComponentPage } from '../helpers/staticComponentPage.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';

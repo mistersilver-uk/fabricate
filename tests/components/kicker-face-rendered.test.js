@@ -4,7 +4,6 @@ import { createServer as createNetServer } from 'node:net';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 import {
@@ -19,6 +18,7 @@ import {
   registerChromeRunnerGuards,
   skipWithoutHarvest,
 } from '../helpers/harvestedFoundryChrome.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { viteDepCacheDir } from '../helpers/vite-dep-cache-dir.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

@@ -5,9 +5,8 @@ import { dirname, resolve } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

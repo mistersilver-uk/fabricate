@@ -4,8 +4,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
@@ -14,6 +12,7 @@ import {
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
 import { choosePageSize } from '../helpers/page-size-control.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,

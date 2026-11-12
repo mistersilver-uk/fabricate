@@ -16,8 +16,6 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 import {
@@ -31,6 +29,7 @@ import {
 } from '../helpers/harvestedFoundryChrome.js';
 import { walkNodes } from '../helpers/moduleAst.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,

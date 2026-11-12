@@ -14,9 +14,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { chromiumAxNode } from '../helpers/chromiumAxNode.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { settle } from '../helpers/publishedComponentModules.js';
 import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 import { renderedPageHead } from '../helpers/renderedPageHead.js';

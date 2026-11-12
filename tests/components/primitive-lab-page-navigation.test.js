@@ -9,9 +9,8 @@ import { dirname, extname, resolve, sep } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
-
 import { LAB_PAGE_PATH } from '../../scripts/lib/primitiveLabSmoke.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const ORIGIN = 'https://primitive-lab.test';

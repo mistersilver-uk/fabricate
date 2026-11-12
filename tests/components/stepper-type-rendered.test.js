@@ -9,11 +9,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { readDesignLibrary } from '../helpers/designLibrary.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 

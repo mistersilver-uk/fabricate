@@ -7,8 +7,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
+import { chromium } from '../helpers/playwrightChromium.js';
 import { settle } from '../helpers/publishedComponentModules.js';
 import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 import { renderedPageHead } from '../helpers/renderedPageHead.js';

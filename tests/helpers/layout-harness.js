@@ -3,7 +3,7 @@
  */
 import { after } from 'node:test';
 
-import { chromium } from 'playwright';
+import { chromium } from './playwrightChromium.js';
 
 /** Launched on first use and closed once, by the root hook registered below. */
 let browserPromise;

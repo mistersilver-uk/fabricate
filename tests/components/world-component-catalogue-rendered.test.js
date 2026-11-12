@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
 // The frame's lifted view-state factory, so the paged mount below states the SHIPPED shape.
@@ -16,6 +15,7 @@ import {
   createWorldComponentCatalogueHarness,
   drainMicrotasks,
 } from '../helpers/componentScopeMountModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readStylesheet();

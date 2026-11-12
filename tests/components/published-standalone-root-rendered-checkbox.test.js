@@ -15,8 +15,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   STANDALONE_COMPARED,
@@ -24,6 +22,7 @@ import {
 } from '../fixtures/published-components/standaloneSpecimens.js';
 import { walkNodes } from '../helpers/moduleAst.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,

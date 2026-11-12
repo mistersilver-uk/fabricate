@@ -11,8 +11,6 @@ import { readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
@@ -29,6 +27,7 @@ import {
   skipWithoutHarvest,
 } from './harvestedFoundryChrome.js';
 import { componentAstOf } from './parsedSource.js';
+import { chromium } from './playwrightChromium.js';
 import { SHIPPED, byName, importClosure, isComponent } from './publishedComponentGate.js';
 import {
   PUBLISHED_ADAPTER,

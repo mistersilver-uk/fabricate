@@ -9,9 +9,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test, { after, before } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

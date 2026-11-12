@@ -7,8 +7,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
+import { chromium } from '../helpers/playwrightChromium.js';
 import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';

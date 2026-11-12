@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');

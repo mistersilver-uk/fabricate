@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { CHIP_TONES } from '../helpers/chipTone.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

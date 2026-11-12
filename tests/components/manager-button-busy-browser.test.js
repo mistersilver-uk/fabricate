@@ -8,12 +8,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import { staticComponentPage } from '../helpers/staticComponentPage.js';
 import {
   CHECK_EVIDENCE_RAW_MODULES,

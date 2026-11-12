@@ -11,8 +11,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import {
   ROOT,
   cascadeMembers,
@@ -21,6 +19,7 @@ import {
   openCascadePage,
   probeMembers,
 } from '../helpers/buttonCascadeProbe.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 

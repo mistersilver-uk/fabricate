@@ -19,8 +19,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
-
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { POPOVER_PLACEMENTS } from '../../src/ui/svelte/util/popoverLayout.js';
 import {
@@ -32,6 +30,7 @@ import {
   registerChromeRunnerGuards,
   skipWithoutHarvest,
 } from '../helpers/harvestedFoundryChrome.js';
+import { chromium } from '../helpers/playwrightChromium.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,

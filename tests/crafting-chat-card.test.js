@@ -8,7 +8,6 @@ import { dirname, join, resolve } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
 
 import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 import { chatModeOption } from '../src/systems/bulkChatVisibility.js';
@@ -28,6 +27,7 @@ import {
   executedCheck,
   shippedLocalize as shippedKeyLocalize,
 } from './helpers/checkEvidenceFixtures.js';
+import { chromium } from './helpers/playwrightChromium.js';
 
 /** The SHIPPED localization, so a placeholder assertion reads the real string. */
 const LANG = JSON.parse(

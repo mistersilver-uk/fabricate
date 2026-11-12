@@ -8,9 +8,9 @@ import { createReadStream, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+import { chromium } from './playwrightChromium.js';
 import { viteDepCacheDir } from './vite-dep-cache-dir.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
