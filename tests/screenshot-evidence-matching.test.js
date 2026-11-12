@@ -1888,7 +1888,7 @@ const MODULE_FRAMES = Object.freeze({
   },
   'src/ui/model/recipeAccessRoster.js': {
     cases: ['manager-recipe-edit-access-rail', 'manager-recipe-edit-access-inspector'],
-    views: ['manager-recipe-edit-access-rail'],
+    views: ['manager-recipe-edit-access-rail', 'manager-access-view'],
   },
   'src/ui/model/vocabularyCascade.js': {
     cases: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],

@@ -660,6 +660,24 @@ export default {
         label: 'manager-recipe-edit-access-rail',
       });
       results.steps.push({ step: 'recipe-edit-access-rail', passed: true });
+      // The same restricted system's Access view itself (issue 942): the recipe list and its
+      // grant inspector, which no other frame reaches. Its own try, so a miss here does not
+      // report the editor's rail capture above as failed.
+      try {
+        await openManagerCraftingSection(page, 'access', 'access');
+        await page
+          .locator('.fabricate-manager [data-access-row]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 });
+        await captureStableManagerView(ctx, {
+          layout: 'manager access view',
+          label: 'manager-access-view',
+        });
+        results.steps.push({ step: 'access-view', passed: true });
+      } catch (error) {
+        results.steps.push({ step: 'access-view', passed: false, error: error.message });
+        process.stderr.write(`Access view capture failed: ${error.message}\n`);
+      }
     } catch (error) {
       results.steps.push({ step: 'recipe-edit-access-rail', passed: false, error: error.message });
       process.stderr.write(`Restricted recipe rail capture failed: ${error.message}\n`);
