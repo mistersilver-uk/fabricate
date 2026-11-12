@@ -106,10 +106,17 @@
     return 'fas fa-fire-flame-curved';
   }
 
+  // The button's name holds its visible label, so a speech-input user can say what they see
+  // (issue 2869); a spent or uncapped copy names the reason after it.
+  function expendName(row) {
+    if (row.canExpend) return expendTitle(row);
+    return `${text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}: ${expendTitle(row)}`;
+  }
+
   function expendTitle(row) {
     if (row.canExpend) {
       return fill(
-        text('FABRICATE.Admin.Manager.Knowledge.ExpendLabel', 'Spend one use of {name}'),
+        text('FABRICATE.Admin.Manager.Knowledge.ExpendLabel', 'Expend use of {name}'),
         { name: row.name }
       );
     }
@@ -184,7 +191,7 @@
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
-        ariaLabel={expendTitle(copy)}
+        ariaLabel={expendName(copy)}
         onclick={() => onExpend(copy.itemId)}
       >
         <!-- NOT `fa-fire-flame-curved`: that is the uses chip's glyph, one element away. -->

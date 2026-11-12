@@ -9,6 +9,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
   assertSelectHasResolvedName,
@@ -396,9 +397,11 @@ describe('Tool Studio editor (mounted)', () => {
       'Rules in The Herbalist · identity comes from the world Tool'
     );
     assert.equal(root.querySelector('[data-tool-editor-status]'), null);
+    // Judged on the two header buttons: the Remove and Preview buttons beside them are not yet held to it.
+    assertButtonsHoldTheirLabels(assert, root, '[data-tool-editor-back],[data-tool-editor-save]');
     assert.equal(
       root
-        .querySelector('[data-tool-editor-back][aria-label="Back to the Tool Rules list"]')
+        .querySelector('[data-tool-editor-back][aria-label="Back to Tool Rules list"]')
         .textContent.trim(),
       'Back to Tool Rules'
     );

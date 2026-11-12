@@ -15,6 +15,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
@@ -350,6 +351,8 @@ describe('KnowledgeView mounted behaviour', () => {
       assert.equal(Boolean(row.querySelector('[data-knowledge-inert]')), testCase.inert);
       assert.equal(row.querySelector('[data-knowledge-expend]').disabled, testCase.expendDisabled);
       assert.equal(row.classList.contains('is-spent'), testCase.chip === 'spent');
+      // Expend's name holds its label whether the copy can be spent or not (issue 2869).
+      assertButtonsHoldTheirLabels(assert, row);
     });
   }
 
@@ -714,7 +717,7 @@ describe('KnowledgeView mounted behaviour', () => {
     );
     assert.equal(
       target.querySelector('[data-knowledge-expend="i1"]').getAttribute('title'),
-      `Spend one use of ${DOLLAR_NAME}`
+      `Expend use of ${DOLLAR_NAME}`
     );
 
     deleteButton().click();
