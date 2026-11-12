@@ -71,7 +71,7 @@
   import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { dismissPanelOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { activeOptionId, holderKeyIntent, plainTab, tabInto } from '../util/listboxNavigation.js';
@@ -410,14 +410,9 @@
   bind:this={pickerRoot}
   style:display={anchored ? 'contents' : undefined}
   onkeydowncapture={toFooter}
-  use:dismissOnOutsideClick={{
+  use:dismissPanelOnOutsideClick={{
     enabled: open,
-    onDismiss: (event) => {
-      // An Escape that closes the panel is the panel's, so a modal dialog around it stays open
-      // (issue 2917), as `Popover`'s does.
-      if (event?.key === 'Escape') event.preventDefault();
-      close();
-    },
+    onDismiss: () => close(),
     onDetached: anchored ? undefined : () => close({ restoreFocus: false }),
     onFocusLeave: () => close({ restoreFocus: false }),
     additionalNodes: () => [popoverRoot, anchorNode()],

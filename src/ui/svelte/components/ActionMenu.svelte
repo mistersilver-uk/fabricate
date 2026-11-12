@@ -55,7 +55,7 @@
   import IconButton from './IconButton.svelte';
   import Kicker from './Kicker.svelte';
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { dismissPanelOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeActionMenuLayout } from '../util/actionMenuLayout.js';
 
   let {
@@ -257,14 +257,9 @@
 <div
   class="fabricate-action-menu"
   bind:this={menuRoot}
-  use:dismissOnOutsideClick={{
+  use:dismissPanelOnOutsideClick={{
     enabled: open,
-    onDismiss: (event) => {
-      // An Escape that closes the panel is the panel's, so a modal dialog around it stays open
-      // (issue 2917), as `Popover`'s does.
-      if (event?.key === 'Escape') event.preventDefault();
-      close({ restoreFocus: event?.key === 'Escape' });
-    },
+    onDismiss: (event) => close({ restoreFocus: event?.key === 'Escape' }),
     onDetached: () => close({ restoreFocus: false }),
     additionalNodes: () => [panelRoot],
   }}
