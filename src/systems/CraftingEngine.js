@@ -106,6 +106,7 @@ import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
   cancelledCraftResult,
   commitCraft,
+  consumeUnlessRefused,
   continueCollapsedChain,
   misconfiguredCheckResult,
   openCraftStep,
@@ -131,11 +132,8 @@ import {
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import {
   hasStackQuantity,
-  readStackQuantity,
   readStoredStackQuantity,
   setStackQuantity,
-  itemStackQuantityPath,
-  updateStackQuantity,
 } from './itemStackQuantity.js';
 import { pairPlannedTools } from './plannedToolPairs.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
@@ -166,16 +164,19 @@ import {
   attachAwardReceipts,
   attachRolledAwards,
   awardReceipts,
+  confirmItemConsumption,
   createItemReceiptCollector,
+  failedFizzleSettlement,
+  isDefiniteEffectRefusal,
   itemReceipt,
   mapConsumedIngredientRef,
   sourceItemQuantity,
   receiptQuantity,
-  requireDocumentAcknowledgment,
   splitHistoryReceipts,
   unconfirmedHistoryError,
   linkResultGroups,
   assertNativeEffectsUninvoked,
+  nativeStageRestorer,
 } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolveRunRecipe, snapshotRunTerms, withAcceptedCraftingCheck } from './runTerms.js';
@@ -192,6 +193,7 @@ import {
   resolveSalvageRunRecord,
   runSalvageCheck,
   salvageRefusal,
+  settleSalvageRefusal,
   settleSalvageRoll,
   validateSalvageTools,
 } from './salvagePipeline.js';
@@ -1351,12 +1353,15 @@ export class CraftingEngine {
       snapshots.resolutionSnapshot.kind = 'none';
     }
     if (timedStart) delete snapshots.resolutionSnapshot;
+    const persist = () => runManager.updateRun(craftingActor, run);
+    const restore = nativeStageRestorer(stage, Object.keys(snapshots), persist);
     Object.assign(stage, snapshots);
     stage.historySettlement = {
       consumption: stage.historySettlement?.consumption ?? 'notApplicable',
       awards: 'pending',
     };
-    await runManager.updateRun(craftingActor, run);
+    await persist();
+    return restore;
   }
 
   async _consumeNativeIngredients(plan, { craftingActor, run, runManager, stepIndex }) {
@@ -1368,6 +1373,15 @@ export class CraftingEngine {
     const consumed = await this._consumeIngredients(plan);
     await this._saveNativeConsumption(consumed, { craftingActor, run, runManager, stepIndex });
     return consumed;
+  }
+
+  /** Open a timed START stage and consume its plan; a Definite Effect Refusal restores it. */
+  async _consumeTimedStart(plan, stageArgs) {
+    const restore = await this._beginNativeStage({ ...stageArgs, timedStart: true });
+    return this._consumeNativeIngredients(plan, stageArgs).catch(async (error) => {
+      if (isDefiniteEffectRefusal(error)) await restore?.();
+      throw error;
+    });
   }
 
   async _saveNativeConsumption(consumed, { craftingActor, run, runManager, stepIndex }) {
@@ -2987,7 +3001,7 @@ export class CraftingEngine {
       if (checked) return settle(checked);
       // Both halves of the native-effect bracket stay here: this stage opens on the success and
       // the failure path alike, and the `catch` below is what closes it.
-      await this._beginNativeStage({
+      ctx.restoreNativeStage = await this._beginNativeStage({
         craftingActor,
         run: ctx.run,
         runManager: ctx.runManager,
@@ -3020,6 +3034,7 @@ export class CraftingEngine {
             : `Completed ${ctx.step.name || `step ${ctx.stepIndex + 1}`} for ${recipe.name}`,
       };
     } catch (error) {
+      if (isDefiniteEffectRefusal(error)) await ctx.restoreNativeStage?.();
       if (error.code === 'HISTORY_EFFECT_UNCERTAIN') {
         ctx.resolved = true;
         await this._recordNativeStageUncertainty(craftingActor, ctx.runManager, ctx.run, error);
@@ -3138,7 +3153,7 @@ export class CraftingEngine {
     }
 
     // Items first, then currency; both gates have passed.
-    await this._beginNativeStage({
+    const consumedItems = await this._consumeTimedStart(craftSelection.plan, {
       craftingActor,
       run,
       runManager,
@@ -3146,13 +3161,6 @@ export class CraftingEngine {
       recipe: executionRecipe,
       step,
       componentSourceActors,
-      timedStart: true,
-    });
-    const consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
-      craftingActor,
-      run,
-      runManager,
-      stepIndex,
     });
     // The deduction never aborts or rolls back, so the run records what settled, not what was
     // planned; otherwise a cancel refunds currency never paid.
@@ -3801,19 +3809,13 @@ export class CraftingEngine {
     let usedTools = [];
     try {
       if (consumeOnFail) {
-        consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
-          craftingActor,
-          run,
-          runManager,
-          stepIndex,
-        });
-        await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
-        await this._saveNativeConsumption(consumedItems, {
-          craftingActor,
-          run,
-          runManager,
-          stepIndex,
-        });
+        const native = { craftingActor, run, runManager, stepIndex };
+        const consumed = await consumeUnlessRefused(this, craftSelection.plan, native);
+        if (consumed) {
+          consumedItems = consumed;
+          await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+          await this._saveNativeConsumption(consumedItems, native);
+        }
         await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
       }
       if (failurePolicy.breakToolsOnFail) {
@@ -3995,11 +3997,8 @@ export class CraftingEngine {
             },
           });
       } catch (error) {
-        if (fizzle)
-          await runManager.settleHistory(craftingActor, fizzle.id, {
-            consumedIngredients: error.historyField === 'consumption' ? error.receipts : consumed,
-            historySettlement: { consumption: 'uncertain', awards: 'complete' },
-          });
+        const settlement = failedFizzleSettlement(error, consumed);
+        if (fizzle) await runManager.settleHistory(craftingActor, fizzle.id, settlement);
         throw error;
       }
       return {
@@ -4557,8 +4556,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Consume the item plan from the single craft selection; every consumption requires document
-   * acknowledgement.
+   * Consume the item plan from the single craft selection; every consumption is confirmed from the
+   * consumed Item's persisted state, and a first-item refusal dispatches nothing later.
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
    */
   async _consumeIngredients(consumptionPlan = []) {
@@ -4581,9 +4580,9 @@ export class CraftingEngine {
         if (actual !== quantity) throw unconfirmedHistoryError('Partial consumption');
       }
     } catch (error) {
-      // A path-guard refusal before anything was consumed is a definite failure; after an earlier
+      // A Definite Effect Refusal before anything was consumed stays definite; after an earlier
       // decrement the partial effect is real and stays uncertain.
-      if (error?.code === 'STACK_QUANTITY_PATH_REFUSED' && consumedItems.length === 0) throw error;
+      if (isDefiniteEffectRefusal(error) && consumedItems.length === 0) throw error;
       const failure = unconfirmedHistoryError(
         'Consumption requires reconciliation',
         [...consumedItems.map(mapConsumedIngredientRef), ...(error.receipts ?? [])],
@@ -4595,29 +4594,9 @@ export class CraftingEngine {
     return consumedItems;
   }
 
-  /** Only the acknowledged source decrement establishes consumption. */
+  /** Only a decrement confirmed from the Item's persisted state establishes consumption. */
   async _consumeItemQuantity(item, quantity) {
-    const path = itemStackQuantityPath();
-    const before = sourceItemQuantity(item, { path });
-    const captured = mapConsumedIngredientRef({ item, quantity });
-    if (before === null || receiptQuantity(quantity) === null)
-      throw unconfirmedHistoryError('Unknown consumption quantity');
-    // A whole-document delete yields what the plan counted, and plans read capacity with
-    // `readStackQuantity`, which refuses a stored-`0` stack.
-    const whole = readStackQuantity(item?._source ?? item, path);
-    const result = await (quantity >= before
-      ? item.delete()
-      : updateStackQuantity(item, before - quantity, path, { throwOnRefusal: true }));
-    requireDocumentAcknowledgment(item, result);
-    if (quantity >= before) return whole;
-    const after = sourceItemQuantity(item, { path, absentDefault: null });
-    if (after === null || after > before)
-      throw unconfirmedHistoryError('Consumption decrement is uncertain');
-    if (before - after !== quantity)
-      throw unconfirmedHistoryError('Partial consumption decrement', [
-        { ...captured, quantity: before - after },
-      ]);
-    return before - after;
+    return confirmItemConsumption(item, quantity);
   }
 
   /**
@@ -6375,6 +6354,8 @@ export class CraftingEngine {
       const succeeded = await publishSalvageSuccess(this, ctx);
       return succeeded.result;
     } catch (error) {
+      const refused = await settleSalvageRefusal(ctx, error);
+      if (refused) return refused;
       await this._recordSalvageUncertainty(ctx, error);
       throw error;
     }

@@ -176,11 +176,13 @@ export const BULK_SALVAGE_SKIP_REASONS = Object.freeze({
 /**
  * What one `salvage()` return means, in the one total order: the time gate returns `waiting` WITH
  * `success: true` and a misconfigured check `misconfigured` WITH `success: false`, so both are read
- * before `success`. Total given a salvage run manager; without one the time gate never arms.
+ * before `success`, as is a definite consumption refusal, which is `refused` and never a rolled
+ * failure. Total given a salvage run manager; without one the time gate never arms.
  */
 export function classifySalvageOutcome(result) {
   if (result?.cancelled === true) return 'cancelled';
   if (result?.misconfigured === true) return 'misconfigured';
+  if (result?.refused === true) return 'refused';
   if (result?.waiting === true) return 'waiting';
   if (result?.success === true) return 'succeeded';
   return 'failed';
@@ -759,6 +761,7 @@ function countBy(items) {
     failed: 0,
     waiting: 0,
     misconfigured: 0,
+    refused: 0,
     skipped: 0,
     cancelled: 0,
     error: 0,

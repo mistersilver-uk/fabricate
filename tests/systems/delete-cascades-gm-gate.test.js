@@ -11,6 +11,7 @@ globalThis.foundry = { utils: { randomID: () => 'cascade-rid' } };
 globalThis.game = { user: { isGM: false }, system: { id: 'dnd5e' }, actors: [], fabricate: null };
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
+const { createComponentScopeStore } = await import('../../src/systems/worldScopeStores.js');
 
 /** Install a fresh `globalThis.ui` whose notifications are recorded as `level: text`. */
 function recordNotifications() {
@@ -288,6 +289,7 @@ test('deleteComponents announces the set exactly and reaches a reconcile replace
     componentIds: ['c1', 'c2'],
     recipesUpdated: 1,
     recipesDisabled: 1,
+    membershipsParted: 0,
   });
   assert.deepEqual(calls, [
     'updateRecipe:r1',
@@ -385,4 +387,141 @@ test('deleteEssences overrides the set in one cohort, then writes recipes and th
   ]);
   assert.deepEqual(manager.getSystem('sysB').components[0].essences, {});
   assert.deepEqual(notes, ['info: Removed 2 essence(s) and updated 1 recipe(s).']);
+});
+
+/** A real component scope store over a settings double holding `records`, recording writes. */
+function componentScope(calls, records, { refuse = false } = {}) {
+  const state = {
+    setting: {
+      entities: [],
+      defaults: {},
+      membership: Object.fromEntries(records.map((r) => [`${r.entityId}|${r.systemId}`, r])),
+    },
+  };
+  state.store = createComponentScopeStore({
+    getSetting: () => structuredClone(state.setting),
+    setSetting: async (_key, value) => {
+      calls.push('scope.save');
+      if (refuse) throw new Error('The component scope setting could not be saved.');
+      state.setting = structuredClone(value);
+    },
+  });
+  return state;
+}
+
+const member = (entityId, systemId) => ({ entityId, systemId, inherit: {} });
+
+/** `cascadeManager` with the scope store and a persisted snapshot that follows the live map. */
+function pruningManager(calls, scope, { snapshot } = {}) {
+  const manager = cascadeManager(calls);
+  manager._componentScopeStore = () => scope.store;
+  manager._repository = {
+    readReplicatedSnapshot: snapshot ?? (() => [structuredClone(manager.getSystem('sysB'))]),
+  };
+  stubMembers(manager, calls, ['_reconcileAlchemySignaturesAfterDeletion']);
+  return manager;
+}
+
+const memberships = (scope) =>
+  scope.store.listMemberships().map((r) => `${r.entityId}|${r.systemId}`);
+
+test('deleteComponents prunes the removed ids memberships in this system after the write lands', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const scope = componentScope(calls, [
+    member('c1', 'sysB'),
+    member('c1', 'sysA'),
+    member('c2', 'sysB'),
+  ]);
+  const manager = pruningManager(calls, scope);
+  recordNotifications();
+
+  const outcome = await manager.deleteComponents('sysB', ['c1']);
+
+  assert.equal(outcome.membershipsParted, 1);
+  assert.deepEqual(memberships(scope), ['c1|sysA', 'c2|sysB'], 'another system keeps (c1, sysA)');
+  assert.ok(
+    calls.indexOf('save') < calls.indexOf('scope.save'),
+    `the membership write follows the crafting-system write: ${calls}`
+  );
+});
+
+test('deleteComponents keeps a membership the persisted setting still holds a row for', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const scope = componentScope(calls, [member('c1', 'sysB')]);
+  // A write left only in memory: the setting still carries `c1`.
+  const persisted = [{ id: 'sysB', components: [{ id: 'c1' }] }];
+  const manager = pruningManager(calls, scope, { snapshot: () => persisted });
+  recordNotifications();
+
+  const outcome = await manager.deleteComponents('sysB', ['c1']);
+
+  assert.equal(outcome.membershipsParted, 0);
+  assert.deepEqual(memberships(scope), ['c1|sysB']);
+  assert.equal(calls.includes('scope.save'), false);
+});
+
+test('deleteComponents prunes nothing when the persisted setting cannot be read', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const scope = componentScope(calls, [member('c1', 'sysB')]);
+  const manager = pruningManager(calls, scope, {
+    snapshot: () => {
+      throw new Error('unreadable');
+    },
+  });
+  recordNotifications();
+
+  assert.equal((await manager.deleteComponents('sysB', ['c1'])).membershipsParted, 0);
+  assert.deepEqual(memberships(scope), ['c1|sysB']);
+});
+
+test('a membership written during the crafting-system write survives the prune', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const scope = componentScope(calls, [member('c1', 'sysB')]);
+  const manager = pruningManager(calls, scope);
+  manager.save = async () => {
+    calls.push('save');
+    const payload = scope.store.get();
+    payload.membership['x|sysB'] = member('x', 'sysB');
+    await scope.store.save(payload);
+  };
+  recordNotifications();
+
+  await manager.deleteComponents('sysB', ['c1']);
+
+  assert.deepEqual(memberships(scope), ['x|sysB'], 'the prune is planned after the await');
+});
+
+test('a refused membership write is logged, reloads the store and leaves the row delete landed', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const scope = componentScope(calls, [member('c1', 'sysB')], { refuse: true });
+  const manager = pruningManager(calls, scope);
+  recordNotifications();
+  const logged = [];
+  const consoleError = console.error;
+  console.error = (...args) => {
+    logged.push(args);
+  };
+  let outcome;
+  try {
+    outcome = await manager.deleteComponents('sysB', ['c1']);
+  } finally {
+    console.error = consoleError;
+  }
+
+  assert.equal(outcome.deleted, 1, 'the row delete landed');
+  assert.equal(outcome.membershipsParted, 0);
+  assert.equal(outcome.recipesUpdated, 1, 'and so did the recipe repair');
+  assert.equal(logged.length, 1);
+  assert.match(String(logged[0][0]), /component membership prune failed/);
+  assert.deepEqual(memberships(scope), ['c1|sysB'], 'the client corpus matches the setting');
+  assert.deepEqual(Object.keys(scope.setting.membership), ['c1|sysB']);
+  assert.equal(
+    manager.getSystem('sysB').components.some((c) => c.id === 'c1'),
+    false
+  );
 });

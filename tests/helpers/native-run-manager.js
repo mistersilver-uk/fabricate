@@ -4,12 +4,7 @@
  * @param {object} [options] `stepCount`/`stepIndex` shape the run; `onSuccess`/`onFailure` spy the
  * terminal payloads.
  */
-export function nativeCraftRunManager({
-  stepCount = 1,
-  stepIndex = 0,
-  onSuccess,
-  onFailure
-} = {}) {
+export function nativeCraftRunManager({ stepCount = 1, stepIndex = 0, onSuccess, onFailure } = {}) {
   const run = {
     id: 'run-1',
     status: 'inProgress',
@@ -20,8 +15,8 @@ export function nativeCraftRunManager({
       status: index === stepIndex ? 'inProgress' : 'pending',
       consumedIngredients: [],
       usedTools: [],
-      createdResults: []
-    }))
+      createdResults: [],
+    })),
   };
   const updates = [];
   let active = true;
@@ -48,6 +43,8 @@ export function nativeCraftRunManager({
       return run;
     },
     canProceedTimeGate: () => true,
+    durationToSeconds: () => 3600,
+    markStepPrepared: async (_actor, current) => current,
     async markStepInProgress(_actor, current) {
       return current;
     },
@@ -64,6 +61,6 @@ export function nativeCraftRunManager({
     },
     inspectDiscarded: () => discarded,
     inspectRun: () => run,
-    inspectUpdates: () => updates
+    inspectUpdates: () => updates,
   };
 }

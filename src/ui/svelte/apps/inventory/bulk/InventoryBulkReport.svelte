@@ -40,7 +40,7 @@
 
   let { report = null } = $props();
 
-  // outcome -> tone + glyph + copy. Eight outcomes over six tones, so tones are
+  // outcome -> tone + glyph + copy. Ten visuals over five tones, so tones are
   // shared; every sharing pair differs on icon AND word. `labelKey` is a whole
   // literal rather than a suffix on a shared prefix so the lang guards can see it:
   // the narrow one only requires a STRING (and so only catches a namespace-shadowing
@@ -70,6 +70,13 @@
       tone: 'warning',
       icon: 'fas fa-triangle-exclamation',
       labelKey: 'FABRICATE.App.Inventory.Bulk.OutcomeMisconfigured',
+    },
+    // A definite consumption refusal: nothing was written, so the item is still in
+    // the pack and the row is neither recovered nor lost.
+    refused: {
+      tone: 'warning',
+      icon: 'fas fa-hand',
+      labelKey: 'FABRICATE.App.Inventory.Bulk.OutcomeRefused',
     },
     skipped: {
       tone: 'subtle',
@@ -151,8 +158,8 @@
   const emptyHandedCount = $derived(
     items.filter((item) => ['failed', 'error', 'succeededEmpty'].includes(visualKeyOf(item))).length
   );
-  // Everything that did not resolve either way: waiting, misconfigured, skipped,
-  // cancelled, notPermitted.
+  // Everything that did not resolve either way: waiting, misconfigured, refused,
+  // skipped, cancelled, notPermitted.
   const unresolvedCount = $derived(Math.max(0, items.length - recoveredCount - emptyHandedCount));
 
   const status = $derived.by(() => {

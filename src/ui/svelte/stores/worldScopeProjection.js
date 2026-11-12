@@ -537,16 +537,15 @@ function indexDefaults(defaults) {
  * the rules editor authors the in-system row; this row only says which of the two the system
  * reads.
  *
- * `ScopedEntrySystemsCard` receives caller-resolved summaries and does not consume this map.
- * Projection tests pin it until a per-system presentation reads it directly.
+ * `holdsRow`, on the same leg, says this system holds an in-system row for the entity, which the
+ * world delete refusal reads beside `member`. Projection tests pin both.
  *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system
  * @param {object|null} membership
  * @param {object|null} worldDefault
  * @param {number} [recipeCount] Recipes in THIS system that reference the entity.
- * @param {object|null} [inSystemRow] This system's own in-system row for the entity, when the
- *   roster holds one; read for the component `essences` section alone.
+ * @param {object|null} [inSystemRow] This system's own in-system row, read on the component leg.
  * @returns {object}
  */
 function buildSystemRow(
@@ -591,6 +590,7 @@ function buildSystemRow(
   }
   if (resolvesEssences(descriptor)) {
     row.resolvedEssences = resolvedEssencesFor(resolved, worldDefault, inSystemRow);
+    row.holdsRow = inSystemRow !== null;
   }
   return row;
 }

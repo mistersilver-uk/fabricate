@@ -131,6 +131,12 @@ function salvagingActorName(row, participation) {
   return sources.find((source) => source?.actorId === actorId)?.actorName;
 }
 
+/** A thrown salvage, logged with its cause; the message is what the toast reports. */
+function loggedSalvageFailure(error) {
+  console.error('Fabricate | Salvage failed:', error);
+  return error?.message ?? String(error);
+}
+
 /**
  * @param {object} deps
  * @param {() => ?object} deps.selectedItem the inspected card, the held row included.
@@ -287,7 +293,7 @@ export function createSalvageExecution({
       notifyAdditionalDice(result, services, salvagingActorName(row, participation));
       return await recordOutcome(result, row, systemId, componentId);
     } catch (error) {
-      const message = error?.message ?? String(error);
+      const message = loggedSalvageFailure(error);
       salvageResult = null;
       services?.notify?.(message);
       return { success: false, message };
@@ -316,8 +322,8 @@ export function createSalvageExecution({
     }
     // A rolled failure (issue 2092) carries the executed `check` projection
     // (`publishSalvageFailure`, issue 2005); a refusal before any roll — missing
-    // materials, missing tools, misconfigured — never sets that key, and stays
-    // toast-only exactly as before.
+    // materials, missing tools, misconfigured, a definite consumption refusal — never
+    // sets that key, and stays toast-only exactly as before.
     salvageResult = result?.check ? failureSnapshot(result, systemId, componentId) : null;
     if (result?.message) services?.notify?.(result.message);
     return result ?? { success: false };

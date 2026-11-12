@@ -19,6 +19,8 @@ import {
 } from '../../src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js';
 import {
   componentAttributionNote,
+  componentBulkDeleteNote,
+  componentBulkDeletePlan,
   componentBulkEssenceCarried,
   componentBulkEssencePlan,
   componentCategoryInheritOffered,
@@ -28,6 +30,7 @@ import {
   componentEssenceFilter,
   componentEssenceInheritOffered,
   componentEssenceNote,
+  componentHoldingSystemNames,
   componentRowEssenceChips,
   componentWorldEssenceNote,
   componentRowStats,
@@ -274,11 +277,29 @@ describe('the world category note pluralises BOTH of its counts', () => {
 describe('the delete note refuses while any system holds rules', () => {
   // AC-15's pure half. The in-use branch is REFUSAL copy rather than the prototype's proceed
   // copy, because this lane refuses the delete.
-  it('names the systems and says what to do instead', () => {
+  it('names the systems and the control that frees them', () => {
     const note = componentDeleteNote(['Forge', 'Alchemy'], phrase);
     assert.equal(note.refused, true);
-    assert.match(note.text, /cannot be deleted yet/);
-    assert.match(note.text, /Forge, Alchemy/);
+    assert.equal(
+      note.text,
+      '2 systems have rules for this component, so it cannot be deleted yet. Use “Remove from ' +
+        'this system” under “Systems using this component” for each of: Forge, Alchemy.'
+    );
+    assert.equal(
+      componentDeleteNote(['Forge'], phrase).text,
+      '1 system has rules for this component, so it cannot be deleted yet. Use “Remove from ' +
+        'this system” under “Systems using this component” for Forge.'
+    );
+  });
+
+  it('interpolates the control names from their own keys', () => {
+    const asked = [];
+    componentDeleteNote(['Forge'], (key, fallback, data) => {
+      asked.push(key);
+      return phrase(key, fallback, data);
+    });
+    assert.ok(asked.includes('FABRICATE.Admin.Manager.Scoped.Component.Entry.RemoveFromSystem'));
+    assert.ok(asked.includes('FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsTitle'));
   });
 
   it('lists the first three and counts the rest', () => {
@@ -286,10 +307,50 @@ describe('the delete note refuses while any system holds rules', () => {
     assert.match(note.text, /A, B, C and 2 more/);
   });
 
-  it('and states that nothing else is affected when no system has rules', () => {
+  it('and states that no system holds it when none does', () => {
     const note = componentDeleteNote([], phrase);
     assert.equal(note.refused, false);
-    assert.match(note.text, /nothing else is affected/);
+    assert.equal(
+      note.text,
+      'No system holds this component, so deleting it changes no system’s rules.'
+    );
+  });
+});
+
+describe('only a system holding a row and a membership holds a component', () => {
+  const systems = [
+    { systemId: 'a', systemName: 'Forge', member: true, holdsRow: true },
+    { systemId: 'b', systemName: 'Alchemy', member: true, holdsRow: false },
+    { systemId: 'c', systemName: 'Tide', member: false, holdsRow: true },
+  ];
+
+  it('names only the held pair, so an inert membership does not refuse', () => {
+    assert.deepEqual(componentHoldingSystemNames(systems), ['Forge']);
+    assert.deepEqual(componentHoldingSystemNames(systems.slice(1)), []);
+    assert.deepEqual(componentHoldingSystemNames(null), []);
+  });
+
+  it('and the bulk plan reads the same list', () => {
+    const entries = [
+      { id: 'held', entity: { name: 'Ore' }, systems },
+      { id: 'inert', entity: { name: 'Ash' }, systems: systems.slice(1) },
+    ];
+    assert.deepEqual(componentBulkDeletePlan(entries, ['held', 'inert']), {
+      deletable: ['inert'],
+      blocked: [{ id: 'held', name: 'Ore', systemNames: ['Forge'] }],
+    });
+  });
+
+  it('and the bulk notes end with the bulk panel direction', () => {
+    const held = { id: 'held', name: 'Ore', systemNames: ['Forge'] };
+    assert.match(
+      componentBulkDeleteNote({ deletable: [], blocked: [held] }, phrase).text,
+      /none of them can be deleted: Ore \(Forge\)\. Use the “Remove from” direction first\.$/
+    );
+    assert.match(
+      componentBulkDeleteNote({ deletable: ['x'], blocked: [held] }, phrase).text,
+      /Ore \(Forge\)\. Use the “Remove from” direction first\. What is deleted/
+    );
   });
 });
 
