@@ -275,7 +275,7 @@ test('route chrome and header actions are validated as shape, not as content', (
 // treatments Core's own editors use — a ghost Back, a danger Delete, a primary Save — not just
 // `primary`, on the 38px rung Core's header actions stand on (issue 2257 D10). `fabricate-button`
 // leads every one of them (issue 1502).
-const HEADER_ACTION_BASE = 'fabricate-button fab-manager-button is-size-38';
+const HEADER_ACTION_BASE = 'fabricate-button is-size-38';
 
 test('an action tone renders the Manager button class Core uses for its own controls', () => {
   assert.equal(managerHeaderActionClass({ tone: 'primary' }), `${HEADER_ACTION_BASE} is-primary`);

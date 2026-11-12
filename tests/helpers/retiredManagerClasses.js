@@ -1,8 +1,7 @@
 /**
  * The ten `manager-*` root classes issues 1507 and 2543 retired and the `fab-manager-button`
- * token issue 2540 retired, each with the root that replaced it and the primitive whose template
- * writes that root; the prose lines that may still name one; and the header-action compat lines
- * that still write `fab-manager-button` until the release that removes them.
+ * token issues 2540 and 2569 retired, each with the root that replaced it and the primitive whose
+ * template writes that root; and the prose lines that may still name one.
  * Read by `tests/retired-manager-classes.test.js`. A line is allowlisted by a substring unique to
  * it and by the number of retired tokens it names, so an edit that drops the history from the
  * line, or adds a token to it, drops it from this list too.
@@ -52,6 +51,7 @@ export const RETIRED_CLASSES = Object.freeze({
 
 const REPLACED = 'records what a primitive replaced, and says the class is retired';
 const RETIRED_2540 = 'records the token issue 2540 retired, and says so';
+const RETIRED_2569 = 'records the token issue 2569 removed from the header-action seam, and says so';
 const WORKED = 'a worked re-rooting example of a compound naming a retired class';
 
 /** @type {ReadonlyArray<{ file: string, includes: string, tokens: number, why: string }>} */
@@ -141,70 +141,10 @@ export const HISTORICAL_LINES = Object.freeze([
     tokens: 1,
     why: RETIRED_2540,
   },
-]);
-
-/**
- * Why a compat line may still write `fab-manager-button`: the companion header-action seam
- * published it, so issue 2540 keeps it there as an inert deprecated token that no rule names.
- */
-export const HEADER_ACTION_COMPAT_WHY =
-  'the deprecated header-action compat token: extension header actions still carry it, no ' +
-  'Fabricate rule names it, and it goes after at least one minor release announced in the notes';
-
-/**
- * The release that removes the compat token: issue 2540 ships in the 1.14 line (`main` cuts
- * `v1.14.0-beta.*`, the last stable tag is `v1.13.0`), so 1.15.0 is one minor after it.
- * Issue 2569 tracks the removal; no test enforces the release.
- */
-export const HEADER_ACTION_COMPAT_REMOVE_IN = '1.15.0';
-
-const COMPAT = Object.freeze({
-  tokens: 1,
-  why: HEADER_ACTION_COMPAT_WHY,
-  removeIn: HEADER_ACTION_COMPAT_REMOVE_IN,
-});
-
-/** @type {ReadonlyArray<{ file: string, includes: string, tokens: number, why: string, removeIn: string }>} */
-export const COMPAT_LINES = Object.freeze([
   {
-    ...COMPAT,
-    file: 'src/ui/managerExtensions.js',
-    includes:
-      "const HEADER_ACTION_BASE_CLASSES = 'fabricate-button fab-manager-button is-size-38';",
-  },
-  {
-    ...COMPAT,
-    file: 'src/ui/managerExtensions.js',
-    includes: '`fab-manager-button` is an inert compat token, deprecated',
-  },
-  {
-    ...COMPAT,
-    file: 'tests/manager-extensions.test.js',
-    includes: "const HEADER_ACTION_BASE = 'fabricate-button fab-manager-button is-size-38';",
-  },
-  // The extension lines of the header census, which issue 2540 left unchanged.
-  ...[
-    String.raw`is-size-38 is-ghost\" data-manager-header-action=\"back`,
-    String.raw`is-size-38\" data-manager-header-action=\"guide`,
-    String.raw`is-size-38 is-primary\" data-manager-header-action=\"save`,
-  ].map((tail) => ({
-    ...COMPAT,
-    file: 'tests/components/manager-header-mounted.js',
-    includes: `fab-manager-button ${tail}`,
-  })),
-  ...['is-ghost', 'is-danger', 'is-primary'].map((role) => ({
-    ...COMPAT,
-    file: 'scripts/lib/view-lab-cases/managerWorldPartiesAndDowntime.js',
-    includes: `value: 'fabricate-button fab-manager-button is-size-38 ${role}',`,
-  })),
-  {
-    ...COMPAT,
     file: 'openspec/specs/ui-extension-points/spec.md',
-    includes: 'and also `fab-manager-button`, a deprecated compat token',
-  },
-  {
-    ...COMPAT,
-    file: 'openspec/specs/ui-extension-points/spec.md',
-    includes: '- **THEN** it still carries `fab-manager-button`',
+    includes: '- **THEN** it carries `fabricate-button is-size-38` and no `fab-manager-button`',
+    tokens: 1,
+    why: RETIRED_2569,
   },
 ]);
