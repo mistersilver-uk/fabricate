@@ -103,11 +103,10 @@ const QUEUE_CURRENCY_HORSESHOE = (times = 1) => [
 /** The currency tile in the requirement rail, in the state a case is named for. */
 const CURRENCY_TILE = (state) =>
   `[data-recipe-section="requirement-rail"] [data-requirement-slot="s1-currency"][data-slot-state="${state}"]`;
-/** What a currency cost's player-side surfaces are drawn from (issue 1526). */
+/** What a currency cost's player-side surfaces are drawn from (issue 1526). `RequirementChooser` is a broad signal, which selects these frames already. */
 const CURRENCY_SOURCES = Object.freeze([
   CRAFTING_SHARED,
   CRAFTING_SIMPLE,
-  /^src\/ui\/svelte\/components\/RequirementChooser\.svelte$/,
   /^src\/ui\/svelte\/util\/(?:requirementSlots|shoppingListAggregator)\.js$/,
   /^src\/ui\/svelte\/stores\/craftingStore/,
 ]);
