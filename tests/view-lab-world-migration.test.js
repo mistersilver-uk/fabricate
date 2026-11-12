@@ -15,6 +15,7 @@ import {
 } from '../src/systems/checkModifierResolver.js';
 import { resolveComponentScope } from '../src/systems/componentScope.js';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
+
 import { settingsKey } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
@@ -474,8 +475,9 @@ function toolIdsNamed(node, found = new Set()) {
     for (const entry of node) toolIdsNamed(entry, found);
   } else if (node && typeof node === 'object') {
     for (const [key, value] of Object.entries(node)) {
-      if (key === 'toolIds' && Array.isArray(value)) value.forEach((id) => found.add(id));
-      else toolIdsNamed(value, found);
+      if (key === 'toolIds' && Array.isArray(value)) {
+        for (const id of value) found.add(id);
+      } else toolIdsNamed(value, found);
     }
   }
   return found;

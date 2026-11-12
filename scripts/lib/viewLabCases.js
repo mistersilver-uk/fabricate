@@ -1079,7 +1079,7 @@ const LAB_SURFACE_CASE_ID_SET = new Set(LAB_SURFACE_CASE_IDS);
 
 /** Whether a case builds the lab world with one of the {@link WORLD_SHAPING_LAB_FLAGS}. */
 function dependsOnFixturePremise(viewCase) {
-  return WORLD_SHAPING_LAB_FLAGS.some((flag) => Boolean(viewCase.query?.[flag]));
+  return WORLD_SHAPING_LAB_FLAGS.some((flag) => viewCase.query?.[flag]);
 }
 
 /** The cases a change to one case file selects, given the PR's patch for it. */

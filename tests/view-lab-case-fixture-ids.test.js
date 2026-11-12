@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
+
 import { settingsKey } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
@@ -18,7 +19,6 @@ const parties = seedSettings(content, buildLabActors(content), null, true, false
   settingsKey('fabricate', 'gatheringParties')
 );
 const ids = (records) => new Set((records ?? []).map((record) => record.id));
-const flatIds = (...collections) => new Set(collections.flatMap((collection) => [...collection]));
 
 /** The fixture collection each id-bearing attribute addresses. */
 const COLLECTION_BY_ATTRIBUTE = Object.freeze({

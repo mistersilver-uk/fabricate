@@ -6020,7 +6020,11 @@ test('a fixture content edit selects coverage and every case built on a world-sh
   }
   const expected = caseIds.filter((id) => [...LAB_SURFACE_CASE_IDS, ...flagged].includes(id));
   for (const file of ['tests/view-lab/world/labContent.js', 'tests/view-lab/world/labWorld.js']) {
-    assert.deepEqual(selectedIds([file]), expected, file);
+    assert.deepEqual(
+      mapChangedFilesToCases([file]).map((viewCase) => viewCase.id),
+      expected,
+      file
+    );
     assert.equal(hasUiChanges([file]), false, `${file} must not arm the gate`);
   }
   assert.ok(
