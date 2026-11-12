@@ -34,9 +34,14 @@ const harnesses = new Map(
 // may carry; every other import line is returned as a violation.
 const SVELTE_NAMED_IMPORT = /^\s*import\s*\{[\w\s,]*\}\s*from\s*(?:'svelte'|"svelte");?\s*$/;
 
+// The one shared module a leaf may also import: the harness adds it to every tree rendering a user
+// of it, so it propagates no allowlist entry (issue 2868).
+const FOCUS_TOOLTIP_IMPORT =
+  /^\s*import\s*\{\s*createFocusTooltip\s*\}\s*from\s*'..\/util\/focusTooltip\.svelte\.js';?\s*$/;
+
 function localImports(source) {
   return (source.match(/^\s*import\s.*$/gm) || []).filter(
-    (line) => !SVELTE_NAMED_IMPORT.test(line)
+    (line) => !SVELTE_NAMED_IMPORT.test(line) && !FOCUS_TOOLTIP_IMPORT.test(line)
   );
 }
 

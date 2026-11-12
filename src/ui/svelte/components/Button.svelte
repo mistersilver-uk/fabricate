@@ -68,7 +68,9 @@
     `[hidden]` rule.
 -->
 <script>
-  import { getContext, onDestroy } from 'svelte';
+  import { getContext } from 'svelte';
+
+  import { createFocusTooltip } from '../util/focusTooltip.svelte.js';
 
   let {
     role = 'neutral',
@@ -183,34 +185,21 @@
       : ''
   );
 
-  // The text the focus tooltip opened with, until it closes; no markup reads it.
-  let shownText = null;
-
-  function dismissTooltip() {
-    if (tooltipText || shownText !== null) tooltips?.hide(element);
-    shownText = null;
-  }
+  const tip = createFocusTooltip(tooltips, {
+    current: () => ({ text: tooltipText, off: disabled }),
+    rest: () => (tooltipText ? element : undefined),
+  });
 
   function showOnKeyboardFocus(event) {
     onfocus?.(event);
-    if (!tooltipText || !event.currentTarget.matches(':focus-visible')) return;
-    shownText = tooltipText;
-    tooltips?.show(event.currentTarget, tooltipText);
+    tip.open(event);
   }
 
   function press(event) {
-    dismissTooltip();
+    tip.close();
     if (busy) event.preventDefault();
     else onclick(event);
   }
-
-  // Both are read before any test short-circuits, so a change to either re-runs it.
-  $effect(() => {
-    const [text, off] = [tooltipText, disabled];
-    if (shownText !== null && (text !== shownText || off)) dismissTooltip();
-  });
-
-  onDestroy(dismissTooltip);
 
   const resolvedRel = $derived(rel ?? (target === '_blank' ? 'noreferrer' : undefined));
 
@@ -251,11 +240,11 @@
   onfocus={showOnKeyboardFocus}
   onblur={(event) => {
     onblur?.(event);
-    dismissTooltip();
+    tip.close();
   }}
   onkeydown={(event) => {
     onkeydown?.(event);
-    if (event.key === 'Escape') dismissTooltip();
+    if (event.key === 'Escape') tip.close();
   }}
   >{#if icon}<i class={icon} aria-hidden="true"
     ></i>{/if}{@render children?.()}{#if descriptionText}<span
