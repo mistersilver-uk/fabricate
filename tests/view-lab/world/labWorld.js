@@ -815,7 +815,7 @@ function seedJournalUnderCheck(content) {
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties) {
+export function seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
   // Membership, component sources and the remembered crafting actor are all PLAYER-CHARACTER
