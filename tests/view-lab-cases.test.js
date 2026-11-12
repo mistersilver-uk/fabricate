@@ -55,6 +55,7 @@ import {
   CHECK_TO_ISSUES as RECIPE_CHECK_TO_ISSUES,
   evaluateRecipeReadiness,
 } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
+import { CRAFTING_DEFAULT_PAGE_SIZE } from '../src/ui/svelte/stores/craftingPaging.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import {
   CHECK_READINESS_ISSUE_IDS,
@@ -4550,15 +4551,9 @@ test('system Travel Map no-regions evidence reaches its world through the lab fl
 test('an unfiltered crafting row click targets a recipe provably on the first page', () => {
   // The Crafting tab pages at `DEFAULT_PAGE_SIZE` rows sorted by name, so a recipe added to the lab
   // world that sorts ahead of a target pushes it onto page 2 and the case fails in `capture`
-  // (issue 1911, which #1908 hit twice). A step that narrows the list first is immune. The rank is
+  // (issue 1911). A step that narrows the list first is immune. The rank is
   // taken over EVERY enabled lab recipe, which can only overstate the position the actor's own
   // visible list gives it, so the check never passes a row that could sink.
-  const storeSource = readFileSync(
-    resolve(ROOT, 'src/ui/svelte/stores/craftingStore.svelte.js'),
-    'utf8'
-  );
-  const pageSize = Number(/const DEFAULT_PAGE_SIZE = (\d+);/.exec(storeSource)?.[1]);
-  assert.ok(pageSize > 0, 'the crafting store no longer declares DEFAULT_PAGE_SIZE as a literal');
   const rankById = new Map(
     content.recipes
       .filter((recipe) => recipe.enabled !== false)
@@ -4582,7 +4577,8 @@ test('an unfiltered crafting row click targets a recipe provably on the first pa
       if (!recipeId || narrowed) continue;
       checked += 1;
       const rank = rankById.get(recipeId);
-      if (!(rank <= pageSize)) sunk.push(`${viewCase.id}: ${recipeId} ranks ${rank ?? 'nowhere'}`);
+      if (!(rank <= CRAFTING_DEFAULT_PAGE_SIZE))
+        sunk.push(`${viewCase.id}: ${recipeId} ranks ${rank ?? 'nowhere'}`);
       break;
     }
   }
@@ -4590,7 +4586,7 @@ test('an unfiltered crafting row click targets a recipe provably on the first pa
   assert.deepEqual(
     sunk,
     [],
-    `these cases click a crafting row that can fall past page one (${pageSize} rows) — fill ` +
+    `these cases click a crafting row that can fall past page one (${CRAFTING_DEFAULT_PAGE_SIZE} rows) — fill ` +
       'the crafting search with the recipe name first, as the filtered cases do'
   );
 });
