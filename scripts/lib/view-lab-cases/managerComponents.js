@@ -956,7 +956,8 @@ export const CASES = Object.freeze([
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // A cleared stage searches again in place (issue 1516): its suggestion list opens beneath it,
-  // inside the editor's form, and its last suggestion must own its pointer target.
+  // inside the editor's form, and its first suggestion must own its pointer target. A long list
+  // scrolls inside the panel, so its last row may sit below the fold (issue 2960).
   managerCase({
     id: 'manager-component-edit-salvage-suggestions',
     label: 'Manager — Component edit salvage, a cleared stage row’s suggestion list open',
@@ -973,7 +974,7 @@ export const CASES = Object.freeze([
     expectContained: [
       { container: '.fabricate-manager', target: '.manager-recipe-option-suggestions' },
     ],
-    expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
+    expectCenterHit: `${REQUIREMENT_SUGGESTION}:first-child`,
     kinds: ['manager', 'components'],
     sourceMatches: [
       ...COMPONENT_EDITOR_MATCHES,
