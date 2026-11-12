@@ -2081,9 +2081,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
       if (!runId || ['legacy', 'redacted-owner'].includes(state)) continue;
       // The history-data states need the seeded world for the same reason the prototype states
       // do: their records name a real mining task and real recipes, and a substitute would
-      // resolve a different account's evidence under this state's name.
+      // resolve a different account's evidence under this state's name. So does the needs-tools
+      // state, which names the seeded world's `hb-task-icecap`.
       const fixtureContent =
-        Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) || LAB_HISTORY_DATA_STATES.includes(state)
+        Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) ||
+        LAB_HISTORY_DATA_STATES.includes(state) ||
+        state === 'gathering-needs-tools'
           ? buildLabContent({ journalCaseState: state })
           : null;
       const containers = buildLabRunStates({
