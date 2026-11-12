@@ -107,3 +107,73 @@ describe('the entries whose name the seam holds (issue 2882)', () => {
     }
   }
 });
+
+const NAME_KEYS = Object.freeze(['ariaLabel', 'label', 'title', 'legend']);
+const namedBy = (entry) =>
+  new Set(
+    Object.values(entry.props)
+      .map(({ contains }) => contains)
+      .filter((key) => key !== undefined)
+  );
+
+/** Each `required` name key of `entry` with no `contains` partner, `waivedBy` or `waivedWhen`. */
+const bareNameKeys = (entry) =>
+  Object.entries(entry.props)
+    .filter(
+      ([key, spec]) =>
+        NAME_KEYS.includes(key) &&
+        spec.required === true &&
+        !namedBy(entry).has(key) &&
+        spec.waivedBy === undefined &&
+        spec.waivedWhen === undefined
+    )
+    .map(([key]) => key);
+
+const BARE_ENTRIES = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => bareNameKeys(entry).length > 0);
+
+describe('the required name keys with no contains partner (issue 2924)', () => {
+  it('derives the entries from the manifest, the ones the issue names among them', () => {
+    const names = BARE_ENTRIES.map((entry) => entry.name);
+    for (const expected of [
+      'SegmentedControl',
+      'Stepper',
+      'Typeahead',
+      'Select',
+      'Pagination',
+      'ActionMenu',
+      'Modal',
+      'ToggleCard',
+    ]) {
+      assert.ok(names.includes(expected), expected);
+    }
+  });
+
+  for (const entry of BARE_ENTRIES) {
+    for (const key of bareNameKeys(entry)) {
+      describe(`${entry.name} ${key}`, () => {
+        const refused = [...BLANKS.filter((value) => value !== ''), ...NOT_STRINGS];
+        for (const value of refused) {
+          it(`M9: refuses ${JSON.stringify(value)}, which would write no name or a wrong one`, () => {
+            assert.throws(
+              () => copyProps(entry, { ...required(entry), [key]: value }),
+              typeof value === 'string'
+                ? refusing(`${entry.name} requires a non-blank string "${key}"`)
+                : (error) => error instanceof TypeError && error.message.startsWith(PREFIX)
+            );
+          });
+        }
+
+        it('still refuses an empty or absent one as before, and takes a non-blank string', () => {
+          assert.throws(
+            () => copyProps(entry, { ...required(entry), [key]: '' }),
+            refusing(`${entry.name} requires a non-empty "${key}"`)
+          );
+          const without = required(entry);
+          delete without[key];
+          assert.throws(() => copyProps(entry, without), /requires a non-empty/);
+          assert.equal(copyProps(entry, { ...required(entry), [key]: 'Reward' })[key], 'Reward');
+        });
+      });
+    }
+  }
+});

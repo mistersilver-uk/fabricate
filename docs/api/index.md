@@ -2038,6 +2038,10 @@ async _preClose(options) {
 Draw the visible reading yourself, because `Meter` draws no figure.
 A later change goes through `this.#meter.update({ ... })` with every prop again.
 
+A `required` prop that names or labels a control, `ariaLabel`, `label`, `title` or `legend`, with no other prop that states its own rule, is refused when it is not a string or is white space alone, with `<Component> requires a non-blank string "<prop>"`, so a control is never mounted with no name or with a wrong one such as `true`.
+An empty or absent one is refused as before, with `<Component> requires a non-empty "<prop>"`.
+Pass a name written out in words, never white space or a non-string.
+
 The published components, in publication order:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
