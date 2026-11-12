@@ -929,3 +929,17 @@
   margin: 0;
 }
 
+/* Forced colours: the chosen segment is the reader's Highlight behind HighlightText, out of the repaint's reach, and its ring is canvastext, which the opt-out would otherwise leave the accent. The segment's own sheet is unlayered, so `!important` is what outranks it. */
+@media (forced-colors: active) {
+  .manager-segmented .manager-segment.is-active,
+  .manager-segmented .manager-segment.is-active .manager-segment-count {
+    forced-color-adjust: none;
+    border-color: highlight !important;
+    background: highlight !important;
+    color: highlighttext !important;
+  }
+
+  .manager-segmented .manager-segment.is-active:has(:focus-visible) {
+    outline-color: canvastext !important;
+  }
+}

@@ -496,28 +496,4 @@
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
-
-  /* Forced colours repaint every segment in the reader's palette, so the chosen one would differ by
-     weight alone, and an idle pill segment shares even that. The chosen segment is painted
-     Highlight behind HighlightText, opting out of the repaint as the switch does (issue 2492), in
-     every density, tone, shape and variant; `!important` is the only way past the tone and variant
-     rules above, which out-specify this one. */
-  @media (forced-colors: active) {
-    .manager-segmented .manager-segment.is-active {
-      forced-color-adjust: none;
-      border-color: highlight !important;
-      background: highlight !important;
-      color: highlighttext !important;
-    }
-
-    .manager-segmented .manager-segment.is-active .manager-segment-count {
-      color: inherit !important;
-    }
-
-    /* The opt-out above also reaches the keyboard ring, which would otherwise take the accent
-       custom property, so the ring is named canvastext as the switch's is (issue 2872). */
-    .manager-segmented .manager-segment.is-active:has(:focus-visible) {
-      outline-color: canvastext;
-    }
-  }
 </style>
