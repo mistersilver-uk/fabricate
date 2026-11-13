@@ -74,7 +74,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The two-step arm-then-confirm destructive control, rendered by 11 importing files.",
+        "The two-step arm-then-confirm destructive control, rendered by more than ten importing files.",
         "It is a caller of `Button` at `role=\"danger\"`: its busy face is `Button`'s `busy`, `aria-disabled` and never `disabled`, so it keeps focus."
       ]
     },
@@ -295,7 +295,7 @@
       "evidence": "broad",
       "scope": "manager-only",
       "why": [
-        "The labelled icon-and-fact row, with 9 importing files.",
+        "The labelled icon-and-fact row, with more than eight importing files.",
         "`<StatBox>` is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so no library entry is matched and it stays `target`, and only the manager draws it, so it is manager-only."
       ]
     },
@@ -328,7 +328,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "How a Fabricate record points at a game-world document, as the `<LinkField>` entry of `library.html` states, rendered by 11 importing files.",
+        "How a Fabricate record points at a game-world document, as the `<LinkField>` entry of `library.html` states, rendered by more than ten importing files.",
         "Its family is rooted at `fabricate-link-field`, so it is shared, though every importer today is a manager screen."
       ]
     },
@@ -564,7 +564,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The shared icon picker, rendered by 11 importing files beside the published seam's adapter.",
+        "The shared icon picker, rendered by more than ten importing files beside the published seam's adapter.",
         "No library entry specifies it, so it stays `target`, and it is shared."
       ]
     },
@@ -620,7 +620,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The filter bar, with 14 importers: the manager's browse surfaces, scoped list frame and Vocabulary panel, and the interactables browser.",
+        "The filter bar, with more than ten importers: the manager's browse surfaces, scoped list frame and Vocabulary panel, and the interactables browser.",
         "`library.html`'s `<FilterBar>` specifies it as a bordered box, so it is shared."
       ]
     },
