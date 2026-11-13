@@ -310,6 +310,12 @@ const isBareNameKey = (key, spec, named) =>
   spec.waivedBy === undefined &&
   spec.waivedWhen === undefined;
 
+/** M9's refusal of a bare name key holding a blank string or a non-string (issue 2924). */
+function assertBareName(entry, key, spec, named, value) {
+  if (value === undefined || value === '' || !isBareNameKey(key, spec, named)) return;
+  if (!isNonBlank(value)) throw refuse(`${entry.name} requires a non-blank string "${key}"`);
+}
+
 /**
  * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
  * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
@@ -322,10 +328,7 @@ function assertRequired(entry, copy) {
   const named = namedTextKeys(entry);
   for (const [key, spec] of Object.entries(entry.props)) {
     if (isBlankWaived(spec, copy[key], copy)) copy[key] = undefined;
-    const bare = isBareNameKey(key, spec, named) && copy[key] !== undefined && copy[key] !== '';
-    if (bare && !isNonBlank(copy[key])) {
-      throw refuse(`${entry.name} requires a non-blank string "${key}"`);
-    }
+    assertBareName(entry, key, spec, named, copy[key]);
     const blank = named.has(key) && typeof copy[key] === 'string' && !isNonBlank(copy[key]);
     if (!blank && copy[key] !== undefined && copy[key] !== '') continue;
     if (spec.waivedWhen !== undefined && copy[spec.waivedWhen] === true) continue;
