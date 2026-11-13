@@ -5,7 +5,6 @@
  */
 
 import { collectWorkingTreeSources } from './sourceScan.js';
-import { STYLE_PARTS } from './splitComponentStyles.js';
 
 /** The roots holding shipped CSS. `src` for Svelte scoped blocks, `styles` for the global sheet. */
 export const STYLE_CORPUS_ROOTS = Object.freeze(['src', 'styles']);
@@ -120,7 +119,6 @@ export function styleTextFor(file, source) {
 export function collectStyleCorpus({
   roots = STYLE_CORPUS_ROOTS,
   extensions = STYLE_CORPUS_EXTENSIONS,
-  foldStyleParts = true,
 } = {}) {
   const corpus = {};
   for (const [file, source] of Object.entries(
@@ -128,16 +126,6 @@ export function collectStyleCorpus({
   )) {
     const css = styleTextFor(file, source);
     if (css.trim().length > 0) corpus[file] = css;
-  }
-  // A component's style parts read as its own, after its text so its line numbers hold (issue 2317).
-  const folds = foldStyleParts
-    ? Object.entries(STYLE_PARTS).flatMap(([file, parts]) =>
-        parts.filter((part) => part in corpus && file in corpus).map((part) => [file, part])
-      )
-    : [];
-  for (const [file, part] of folds) {
-    corpus[file] += `\n${corpus[part]}`;
-    delete corpus[part];
   }
   return corpus;
 }

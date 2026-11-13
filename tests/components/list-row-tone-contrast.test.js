@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   propertiesOf,
@@ -46,7 +47,7 @@ const fillOf = (tone) => token(SHEET, toneRule(tone), 'background');
 const chipPaint = (tone) =>
   ['color', 'background'].map((property) => {
     const own = tone ? `.manager-chip.is-${tone}` : '.manager-chip';
-    const declares = rulesIn(corpus[CHIP]).some(
+    const declares = rulesIn(styleTextOf(corpus, CHIP)).some(
       (rule) => splitSelectorList(rule.selector).includes(own) && propertiesOf(rule).has(property)
     );
     return token(CHIP, declares ? own : '.manager-chip', property);

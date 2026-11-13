@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
-import { STYLE_PART_PATHS } from '../helpers/splitComponentStyles.js';
+import { STYLE_PART_PATHS, styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   contrast,
@@ -136,7 +136,7 @@ const DANGER_FILLS = Object.freeze({
 function dangerFillsInPublishedBlocks() {
   const found = {};
   for (const { path } of PUBLISHED_COMPONENT_MANIFEST) {
-    for (const rule of corpus[path] ? rulesIn(corpus[path]) : []) {
+    for (const rule of rulesIn(styleTextOf(corpus, path))) {
       const properties = propertiesOf(rule);
       const paints = ['background', 'background-color'].some((property) =>
         properties.get(property)?.includes(DANGER)
@@ -162,7 +162,7 @@ test('the ledger names every danger fill a published component paints in its own
 });
 
 for (const [file, fills] of Object.entries(DANGER_FILLS)) {
-  const rules = rulesIn(corpus[file]);
+  const rules = rulesIn(styleTextOf(corpus, file));
   for (const [fill, parts] of Object.entries(fills)) {
     test(`on ${fill}, every part clears its floor over the four grounds, or is a pinned muted body`, () => {
       assert.equal(declaredToken(rules, fill, 'background', file), DANGER);
@@ -226,7 +226,7 @@ const MUTED_RULES = Object.freeze({
 
 /** The selectors of `file`'s rules whose `color` names the muted ink. */
 const mutedSelectorsOf = (file) =>
-  rulesIn(corpus[file]).flatMap((rule) =>
+  rulesIn(styleTextOf(corpus, file)).flatMap((rule) =>
     propertiesOf(rule).get('color')?.includes('--fab-text-muted')
       ? splitSelectorList(rule.selector)
       : []
@@ -235,7 +235,7 @@ const mutedSelectorsOf = (file) =>
 test('each ledgered file composes exactly the components the ledger answers for', () => {
   for (const file of Object.keys(DANGER_FILLS)) {
     const source = readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8');
-    // A style part's rules ride its owner's corpus entry, so it is not a separate composition.
+    // A style part is its owner's styles, read through `styleTextOf`, not a separate composition.
     const imported = [...source.matchAll(/import \w+ from '\.\/(\w+)\.svelte'/gu)]
       .map(([, name]) => `${COMPONENTS}/${name}.svelte`)
       .filter((path) => !STYLE_PART_PATHS.has(path));
@@ -251,7 +251,7 @@ for (const [file, classified] of Object.entries(MUTED_RULES)) {
       Object.keys(classified).toSorted(byText),
       'unclassified muted ink'
     );
-    const rules = rulesIn(corpus[file]);
+    const rules = rulesIn(styleTextOf(corpus, file));
     const parts = Object.values(DANGER_FILLS[file]).flat();
     for (const [selector, { overriddenBy: over, offFill: reason, pinned }] of Object.entries(
       classified

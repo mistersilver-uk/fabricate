@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { BLOCKED_TASK, GATHERING_TASK_ROW_HARNESS } from '../helpers/gatheringTaskRowHarness.js';
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, declarationsIn, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
@@ -19,7 +20,7 @@ import {
 const CHIP = 'src/ui/svelte/components/Chip.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
-const chipRules = rulesIn(corpus[CHIP]);
+const chipRules = rulesIn(styleTextOf(corpus, CHIP));
 
 const harness = createMountedComponentHarness({
   ...GATHERING_TASK_ROW_HARNESS,

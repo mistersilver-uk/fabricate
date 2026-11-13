@@ -9,5 +9,12 @@ export const STYLE_PARTS = Object.freeze({
 /** The repo-relative paths whose styles make up `path`'s, parts first, as a cascade reads them. */
 export const styleSourcesOf = (path) => [...(STYLE_PARTS[path] ?? []), path];
 
+/** `path`'s style text in a `collectStyleCorpus` corpus, which keys each part under its own file. */
+export const styleTextOf = (corpus, path) =>
+  styleSourcesOf(path)
+    .map((source) => corpus[source])
+    .filter(Boolean)
+    .join('\n');
+
 /** Every part, whose rules the corpus reads under its owner's path. */
 export const STYLE_PART_PATHS = new Set(Object.values(STYLE_PARTS).flat());

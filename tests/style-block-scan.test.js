@@ -265,7 +265,7 @@ test('every Svelte file carrying a real block is in the corpus, and only those',
     .filter(([, source]) => source.includes('</style>'))
     .map(([file]) => file)
     .sort(byCodePoint);
-  const contributes = Object.keys(collectStyleCorpus({ foldStyleParts: false }))
+  const contributes = Object.keys(collectStyleCorpus())
     .filter((file) => file.endsWith('.svelte'))
     .sort(byCodePoint);
 
