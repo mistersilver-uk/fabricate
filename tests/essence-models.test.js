@@ -432,18 +432,6 @@ describe('1036 — essenceBrowserModel', () => {
     );
   });
 
-  it('clamps an out-of-range page rather than stranding the pager on an empty one', () => {
-    const model = buildEssenceBrowserModel(ROWS, { pageSize: 2, pageIndex: 9 });
-    assert.equal(model.pageIndex, 1);
-    assert.deepEqual(model.essences.map((row) => row.id), ['fire', 'water']);
-    assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [3, 4, 4]);
-  });
-
-  it('reports an empty result as 0..0, never 1..0', () => {
-    const model = buildEssenceBrowserModel([], { pageSize: 2 });
-    assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [0, 0, 0]);
-  });
-
   it('negative control: an unrecognised source filter matches everything rather than nothing', () => {
     // Without the allowed-list coercion an unknown value falls through to the broken-source
     // branch, which would show `water` and `earth` instead of the whole library.

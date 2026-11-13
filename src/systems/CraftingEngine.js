@@ -3734,7 +3734,7 @@ export class CraftingEngine {
       result: {
         success: false,
         results: resultItems.length > 0 ? resultItems : null,
-        message: checkResult.message || 'FABRICATE.Alchemy.FailureResult',
+        ...(checkResult.message && { message: checkResult.message }),
         disposition: resultItems.length > 0 ? 'produced-on-failure' : 'failed',
       },
     };

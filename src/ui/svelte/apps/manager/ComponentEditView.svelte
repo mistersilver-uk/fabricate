@@ -956,25 +956,6 @@
     tagDraft = next;
   }
 
-  // No caller left. Deleting it would strip the only reader of the two TagsEdit ApplyTag /
-  // RemoveTag lang keys, orphaning both and failing the lang-keys-no-orphans ratchet, which
-  // may not be grown. lang/en.json is outside this change's owned paths, so the helper is
-  // suppressed rather than deleted; issue 926 removes the code and the keys together.
-  // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
-  // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
-  // eslint-disable-next-line no-unused-vars
-  function toggleTagLabel(tag, checked) {
-    return checked
-      ? text('FABRICATE.Admin.Manager.Component.TagsEdit.RemoveTag', 'Remove {name}').replace(
-          '{name}',
-          tag
-        )
-      : text('FABRICATE.Admin.Manager.Component.TagsEdit.ApplyTag', 'Apply {name}').replace(
-          '{name}',
-          tag
-        );
-  }
-
   // A throw is a failure exactly as a `false` return is, so both mark the draft failed in their own
   // branch. The save is still awaited exactly once — an extra async hop would move the failure notice
   // later than the mounted route tests observe it.
