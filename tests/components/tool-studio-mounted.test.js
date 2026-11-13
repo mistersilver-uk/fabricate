@@ -9,6 +9,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
   assertSelectHasResolvedName,
@@ -395,10 +396,11 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-editor-source-context]').textContent,
       'Rules in The Herbalist · identity comes from the world Tool'
     );
-    assert.equal(root.querySelector('[data-tool-editor-status]'), null);
+    assert.ok(root.querySelector('[data-tool-editor-status]') === null);
+    assertButtonsHoldTheirLabels(assert, root);
     assert.equal(
       root
-        .querySelector('[data-tool-editor-back][aria-label="Back to the Tool Rules list"]')
+        .querySelector('[data-tool-editor-back][aria-label="Back to Tool Rules list"]')
         .textContent.trim(),
       'Back to Tool Rules'
     );
@@ -431,7 +433,7 @@ describe('Tool Studio editor (mounted)', () => {
       /Rules in The Herbalist · identity comes from the world Tool/
     );
     assert.doesNotMatch(root.textContent, /\bKind\b/);
-    assert.equal(root.querySelector('footer'), null);
+    assert.ok(root.querySelector('footer') === null);
   });
 
   it('opens Breakage with the two system-scope controls and no standing explainer', async () => {
@@ -484,7 +486,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(Boolean(root.querySelector(PREVIEW_ACTOR)), 'the actor selector renders');
     assert.equal(
       assertSelectHasResolvedName(root, PREVIEW_ACTOR),
-      'Preview as actor',
+      'No actor, Preview as actor',
       'the kicker above it is a paragraph, so the trigger keeps its own name string'
     );
     assert.equal(selectTriggerText(root, PREVIEW_ACTOR), 'No actor');
@@ -754,7 +756,7 @@ describe('Tool Studio editor (mounted)', () => {
     const patches = [];
     const root = await harness.mount(props({ onPatch: (patch) => patches.push(patch) }));
 
-    assert.equal(root.querySelector('[data-tool-name]'), null);
+    assert.ok(root.querySelector('[data-tool-name]') === null);
     assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
 
     // BLANK IS INHERITING, and inheriting renders the world value read-only - not a disabled
@@ -841,7 +843,7 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    assert.equal(root.querySelector('[data-tool-name]'), null);
+    assert.ok(root.querySelector('[data-tool-name]') === null);
     // The field exists only on the OVERRIDING face of the label card (issue 1373).
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
@@ -878,7 +880,7 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(props({ onTabChange: (id) => tabs.push(id) }));
     for (const button of root.querySelectorAll('[role="tab"]')) button.click();
     assert.deepEqual(tabs, ['breakage', 'requirements', 'validation']);
-    assert.equal(root.querySelector('footer'), null);
+    assert.ok(root.querySelector('footer') === null);
   });
 
   it('keeps tab relationships truthful and supports standard roving keyboard navigation', async () => {
@@ -1210,8 +1212,8 @@ describe('Tool Studio editor (mounted)', () => {
       ),
       'the selected replacement Component image remains inside the shared portrait wrapper'
     );
-    assert.equal(root.querySelector('input[name="tool-replacement-type"]'), null);
-    assert.equal(root.querySelector('[data-item-drop-zone="tool-replacement"]'), null);
+    assert.ok(root.querySelector('input[name="tool-replacement-type"]') === null);
+    assert.ok(root.querySelector('[data-item-drop-zone="tool-replacement"]') === null);
     root.querySelector('.manager-tool-replacement-component-trigger').click();
     await tick();
     document.querySelector('.manager-travel-option[title="Smith\'s Hammer"]').click();
@@ -1242,8 +1244,8 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    assert.equal(root.querySelector('[data-item-drop-zone="tool-replacement"]'), null);
-    assert.equal(root.querySelector('input[name="tool-replacement-type"]'), null);
+    assert.ok(root.querySelector('[data-item-drop-zone="tool-replacement"]') === null);
+    assert.ok(root.querySelector('input[name="tool-replacement-type"]') === null);
     assert.equal(patches.length, 0, 'rendering a legacy target does not rewrite it');
 
     root.querySelector('.manager-tool-replacement-component-trigger').click();
@@ -1298,7 +1300,7 @@ describe('Tool Studio editor (mounted)', () => {
     const firstPopover = document.querySelector('.manager-travel-popover');
     firstPopover.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
-    assert.equal(document.querySelector('.manager-travel-popover'), null);
+    assert.ok(document.querySelector('.manager-travel-popover') === null);
     assert.ok(document.activeElement === trigger, 'focus is on the trigger');
 
     trigger.click();
@@ -1307,7 +1309,7 @@ describe('Tool Studio editor (mounted)', () => {
     document.body.appendChild(outside);
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     await tick();
-    assert.equal(document.querySelector('.manager-travel-popover'), null);
+    assert.ok(document.querySelector('.manager-travel-popover') === null);
     assert.ok(document.activeElement === trigger, 'focus is on the trigger');
     outside.remove();
   });
@@ -1862,7 +1864,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     // THE BONUS IS A PICK FROM THE WORLD LIBRARY.
     assert.ok(!root.querySelector('.fab-expr-input'), 'no free-text bonus expression field');
-    assert.equal(root.querySelector('[data-tool-bonus-preset]'), null);
+    assert.ok(root.querySelector('[data-tool-bonus-preset]') === null);
     root.querySelector('.manager-tool-prerequisite-list input[value="strong"]').click();
     root.querySelector('input[name="tool-gate-mode"][value="bonus"]').click();
     root.querySelector('[data-tool-bonus-modifier="mod-guidance"] input[type="radio"]').click();
@@ -2342,9 +2344,8 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-editor-validation-summary]').textContent,
       /blocking issue/
     );
-    assert.equal(
-      root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'),
-      null
+    assert.ok(
+      root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card') === null
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
     assert.ok(!root.querySelector('[data-tool-preview-live-update]'), 'no live-update strip');

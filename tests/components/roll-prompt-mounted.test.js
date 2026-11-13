@@ -691,8 +691,11 @@ describe('mounted roll prompt', () => {
       const chip = dialog.querySelector('.formula-content .manager-chip');
       assert.equal(chip.textContent.trim(), 'DC 12 · meet or beat');
       assert.ok(!chip.hasAttribute('data-roll-prompt-target'), 'no target hook on a roll-over chip');
-      assert.equal(dialog.querySelector('.target-row, .target-source'), null, 'no target explanation over');
-      assert.equal(dialog.querySelector('.formula-note'), null, 'no compared-as-rolled note over');
+      assert.ok(
+        dialog.querySelector('.target-row, .target-source') === null,
+        'no target explanation over'
+      );
+      assert.ok(dialog.querySelector('.formula-note') === null, 'no compared-as-rolled note over');
       assert.ok(!chip.hasAttribute('data-roll-prompt-required'), 'no successes hook on a DC chip');
       assert.ok(!dialog.querySelector('[data-roll-prompt-count]'), 'no count hook on a summed formula');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each adds to the total.');
@@ -748,7 +751,10 @@ describe('mounted roll prompt', () => {
       assert.equal(chips[0].dataset.rollPromptRequired, String(input.required));
       assert.ok(chips[0].classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
       assert.ok(!chips[0].hasAttribute('data-roll-prompt-target'));
-      assert.equal(dialog.querySelector('.target-row, .target-source'), null, 'a count explains no target');
+      assert.ok(
+        dialog.querySelector('.target-row, .target-source') === null,
+        'a count explains no target'
+      );
       assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
       assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);
@@ -763,7 +769,7 @@ describe('mounted roll prompt', () => {
       displayFormula: '1d20 + 3', dc: 12,
     });
     const { dialog, pending } = await openThroughHost(view, false, noChoice);
-    assert.equal(dialog.querySelector('.formula-row'), null, 'no pool, threshold or count to show');
+    assert.ok(dialog.querySelector('.formula-row') === null, 'no pool, threshold or count to show');
     assert.ok(!/\d/.test(dialog.querySelector('.fabricate-roll-prompt').textContent.replace('1d4', '')), 'no number');
     assert.equal(
       dialog.querySelector('.bonus-group .help').textContent,

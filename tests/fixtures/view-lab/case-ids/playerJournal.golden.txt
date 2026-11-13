@@ -10,6 +10,8 @@ fabricate-journal-craft-detail
 player-journal-check-roll-prompt
 player-journal-check-roll-prompt-bonus
 player-gathering-journal-check-roll-prompt
+player-journal-gathering-needs-tools
+player-journal-gathering-station-tool
 player-journal-check-roll-prompt-count
 player-journal-check-roll-prompt-count-additional
 player-journal-check-roll-prompt-count-additional-secret

@@ -89,14 +89,12 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
 
     // Issue 1036 round 4: both real tiles are mounted `interactive={false}` — a preview.
     const appears = root.querySelector('[data-essence-preview-appears]');
-    assert.equal(
-      appears.querySelector('button'),
-      null,
+    assert.ok(
+      appears.querySelector('button') === null,
       'the preview subtree mounts no <button> at all'
     );
-    assert.equal(
-      appears.querySelector('[aria-pressed]'),
-      null,
+    assert.ok(
+      appears.querySelector('[aria-pressed]') === null,
       'and nothing in it carries aria-pressed'
     );
     assert.ok(

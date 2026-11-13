@@ -264,6 +264,55 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
+  // Issue 2763: a matured gathering run on the Tool-gated Cut Icecap Fronds, whose alembic Brenna lacks.
+  playerCase({
+    id: 'player-journal-gathering-needs-tools',
+    label:
+      'Player Journal — a ready gathering run whose Tool the actor lacks: Cut Icecap Fronds, with Needs tools on its row and in its header and the resolve control disabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'gathering-needs-tools' },
+    steps: [{ selector: '[data-run-id="lab-v1-gathering-needs-tools"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '.journal-view-container' +
+      ':has([data-run-id="lab-v1-gathering-needs-tools"] [data-run-attention="tools"])' +
+      ':has([data-journal-detail] [data-run-attention="tools"])' +
+      ':has([data-journal-detail] [data-run-action="primary"]:disabled)',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalGatheringTools\.js$/,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+    ],
+  }),
+  // Issue 2277: the same run with the Glass Alembic station active, which supplies the Tool.
+  playerCase({
+    id: 'player-journal-gathering-station-tool',
+    label:
+      'Player Journal — the same Cut Icecap Fronds run with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, no Needs tools on its row or in its header, and the resolve control enabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'gathering-needs-tools', canvasStation: 'named' },
+    steps: [{ selector: '[data-run-id="lab-v1-gathering-needs-tools"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("Station tool: Glass Alembic"))' +
+      ':has([data-run-id="lab-v1-gathering-needs-tools"])' +
+      ':not(:has([data-run-attention="tools"]))' +
+      ':has([data-journal-detail] [data-run-action="primary"]:not(:disabled))',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalGatheringTools\.js$/,
+      /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+      /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+      /^src\/gatheringToolRuntime\.js$/,
+      /^src\/systems\/stationPresence\.js$/,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+      /^src\/bootstrap\/journalFacade\.js$/,
+    ],
+  }),
   // Issue 2006: a Journal-prompted count check opens the same count prompt, its faces named.
   playerCase({
     id: 'player-journal-check-roll-prompt-count',

@@ -209,7 +209,7 @@ describe('the published StatBox, note', () => {
       assert.equal(note.children.length, 0, 'the note is text and never markup');
       assert.equal(handle.update({ ...BASE, layout }), true);
       await settle();
-      assert.equal(box().querySelector('.fab-stat-box-note'), null);
+      assert.ok(box().querySelector('.fab-stat-box-note') === null);
       handle.destroy();
     });
   }
@@ -217,7 +217,7 @@ describe('the published StatBox, note', () => {
   it('draws nothing for an empty note, and redraws the text on update', async () => {
     const { handle, box } = mountBox({ layout: 'start', note: '' });
     await settle();
-    assert.equal(box().querySelector('.fab-stat-box-note'), null);
+    assert.ok(box().querySelector('.fab-stat-box-note') === null);
     assert.equal(handle.update({ ...BASE, layout: 'start', note: 'Two to go' }), true);
     await settle();
     assert.equal(box().querySelector('.fab-stat-box-note').textContent, 'Two to go');
@@ -256,7 +256,7 @@ describe('how the published StatBox is announced', () => {
         ['i'],
         `${layout}: only the glyph is hidden`
       );
-      assert.equal(box().querySelector('h1, h2, h3, h4, h5, h6, [role]'), null);
+      assert.ok(box().querySelector('h1, h2, h3, h4, h5, h6, [role]') === null);
       handle.destroy();
     }
   });
@@ -295,7 +295,7 @@ describe('the default StatBox every in-app caller draws', () => {
     const { handle, box } = mountBox();
     await settle();
     assert.deepEqual(classesOf(box()), [ROOT]);
-    assert.equal(box().querySelector('.fab-stat-box-note'), null);
+    assert.ok(box().querySelector('.fab-stat-box-note') === null);
     handle.destroy();
   });
 });

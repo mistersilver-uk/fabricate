@@ -104,9 +104,8 @@ export function registerTagsCases() {
     );
 
     // Item 5 of issue 878: the view renders NO page header of its own.
-    assert.equal(
-      target.querySelector('.manager-tags-categories .manager-section-header'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-tags-categories .manager-section-header') === null,
       'the tags route must not render a second page header'
     );
     // Issue 1915: the strip is RETIRED, roles and classes together, and each panel carries its
@@ -242,9 +241,8 @@ export function registerTagsCases() {
     target.querySelector('[aria-label="Remove tag herb"]').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-vocabulary-confirm="herb"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-vocabulary-confirm="herb"]') === null,
       'an unused delete never opens a confirm strip'
     );
     assert.ok(
@@ -283,9 +281,8 @@ export function registerTagsCases() {
     );
     // The recipe vocabulary is a different PANEL on the same screen, so its rows carry a
     // different hook and never resolve inside this one.
-    assert.equal(
-      panel.querySelector('[data-category-id]'),
-      null,
+    assert.ok(
+      panel.querySelector('[data-category-id]') === null,
       'the recipe vocabulary never leaks into the component panel'
     );
 
@@ -467,9 +464,8 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    assert.equal(
-      target.querySelector('[data-vocabulary-icon-edit="potions"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-vocabulary-icon-edit="potions"]') === null,
       'the free-text icon-edit strip is gone'
     );
     await chooseRowIcon('potions', 'vial');
@@ -478,9 +474,8 @@ export function registerTagsCases() {
       ['setCategoryIcon', 'potions', 'fas fa-vial'],
       'choosing an option commits immediately — no separate save step'
     );
-    assert.equal(
-      target.querySelector('.essence-icon-picker-popover'),
-      null,
+    assert.ok(
+      target.querySelector('.essence-icon-picker-popover') === null,
       'the popover closes once an icon is chosen'
     );
   });
@@ -524,14 +519,12 @@ export function registerTagsCases() {
     // one now, so it is taken from the recipe panel by name rather than from the document.
     const iconField = panelFor('recipeCategories').querySelector('[data-vocabulary-add-icon]');
     assert.ok(iconField, 'the add form renders an icon field');
-    assert.equal(
-      panelFor('componentTags').querySelector('[data-vocabulary-add-icon]'),
-      null,
+    assert.ok(
+      panelFor('componentTags').querySelector('[data-vocabulary-add-icon]') === null,
       'and the tag vocabulary, which has no persisted row icon, renders none'
     );
-    assert.equal(
-      iconField.querySelector('input'),
-      null,
+    assert.ok(
+      iconField.querySelector('input') === null,
       'the add form icon field is a picker, not a Font Awesome class box'
     );
     const trigger = iconField.querySelector(

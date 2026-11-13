@@ -41,7 +41,7 @@ import {
  * The published icon button's root: the classes `role` and `size` write beside it, the classes
  * under which a Fabricate rule redraws an icon button in its own rows and pager, no extension
  * target sitting in one. `disabled` is published, so `:disabled` keeps no selector off it, and
- * `icon` writes the glyph's classes, so a classed child is held as drawn.
+ * `icon` writes the glyph's classes in the companion's choosing, so a classed child is held as drawn.
  */
 const ICON_BUTTON = Object.freeze({
   root: 'fabricate-icon-button',
@@ -62,7 +62,7 @@ const ICON_BUTTON = Object.freeze({
     'manager-scoped-list-row',
     'manager-tool-replacement-tile',
   ]),
-  drawsChildren: true,
+  drawsChildren: 'caller',
   disables: true,
 });
 
@@ -209,7 +209,6 @@ describe('the icon button census, synthetic', () => {
     ['a class a Fabricate caller writes', '.fabricate-icon-button.manager-recipe-step-nav'],
     ['the pager above it', '.fabricate-pagination .fabricate-icon-button'],
     ['a row of the Manager’s above it', '.manager-scoped-list-row .fabricate-icon-button'],
-    ['a classed child no closure spells', '.fabricate-icon-button .manager-unspelled'],
   ]) {
     it(`admits a selector that needs ${claim}`, () => {
       assert.equal(syntheticCensus(ICON_BUTTON, `${selector} { gap: 0 }`).length, 1);
@@ -225,6 +224,7 @@ describe('the icon button census, synthetic', () => {
     '.fabricate .fabricate-icon-button',
     '.fabricate-manager .fabricate-icon-button',
     '.fabricate-icon-button .fa-trash',
+    '.fabricate-icon-button .manager-foo',
     '.fabricate-icon-button > i',
     '.fabricate-icon-button[data-x]',
   ]) {

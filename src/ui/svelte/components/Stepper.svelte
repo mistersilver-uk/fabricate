@@ -1,8 +1,8 @@
-<!-- ratchet-exempt(file-size): the step buttons' focus tooltips (issue 2852) leave this leaf for the shared tooltip attachment issue 2868 tracks; the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
+<!-- ratchet-exempt(file-size): the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
-  stepper is a keyboard regression, so the input stays editable. It imports nothing but Svelte.
+  stepper is a keyboard regression, so the input stays editable. Its one local import is the shared focus-tooltip lifecycle.
 
   Props:
   | prop | values | default | contract |
@@ -45,7 +45,9 @@
     until stepped; `tests/components/stepper-formatted-mounted.test.js`.
 -->
 <script>
-  import { getContext, onDestroy, tick } from 'svelte';
+  import { getContext, tick } from 'svelte';
+
+  import { createFocusTooltip } from '../util/focusTooltip.svelte.js';
 
   let {
     value = null,
@@ -250,28 +252,10 @@
     return typeof raw === 'string' && raw.trim() !== '' ? raw : '';
   };
   const offOf = (direction) => disabled || (direction < 0 ? decrementBlocked : incrementBlocked);
-  // The adjunct whose focus tooltip is open, its direction and text; no markup reads it.
-  let tipped = null;
-  const closeTip = (button = tipped?.button) => {
-    tipped = null;
-    if (button) tooltips?.hide(button);
-  };
-  function openTip(event, direction) {
-    const hint = tipOf(direction);
-    if (!hint || !event.currentTarget.matches(':focus-visible')) return;
-    tipped = { button: event.currentTarget, direction, text: hint };
-    tooltips?.show(tipped.button, hint);
-  }
-  // Both are read before the test, so an update that renames or disables the open one closes it.
-  $effect(() => {
-    const [down, up] = [
-      [tipOf(-1), offOf(-1)],
-      [tipOf(1), offOf(1)],
-    ];
-    const [text, off] = tipped?.direction < 0 ? down : up;
-    if (tipped && (text !== tipped.text || off)) closeTip();
+  const tip = createFocusTooltip(tooltips, {
+    current: (direction) => ({ text: tipOf(direction), off: offOf(direction) }),
+    keys: [-1, 1],
   });
-  onDestroy(() => closeTip());
 
   function stepAdjunct(direction) {
     if (isFormatted) emitFormatted(formattedStep(committedFrom, direction), null);
@@ -329,12 +313,12 @@
     data-tooltip-text={tipOf(-1) || undefined}
     disabled={disabled || decrementBlocked}
     onclick={(event) => {
-      closeTip(event.currentTarget);
+      tip.close(event.currentTarget);
       stepAdjunct(-1);
     }}
-    onfocus={(event) => openTip(event, -1)}
-    onblur={(event) => closeTip(event.currentTarget)}
-    onkeydown={(event) => event.key === 'Escape' && closeTip(event.currentTarget)}
+    onfocus={(event) => tip.open(event, -1)}
+    onblur={(event) => tip.close(event.currentTarget)}
+    onkeydown={(event) => event.key === 'Escape' && tip.close(event.currentTarget)}
   >
     <i class="fas {decrementIcon}" aria-hidden="true"></i>
   </button>
@@ -350,12 +334,12 @@
     data-tooltip-text={tipOf(1) || undefined}
     disabled={disabled || incrementBlocked}
     onclick={(event) => {
-      closeTip(event.currentTarget);
+      tip.close(event.currentTarget);
       stepAdjunct(1);
     }}
-    onfocus={(event) => openTip(event, 1)}
-    onblur={(event) => closeTip(event.currentTarget)}
-    onkeydown={(event) => event.key === 'Escape' && closeTip(event.currentTarget)}
+    onfocus={(event) => tip.open(event, 1)}
+    onblur={(event) => tip.close(event.currentTarget)}
+    onkeydown={(event) => event.key === 'Escape' && tip.close(event.currentTarget)}
   >
     <i class="fas {incrementIcon}" aria-hidden="true"></i>
   </button>

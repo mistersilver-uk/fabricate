@@ -104,9 +104,8 @@ describe('ComponentEditView — the save payload follows the section flags (issu
     const { props: mountProps, saves } = props({ showEssences: false });
     const target = await harness.mount(mountProps);
 
-    assert.equal(
-      target.querySelector('[data-component-edit-essence="earth"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-edit-essence="earth"]') === null,
       'negative control: the essence card is not drawn'
     );
 

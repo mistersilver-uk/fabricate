@@ -8,15 +8,17 @@
  * matches before a hyphen and would count every one of them; the factory's
  * `classTokenPattern` terminates `(?![\w-])` and does not. The family is broader still:
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import test from 'node:test';
 
 import { parse } from 'svelte/compiler';
 
 import { measureImporters } from '../../scripts/lib/componentImporters.js';
-import { repoRoot } from '../helpers/sourceScan.js';
-import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
+import { DESIGN_SYSTEM_PRIMITIVES } from '../../scripts/lib/designSystemPrimitives.js';
+import { readDesignLibrary } from '../helpers/designLibrary.js';
 import {
   SOURCES,
   callSitesIn,
@@ -24,6 +26,8 @@ import {
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
+import { repoRoot } from '../helpers/sourceScan.js';
+import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 
 const POPOVER_PATH = 'src/ui/svelte/components/SearchablePopover.svelte';
 const PANEL_PATH = 'src/ui/svelte/components/SearchablePopoverPanel.svelte';
@@ -703,5 +707,85 @@ test('no call site restates a class the primitive emits itself', () => {
     [],
     'the primitive emits these classes itself and APPENDS the caller`s prop after them, so ' +
       `restating one emits the token twice:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+const COUNT_WORDS = new Map(
+  'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'
+    .split(' ')
+    .map((word, n) => [word, n])
+);
+
+/** A spelled figure, digits or a number word. */
+const figure = (spelling) => COUNT_WORDS.get(spelling.toLowerCase()) ?? Number(spelling);
+
+/**
+ * Every figure each prose home publishes about this picker's population (issue 1577): its
+ * importing files, its call sites, and the call sites that suppress the search field and so
+ * carry the combobox on the trigger. The floors above cannot see a figure that GREW, which is how
+ * four homes went stale at once.
+ */
+function publishedPopulation() {
+  const register = DESIGN_SYSTEM_PRIMITIVES.find((row) => row.path === POPOVER_PATH).why;
+  const spec = readFileSync(resolve(repoRoot, 'openspec/specs/design-system/spec.md'), 'utf8');
+  const library = readDesignLibrary();
+  const all = (text, pattern) => [...text.matchAll(pattern)];
+  return [
+    ...all(register, /(\w+) importing files over (\w+) call sites/giu).flatMap((found) => [
+      ['register importing files', figure(found[1])],
+      ['register call sites', figure(found[2])],
+    ]),
+    ...all(library, /\((\w+) importing files\)/giu).map((f) => [
+      'library importing files',
+      figure(f[1]),
+    ]),
+    ...all(library, /zero of the (\w+) importers/giu).map((f) => [
+      'library importers',
+      figure(f[1]),
+    ]),
+    ...all(library, /where there is none, at (\w+) (?:shipped )?call sites/giu).map((f) => [
+      'library suppressed holders',
+      figure(f[1]),
+    ]),
+    ...all(spec, /it is the TRIGGER, at (\w+) shipped call sites/giu).map((f) => [
+      'spec suppressed holders',
+      figure(f[1]),
+    ]),
+  ];
+}
+
+test('the picker prose publishes the importer, call-site and search-suppressed counts the tree has', () => {
+  const importers = new Set(popover.callSites.map((site) => site.file)).size;
+  const measured = {
+    'register importing files': importers,
+    'register call sites': popover.callSites.length,
+    'library importing files': importers,
+    'library importers': importers,
+    'library suppressed holders': popover.callSites.filter(
+      (site) => site.attribute('showSearch') === 'showSearch={false}'
+    ).length,
+  };
+  measured['spec suppressed holders'] = measured['library suppressed holders'];
+
+  const published = publishedPopulation();
+  // Each home is read, so a rewording that drops one is a red here and not a silent loss.
+  for (const home of [
+    'library importing files',
+    'library importers',
+    'library suppressed holders',
+    'spec suppressed holders',
+  ]) {
+    assert.ok(
+      published.some(([name]) => name === home),
+      `no "${home}" figure was found, so the prose changed shape and this clause reads nothing`
+    );
+  }
+  const stale = published
+    .filter(([name, stated]) => stated !== measured[name])
+    .map(([name, stated]) => `${name}: prose says ${stated}, the tree has ${measured[name]}`);
+  assert.deepEqual(
+    stale,
+    [],
+    'a prose home publishes a picker population figure the tree does not have; correct the prose'
   );
 });

@@ -1258,7 +1258,7 @@ const STATE_TINTS = Object.freeze([
     `${COMPONENTS}/SegmentedControl.svelte`,
     '.manager-segmented.is-accent-soft .manager-segment.is-active',
     'var(--fab-accent-soft)',
-    'the `accent-soft` tone, the chosen chip’s face, `.k-chip.sel` (library.html:191)',
+    'the `accent-soft` tone, the chosen chip’s face, `.k-chip.sel` (the `library.html` specimen rule)',
   ],
   [
     `${COMPONENTS}/SegmentedControl.svelte`,
@@ -1411,6 +1411,12 @@ const STATE_TINTS = Object.freeze([
     'under forced colours a pressed toggle is the reader’s Highlight at rest and under the pointer',
   ],
   [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented .manager-segment.is-active, .manager-segmented .manager-segment.is-active .manager-segment-count',
+    'highlight',
+    'under forced colours the chosen segment is the reader’s Highlight (issue 2872)',
+  ],
+  [
     MODULE_SHEET,
     '.fabricate-pill-select .manager-availability-remove:hover, .fabricate-pill-select .manager-availability-remove:focus-visible, .fabricate-manager .manager-danger-tag-remove:hover, .fabricate-manager .manager-danger-tag-remove:focus-visible',
     'var(--fab-danger-soft)',
@@ -1453,7 +1459,7 @@ const STATE_TINTS = Object.freeze([
     `${COMPONENTS}/SelectionCheckbox.svelte`,
     '.fab-selection-check.is-checked',
     'var(--fab-accent)',
-    'the ticked box, `.k-cb.on i` (library.html:181)',
+    'the ticked box, `.k-cb.on i` (the `library.html` specimen rule)',
   ],
   [
     `${COMPONENTS}/SelectionCheckbox.svelte`,
@@ -1489,13 +1495,13 @@ const STATE_TINTS = Object.freeze([
     MODULE_SHEET,
     '.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on',
     'var(--fab-accent-soft)',
-    'the eligibility pill’s pressed face, `.k-chip.sel` (library.html:191)',
+    'the eligibility pill’s pressed face, `.k-chip.sel` (the `library.html` specimen rule)',
   ],
   [
     MODULE_SHEET,
     '.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on .manager-modifier-eligibility-dot',
     'var(--fab-accent)',
-    'the lit state dot, `.k-dot` (library.html:197): a mark inside the pill',
+    'the lit state dot, `.k-dot` (the `library.html` specimen rule): a mark inside the pill',
   ],
   [
     MODULE_SHEET,
@@ -1507,7 +1513,7 @@ const STATE_TINTS = Object.freeze([
     'src/ui/svelte/apps/crafting/RollPrompt.svelte',
     '.modifier-choice.is-chosen',
     'var(--fab-accent-soft)',
-    'the chosen modifier chip’s face, `.k-chip.sel` (library.html:191)',
+    'the chosen modifier chip’s face, `.k-chip.sel` (the `library.html` specimen rule)',
   ],
   [
     'src/ui/svelte/apps/crafting/RollPrompt.svelte',
@@ -1533,7 +1539,7 @@ const STATE_TINTS = Object.freeze([
     'var(--fab-accent-soft)',
     'the current step’s marker, a mark inside the timeline',
   ],
-  // A flag that is on is a status reading, not a selection: `.k-status.on` (library.html:200).
+  // A flag that is on is a status reading, not a selection: `.k-status.on` (the `library.html` specimen rule).
   ...[
     [
       `${MANAGER}/CraftingEffectPanel.svelte`,
@@ -1720,7 +1726,7 @@ const HOVER_EDGE_TINTS = Object.freeze(
     MODULE_SHEET,
     selector,
     'var(--fab-accent-border)',
-    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (library.html:141)',
+    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (the `library.html` specimen rule)',
   ])
 );
 

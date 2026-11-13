@@ -202,6 +202,13 @@
     color: var(--fab-accent);
   }
 
+  /* A compact box that is `checked` and mixed keeps the mixed ink, which reads on the soft fill:
+     `.is-sm.is-checked`'s on-accent ink is for the solid fill and outranks the rule above, so this
+     restates the mixed ink one class heavier, `.is-success` excepted (issue 2926). */
+  .fab-selection-check.is-sm.is-indeterminate:not(.is-success) {
+    color: var(--fab-accent);
+  }
+
   .fab-selection-checkbox:has(.fab-selection-input:focus-visible) .fab-selection-check {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;

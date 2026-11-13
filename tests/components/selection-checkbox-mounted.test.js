@@ -80,7 +80,7 @@ describe('SelectionCheckbox', () => {
     });
 
     assert.equal(input(target), null, 'no real control');
-    assert.equal(target.querySelector('label'), null, 'no label wrapper');
+    assert.ok(target.querySelector('label') === null, 'no label wrapper');
     assert.equal(box(target).getAttribute('aria-hidden'), 'true');
     assert.equal(box(target).classList.contains('is-checked'), true);
     box(target).click();
@@ -114,7 +114,7 @@ describe('SelectionCheckbox', () => {
 
   it('wrapper="contents" renders bare siblings, so a label host does not nest labels', async () => {
     const target = await harness.mount({ wrapper: 'contents', checked: true });
-    assert.equal(target.querySelector('label'), null, 'no label of its own');
+    assert.ok(target.querySelector('label') === null, 'no label of its own');
     // Both land directly in the host's own element.
     assert.equal(input(target).parentElement, target);
     assert.equal(box(target).parentElement, target);

@@ -109,6 +109,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-recipe-edit-results-progressive',
   'manager-recipe-edit-results-alchemy',
   'manager-recipe-edit-access-rail',
+  'manager-access-view',
   'manager-components-normal',
   'manager-components-bulk-edit',
   'manager-components-bulk-edit-unstaged',
@@ -318,7 +319,7 @@ const D0_SECTION_SPANS = [
   {
     name: 'recipes',
     from: 'manager-recipes-normal',
-    to: 'manager-recipe-edit-access-rail',
+    to: 'manager-access-view',
     extra: ['manager-recipes-editor-roundtrip'],
   },
   {

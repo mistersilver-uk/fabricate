@@ -2169,7 +2169,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-access-rail',
     label: 'Manager — Recipe edit access rail',
-    smokeLabels: ['manager-recipe-edit-access-rail'],
+    smokeLabels: ['manager-recipe-edit-access-rail', 'manager-access-view'],
     reaches: 'exact',
     query: { system: 'lab-alchemy' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-access' }],

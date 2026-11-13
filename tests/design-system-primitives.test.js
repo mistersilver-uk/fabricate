@@ -1120,7 +1120,7 @@ test('(a) an IconPicker change publishes its frame, then the four specimens that
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Modal change publishes its five frames, then the three specimens that mount it through the seam, then the one that opens it with no Fabricate root', () => {
+test('(a) a Modal change publishes its five frames, then the four specimens that mount it through the seam, then the one that opens it with no Fabricate root', () => {
   const file = 'src/ui/svelte/components/Modal.svelte';
   const frames = [
     'player-crafting-roll-prompt-basic',
@@ -1131,6 +1131,7 @@ test('(a) a Modal change publishes its five frames, then the three specimens tha
     'manager-published-modal-specimen',
     'manager-published-modal-close',
     'manager-published-modal-scrim-specimen',
+    'manager-published-modal-sizes-specimen',
     'published-standalone-modal-open',
   ];
   assertBroadSignalFrames(file, frames);
@@ -1517,7 +1518,7 @@ test('(d) every shipped primitive still clears the membership bar', () => {
     assert.ok(
       !('callers' in row),
       `${row.path} is a member and carries a \`callers\` field. Members are held to the BAR, not ` +
-        'to an enumeration — `Chip` has 59 importers and an exact list there would be a manifest ' +
+        'to an enumeration — `Chip` has over a hundred importers and an exact list there would be a manifest ' +
         'edit on every unrelated PR that adds one usage. A half-filled field on some members and ' +
         'not others is the ambiguity this asymmetry is deliberate to avoid.'
     );

@@ -195,8 +195,8 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
 
   it('carries no DC and no comparison: those belong to the Difficulty card', async () => {
     const target = await harness.mount({ rollFormula: '1d20' });
-    assert.equal(target.querySelector('[data-check-dc]'), null);
-    assert.equal(target.querySelector('[data-threshold-mode]'), null);
+    assert.ok(target.querySelector('[data-check-dc]') === null);
+    assert.ok(target.querySelector('[data-threshold-mode]') === null);
   });
 });
 

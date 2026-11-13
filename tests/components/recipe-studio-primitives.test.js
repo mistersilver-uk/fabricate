@@ -34,9 +34,14 @@ const harnesses = new Map(
 // may carry; every other import line is returned as a violation.
 const SVELTE_NAMED_IMPORT = /^\s*import\s*\{[\w\s,]*\}\s*from\s*(?:'svelte'|"svelte");?\s*$/;
 
+// The one shared module a leaf may also import: the harness adds it to every tree rendering a user
+// of it, so it propagates no allowlist entry (issue 2868).
+const FOCUS_TOOLTIP_IMPORT =
+  /^\s*import\s*\{\s*createFocusTooltip\s*\}\s*from\s*'..\/util\/focusTooltip\.svelte\.js';?\s*$/;
+
 function localImports(source) {
   return (source.match(/^\s*import\s.*$/gm) || []).filter(
-    (line) => !SVELTE_NAMED_IMPORT.test(line)
+    (line) => !SVELTE_NAMED_IMPORT.test(line) && !FOCUS_TOOLTIP_IMPORT.test(line)
   );
 }
 
@@ -185,7 +190,7 @@ describe('Medallion (mounted)', () => {
 
     assert.equal(medallion.dataset.medallion, 'image');
     assert.equal(medallion.querySelector('img').getAttribute('src'), 'icons/svg/book.svg');
-    assert.equal(medallion.querySelector('i'), null);
+    assert.ok(medallion.querySelector('i') === null);
   });
 
   it('falls back to the glyph when art is falsy', async () => {
@@ -193,7 +198,7 @@ describe('Medallion (mounted)', () => {
     const medallion = root.querySelector('[data-medallion]');
 
     assert.equal(medallion.dataset.medallion, 'glyph');
-    assert.equal(medallion.querySelector('img'), null);
+    assert.ok(medallion.querySelector('img') === null);
     assert.ok(medallion.querySelector('i.fas.fa-flask'));
   });
 

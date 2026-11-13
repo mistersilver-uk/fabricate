@@ -91,9 +91,8 @@ describe('ComponentInventoryColumn (mounted)', () => {
   it('shows the distinct "no matches" filtered-empty state (NOT the onboarding state)', async () => {
     const target = await harness.mount({ components: [], hasComponents: true, search: 'zzz' });
     assert.ok(target.querySelector('[data-alchemy-inventory-no-matches]'), 'filtered-empty state shown');
-    assert.equal(
-      target.querySelector('[data-alchemy-empty-inventory]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-alchemy-empty-inventory]') === null,
       'the onboarding empty state is NOT shown when the actor owns components'
     );
   });
@@ -101,7 +100,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
   it('shows the onboarding empty state when the actor owns no components', async () => {
     const target = await harness.mount({ components: [], hasComponents: false });
     assert.ok(target.querySelector('[data-alchemy-empty-inventory]'), 'onboarding empty state shown');
-    assert.equal(target.querySelector('[data-alchemy-inventory-no-matches]'), null);
+    assert.ok(target.querySelector('[data-alchemy-inventory-no-matches]') === null);
   });
 
   it('renders a drag handle inside the row button and adds on click', async () => {
@@ -287,9 +286,8 @@ describe('KnownRecipesColumn (mounted)', () => {
   it('shows the distinct filtered "no matches" state when a search hides every revealed recipe', async () => {
     const target = await harness.mount({ recipes: [], knownCount: 3, search: 'zzz' });
     assert.ok(target.querySelector('[data-alchemy-known-no-matches]'), 'filtered-empty state shown');
-    assert.equal(
-      target.querySelector('[data-alchemy-zero-known]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-alchemy-zero-known]') === null,
       'the onboarding zero-revealed state is NOT shown when recipes exist'
     );
   });
@@ -297,7 +295,7 @@ describe('KnownRecipesColumn (mounted)', () => {
   it('shows the onboarding zero-revealed state when nothing is revealed yet', async () => {
     const target = await harness.mount({ recipes: [], knownCount: 0 });
     assert.ok(target.querySelector('[data-alchemy-zero-known]'), 'onboarding empty state shown');
-    assert.equal(target.querySelector('[data-alchemy-known-no-matches]'), null);
+    assert.ok(target.querySelector('[data-alchemy-known-no-matches]') === null);
   });
 
   it('renders an essence ingredient option as its resolved NAME x AMOUNT, not the raw id', async () => {

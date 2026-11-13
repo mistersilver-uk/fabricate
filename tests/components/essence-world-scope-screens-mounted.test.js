@@ -16,6 +16,7 @@ import {
   ESSENCE_WORLD_SHELL_MODULES,
 } from '../helpers/essenceWorldScopeModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -690,6 +691,7 @@ describe('the essence entry row states what an essence removal actually does', (
       /Disabled here/
     );
 
+    assertButtonsHoldTheirLabels(assert, root);
     root.querySelector('[data-scoped-entry-system-rules="sys-b"]').click();
     assert.deepEqual(calls, [['rules', 'ash', 'sys-b']]);
 
@@ -709,6 +711,7 @@ describe('the essence entry row states what an essence removal actually does', (
     await entryHarness.setProps({});
     const outsider = root.querySelector('[data-scoped-entry-system="sys-c"]');
     assert.ok(Boolean(outsider.querySelector('[data-scoped-membership-add]')));
+    assertButtonsHoldTheirLabels(assert, root);
     outsider.querySelector('[data-scoped-membership-add]').click();
     assert.deepEqual(calls.at(-1), ['add', 'ash', 'sys-c']);
   });

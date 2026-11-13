@@ -283,7 +283,7 @@ test('a Primitive Lab file beside a real render file leaves the gate armed by th
 
 test('a Primitive Lab file beside only lang/ or a lab input adds nothing', () => {
   assert.deepEqual(reachedBy([PAGE_CSS, 'lang/en.json']), []);
-  assert.deepEqual(selectedIds([PAGE_CSS, 'tests/view-lab/world/labContent.js']), [
+  assert.deepEqual(selectedIds([PAGE_CSS, 'tests/view-lab/world/labFlags.js']), [
     ...LAB_SURFACE_CASE_IDS,
   ]);
 });
@@ -298,7 +298,7 @@ test('a path only near the Primitive Lab still arms the gate', () => {
 test('a Primitive Lab file leaves a real lab input its coverage, and a near miss keeps it', () => {
   const catalogue = 'tests/view-lab/primitives/catalogue/controls.json';
   assert.ok(tracked.includes(catalogue), `${catalogue} is not tracked, so this probe is inert`);
-  assert.deepEqual(selectedIds([catalogue, 'tests/view-lab/world/labContent.js']), [
+  assert.deepEqual(selectedIds([catalogue, 'tests/view-lab/world/labFlags.js']), [
     ...LAB_SURFACE_CASE_IDS,
   ]);
   assert.deepEqual(selectedIds(['tests/view-lab/primitivesNobodyMadeYet.js']), [

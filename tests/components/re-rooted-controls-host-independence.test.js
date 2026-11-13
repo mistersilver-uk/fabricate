@@ -1514,7 +1514,7 @@ test('the values the comparison holds over are the ones the family declares, not
   // once and nothing below it, so a button that inherits carries the body's FAMILY; one that does
   // not carries the UA's default button font, which in Chromium is Arial. This is the single
   // computed observation that proves the family no longer depends on
-  // `.fabricate-manager button, … { font: inherit }` (`fabricate.css:1088-1093`) to get there.
+  // `.fabricate-manager button, … { font: inherit }` (`styles/fabricate-manager-shell.css`'s `.fabricate-manager button` rule) to get there.
   for (const control of ['button', 'icon-button']) {
     assert.match(
       bare(control)['font-family'],
