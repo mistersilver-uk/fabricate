@@ -1306,7 +1306,6 @@ Fabricate localizes only its own fallback copy.
 
 `tone` selects the action's button treatment: `primary`, `ghost`, `danger`, or `neutral`, the default, which is the plain Manager button with no added styling.
 Every header action renders at the page header's 38px control height and carries `fabricate-button is-size-38`, so a companion's actions match Core's own.
-It also carries `fab-manager-button`, which is deprecated: Fabricate styles nothing by it, and it is removed after at least one minor release, announced in the release notes.
 `primary: true` is the older, still-supported spelling of `tone: 'primary'`.
 An action that declares both `primary` and `tone` is refused at registration.
 

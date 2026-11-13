@@ -317,3 +317,29 @@ describe('the Modal hosted in a companion region through the overlayHost option'
     assert.equal(read, 436, 'min(640px, 100vh − 64px) at 500px');
   });
 });
+
+describe('the real Manager root as a containing block for fixed content', () => {
+  it('sets container-type: inline-size yet leaves fixed content placed from the viewport', async () => {
+    const read = await inFixture(
+      '',
+      () => {
+        const root = document.querySelector('.fabricate-manager');
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position: fixed; inset: 0';
+        root.append(probe);
+        const box = probe.getBoundingClientRect();
+        return {
+          containerType: getComputedStyle(root).containerType,
+          probe: [box.left, box.top, box.width, box.height],
+          viewport: [0, 0, innerWidth, innerHeight],
+          rootWidth: root.getBoundingClientRect().width,
+        };
+      },
+      DESKTOP,
+      'manager'
+    );
+    assert.equal(read.containerType, 'inline-size', 'the root is a size container');
+    assert.deepEqual(read.probe, read.viewport, 'the viewport, not the root, is its block');
+    assert.ok(read.rootWidth < read.viewport[2], 'the root is narrower than the viewport');
+  });
+});

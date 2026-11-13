@@ -1,7 +1,6 @@
 /**
  * Pure staging model for the GM component browser's bulk edit (issue 772). Two shapes travel
- * together: the SELECTION (a `Set` the browser owns, defined in `bulkSelectionModel.js` and
- * re-exported at the foot of this file under its original `…ComponentSelection` names) and the
+ * together: the SELECTION (a `Set` the browser owns, defined in `bulkSelectionModel.js`) and the
  * DRAFT, which is what this file defines. Every helper returns a NEW draft. Essences and difficulty
  * carry an explicit `…Staged` flag because `{}` and `0` are meaningful values — a staged all-zero
  * essence map means "clear essences", so emptiness is never "no change" downstream.
@@ -264,14 +263,3 @@ export function pageBulkInsetRows(
     rangeEnd: rows.length > 0 ? start + rows.length : 0,
   };
 }
-
-/**
- * The selection helpers this module used to define, re-exported under the names every call site
- * already imports.
- */
-export {
-  describeBulkSelection as describeComponentSelection,
-  toggleBulkSelection as toggleComponentSelection,
-  setBulkSelection as setComponentSelection,
-  pruneBulkSelection as pruneComponentSelection,
-} from '../../utils/bulkSelectionModel.js';

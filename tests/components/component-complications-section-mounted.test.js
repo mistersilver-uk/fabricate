@@ -39,6 +39,8 @@ import {
   selectTriggerText,
 } from '../helpers/select-control.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
+import { seedRuneworkCheckMode } from '../view-lab/world/labWorld.js';
 
 const TRIGGER_PICKER = '[data-complication-trigger]';
 const COMPARATOR = '[data-complication-roll-condition-cmp]';
@@ -185,6 +187,36 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       !target.querySelector('[data-complications-section]'),
       'a complication has no moment to fire in a system with no progressive resolution'
     );
+  });
+
+  it('draws the Runework complication and its trigger picker the way the View Lab cases step through it (issue 1865)', async () => {
+    const content = buildLabContent();
+    const runework = () => content.systems.find((entry) => entry.id === 'lab-runework');
+    const rwBar = () => runework().components.find((entry) => entry.id === 'rw-bar');
+    // The root's gate: Runework resolves crafting and salvage by routed checks, so it draws nothing.
+    const gated = await harness.mount({
+      activityProgressive: { crafting: false, salvage: false, gathering: false },
+      complications: rwBar().complications,
+    });
+    assert.ok(!gated.querySelector('[data-complications-section]'), 'default Runework: no section');
+
+    seedRuneworkCheckMode(content, 'salvage-triggers');
+    const triggers = runework().salvageCraftingCheck.progressive.checkBreakage.triggers;
+    await harness.remount();
+    const { target } = await mountSection({
+      activityProgressive: { crafting: false, salvage: true, gathering: false },
+      complications: rwBar().complications,
+      triggerOptions: triggers.map(({ id }) => ({ id, label: id, activity: 'salvage' })),
+    });
+    const row = '[data-complication="rw-comp-cross-thread"]';
+    target.querySelector(`${row} [data-complication-disclosure]`).click();
+    await flushRender();
+    const live = `${row} [data-complication-trigger-clause]:not(.is-unavailable) [data-complication-trigger]`;
+    assert.ok(target.querySelector(`${live}[aria-expanded="false"]`), 'closed case expectation');
+    assert.ok(target.querySelector(`${row} [data-complication-roll-condition]`), 'scroll target');
+    target.querySelector(`${row} [data-complication-trigger]`).click();
+    await flushRender();
+    assert.ok(target.querySelector(`${live}[aria-expanded="true"]`), 'open case expectation');
   });
 
   it('renders the section once ANY activity is progressive', async () => {

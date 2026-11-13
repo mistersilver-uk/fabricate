@@ -236,7 +236,7 @@ export class SignatureValidator {
     const cohortIndexByRecipeId = new Map();
     for (const [cohortIndex, recipe] of cohort.entries()) {
       cohortIndexByRecipeId.set(recipe?.id, cohortIndex);
-      if (!recipe?.enabled) continue;
+      if (recipe?.enabled === false) continue;
       entries.push(...this.compileRecipeEntries(recipe, components, cohortIndex));
     }
     return { system, components, entries, cohortIndexByRecipeId };

@@ -26,7 +26,7 @@ const RUNE_MODULES = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-crafting-actor-bar-',
-  rawModules: [...CRAFTING_APP_RAW_MODULES, 'src/ui/svelte/util/shoppingListAggregator.js'],
+  rawModules: [...CRAFTING_APP_RAW_MODULES, 'src/ui/svelte/util/shoppingListAggregator.js', 'src/ui/svelte/stores/craftingPaging.js'],
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   runeModules: RUNE_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte'

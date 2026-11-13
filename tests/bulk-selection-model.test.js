@@ -12,12 +12,6 @@ import {
   setBulkSelection,
   toggleBulkSelection,
 } from '../src/utils/bulkSelectionModel.js';
-import {
-  describeComponentSelection,
-  pruneComponentSelection,
-  setComponentSelection,
-  toggleComponentSelection,
-} from '../src/ui/model/componentBulkEditModel.js';
 
 describe('bulk selection model (issue 772) — describing the selection', () => {
   const describe_ = (pageIds, filteredIds, selectedIds) =>
@@ -99,14 +93,6 @@ describe('bulk selection model (issue 772) — the selection set', () => {
     assert.deepEqual([...pruned], ['a', 'c']);
     assert.deepEqual([...selected], ['a', 'b', 'c'], 'the input Set is not mutated');
     assert.deepEqual([...pruneBulkSelection(selected, [])], []);
-  });
-
-  it('componentBulkEditModel re-exports all four under the names its call sites import', () => {
-    // The Component Studio's Svelte surfaces still import `…ComponentSelection`.
-    assert.equal(describeComponentSelection, describeBulkSelection);
-    assert.equal(toggleComponentSelection, toggleBulkSelection);
-    assert.equal(setComponentSelection, setBulkSelection);
-    assert.equal(pruneComponentSelection, pruneBulkSelection);
   });
 });
 

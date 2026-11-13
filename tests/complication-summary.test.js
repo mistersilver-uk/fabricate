@@ -338,4 +338,12 @@ describe('complicationSummary: the injected translator', () => {
     }
     assert.ok(Object.isFrozen(COMPLICATION_SUMMARY_STRINGS));
   });
+
+  it('inserts a `$` pattern in a substituted value literally (issue 1292)', () => {
+    const summary = complicationSummary(
+      { when: { checkTrigger: true } },
+      { triggerName: '$& and $`' }
+    );
+    assert.ok(summary.includes('$& and $`'), summary);
+  });
 });

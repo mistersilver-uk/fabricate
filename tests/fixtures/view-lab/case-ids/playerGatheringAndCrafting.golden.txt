@@ -35,6 +35,9 @@ player-gathering-task-ready
 player-gathering-after-success
 player-gathering-chat-card-event
 player-gathering-drop-open
+player-gathering-station-tool-available
+player-gathering-station-tool-unnamed
+player-gathering-station-tool-absent
 player-gathering-tool-blocked
 player-gathering-timed-ready
 player-gathering-timed-active
@@ -43,6 +46,10 @@ player-gathering-realm-locked
 player-gathering-stacked
 player-crafting-simple
 player-crafting-results-kinds
+player-crafting-currency-affordable
+player-crafting-currency-unaffordable
+player-crafting-currency-unresolvable
+player-crafting-currency-repeated
 player-crafting-results-choice-group
 player-crafting-results-rolled-group
 player-crafting-outcome-award-pending

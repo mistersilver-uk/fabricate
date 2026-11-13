@@ -359,10 +359,10 @@ function actorProjectionServices() {
 function dialogServices() {
   return {
     pickImagePath: async (currentPath = '') => {
+      // Canonical on V13 and V14; `globalThis.FilePicker` is a warning alias until V15 (issue 1904).
       const FilePickerClass =
         foundry?.applications?.apps?.FilePicker?.implementation ||
-        foundry?.applications?.apps?.FilePicker ||
-        globalThis.FilePicker;
+        foundry?.applications?.apps?.FilePicker;
       if (!FilePickerClass) {
         ui.notifications.warn(localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'));
         return null;
@@ -410,8 +410,10 @@ function dialogServices() {
       await clipboard.copyPlainText(text);
     },
     downloadFile: async (json, filename) => {
-      if (typeof saveDataToFile === 'function') {
-        saveDataToFile(json, 'application/json', filename);
+      // Canonical on V13 and V14; the bare `saveDataToFile` global is a warning alias until V15.
+      const save = foundry?.utils?.saveDataToFile;
+      if (typeof save === 'function') {
+        save(json, 'application/json', filename);
       } else {
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);

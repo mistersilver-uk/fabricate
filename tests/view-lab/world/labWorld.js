@@ -73,6 +73,31 @@ function seedCurrencyGeneratedId(content) {
   });
 }
 
+/**
+ * Issue 1526's three player-side currency states: Bend Horseshoe costs `amount` gp, under a
+ * Smithing that takes part in currency. Every lab actor holds 45 gp, so 10 is affordable and 500
+ * is not. `unresolvable` blanks the gold unit's `actorPath`, which is a world currency profile the
+ * spend strategy cannot read a balance off, so the cost carries no verdict at all.
+ */
+function seedCurrencyCost(state, { amount, unresolvable = false }) {
+  return (content) => {
+    const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', state);
+    system.requirements = { ...system.requirements, currency: { enabled: true } };
+    if (unresolvable) {
+      content.currencyConfig.units = content.currencyConfig.units.map((unit) => {
+        if (unit.id !== 'gp') return unit;
+        const unreadable = { ...unit };
+        delete unreadable.actorPath;
+        return unreadable;
+      });
+    }
+    recipe.ingredientSets[0].ingredientGroups.push({
+      id: 's1-currency',
+      options: [{ match: { type: 'currency', unit: 'gp', amount } }],
+    });
+  };
+}
+
 /** `reward-craft`: the `reward-kinds` horseshoe under a knowledge-visibility Smithing, so the craft
  *  clears the pre-flight, also re-teaching itself, which Brenna knows (`seedRewardCraftLearned`). */
 function seedRewardCraft(content) {
@@ -393,6 +418,12 @@ const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
   'currency-generated-id': seedCurrencyGeneratedId,
+  'currency-affordable': seedCurrencyCost('currency-affordable', { amount: 10 }),
+  'currency-unaffordable': seedCurrencyCost('currency-unaffordable', { amount: 500 }),
+  'currency-unresolvable': seedCurrencyCost('currency-unresolvable', {
+    amount: 10,
+    unresolvable: true,
+  }),
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
   'reward-duplicate': seedRewardDuplicate,
@@ -539,9 +570,25 @@ function seedSubjectModifierPicks(content, state) {
  * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006), and
  * `routed-count-unordered` needs three from tiers authored out of order (issue 2135).
  */
-function seedRuneworkCheckMode(content, mode) {
+export function seedRuneworkCheckMode(content, mode) {
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
   const routed = system?.craftingCheck?.routed;
+  if (system && routed && mode === 'salvage-triggers') {
+    // Issue 1865: the component editor lists complication triggers from a PROGRESSIVE check block,
+    // and draws its complications section only when some activity is progressive. Runework
+    // authors its triggers on the ROUTED block, so neither holds until salvage is progressive.
+    system.salvageResolutionMode = 'progressive';
+    system.salvageCraftingCheck = {
+      ...system.salvageCraftingCheck,
+      progressive: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        thresholds: { success: 10 },
+        awardMode: 'equal',
+        checkBreakage: structuredClone(routed.checkBreakage),
+      },
+    };
+    return;
+  }
   if (routed && mode?.startsWith('routed-count')) {
     const unordered = mode === 'routed-count-unordered';
     const extra = unordered
@@ -784,7 +831,7 @@ function seedJournalUnderCheck(content) {
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties) {
+export function seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
   // Membership, component sources and the remembered crafting actor are all PLAYER-CHARACTER
@@ -902,7 +949,7 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
  *
  * @param {object} content the built lab content, mutated in place.
  */
-function stripTools(content) {
+export function stripTools(content) {
   content.tools = [];
   for (const system of content.systems ?? []) {
     if (system && typeof system === 'object') system.tools = [];
@@ -931,13 +978,32 @@ function stripTools(content) {
 }
 
 /**
- * Remove the world's OWN authored component records, leaving the migration's lifted ones (issue
- * 1540).
+ * Remove the world's OWN authored component records and component tags, leaving the migration's
+ * lifted component records (issue 1540).
  *
  * @param {object} content the built lab content, mutated in place.
  */
-function stripAuthoredWorldComponents(content) {
+export function stripAuthoredWorldComponents(content) {
   content.componentScope = { entities: [], defaults: {} };
+  // The world vocabulary's component tags too: the Tool repair tag picker lists them whenever the
+  // vocabulary store is available, so a world "with no tags" has none there either.
+  content.worldVocabulary = { ...content.worldVocabulary, componentTags: [] };
+}
+
+/** The shipped travel tab label the `longTravelLabels` flag swaps for a long one. */
+export const LONG_TRAVEL_LABEL_KEY = 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks';
+export const LONG_TRAVEL_LABEL = 'Map Region Links Across the Active Scene';
+
+/**
+ * The lab's localizer: the shipped strings, except that `longTravelLabels` lengthens one tab label.
+ *
+ * @param {(key: string) => string} shippedLocalize The shipped-string resolver.
+ * @param {boolean} longTravelLabels Whether to lengthen the Map Region Links tab label.
+ * @returns {(key: string) => string} The lab's resolver.
+ */
+export function labLocalizer(shippedLocalize, longTravelLabels) {
+  return (key) =>
+    longTravelLabels && key === LONG_TRAVEL_LABEL_KEY ? LONG_TRAVEL_LABEL : shippedLocalize(key);
 }
 
 /**
@@ -965,7 +1031,9 @@ function stripAuthoredWorldComponents(content) {
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result,
- *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id, `reward-craft`
+ *   `currency-generated-id` for it costing a unit labelled Handfuls under a generated id,
+ *   `currency-affordable`, `currency-unaffordable` or `currency-unresolvable` for it costing gold the
+ *   crafter can pay, cannot pay, or that the world's currency profile cannot read (issue 1526), `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
  *   holds, `reward-duplicate` for its first result listed twice, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
@@ -1041,10 +1109,7 @@ export async function buildLabWorld({
   const documents = buildDocumentIndex(content, actors);
   registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();
-  const localize = (key) =>
-    longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
-      ? 'Map Region Links Across the Active Scene'
-      : shippedLocalize(key);
+  const localize = labLocalizer(shippedLocalize, longTravelLabels);
 
   const world = {
     seed,
