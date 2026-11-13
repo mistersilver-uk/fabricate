@@ -1206,7 +1206,7 @@ test('every scoped rule count the manifest asserts is re-derived from that compo
  * up to three words of qualifier, then `rules`, `selectors`, `compounds` or `declarations`.
  */
 const RULE_COUNT_PROSE =
-  /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty)\s+(?:[^\s.;]+\s+){0,3}?(?:rules|selectors|compounds|declarations)\b/giu;
+  /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:[^\s.;]+\s+){0,3}?(?:rules|selectors|compounds|declarations)\b/giu;
 
 /** The text of a row's `why` with every claim a property above re-derives taken out of it. */
 function withoutGuardedRuleClaims(why) {

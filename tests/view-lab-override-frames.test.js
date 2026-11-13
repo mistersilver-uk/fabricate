@@ -73,6 +73,7 @@ test('a case no importer of the component selects is refused', () => {
  * disproved one: the frame may draw the component through a route the patterns do not spell.
  * A stylesheet key has no importers, so it is outside this property.
  */
+// tracked: issue 1603
 const UNPROVEN_BY_IMPORTERS = [
   'src/ui/svelte/components/EditorTabs.svelte -> world-component-entry-validation',
   'src/ui/svelte/components/NavSidebarRows.svelte -> manager-recipes-normal',

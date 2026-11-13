@@ -10,6 +10,9 @@
  *   - `N render sites` counts the `<Component>` nodes across `src/`;
  *   - `N callers`, `N call sites` is deliberately either, because both ship (`Field`: "81 call
  *     sites across 23 components"; `FilterBar`: "14 callers", which are its importers);
+ *   - `N tags` is the render-site count of a component drawn as tags (`InspectorCard`);
+ *   - `over N`, `more than N` is a BOUND, true while the measurement exceeds N, which is how a
+ *     component that gains importers every week is spelled without a prose edit on each one;
  *   - `independent` marks a JUDGED subset, so it is bounded by the measurement rather than equal
  *     to it, because a wrapper that forwards its props is an importer and not an independent one.
  *
@@ -49,8 +52,8 @@ const NUMBER_WORDS = new Map(
 
 /** A spelled count: the number, whether it is `independent`, and the noun that gives its kind. */
 const SPELLED_COUNT = new RegExp(
-  String.raw`(?:<b>)?\b(\d+|${[...NUMBER_WORDS.keys()].join('|')})\s+(independent\s+|direct\s+)?` +
-    String.raw`(importers?|importing files|callers|call sites|render sites)\b`,
+  String.raw`(?:<b>)?\b(?:(over|more than)\s+)?(\d+|${[...NUMBER_WORDS.keys()].join('|')})\s+` +
+    String.raw`(independent\s+|direct\s+)?(importers?|importing files|callers|call sites|render sites|tags)\b`,
   'giu'
 );
 
@@ -95,10 +98,11 @@ function spelledCountsIn(text) {
   return [...text.matchAll(SPELLED_COUNT)].map((found) => ({
     at: found.index,
     end: found.index + found[0].length,
-    spelling: found[1],
-    stated: valueOf(found[1]),
-    judged: found[2] !== undefined,
-    kind: found[3].toLowerCase(),
+    spelling: found[2],
+    stated: valueOf(found[2]),
+    over: found[1] !== undefined,
+    judged: found[3] !== undefined,
+    kind: found[4].toLowerCase(),
   }));
 }
 
@@ -106,7 +110,7 @@ function spelledCountsIn(text) {
 function acceptedFigures(measured, { kind }) {
   const importers = [measured.importers.length, measured.withoutAdapter.length];
   if (/^importer|importing/u.test(kind)) return importers;
-  if (kind === 'render sites') return [measured.sites];
+  if (kind === 'render sites' || kind === 'tags') return [measured.sites];
   return [...importers, measured.sites];
 }
 
@@ -114,12 +118,13 @@ function acceptedFigures(measured, { kind }) {
 function disagreement(subject, count) {
   const measured = measureComponent(subject);
   const accepted = acceptedFigures(measured, count);
-  const agrees = count.judged
-    ? count.stated >= 1 && count.stated <= Math.max(...accepted)
-    : accepted.includes(count.stated);
+  let agrees = accepted.includes(count.stated);
+  // A bound is true while the measurement stays above it, so it survives an added importer.
+  if (count.over) agrees = Math.max(...accepted) > count.stated;
+  else if (count.judged) agrees = count.stated >= 1 && count.stated <= Math.max(...accepted);
   if (agrees) return null;
   return (
-    `${subject} is spelled with "${count.spelling} ${count.kind}" and the tree has ` +
+    `${subject} is spelled "${count.over ? 'over ' : ''}${count.spelling} ${count.kind}" and the tree has ` +
     `${measured.importers.length} importers (${measured.withoutAdapter.length} without the seam's ` +
     `adapter) and ${measured.sites} render sites`
   );
@@ -186,9 +191,7 @@ test('a spelled count is refused when it disagrees with the tree, and an indepen
 });
 
 test('(register) every caller and importer count a member row spells is the tree’s', () => {
-  const problems = MANIFEST_ROWS.flatMap((row) =>
-    disagreementsIn(whyText(row), () => row.path).map((problem) => `${row.path}: ${problem}`)
-  );
+  const problems = MANIFEST_ROWS.flatMap((row) => disagreementsIn(whyText(row), () => row.path));
   assert.deepEqual(
     problems,
     [],
