@@ -134,7 +134,7 @@ describe('ImportReportModal (mounted)', () => {
       REPORTED_CONTENT.headline
     );
     // The old raw-HTML report used <h2> per kind; the card head is an <h4> inside a card.
-    assert.equal(modal().querySelector('h2'), null);
+    assert.ok(modal().querySelector('h2') === null);
   });
 
   it('renders one bordered card per reference kind, each carrying its own count', async () => {
@@ -186,7 +186,7 @@ describe('ImportReportModal (mounted)', () => {
       REPORTED_CONTENT.handledLine
     );
     await harness.setProps({ content: RESOLVED_CONTENT });
-    assert.equal(document.querySelector('[data-import-report-handled]'), null);
+    assert.ok(document.querySelector('[data-import-report-handled]') === null);
   });
 
   it('uses the shared EmptyState primitive when nothing needs attention', async () => {

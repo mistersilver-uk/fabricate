@@ -128,9 +128,8 @@ describe('SystemOverviewView (mounted)', () => {
 
     // The system-blocker banner renders and the system row carries no deep link.
     assert.ok(target.querySelector('[data-system-overview-blocker]'), 'blocker banner renders');
-    assert.equal(
-      systemGroup.querySelector('[data-overview-link]'),
-      null,
+    assert.ok(
+      systemGroup.querySelector('[data-overview-link]') === null,
       'system kind carries no deep-link button'
     );
 
@@ -252,7 +251,10 @@ describe('SystemOverviewView (mounted)', () => {
     });
     const row = target.querySelector('[data-overview-issue="taskNoDescription"]');
     assert.ok(row, 'the task row still renders');
-    assert.equal(row.querySelector('[data-overview-link]'), null, 'no deep-link button without an environmentId');
+    assert.ok(
+      row.querySelector('[data-overview-link]') === null,
+      'no deep-link button without an environmentId'
+    );
     harness.remount();
   });
 
@@ -261,8 +263,11 @@ describe('SystemOverviewView (mounted)', () => {
       report: { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false }
     });
     assert.ok(target.querySelector('[data-system-overview-empty]'), 'empty state renders');
-    assert.equal(target.querySelector('[data-system-overview-group]'), null, 'no groups rendered');
-    assert.equal(target.querySelector('[data-system-overview-blocker]'), null, 'no blocker banner with no blocker');
+    assert.ok(target.querySelector('[data-system-overview-group]') === null, 'no groups rendered');
+    assert.ok(
+      target.querySelector('[data-system-overview-blocker]') === null,
+      'no blocker banner with no blocker'
+    );
     harness.remount();
   });
 });

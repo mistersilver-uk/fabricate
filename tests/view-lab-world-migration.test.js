@@ -15,7 +15,18 @@ import {
 } from '../src/systems/checkModifierResolver.js';
 import { resolveComponentScope } from '../src/systems/componentScope.js';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
+
+import { settingsKey } from './view-lab/foundry/installFoundryShim.js';
+import { buildLabActors } from './view-lab/world/labActors.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
+import {
+  labLocalizer,
+  LONG_TRAVEL_LABEL,
+  LONG_TRAVEL_LABEL_KEY,
+  seedSettings,
+  stripAuthoredWorldComponents,
+  stripTools,
+} from './view-lab/world/labWorld.js';
 
 /**
  * Run the real startup migration pass over the lab fixtures, exactly as a lab build does.
@@ -94,8 +105,7 @@ test('the startup migration pass MERGES both lab libraries into the world librar
     'the fixture must go on authoring the catalogue at the PRE-1.22.0 location, or the lab ' +
       'build stops exercising the migration and this assertion proves nothing'
   );
-  const seededGatheringConfig =
-    before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
+  const seededGatheringConfig = before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
   const seededGathering = seededGatheringConfig.characterModifiers ?? [];
 
   // NO COLLISION IN THE LAB WORLD, deliberately: the two libraries authored the same id for two
@@ -203,10 +213,7 @@ function localizeLang(key, data) {
 function toleratedWarningPatterns() {
   const source = readFileSync(DRIVER_PATH, 'utf8');
   const start = source.indexOf('const TOLERATED_WARNINGS = [');
-  assert.ok(
-    start !== -1,
-    '`scripts/lib/viewLabCases.js` no longer declares TOLERATED_WARNINGS'
-  );
+  assert.ok(start !== -1, '`scripts/lib/viewLabCases.js` no longer declares TOLERATED_WARNINGS');
   const end = source.indexOf('\n];', start);
   assert.ok(end > start, 'the TOLERATED_WARNINGS declaration is no longer a closed array literal');
   const patterns = source
@@ -329,8 +336,9 @@ test('no tolerated pattern matches a warning the capture gate exists to catch', 
  * The lab's THREE world-scope payloads through the same startup pass, seeded exactly as
  * `labWorld.js` seeds them.
  */
-async function migrateLabWorldScopes() {
+async function migrateLabWorldScopes(shape = () => {}) {
   const content = buildLabContent();
+  shape(content);
   const store = new Map(
     Object.entries(
       structuredClone({
@@ -369,6 +377,8 @@ async function migrateLabWorldScopes() {
     componentScope: store.get('componentScope'),
     essenceScope: store.get('essenceScope'),
     craftingSystems: store.get('craftingSystems'),
+    recipes: store.get('recipes'),
+    toolScope: store.get('toolScope'),
   };
 }
 
@@ -404,7 +414,11 @@ test('the lab resolves an essence map for `sm-iron-ingot` that its OWN row does 
     [persisted]
   );
 
-  assert.deepEqual(persisted.essences, { earth: 2, fire: 1 }, 'the row the authoring accessor gives');
+  assert.deepEqual(
+    persisted.essences,
+    { earth: 2, fire: 1 },
+    'the row the authoring accessor gives'
+  );
   assert.deepEqual(
     resolved.essences,
     { earth: 2, fire: 1, air: 1 },
@@ -435,9 +449,7 @@ test('and the divergence reaches NO essence demand this system makes', async () 
     }
     for (const value of Object.values(node)) walk(value);
   };
-  walk(
-    content.recipes.filter((recipe) => recipe.craftingSystemId === LAB_SYSTEM_IDS.SMITHING)
-  );
+  walk(content.recipes.filter((recipe) => recipe.craftingSystemId === LAB_SYSTEM_IDS.SMITHING));
 
   assert.ok(demanded.size > 0, 'the walk found no essence demand at all, so this is vacuous');
   assert.ok(
@@ -450,4 +462,73 @@ test('and the divergence reaches NO essence demand this system makes', async () 
     ),
     'and the system does define it, so the tile has a name and an icon to draw'
   );
+});
+
+// Issue 1543: each world-shaping flag `buildLabWorld` takes, asserted by the world it produces. A
+// flag that quietly stopped shaping the world would otherwise surface as a layout-guard error in an
+// unrelated case (which is how issue 1540 was found). The shaping functions are the ones
+// `buildLabWorld` calls, and the worlds are measured AFTER the startup pass, as the lab renders them.
+
+/** Every tool id a recipe, however deeply nested, still names. */
+function toolIdsNamed(node, found = new Set()) {
+  if (Array.isArray(node)) {
+    for (const entry of node) toolIdsNamed(entry, found);
+  } else if (node && typeof node === 'object') {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'toolIds' && Array.isArray(value)) {
+        for (const id of value) found.add(id);
+      } else toolIdsNamed(value, found);
+    }
+  }
+  return found;
+}
+
+test('noTools builds a world with no Tool in any system, recipe or world scope', async () => {
+  const control = await migrateLabWorldScopes();
+  assert.ok(control.toolScope.entities.length > 0, 'the default world has world Tools to remove');
+  assert.ok(toolIdsNamed(control.recipes).size > 0, 'and recipes that name them');
+
+  const shaped = await migrateLabWorldScopes(stripTools);
+  assert.deepEqual(shaped.toolScope.entities, [], 'no world Tool survives the pass');
+  assert.deepEqual([...toolIdsNamed(shaped.recipes)], [], 'no recipe names a Tool');
+  for (const system of shaped.craftingSystems) {
+    assert.deepEqual(system.tools ?? [], [], `${system.id} still carries a Tool`);
+  }
+});
+
+test('noAuthoredWorldComponents drops the fixture records and keeps the migration’s lifted ones', async () => {
+  const authored = buildLabContent().componentScope.entities.map((entity) => entity.id);
+  assert.ok(authored.length > 0, 'the fixture authors world components for the flag to drop');
+
+  const control = await migrateLabWorldScopes();
+  const controlIds = new Set(control.componentScope.entities.map((entity) => entity.id));
+  for (const id of authored) assert.ok(controlIds.has(id), `${id} is in the default world`);
+
+  const shaped = await migrateLabWorldScopes(stripAuthoredWorldComponents);
+  const shapedIds = new Set(shaped.componentScope.entities.map((entity) => entity.id));
+  for (const id of authored) assert.ok(!shapedIds.has(id), `${id} survived the flag`);
+  // The flag does NOT empty the catalogue by itself: the migration lifts one record per system component.
+  assert.ok(shapedIds.size > 0, 'the migration still lifts the systems’ own components');
+});
+
+test('noParties seeds an empty party list, and the default world seeds several', () => {
+  const content = buildLabContent();
+  const actors = buildLabActors(content);
+  const partiesOf = (noParties) =>
+    seedSettings(content, actors, null, true, noParties).get(
+      settingsKey('fabricate', 'gatheringParties')
+    );
+  assert.ok(partiesOf(false).length > 1, 'the default world seeds a searchable party list');
+  assert.deepEqual(partiesOf(true), []);
+});
+
+test('longTravelLabels lengthens the one travel tab label and leaves every other string alone', () => {
+  const shipped = (key) => (key === LONG_TRAVEL_LABEL_KEY ? 'Map Region Links' : `shipped:${key}`);
+  const long = labLocalizer(shipped, true);
+  const plain = labLocalizer(shipped, false);
+
+  assert.equal(long(LONG_TRAVEL_LABEL_KEY), LONG_TRAVEL_LABEL);
+  assert.ok(LONG_TRAVEL_LABEL.length > shipped(LONG_TRAVEL_LABEL_KEY).length);
+  assert.equal(plain(LONG_TRAVEL_LABEL_KEY), shipped(LONG_TRAVEL_LABEL_KEY));
+  assert.equal(long('FABRICATE.Other'), shipped('FABRICATE.Other'));
 });

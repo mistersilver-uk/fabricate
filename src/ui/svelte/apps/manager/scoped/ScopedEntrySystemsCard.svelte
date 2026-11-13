@@ -196,13 +196,13 @@
                 title={openRulesAria(row) ||
                   phrase(
                     'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                    'Open this component in {system}',
+                    'View system rules in {system}',
                     { system: row.systemName }
                   )}
                 ariaLabel={openRulesAria(row) ||
                   phrase(
                     'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                    'Open this component in {system}',
+                    'View system rules in {system}',
                     { system: row.systemName }
                   )}
                 onclick={() => onOpenSystemRules(entryId, row.systemId)}
@@ -239,7 +239,7 @@
               ariaLabel={addAria(row) ||
                 phrase(
                   'FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystemAria',
-                  'Add {entity} to {system}',
+                  'Add to system {system}: {entity}',
                   { entity: entityName || entryId, system: row.systemName || row.systemId }
                 )}
               onclick={() => onAdd(row.systemId)}

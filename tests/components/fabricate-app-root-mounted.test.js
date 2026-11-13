@@ -481,12 +481,12 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, 'transparent', 'the actor child releases its second translucent fill');
     assert.ok(clock.classList.contains('is-clock'));
     assert.match(clock.textContent, /"day":14,"time":"08:00"/, 'it uses the existing calendar formatter');
-    assert.equal(clock.querySelector('button, input'), null, 'the clock is read-only');
+    assert.ok(clock.querySelector('button, input') === null, 'the clock is read-only');
 
     railButton(root, 'crafting').click();
     await tick();
     await harness.setProps(host.props());
-    assert.equal(root.querySelector('[data-world-clock]'), null, 'other tabs do not duplicate it');
+    assert.ok(root.querySelector('[data-world-clock]') === null, 'other tabs do not duplicate it');
     assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, '', 'other tabs keep the ordinary actor surface');
   });
 

@@ -788,6 +788,18 @@ export const VIEW_RECIPES = Object.freeze([
     // The rail's resolved player and character rows (issue 1790).
     matches: [...RECIPE_EDIT_MATCHES, /^src\/ui\/model\/recipeAccessRoster\.js$/],
   },
+  // The manager's Access VIEW — the recipe list and grant inspector of a restricted system — as
+  // distinct from the recipe editor's Access tab above (issue 942).
+  {
+    id: 'manager-access-view',
+    label: 'Manager Access view — restricted-visibility recipe list and grant inspector',
+    smokeLabels: ['manager-access-view'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      /^src\/ui\/model\/recipeAccessRoster\.js$/,
+    ],
+  },
   // The Books & Scrolls tab body (issue 796).
   recipeEditFrame('manager-recipe-edit-books-scrolls', 'Manager recipe editor — Books & Scrolls tab (linked-book grid fills the panel)'),
   {

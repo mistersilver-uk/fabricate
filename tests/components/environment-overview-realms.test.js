@@ -123,9 +123,15 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
 
   it('hides the realm field entirely when the Travel & Realms toggle is off', async () => {
     await mountTab(baseProps({ realmsEnabled: false, realmRecords: [{ id: 'r1', name: 'Verdant' }] }));
-    assert.equal(target.querySelector('[data-environment-field="includedRealmIds"]'), null, 'realm field is hidden when disabled');
+    assert.ok(
+      target.querySelector('[data-environment-field="includedRealmIds"]') === null,
+      'realm field is hidden when disabled'
+    );
     // The legacy single-region <select> must not appear either.
-    assert.equal(target.querySelector('[data-environment-field="region"]'), null, 'legacy single-region select is removed');
+    assert.ok(
+      target.querySelector('[data-environment-field="region"]') === null,
+      'legacy single-region select is removed'
+    );
     remount();
   });
 

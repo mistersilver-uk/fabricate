@@ -189,9 +189,8 @@ describe('ComponentEditView — each validation row reaches the control that fix
     await activateRow(target, 'progressiveDc');
     const panel = target.querySelector('[data-component-edit-panel="rules"]');
     assert.ok(Boolean(panel), 'routed');
-    assert.equal(
-      target.querySelector('[data-validation-target="component-progressive-dc"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-validation-target="component-progressive-dc"]') === null,
       'and the control is absent'
     );
     assertIs(document.activeElement, panel, 'so the panel holds focus');

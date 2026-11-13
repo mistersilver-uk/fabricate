@@ -391,7 +391,7 @@ export function registerWorldScopeCases() {
     );
     assert.equal(worldTravelItem('travel').getAttribute('aria-controls'), 'manager-travel-submenu');
     assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
+    assert.ok(target.querySelector('[data-world-travel-submenu]') === null);
 
     target.querySelector('#manager-travel-toggle').click();
     await tick();
@@ -559,9 +559,8 @@ export function registerWorldScopeCases() {
     flushSync();
 
     assert.ok(worldTravelItem('travel'), 'World Travel is present before any system opts in');
-    assert.equal(
-      target.querySelector('[data-gathering-realm-toggle]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-realm-toggle]') === null,
       'the toggle is not on the systems library route'
     );
 
@@ -836,7 +835,7 @@ export function registerWorldScopeCases() {
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'World party actions'
     );
-    assert.equal(target.querySelector('.manager-travel-inspector'), null, 'no Parties inspector');
+    assert.ok(target.querySelector('.manager-travel-inspector') === null, 'no Parties inspector');
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.worldTravelTab,
       'parties',
@@ -847,11 +846,11 @@ export function registerWorldScopeCases() {
     );
     assert.equal(createButton.disabled, false);
     assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
-    assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);
+    assert.ok(target.querySelector('[data-party-realm-evidence-unavailable]') === null);
     assert.equal(target.textContent.includes('No current realm set for this system.'), false);
 
     // Every card renders its own controls in the full-width pane.
-    assert.equal(target.querySelector('.manager-party-enable-toggle'), null);
+    assert.ok(target.querySelector('.manager-party-enable-toggle') === null);
 
     createButton.click();
     const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
@@ -992,9 +991,9 @@ export function registerWorldScopeCases() {
       errors[0].id,
       'the message is associated with the member list that produced it'
     );
-    assert.equal(secondCard.querySelector('.manager-party-field-error'), null);
+    assert.ok(secondCard.querySelector('.manager-party-field-error') === null);
     // A field error whose card is on the page suppresses the pane-level summary.
-    assert.equal(target.querySelector('[data-manager-party-summary-error]'), null);
+    assert.ok(target.querySelector('[data-manager-party-summary-error]') === null);
 
     unmount(mounted);
     mounted = null;
@@ -1027,7 +1026,7 @@ export function registerWorldScopeCases() {
     const summaries = target.querySelectorAll('[data-manager-party-summary-error]');
     assert.equal(summaries.length, 1);
     assert.equal(summaries[0].textContent.trim(), 'Mira is already in an enabled party.');
-    assert.equal(target.querySelector('.manager-party-field-error'), null);
+    assert.ok(target.querySelector('.manager-party-field-error') === null);
 
     unmount(mounted);
     mounted = null;
@@ -2017,7 +2016,7 @@ export function registerWorldScopeCases() {
         );
         assert.equal(
           assertSelectHasResolvedName(target, picker),
-          'Preview as actor',
+          'No actor, Preview as actor',
           'the kicker above it is a paragraph, so the trigger keeps its own name string'
         );
         assert.deepEqual(
@@ -2253,7 +2252,7 @@ export function registerWorldScopeCases() {
           assert.ok(!entity[field], `${field} is cleared`);
         }
         assert.deepEqual(entity.aliasItemUuids ?? [], []);
-        assert.equal(target.querySelector('[data-tool-source-unlink]'), null);
+        assert.ok(target.querySelector('[data-tool-source-unlink]') === null);
       });
     });
 
@@ -2489,7 +2488,7 @@ export function registerWorldScopeCases() {
           assert.ok(!entity[field], `${field} is cleared`);
         }
         assert.deepEqual(entity.aliasItemUuids ?? [], []);
-        assert.equal(target.querySelector('[data-scoped-entry-source-unlink]'), null);
+        assert.ok(target.querySelector('[data-scoped-entry-source-unlink]') === null);
       });
 
       it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {

@@ -17,6 +17,7 @@ import {
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -1417,11 +1418,17 @@ describe('world Component entry editor (issue 1371)', () => {
       const count = target.querySelector('[data-scoped-entry-system-count]');
       assert.ok(Boolean(count));
       assert.match(count.textContent, /2 of 2/);
+      // The View system rules button's name holds its visible text (issue 2869).
+      assert.ok(Boolean(target.querySelector('[data-scoped-entry-system-rules]')));
+      assertButtonsHoldTheirLabels(assert, target);
     });
 
     it('and the membership filter NARROWS the rows, carrying its own counts', async () => {
       // `proto:929` draws three PRESSABLE SEGMENTS, each with a trailing count badge.
       const { target } = await open('resin');
+      // The Add to system button's name holds its visible text (issue 2869).
+      assert.ok(Boolean(target.querySelector('[data-scoped-membership-add]')));
+      assertButtonsHoldTheirLabels(assert, target);
       const segments = [...target.querySelectorAll('[data-scoped-entry-system-filter]')].map(
         (segment) => [
           segment.getAttribute('data-scoped-entry-system-filter'),

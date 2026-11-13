@@ -165,7 +165,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       .sort();
     assert.deepEqual(values, ['nodes', 'stamina']);
     // No pill active and the muted no-limit hint is shown.
-    assert.equal(target.querySelector('[data-economy-mode-option].is-active'), null);
+    assert.ok(target.querySelector('[data-economy-mode-option].is-active') === null);
     options.forEach((o) => assert.equal(o.getAttribute('aria-pressed'), 'false'));
     assert.ok(target.querySelector('[data-economy-no-limit-hint]'));
     unmount(mounted);
@@ -181,7 +181,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     });
     await mountView({ services, systemId: 'sys-1' });
 
-    assert.equal(target.querySelector('[data-gathering-resolution-mode]'), null);
+    assert.ok(target.querySelector('[data-gathering-resolution-mode]') === null);
     assert.ok(target.querySelector('[data-economy-mode-card]'));
 
     target.querySelector('[data-economy-mode-option="nodes"]').click();
@@ -213,7 +213,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.ok(target.querySelector('[data-economy-regen-card]'));
     assert.ok(target.querySelector('[data-economy-nodes-note]'));
     // No empty-state hint when at least one is on.
-    assert.equal(target.querySelector('[data-economy-no-limit-hint]'), null);
+    assert.ok(target.querySelector('[data-economy-no-limit-hint]') === null);
     unmount(mounted);
     mounted = null;
     target.remove();
@@ -268,7 +268,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     const amountInput = target.querySelector('[data-economy-regen-amount]');
     assert.ok(amountInput);
     assert.equal(amountInput.getAttribute('type'), 'text'); // single number-or-formula expression
-    assert.equal(target.querySelector('[data-economy-regen-formula]'), null); // separate formula field removed
+    assert.ok(target.querySelector('[data-economy-regen-formula]') === null); // separate formula field removed
     assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 1);
 
     // The amount field accepts a formula expression and persists it verbatim.
@@ -341,9 +341,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.equal(calls.setStamina[0].maxOverride, 15);
     assert.equal(calls.setStamina[0].current, 3);
     // No per-row save buttons remain.
-    assert.equal(
-      target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save'),
-      null
+    assert.ok(
+      target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save') === null
     );
     unmount(mounted);
     mounted = null;

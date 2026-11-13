@@ -792,7 +792,7 @@
                 openRulesAria={(row) =>
                   format(
                     'FABRICATE.Admin.Manager.Scoped.Essence.OpenSystemRulesAria',
-                    'Open this essence in {system}',
+                    'View system rules in {system}',
                     { system: systemLabel(row) }
                   )}
                 removeLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')}
@@ -800,7 +800,7 @@
                 addAria={(row) =>
                   format(
                     'FABRICATE.Admin.Manager.Scoped.Essence.AddToSystemAria',
-                    'Add {entity} to {system}',
+                    'Add to system {system}: {entity}',
                     { entity: entity?.name ?? entry.id, system: systemLabel(row) }
                   )}
                 onArm={(token) => (armedToken = token)}

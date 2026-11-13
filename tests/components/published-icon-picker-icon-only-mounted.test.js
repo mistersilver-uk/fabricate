@@ -151,11 +151,14 @@ describe('the published IconPicker captioned trigger name', () => {
     }
   });
 
+  // `ariaLabel` is `required` and names the control, so M9 refuses any non-string (issue 2924); the
+  // trigger never composes `42, Flask` or `true, Flask` from a value the seam lets through.
   for (const ariaLabel of [42, true, {}, ['a']]) {
-    it(`renders an ariaLabel of ${JSON.stringify(ariaLabel)}, which the seam passes, without throwing`, async () => {
-      const { handle, trigger } = await mountPicker({ ariaLabel });
-      assert.equal(drawn(trigger()).name, `${String(ariaLabel)}, Flask`);
-      handle.destroy();
+    it(`refuses an ariaLabel of ${JSON.stringify(ariaLabel)} at the seam`, () => {
+      assert.throws(
+        () => mountEntry('IconPicker', { ...BASE, ariaLabel }),
+        /IconPicker requires a non-blank string "ariaLabel"/
+      );
     });
   }
 

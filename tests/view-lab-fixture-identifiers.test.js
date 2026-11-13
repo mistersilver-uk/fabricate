@@ -1213,6 +1213,23 @@ test('every Journal state survives the real run-manager normalizers at its decla
   }
 });
 
+test('the needs-tools gathering fixture seeds a matured run on the Tool-gated task its actor cannot equip', () => {
+  const fixture = journalFixture('gathering-needs-tools');
+  const [run, ...others] = Object.values(fixture.containers.gatheringRuns.active);
+  assert.equal(others.length, 0, 'one active gathering run');
+  assert.equal(run.id, LAB_JOURNAL_CASE_STATE_RUN_IDS['gathering-needs-tools']);
+  assert.equal(run.taskId, 'hb-task-icecap');
+  assert.equal(run.status, 'waitingTime');
+  assert.ok(run.timeGate.availableAt <= run.updatedAtWorldTime, 'the run is matured');
+  const task = fixture.seeded.gatheringConfig.tasks.find((entry) => entry.id === run.taskId);
+  assert.deepEqual(task.toolIds, ['hb-tool-alembic']);
+  const tool = fixture.seeded.tools.find((entry) => entry.id === 'hb-tool-alembic');
+  assert.ok(
+    fixture.actor.items.every((item) => item.uuid !== tool.registeredItemUuid),
+    'the lab actor holds no alembic'
+  );
+});
+
 test('finished gathering fixtures persist actual mode-specific awards and shared-roll evidence', async () => {
   const expected = {
     'gathering-straight': [

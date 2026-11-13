@@ -917,24 +917,21 @@ export function registerEnvironmentsCases() {
       false,
       'selected gathering task inspector should not duplicate row actions'
     );
-    assert.equal(
-      target.querySelector('.manager-inspector [aria-label="Edit Gather Moon Herbs"]'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector [aria-label="Edit Gather Moon Herbs"]') === null,
       'selected gathering task inspector should not render edit action buttons'
     );
-    assert.equal(
-      target.querySelector('.manager-inspector [aria-label="Duplicate Gather Moon Herbs"]'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector [aria-label="Duplicate Gather Moon Herbs"]') ===
+        null,
       'selected gathering task inspector should not render duplicate action buttons'
     );
-    assert.equal(
-      target.querySelector('.manager-inspector [aria-label="Delete Gather Moon Herbs"]'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector [aria-label="Delete Gather Moon Herbs"]') === null,
       'selected gathering task inspector should not render delete action buttons'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-task-inspector] .manager-action-group'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-task-inspector] .manager-action-group') === null,
       'selected gathering task identity card should not contain an action group'
     );
     const dropChips = target.querySelectorAll(
@@ -954,9 +951,8 @@ export function registerEnvironmentsCases() {
       '1'
     );
     // Region is no longer a composition fact in the task inspector.
-    assert.equal(
-      target.querySelector('[data-gathering-task-fact="region"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-task-fact="region"]') === null,
       'region fact is removed from the task inspector'
     );
     // A user-defined biome keeps its contextual label inline (e.g. "2 Biome").
@@ -1080,7 +1076,7 @@ export function registerEnvironmentsCases() {
     assertHeaderBackIsGhost('[data-gathering-task-back]', 'gathering-task-edit');
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
     assert.ok(coreEditor);
-    assert.equal(coreEditor.querySelector('.manager-link-button'), null);
+    assert.ok(coreEditor.querySelector('.manager-link-button') === null);
     assert.equal(coreEditor.textContent.includes('Back to task library'), false);
     assert.ok(target.textContent.includes('Task Identity'));
     assert.equal(target.textContent.includes('Internal ID'), false);
@@ -1103,11 +1099,11 @@ export function registerEnvironmentsCases() {
     assert.ok(dropInspectorChildren[2].classList.contains('manager-drop-inspector-scroll'));
     assert.ok(dropInspectorChildren[2].querySelector('.manager-drop-editor-card'));
     assert.ok(dropInspectorChildren[2].querySelector('[data-gathering-drop-character-modifiers]'));
-    assert.equal(target.querySelector('.manager-task-editor-tabs'), null);
-    assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
-    assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
+    assert.ok(target.querySelector('.manager-task-editor-tabs') === null);
+    assert.ok(target.querySelector('[data-gathering-task-summary]') === null);
+    assert.ok(target.querySelector('[data-gathering-task-matching-logic]') === null);
     assert.ok(target.textContent.includes('Drop chance'));
-    assert.equal(target.querySelector('.manager-task-card-header .manager-drop-count'), null);
+    assert.ok(target.querySelector('.manager-task-card-header .manager-drop-count') === null);
     // The count is the drop table's own caption since issue 1782, beside its heading.
     assert.equal(
       target.querySelector('[data-gathering-task-drops-table] caption .fabricate-data-table-count')
@@ -1127,7 +1123,7 @@ export function registerEnvironmentsCases() {
     const populatedDropRow = target.querySelector(
       '[data-gathering-task-drop-id="drop-nightshade"]'
     );
-    assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
+    assert.ok(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]') === null);
     const populatedComponentCell = populatedDropRow.querySelector(
       '[data-gathering-task-drop-component-cell]'
     );
@@ -1151,11 +1147,10 @@ export function registerEnvironmentsCases() {
         'Nightshade With An Exceptionally Long Localized Component Name'
       )
     );
-    assert.equal(
+    assert.ok(
       populatedComponentCell.querySelector(
         '.manager-drop-component-button .manager-system-description'
-      ),
-      null
+      ) === null
     );
     assert.equal(
       populatedComponentCell.textContent.includes('A dusky flowering herb used in careful doses.'),
@@ -1325,8 +1320,8 @@ export function registerEnvironmentsCases() {
           pill.textContent.includes('+0%')
       )
     );
-    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate"]'), null);
-    assert.equal(populatedDropRow.querySelector('[aria-label="Delete"]'), null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Duplicate"]') === null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Delete"]') === null);
     const selectedDropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
     const selectedDropActions = selectedDropInspector.querySelector('.manager-drop-editor-actions');
     assert.ok(selectedDropActions);
@@ -1449,8 +1444,8 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     assert.equal(refreshedInspectorCountInput.value, '5');
-    assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
-    assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Select drop rule"]') === null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Edit drop rule"]') === null);
     // Back to Overview for the identity card, which the tab switch redrew (issue 1522).
     target.querySelector('[data-gathering-task-tab="overview"]').click();
     await tick();
@@ -1463,7 +1458,7 @@ export function registerEnvironmentsCases() {
     assert.equal(mediaColumn.firstElementChild, taskImagePicker);
     assert.equal(mediaColumn.children[1], taskStatus);
     assert.equal(taskStatusToggle.tagName, 'BUTTON');
-    assert.equal(taskStatusToggle.querySelector('input'), null);
+    assert.ok(taskStatusToggle.querySelector('input') === null);
     assert.equal(
       taskStatusToggle.querySelector('.manager-status-toggle-label').textContent.trim(),
       'Off'
@@ -1496,9 +1491,8 @@ export function registerEnvironmentsCases() {
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
     // Region is no longer a task availability/composition axis.
-    assert.equal(
-      target.querySelector('[data-gathering-task-field="regions"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-task-field="regions"]') === null,
       'region availability picker is removed from the task editor'
     );
     // What each row is, rather than "not a native select" (issue 1510): this editor renders none
@@ -1736,7 +1730,7 @@ export function registerEnvironmentsCases() {
       target.querySelector('[data-gathering-events-browser]'),
       'Events tab should mount the event library browser'
     );
-    assert.equal(target.querySelector('.manager-environments-table'), null);
+    assert.ok(target.querySelector('.manager-environments-table') === null);
     assert.ok(
       target.querySelector('.manager-inspector').textContent.includes('Select a gathering event'),
       'inspector should show the select-event empty state when no event is selected'
@@ -1750,8 +1744,8 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelector('.fabricate-filter-bar'), null);
-    assert.equal(target.querySelector('.manager-environments-table'), null);
+    assert.ok(target.querySelector('.fabricate-filter-bar') === null);
+    assert.ok(target.querySelector('.manager-environments-table') === null);
     // The Gathering tab's page hint is the SHELL's since issue 1515 deleted the browse view's own
     // section header, so it reads the rail record's fallback — which is the one that agrees with
     // `lang/en.json`. The view's own tab table still carries a longer copy for the empty-tab
@@ -1765,7 +1759,7 @@ export function registerEnvironmentsCases() {
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 1);
     assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
     assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
-    assert.equal(target.querySelector('[data-gathering-vocabulary-panel="regions"]'), null);
+    assert.ok(target.querySelector('[data-gathering-vocabulary-panel="regions"]') === null);
     assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
     // The Travel & Realms toggle LEFT this tab for a System Settings feature tile beside
     // Currency (issue 1282), because participation in a world-scope subsystem is the same kind
@@ -2002,9 +1996,8 @@ export function registerEnvironmentsCases() {
       managerShell,
       'biome color popover should stay inside the Manager shell overlay layer'
     );
-    assert.equal(
-      colorPopover.closest('[data-gathering-vocabulary-panel="biomes"]'),
-      null,
+    assert.ok(
+      colorPopover.closest('[data-gathering-vocabulary-panel="biomes"]') === null,
       'biome color popover should be portaled out of the settings panel'
     );
     assert.match(
@@ -2070,8 +2063,8 @@ export function registerEnvironmentsCases() {
     managerShell.getBoundingClientRect = originalShellRect;
     managerMain.getBoundingClientRect = originalMainRect;
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
-    assert.equal(target.querySelector('.manager-gathering-settings-summary'), null);
-    assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
+    assert.ok(target.querySelector('.manager-gathering-settings-summary') === null);
+    assert.ok(target.querySelector('[data-gathering-rule-fact]') === null);
     assert.ok(
       target
         .querySelector('.manager-inspector')
@@ -2134,7 +2127,7 @@ export function registerEnvironmentsCases() {
       ['Danger level only', 'Encounter chance', 'Full details'],
       'event visibility select renders in the rules inspector'
     );
-    assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
+    assert.ok(target.querySelector('.manager-inspector [data-gathering-rule-stepper]') === null);
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
       false
@@ -2171,7 +2164,7 @@ export function registerEnvironmentsCases() {
     );
     assert.equal(forestRow.textContent.includes('results'), false);
     assert.equal(forestRow.textContent.includes('catalysts'), false);
-    assert.equal(forestRow.querySelector('.manager-environment-task-count.manager-chip'), null);
+    assert.ok(forestRow.querySelector('.manager-environment-task-count.manager-chip') === null);
     assert.ok(forestRow.querySelector('.fabricate-toggle'));
     assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
@@ -2195,9 +2188,8 @@ export function registerEnvironmentsCases() {
       ),
       ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern']
     );
-    assert.equal(
-      forestRow.querySelector('.manager-environment-reorder-stack'),
-      null,
+    assert.ok(
+      forestRow.querySelector('.manager-environment-reorder-stack') === null,
       'environment rows should no longer render reorder controls'
     );
     assert.ok(
@@ -2401,9 +2393,8 @@ export function registerEnvironmentsCases() {
       target.querySelector(':scope [data-overview-section="identity"] .fab-art-picker');
     assert.ok(artRoot().hasAttribute('data-scene-locked-image'), 'the locked art keeps its hook');
     assert.ok(picker.querySelector('.fa-lock'), 'locked identity image should show a lock icon');
-    assert.equal(
-      target.querySelector('[data-overview-section="identity"] .fa-pen'),
-      null,
+    assert.ok(
+      target.querySelector('[data-overview-section="identity"] .fa-pen') === null,
       'locked identity image should not show the edit affordance'
     );
     assert.equal(
@@ -2666,24 +2657,20 @@ export function registerEnvironmentsCases() {
       'available',
       'task inspector header should keep the runtime pill'
     );
-    assert.equal(
-      target.querySelector('[data-record-inspector-section="source"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-record-inspector-section="source"]') === null,
       'task inspector should not render a Source card'
     );
-    assert.equal(
-      target.querySelector('[data-record-inspector-section="runtime-state"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-record-inspector-section="runtime-state"]') === null,
       'task inspector should not render a Runtime state card'
     );
-    assert.equal(
-      target.querySelector('.manager-environment-inspector-actions'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-environment-inspector-actions') === null,
       'task inspector should not render the selected-record action strip'
     );
-    assert.equal(
-      target.querySelector('.manager-environment-open-source'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-environment-open-source') === null,
       'task inspector should not render an open-source CTA'
     );
     assert.equal(
@@ -2839,9 +2826,10 @@ export function registerEnvironmentsCases() {
       false,
       'negative modifiers should not color the percent input shell'
     );
-    assert.equal(
-      taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] input[type="number"]'),
-      null,
+    assert.ok(
+      taskOverrides.querySelector(
+        '[data-drop-rate-adjustment="drop-herb"] input[type="number"]'
+      ) === null,
       'task drop override should not use the plain number input'
     );
     taskAdjustmentInput.value = '-';
@@ -2892,29 +2880,24 @@ export function registerEnvironmentsCases() {
       'available',
       'event inspector header should keep the runtime pill'
     );
-    assert.equal(
-      target.querySelector('[data-record-inspector-section="source"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-record-inspector-section="source"]') === null,
       'event inspector should not render a Source card'
     );
-    assert.equal(
-      target.querySelector('[data-record-inspector-section="runtime-state"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-record-inspector-section="runtime-state"]') === null,
       'event inspector should not render a Runtime state card'
     );
-    assert.equal(
-      target.querySelector('[data-record-inspector-section="event-runtime"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-record-inspector-section="event-runtime"]') === null,
       'event inspector should not render a Event runtime card'
     );
-    assert.equal(
-      target.querySelector('.manager-environment-inspector-actions'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-environment-inspector-actions') === null,
       'event inspector should not render the selected-record action strip'
     );
-    assert.equal(
-      target.querySelector('.manager-environment-open-source'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-environment-open-source') === null,
       'event inspector should not render an open-source CTA'
     );
     assert.equal(
@@ -3015,9 +2998,8 @@ export function registerEnvironmentsCases() {
       'text',
       'event override input should use the text percentage input formatting'
     );
-    assert.equal(
-      eventAdjustmentRow.querySelector('input[type="number"]'),
-      null,
+    assert.ok(
+      eventAdjustmentRow.querySelector('input[type="number"]') === null,
       'event override should no longer use the plain number input'
     );
     assert.ok(

@@ -138,19 +138,16 @@ export function registerRecipesCases() {
       recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: ['u1'] } },
       onUpdateRecipe: () => {},
     });
-    assert.equal(
-      target.querySelector('[data-recipe-section="visibility"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="visibility"]') === null,
       'the legacy visibility section is deleted, not restyled'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-field="visibility-restricted"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-field="visibility-restricted"]') === null,
       'no restrict toggle'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-users]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-users]') === null,
       'no allowed-users allow-list'
     );
   });
@@ -168,9 +165,8 @@ export function registerRecipesCases() {
     });
     const card = target.querySelector('[data-recipe-section="locked-status"]');
     assert.ok(card, 'the Locked status card renders');
-    assert.equal(
-      target.querySelector('[data-recipe-item-locked-image]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-item-locked-image]') === null,
       'the Locked card is not the recipe-item locked-image affordance'
     );
     // The Locked card is a left-aligned status card (icon + copy + switch).
@@ -183,9 +179,8 @@ export function registerRecipesCases() {
       card.querySelector('[data-recipe-field="locked"]'),
       'the Locked switch renders in the status card'
     );
-    assert.equal(
-      card.querySelector('.manager-task-core-status'),
-      null,
+    assert.ok(
+      card.querySelector('.manager-task-core-status') === null,
       'a card with no image picker must not reuse the media column stack, which centres and 14ch-clamps its copy'
     );
     const toggle = target.querySelector('[data-recipe-field="locked"]');
@@ -256,16 +251,14 @@ export function registerRecipesCases() {
     assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
     // No "On"/"Off" TEXT in the row (issue 643): the track colour is the state.
     for (const toggle of [enabledRecipeToggle, disabledRecipeToggle]) {
-      assert.equal(
-        toggle.querySelector('.manager-status-toggle-label'),
-        null,
+      assert.ok(
+        toggle.querySelector('.manager-status-toggle-label') === null,
         'the row switch carries no redundant On/Off text'
       );
       assert.ok(toggle.getAttribute('aria-label'), 'the switch is still named for assistive tech');
     }
-    assert.equal(
-      target.querySelector('[data-recipe-id="r2"] .manager-toggle input[type="checkbox"]'),
-      null
+    assert.ok(
+      target.querySelector('[data-recipe-id="r2"] .manager-toggle input[type="checkbox"]') === null
     );
 
     target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
@@ -278,22 +271,19 @@ export function registerRecipesCases() {
     const r2Blocked = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-danger');
     assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
     assert.equal(r2Blocked.textContent.trim(), "Can't enable");
-    assert.equal(
-      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning') === null,
       'a complete recipe row should not render an authoring-state pill'
     );
 
-    assert.equal(
-      target.querySelector('.fabricate-pagination'),
-      null,
+    assert.ok(
+      target.querySelector('.fabricate-pagination') === null,
       'pagination should hide while filtered row count is below the page size'
     );
 
     // The status filter is a segmented control (all / on / off).
-    assert.equal(
-      target.querySelector('[data-recipe-filter-chip="status"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-filter-chip="status"]') === null,
       'no active-filter chip should show while every filter is at its default'
     );
     const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
@@ -311,9 +301,8 @@ export function registerRecipesCases() {
     statusChip.querySelector('.manager-recipe-chip-clear').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-recipe-filter-chip="status"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-filter-chip="status"]') === null,
       'clearing the chip should reset the filter'
     );
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
@@ -401,7 +390,7 @@ export function registerRecipesCases() {
       'function',
       "the root must forward the row's blocked-message sink to the store — dropping it silently restores the Foundry toast"
     );
-    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'nothing has been refused yet');
+    assert.ok(target.querySelector('[data-recipe-flash]') === null, 'nothing has been refused yet');
     enableCall[3].onBlocked('This recipe has no result groups.');
     flushSync();
     const flash = target.querySelector('[data-recipe-flash]');
@@ -444,9 +433,8 @@ export function registerRecipesCases() {
       'recipe-edit renders the identity card in the central main'
     );
     // The mock system carries no recipeVisibility.knowledge.mode.
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector') === null,
       'recipe-edit renders no inspector aside — the rail is deleted and its column released'
     );
     const booksTab = target.querySelector('.manager-main [data-recipe-tab-button="books-scrolls"]');
@@ -1262,15 +1250,13 @@ export function registerRecipesCases() {
     assert.equal(craftingSubitem('Knowledge').classList.contains('is-active'), true);
     assert.ok(target.querySelector('[data-knowledge-view]'), 'the knowledge surface renders');
     assert.ok(target.querySelector('[data-knowledge-search]'), 'the roster search renders');
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector') === null,
       'the shared inspector aside is suppressed for the knowledge route'
     );
     // The page header carries no roster roll-up pill.
-    assert.equal(
-      target.querySelector('[data-knowledge-header-pills]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-knowledge-header-pills]') === null,
       'the knowledge page header renders no roster roll-up pill'
     );
   });
@@ -1605,7 +1591,7 @@ export function registerRecipesCases() {
     flushSync();
 
     // Creation is a drop-zone now (issue 844) — the blank-window create dialog is gone.
-    assert.equal(target.querySelector('[data-books-scrolls-create]'), null, 'no create button');
+    assert.ok(target.querySelector('[data-books-scrolls-create]') === null, 'no create button');
     const dropZone = target.querySelector('[data-books-scrolls-drop-zone]');
     assert.ok(dropZone, 'the Books & Scrolls surface has a creation drop-zone');
 

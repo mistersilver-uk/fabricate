@@ -70,13 +70,13 @@ describe('RecipeItemLimitsTab (mounted)', () => {
   it('renders only the item Uses card in item mode', async () => {
     const root = await harness.mount({ recipeItem: itemDraft(), visibilityMode: 'item' });
     assert.ok(root.querySelector('[data-recipe-item-limits-card="item"]'));
-    assert.equal(root.querySelector('[data-recipe-item-limits-card="knowledge"]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-limits-card="knowledge"]') === null);
   });
 
   it('renders only the knowledge Learning card in knowledge mode', async () => {
     const root = await harness.mount({ recipeItem: learnDraft(), visibilityMode: 'knowledge' });
     assert.ok(root.querySelector('[data-recipe-item-limits-card="knowledge"]'));
-    assert.equal(root.querySelector('[data-recipe-item-limits-card="item"]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-limits-card="item"]') === null);
   });
 
   // Set a typeahead's term (bubbling input event) then click the matching suggestion.
@@ -136,9 +136,8 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     search2.value = 'expert';
     search2.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(
-      root.querySelector('[data-recipe-item-character-prereq-option="p1"]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-character-prereq-option="p1"]') === null,
       'an already-selected prereq is not offered again'
     );
   });
@@ -163,16 +162,14 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       visibilityMode: 'knowledge',
       characterPrerequisites: [],
     });
-    assert.equal(
-      root.querySelector('[data-recipe-item-character-prereq-search]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-character-prereq-search]') === null,
       'no search input when the library is empty'
     );
     const empty = root.querySelector('[data-recipe-item-character-prereq-empty]');
     assert.ok(empty && empty.textContent.trim().length > 0, 'a real muted empty note is rendered');
-    assert.equal(
-      root.querySelector('[data-recipe-item-character-prereq-chips]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-character-prereq-chips]') === null,
       'no chips when nothing selected'
     );
   });
@@ -250,9 +247,8 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       cpChip.querySelector('i.fa-hat-wizard'),
       'the character-prereq chip uses the prereq’s own icon'
     );
-    assert.equal(
-      cpChip.querySelector('i.fa-user-check'),
-      null,
+    assert.ok(
+      cpChip.querySelector('i.fa-user-check') === null,
       'no generic fallback icon when the prereq has its own'
     );
   });
@@ -280,9 +276,8 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       linkedRecipes: [],
       availableRecipes: [],
     });
-    assert.equal(
-      root.querySelector('[data-recipe-item-required-knowledge-search]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-required-knowledge-search]') === null,
       'no search input with no options'
     );
     const empty = root.querySelector('[data-recipe-item-required-knowledge-empty]');
@@ -432,14 +427,12 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       linkedRecipes: [{ id: 'r1', name: 'Alloy Bronze' }],
       characterPrerequisites: [{ id: 'p1', name: 'Expert', path: 'x', op: 'gte', value: 1 }],
     });
-    assert.equal(
-      root.querySelector('[data-recipe-item-required-knowledge-search]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-required-knowledge-search]') === null,
       'Required Knowledge is hidden when the toggle is off'
     );
-    assert.equal(
-      root.querySelector('[data-recipe-item-character-prereq-search]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-character-prereq-search]') === null,
       'Learning prerequisites are hidden when the toggle is off'
     );
   });
@@ -471,9 +464,8 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       visibilityMode: 'item',
       onPatch: (p) => patches.push(p),
     });
-    assert.equal(
-      root.querySelector('[data-recipe-item-uses-stepper]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-uses-stepper]') === null,
       'uses detail hidden while limited-use is off'
     );
     root.querySelector('[data-recipe-item-limit-uses]').click();

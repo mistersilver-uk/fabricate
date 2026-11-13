@@ -80,6 +80,7 @@ function primaryPress(outside) {
  *   onDismiss?: Function,
  *   onDetached?: Function,
  *   onFocusLeave?: Function,
+ *   preventEscape?: boolean,
  *   additionalNodes?: HTMLElement | null | Array<HTMLElement | null> | (() => HTMLElement | null | Array<HTMLElement | null>)
  * }} [options]
  * @returns {{
@@ -89,6 +90,7 @@ function primaryPress(outside) {
  *     onDismiss?: Function,
  *     onDetached?: Function,
  *     onFocusLeave?: Function,
+ *     preventEscape?: boolean,
  *     additionalNodes?: HTMLElement | null | Array<HTMLElement | null> | (() => HTMLElement | null | Array<HTMLElement | null>)
  *   }): void,
  *   destroy(): void
@@ -99,6 +101,7 @@ export function dismissOnOutsideClick(node, options = {}) {
   let onDismiss = options.onDismiss;
   let onDetached = options.onDetached;
   let onFocusLeave = options.onFocusLeave;
+  let preventEscape = options.preventEscape === true;
   let additionalNodes = options.additionalNodes;
   let onClick = options.dismissOn === 'click';
   // The document the pair is bound to, so it is removed from that one.
@@ -133,7 +136,9 @@ export function dismissOnOutsideClick(node, options = {}) {
 
   function handleKeyDown(event) {
     press.reset();
-    if (event.key === 'Escape') dismiss(event);
+    if (event.key !== 'Escape') return;
+    if (preventEscape) event.preventDefault();
+    dismiss(event);
   }
 
   const listeners = [
@@ -169,6 +174,7 @@ export function dismissOnOutsideClick(node, options = {}) {
       onDismiss = newOptions.onDismiss;
       onDetached = newOptions.onDetached;
       onFocusLeave = newOptions.onFocusLeave;
+      preventEscape = newOptions.preventEscape === true;
       additionalNodes = newOptions.additionalNodes;
       onClick = newOptions.dismissOn === 'click';
       const nextEnabled = newOptions.enabled !== false;
@@ -183,5 +189,21 @@ export function dismissOnOutsideClick(node, options = {}) {
     destroy() {
       detach();
     },
+  };
+}
+
+/**
+ * `dismissOnOutsideClick` for a panel that owns the Escape that closes it: the key's default is
+ * prevented, so a modal dialog around the panel stays open and only a second Escape closes it
+ * (issue 2917). `Modal` keeps the plain action, whose Escape is judged by its own dialog.
+ *
+ * @param {HTMLElement} node
+ * @param {Parameters<typeof dismissOnOutsideClick>[1]} [options]
+ */
+export function dismissPanelOnOutsideClick(node, options = {}) {
+  const action = dismissOnOutsideClick(node, { ...options, preventEscape: true });
+  return {
+    update: (next = {}) => action.update({ ...next, preventEscape: true }),
+    destroy: action.destroy,
   };
 }

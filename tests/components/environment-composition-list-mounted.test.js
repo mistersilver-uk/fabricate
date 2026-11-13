@@ -5,8 +5,6 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { compile } from 'svelte/compiler';
-
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 
 // The raw `.js` closure of `SearchablePopover`.
@@ -15,10 +13,10 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
@@ -29,18 +27,7 @@ let Component;
 let mounted;
 let target;
 
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected',
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
+const { writeCompiledSvelte } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 function copyModule(sourcePath) {
   const destination = join(tempRoot, sourcePath);
@@ -446,8 +433,8 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
     assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
-    assert.equal(target.querySelector('[data-section="excluded"]'), null);
-    assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+    assert.ok(target.querySelector('[data-section="excluded"]') === null);
+    assert.ok(target.querySelector('[data-section="non-matching"]') === null);
     assert.ok(
       !target.textContent.includes('Excluded'),
       'manual task mode does not present excluded task rows'
@@ -621,9 +608,9 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
     assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
-    assert.equal(target.querySelector('[data-section="candidates"]'), null);
-    assert.equal(target.querySelector('[data-section="excluded"]'), null);
-    assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+    assert.ok(target.querySelector('[data-section="candidates"]') === null);
+    assert.ok(target.querySelector('[data-section="excluded"]') === null);
+    assert.ok(target.querySelector('[data-section="non-matching"]') === null);
     assert.ok(
       !target.querySelector('[data-sortable-grip]'),
       'all-drops event mode does not render rank handles'
@@ -639,11 +626,10 @@ describe('CompositionList mounted layout', () => {
     assert.equal(removeQuick.getAttribute('data-tooltip-text'), 'Remove');
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '[data-record-id="included"] .fabricate-icon-button[aria-label="Open source event"]'
-      ),
-      null,
+      ) === null,
       'included manual event rows do not render a standalone edit-source action'
     );
 

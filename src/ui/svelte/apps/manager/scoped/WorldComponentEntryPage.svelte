@@ -758,10 +758,10 @@
                     triggerClass="manager-component-entry-category-trigger"
                     valueClass="manager-component-entry-category-value"
                     triggerLabel={worldCategory || noCategoryLabel}
-                    ariaLabel={text(
+                    ariaLabel={`${worldCategory || noCategoryLabel}, ${text(
                       'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
                       'World category'
-                    )}
+                    )}`}
                     panelLabel={text(
                       'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
                       'World category'

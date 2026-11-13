@@ -7,7 +7,6 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import { choosePageSize, pageSizeValues } from '../helpers/page-size-control.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 // The raw `.js` closure of `SearchablePopover`.
@@ -20,6 +19,7 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
@@ -32,18 +32,7 @@ let mounted;
 let target;
 
 
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected'
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
+const { writeCompiledSvelte } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 function environment(overrides = {}) {
   return {
@@ -264,7 +253,10 @@ describe('GatheringView mounted behavior', () => {
   it('transitions from loading to a populated 3-column layout', async () => {
     await mountView(makeServices(listing([environment()])));
 
-    assert.equal(target.querySelector('[data-gathering-state="loading"]'), null, 'loading state cleared');
+    assert.ok(
+      target.querySelector('[data-gathering-state="loading"]') === null,
+      'loading state cleared'
+    );
     assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'populated layout shown');
     assert.ok(target.querySelector('.gathering-view-column-center'), 'center column present');
     assert.ok(target.querySelector('.gathering-view-column-right'), 'right column present');
@@ -299,7 +291,7 @@ describe('GatheringView mounted behavior', () => {
     await mountView(makeServices({ visible: true, selectedActorId: null, environments: [] }));
 
     assert.ok(target.querySelector('[data-gathering-state="empty"]'), 'no-actor renders empty state');
-    assert.equal(target.querySelector('[data-gathering-state="populated"]'), null);
+    assert.ok(target.querySelector('[data-gathering-state="populated"]') === null);
   });
 
   it('shows the error state when the service rejects', async () => {
@@ -350,9 +342,8 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(thumbWrap, 'locked card has the relative thumb wrapper');
     assert.ok(thumbWrap.contains(overlay), 'lock overlay sits within the thumb container (over the image)');
     assert.ok(overlay.querySelector('.fa-lock'), 'overlay carries the lock icon');
-    assert.equal(
-      lockedCard.querySelector('.gathering-env-card-lock'),
-      null,
+    assert.ok(
+      lockedCard.querySelector('.gathering-env-card-lock') === null,
       'no separate lock chip element remains (the old .gathering-env-card-lock chip is gone)'
     );
 
@@ -477,7 +468,10 @@ describe('GatheringView mounted behavior', () => {
 
     // A normal (in-realm/open) environment shows no realm alert.
     const openCard = target.querySelector('[data-environment-id="env-open"]');
-    assert.equal(openCard.querySelector('.gathering-env-card-realm-alert'), null, 'open env has no realm alert');
+    assert.ok(
+      openCard.querySelector('.gathering-env-card-realm-alert') === null,
+      'open env has no realm alert'
+    );
   });
 
   it('renders a literal customColor hex in the chip --fab-chip-color, distinct from the token path', async () => {
@@ -535,9 +529,8 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(twoTagCard.querySelector('.gathering-env-card-chips'), 'chip row container present');
 
     const noTagCard = target.querySelector('[data-environment-id="env-no-tags"]');
-    assert.equal(
-      noTagCard.querySelector('.gathering-env-card-chips'),
-      null,
+    assert.ok(
+      noTagCard.querySelector('.gathering-env-card-chips') === null,
       'empty biomeTags renders no chip row (the {#if biomeTags.length > 0} empty branch)'
     );
     assert.equal(noTagCard.querySelectorAll('.gathering-env-card-chip').length, 0, 'no chips when biomeTags is empty');
@@ -585,10 +578,16 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(blindCard.textContent.includes('(1/3)'), 'suffix renders the counts');
 
     const neverCard = target.querySelector('[data-environment-id="env-blind-never"]');
-    assert.equal(neverCard.querySelector('.gathering-env-card-discovered'), null, 'reveal never hides suffix');
+    assert.ok(
+      neverCard.querySelector('.gathering-env-card-discovered') === null,
+      'reveal never hides suffix'
+    );
 
     const targetedCard = target.querySelector('[data-environment-id="env-targeted"]');
-    assert.equal(targetedCard.querySelector('.gathering-env-card-discovered'), null, 'targeted hides suffix');
+    assert.ok(
+      targetedCard.querySelector('.gathering-env-card-discovered') === null,
+      'targeted hides suffix'
+    );
   });
 
   it('auto-selects the first non-locked environment after load', async () => {
@@ -657,9 +656,8 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(head.compareDocumentPosition(desc) & 4, 'beneath the name');
 
     const bareCard = target.querySelector('[data-environment-id="env-no-desc"]');
-    assert.equal(
-      bareCard.querySelector('.gathering-env-card-description'),
-      null,
+    assert.ok(
+      bareCard.querySelector('.gathering-env-card-description') === null,
       'description element omitted entirely when description is empty'
     );
   });
@@ -948,7 +946,10 @@ describe('GatheringView mounted behavior', () => {
 
     target.querySelector('[data-pagination-next]').click();
     flushSync();
-    assert.equal(target.querySelector('[data-environment-id="env-0"]'), null, 'selected card is off the visible page');
+    assert.ok(
+      target.querySelector('[data-environment-id="env-0"]') === null,
+      'selected card is off the visible page'
+    );
 
     target.querySelector('[data-pagination-prev]').click();
     flushSync();
@@ -971,9 +972,8 @@ describe('GatheringView mounted behavior', () => {
     typeSearch('Environment 3');
     const survivors = Array.from(target.querySelectorAll('[data-environment-id]')).map(card => card.getAttribute('data-environment-id'));
     assert.deepEqual(survivors, ['env-3'], 'the single matching card is visible after the page reset');
-    assert.equal(
-      target.querySelector('[data-pagination-prev]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-pagination-prev]') === null,
       'page reset to 0 — the prev control is gone (single filtered page)'
     );
   });
@@ -1018,7 +1018,10 @@ describe('GatheringView mounted behavior', () => {
 
     // Search only matches Alpha, so env-b leaves the DOM entirely.
     typeSearch('Alpha');
-    assert.equal(target.querySelector('[data-environment-id="env-b"]'), null, 'selected card is filtered out of the DOM');
+    assert.ok(
+      target.querySelector('[data-environment-id="env-b"]') === null,
+      'selected card is filtered out of the DOM'
+    );
 
     // Clearing the search brings env-b back with its selection intact (selectedId retained).
     typeSearch('');
@@ -1030,7 +1033,10 @@ describe('GatheringView mounted behavior', () => {
   it('hides the pager footer at exactly 6 environments and shows it with two pages at 7', async () => {
     // At <= 6 the footer is hidden (showPagination = totalCount > minPageSize, minPageSize 6).
     await mountView(makeServices(listing(manyEnvironments(6))));
-    assert.equal(target.querySelector('.fabricate-pagination'), null, 'no pager footer at exactly 6 environments');
+    assert.ok(
+      target.querySelector('.fabricate-pagination') === null,
+      'no pager footer at exactly 6 environments'
+    );
 
     // afterEach unmounts the first mount; remount with 7 to cross the boundary.
     unmount(mounted);

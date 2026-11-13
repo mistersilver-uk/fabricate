@@ -262,9 +262,8 @@ describe('Workbench (mounted)', () => {
       benchChips: BENCH,
       benchEssences: []
     });
-    assert.equal(
-      target.querySelector('[data-alchemy-bench-essences]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-alchemy-bench-essences]') === null,
       'no readout for an essence-less bench'
     );
   });

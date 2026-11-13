@@ -111,7 +111,7 @@ describe('ItemPickerGrid: header structure', () => {
     const scrollRegion = panel.querySelector('.picker-grid-scroll');
     assert.ok(scrollRegion, '.picker-grid-scroll should exist');
     assert.equal(scrollRegion.previousElementSibling, header);
-    assert.equal(scrollRegion.querySelector('.picker-search'), null);
+    assert.ok(scrollRegion.querySelector('.picker-search') === null);
   });
 
   it('picker-header appears before picker-grid-scroll in the DOM', () => {

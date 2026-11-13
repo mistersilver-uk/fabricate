@@ -106,7 +106,7 @@ describe('RecipeItemValidationTab (mounted)', () => {
     assert.equal(blockingTile(root).getAttribute('data-critical-count'), '2');
     // Exactly two count tiles — no Warnings tile (books validation is two-state).
     assert.equal(root.querySelectorAll('[data-recipe-item-validation-counts] .manager-recipe-rail-count').length, 2);
-    assert.equal(root.querySelector('.manager-recipe-rail-count.is-warning'), null);
+    assert.ok(root.querySelector('.manager-recipe-rail-count.is-warning') === null);
   });
 
   it('passes all checks when linked, with recipes and valid uses', async () => {

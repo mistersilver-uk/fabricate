@@ -9,6 +9,7 @@ import { mountWithLocalizer } from '../../src/ui/svelte/util/appLocalizer.js';
 import { foundryTooltips, localize } from '../../src/ui/svelte/util/foundryBridge.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
 import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
+import { labCanvasStation } from './labCanvasStation.js';
 import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
@@ -207,6 +208,10 @@ function readParams() {
       ? params.get('companionRoll')
       : null,
     // view-lab-region:end
+    // view-lab-region:player-canvas-station
+    // The canvas station the window opens with (issue 2277): `named` or `unnamed`, else none.
+    canvasStation: params.get('canvasStation'),
+    // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).
     //
@@ -366,10 +371,11 @@ async function mountPlayerApp(content, params) {
   }
 
   const activeTab = params.tab ?? 'crafting';
+  const activeCanvasTool = labCanvasStation(params.canvasStation);
   const app = borrowInstance(SvelteFabricateApp, {
     _activeTab: activeTab,
     _services: null,
-    _activeCanvasTool: null,
+    _activeCanvasTool: activeCanvasTool,
     _scopedInteractableRef: null,
     _scopedEnvironmentId: null,
     _scopedTaskId: null,
@@ -386,7 +392,7 @@ async function mountPlayerApp(content, params) {
     showAlchemy: isAlchemyTabAvailable(services),
     onSelectTab: () => {},
     services,
-    activeCanvasTool: null,
+    activeCanvasTool,
     scopedEnvironmentId: null,
     scopedTaskId: null,
     scopedActorId: null,
@@ -862,6 +868,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-tint-swatches': () => import('./fixtures/PublishedTintSwatches.svelte'),
   // Issue 2859: two open dialogs over busy panes, without a scrim and with the dim one.
   'published-modal-scrim': () => import('./fixtures/PublishedModalScrim.svelte'),
+  // Issue 2840: three open dialogs, one per width rung, each with its icon and a subtitle.
+  'published-modal-sizes': () => import('./fixtures/PublishedModalSizes.svelte'),
   // Issues 2456, 2679, 2680, 2775, 2836, 2862, 2860, 2861 and 2901: the twenty-two entries that state a
   // standalone style root, in targets with no Fabricate root and under one.
   'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),

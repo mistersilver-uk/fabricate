@@ -447,9 +447,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   it('progressive salvage has NO quantity stepper — the engine forces quantity 1', async () => {
     // This test was the exact REVERSE until issue 676.
     const target = await harness.mount(props());
-    assert.equal(
-      target.querySelector('[data-salvage-result-quantity]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-salvage-result-quantity]') === null,
       'a progressive yield is one item; repetition is authored by listing the component twice'
     );
     harness.remount();
@@ -751,8 +750,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   it('D3: ordinals and badges are progressive-only', async () => {
     const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
-    assert.equal(target.querySelector('[data-salvage-result-ordinal]'), null);
-    assert.equal(target.querySelector('[data-salvage-result-difficulty]'), null);
+    assert.ok(target.querySelector('[data-salvage-result-ordinal]') === null);
+    assert.ok(target.querySelector('[data-salvage-result-difficulty]') === null);
     harness.remount();
   });
 
@@ -761,9 +760,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   it('Simple mode HIDES Add group at the one-success-group cap and shows the required hint', async () => {
     // RESULT_GROUPS carries one success group, so Simple mode is at its cap.
     const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
-    assert.equal(
-      target.querySelector('[data-add-salvage-group]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]') === null,
       'no Add group control at the Simple one-success-group cap'
     );
     const hint = target.querySelector('[data-salvage-simple-hint]');
@@ -831,9 +829,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       target.querySelector('[data-add-salvage-group]'),
       'Routed still exposes Add group'
     );
-    assert.equal(
-      target.querySelector('[data-salvage-simple-hint]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-salvage-simple-hint]') === null,
       'the Simple hint is Simple-only'
     );
     harness.remount();
@@ -855,9 +852,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         },
       })
     );
-    assert.equal(
-      target.querySelector('[data-add-salvage-group]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]') === null,
       'capped at one success group even with a legacy failure group present'
     );
     const groups = target.querySelectorAll('[data-salvage-group]');

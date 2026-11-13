@@ -1120,7 +1120,7 @@ test('(a) an IconPicker change publishes its frame, then the four specimens that
   assertBroadSignalFrames(file, frames);
 });
 
-test('(a) a Modal change publishes its five frames, then the three specimens that mount it through the seam, then the one that opens it with no Fabricate root', () => {
+test('(a) a Modal change publishes its five frames, then the four specimens that mount it through the seam, then the one that opens it with no Fabricate root', () => {
   const file = 'src/ui/svelte/components/Modal.svelte';
   const frames = [
     'player-crafting-roll-prompt-basic',
@@ -1131,6 +1131,7 @@ test('(a) a Modal change publishes its five frames, then the three specimens tha
     'manager-published-modal-specimen',
     'manager-published-modal-close',
     'manager-published-modal-scrim-specimen',
+    'manager-published-modal-sizes-specimen',
     'published-standalone-modal-open',
   ];
   assertBroadSignalFrames(file, frames);
