@@ -748,3 +748,17 @@ test('validateSystem is enabled-scoped: a disabled collider does not count again
   const result = validator.validateSystem('sys-1');
   assert.equal(result.valid, true, 'the disabled collider is excluded, so the enabled set is clean');
 });
+
+test('validateSystem treats a recipe payload that omits `enabled` as enabled (issue 1134)', () => {
+  const components = [makeComponent('comp-a')];
+  const makeSet = () =>
+    makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const bare = (id, name) => ({ id, name, ingredientSets: [makeSet()] });
+  const validator = buildValidator(
+    { id: 'sys-1', resolutionMode: 'alchemy' },
+    [bare('r-1', 'A'), bare('r-2', 'B')],
+    components
+  );
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'absence of `enabled` means enabled, so the collision is found');
+});

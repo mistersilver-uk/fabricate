@@ -391,6 +391,23 @@ describe('world-scope model', () => {
       }
     });
 
+    it('sources the tag list from the world tag vocabulary when a store is registered', () => {
+      const vocabulary = {
+        available: true,
+        componentTags: [
+          { id: 'zinc', name: 'zinc' },
+          { id: 'amber', name: 'Amber' },
+        ],
+      };
+      const { model } = openModel({ components: COMPONENTS, vocabulary });
+      assert.deepEqual(model.worldComponentTags, ['Amber', 'zinc']);
+      const empty = openModel({
+        components: COMPONENTS,
+        vocabulary: { available: true, componentTags: [] },
+      });
+      assert.deepEqual(empty.model.worldComponentTags, []);
+    });
+
     it('joins the inspected essence to the selected system, and only when available', () => {
       const systems = [
         { systemId: 'other', inherited: true },
