@@ -1,23 +1,5 @@
 import { normalizeConfirmOptions } from './svelte/util/foundryBridge.js';
 
-export function getDragEventData(event) {
-  // Strategy 1: Foundry v13+ API (evaluated at call time, not module load time)
-  const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;
-  if (impl?.getDragEventData) {
-    return impl.getDragEventData(event);
-  }
-
-  // Strategy 2: Parse text/plain from dataTransfer (universal Foundry format)
-  try {
-    const raw = event?.dataTransfer?.getData?.('text/plain');
-    if (raw) return JSON.parse(raw);
-  } catch (_) {
-    // Not valid JSON -- fall through
-  }
-
-  return null;
-}
-
 /**
  * A yes/no confirmation, through the shared confirm-shape mapping to `DialogV2.confirm`.
  *

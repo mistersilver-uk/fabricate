@@ -120,11 +120,3 @@ export function describeEssenceDeleteImpact(rows) {
     recipeRewrites: unionOfIds(selected, ['recipeUsageIds']).size,
   };
 }
-
-/** The shared selection helpers, re-exported under essence-flavoured names. */
-export {
-  describeBulkSelection as describeEssenceSelection,
-  toggleBulkSelection as toggleEssenceSelection,
-  setBulkSelection as setEssenceSelection,
-  pruneBulkSelection as pruneEssenceSelection,
-} from '../../utils/bulkSelectionModel.js';

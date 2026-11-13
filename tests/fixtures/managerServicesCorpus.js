@@ -668,7 +668,12 @@ export function buildManagerWorld(options = {}) {
   };
 
   const foundry = {
-    utils: { deepClone: (value) => (value === null || typeof value !== 'object' ? value : { ...value }) },
+    utils: {
+      deepClone: (value) => (value === null || typeof value !== 'object' ? value : { ...value }),
+      ...(saveDataToFile && {
+        saveDataToFile: (json, mime, filename) => record('saveDataToFile', json, mime, filename),
+      }),
+    },
     applications: {
       api: { DialogV2: dialogV2 },
       apps: filePicker ? { FilePicker: { implementation: filePickerClass } } : {},
@@ -694,7 +699,7 @@ export function buildManagerWorld(options = {}) {
     },
   };
 
-  return { game, notifications, foundry, journal, record, handles, scenes, users, items, definitions, resolveUuid, saveDataToFile };
+  return { game, notifications, foundry, journal, record, handles, scenes, users, items, definitions, resolveUuid, saveDataToFile, filePickerClass };
 }
 
 /**
@@ -752,15 +757,28 @@ export function installWorld(world) {
     },
     revokeObjectURL: (url) => world.record('URL.revokeObjectURL', url),
   });
-  if (world.saveDataToFile) {
-    set('saveDataToFile', (json, mime, filename) =>
-      world.record('saveDataToFile', json, mime, filename)
-    );
-  } else {
-    set('saveDataToFile', undefined);
-  }
+  // Foundry's V13 back-compat aliases (issue 1904): every read logs a compatibility warning, so the
+  // getter journals it. Each resolves even where the canonical class is absent, so a ladder rung
+  // that still reads the alias is visible rather than masked by an undefined answer.
+  const aliases = new Map();
+  const alias = (name, resolve) => {
+    aliases.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      get() {
+        world.record(`compat.${name}`);
+        return resolve();
+      },
+    });
+  };
+  alias('FilePicker', () => world.filePickerClass);
+  alias('saveDataToFile', () => world.foundry.utils.saveDataToFile);
 
   return () => {
+    for (const [name, descriptor] of aliases) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
     for (const [name, { had, value }] of saved) {
       if (had) globalThis[name] = value;
       else delete globalThis[name];
