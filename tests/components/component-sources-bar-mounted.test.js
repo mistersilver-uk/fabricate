@@ -72,7 +72,10 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.match(avatar.getAttribute('aria-label'), /Aria/, 'aria-label names the actor');
     assert.match(avatar.getAttribute('aria-label'), /AlwaysIncluded/, 'aria-label carries the always-included suffix');
     assert.ok(required.querySelector('.crafting-source-lock'), 'lock badge rendered');
-    assert.equal(required.querySelector('.crafting-source-remove'), null, 'no remove control for the required source');
+    assert.ok(
+      required.querySelector('.crafting-source-remove') === null,
+      'no remove control for the required source'
+    );
   });
 
   it('renders a keyboard-reachable remove control for a removable source and calls remove on click', async () => {

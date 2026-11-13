@@ -280,7 +280,7 @@ describe('an option title on the published SegmentedControl', () => {
     await settle();
     assert.equal(segment('a').getAttribute('data-tooltip-text'), hint);
     assert.equal(target.querySelector('[hidden]').textContent, hint);
-    assert.equal(target.querySelector('b'), null);
+    assert.ok(target.querySelector('b') === null);
     handle.destroy();
   });
 

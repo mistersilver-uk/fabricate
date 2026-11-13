@@ -120,7 +120,10 @@ describe('CraftingView ↔ actor bar wiring', () => {
     const lastCall = calls.list.at(-1);
     assert.equal(lastCall.rememberedActorId, 'actor-x', 'the listing loads for the selected actor');
     assert.equal(settings.crafting, 'actor-x', 'the crafting view persisted LAST_CRAFTING_ACTOR');
-    assert.equal(target.querySelector('[data-crafting-state="no-actor"]'), null, 'leaves the no-actor state');
+    assert.ok(
+      target.querySelector('[data-crafting-state="no-actor"]') === null,
+      'leaves the no-actor state'
+    );
     assert.ok(target.querySelector('[data-crafting-state="populated"]'), 'renders the populated layout for the selected actor');
   });
 

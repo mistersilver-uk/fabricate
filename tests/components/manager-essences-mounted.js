@@ -191,7 +191,7 @@ export function registerEssencesCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 2);
     assert.ok(target.textContent.includes('Earth'));
-    assert.equal(target.querySelector('.manager-essence-action-band'), null);
+    assert.ok(target.querySelector('.manager-essence-action-band') === null);
 
     // The DISABLED essence is marked in words, not by dimming alone.
     const waterRow = target.querySelector('.manager-essence-row[data-essence-id="water"]');
@@ -578,9 +578,8 @@ export function registerEssencesCases() {
       linkedSource.textContent.includes('Drop another Item here to replace the linked source.'),
       'and instructing the GM, where it used to restate the raw uuid'
     );
-    assert.equal(
-      target.querySelector('.manager-essence-source-drop-zone'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-essence-source-drop-zone') === null,
       'and no second drop zone renders beneath it'
     );
     // The Tool Studio's grouped icon pair.

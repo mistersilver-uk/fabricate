@@ -779,9 +779,8 @@ describe('RecipeDetail mounted behavior', () => {
     const value = formula.querySelector('.fabricate-info-strip-value');
     assert.equal(value.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
     assert.equal(formula.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
-    assert.equal(
-      target.querySelector('[data-check-formula-error]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-check-formula-error]') === null,
       'no error note when resolved'
     );
   });
@@ -845,26 +844,22 @@ describe('RecipeDetail mounted behavior', () => {
 
     assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
     // The mode chip reveals the crafting mechanism.
-    assert.equal(
-      target.querySelector('.crafting-detail-mode-chip'),
-      null,
+    assert.ok(
+      target.querySelector('.crafting-detail-mode-chip') === null,
       'no mode chip leaks the crafting mechanism on a discovery teaser'
     );
     // None of the body detail (sections, IO, outcome tiers, craft button) leaks.
-    assert.equal(
-      target.querySelector('[data-recipe-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section]') === null,
       'no detail sections rendered'
     );
-    assert.equal(target.querySelector('[data-io-group]'), null, 'no IO rows rendered');
-    assert.equal(
-      target.querySelector('[data-recipe-section="outcome-tiers"]'),
-      null,
+    assert.ok(target.querySelector('[data-io-group]') === null, 'no IO rows rendered');
+    assert.ok(
+      target.querySelector('[data-recipe-section="outcome-tiers"]') === null,
       'no outcome tiers rendered'
     );
-    assert.equal(
-      target.querySelector('[data-crafting-craft]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-crafting-craft]') === null,
       'no craft button on a teaser'
     );
   });
@@ -911,9 +906,8 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(stepTwoTiles.length, 1, 'step 2 shows its material');
 
     // No per-step Output group leaks into a step block (inputs only).
-    assert.equal(
-      steps[0].querySelector('[data-io-group="outputs"]'),
-      null,
+    assert.ok(
+      steps[0].querySelector('[data-io-group="outputs"]') === null,
       'step blocks render no per-step output'
     );
 
@@ -927,9 +921,8 @@ describe('RecipeDetail mounted behavior', () => {
     );
 
     // A disabled, formula-less check surfaces no check card.
-    assert.equal(
-      target.querySelector('[data-recipe-section="check"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="check"]') === null,
       'no crafting-check card when the check is off'
     );
   });
@@ -1084,9 +1077,8 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: fixture.ingredientSets[0].craftability,
       steps: []
     });
-    assert.equal(
-      target.querySelector('[data-recipe-section="steps"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="steps"]') === null,
       'no ordered step list when steps is empty'
     );
     assert.ok(target.querySelector('[data-recipe-section="io"]'), 'the single IoTable renders');
@@ -1124,9 +1116,8 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: instant.ingredientSets[0].craftability,
     });
 
-    assert.equal(
-      target.querySelector('[data-recipe-duration]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-duration]') === null,
       'no duration chip on an instant recipe'
     );
   });
@@ -1145,9 +1136,8 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
-    assert.equal(
-      target.querySelector('[data-recipe-duration]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-duration]') === null,
       'no duration chip leaks on a discovery teaser'
     );
   });
@@ -1263,9 +1253,8 @@ describe('RecipeDetail mounted behavior', () => {
     assert.match(pip.getAttribute('aria-label'), /Status\.MissingMaterials/);
     assert.equal(pip.getAttribute('data-crafting-status'), 'missingMaterials');
     assert.equal(chipGroundAlpha(pip, THEMES), 1, 'opaque over the artwork it covers');
-    assert.equal(
-      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
-      null,
+    assert.ok(
+      header.querySelector('.player-detail-header-meta [data-crafting-status]') === null,
       'the labelled status badge is dropped in favour of the pip'
     );
     // The well is a non-blocking `Notice` since issue 1514.
@@ -1350,9 +1339,8 @@ describe('RecipeDetail mounted behavior', () => {
       header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       'craftable recipe keeps the labelled status badge'
     );
-    assert.equal(
-      header.querySelector('.crafting-detail-pip'),
-      null,
+    assert.ok(
+      header.querySelector('.crafting-detail-pip') === null,
       'no thumbnail pip when craftable'
     );
   });

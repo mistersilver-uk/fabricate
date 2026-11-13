@@ -934,7 +934,7 @@ describe('JournalView mounted behavior', () => {
     });
     const straightTarget = await harness.mount({ services: makeServices(straightStore) });
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
-    assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
+    assert.ok(straightTarget.querySelector('[data-yield-cut]') === null);
     assert.match(straightTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.straight/u);
   });
 
