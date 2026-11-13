@@ -230,9 +230,8 @@ describe('CraftingSettingsView (mounted)', () => {
     harness.remount();
 
     const withoutSalvage = await harness.mount({ selectedSystem: makeSystem({ features: { salvage: false } }) });
-    assert.equal(
-      withoutSalvage.querySelector('[data-crafting-salvage-resolution-mode]'),
-      null,
+    assert.ok(
+      withoutSalvage.querySelector('[data-crafting-salvage-resolution-mode]') === null,
       'salvage card hidden when the feature is off'
     );
   });

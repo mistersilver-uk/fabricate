@@ -386,9 +386,8 @@ describe('KnowledgeView mounted behaviour', () => {
   it('shows the match-tier chip only for the actionable duplicate tier', async () => {
     const durable = await harness.mount(makeProps());
     const durableRow = durable.querySelector('[data-knowledge-copy="i1"]');
-    assert.equal(
-      durableRow.querySelector('[data-knowledge-match-tier]'),
-      null,
+    assert.ok(
+      durableRow.querySelector('[data-knowledge-match-tier]') === null,
       'a durable match is diagnostic, not actionable, so it earns no chip'
     );
     // The tier is still disclosed — in the row's title.
@@ -411,7 +410,7 @@ describe('KnowledgeView mounted behaviour', () => {
 
   it('raises the party-pool ordering warning only when the hazard is real', async () => {
     const safe = await harness.mount(makeProps());
-    assert.equal(safe.querySelector('[data-knowledge-party-pool-warning]'), null);
+    assert.ok(safe.querySelector('[data-knowledge-party-pool-warning]') === null);
     harness.remount();
 
     const hazardous = await harness.mount(
@@ -483,7 +482,7 @@ describe('KnowledgeView mounted behaviour', () => {
 
     // A refundable row carries the source line alone — no clause, no second sub-label.
     assert.match(owned.textContent, /Learned from Alchemist Cook Book/);
-    assert.equal(owned.querySelector('[data-knowledge-no-refund]'), null);
+    assert.ok(owned.querySelector('[data-knowledge-no-refund]') === null);
 
     // The other three state the reason as ONE icon-led clause inside the source line.
     const clause = (row) => row.querySelector('[data-knowledge-no-refund]');
@@ -514,13 +513,13 @@ describe('KnowledgeView mounted behaviour', () => {
     }
 
     // Nothing anywhere still renders the retired sub-label.
-    assert.equal(target.querySelector('[data-knowledge-frees-no-slot]'), null);
+    assert.ok(target.querySelector('[data-knowledge-frees-no-slot]') === null);
   });
 
   it('shows a per-character fact cluster and hides the zero-valued roll-ups', async () => {
     const quiet = await harness.mount(makeProps());
-    assert.equal(quiet.querySelector('[data-knowledge-fact="other-systems"]'), null);
-    assert.equal(quiet.querySelector('[data-knowledge-fact="orphans"]'), null);
+    assert.ok(quiet.querySelector('[data-knowledge-fact="other-systems"]') === null);
+    assert.ok(quiet.querySelector('[data-knowledge-fact="orphans"]') === null);
     harness.remount();
 
     const noisy = await harness.mount(
@@ -670,7 +669,7 @@ describe('KnowledgeView mounted behaviour', () => {
     await harness.setProps({
       knowledge: makeKnowledge({ characters: [rawCharacter({ ownedCopies: [rawCopy()] })] }),
     });
-    assert.equal(target.querySelector('[data-arm-token="delete:i2"]'), null);
+    assert.ok(target.querySelector('[data-arm-token="delete:i2"]') === null);
 
     // It comes back (an undo, an import) — and must NOT still be armed.
     await harness.setProps({
@@ -923,8 +922,8 @@ describe('KnowledgeView mounted behaviour', () => {
     );
     assert.match(target.textContent, /Loading character knowledge\.\.\./);
     assert.doesNotMatch(target.textContent, /No player characters/);
-    assert.equal(target.querySelector('[data-knowledge-no-selection]'), null);
-    assert.equal(target.querySelector('[data-knowledge-error]'), null);
+    assert.ok(target.querySelector('[data-knowledge-no-selection]') === null);
+    assert.ok(target.querySelector('[data-knowledge-error]') === null);
     assert.ok(target.querySelector('[data-knowledge-search]'), 'the search field stays');
   });
 
@@ -949,9 +948,9 @@ describe('KnowledgeView mounted behaviour', () => {
     const target = await harness.mount(makeProps());
 
     assert.equal(target.querySelector('[data-knowledge-view]').hasAttribute('aria-busy'), false);
-    assert.equal(target.querySelector('[data-knowledge-loading]'), null);
-    assert.equal(target.querySelector('[data-knowledge-roster-loading]'), null);
-    assert.equal(target.querySelector('[data-knowledge-error]'), null);
+    assert.ok(target.querySelector('[data-knowledge-loading]') === null);
+    assert.ok(target.querySelector('[data-knowledge-roster-loading]') === null);
+    assert.ok(target.querySelector('[data-knowledge-error]') === null);
   });
 });
 

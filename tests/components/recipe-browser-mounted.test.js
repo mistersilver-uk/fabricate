@@ -117,9 +117,8 @@ describe('RecipeBrowser mounted behavior', () => {
       uncraftable.querySelector('.crafting-recipe-row-thumb.is-uncraftable'),
       'thumbnail is flagged for the faded/scrim treatment'
     );
-    assert.equal(
-      uncraftable.querySelector('.crafting-recipe-row-meta [data-crafting-status]'),
-      null,
+    assert.ok(
+      uncraftable.querySelector('.crafting-recipe-row-meta [data-crafting-status]') === null,
       'uncraftable row drops its compact meta badge'
     );
 
@@ -128,9 +127,8 @@ describe('RecipeBrowser mounted behavior', () => {
       craftable.querySelector('.crafting-recipe-row-meta [data-crafting-status]'),
       'craftable row keeps the compact meta badge'
     );
-    assert.equal(
-      craftable.querySelector('.crafting-recipe-row-pip'),
-      null,
+    assert.ok(
+      craftable.querySelector('.crafting-recipe-row-pip') === null,
       'craftable row has no thumbnail pip'
     );
 
@@ -384,9 +382,8 @@ describe('RecipeBrowser mounted behavior', () => {
       totalCount: 1,
       systems: [],
     });
-    assert.equal(
-      target.querySelector('.crafting-browser-filter-system'),
-      null,
+    assert.ok(
+      target.querySelector('.crafting-browser-filter-system') === null,
       'no system dropdown without systems'
     );
   });
@@ -411,9 +408,8 @@ describe('RecipeBrowser mounted behavior', () => {
       totalCount: 1,
     });
     const row = target.querySelector('[data-recipe-id="r1"]');
-    assert.equal(
-      row.querySelector('.crafting-recipe-row-category'),
-      null,
+    assert.ok(
+      row.querySelector('.crafting-recipe-row-category') === null,
       'the reserved general bucket is not badged'
     );
   });
@@ -469,9 +465,8 @@ describe('RecipeBrowser mounted behavior', () => {
       totalCount: 1,
       categories: [],
     });
-    assert.equal(
-      target.querySelector('.crafting-browser-filter-category'),
-      null,
+    assert.ok(
+      target.querySelector('.crafting-browser-filter-category') === null,
       'no category dropdown without categories'
     );
   });

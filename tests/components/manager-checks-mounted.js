@@ -117,9 +117,8 @@ export function registerChecksCases() {
       craftingPanel.querySelector('[data-simple-check-editor]'),
       'alchemy crafting shows the simple check editor'
     );
-    assert.equal(
-      target.querySelector('.manager-header-actions [data-checks-create]'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-header-actions [data-checks-create]') === null,
       'a singleton check has no create action'
     );
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
@@ -157,9 +156,8 @@ export function registerChecksCases() {
       salvagePanel.querySelector('[data-simple-check-editor]'),
       'salvage simple mode shows the simple check editor'
     );
-    assert.equal(
-      salvagePanel.querySelector('[data-dc-mode-option]'),
-      null,
+    assert.ok(
+      salvagePanel.querySelector('[data-dc-mode-option]') === null,
       'salvage hides the recipe-specific DC source section'
     );
     assert.ok(
@@ -266,9 +264,8 @@ export function registerChecksCases() {
       ['Crafting', 'Gathering', 'Validation'],
       'the Salvage tab is dropped when salvage is off'
     );
-    assert.equal(
-      target.querySelector('[data-checks-nav-item="salvage"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-nav-item="salvage"]') === null,
       'no salvage tab button renders'
     );
   });
@@ -393,17 +390,15 @@ export function registerChecksCases() {
       target.querySelector('[data-checks-turn-on]'),
       'and offers the turn-this-check-on button'
     );
-    assert.equal(
-      target.querySelector('[data-alchemy-none-readonly]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-alchemy-none-readonly]') === null,
       'the retired read-only notice is gone — it named a mode the selector no longer offers'
     );
     // The switch is LIVE and reads off, which is the whole point.
     const toggle = target.querySelector('[data-checks-active-toggle]');
     assert.ok(toggle, 'the Active toggle renders and is operable');
-    assert.equal(
-      target.querySelector('[data-checks-active-required]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-active-required]') === null,
       'and carries no "cannot be turned off" hint'
     );
 
@@ -451,9 +446,8 @@ export function registerChecksCases() {
       target.querySelector('[data-checks-active-toggle]'),
       'Simple mode is OPTIONAL — it offers a live Active toggle'
     );
-    assert.equal(
-      target.querySelector('[data-checks-active-required]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-active-required]') === null,
       'and no longer claims the mode requires the check'
     );
   });
@@ -468,9 +462,8 @@ export function registerChecksCases() {
       target.querySelector('[data-checks-panel="crafting"] [data-crafting-check-editor]'),
       'Tiered mode renders the routed outcome-tier editor below the selector'
     );
-    assert.equal(
-      target.querySelector('[data-checks-active-toggle]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-active-toggle]') === null,
       'Tiered mode is mandatory — no operable Active toggle'
     );
     const locked = target.querySelector('[data-checks-active-locked]');
@@ -582,9 +575,8 @@ export function registerChecksCases() {
     assert.equal(consume.getAttribute('aria-pressed'), 'true');
     assert.equal(history.getAttribute('aria-pressed'), 'false');
     // The consumption-policy card is alchemy-exclusive-off.
-    assert.equal(
-      target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]') === null,
       'the failure consumption policy card is not shown in alchemy mode'
     );
 
@@ -638,9 +630,8 @@ export function registerChecksCases() {
     assert.equal(consume.getAttribute('aria-pressed'), 'false');
     assert.equal(breakTools.getAttribute('aria-pressed'), 'true');
     // The alchemy behaviour card is not shown outside alchemy mode.
-    assert.equal(
-      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-behaviour]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-behaviour]') === null,
       'the alchemy behaviour card is not shown in non-alchemy crafting mode'
     );
 
@@ -885,17 +876,15 @@ export function registerChecksCases() {
       'routedByIngredients renders the simple pass/fail editor'
     );
     // It is NOT the routed tier editor: no relative/fixed toggle.
-    assert.equal(
-      craftingPanel.querySelector('[data-crafting-check-editor]'),
-      null,
+    assert.ok(
+      craftingPanel.querySelector('[data-crafting-check-editor]') === null,
       'the routed tier editor is not rendered for routedByIngredients'
     );
-    assert.equal(
-      craftingPanel.querySelector('[data-check-type-option]'),
-      null,
+    assert.ok(
+      craftingPanel.querySelector('[data-check-type-option]') === null,
       'no relative/fixed type toggle'
     );
-    assert.equal(craftingPanel.querySelector('[data-outcome-row]'), null, 'no outcome-tiers table');
+    assert.ok(craftingPanel.querySelector('[data-outcome-row]') === null, 'no outcome-tiers table');
     // The DC + static/dynamic DC source are shown (pass/fail gate uses the DC).
     assert.ok(
       craftingPanel.querySelector('[data-dc-mode-option]'),
@@ -1160,14 +1149,12 @@ export function registerChecksCases() {
       panel.hasAttribute('data-gathering-d100-readonly'),
       'd100 mode renders the read-only card'
     );
-    assert.equal(
-      panel.querySelector('[data-progressive-check-editor]'),
-      null,
+    assert.ok(
+      panel.querySelector('[data-progressive-check-editor]') === null,
       'd100 mode renders no progressive editor'
     );
-    assert.equal(
-      panel.querySelector('[data-crafting-check-editor]'),
-      null,
+    assert.ok(
+      panel.querySelector('[data-crafting-check-editor]') === null,
       'd100 mode renders no routed editor'
     );
     // d100 is the fixed roll: the Active card shows the read-only note, no toggle.
@@ -1175,9 +1162,8 @@ export function registerChecksCases() {
       target.querySelector('[data-checks-active="gathering"] [data-checks-active-required]'),
       'd100 gathering shows the read-only required hint'
     );
-    assert.equal(
-      target.querySelector('[data-checks-active="gathering"] [data-checks-active-toggle]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-active="gathering"] [data-checks-active-toggle]') === null,
       'd100 gathering offers no Active toggle'
     );
   });
@@ -1293,9 +1279,8 @@ export function registerChecksCases() {
     assert.ok(editor, 'routed gathering shows the crafting check editor');
     // Routed gathering reuses the crafting editor with recipe tiers hidden
     // (showTiers={false}), like routed salvage.
-    assert.equal(
-      editor.querySelector('[data-routed-tiers]'),
-      null,
+    assert.ok(
+      editor.querySelector('[data-routed-tiers]') === null,
       'routed gathering hides the recipe tiers card'
     );
     assert.equal(panel.querySelector('[data-check-roll-formula]').value, '2d6');
@@ -1341,8 +1326,8 @@ export function registerChecksCases() {
       '[data-checks-active="crafting"] [data-checks-active-toggle]'
     );
     assert.ok(toggle, 'optional crafting check shows the Active toggle');
-    assert.equal(target.querySelector('[data-checks-active-required]'), null);
-    assert.equal(target.querySelector('[data-crafting-check-editor]'), null);
+    assert.ok(target.querySelector('[data-checks-active-required]') === null);
+    assert.ok(target.querySelector('[data-crafting-check-editor]') === null);
 
     // IT STAGES rather than persisting on click. Every Active switch in the studio now goes
     // through the shared stage → `Save checks` → applied lifecycle, so one affordance does not
@@ -1396,7 +1381,7 @@ export function registerChecksCases() {
     assert.equal(target.querySelector('[data-check-dc]').value, '14');
     assert.ok(target.querySelector('[data-threshold-mode]'), 'the comparison control renders');
     assert.ok(target.querySelector('[data-check-triggers]'), 'the unified trigger editor renders');
-    assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
+    assert.ok(target.querySelector('[data-crit-group]') === null, 'the old crit table is gone');
     // Relative checks expose recipe tiers (DC overrides); fixed checks do not.
     assert.ok(
       target.querySelector('[data-routed-tiers]'),
@@ -1404,9 +1389,8 @@ export function registerChecksCases() {
     );
 
     // NO COLUMN HEADER ROW (issue 1096). The tier list is the prototype's flex list.
-    assert.equal(
-      target.querySelector('.manager-checks-outcome-head'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-checks-outcome-head') === null,
       'the tier list carries no column-header row'
     );
     assert.ok(
@@ -1419,9 +1403,8 @@ export function registerChecksCases() {
       'the name field names itself'
     );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
-    assert.equal(
-      target.querySelector('[data-outcome-start]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-outcome-start]') === null,
       'relative tiers do not expose a fixed range'
     );
 
@@ -1453,9 +1436,8 @@ export function registerChecksCases() {
     );
     assert.ok(litSegment.classList.contains('is-danger'), 'the failure segment takes the red tint');
     // The per-outcome break-tools pill is hidden under toolSpecific authority.
-    assert.equal(
-      target.querySelector('[data-outcome-break]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-outcome-break]') === null,
       'the per-outcome break column is hidden under toolSpecific'
     );
     // The radio, not the label: `SegmentedControl` renders real radios and commits on their
@@ -1520,9 +1502,8 @@ export function registerChecksCases() {
         Boolean(target.querySelector('[data-outcomes-empty]')),
         'the empty state states the absence'
       );
-      assert.equal(
-        target.querySelector('.manager-checks-tier-list'),
-        null,
+      assert.ok(
+        target.querySelector('.manager-checks-tier-list') === null,
         'and there is no list, which is exactly what used to take the add control with it'
       );
       const add = target.querySelector('[data-add-outcome-tier]');
@@ -1536,14 +1517,12 @@ export function registerChecksCases() {
       // invited a GM to drag a band edge on a strip that has no edges. Asserted by ABSENCE
       // because presence is what shipped — a test that only checked the empty sentence and the
       // add control passed with both lies on screen beside them.
-      assert.equal(
-        target.querySelector('[data-outcome-band-strip]'),
-        null,
+      assert.ok(
+        target.querySelector('[data-outcome-band-strip]') === null,
         'a strip with no bands claims a gap or overlap between tiers that do not exist'
       );
-      assert.equal(
-        target.querySelector('[data-outcome-band-strip-hint]'),
-        null,
+      assert.ok(
+        target.querySelector('[data-outcome-band-strip-hint]') === null,
         'and the drag hint names an affordance the zero state does not offer'
       );
 
@@ -1573,16 +1552,14 @@ export function registerChecksCases() {
     flushSync();
 
     assert.ok(target.querySelector('[data-outcome-start]'), 'fixed tiers expose a range');
-    assert.equal(target.querySelector('[data-outcome-dc]'), null, 'fixed tiers hide the DC field');
-    assert.equal(
-      target.querySelector('[data-expression-range]'),
-      null,
+    assert.ok(target.querySelector('[data-outcome-dc]') === null, 'fixed tiers hide the DC field');
+    assert.ok(
+      target.querySelector('[data-expression-range]') === null,
       'no value range is computed (the roll may reference actor data)'
     );
     // Inline textual validation moved to the Checks Validation tab.
-    assert.equal(
-      target.querySelector('[data-checks-validation]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-validation]') === null,
       'the editor no longer renders inline validation messages'
     );
     assert.equal(
@@ -1610,9 +1587,8 @@ export function registerChecksCases() {
 
     // The unnamed-tier (and no-Success) messages are surfaced by the Checks
     // Validation tab now; the editor itself renders no inline validation list.
-    assert.equal(
-      target.querySelector('[data-checks-validation]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-validation]') === null,
       'the editor no longer renders the inline unnamed-tier validation message'
     );
   });
@@ -1674,7 +1650,7 @@ export function registerChecksCases() {
     );
 
     // The old crit table is replaced by the always-rendered unified trigger editor.
-    assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
+    assert.ok(target.querySelector('[data-crit-group]') === null, 'the old crit table is gone');
     const triggers = target.querySelector('[data-check-triggers]');
     assert.ok(triggers, 'the unified trigger editor renders');
     assert.equal(triggers.querySelectorAll('[data-trigger]').length, 2, 'both triggers render');
@@ -1702,7 +1678,7 @@ export function registerChecksCases() {
 
     // Static mode shows the tiers table (no macro drop zone).
     assert.equal(target.querySelector('[data-tier-name]').value, 'Hard');
-    assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
+    assert.ok(target.querySelector('[data-check-macro-dropzone]') === null);
 
     target.querySelector('[data-add-tier]').click();
     assert.equal(emitted.at(-1).tiers.length, 2);
@@ -1737,7 +1713,7 @@ export function registerChecksCases() {
     flushSync();
     assert.ok(target.querySelector('[data-dynamic-dc]'));
     assert.ok(target.querySelector('[data-check-macro-dropzone]'), 'shows the macro drop zone');
-    assert.equal(target.querySelector('[data-tier-name]'), null, 'no tiers table in dynamic mode');
+    assert.ok(target.querySelector('[data-tier-name]') === null, 'no tiers table in dynamic mode');
     // The threshold is shared, so it is shown in both modes.
     assert.ok(target.querySelector('[data-check-dc]'));
   });
@@ -1787,12 +1763,12 @@ export function registerChecksCases() {
     assert.ok(target.querySelector('[data-progressive-check-editor]'));
     // Formula field is shared, but the DC + comparison are hidden (no threshold).
     assert.ok(target.querySelector('[data-check-roll-formula]'), 'the formula field renders');
-    assert.equal(target.querySelector('[data-check-dc]'), null, 'no DC field');
-    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison control');
+    assert.ok(target.querySelector('[data-check-dc]') === null, 'no DC field');
+    assert.ok(target.querySelector('[data-threshold-mode]') === null, 'no comparison control');
     // No DC-source radios, recipe tiers, or macro drop zone.
-    assert.equal(target.querySelector('[data-dc-mode-option]'), null);
-    assert.equal(target.querySelector('[data-tier-name]'), null);
-    assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
+    assert.ok(target.querySelector('[data-dc-mode-option]') === null);
+    assert.ok(target.querySelector('[data-tier-name]') === null);
+    assert.ok(target.querySelector('[data-check-macro-dropzone]') === null);
 
     // The unified trigger list renders. In the progressive (numeric) context the
     // outcome toggle is relabelled award-all/award-none rather than success/failure.
@@ -2006,9 +1982,8 @@ export function registerChecksCases() {
 
   it('routed check editor: shows the per-outcome break-tools column only under checkDriven', () => {
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
-    assert.equal(
-      target.querySelector('[data-outcome-break]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-outcome-break]') === null,
       'the per-outcome break-tools pill is hidden under toolSpecific'
     );
 
@@ -2144,9 +2119,8 @@ export function registerChecksCases() {
     );
 
     // Gathering is an opt-in feature: with it off.
-    assert.equal(
-      target.querySelector('[data-checks-nav-item="gathering"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-checks-nav-item="gathering"]') === null,
       'the gathering tab is hidden when the gathering feature is off'
     );
   });
@@ -2837,9 +2811,8 @@ export function registerChecksCases() {
         target.querySelector('[data-simple-check-editor]'),
         `${mode} mode shows the simple check editor`
       );
-      assert.equal(
-        target.querySelector('[data-crafting-check-editor]'),
-        null,
+      assert.ok(
+        target.querySelector('[data-crafting-check-editor]') === null,
         'not the routed editor'
       );
 
@@ -2979,9 +2952,8 @@ export function registerChecksCases() {
       target.querySelector('[data-world-prerequisites-page]'),
       'the copy NAVIGATES to the destination page'
     );
-    assert.equal(
-      target.querySelector('[data-world-modifiers-page]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-world-modifiers-page]') === null,
       'and leaves the source page behind'
     );
     assert.match(

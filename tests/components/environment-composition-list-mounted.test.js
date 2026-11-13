@@ -433,8 +433,8 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
     assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
-    assert.equal(target.querySelector('[data-section="excluded"]'), null);
-    assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+    assert.ok(target.querySelector('[data-section="excluded"]') === null);
+    assert.ok(target.querySelector('[data-section="non-matching"]') === null);
     assert.ok(
       !target.textContent.includes('Excluded'),
       'manual task mode does not present excluded task rows'
@@ -608,9 +608,9 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
     assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
-    assert.equal(target.querySelector('[data-section="candidates"]'), null);
-    assert.equal(target.querySelector('[data-section="excluded"]'), null);
-    assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+    assert.ok(target.querySelector('[data-section="candidates"]') === null);
+    assert.ok(target.querySelector('[data-section="excluded"]') === null);
+    assert.ok(target.querySelector('[data-section="non-matching"]') === null);
     assert.ok(
       !target.querySelector('[data-sortable-grip]'),
       'all-drops event mode does not render rank handles'
@@ -626,11 +626,10 @@ describe('CompositionList mounted layout', () => {
     assert.equal(removeQuick.getAttribute('data-tooltip-text'), 'Remove');
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '[data-record-id="included"] .fabricate-icon-button[aria-label="Open source event"]'
-      ),
-      null,
+      ) === null,
       'included manual event rows do not render a standalone edit-source action'
     );
 

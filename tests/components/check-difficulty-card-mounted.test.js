@@ -99,9 +99,8 @@ describe('the Difficulty card writes what its controls say', () => {
 
   it('withholds the DC-source chooser entirely when the slot carries no dcMode', async () => {
     const root = await harness.mount({ dc: 12 });
-    assert.equal(
-      root.querySelector('[data-dc-mode-option]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-dc-mode-option]') === null,
       'a chooser writing a field nothing reads must not render'
     );
     assert.ok(root.querySelector('[data-check-dc]'), 'the base DC still does');

@@ -1543,14 +1543,12 @@ describe('RecipeEditView (mounted)', () => {
       'description textarea renders'
     );
     assert.ok(target.querySelector('[data-recipe-field="enabled"]'), 'enabled toggle renders');
-    assert.equal(
-      target.querySelector('[data-recipe-section="recipe-item"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="recipe-item"]') === null,
       'no recipe-item card in the view'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="steps"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="steps"]') === null,
       'no steps card for a single-step recipe'
     );
     editHarness.remount();
@@ -1626,14 +1624,12 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="identity"]'),
       'identity lives in Overview'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="ingredients"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="ingredients"]') === null,
       'ingredients not in Overview'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="tools"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="tools"]') === null,
       'tools not in Overview'
     );
 
@@ -2234,9 +2230,8 @@ describe('RecipeEditView (mounted)', () => {
       !view.querySelector('[data-set-card-actions]'),
       'the reserved failure set (and the success set) carry no kebab'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-add="result-set"]') === null,
       'the "Add result set" button is suppressed in the alchemy Simple view'
     );
     editHarness.remount();
@@ -2767,9 +2762,8 @@ describe('RecipeEditView (mounted)', () => {
       durationSection.querySelector('[data-recipe-duration-steppers]'),
       'inline duration steppers render'
     );
-    assert.equal(
-      durationSection.querySelector('[data-recipe-duration-trigger]'),
-      null,
+    assert.ok(
+      durationSection.querySelector('[data-recipe-duration-trigger]') === null,
       'the single-step Duration card no longer routes through a popover trigger'
     );
     // Each unit is the shared Stepper: the PRIMARY control is a real.
@@ -2811,9 +2805,8 @@ describe('RecipeEditView (mounted)', () => {
     // Leave Overview (unmount the tab) and come back (remount it).
     clickTab(target, 'ingredients');
     await flushRender();
-    assert.equal(
-      target.querySelector('[data-recipe-section="duration"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="duration"]') === null,
       'the Duration section is gone while another tab is active (the tab genuinely unmounts)'
     );
 
@@ -2858,9 +2851,8 @@ describe('RecipeEditView (mounted)', () => {
 
   it('hides the single-step Duration card when time requirements are disabled (issue 714)', async () => {
     const target = await editHarness.mount(identityProps({ timeRequirementsEnabled: false }));
-    assert.equal(
-      target.querySelector('[data-recipe-section="duration"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="duration"]') === null,
       'the single-step Duration card is gated off when the system time toggle is off'
     );
     editHarness.remount();
@@ -2887,9 +2879,8 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="steps"]'),
       'the multi-step Steps card renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-duration-trigger]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-duration-trigger]') === null,
       'the inline per-step duration editor is gated off'
     );
     assert.ok(
@@ -2957,9 +2948,8 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="steps"]'),
       'multi-step Overview shows the Steps card'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="duration"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="duration"]') === null,
       'the single-step Duration section is hidden for a multi-step recipe'
     );
     editHarness.remount();
@@ -2971,9 +2961,8 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('button[data-recipe-field="img"]'),
       'editable image picker button renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-item-locked-image]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-item-locked-image]') === null,
       'no locked-image span when unlinked'
     );
     editHarness.remount();
@@ -2991,9 +2980,8 @@ describe('RecipeEditView (mounted)', () => {
         onPickImagePath: async () => 'icons/should-not-be-used.webp',
       })
     );
-    assert.equal(
-      target.querySelector('[data-recipe-item-locked-image]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-item-locked-image]') === null,
       'no locked-image span when a recipe item is linked'
     );
     const button = target.querySelector('button[data-recipe-field="img"]');
@@ -3028,12 +3016,11 @@ describe('RecipeEditView (mounted)', () => {
   it('has no in-view save form (the header Save button owns committing)', async () => {
     const target = await editHarness.mount(identityProps());
     // The editor is fully controlled: there is no <form> to submit.
-    assert.equal(
-      target.querySelector('#manager-recipe-edit-form'),
-      null,
+    assert.ok(
+      target.querySelector('#manager-recipe-edit-form') === null,
       'no recipe-edit form wrapper in the view'
     );
-    assert.equal(target.querySelector('form'), null, 'the editor renders no form element');
+    assert.ok(target.querySelector('form') === null, 'the editor renders no form element');
     editHarness.remount();
   });
 
@@ -3145,19 +3132,16 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="ingredients"]'),
       'ingredients section still renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="ingredient-set"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-add="ingredient-set"]') === null,
       'no Add set button in Simple mode'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-set-field="name"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-set-field="name"]') === null,
       'no set-name input in Simple mode'
     );
-    assert.equal(
-      target.querySelector('.manager-recipe-ingredient-set-or'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-recipe-ingredient-set-or') === null,
       'no OR separator in Simple mode'
     );
     assert.ok(
@@ -3175,9 +3159,8 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="results"]'),
       'results section still renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-add="result-set"]') === null,
       'no Add result set button in Simple mode'
     );
     assert.ok(
@@ -3553,9 +3536,8 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { progressive: false }
     );
-    assert.equal(
-      target.querySelector('[data-recipe-result-row]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-result-row]') === null,
       'no reorderable wrapper outside progressive mode'
     );
     assert.ok(
@@ -3599,9 +3581,9 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
-    assert.equal(
-      target.querySelector('[data-recipe-section="results"] [data-recipe-option-quantity]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="results"] [data-recipe-option-quantity]') ===
+        null,
       'progressive result rows hide the quantity field'
     );
     // Sanity: the same rows DO expose a quantity field outside progressive mode.
@@ -3729,9 +3711,8 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { progressive: false }
     );
-    assert.equal(
-      target.querySelector('[data-recipe-result-move]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-result-move]') === null,
       'only progressive results are ordered, so only they get move controls'
     );
     editHarness.remount();
@@ -3862,11 +3843,10 @@ describe('RecipeEditView (mounted)', () => {
     assert.match(dc.textContent, /DC 12/, 'and reads it out as a DC, like the salvage stage row');
     // The DC is a read-only FACT: not a control at all, and carrying no editor.
     assert.equal(dc.tagName, 'SPAN', 'the DC is not a button');
-    assert.equal(dc.querySelector('input'), null, 'the DC carries no editable control');
+    assert.ok(dc.querySelector('input') === null, 'the DC carries no editable control');
     // The micro-label is gone: the DC says what it is.
-    assert.equal(
-      target.querySelector('.manager-recipe-difficulty-label'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-recipe-difficulty-label') === null,
       'no DIFFICULTY micro-label — the salvage row has none'
     );
     // Editing is a SEPARATE link, and it is the only route to the value.
@@ -4193,9 +4173,8 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    assert.equal(
-      target.querySelector('[data-recipe-result-difficulty]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-result-difficulty]') === null,
       'difficulty only participates in progressive resolution'
     );
     editHarness.remount();
@@ -4454,14 +4433,12 @@ describe('RecipeEditView (mounted)', () => {
       'set name is editable and populated'
     );
     // The group-name field and the per-row match toggle are both gone.
-    assert.equal(
-      set.querySelector('[data-recipe-group-field="name"]'),
-      null,
+    assert.ok(
+      set.querySelector('[data-recipe-group-field="name"]') === null,
       'no group-name field on a requirement'
     );
-    assert.equal(
-      set.querySelector('[data-recipe-option-match]'),
-      null,
+    assert.ok(
+      set.querySelector('[data-recipe-option-match]') === null,
       'no Component|Tags match toggle on an option'
     );
 
@@ -4555,21 +4532,18 @@ describe('RecipeEditView (mounted)', () => {
       'the essence stepper sits in the row’s trailing control cluster'
     );
     // Still no `data-recipe-option-quantity`.
-    assert.equal(
-      essenceReq.querySelector('[data-recipe-option-quantity]'),
-      null,
+    assert.ok(
+      essenceReq.querySelector('[data-recipe-option-quantity]') === null,
       'an essence option edits match.amount, not option.quantity'
     );
     // §676: the ESSENCE pill and the "met by any components carrying this essence"
     // sub-line are gone — the flask lead chip already says what the row is.
-    assert.equal(
-      essenceReq.querySelector('[data-recipe-req-tag="essence"]'),
-      null,
+    assert.ok(
+      essenceReq.querySelector('[data-recipe-req-tag="essence"]') === null,
       'the redundant ESSENCE pill is gone'
     );
-    assert.equal(
-      essenceReq.querySelector('[data-recipe-essence-subline]'),
-      null,
+    assert.ok(
+      essenceReq.querySelector('[data-recipe-essence-subline]') === null,
       'the over-explaining met-by sub-line is gone'
     );
     editHarness.remount();
@@ -5284,9 +5258,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     await openOrMenu(target, 'grp-1');
 
-    assert.equal(
-      document.querySelector('[data-popover-group]'),
-      null,
+    assert.ok(
+      document.querySelector('[data-popover-group]') === null,
       'no ARIA option-group headings — the menu is a single flat list'
     );
     const menu = document.querySelector('.manager-recipe-or-menu [role="menu"]');
@@ -5554,9 +5527,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     const qty = target.querySelector('[data-recipe-option-quantity]');
     // The visible "Quantity" label is gone; the input keeps an aria-label.
-    assert.equal(
-      qty.closest('.manager-recipe-option-quantity-field'),
-      null,
+    assert.ok(
+      qty.closest('.manager-recipe-option-quantity-field') === null,
       'no labelled quantity field wrapper'
     );
     assert.equal(
@@ -5722,9 +5694,8 @@ describe('RecipeEditView (mounted)', () => {
       'and reads its unit back on the chosen chip'
     );
     // Still no `data-recipe-option-quantity`.
-    assert.equal(
-      target.querySelector('[data-recipe-option] [data-recipe-option-quantity]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-option] [data-recipe-option-quantity]') === null,
       'currency rows edit match.amount, not option.quantity'
     );
 
@@ -5879,9 +5850,8 @@ describe('RecipeEditView (mounted)', () => {
     const currency = target.querySelector('[data-recipe-option-currency]');
     assert.ok(currency, 'the persisted currency requirement is still rendered (not hidden)');
     // The unit is a static read-only label, not the interactive picker.
-    assert.equal(
-      currency.querySelector('.manager-recipe-currency-trigger'),
-      null,
+    assert.ok(
+      currency.querySelector('.manager-recipe-currency-trigger') === null,
       'the interactive unit picker is gone'
     );
     assert.ok(
@@ -5895,7 +5865,7 @@ describe('RecipeEditView (mounted)', () => {
     // The amount is static text, not the editable Stepper.
     const amount = target.querySelector('[data-recipe-currency-amount]');
     assert.ok(amount, 'the persisted amount is still shown');
-    assert.equal(amount.closest('.fab-stepper'), null, 'the amount is static, not a Stepper');
+    assert.ok(amount.closest('.fab-stepper') === null, 'the amount is static, not a Stepper');
     assert.match(amount.textContent, /100/, 'the persisted amount value is displayed');
     editHarness.remount();
   });
@@ -7265,18 +7235,16 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-result-set-id].fabricate-set-card.is-bare'),
       'the single group renders chromeless'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-add="result-set"]') === null,
       'no Add result set button in Simple mode'
     );
     assert.ok(
       !target.querySelector('[data-recipe-result-set-id] [data-set-card-actions]'),
       'no remove-set control in Simple mode'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-result-set-field="name"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-result-set-field="name"]') === null,
       'no group-name field in Simple mode'
     );
     // The single group is still fully authorable (picker + quantity).
@@ -7501,9 +7469,8 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="collapsed-steps"]'),
       'the read-only collapsed steps card renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="recipe-step-mode"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="recipe-step-mode"]') === null,
       'the step-mode revert control is hidden while collapsed'
     );
     assert.equal(
@@ -7827,9 +7794,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     );
     // Adding a recipe to a book is authored on Books & Scrolls. The recipe-side drop
     // zone was a SECOND authoring path for the same many-to-many and is removed.
-    assert.equal(
-      target.querySelector('[data-recipe-item-dropzone]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-item-dropzone]') === null,
       'no drop zone: adding a recipe to a book happens on Books & Scrolls'
     );
     assert.ok(target.querySelector('[data-recipe-item-empty]'), 'shows the empty summary copy');
@@ -7877,14 +7843,12 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const target = await editHarness.mount(
       contextProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
     );
-    assert.equal(
-      target.querySelector('[data-recipe-tab-button="books-scrolls"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-tab-button="books-scrolls"]') === null,
       'a globally-visible system uses no books, so the tab button is absent'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-tab-button="access"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-tab-button="access"]') === null,
       'a globally-visible system grants no per-recipe access, so the tab button is absent'
     );
     editHarness.remount();
@@ -8007,9 +7971,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       ),
       'the access tab is headed by the shared tab title, like Results/Tools/Validation'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-tab-button="books-scrolls"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-tab-button="books-scrolls"]') === null,
       'restricted systems use no books'
     );
     assert.ok(target.querySelector('[data-recipe-access-player="u1"]'), 'lists the granted player');
@@ -8065,9 +8028,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       })
     );
     await openTab(target, 'access');
-    assert.equal(
-      target.querySelector('[data-recipe-access-subline]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-access-subline]') === null,
       'an empty control set invents no attribution'
     );
     editHarness.remount();
@@ -8198,9 +8160,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const target = await editHarness.mount(
       identityProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: false })
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="recipe-step-mode"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="recipe-step-mode"]') === null,
       'step-mode card is hidden'
     );
     editHarness.remount();
@@ -8278,14 +8239,12 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   // The Simple/Complex toggle was removed (issue 643).
   it('renders NO recipe-mode control (complexity is emergent from structure)', async () => {
     const single = await editHarness.mount(identityProps({ recipe: { ...RECIPE, steps: [] } }));
-    assert.equal(
-      single.querySelector('[data-recipe-section="recipe-mode"]'),
-      null,
+    assert.ok(
+      single.querySelector('[data-recipe-section="recipe-mode"]') === null,
       'no recipe-mode section for a single-set recipe'
     );
-    assert.equal(
-      single.querySelector('[data-recipe-mode-option]'),
-      null,
+    assert.ok(
+      single.querySelector('[data-recipe-mode-option]') === null,
       'no Simple/Complex segmented control'
     );
     editHarness.remount();
@@ -8296,9 +8255,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
       })
     );
-    assert.equal(
-      multi.querySelector('[data-recipe-section="recipe-mode"]'),
-      null,
+    assert.ok(
+      multi.querySelector('[data-recipe-section="recipe-mode"]') === null,
       'no recipe-mode section for a multi-step recipe either'
     );
     editHarness.remount();
@@ -8309,9 +8267,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   // routedByCheck). The editor renders no routing toggle.
   it('does not render a per-recipe routing toggle (routing basis is the system mode)', async () => {
     const target = await editHarness.mount(identityProps());
-    assert.equal(
-      target.querySelector('[data-recipe-section="recipe-routing"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-section="recipe-routing"]') === null,
       'the routing sub-selector is gone'
     );
     editHarness.remount();
@@ -8447,9 +8404,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
 
   it('shows the aggregate ONLY on the Validation tab', async () => {
     const target = await editHarness.mount(identityProps({ recipe: COMPLETE_RECIPE }));
-    assert.equal(
-      target.querySelector('[data-recipe-validation-summary]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-validation-summary]') === null,
       'no summary while another tab is active'
     );
     await openTab(target, 'validation');
@@ -8723,15 +8679,13 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   // The mini-list is NOT coming back: the grouped rows below ARE the list.
   it('does not reintroduce the rail check mini-list', async () => {
     const target = await openValidation(COMPLETE_RECIPE);
-    assert.equal(target.querySelector('[data-recipe-rail-check]'), null, 'no rail check list');
-    assert.equal(
-      target.querySelector('[data-recipe-validation-issues]'),
-      null,
+    assert.ok(target.querySelector('[data-recipe-rail-check]') === null, 'no rail check list');
+    assert.ok(
+      target.querySelector('[data-recipe-validation-issues]') === null,
       'no rail issue list'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-validation-clear]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-recipe-validation-clear]') === null,
       'no rail All-clear pill'
     );
     editHarness.remount();

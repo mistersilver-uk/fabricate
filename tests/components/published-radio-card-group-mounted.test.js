@@ -477,9 +477,9 @@ describe('an option’s example and badge on the published RadioCardGroup', () =
       card('d').querySelector('[data-radio-card-badge]').classList.contains('is-secondary')
     );
     for (const value of ['b', 'c', 'e', 'f']) {
-      assert.equal(card(value).querySelector('[data-radio-card-badge]'), null, value);
-      assert.equal(card(value).querySelector('.manager-resolution-option-line'), null, value);
-      assert.equal(card(value).querySelector('[data-radio-card-example]'), null, value);
+      assert.ok(card(value).querySelector('[data-radio-card-badge]') === null, value);
+      assert.ok(card(value).querySelector('.manager-resolution-option-line') === null, value);
+      assert.ok(card(value).querySelector('[data-radio-card-example]') === null, value);
     }
   });
 
@@ -507,9 +507,9 @@ describe('an option’s example and badge on the published RadioCardGroup', () =
     );
     await settle();
     for (const { value } of FLAGGED) {
-      assert.equal(card(value).querySelector('[data-radio-card-badge]'), null, value);
-      assert.equal(card(value).querySelector('[data-radio-card-example]'), null, value);
-      assert.equal(card(value).querySelector('.manager-resolution-option-line'), null, value);
+      assert.ok(card(value).querySelector('[data-radio-card-badge]') === null, value);
+      assert.ok(card(value).querySelector('[data-radio-card-example]') === null, value);
+      assert.ok(card(value).querySelector('.manager-resolution-option-line') === null, value);
       assert.ok(!radio(value).hasAttribute('aria-describedby'), value);
     }
     handle.update({

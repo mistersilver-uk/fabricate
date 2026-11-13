@@ -499,9 +499,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(pips.textContent.includes('Forest'), 'biome pip present');
     // Region is no longer a composition/display axis.
     assert.ok(!pips.textContent.includes('Greenvale'), 'no legacy region pip');
-    assert.equal(
-      target.querySelector('.gathering-detail-pip i.fa-map-location-dot'),
-      null,
+    assert.ok(
+      target.querySelector('.gathering-detail-pip i.fa-map-location-dot') === null,
       'region pip icon removed'
     );
     // Danger is localized via the Risk.<value> key (not the raw enum).
@@ -519,9 +518,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'success-chance bar present for d100 task'
     );
     // The center row is now read-only: no attempt button.
-    assert.equal(
-      row.querySelector('[data-gathering-attempt]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-attempt]') === null,
       'center row has no attempt button'
     );
     const desc = row.querySelector('[data-gathering-task-description]');
@@ -537,9 +535,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       inspectorAttempt && !inspectorAttempt.disabled,
       'right-column attempt enabled for the attemptable task'
     );
-    assert.equal(
-      inspectorAttempt.querySelector('.fa-ban'),
-      null,
+    assert.ok(
+      inspectorAttempt.querySelector('.fa-ban') === null,
       'no ban icon on an attemptable task'
     );
     assert.equal(inspectorAttempt.getAttribute('data-gathering-attempt-blocked'), 'false');
@@ -896,16 +893,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'and does NOT become a callout: a caption for a control is not a standing statement, and ' +
         'converting it would draw a box around a bar label'
     );
-    assert.equal(
-      section.querySelector('[data-gathering-safe-hint]'),
-      null,
+    assert.ok(
+      section.querySelector('[data-gathering-safe-hint]') === null,
       'safe hint hidden when chance > 0'
     );
     // Targeted (non-blind) environments never show the "events hidden" redaction
     // hint — that is blind-only, even with chance > 0 and no individual events.
-    assert.equal(
-      target.querySelector('[data-gathering-events-hidden]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-events-hidden]') === null,
       'no "events hidden" hint for a targeted environment'
     );
   });
@@ -921,9 +916,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       section.textContent.includes('Risk.safe'),
       'danger level still shown for a safe environment'
     );
-    assert.equal(
-      section.querySelector('[data-gathering-event-value]'),
-      null,
+    assert.ok(
+      section.querySelector('[data-gathering-event-value]') === null,
       'no event bar when chance is zero'
     );
     const safe = section.querySelector('[data-gathering-safe-hint]');
@@ -956,26 +950,23 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await mountView(services);
 
     // No tab strip at all in the restricted tiers.
-    assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
+    assert.ok(target.querySelector('[data-gathering-detail-tab]') === null, 'tab strip is hidden');
     // The environment still carries its danger tag in the header pips.
     assert.ok(
       target.querySelector('[data-gathering-pips] .is-danger'),
       'danger pip retained in the header'
     );
     // No chance bar and no events summary/list, but a risk note above the tasks.
-    assert.equal(
-      target.querySelector('[data-gathering-event-value]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-event-value]') === null,
       'no chance bar under dangerLevelOnly'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-event-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-event-section]') === null,
       'no full-tier event block'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-events-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-events-section]') === null,
       'no individual event list'
     );
     const note = target.querySelector('[data-gathering-event-risk-note]');
@@ -1006,21 +997,19 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
     await mountView(services);
 
-    assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
+    assert.ok(target.querySelector('[data-gathering-detail-tab]') === null, 'tab strip is hidden');
     const summary = target.querySelector('[data-gathering-event-summary]');
     assert.ok(summary, 'an event summary renders above the tasks');
     assert.ok(
       summary.querySelector('[data-gathering-event-value]'),
       'the encounter-chance bar is shown'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-event-risk-note]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-event-risk-note]') === null,
       'no risk note in encounterChance (bar only)'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-events-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-events-section]') === null,
       'no individual event list under encounterChance'
     );
     assert.ok(
@@ -1044,9 +1033,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const summary = target.querySelector('[data-gathering-event-summary]');
     assert.ok(summary, 'an event summary renders');
-    assert.equal(
-      summary.querySelector('[data-gathering-event-value]'),
-      null,
+    assert.ok(
+      summary.querySelector('[data-gathering-event-value]') === null,
       'no bar when chance is zero'
     );
     const safe = summary.querySelector('[data-gathering-safe-hint]');
@@ -1091,19 +1079,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const callouts = row.querySelector('[data-gathering-callouts]');
     assert.ok(callouts, 'header callout bar present');
     assert.ok(callouts.textContent.includes('Conditions'), 'a conditions callout is shown');
-    assert.equal(
-      row.querySelector('[data-gathering-success-value]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-success-value]') === null,
       'no success bar when successChance is null'
     );
-    assert.equal(
-      row.querySelector('[data-gathering-attempt]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-attempt]') === null,
       'center row has no attempt button'
     );
-    assert.equal(
-      row.querySelector('[data-gathering-blocked]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-blocked]') === null,
       'no inline blocked detail in the center row'
     );
 
@@ -1165,9 +1150,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'),
       'missing-tools callout shown'
     );
-    assert.equal(
-      row.querySelector('[data-gathering-tools]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-tools]') === null,
       'center row does not render the tools inline'
     );
 
@@ -1506,9 +1490,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       !callouts || !callouts.textContent.includes('VisitScene'),
       'no scene callout on the task card'
     );
-    assert.equal(
-      row.querySelector('[data-gathering-scene]'),
-      null,
+    assert.ok(
+      row.querySelector('[data-gathering-scene]') === null,
       'no linked-scene panel inside the task card'
     );
   });
@@ -1592,9 +1575,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-gathering-blind-attempt]'),
       'blind attempt button still present'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-discovered]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-discovered]') === null,
       'no discovered section when reveal is never'
     );
     assert.equal(
@@ -1806,9 +1788,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'),
       'false'
     );
-    assert.equal(
-      target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-task-id="task-2"] [data-gathering-tools]') === null,
       'center row has no inline requirements'
     );
   });
@@ -1934,9 +1915,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-gathering-tasks-section]'),
       'tasks panel shown by default'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-event-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-event-section]') === null,
       'event summary not shown on the Tasks tab'
     );
 
@@ -1949,9 +1929,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-gathering-event-section]'),
       'event summary shown on the Events tab'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-tasks-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-tasks-section]') === null,
       'tasks panel hidden on the Events tab'
     );
   });
@@ -2145,9 +2124,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'),
       'aggregate chance bar still shown for a blind env'
     );
-    assert.equal(
-      target.querySelector('.gathering-event-row'),
-      null,
+    assert.ok(
+      target.querySelector('.gathering-event-row') === null,
       'no individual event rows for a blind env'
     );
     assert.ok(
@@ -2536,9 +2514,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'does not repeat the node count'
     );
     // It is NOT the depleted/exhausted callout (resource is not yet exhausted).
-    assert.equal(
-      target.querySelector('[data-gathering-node-depleted]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-node-depleted]') === null,
       'no depleted/exhausted callout while current > 0'
     );
   });
@@ -2581,9 +2558,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       !callout.querySelector('.fab-notice-detail'),
       'no respawn ETA for a permanently exhausted node'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-node-scarce]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-node-scarce]') === null,
       'the pre-exhaustion scarcity callout is not used at current <= 0'
     );
   });

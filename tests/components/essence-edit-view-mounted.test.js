@@ -374,18 +374,18 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
 
     // 3. the duplicated `Drop or pick` zone under the linked card is gone. The card IS the
     //    drop target, which is exactly what `ToolOverviewTab` does with the same primitive.
-    assert.equal(
-      root.querySelector('[data-essence-section="effect-source"] .manager-essence-source-drop-zone'),
-      null,
+    assert.ok(
+      root.querySelector(
+        '[data-essence-section="effect-source"] .manager-essence-source-drop-zone'
+      ) === null,
       'no second drop zone says the same thing twice under the linked card'
     );
 
     // ...and the picker returns the moment the link is gone.
     actions[1].click();
     flushSync();
-    assert.equal(
-      root.querySelector('[data-item-drop-zone="essence-source"]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-item-drop-zone="essence-source"]') === null,
       'unlinking removes the card'
     );
     assert.ok(
@@ -570,9 +570,8 @@ describe('1036 EssenceEditView — tab badges', () => {
     openTab(root, 'rules');
 
     // THE NEGATIVE HALF: the inherited section presents no edit affordance at all.
-    assert.equal(
-      root.querySelector('[data-scoped-source-unlink]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-scoped-source-unlink]') === null,
       'an inherited section is not this system to change, so its unlink must be absent'
     );
     assert.ok(
@@ -585,7 +584,7 @@ describe('1036 EssenceEditView — tab badges', () => {
       root.querySelector('[data-scoped-macro-unlink]'),
       'the overridden macro section keeps its unlink'
     );
-    assert.equal(root.querySelector('[data-scoped-macro-locked]'), null);
+    assert.ok(root.querySelector('[data-scoped-macro-locked]') === null);
     harness.remount();
   });
 
@@ -600,8 +599,8 @@ describe('1036 EssenceEditView — tab badges', () => {
 
     // The mirror image of the test above.
     assert.ok(root.querySelector('[data-scoped-source-unlink]'));
-    assert.equal(root.querySelector('[data-scoped-source-locked]'), null);
-    assert.equal(root.querySelector('[data-scoped-macro-unlink]'), null);
+    assert.ok(root.querySelector('[data-scoped-source-locked]') === null);
+    assert.ok(root.querySelector('[data-scoped-macro-unlink]') === null);
     assert.ok(root.querySelector('[data-scoped-macro-locked="macro"]'));
     harness.remount();
   });
@@ -623,7 +622,7 @@ describe('1036 EssenceEditView — tab badges', () => {
       'and the one action that changes that is on screen'
     );
     // NON-VACUITY: the inherit switches are NOT drawn for a non-member.
-    assert.equal(root.querySelector('[data-scoped-inherit-toggle="effectSource"]'), null);
+    assert.ok(root.querySelector('[data-scoped-inherit-toggle="effectSource"]') === null);
     harness.remount();
   });
 
@@ -637,9 +636,9 @@ describe('1036 EssenceEditView — tab badges', () => {
     flushSync();
     openTab(root, 'oncraft');
 
-    assert.equal(root.querySelector('[data-essence-scope-banner]'), null);
-    assert.equal(root.querySelector('[data-scoped-inherit-toggle]'), null);
-    assert.equal(root.querySelector('[data-scoped-source-locked]'), null);
+    assert.ok(root.querySelector('[data-essence-scope-banner]') === null);
+    assert.ok(root.querySelector('[data-scoped-inherit-toggle]') === null);
+    assert.ok(root.querySelector('[data-scoped-source-locked]') === null);
     assert.ok(
       root.querySelector('[data-scoped-source-unlink]'),
       'and the source card is editable, which is what the shipped editor always did'
@@ -961,9 +960,8 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     const palette = root.querySelector('[data-manager-essence-colour]');
     assert.ok(palette, 'the identity screen HAS a colour control — the non-vacuity half');
-    assert.equal(
-      globalThis.document.querySelector('[data-manager-custom-color]'),
-      null,
+    assert.ok(
+      globalThis.document.querySelector('[data-manager-custom-color]') === null,
       'the essence tint picker offers the ten presets and no free hex field'
     );
     palette.querySelector('[data-manager-color-none]').click();

@@ -620,7 +620,7 @@ export default [
         },
         // happy-dom: a failing `assert.equal(el, null)` never returns (the diff walks a ~117k
         // character inspect string), so a regression surfaces as `# cancelled`, not `# fail`.
-        // The base-count lint gate grandfathers the existing sites; a file may only lose them.
+        // No sites remain; the base-count lint gate keeps the count at zero.
         {
           selector:
             "CallExpression[callee.object.name='assert']" +
