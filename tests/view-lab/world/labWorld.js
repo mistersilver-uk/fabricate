@@ -978,13 +978,16 @@ export function stripTools(content) {
 }
 
 /**
- * Remove the world's OWN authored component records, leaving the migration's lifted ones (issue
- * 1540).
+ * Remove the world's OWN authored component records and component tags, leaving the migration's
+ * lifted component records (issue 1540).
  *
  * @param {object} content the built lab content, mutated in place.
  */
 export function stripAuthoredWorldComponents(content) {
   content.componentScope = { entities: [], defaults: {} };
+  // The world vocabulary's component tags too: the Tool repair tag picker lists them whenever the
+  // vocabulary store is available, so a world "with no tags" has none there either.
+  content.worldVocabulary = { ...content.worldVocabulary, componentTags: [] };
 }
 
 /** The shipped travel tab label the `longTravelLabels` flag swaps for a long one. */

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { WORLD_SHAPING_LAB_FLAGS } from '../scripts/lib/viewLabCases.js';
+import { WORLD_SHAPING_LAB_FLAGS, getCaseById } from '../scripts/lib/viewLabCases.js';
 
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
@@ -38,6 +38,7 @@ test('each world-shaping flag builds the world it claims, against the default wo
           systemTools: world.content.systems.flatMap((system) => system.tools ?? []),
           parties: setting(world, 'gatheringParties'),
           componentIds: setting(world, 'componentScope').entities.map(({ id }) => id),
+          componentTags: setting(world, 'worldVocabulary').componentTags,
           label: world.localize(LONG_TRAVEL_LABEL_KEY),
         };
       } finally {
@@ -51,7 +52,12 @@ test('each world-shaping flag builds the world it claims, against the default wo
 
     assert.deepEqual((await flagged({ noParties: true })).parties, [], 'noParties');
 
+    assert.ok(
+      setting(control, 'worldVocabulary').componentTags.length > 0,
+      'default world vocabulary carries component tags'
+    );
     const noComponents = await flagged({ noAuthoredWorldComponents: true });
+    assert.deepEqual(noComponents.componentTags, [], 'and the flag empties them');
     for (const id of authoredComponentIds) {
       assert.ok(
         !noComponents.componentIds.includes(id),
@@ -101,6 +107,28 @@ test('the salvage-triggers Runework state gives the component editor progressive
       assert.deepEqual(triggersOf(shaped), ['rw-trig-step-target', 'rw-trig-step-up']);
     } finally {
       shaped.shim.restore();
+    }
+  });
+});
+
+test('the tag-picker-empty case builds a world with no component tags in scope or vocabulary', async () => {
+  const viewCase = getCaseById('world-tool-entry-on-break-repair-tag-picker-empty');
+  assert.equal(viewCase.query.noAuthoredWorldComponents, '1');
+  await withFabricateLifecycleReplay(async ({ loadModule }) => {
+    const { buildLabWorld } = await loadModule('/tests/view-lab/world/labWorld.js');
+    const { settingsKey } = await loadModule('/tests/view-lab/foundry/installFoundryShim.js');
+    const world = await buildLabWorld({ noAuthoredWorldComponents: true });
+    try {
+      const get = (key) => world.settings.get(settingsKey('fabricate', key));
+      assert.deepEqual(get('worldVocabulary').componentTags, []);
+      const tagged = get('componentScope').entities.filter((entity) => entity.tags?.length > 0);
+      assert.deepEqual(
+        tagged.map(({ id }) => id),
+        [],
+        'no world component record carries a tag either'
+      );
+    } finally {
+      world.shim.restore();
     }
   });
 });
