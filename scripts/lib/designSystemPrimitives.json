@@ -457,6 +457,17 @@
       ]
     },
     {
+      "path": "src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": [
+        "The manager's essence quantity card: an essence tile and name above a clamped `Stepper`, tinted by whether the essence is contributed at all. `src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte` and `src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte` both import it, so it clears the two-caller bar.",
+        "No library entry names it, and both callers are manager screens, so it is manager-only."
+      ]
+    },
+    {
       "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
       "library": null,
       "status": "target",
