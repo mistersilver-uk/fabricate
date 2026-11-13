@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(design-system): registers an existing two-importer component in the primitive register at `target`; it is not a promotion into a primitive directory -->
 <!--
   The manager's ONE essence quantity card: an icon tile and a truncating essence name above a
   clamped numeric stepper, tinted by whether this essence is contributed at all. The editor's 4-up
