@@ -1411,6 +1411,12 @@ const STATE_TINTS = Object.freeze([
     'under forced colours a pressed toggle is the reader’s Highlight at rest and under the pointer',
   ],
   [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented .manager-segment.is-active, .manager-segmented .manager-segment.is-active .manager-segment-count',
+    'highlight',
+    'under forced colours the chosen segment is the reader’s Highlight (issue 2872)',
+  ],
+  [
     MODULE_SHEET,
     '.fabricate-pill-select .manager-availability-remove:hover, .fabricate-pill-select .manager-availability-remove:focus-visible, .fabricate-manager .manager-danger-tag-remove:hover, .fabricate-manager .manager-danger-tag-remove:focus-visible',
     'var(--fab-danger-soft)',

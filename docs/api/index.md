@@ -2037,6 +2037,11 @@ async _preClose(options) {
 Draw the visible reading yourself, because `Meter` draws no figure.
 A later change goes through `this.#meter.update({ ... })` with every prop again.
 
+A `required` prop that names or labels a control, `ariaLabel`, `label`, `title` or `legend`, with no other prop that states its own rule, is refused when it is not a string or is white space alone, with `<Component> requires a non-blank string "<prop>"`, so a control is never mounted with no name or with a wrong one such as `true`.
+An empty or absent one is refused as before, with `<Component> requires a non-empty "<prop>"`.
+This is not a narrowing under the versioning rule: each such prop's section states it as final display text naming the control, so a non-string or a string of white space alone was already outside its accepted values.
+Pass a name written out in words, never white space or a non-string.
+
 The published components, in publication order:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -5092,7 +5097,8 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 - `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
-A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` (or white space alone where a `contains` key names it) where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` (or white space alone where a `contains` key names it) where it is not a callback prop, throws `<name> requires a non-empty "<key>"`, and `''` on a callback prop throws `"<key>" must be a function`.
+A required `ariaLabel`, `label`, `title` or `legend` prop that no `contains` prop names and that states no `waivedBy` or `waivedWhen` throws `<name> requires a non-blank string "<key>"` when it holds a non-string or white space alone.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 A required prop that its component's section lets be empty while other props hold text, as `Chip`'s `children` beside `icon` and `ariaLabel`, is refused with `<name> requires a non-blank "<other>" when "<key>" is empty` while only some of them do, naming the first that does not.
 A required prop that its component's section lets be empty while another prop is `true`, as `SelectionCheckbox`'s `label` and `onChange` beside `decorative: true`, may be absent, or `''` where it is not a callback prop, while that prop is exactly `true`, and is refused as any required prop is otherwise; `describe` still reports it `required`.
@@ -5294,7 +5300,7 @@ The standalone layer, its class and its `data-fabricate-theme` copy are private 
 A standalone style root is a different element, is never an overlay host, and holds no panel.
 The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 An `overlayHost` you pass outside a modal `<dialog>` that holds `target` still wins, and a panel drawn there is inert, so in such a dialog pass one inside it, or none.
-In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover` and a `Typeahead` prevent the Escape that closes their panel, so the dialog stays open, while the Escape that closes a `Select` or `IconPicker` list or an `ActionMenu` menu is not prevented, so Chromium closes the dialog with it unless your own listener prevents that key.
+In a `<dialog>` opened with `showModal()`, Chromium closes the dialog on an Escape whose default nothing prevents: a `Popover`, a `Typeahead`, a `Select`, an `IconPicker` and an `ActionMenu` prevent the Escape that closes their panel, so the dialog stays open and a second Escape, with no panel open, closes it.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and an open `Select`, `IconPicker`, `ActionMenu` or `Typeahead` watches that document for its `target` leaving it; it listens for resizes, and a `Modal` dialog for its record of each Escape, on that document's window.
 An overlay whose document has no window stays closed.
 An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.

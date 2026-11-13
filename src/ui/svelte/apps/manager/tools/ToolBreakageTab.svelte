@@ -584,7 +584,7 @@
         idleAriaLabel={formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemLabel',
           { system: systemName },
-          'Remove this Tool from {system}'
+          'Remove from system {system}'
         )}
         armedAriaLabel={formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemConfirm',

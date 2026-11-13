@@ -30,9 +30,8 @@
     fill = false,
     iconOnly = false,
     density = 'default',
-    // `variant` says what choosing a segment MEANS, `tone` what the track is ABOUT. 'tag' carries
-    // its own 22px SCALE, so a `tone="tag"` consumer in a row that must not grow passes no `density`;
-    // `inline` (30px) and `field` (34px) lift it to those rungs for a row of taller siblings.
+    // `variant` says what choosing a segment MEANS, `tone` what the track is ABOUT. 'tag' carries its own 22px SCALE,
+    // so a `tone="tag"` consumer in a row that must not grow passes no `density`; `inline` (30px) and `field` (34px) lift it to those rungs.
     tone = '',
     shape = '',
     surface = 'default',
@@ -142,8 +141,7 @@
   }
 
   /* COMPACT and FIELD densities, declared BEFORE `.is-active` so the active tile's weight still wins
-     at equal specificity. FIELD is a third density rather than a rule written from the Difficulty
-     card, because those four properties are the primitive's to state. */
+     at equal specificity. FIELD is a third density, not a rule from the Difficulty card: those four properties are the primitive's. */
   .manager-segmented.is-compact,
   .manager-segmented.is-field {
     gap: var(--fab-space-1);
@@ -181,8 +179,7 @@
     background: var(--fab-surface-active);
   }
 
-  /* Inline density: a 30px track (24px segments, 2px padding, 1px border) for a row whose other
-     controls are 30px, so the track never makes its row taller than its siblings. */
+  /* Inline density: a 30px track (24px segments, 2px padding, 1px border), so it never makes a row of 30px controls taller. */
   .manager-segmented.is-inline {
     gap: var(--fab-space-2xs);
     padding: var(--fab-space-2xs);
@@ -198,10 +195,9 @@
     font-size: 10px;
   }
 
-  /* TAG tone. `overflow: hidden` is why no segment restates a corner radius and why the track
-     carries no padding or gap. THE TRACK IS SHORTER than the other rungs and that is load-bearing:
-     a taller one makes an EMPTY tag row stand above every sibling, guarded by `the tag requirement
-     row keeps its arm whole, and an EMPTY one is a row like any other`. */
+  /* TAG tone. `overflow: hidden` is why no segment restates a corner radius and why the track carries no
+     padding or gap. THE TRACK IS SHORTER than the other rungs and that is load-bearing: a taller one makes an EMPTY
+     tag row stand above every sibling, guarded by `the tag requirement row keeps its arm whole, and an EMPTY one is a row like any other`. */
   .manager-segmented.is-tag {
     gap: 0;
     padding: 0;
@@ -221,16 +217,14 @@
     font-weight: 600;
   }
 
-  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. The
-     weight is restated because `is-inline` and `is-field` set an idle 500 at the same specificity. */
+  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. The weight is restated because `is-inline` and `is-field` set an idle 500 at the same specificity. */
   .manager-segmented.is-tag .manager-segment:not(.is-active) {
     color: var(--fab-text-muted);
     font-weight: 600;
   }
 
-  /* TAG tone on a taller rung: `density` lifts the track to the height of its row's siblings and
-     nothing else, so the well, the gap and the equal-width segments the density would bring stay
-     out. The track owns the rung and the segments stretch to fill it inside its border. */
+  /* TAG tone on a taller rung: `density` lifts the track to its row's height and nothing else, so the
+     well, the gap and the equal-width segments stay out. The track owns the rung; segments stretch to fill it. */
   .manager-segmented.is-tag.is-inline {
     box-sizing: border-box;
     height: 30px;
@@ -273,8 +267,7 @@
     outline-offset: -2px;
   }
 
-  /* ICON-ONLY (issue 1036). `min-width: 32px` is the TARGET, one step inside the 34px icon button
-     because the track adds its own padding and border around the pair. */
+  /* ICON-ONLY. `min-width: 32px` is the TARGET, one step inside the 34px icon button: the track adds its own padding and border. */
   .manager-segmented.is-icon-only .manager-segment {
     /* A local containing block for the two clipped 1px children. */
     position: relative;
@@ -283,10 +276,9 @@
     padding: var(--fab-space-chip) var(--fab-space-2);
   }
 
-  /* The label is CLIPPED, never removed: the `<label>` IS the radio's accessible name. It restates
-     `.visually-hidden` because a scoped block cannot see a global class, and stamping that class
-     into the markup would fire it for labelled consumers too. The radio is hidden the same way
-     and stays focusable: the label segment is the visible control, the radio the keyboard's. */
+  /* The label is CLIPPED, never removed: the `<label>` IS the radio's accessible name. It restates `.visually-hidden`
+     because a scoped block cannot see a global class, and stamping that class into the markup would fire it for labelled
+     consumers too. The radio is hidden the same way and stays focusable: the segment is the visible control, the radio the keyboard's. */
   .manager-segment-input,
   .manager-segmented.is-icon-only .manager-segment-label {
     position: absolute;
@@ -300,9 +292,8 @@
     border: 0;
   }
 
-  /* PILL shape: the track gives up its fill, edge and padding. WRITTEN AFTER `is-compact` AND
-     `is-field`, because it ties them on specificity and ORDER decides the corner; and
-     `border-color: transparent` rather than `border: 0` keeps the 1px it contributes. */
+  /* PILL shape: the track gives up its fill, edge and padding. WRITTEN AFTER `is-compact` AND `is-field`,
+     because it ties them on specificity and ORDER decides the corner; `border-color: transparent` rather than `border: 0` keeps the 1px. */
   .manager-segmented.is-pill {
     gap: var(--fab-space-2);
     padding: 0;
@@ -357,8 +348,7 @@
     color: var(--fab-on-info);
   }
 
-  /* Both selectors reach (0,4,0), because the shipped `.is-active .manager-segment-count` below is
-     (0,3,0) and is written LATER. */
+  /* Both reach (0,4,0), because the shipped `.is-active .manager-segment-count` below is (0,3,0) and written LATER. */
   .manager-segmented.is-accent .manager-segment.is-active .manager-segment-count {
     color: inherit;
   }
@@ -369,9 +359,8 @@
     color: inherit;
   }
 
-  /* SOFT ACCENT tone: colour only, pinned by `segmented-control-mounted.test.js`; the measurement
-     is in the issue, because `theme-colour-contract.test.js` scans prose too. `--fab-bg-1` for the
-     idle fill is this epic's standing licensed departure (issue 676). */
+  /* SOFT ACCENT tone: colour only, pinned by `segmented-control-mounted.test.js`; the measurement is in the
+     issue, because `theme-colour-contract.test.js` scans prose too. `--fab-bg-1` for the idle fill is this epic's licensed departure (issue 676). */
   .manager-segmented.is-accent-soft .manager-segment.is-active {
     border-color: var(--fab-accent-border);
     background: var(--fab-accent-soft);
@@ -384,9 +373,9 @@
     color: var(--fab-text-muted);
   }
 
-  /* THE CHOSEN SEGMENT'S TALLY, and only the chosen one's. THE IDLE ONE IS DELIBERATELY NOT
-     RESTATED: `.manager-segment-count.is-badge` already declares `--fab-text-muted`, and a
-     `:not(.is-active)` rule here would out-specify it and pull the idle numeral brighter. */
+  /* THE CHOSEN SEGMENT'S TALLY, and only the chosen one's. THE IDLE ONE IS DELIBERATELY NOT RESTATED:
+     `.manager-segment-count.is-badge` already declares `--fab-text-muted`, and a `:not(.is-active)` rule
+     here would out-specify it and pull the idle numeral brighter. */
   .manager-segmented.is-accent-soft .manager-segment.is-active .manager-segment-count {
     color: inherit;
   }
@@ -431,8 +420,7 @@
     color: var(--fab-text-secondary);
   }
 
-  /* Active option is a raised dark tile (issue 643 §G3), not a solid accent fill — the accent
-     fill out-shouted the Save button on the editor rail. */
+  /* Active option is a raised dark tile, not a solid accent fill: that out-shouted the Save button on the editor rail. */
   .manager-segment.is-active {
     border: 1px solid var(--fab-border-strong);
     background: var(--fab-surface-active);
@@ -440,17 +428,15 @@
     font-weight: 600;
   }
 
-  /* Optional per-option tints for the ACTIVE segment (issue 975). `neutral` declares nothing and
-     exists so a three-way control can name every segment; the coloured cells share one formula —
-     the family's `-border`, `-soft` and `-text` — so this is one ramp at four hues. */
+  /* Optional per-option tints for the ACTIVE segment. `neutral` declares nothing and exists so a three-way
+     control can name every segment; the coloured cells share one formula, the family's `-border`, `-soft` and `-text`. */
   .manager-segment.is-active.is-success {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
     color: var(--fab-success-text);
   }
 
-  /* INFO and WARNING (issue 1286) complete the ramp: without them a severity control's two
-     unpainted segments would read as the unchosen ones even while selected. */
+  /* INFO and WARNING complete the ramp: without them a severity control's two unpainted segments read as unchosen while selected. */
   .manager-segment.is-active.is-info {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
@@ -469,8 +455,7 @@
     color: var(--fab-danger-text);
   }
 
-  /* An info option inside an accent track keeps its own tint: the variant says what choosing this
-     segment means, and the track's tone rules above out-specify the ramp. */
+  /* An info option inside an accent track keeps its own tint: the track's tone rules above out-specify the ramp. */
   .manager-segmented.is-accent .manager-segment.is-active.is-info,
   .manager-segmented.is-accent-soft .manager-segment.is-active.is-info {
     border-color: var(--fab-info-border);
@@ -478,8 +463,7 @@
     color: var(--fab-info-text);
   }
 
-  /* `:not(.is-disabled)` is load-bearing: without it a disabled segment still recolours under the
-     pointer and reads as choosable. */
+  /* `:not(.is-disabled)` is load-bearing: without it a disabled segment recolours under the pointer and reads as choosable. */
   .manager-segment:hover:not(.is-active):not(.is-disabled) {
     color: var(--fab-text-secondary);
   }
@@ -490,10 +474,25 @@
     cursor: default;
   }
 
-  /* `:has(:focus-visible)`, not `:focus-within`, so a mouse click does not leave a persistent
-     ring — the visually-hidden radio keeps focus after click. */
+  /* `:has(:focus-visible)`, not `:focus-within`: a mouse click leaves no persistent ring, though the hidden radio keeps focus. */
   .manager-segment:has(:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  /* Forced colours: the chosen segment is the reader's Highlight behind HighlightText, out of the
+     repaint's reach, and its ring canvastext; `!important` outranks the tone and variant rules. */
+  @media (forced-colors: active) {
+    .manager-segmented .manager-segment.is-active,
+    .manager-segmented .manager-segment.is-active .manager-segment-count {
+      forced-color-adjust: none;
+      border-color: highlight !important;
+      background: highlight !important;
+      color: highlighttext !important;
+    }
+
+    .manager-segmented .manager-segment.is-active:has(:focus-visible) {
+      outline-color: canvastext;
+    }
   }
 </style>

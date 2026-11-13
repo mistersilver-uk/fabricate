@@ -55,7 +55,7 @@
   import IconButton from './IconButton.svelte';
   import Kicker from './Kicker.svelte';
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { dismissPanelOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeActionMenuLayout } from '../util/actionMenuLayout.js';
 
   let {
@@ -196,6 +196,7 @@
       return;
     }
     if (key === 'Escape') {
+      event.preventDefault();
       stop(event);
       return;
     }
@@ -256,7 +257,7 @@
 <div
   class="fabricate-action-menu"
   bind:this={menuRoot}
-  use:dismissOnOutsideClick={{
+  use:dismissPanelOnOutsideClick={{
     enabled: open,
     onDismiss: (event) => close({ restoreFocus: event?.key === 'Escape' }),
     onDetached: () => close({ restoreFocus: false }),
