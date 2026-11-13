@@ -7,6 +7,7 @@
  */
 
 import { operatorMeta } from '../../systems/characterPrerequisites.js';
+import { fill } from '../../utils/fillPlaceholders.js';
 
 /** Every string this builder reads, as `[key, fallback]` pairs. */
 export const COMPLICATION_SUMMARY_STRINGS = Object.freeze({
@@ -65,13 +66,6 @@ function englishTemplate(_key, fallback) {
   return fallback;
 }
 
-/** Substitute `{name}` placeholders, in ONE pass over the TEMPLATE. */
-function fill(template, data = {}) {
-  return String(template ?? '').replaceAll(/\{(\w+)\}/g, (placeholder, name) =>
-    Object.hasOwn(data, name) ? String(data[name] ?? '') : placeholder
-  );
-}
-
 /** The comparator's rendered glyph. */
 function comparatorSymbol(cmp) {
   const id = String(cmp ?? '').trim();
@@ -98,9 +92,9 @@ export function complicationSummary(complication, options = {}) {
   if (rollCondition.enabled === true) {
     clauses.push(
       fill(key('RollCondition'), {
-        expr: rollCondition.expr,
+        expr: rollCondition.expr ?? '',
         operator: comparatorSymbol(rollCondition.cmp),
-        value: rollCondition.value,
+        value: rollCondition.value ?? '',
       })
     );
   }
@@ -111,7 +105,7 @@ export function complicationSummary(complication, options = {}) {
   const effects = [];
   const effectRoll = complication?.effectRoll || {};
   if (effectRoll.enabled === true) {
-    effects.push(fill(key('EffectRoll'), { expr: effectRoll.expr }));
+    effects.push(fill(key('EffectRoll'), { expr: effectRoll.expr ?? '' }));
   }
   if (complication?.macroUuid) {
     effects.push(

@@ -1,16 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The gathering, travel and environment inspector rail: the branch chain that picks the task,
-  event, rules or travel leaf, and the four states it owns itself — the gathering-tab
-  placeholder, the selected environment's summary, the empty-library setup card and the
-  no-selection empty state (issue 1707).
+  event, rules or travel leaf, and the two states it owns itself — the selected
+  environment's summary and the empty-library setup card (issue 1707).
 
   Every reader and writer arrives as a prop from the shell, which still owns the state; the
   one `bind:` prop is the character-modifier search term, shared by both subjects.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../../../components/EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringEventInspector from './GatheringEventInspector.svelte';
   import GatheringRulesInspector from './GatheringRulesInspector.svelte';
@@ -23,7 +21,6 @@
     currentView,
     displayedGatheringTab,
     isWorldTravelRoute,
-    activeGatheringInspectorTab,
     selectedGatheringTask,
     editingGatheringTask,
     selectedGatheringDrop,
@@ -228,25 +225,6 @@
     {onDeleteRealm}
     {onRenameRealm}
   />
-{:else if currentView === 'environments' && activeGatheringInspectorTab}
-  <InspectorCard data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}>
-    <div class="manager-inspector-title-row is-hero-large">
-      <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-        <i class={activeGatheringInspectorTab.icon}></i>
-      </span>
-      <div class="manager-inspector-copy">
-        <p class="manager-kicker">
-          {text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Label', 'Gathering sections')}
-        </p>
-        <h2 class="manager-inspector-name">
-          {text(activeGatheringInspectorTab.titleKey, activeGatheringInspectorTab.titleFallback)}
-        </h2>
-      </div>
-    </div>
-    <p class="manager-muted">
-      {text(activeGatheringInspectorTab.hintKey, activeGatheringInspectorTab.hintFallback)}
-    </p>
-  </InspectorCard>
 {:else if selectedEnvironment}
   <InspectorCard>
     <img
@@ -405,14 +383,4 @@
       </Button>
     </div>
   </section>
-{:else}
-  <EmptyState
-    fill
-    icon="fas fa-seedling"
-    title={text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}
-    hint={text(
-      'FABRICATE.Admin.Manager.Environment.InspectorHint',
-      'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.'
-    )}
-  />
 {/if}

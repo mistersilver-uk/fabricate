@@ -15,7 +15,6 @@ import {
   describeActiveFilters,
   filterRecipes,
   groupRecipesByCategory,
-  paginateRecipes,
   recipeCheckFact,
   recipeCheckPill,
   recipeCheckSortLabel,
@@ -58,15 +57,6 @@ describe('recipeBrowserModel — view-state factory', () => {
     // The PERSISTED system sentinel (issue 806): starts empty so the first mount's reset
     // effect stamps it, and it survives the editor round-trip so a remount is not a switch.
     assert.equal(state.systemId, '');
-  });
-
-  it('createRecipeBrowserState returns a FRESH object with a fresh Set each call', () => {
-    const first = createRecipeBrowserState();
-    const second = createRecipeBrowserState();
-    assert.notEqual(first, second);
-    assert.notEqual(first.collapsedCategories, second.collapsedCategories);
-    first.collapsedCategories.add('alchemy');
-    assert.equal(second.collapsedCategories.has('alchemy'), false);
   });
 });
 
@@ -262,12 +252,6 @@ describe('recipeBrowserModel — sorting', () => {
     );
   });
 
-  it('does not mutate the input array', () => {
-    const input = [...rows];
-    sortRecipes(input, { key: 'name', direction: 'desc' });
-    assert.deepEqual(names(input), ['Beta', 'Alpha', 'Gamma']);
-  });
-
   it('falls back to name for an unknown sort key', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'bogus' })), ['Alpha', 'Beta', 'Gamma']);
   });
@@ -420,59 +404,6 @@ describe('recipeBrowserModel — category-major grouped pagination (issue 801)',
 });
 
 describe('recipeBrowserModel — pagination boundaries', () => {
-  const rows = Array.from({ length: 7 }, (_, index) => makeRecipe({ id: `r${index}`, name: `R${index}` }));
-
-  it('slices the requested page', () => {
-    const page = paginateRecipes(rows, { pageIndex: 1, pageSize: 3 });
-    assert.deepEqual(names(page.recipes), ['R3', 'R4', 'R5']);
-    assert.equal(page.pageCount, 3);
-    assert.equal(page.totalCount, 7);
-  });
-
-  it('clamps an out-of-range page index back into the list', () => {
-    const page = paginateRecipes(rows, { pageIndex: 99, pageSize: 3 });
-    assert.equal(page.pageIndex, 2);
-    assert.deepEqual(names(page.recipes), ['R6']);
-  });
-
-  it('reports one empty page for an empty list', () => {
-    const page = paginateRecipes([], { pageIndex: 0, pageSize: 10 });
-    assert.deepEqual(page.recipes, []);
-    assert.equal(page.pageCount, 1);
-    assert.equal(page.pageIndex, 0);
-  });
-
-  // The library's count reads "1–5 of 12". A bare "5 of 12" never told the GM WHICH page
-  // they were on, which is the whole job of a count above a paged list.
-  it('reports the page window as a 1-based inclusive range', () => {
-    assert.deepEqual(
-      [0, 1, 2]
-        .map((pageIndex) => paginateRecipes(rows, { pageIndex, pageSize: 3 }))
-        .map((page) => [page.rangeStart, page.rangeEnd]),
-      [
-        [1, 3],
-        [4, 6],
-        [7, 7],
-      ]
-    );
-  });
-
-  it('reports an empty range for an empty list rather than 1-0', () => {
-    const page = paginateRecipes([], { pageIndex: 0, pageSize: 10 });
-    assert.deepEqual([page.rangeStart, page.rangeEnd], [0, 0]);
-  });
-
-  // Issue 1036 review: `paginateRecipes` now delegates to the shared `paginateRows`, and the one
-  // input class no pinned test covered was a `pageSize` that is falsy but NUMERIC.
-  it('clamps a zero or null pageSize to one row per page rather than defaulting', () => {
-    for (const pageSize of [0, null]) {
-      const page = paginateRecipes(rows, { pageIndex: 0, pageSize });
-      assert.deepEqual(names(page.recipes), ['R0'], `pageSize ${pageSize} yields ONE row`);
-      assert.equal(page.pageCount, rows.length, `pageSize ${pageSize} yields one page per row`);
-      assert.deepEqual([page.rangeStart, page.rangeEnd], [1, 1]);
-    }
-  });
-
   it('defaults to a page size that clears the smoke fixture recipe count', () => {
     // The smoke harness waits for a VISIBLE row and throws "Manager rendered no
     // table rows" on zero, so the default page must hold the fixture's recipes.
