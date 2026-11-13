@@ -442,7 +442,11 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
+    steps: [
+      // Narrowed first: the list pages at 12 by name, so an unfiltered row sinks onto page 2 as the lab world grows (issue 1911).
+      { selector: '.crafting-browser-search input', fill: 'Forge Longsword' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' },
+    ],
     kinds: ['player', 'crafting', 'resolution-mode'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE],
   }),

@@ -48,6 +48,11 @@ const CASES = Object.freeze([
   ['on-twin', { checked: true, label: LABEL }],
   ['mixed', { checked: false, indeterminate: true, label: LABEL }],
   ['compact', { checked: true, density: 'compact', label: 'Spent' }],
+  [
+    'compact-mixed-checked',
+    { checked: true, indeterminate: true, density: 'compact', label: 'Spent' },
+  ],
+  ['compact-mixed', { checked: false, indeterminate: true, density: 'compact', label: 'Spent' }],
   ['comfortable', { checked: false, density: 'comfortable', label: 'Spent' }],
   ['disabled', { checked: true, disabled: true, label: 'Advance to step' }],
   [
@@ -323,6 +328,12 @@ describe('the published SelectionCheckbox in Chromium', () => {
     });
     assert.equal((await read('named')).name, 'Select Iron ore');
     assert.equal((await read('renamed')).name, 'Ember salt spent when this stage begins');
+  });
+
+  it('inks a compact box that is checked and mixed as a mixed one, not in the on-accent ink (issue 2926)', async () => {
+    const ink = (id) => tab.$eval(boxOf(id), (box) => getComputedStyle(box).color);
+    assert.equal(await ink('compact-mixed-checked'), await ink('compact-mixed'));
+    assert.notEqual(await ink('compact-mixed-checked'), await ink('compact'));
   });
 
   it('inks the label in the secondary ink, and dims a disabled box to half with its label in the muted ink', async () => {

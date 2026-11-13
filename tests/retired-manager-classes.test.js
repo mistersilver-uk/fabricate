@@ -1,7 +1,7 @@
 /**
  * The ten `manager-*` root classes issues 1507 and 2543 retired and the `fab-manager-button`
- * token issue 2540 retired stay retired, and each primitive still writes the root that replaced
- * its class.
+ * token issues 2540 and 2569 retired stay retired, and each primitive still writes the root that
+ * replaced its class.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -11,13 +11,7 @@ import test from 'node:test';
 import { parse } from 'svelte/compiler';
 
 import { walkTemplate } from './helpers/primitiveAdoptionContract.js';
-import {
-  COMPAT_LINES,
-  HEADER_ACTION_COMPAT_REMOVE_IN,
-  HEADER_ACTION_COMPAT_WHY,
-  HISTORICAL_LINES,
-  RETIRED_CLASSES,
-} from './helpers/retiredManagerClasses.js';
+import { HISTORICAL_LINES, RETIRED_CLASSES } from './helpers/retiredManagerClasses.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const SCANNED_ROOTS = Object.freeze(['src', 'styles', 'tests', 'scripts', 'openspec/specs']);
@@ -48,7 +42,7 @@ const RETIRED_TOKEN = new RegExp(
 
 const RETIRED_TOKENS = new RegExp(RETIRED_TOKEN.source, 'gu');
 
-const ALLOWED_LINES = Object.freeze([...HISTORICAL_LINES, ...COMPAT_LINES]);
+const ALLOWED_LINES = Object.freeze([...HISTORICAL_LINES]);
 
 /** Every line naming a retired token, less the allowlisted ones, as `file:line text`. */
 function retiredTokenLines(corpus, allowlist = ALLOWED_LINES) {
@@ -82,8 +76,7 @@ test('no retired manager root class is written in code, styles, tests, scripts o
     hits,
     [],
     'a retired class is back. Name its primitive root instead (`RETIRED_CLASSES`), or, for a ' +
-      'sentence recording what a primitive replaced, add the line to `HISTORICAL_LINES`; only ' +
-      'the header-action seam may still write `fab-manager-button` (`COMPAT_LINES`):\n  ' +
+      'sentence recording what a primitive replaced, add the line to `HISTORICAL_LINES`:\n  ' +
       hits.join('\n  ')
   );
 });
@@ -130,20 +123,7 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
   );
 });
 
-// The removal itself is not enforced here: no version this test can read moves with a release.
-// `package.json` stays at its development placeholder, release builds stamp only the built
-// `dist/module.json`, and the unit-test checkout fetches no tags. Issue 2569 tracks removing the
-// token in `HEADER_ACTION_COMPAT_REMOVE_IN`; this test keeps the compat lines honest until then.
-test('the header-action compat lines state why they survive and the release removing them', () => {
-  assert.ok(COMPAT_LINES.length > 0, 'the compat seam still writes the token somewhere');
-  for (const entry of COMPAT_LINES) {
-    assert.equal(entry.why, HEADER_ACTION_COMPAT_WHY, `${entry.file} states the compat reason`);
-    assert.equal(entry.removeIn, HEADER_ACTION_COMPAT_REMOVE_IN, `${entry.file} names the release`);
-  }
-  assert.match(HEADER_ACTION_COMPAT_REMOVE_IN, /^\d+\.\d+\.0$/, 'removal lands on a minor release');
-});
-
-/** Every class token a template writes on an element, a composed `classes` array included. */
+// Issue 2569 removed the header-action compat token: every tone renders the root and thed. */
 function writtenClassTokens(source, file) {
   const ast = parse(source, { modern: true });
   const literalsOf = (name) => {
@@ -202,9 +182,6 @@ test('the root reader reds when a template stops writing its root', () => {
       '<b class={classes}></b>',
     ].join('\n');
   const read = (literals) => writtenClassTokens(composed(literals), 'Synthetic.svelte');
-  assert.ok(read("'fabricate-button', 'fab-manager-button'").includes('fabricate-button'));
-  assert.ok(
-    !read("'fab-manager-button'").includes('fabricate-button'),
-    'the reader still finds it'
-  );
+  assert.ok(read("'fabricate-button', 'is-size-38'").includes('fabricate-button'));
+  assert.ok(!read("'is-size-38'").includes('fabricate-button'), 'the reader still finds it');
 });

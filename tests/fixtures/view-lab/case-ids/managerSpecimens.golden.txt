@@ -78,6 +78,7 @@ manager-published-modal-scrim-specimen
 manager-published-modal-scrim-specimen-foundry-native
 manager-published-modal-scrim-specimen-hearth-herb
 manager-published-modal-scrim-specimen-mythwright
+manager-published-modal-sizes-specimen
 manager-published-typeahead-specimen
 manager-published-typeahead-specimen-foundry-native
 manager-published-typeahead-specimen-hearth-herb

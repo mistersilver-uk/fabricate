@@ -71,6 +71,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'gathering-d100': 'lab-v1-gathering-d100',
   'gathering-check': 'lab-v1-gathering-check',
   'gathering-journal-check-prompt': 'lab-v1-gathering-journal-check-prompt',
+  // Issue 2763: a matured run on a Tool-gated task whose Tool the lab actor lacks.
+  'gathering-needs-tools': 'lab-v1-gathering-needs-tools',
   'finished-success': 'lab-v1-finished-success',
   'finished-failure': 'lab-v1-finished-failure',
   // Issue 2133: a routed count that cleared Masterwork, its line against the check's own count.
@@ -639,6 +641,15 @@ function journalCaseFactories(context) {
       emptyRunContainers({
         gatheringActive: [
           { ...gatheringCaseRun(context, 'routed'), id: 'lab-v1-gathering-journal-check-prompt' },
+        ],
+      }),
+    'gathering-needs-tools': () =>
+      emptyRunContainers({
+        gatheringActive: [
+          gatheringCaseRun(context, 'd100', {
+            id: 'lab-v1-gathering-needs-tools',
+            task: requireToolGatedTask(context.tasks),
+          }),
         ],
       }),
     'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
@@ -1595,13 +1606,13 @@ function cancelledCraftingCase(context, recipe) {
   });
 }
 
-function gatheringCaseRun(context, mode) {
-  const task = requireGatheringTask(context.tasks, mode);
+function gatheringCaseRun(context, mode, { id: runId, task: chosen } = {}) {
+  const task = chosen ?? requireGatheringTask(context.tasks, mode);
   const environment =
     context.environments.find((entry) => entry?.craftingSystemId === task.craftingSystemId) ??
     context.environments[0];
   if (!environment) throw new Error(`labRunStates: ${mode} gathering fixture has no environment`);
-  const id = `lab-v1-gathering-${mode === 'routed' ? 'check' : mode}`;
+  const id = runId ?? `lab-v1-gathering-${mode === 'routed' ? 'check' : mode}`;
   return {
     id,
     actorUuid: context.actorUuid,
@@ -1671,6 +1682,14 @@ function requireGatheringTask(tasks, mode) {
   });
   if (!task)
     throw new Error(`labRunStates: journal fixture requires a real ${mode} gathering task`);
+  return task;
+}
+
+/** The Herbalism task gated on a Tool (`hb-task-icecap`, the alembic) the lab actor does not hold. */
+function requireToolGatedTask(tasks) {
+  const task = (tasks ?? []).find((entry) => entry?.id === 'hb-task-icecap');
+  if (!task?.toolIds?.length)
+    throw new Error('labRunStates: the Tool-needed gathering fixture requires hb-task-icecap');
   return task;
 }
 

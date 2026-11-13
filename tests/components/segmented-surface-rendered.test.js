@@ -290,14 +290,52 @@ describe('the published SegmentedControl surface in Chromium', () => {
     await tab.$eval('input:focus', (radio) => radio.blur());
   });
 
-  it('carries the selected state by weight under forced colours on the panel track, as on its own', async () => {
+  it('paints the chosen segment Highlight behind HighlightText under forced colours, in every case, and an idle one apart (issues 2872, 2777)', async () => {
     await tab.emulateMedia({ forcedColors: 'active' });
     try {
-      for (const density of DENSITIES) {
-        for (const id of [`panel-${density}`, `own-${density}`]) {
-          const { chosen, idle } = await faceOf(id);
-          assert.deepEqual([chosen.weight, idle.weight], ['600', '500'], id);
-        }
+      const system = await tab.evaluate(() => {
+        const probe = document.createElement('i');
+        probe.style.cssText = 'background:Highlight;color:HighlightText;forced-color-adjust:none';
+        document.body.append(probe);
+        const { backgroundColor, color } = getComputedStyle(probe);
+        probe.remove();
+        return { highlight: backgroundColor, highlightText: color };
+      });
+      for (const [id] of CASES) {
+        const { chosen, idle } = await faceOf(id);
+        assert.equal(chosen.fill, system.highlight, `${id}: chosen fill`);
+        assert.equal(chosen.ink, system.highlightText, `${id}: chosen ink`);
+        assert.notEqual(chosen.fill, idle.fill, `${id}: idle fill differs`);
+        assert.notEqual(chosen.ink, idle.ink, `${id}: idle ink differs`);
+      }
+    } finally {
+      await tab.emulateMedia({ forcedColors: 'none' });
+    }
+  });
+});
+
+describe('the published SegmentedControl keyboard ring under forced colours (issue 2872)', () => {
+  it('names the chosen segment’s ring canvastext, as the opt-out from the repaint would otherwise leave the accent', async () => {
+    await tab.emulateMedia({ forcedColors: 'active' });
+    try {
+      const canvasText = await tab.evaluate(() => {
+        const probe = document.createElement('i');
+        probe.style.cssText = 'color:CanvasText;forced-color-adjust:none';
+        document.body.append(probe);
+        const { color } = getComputedStyle(probe);
+        probe.remove();
+        return color;
+      });
+      for (const id of ['panel-default', 'own-compact', 'panel-pill']) {
+        await tab.focus(`${trackOf(id)} input[value="ash"]`);
+        await tab.keyboard.press('ArrowLeft');
+        const ring = await tab.$eval(`${trackOf(id)} input:focus`, (radio) => {
+          const label = radio.closest('label');
+          const style = getComputedStyle(label);
+          return [label.classList.contains('is-active'), style.outlineStyle, style.outlineColor];
+        });
+        assert.deepEqual(ring, [true, 'solid', canvasText], id);
+        await tab.$eval('input:focus', (radio) => radio.blur());
       }
     } finally {
       await tab.emulateMedia({ forcedColors: 'none' });

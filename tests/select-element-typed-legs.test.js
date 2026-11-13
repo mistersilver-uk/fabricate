@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join, resolve } from 'node:path';
 
-import { measureImporters } from '../scripts/lib/componentImporters.js';
+import { importGraph, measureImporters } from '../scripts/lib/componentImporters.js';
 import { compoundsOf, ruleBlocks } from '../scripts/lib/stylesheetLiveClasses.js';
 import {
   TEMPLATE_CORPUS,
@@ -71,29 +71,85 @@ const TEMPLATES = new Map(
  * comments name the element in prose, and a file that only mentions one would otherwise count as a
  * host that renders one and keep a stranded leg in its scope reporting live.
  */
-const RENDERS_SELECT = new Map(
-  [...TEMPLATES].map(([file, template]) => [
-    file,
-    /<select[\s>]/u.test(template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' ')),
-  ])
-);
-const ACCEPTS_CHILDREN = new Map(
-  [...TEMPLATES].map(([file, template]) => [file, /@render\s+children|<slot\b/u.test(template)])
-);
+const rendersSelect = (template) =>
+  /<select[\s>]/u.test(template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' '));
+const acceptsChildren = (template) => /@render\s+children|<slot\b/u.test(template);
 
-const EMITTERS = new Map();
+/**
+ * The component name a file's default import carries: its basename, which is the convention here.
+ * An import aliased to another local name is not matched, so its tag would read as not rendered.
+ */
+const componentName = (file) => file.slice(file.lastIndexOf('/') + 1).replace(/\.svelte$/u, '');
 
-/** The templates that write a class or attribute token. */
-function emittersOf(token) {
-  if (!EMITTERS.has(token)) {
-    const pattern = new RegExp(String.raw`(?<![\w-])${token}(?![\w-])`, 'u');
-    EMITTERS.set(
-      token,
-      [...TEMPLATES.keys()].filter((file) => pattern.test(TEMPLATES.get(file)))
-    );
-  }
-  return EMITTERS.get(token);
+/**
+ * Whether `owner`'s MARKUP instantiates `child` as a component tag. Importing a component is not
+ * rendering it: a child the owner only imports for its script puts no element in the owner's DOM
+ * subtree, so a `<select>` it writes is not reachable by a descendant rule scoped to the owner.
+ */
+function instantiates(template, child) {
+  const markup = template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' ');
+  return new RegExp(String.raw`<${componentName(child)}(?=[\s/>])`, 'u').test(markup);
 }
+
+/**
+ * The host model over a set of templates and their import graph: which templates could render
+ * inside a leg's scope, and which legs are stranded. Built once over the tree and, in the proofs
+ * below, over synthetic trees.
+ */
+function hostModel(templates, graph) {
+  const renders = new Map(
+    [...templates].map(([file, template]) => [file, rendersSelect(template)])
+  );
+  const accepts = new Map(
+    [...templates].map(([file, template]) => [file, acceptsChildren(template)])
+  );
+  const emitters = new Map();
+
+  /** The templates that write a class or attribute token. */
+  const emittersOf = (token) => {
+    if (!emitters.has(token)) {
+      const pattern = new RegExp(String.raw`(?<![\w-])${token}(?![\w-])`, 'u');
+      emitters.set(
+        token,
+        [...templates.keys()].filter((file) => pattern.test(templates.get(file)))
+      );
+    }
+    return emitters.get(token);
+  };
+
+  /** The templates that could render inside a leg's scope. See the file header for the rule. */
+  const possibleHosts = (leg) => {
+    const scored = leg.tokens
+      .map((token, position) => ({ token, owners: emittersOf(token), position }))
+      .filter((entry) => entry.owners.length > 0);
+    if (scored.length === 0) return new Set();
+    scored.sort((a, b) => a.owners.length - b.owners.length || b.position - a.position);
+
+    const hosts = new Set(scored[0].owners);
+    for (const owner of scored[0].owners) {
+      // The owner's OWN directly rendered children are inside its DOM subtree too: a descendant
+      // combinator reaches a `<select>` a child component renders just as it reaches one written
+      // inline (issue 1707 phase 2, where the drop editor's `<select>` moved one file down). Gated
+      // the way the slot widening below is (issue 1853): a child counts only when the owner's
+      // markup instantiates it, so a broad import surface cannot keep a dead leg reporting live.
+      for (const child of graph.importsOf(owner)) {
+        if (child.endsWith('.svelte') && instantiates(templates.get(owner) ?? '', child)) {
+          hosts.add(child);
+        }
+      }
+      if (!accepts.get(owner)) continue;
+      for (const importer of graph.importersOf(owner)) hosts.add(importer);
+    }
+    // A scoped block's own component is always in its scope, whatever its selector names.
+    if (leg.file.endsWith('.svelte')) hosts.add(leg.file);
+    return hosts;
+  };
+
+  return { renders, possibleHosts };
+}
+
+const TREE = hostModel(TEMPLATES, IMPORT_GRAPH);
+const RENDERS_SELECT = TREE.renders;
 
 /**
  * Every selector item in the shipped CSS and in every Svelte scoped block that carries a bare
@@ -123,37 +179,16 @@ function selectElementLegs(corpus = collectStyleCorpus()) {
   return legs;
 }
 
-/** The templates that could render inside a leg's scope. See the file header for the rule. */
-function possibleHosts(leg) {
-  const scored = leg.tokens
-    .map((token, position) => ({ token, owners: emittersOf(token), position }))
-    .filter((entry) => entry.owners.length > 0);
-  if (scored.length === 0) return new Set();
-  scored.sort((a, b) => a.owners.length - b.owners.length || b.position - a.position);
-
-  const hosts = new Set(scored[0].owners);
-  for (const owner of scored[0].owners) {
-    // The owner's OWN directly rendered children are inside its DOM subtree too: a descendant
-    // combinator reaches a `<select>` a child component renders just as it reaches one written
-    // inline (issue 1707 phase 2, where the drop editor's `<select>` moved one file down).
-    for (const child of IMPORT_GRAPH.importsOf(owner)) {
-      if (child.endsWith('.svelte')) hosts.add(child);
-    }
-    if (!ACCEPTS_CHILDREN.get(owner)) continue;
-    for (const importer of IMPORT_GRAPH.importersOf(owner)) hosts.add(importer);
-  }
-  // A scoped block's own component is always in its scope, whatever its selector names.
-  if (leg.file.endsWith('.svelte')) hosts.add(leg.file);
-  return hosts;
+/** The legs, among `legs`, whose whole possible-host set renders no `<select>`. */
+function strandedAmong(legs, model) {
+  return legs.filter((leg) => {
+    const hosts = model.possibleHosts(leg);
+    return hosts.size > 0 && ![...hosts].some((host) => model.renders.get(host));
+  });
 }
 
 /** The legs whose whole possible-host set renders no `<select>`. */
-function strandedLegs() {
-  return selectElementLegs().filter((leg) => {
-    const hosts = possibleHosts(leg);
-    return hosts.size > 0 && ![...hosts].some((host) => RENDERS_SELECT.get(host));
-  });
-}
+const strandedLegs = () => strandedAmong(selectElementLegs(), TREE);
 
 const key = (leg) => `${leg.file}  ${leg.selector}`;
 
@@ -262,5 +297,54 @@ test('the leg walk still opens a Svelte `:global(...)` wrapper, though no scoped
     legs.map((leg) => leg.tokens),
     [['probe-panel', 'probe-toolbar']],
     'a `select` leg inside `:global(...)` is invisible to the walk, so every Svelte scoped block is'
+  );
+});
+
+/** A synthetic tree: `files` maps a `.svelte` path to its source, and the graph is read from it. */
+function syntheticModel(files) {
+  const templates = new Map(
+    Object.entries(files).map(([file, source]) => [
+      file,
+      source.replaceAll(/<style[\s\S]*?<\/style>/gu, ' '),
+    ])
+  );
+  return hostModel(
+    templates,
+    importGraph([...templates.keys()], (file) => files[file])
+  );
+}
+
+const LEG = { file: 'styles/fabricate.css', line: 1, selector: '', tokens: ['probe-card'] };
+const OWNER = 'src/ui/Owner.svelte';
+const EDITOR = 'src/ui/Editor.svelte';
+const importing = `<script>import Editor from './Editor.svelte';</script>`;
+
+test('an import-widened host counts only when the owner renders the child, so a dead leg is stranded (issue 1853)', () => {
+  const stranded = (files) => strandedAmong([LEG], syntheticModel(files)).length;
+  const renderingOwner = `${importing}<div class="probe-card"><Editor /></div>`;
+  const select = '<select><option>a</option></select>';
+
+  assert.equal(
+    stranded({ [OWNER]: renderingOwner, [EDITOR]: select }),
+    0,
+    'the child the owner renders writes the <select>, so the leg is live'
+  );
+  assert.equal(
+    stranded({ [OWNER]: renderingOwner, [EDITOR]: '<input />' }),
+    1,
+    'the child lost its <select> tags, so the leg is dead and must be reported stranded'
+  );
+  assert.equal(
+    stranded({ [OWNER]: `${importing}<div class="probe-card"></div>`, [EDITOR]: select }),
+    1,
+    'a child the owner only imports is not in its DOM subtree, so its <select> keeps no leg live'
+  );
+  assert.equal(
+    stranded({
+      [OWNER]: `${importing}<div class="probe-card"><EditorPanel /></div>`,
+      [EDITOR]: select,
+    }),
+    1,
+    'a longer component name is not the imported child'
   );
 });

@@ -38,6 +38,8 @@ manager-component-complications-expanded
 manager-component-complications-macro-linked
 manager-component-complications-macro-missing
 manager-component-complications-check-trigger
+manager-component-complications-check-trigger-runework
+manager-component-complications-check-trigger-runework-closed
 manager-component-complications-salvage-stage-strip
 manager-recipe-complications-stage-strip
 manager-recipe-complications-stage-strip-named

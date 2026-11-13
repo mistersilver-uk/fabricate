@@ -295,17 +295,40 @@ const namedTextKeys = (entry) =>
       .filter((key) => key !== undefined)
   );
 
+/** The keys that name or label a control, which M9 holds to a non-blank string when `required`. */
+const NAME_KEYS = new Set(['ariaLabel', 'label', 'title', 'legend']);
+
+/**
+ * Whether `key` is a `required` name key with no partner that states its own rule: not one a
+ * `contains` key names, which M22 holds to the words, nor one a `waivedBy` or `waivedWhen` lets
+ * go, which M9 already judges blank beside its waivers (issues 2858, 2882, 2924).
+ */
+const isBareNameKey = (key, spec, named) =>
+  NAME_KEYS.has(key) &&
+  spec.required === true &&
+  !named.has(key) &&
+  spec.waivedBy === undefined &&
+  spec.waivedWhen === undefined;
+
+/** M9's refusal of a bare name key holding a blank string or a non-string (issue 2924). */
+function assertBareName(entry, key, spec, named, value) {
+  if (value === undefined || value === '' || !isBareNameKey(key, spec, named)) return;
+  if (!isNonBlank(value)) throw refuse(`${entry.name} requires a non-blank string "${key}"`);
+}
+
 /**
  * M9 over a validated copy, in manifest order: a `required` key absent, `''` or, where a `contains`
  * key names it, whitespace alone, unless waived, or a `requiredWhen` one so while the data key it
- * names is truthy (issue 2452). A waived key holding a blank string is dropped from the copy, so
- * the component draws its waived form (issue 2858). A key whose `waivedWhen` names a key holding
- * `true` is never refused as empty.
+ * names is truthy (issue 2452). A bare `required` name key (`ariaLabel`, `label`, `title`,
+ * `legend`) also refuses a blank string and any non-string (issue 2924). A waived key holding a
+ * blank string is dropped from the copy, so the component draws its waived form (issue 2858). A
+ * key whose `waivedWhen` names a key holding `true` is never refused as empty.
  */
 function assertRequired(entry, copy) {
   const named = namedTextKeys(entry);
   for (const [key, spec] of Object.entries(entry.props)) {
     if (isBlankWaived(spec, copy[key], copy)) copy[key] = undefined;
+    assertBareName(entry, key, spec, named, copy[key]);
     const blank = named.has(key) && typeof copy[key] === 'string' && !isNonBlank(copy[key]);
     if (!blank && copy[key] !== undefined && copy[key] !== '') continue;
     if (spec.waivedWhen !== undefined && copy[spec.waivedWhen] === true) continue;

@@ -2016,7 +2016,7 @@ export function registerWorldScopeCases() {
         );
         assert.equal(
           assertSelectHasResolvedName(target, picker),
-          'Preview as actor',
+          'No actor, Preview as actor',
           'the kicker above it is a paragraph, so the trigger keeps its own name string'
         );
         assert.deepEqual(

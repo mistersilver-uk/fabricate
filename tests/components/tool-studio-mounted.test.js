@@ -9,6 +9,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertButtonsHoldTheirLabels } from '../helpers/labelInNameRatchet.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
   assertSelectHasResolvedName,
@@ -396,9 +397,10 @@ describe('Tool Studio editor (mounted)', () => {
       'Rules in The Herbalist · identity comes from the world Tool'
     );
     assert.ok(root.querySelector('[data-tool-editor-status]') === null);
+    assertButtonsHoldTheirLabels(assert, root);
     assert.equal(
       root
-        .querySelector('[data-tool-editor-back][aria-label="Back to the Tool Rules list"]')
+        .querySelector('[data-tool-editor-back][aria-label="Back to Tool Rules list"]')
         .textContent.trim(),
       'Back to Tool Rules'
     );
@@ -484,7 +486,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(Boolean(root.querySelector(PREVIEW_ACTOR)), 'the actor selector renders');
     assert.equal(
       assertSelectHasResolvedName(root, PREVIEW_ACTOR),
-      'Preview as actor',
+      'No actor, Preview as actor',
       'the kicker above it is a paragraph, so the trigger keeps its own name string'
     );
     assert.equal(selectTriggerText(root, PREVIEW_ACTOR), 'No actor');

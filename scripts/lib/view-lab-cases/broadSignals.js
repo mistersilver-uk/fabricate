@@ -787,6 +787,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-modal-close',
     // Two open dialogs over busy panes, without a scrim and with the dim one (issue 2859).
     'manager-published-modal-scrim-specimen',
+    // Three open dialogs, one per width rung, each with its icon and subtitle (issue 2840).
+    'manager-published-modal-sizes-specimen',
     // The one that opens it with no Fabricate root above its target, on the standalone layer
     // (issue 2680).
     'published-standalone-modal-open',

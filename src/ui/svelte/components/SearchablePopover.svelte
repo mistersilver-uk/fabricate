@@ -71,7 +71,7 @@
   import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { dismissPanelOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { activeOptionId, holderKeyIntent, plainTab, tabInto } from '../util/listboxNavigation.js';
@@ -410,7 +410,7 @@
   bind:this={pickerRoot}
   style:display={anchored ? 'contents' : undefined}
   onkeydowncapture={toFooter}
-  use:dismissOnOutsideClick={{
+  use:dismissPanelOnOutsideClick={{
     enabled: open,
     onDismiss: () => close(),
     onDetached: anchored ? undefined : () => close({ restoreFocus: false }),

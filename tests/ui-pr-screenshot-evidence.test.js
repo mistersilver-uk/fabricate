@@ -1256,6 +1256,24 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
+  it('routes the manager Access view to its own frame, not the recipe editor’s tab or the global fallback', () => {
+    // Issue 942: the Access view had no smoke label, so a change to it fell through to
+    // `theme-or-global-ui`, whose six broad frames cannot depict it.
+    for (const file of [
+      'src/ui/svelte/apps/manager/AccessTabView.svelte',
+      'src/ui/svelte/apps/manager/GrantAccessInspector.svelte',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.deepEqual(views.map((view) => view.id), ['manager-access-view'], file);
+      assert.deepEqual(views[0].smokeLabels, ['manager-access-view'], file);
+    }
+    // The roster model feeds both the view and the editor's tab, so it republishes both.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/model/recipeAccessRoster.js']).map((view) => view.id),
+      ['manager-recipe-edit-access-rail', 'manager-access-view'],
+    );
+  });
+
   it('maps the issue-770 check-modifier UI to its Checks and recipe-edit frames', () => {
     const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
     // The catalogue card has its OWN dedicated modifier frame (not the failure-
