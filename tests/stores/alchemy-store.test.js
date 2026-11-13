@@ -685,7 +685,6 @@ describe('alchemyStore', () => {
       submitAlchemyAttempt: async () => ({
         success: false,
         results: [{ name: 'Sludge' }],
-        message: 'FABRICATE.Alchemy.FailureResult',
         disposition: 'produced-on-failure',
       }),
     });
