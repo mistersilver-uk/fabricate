@@ -72,6 +72,26 @@ const CHAT_SOURCES = [
   /^src\/systems\/craftCardFields\.js$/,
 ];
 
+/** What a canvas station changes: the chip, the station-aware Tool match and the grant that sets it (issue 2277). */
+const CANVAS_STATION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/gathering\//,
+  /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+  /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+  /^src\/ui\/presenters\/GatheringListingBuilder\.js$/,
+  /^src\/gatheringToolRuntime\.js$/,
+  /^src\/systems\/stationPresence\.js$/,
+  /^src\/canvas\/(?:interactableGrant|regions\/interactableRegionActivation)\.js$/,
+]);
+/** The Cut Icecap Fronds task, which needs the alembic the lab actor lacks, selected in its inspector. */
+const ICECAP_STEPS = Object.freeze([
+  { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+  { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
+]);
+const TOOL_STATE = (state) =>
+  `[data-gathering-task-detail] [data-gathering-tool][data-tool-state="${state}"]`;
+const STATION_CHIP = (text) =>
+  `:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("${text}"))`;
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
@@ -773,6 +793,44 @@ export const CASES = Object.freeze([
     },
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  }),
+  // Issue 2277: the player window opened with a Tool-station grant, which the lab never set before.
+  playerCase({
+    id: 'player-gathering-station-tool-available',
+    label:
+      'Player app — Cut Icecap Fronds opened with the Glass Alembic station active: the chip Station tool: Glass Alembic in the actor bar, and the inspector’s Glass Alembic row Available although the actor holds no alembic',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', canvasStation: 'named' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Glass Alembic')}:has(${TOOL_STATE('present')})`,
+    kinds: ['player', 'gathering'],
+    sourceMatches: CANVAS_STATION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-gathering-station-tool-unnamed',
+    label:
+      'Player app — the same task with a station that carries no Tool name: the chip falls back to Station tool: Active station tool, and the alembic row is Available',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', canvasStation: 'unnamed' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app${STATION_CHIP('Station tool: Active station tool')}:has(${TOOL_STATE('present')})`,
+    kinds: ['player', 'gathering'],
+    sourceMatches: CANVAS_STATION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-gathering-station-tool-absent',
+    label:
+      'Player app — the same task with no station, for comparison: no chip in the actor bar, and the alembic row Missing because the actor holds no alembic',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // `none` names no station: the frame opens bare, and still reads the station module.
+    query: { tab: 'gathering', canvasStation: 'none' },
+    steps: ICECAP_STEPS,
+    expectSelector: `.fabricate-app:not(:has(.actor-bar-tool-chip)):has(${TOOL_STATE('missing')})`,
+    kinds: ['player', 'gathering'],
+    sourceMatches: CANVAS_STATION_SOURCES,
   }),
   playerCase({
     id: 'player-gathering-tool-blocked',

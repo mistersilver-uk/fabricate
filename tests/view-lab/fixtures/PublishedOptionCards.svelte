@@ -1,7 +1,8 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2601). It mounts one `RadioCardGroup`
   through the page-session seam `game.fabricate.api.ui` binds, as a companion does: a tool's
-  breakage choice of three cards, Breakable, Immune, and Limited uses disabled with its reason. Its
+  breakage choice of three cards, Breakable (with an example line and an accent Default badge),
+  Immune, and Limited uses disabled with its reason. Its
   `onChange` passes the chosen value back in its own `update`, before it returns, and writes that
   value on the ground's `data-lab-option-cards-chosen`, which nothing else writes. Every word is a
   companion's final text, so none is localized. `tests/view-lab/mount.js` mounts it for
@@ -22,6 +23,8 @@
       value: 'breakable',
       label: 'Breakable',
       description: 'The check may break it.',
+      example: 'A failed check can snap the blade.',
+      badge: { label: 'Default', tone: 'accent' },
       icon: 'fas fa-hammer',
     },
     {

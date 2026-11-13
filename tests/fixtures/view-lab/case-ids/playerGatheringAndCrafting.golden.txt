@@ -35,6 +35,9 @@ player-gathering-task-ready
 player-gathering-after-success
 player-gathering-chat-card-event
 player-gathering-drop-open
+player-gathering-station-tool-available
+player-gathering-station-tool-unnamed
+player-gathering-station-tool-absent
 player-gathering-tool-blocked
 player-gathering-timed-ready
 player-gathering-timed-active

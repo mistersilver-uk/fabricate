@@ -456,6 +456,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
   'tests/view-lab/fixtures/PublishedModal.svelte',
   'tests/view-lab/fixtures/PublishedModalScrim.svelte',
+  'tests/view-lab/fixtures/PublishedModalSizes.svelte',
   'tests/view-lab/fixtures/PublishedStandalone.svelte',
   'tests/view-lab/fixtures/publishedModalSpecimen.js',
   'tests/view-lab/fixtures/publishedStandaloneSpecimen.js',
@@ -2535,6 +2536,18 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
   'manager-published-modal-scrim-specimen-foundry-native': MODAL_SCRIM_CONTROLS,
   'manager-published-modal-scrim-specimen-hearth-herb': MODAL_SCRIM_CONTROLS,
   'manager-published-modal-scrim-specimen-mythwright': MODAL_SCRIM_CONTROLS,
+  // The published dialog's three width rungs (issue 2840), and the header band centring its glyph.
+  'manager-published-modal-sizes-specimen': [
+    ...['sm', 'md', 'lg'].map((size, at) => ({
+      selector: `[data-lab-modal-sizes] > [data-lab-modal-size="${size}"] .fabricate-modal`,
+      styles: `width: ${[500, 560, 620][at]}px`,
+    })),
+    {
+      selector:
+        '[data-lab-modal-sizes] > [data-lab-modal-size="sm"] .fabricate-modal .manager-modal-header',
+      styles: 'display: flex; align-items: center',
+    },
+  ],
 });
 // And each theme variant of a case above, which measures the same controls under another palette
 // (issue 2837), keyed by its own id.
@@ -4958,7 +4971,55 @@ test('the player top bar routes to the frame that opens its picker, not only to 
 
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
-    ['fabricate-app-shell', 'player-actor-picker']
+    [
+      'fabricate-app-shell',
+      'player-actor-picker',
+      // The station chip it draws (issue 2277), in the frames that open a recipe and a Journal run.
+      'player-gathering-station-tool-absent',
+      'player-gathering-station-tool-available',
+      'player-gathering-station-tool-unnamed',
+      'player-journal-gathering-station-tool',
+    ]
+  );
+});
+
+test('no expectSelector hangs a :has() off a void element, which has no descendants to match', () => {
+  const VOID_HAS =
+    /(?:^|[\s>+~(,])(?:input|img|br|hr)(?:\[[^\]]*\]|[.#:][\w-]+(?:\([^()]*\))?)*:has\(/u;
+  assert.ok(VOID_HAS.test('.a input[type="radio"]:checked:has(.b)'), 'the probe sees a bad one');
+  assert.ok(!VOID_HAS.test('.a:has(input[type="radio"]:checked)'), 'and passes a good one');
+  const bad = VIEW_LAB_CASES.filter((viewCase) => VOID_HAS.test(viewCase.expectSelector ?? ''));
+  assert.deepEqual(
+    bad.map((viewCase) => viewCase.id),
+    []
+  );
+});
+
+test('a change to a canvas-station source selects the station frames that read it', () => {
+  const GATHERING = [
+    'player-gathering-station-tool-absent',
+    'player-gathering-station-tool-available',
+    'player-gathering-station-tool-unnamed',
+  ];
+  const JOURNAL = 'player-journal-gathering-station-tool';
+  const NEEDS_TOOLS = 'player-journal-gathering-needs-tools';
+  const expected = {
+    'src/systems/stationPresence.js': [...GATHERING, JOURNAL],
+    'src/ui/presenters/RunJournalBuilder.js': [JOURNAL, NEEDS_TOOLS],
+    'src/bootstrap/journalFacade.js': [JOURNAL],
+    'tests/view-lab/labCanvasStation.js': [...GATHERING, JOURNAL],
+  };
+  for (const [file, ids] of Object.entries(expected)) {
+    const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+    for (const id of ids) assert.ok(selected.has(id), `${file} selects ${id}`);
+  }
+  const stationOnly = mapChangedFilesToCases(['tests/view-lab/labCanvasStation.js']).map(
+    (viewCase) => viewCase.id
+  );
+  assert.deepEqual(
+    stationOnly.sort((a, b) => a.localeCompare(b)),
+    [...GATHERING, JOURNAL],
+    'the station module selects the four station frames and no others'
   );
 });
 
@@ -7161,11 +7222,27 @@ const SPECIMEN_MOUNT_REGION_ANCHORS = [
 ];
 
 /** Every marked region in the mount page, whatever its readership. */
+const STATION_MOUNT_REGION_ANCHORS = [
+  ['player-canvas-station', "    canvasStation: params.get('canvasStation'),"],
+];
 const ALL_MOUNT_REGION_ANCHORS = [
   ...MOUNT_REGION_ANCHORS,
+  ...STATION_MOUNT_REGION_ANCHORS,
   ...CANVAS_MOUNT_REGION_ANCHORS,
   ...SPECIMEN_MOUNT_REGION_ANCHORS,
 ];
+
+test('a mount.js patch confined to the canvas station param selects the station frames alone', () => {
+  const patches = labMountPatches([
+    labMountLineOf("    canvasStation: params.get('canvasStation'),"),
+  ]);
+  assert.deepEqual(
+    selectedIds([LAB_MOUNT_PATH], patches).sort((a, b) => a.localeCompare(b)),
+    VIEW_LAB_CASES.filter((viewCase) => viewCase.query?.canvasStation)
+      .map((viewCase) => viewCase.id)
+      .sort((a, b) => a.localeCompare(b))
+  );
+});
 
 test('a mount.js patch confined to a player region selects every player frame and only those', () => {
   const players = playerCaseIds();
@@ -8786,6 +8863,28 @@ test('the modal scrim specimen case measures the two panes the scrim fixture mou
   );
 });
 
+test('the modal sizes specimen case measures the three rungs the sizes fixture mounts', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedModalSizes.svelte'
+  );
+  for (const hook of ['data-lab-modal-sizes', 'data-lab-modal-size']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const declared = [...walkNodes(instance.content)].find(
+    (node) => node.type === 'VariableDeclarator' && node.id?.name === 'SIZES'
+  );
+  const sizes = declared.init.arguments[0].elements.map((element) => element.value);
+  assert.deepEqual(sizes, ['sm', 'md', 'lg'], 'one pane per width rung');
+  const { controls } = getCaseById('manager-published-modal-sizes-specimen').expectLayout;
+  assert.deepEqual(
+    controls.slice(0, 3).map(({ selector }) => /data-lab-modal-size="(\w+)"/u.exec(selector)[1]),
+    sizes
+  );
+});
+
 test('the chip forms specimen case measures the rows the chip forms fixture mounts', () => {
   const { instance, fragment } = componentAstOf(
     'tests/view-lab/fixtures/PublishedChipForms.svelte'
@@ -9080,7 +9179,7 @@ test('every specimen case names a LAB_SPECIMENS key, and every key has a case', 
   assert.deepEqual([...new Set(named)].sort(byCodePoint), keys.sort(byCodePoint));
 });
 
-test('the seven mount.js regions the selector keys on are still marked in the file', () => {
+test('the eight mount.js regions the selector keys on are still marked in the file', () => {
   // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
   // selected — which is correct and invisible: the only symptom would be a capture job quietly
   // back at twenty minutes. So it has to fail LOUDLY here too.

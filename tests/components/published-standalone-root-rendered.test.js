@@ -43,7 +43,6 @@ import {
   SCOPED,
   SHARD_COUNT,
   SPECIMENS,
-  UNDRAWN_SCOPED,
   WIDENED,
   assertMeasuredOnce,
   mountSpecimens,
@@ -376,7 +375,6 @@ describe('the standalone specimen table', () => {
     const hashes = scopedHashes();
     for (const palette of PALETTES) {
       for (const [at, name] of SCOPED.entries()) {
-        if (Object.hasOwn(UNDRAWN_SCOPED, name)) continue;
         const drawn = SPECIMENS.filter(({ id }) =>
           Object.values(markup[palette][id]).every(
             ({ target, panel }) => holds(target, hashes[at]) || holds(panel, hashes[at])
@@ -387,9 +385,8 @@ describe('the standalone specimen table', () => {
     }
   });
 
-  it('lays every scoped component of the closures, and names the one no published key draws', () => {
+  it('lays every scoped component of the closures', () => {
     assert.ok(SCOPED.length > 2, 'the closures state scoped rules');
-    for (const name of Object.keys(UNDRAWN_SCOPED)) assert.ok(SCOPED.includes(name), name);
     assert.ok(!Object.hasOwn(entryNamed('EditorTabs').props, 'badges'), 'badges is unpublished');
   });
 });
