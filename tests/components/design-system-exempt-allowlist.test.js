@@ -187,6 +187,7 @@ const ALLOWLIST = Object.freeze([
   [
     OWN_REST,
     {
+      'src/ui/svelte/components/Chip.svelte': 1,
       'src/ui/svelte/components/ModifierPillSelect.svelte': 1,
       'src/ui/svelte/components/SearchField.svelte': 1,
       'src/ui/svelte/components/ViewToggle.svelte': 1,

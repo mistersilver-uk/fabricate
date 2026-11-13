@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   declaredToken,
@@ -21,7 +22,7 @@ const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus[SHEET]));
 
 const token = (file, selector, property) =>
-  declaredToken(rulesIn(corpus[file]), selector, property, file);
+  declaredToken(rulesIn(styleTextOf(corpus, file)), selector, property, file);
 const shortfalls = (ink, stack) => inkShortfalls(themes, ink, stack);
 
 const tierGround = () => token(LADDER, '.fab-outcome-tier', 'background');

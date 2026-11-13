@@ -2655,6 +2655,32 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(passedFaultsOf('<Child {...rest} />', UNKEYED, 'tag', entry), []);
   });
 
+  it('passes an entry that hands the child one of its own props the seam does not publish', () => {
+    const entry = new Map([['label', 'label']]);
+    const withTag = '<Child tag={tag} {...rest} />';
+    const sources = (parent, tagProp) => ({
+      [CHILD]:
+        "<script>let { tag = 'span', ...rest } = $props();</script>" +
+        '<svelte:element this={tag}></svelte:element>',
+      'src/Parent.svelte': `<script>import Child from './E.svelte'; let { label, ${tagProp}, ...rest } = $props();</script>${parent}`,
+    });
+    const faultsOf = (parent, published, tagProp = "tag = 'span'") => {
+      const files = Object.entries(sources(parent, tagProp)).map(([file, source]) => ({
+        file,
+        ast: templateOf(file, source).ast,
+        published: file === 'src/Parent.svelte' ? published : new Map(),
+      }));
+      return dynamicElementFaults(files, UNKEYED);
+    };
+    assert.deepEqual(faultsOf(withTag, entry), []);
+    assert.deepEqual(faultsOf(withTag, entry, 'tag'), []);
+    assert.deepEqual(faultsOf(withTag, new Map([...entry, ['tag', 'tag']])), [PASSED('tag')]);
+    assert.deepEqual(faultsOf('<Child tag={label} />', entry), [PASSED('tag')]);
+    // Its own default must be one of the child's pinned tags, or the entry draws a tag none pinned.
+    assert.deepEqual(faultsOf(withTag, entry, "tag = 'button'"), [PASSED('tag')]);
+    assert.deepEqual(faultsOf(withTag, entry, 'tag = label'), [PASSED('tag')]);
+  });
+
   for (const [claim, drawn, faults] of [
     ['the prop by name', '<Child tag="button" />', [PASSED('tag')]],
     ['its rest, from a file that is no entry', '<Child {...rest} />', [PASSED('a spread')]],

@@ -1211,6 +1211,16 @@
       ]
     },
     {
+      "path": "src/ui/svelte/components/ChipFrame.svelte",
+      "library": null,
+      "evidence": "broad",
+      "callers": ["src/ui/svelte/components/Chip.svelte"],
+      "why": [
+        "`Chip`'s root element and every rule that paints it, split out so `Chip` stays under the file-size limit.",
+        "ONE caller, `src/ui/svelte/components/Chip.svelte`, and it carries the `<Chip>` entry that specifies its parent rather than a specimen of its own."
+      ]
+    },
+    {
       "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
       "library": null,
       "evidence": "targeted",

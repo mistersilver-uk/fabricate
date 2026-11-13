@@ -9,12 +9,13 @@ import { resolve } from 'node:path';
 import { compile } from 'svelte/compiler';
 
 import { borrowBrowser } from './layout-harness.js';
+import { styleSourcesOf } from './splitComponentStyles.js';
 
-/** Every scoped `<style>` block in a harness's compiled tree, in manifest order. */
+/** Every scoped `<style>` block in a harness's compiled tree, a split component's parts included. */
 export function collectScopedCss({ repoRoot, compiledModules }) {
   const parts = [];
   const hashes = [];
-  for (const modulePath of compiledModules) {
+  for (const modulePath of new Set(compiledModules.flatMap(styleSourcesOf))) {
     const filename = resolve(repoRoot, modulePath);
     const { css } = compile(readFileSync(filename, 'utf8'), { filename, css: 'external' });
     if (!css?.code) continue;

@@ -172,7 +172,7 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
     keys: ['actions', 'items', 'title'],
     heldBy: "tests/components/published-callout-mounted.test.js: Callout's host element",
   },
-  'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
+  'src/ui/svelte/components/ChipFrame.svelte: svelte:element': { tags: ['span'], keys: [] },
   // The heading around the head; a `level` outside 2 to 6 draws an `h3`.
   'src/ui/svelte/components/Disclosure.svelte: svelte:element': {
     tags: ['h2', 'h3', 'h4', 'h5', 'h6'],
@@ -492,21 +492,39 @@ export function componentTags(file, ast) {
 /**
  * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
  * naming those props and the pinned tags by the child's path: it states one of them on the child's
- * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`entryFile`)
- * may spread its rest local, which holds `data-*` keys alone (M13). A tag `drawn` answers no
- * published closure draws is not judged (issue 2454).
+ * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`published`
+ * non-empty) may spread its rest local, which holds `data-*` keys alone (M13), and hand on one of
+ * its own props the seam does not publish, which a closure can never set, when that prop's default
+ * is absent or a literal naming one of the child's pinned tags. A tag `drawn` answers no published
+ * closure draws is not judged (issue 2454).
  */
-function passedFaults(file, ast, defaulted, entryFile, drawn) {
-  const rest = entryFile ? restLocal(ast) : null;
+function passedFaults(file, ast, defaulted, published, drawn) {
+  const rest = published.size > 0 ? restLocal(ast) : null;
+  const unpublished = new Map(
+    published.size > 0
+      ? propLocals(ast)
+          .filter(({ local }) => !published.has(local))
+          .map(({ local, fallback }) => [local, fallback])
+      : []
+  );
+  const handsOnUnpublished = ({ type, value }, tags) => {
+    const [part, ...more] = [value].flat();
+    const local = part?.type === 'ExpressionTag' ? part.expression.name : undefined;
+    if (type !== 'Attribute' || more.length > 0 || !unpublished.has(local)) return false;
+    const fallback = unpublished.get(local);
+    return !fallback || (fallback.type === 'Literal' && tags.includes(fallback.value));
+  };
   const tags = componentTags(file, ast).filter(([, node]) => drawn(file, node));
   return tags.flatMap(([child, node]) => {
     const { keys = [], tags = [] } = defaulted.get(child) ?? {};
     if (keys.length === 0) return [];
     const literalTag = (value) => tags.includes(staticText({ value }));
-    const passes = ({ type, name, value, expression }) =>
-      type === 'SpreadAttribute'
-        ? !rest || expression?.name !== rest
-        : keys.includes(name) && !(type === 'Attribute' && literalTag(value));
+    const passes = (attribute) =>
+      attribute.type === 'SpreadAttribute'
+        ? !rest || attribute.expression?.name !== rest
+        : keys.includes(attribute.name) &&
+          !(attribute.type === 'Attribute' && literalTag(attribute.value)) &&
+          !handsOnUnpublished(attribute, tags);
     return node.attributes
       .filter((attribute) => passes(attribute))
       .map(
@@ -546,7 +564,7 @@ export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS, drawnTag
     }
   }
   const passed = files.flatMap(({ file, ast, published }) =>
-    passedFaults(file, ast, defaulted, published.size > 0, drawnTag)
+    passedFaults(file, ast, defaulted, published, drawnTag)
   );
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
   return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];

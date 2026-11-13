@@ -16,6 +16,7 @@ import {
   createWorldComponentCatalogueHarness,
   drainMicrotasks,
 } from '../helpers/componentScopeMountModules.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readStylesheet();
@@ -42,7 +43,7 @@ const MIN_SCOPED_BLOCKS = 12;
 function collectScopedCss() {
   const parts = [];
   const hashes = [];
-  for (const modulePath of compiledModules) {
+  for (const modulePath of compiledModules.flatMap(styleSourcesOf)) {
     const filename = resolve(repoRoot, modulePath);
     const { css } = compile(readFileSync(filename, 'utf8'), { filename, css: 'external' });
     if (!css?.code) continue;

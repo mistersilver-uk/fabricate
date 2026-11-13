@@ -874,6 +874,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 2510: ChoiceGroupAwardHeader and the four PickerRow* parts below each have one caller.
+  // Issue 2317: `Chip`'s root frame, one caller; `<Chip>` specifies its parent.
+  'src/ui/svelte/components/ChipFrame.svelte',
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',

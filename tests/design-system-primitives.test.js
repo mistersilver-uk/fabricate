@@ -113,6 +113,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
   'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/ChipFrame.svelte',
   // Issue 2510: the requirement row family, each part on the states that draw it.
   'src/ui/svelte/components/ChoiceGroup.svelte',
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',

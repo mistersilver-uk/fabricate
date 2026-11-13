@@ -8,6 +8,7 @@ import { createRawSnippet } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, PAGINATION_COMPILED_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -93,7 +94,11 @@ function flushRender() {
 }
 
 function sourceOf(name) {
-  return readFileSync(resolve(repoRoot, component(name)), 'utf8').replaceAll('\r\n', '\n').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+  return styleSourcesOf(component(name))
+    .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+    .join('\n')
+    .replaceAll('\r\n', '\n')
+    .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 }
 
 /** The body of the rule whose selector list is EXACTLY `selector`. */

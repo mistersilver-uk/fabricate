@@ -390,7 +390,7 @@
   white-space: nowrap;
 }
 
-/* The Tool inspector hero's own copy of the compact scale is gone (issue 883): it stated exactly the values `Chip.svelte` now declares for every chip. */
+/* The Tool inspector hero's own copy of the compact scale is gone (issue 883): it stated exactly the values `ChipFrame.svelte` now declares for every chip. */
 
 .fabricate-manager .manager-tool-browser-inspector > .manager-muted {
   margin: 0;

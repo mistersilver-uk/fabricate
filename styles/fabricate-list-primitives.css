@@ -330,7 +330,7 @@
   min-width: 0;
 }
 
-/* Three classes, not two. `Chip.svelte` declares `padding`, `border` and `background` in a scoped block that compiles to `.manager-chip.svelte-<hash>` — also two classes — and is injected AFTER this sheet, so a two-class form here would tie and lose on source order (issue 883). */
+/* Three classes, not two. `ChipFrame.svelte` declares `padding`, `border` and `background` in a scoped block that compiles to `.manager-chip.svelte-<hash>` — also two classes — and is injected AFTER this sheet, so a two-class form here would tie and lose on source order (issue 883). */
 .fabricate-manager .manager-chip.manager-selected-tag-pill {
   padding-right: var(--fab-space-1);
   border-color: var(--fab-success-border);

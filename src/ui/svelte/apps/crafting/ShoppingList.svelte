@@ -455,7 +455,7 @@
     `css: 'injected'` emits these rules UNLAYERED, and an unlayered rule beats a layered
     one whatever the specificity. (The comment above `.manager-access-row` in
     `styles/fabricate.css` says a scoped override is unreliable against Foundry's `button`
-    rule — issue 511. `button.manager-chip` in `Chip.svelte` is the shipped counter-example;
+    rule — issue 511. `button.manager-chip` in `ChipFrame.svelte` is the shipped counter-example;
     moving this to the global sheet would also drag the whole theme screenshot scope in.)
 
     Named reasons for the non-obvious declarations:

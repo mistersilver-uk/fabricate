@@ -14,6 +14,7 @@ import {
   translucentIn,
   withoutComments,
 } from '../helpers/chipPaint.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -73,7 +74,10 @@ const TONE_MATRIX = declaredTones().map((tone) => [tone, `is-${tone}`]);
  * The REAL `<style>` block, sliced at the tag on its own line rather than at the first
  * occurrence of the string.
  */
-const styleBlock = chipSource.slice(chipSource.search(/^<style>$/m));
+const styleBlock = styleSourcesOf('src/ui/svelte/components/Chip.svelte')
+  .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+  .map((source) => source.slice(source.search(/^<style>$/m)))
+  .join('\n');
 
 /**
  * The body of one rule, so an assertion reads on the declarations that rule actually states
@@ -203,11 +207,11 @@ describe('1036 Chip — tone matrix characterization', () => {
 
   it('keeps `--fab-chip-color` DECLARED INSIDE `.manager-chip.is-tag`', () => {
     // The vehicle's scope is why `swatch` cannot reuse the tag FILL.
-    const tagRule = chipSource.slice(chipSource.indexOf('.manager-chip.is-tag'));
+    const tagRule = styleBlock.slice(styleBlock.indexOf('.manager-chip.is-tag'));
     assert.match(tagRule, /--fab-chip-color:\s*var\(--fab-purple\)/, 'the tag tone declares it');
-    const baseRule = chipSource.slice(
-      chipSource.indexOf('.manager-chip {'),
-      chipSource.indexOf('.manager-chip.is-truncated')
+    const baseRule = styleBlock.slice(
+      styleBlock.indexOf('.manager-chip {'),
+      styleBlock.indexOf('.manager-chip.is-truncated')
     );
     assert.ok(
       !baseRule.includes('--fab-chip-color'),
@@ -585,7 +589,7 @@ describe('1506 Chip — the bare emphasis', () => {
     );
     assert.match(
       rule,
-      /\.manager-chip\.svelte-\w+ i\.fa-circle/,
+      /\.manager-chip i\.fa-circle\.svelte-\w+/,
       `the rule must stay scoped to a chip's own glyph, but emitted: ${rule}`
     );
   });
@@ -608,7 +612,7 @@ describe('1506 Chip — the bare emphasis', () => {
   });
 
   it('drops its glyph to the reference 7px WITHOUT touching the status dot', () => {
-    const glyphRule = styleBlock.search(/\.manager-chip\.is-bare i:not\(\.fa-circle\)/);
+    const glyphRule = styleBlock.search(/:global\(\.manager-chip\.is-bare\) i:not\(\.fa-circle\)/);
     assert.notEqual(glyphRule, -1, 'the bare face states its own glyph size');
     assert.match(
       styleBlock.slice(glyphRule, styleBlock.indexOf('}', glyphRule)),
@@ -616,7 +620,7 @@ describe('1506 Chip — the bare emphasis', () => {
       'at `density="list"` the glyph inherits 9px and the reference draws 7px'
     );
     // The tie this `:not()` exists to lose: the dot rule is (0,2,1) and written EARLIER.
-    const dot = styleBlock.search(/\.manager-chip i\.fa-circle/);
+    const dot = styleBlock.search(/:global\(\.manager-chip\) i\.fa-circle/);
     assert.ok(dot !== -1 && dot < glyphRule, 'and the dot rule is still written first');
   });
 });

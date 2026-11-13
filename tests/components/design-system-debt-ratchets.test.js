@@ -1207,7 +1207,7 @@ const STATE_TINTS = Object.freeze([
     'the library segment specimen’s chosen face',
   ],
   [
-    `${COMPONENTS}/Chip.svelte`,
+    `${COMPONENTS}/ChipFrame.svelte`,
     '.manager-chip.is-active, .manager-chip.is-positive',
     'var(--fab-success-soft)',
     'the `active` status tone, a rest face named like a state',
@@ -1219,7 +1219,7 @@ const STATE_TINTS = Object.freeze([
     'a destructive verb hovers in the danger family it acts in',
   ],
   [
-    `${COMPONENTS}/Chip.svelte`,
+    `${COMPONENTS}/ChipFrame.svelte`,
     '.manager-chip.is-solid:is(.is-active, .is-positive)',
     'var(--fab-success)',
     'the `active` status tone’s solid emphasis, a rest face',
@@ -2199,7 +2199,7 @@ const SHAPE_CORNERS = Object.freeze(['0', '999px', '50%', 'inherit']);
 /** Sized rules whose corner follows another kind: `[file: selector, its corners, why]`. */
 const CORNER_KIND_EXCEPTIONS = Object.freeze([
   [
-    'src/ui/svelte/components/Chip.svelte: .manager-chip',
+    'src/ui/svelte/components/ChipFrame.svelte: .manager-chip',
     ['11px'],
     'a text chip keeps its stadium',
   ],

@@ -3353,8 +3353,10 @@ The converted-select captions remain ruled out.
 
 An `asidePlacement` prop on `ListRow`, which would draw the selectable form's `aside` inline beside its button, is recorded as declined: the aside stays beneath the button, as "Dense result rows and compact rail pagination retain their meaning" states, and the library's list row specimens draw it there.
 
-A chip remove-control wrapper is recorded as declined with its measurement: `Chip` imports nothing today, so extracting its remove control into a child component or helper puts a new node in the graph of the tree's most-imported primitive and obliges a roster edit in every mounted suite whose tree contains it, against a 15-line file-size overage on a 500-line threshold.
-The chip keeps drawing its own remove control.
+A chip remove-control wrapper was declined with its measurement: `Chip` then imported nothing, so extracting its remove control into a child component or helper would put a new node in the graph of the tree's most-imported primitive and oblige a roster edit in every mounted suite whose tree contains it, against a 15-line file-size overage on a 500-line threshold.
+`Chip` has since split its root frame into `ChipFrame`, which it composes: every rule that paints the chip's root element lives there, and `Chip` keeps what paints its own children.
+The roster objection is answered rather than paid: the mounted harness's `IMPLIED_MODULES` compiles `ChipFrame` beside every `Chip`, so no suite's module list names it.
+The split brings `Chip` under the threshold, so the chip keeps drawing its own remove control.
 
 #### Scenario: A ruled-out candidate is re-proposed
 
