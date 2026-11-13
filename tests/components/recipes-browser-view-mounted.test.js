@@ -223,15 +223,15 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     for (const header of headers) {
       assert.equal(header.getAttribute('aria-expanded'), 'true', 'groups default to expanded');
     }
-    assert.equal(root.querySelector('[data-recipe-filter-chip]'), null, 'no filter starts active');
-    assert.equal(root.querySelector('.fabricate-pagination'), null, 'the fixture fits one page');
+    assert.ok(root.querySelector('[data-recipe-filter-chip]') === null, 'no filter starts active');
+    assert.ok(root.querySelector('.fabricate-pagination') === null, 'the fixture fits one page');
   });
 
   it('renders the rows as a list of cards, not a table', async () => {
     const root = await browser.mount({ recipes: GROUPED, showRecipeCategories: false });
     assert.equal(root.querySelector('.manager-recipe-group-list').getAttribute('role'), 'list');
     assert.equal(root.querySelector('.manager-recipe-row').tagName, 'LI');
-    assert.equal(root.querySelector('[role="table"]'), null);
+    assert.ok(root.querySelector('[role="table"]') === null);
   });
 
   // The model groups the PAGE, not the filtered list.
@@ -305,7 +305,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     header.click();
     flushSync();
     assert.equal(header.getAttribute('aria-expanded'), 'false');
-    assert.equal(root.querySelector(`#${controls}`), null, 'the collapsed group hides its rows');
+    assert.ok(root.querySelector(`#${controls}`) === null, 'the collapsed group hides its rows');
     assert.deepEqual(rowIds(root), ['r2']);
 
     header.click();
@@ -505,7 +505,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     const io = root.querySelector('[data-recipe-io]');
     assert.match(io.textContent, /2 in/);
     assert.match(io.textContent, /1 out/);
-    assert.equal(io.querySelector('.manager-recipe-io-routed'), null);
+    assert.ok(io.querySelector('.manager-recipe-io-routed') === null);
   });
 
   it('replaces the out half with the result-GROUP count plus a routing glyph in routed modes', async () => {
@@ -624,7 +624,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.match(warning.textContent, /No check/, 'a warning that says nothing is not a warning');
     assert.equal(/—/.test(warning.textContent), false, 'the em dash said nothing at all');
     assert.ok(warning.querySelector('i.fa-triangle-exclamation'), 'it reads as a warning');
-    assert.equal(warning.querySelector('i.fa-ban'), null, 'the ban glyph is retired');
+    assert.ok(warning.querySelector('i.fa-ban') === null, 'the ban glyph is retired');
     assert.equal(warning.classList.contains('is-mono'), false, 'a phrase is not a number');
     browser.remount();
 
@@ -635,9 +635,8 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.equal(neutral.dataset.recipeCheck, 'ingredients');
     assert.match(neutral.textContent, /By ingredients/);
     assert.ok(neutral.querySelector('i.fa-code-branch'), 'routing, not a roll');
-    assert.equal(
-      neutral.querySelector('i.fa-triangle-exclamation'),
-      null,
+    assert.ok(
+      neutral.querySelector('i.fa-triangle-exclamation') === null,
       'a working configuration must not be reported as a problem'
     );
   });
@@ -725,7 +724,10 @@ describe('RecipesBrowserView lock and enable controls', () => {
       assert.ok(!lock.hasAttribute('title'), 'and no native title stacks a second');
       assert.ok(row.querySelector('.fabricate-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643).
-      assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
+      assert.ok(
+        row.querySelector('.manager-action-group') === null,
+        'the row carries no action group'
+      );
     }
 
     root.querySelector('[data-recipe-id="r1"] [data-recipe-lock]').click();
@@ -778,7 +780,7 @@ describe('RecipesBrowserView column header (issue 643)', () => {
 
   it('renders no column header when the library is empty', async () => {
     const root = await browser.mount({ recipes: [] });
-    assert.equal(root.querySelector('.manager-recipe-table-head'), null);
+    assert.ok(root.querySelector('.manager-recipe-table-head') === null);
   });
 });
 
@@ -974,7 +976,7 @@ describe('RecipesBrowserView lifted browser state', () => {
       onToggleEnabled: (id, enabled, options) => calls.push({ id, enabled, options })
     });
 
-    assert.equal(root.querySelector('[data-recipe-flash]'), null, 'no flash before a refusal');
+    assert.ok(root.querySelector('[data-recipe-flash]') === null, 'no flash before a refusal');
 
     root.querySelector('[data-recipe-id="r1"] .fabricate-toggle').click();
     flushSync();
@@ -1134,9 +1136,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
       assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');
     }
-    assert.equal(
-      root.querySelector('[data-recipe-fact="structure"]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-fact="structure"]') === null,
       'Structure restated the row the GM just clicked and is gone'
     );
   });
@@ -1321,7 +1322,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(members[0].querySelector('.manager-recipe-flow-qty').textContent, /×2/);
     assert.match(members[1].textContent, /25 gp/);
     // No member is inset or promoted — the group frame carries the "alternatives" signal.
-    assert.equal(root.querySelector('.is-alternative'), null);
+    assert.ok(root.querySelector('.is-alternative') === null);
 
     // The per-SET essence is an AND requirement: a flat entry, not a group member.
     const essence = root.querySelector(
@@ -1347,7 +1348,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(pill.textContent.trim(), 'On success');
     assert.ok(pill.classList.contains('is-success'));
     assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×3/);
-    assert.equal(root.querySelector('[data-recipe-produces-empty]'), null);
+    assert.ok(root.querySelector('[data-recipe-produces-empty]') === null);
   });
 
   // Issue 1773: a reward row names itself from the rosters the inspector is handed, with its
@@ -1503,7 +1504,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
   it('prompts for a selection when recipes exist but none is selected', async () => {
     const root = await inspector.mount({ selectedRecipe: null, recipeCount: 3 });
     assert.match(root.textContent, /Select a recipe/);
-    assert.equal(root.querySelector('[data-recipe-inspector]'), null);
+    assert.ok(root.querySelector('[data-recipe-inspector]') === null);
   });
 
   // Routed-by-ingredients pairing (issue 643): set-1 (Herb route) requires Mountain Herb
@@ -1550,7 +1551,10 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
     assert.ok(root.querySelector(ROUTE_SET), 'the ingredient-set dropdown renders');
     // The lower result-set dropdown was removed — the single set dropdown drives both lists.
-    assert.equal(root.querySelector('[data-recipe-route="result-set"]'), null, 'no redundant result-set dropdown');
+    assert.ok(
+      root.querySelector('[data-recipe-route="result-set"]') === null,
+      'no redundant result-set dropdown'
+    );
     assert.equal(assertSelectHasResolvedName(root, ROUTE_SET), 'Select ingredient set');
     assert.equal(root.querySelector(ROUTE_SET).getAttribute('data-select-size'), 'inline');
     assert.ok(
@@ -1567,7 +1571,10 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 1, 'only the routed result group is produced');
     assert.match(produceRows[0].textContent, /Healing Potion/, 'grp-1 produces the potion');
-    assert.equal(root.querySelector('.manager-recipe-flow-group'), null, 'no Result Group pill in the produces list');
+    assert.ok(
+      root.querySelector('.manager-recipe-flow-group') === null,
+      'no Result Group pill in the produces list'
+    );
   });
 
   it('routed by ingredients: choosing an ingredient set re-filters both the Requires and Produces lists', async () => {
@@ -1597,7 +1604,10 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    assert.equal(root.querySelector('[data-recipe-route]'), null, 'no routing dropdowns outside routed-by-ingredients');
+    assert.ok(
+      root.querySelector('[data-recipe-route]') === null,
+      'no routing dropdowns outside routed-by-ingredients'
+    );
     // Both groups' produces are listed, each keeping its group pill.
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 2);
@@ -1635,8 +1645,14 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(rows.length, 3, 'a repeated component appears once per ordered entry');
     // No redundant "Result Group 1" pill, and no "×1" quantity implying a bulk output.
-    assert.equal(root.querySelector('.manager-recipe-flow-group.is-success'), null, 'no group pill in progressive');
-    assert.equal(root.querySelector('.manager-recipe-flow-qty'), null, 'no quantity in progressive');
+    assert.ok(
+      root.querySelector('.manager-recipe-flow-group.is-success') === null,
+      'no group pill in progressive'
+    );
+    assert.ok(
+      root.querySelector('.manager-recipe-flow-qty') === null,
+      'no quantity in progressive'
+    );
 
     // Each row shows the component's DC, in authoring order (8, 14, 8 — the herb twice).
     const dcs = [...root.querySelectorAll('[data-recipe-produces-dc]')].map((el) => el.textContent.trim());
@@ -1706,7 +1722,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
 
     // Collapsed by default: no produce rows are rendered until a tier is expanded.
-    assert.equal(root.querySelector('[data-recipe-produces]'), null, 'sections start collapsed');
+    assert.ok(root.querySelector('[data-recipe-produces]') === null, 'sections start collapsed');
     assert.equal(heads[0].getAttribute('aria-expanded'), 'false');
 
     // Expanding a tier reveals its rows (no per-row pill); other tiers stay collapsed.
@@ -1715,9 +1731,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(heads[0].getAttribute('aria-expanded'), 'true');
     assert.equal(tiers[0].querySelectorAll('[data-recipe-produces]').length, 2, 'the tier reveals its two items');
     assert.equal(tiers[1].querySelectorAll('[data-recipe-produces]').length, 0, 'other tiers remain collapsed');
-    assert.equal(
-      tiers[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group'),
-      null,
+    assert.ok(
+      tiers[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group') === null,
       'no per-row group pill inside an expanded tier'
     );
     assert.match(tiers[0].textContent, /×2/, 'quantities still show (routed-by-check is not progressive)');
@@ -1919,7 +1934,10 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1,
       componentOptions: INSPECTOR_COMPONENTS
     });
-    assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
+    assert.ok(
+      root.querySelector('[data-recipe-produces-outcome]') === null,
+      'no outcome sections without a check'
+    );
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
   });
 

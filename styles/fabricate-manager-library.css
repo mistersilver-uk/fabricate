@@ -2049,7 +2049,7 @@
   max-width: 100%;
 }
 
-/* The chip's own appearance is NOT here. It lives in `Chip.svelte`'s scoped block, which is the one implementation of the manager's one chip (issue 883). */
+/* The chip's own appearance is NOT here. It lives in `ChipFrame.svelte`'s scoped block, the root frame of `Chip`, which is the one implementation of the manager's one chip (issue 883). */
 
 .fabricate-manager .manager-chip-row {
   display: flex;

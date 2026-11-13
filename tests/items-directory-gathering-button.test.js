@@ -70,7 +70,7 @@ test('syncGatheringDirectoryButton removes a stale Gathering button when gatheri
     documentRef: document
   });
 
-  assert.equal(actions.querySelector('[data-fabricate-action="gathering"]'), null);
+  assert.ok(actions.querySelector('[data-fabricate-action="gathering"]') === null);
   assert.ok(actions.querySelector('[data-fabricate-action="craft"]'));
 });
 

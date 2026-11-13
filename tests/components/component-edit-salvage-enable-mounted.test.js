@@ -208,8 +208,11 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
       })
     );
     // Chrome — meaningful only once salvage RUNS.
-    assert.equal(target.querySelector('[data-salvage-routing]'), null, 'routing collapses');
-    assert.equal(target.querySelector('[data-salvage-dc-override]'), null, 'the DC control collapses');
+    assert.ok(target.querySelector('[data-salvage-routing]') === null, 'routing collapses');
+    assert.ok(
+      target.querySelector('[data-salvage-dc-override]') === null,
+      'the DC control collapses'
+    );
     // ...but the result-group editor does NOT.
     assert.ok(target.querySelector('[data-salvage-result-groups]'), 'the group editor stays');
     assert.ok(addGroup(target), 'the add-group control stays reachable');
@@ -324,7 +327,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
   it('no disabled-body notice renders when salvage is on', async () => {
     const target = await harness.mount(props());
-    assert.equal(target.querySelector('[data-salvage-disabled-notice]'), null);
+    assert.ok(target.querySelector('[data-salvage-disabled-notice]') === null);
     harness.remount();
   });
 
@@ -569,15 +572,18 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     assert.match(pill.textContent, /Routed by check/);
     assert.ok(off.querySelector('[data-add-salvage-group]'), 'and the group editor stays');
     // The rest of the chrome still collapses — the exemption is the PILL, not Ruling A.
-    assert.equal(off.querySelector('[data-salvage-routing]'), null, 'routing still collapses');
-    assert.equal(off.querySelector('[data-salvage-dc-override]'), null, 'the DC control still collapses');
+    assert.ok(off.querySelector('[data-salvage-routing]') === null, 'routing still collapses');
+    assert.ok(
+      off.querySelector('[data-salvage-dc-override]') === null,
+      'the DC control still collapses'
+    );
     harness.remount();
   });
 
   it('AC5: the DC control is absent when the system salvage check is off', async () => {
     // The presentation is DERIVED from the two axes: mode × check-enablement.
     const target = await harness.mount(props({ salvageCheckEnabled: false }));
-    assert.equal(target.querySelector('[data-salvage-dc-override]'), null);
+    assert.ok(target.querySelector('[data-salvage-dc-override]') === null);
     // ...but the yield groups still render.
     assert.ok(target.querySelector('[data-salvage-result-groups]'));
     harness.remount();
@@ -585,7 +591,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
   it('AC5: progressive salvage shows no DC control (it spends a roll, it does not compare one)', async () => {
     const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
-    assert.equal(target.querySelector('[data-salvage-dc-override]'), null);
+    assert.ok(target.querySelector('[data-salvage-dc-override]') === null);
     assert.ok(
       target.querySelector('[data-recipe-section="salvage-allow-player-result-reorder"]'),
       'the progressive reorder card renders instead'

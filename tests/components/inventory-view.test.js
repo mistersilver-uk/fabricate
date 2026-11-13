@@ -430,9 +430,8 @@ describe('InventoryView (mounted)', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
-    assert.equal(
-      detail.querySelector('[data-inventory-section="required"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-section="required"]') === null,
       'no Required for section for a non-tool component'
     );
     // Used By and Produced By still render.
@@ -532,7 +531,7 @@ describe('InventoryView (mounted)', () => {
     await settle();
 
     const card = target.querySelector('[data-inventory-card="sys:c1"]');
-    assert.equal(card.querySelector('[data-inventory-pip="salvageable"]'), null);
+    assert.ok(card.querySelector('[data-inventory-pip="salvageable"]') === null);
   });
 
   // D14: "Broken" REPLACES the quantity pip; they share one slot and one ternary.
@@ -574,7 +573,7 @@ describe('InventoryView (mounted)', () => {
     const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
     const banner = detail.querySelector('[data-inventory-broken-banner]');
     assert.ok(banner, 'renders the broken banner');
-    assert.equal(banner.querySelector('button'), null, 'the banner offers no action');
+    assert.ok(banner.querySelector('button') === null, 'the banner offers no action');
   });
 
   it('shows contributing components when an essence is selected', async () => {
@@ -591,9 +590,8 @@ describe('InventoryView (mounted)', () => {
     );
     assert.match(detail.textContent, /Iron/, 'names the contributing component');
     // An essence has no Produced By section.
-    assert.equal(
-      detail.querySelector('[data-inventory-produced-by]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-produced-by]') === null,
       'essence has no produced-by'
     );
   });
@@ -651,9 +649,8 @@ describe('InventoryView (mounted)', () => {
     await settle();
 
     assert.ok(target.querySelector('[data-inventory-state="empty"]'), 'renders the empty state');
-    assert.equal(
-      target.querySelector('[data-inventory-state="populated"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-state="populated"]') === null,
       'no populated grid'
     );
   });
@@ -732,9 +729,8 @@ describe('InventoryView (mounted)', () => {
       'a list that fits one page draws no pager'
     );
     assert.ok(detail.querySelector('[data-inventory-used-by="u0"]'), 'shows the first-page rows');
-    assert.equal(
-      detail.querySelector('[data-inventory-used-by="u7"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-used-by="u7"]') === null,
       'hides the second-page rows'
     );
 
@@ -995,9 +991,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.match(detail.textContent, /Forge Breastplate/, 'shows the single recipe name');
     assert.match(detail.textContent, /A sturdy cuirass\./, 'shows the recipe description inline');
     // No accordion for a single recipe.
-    assert.equal(
-      detail.querySelector('[data-inventory-recipe-accordion]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-recipe-accordion]') === null,
       'no accordion for one recipe'
     );
 
@@ -1018,7 +1013,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     // No reveal CTA — the recipe list is shown immediately with per-recipe Learn.
-    assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
+    assert.ok(detail.querySelector('[data-inventory-read-learn]') === null, 'no reveal CTA');
     assert.ok(
       detail.querySelector('[data-inventory-learn-recipe="r1"]'),
       'the recipe list is shown'
@@ -1110,9 +1105,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       true,
       'Learn is disabled when the budget is spent'
     );
-    assert.equal(
-      detail.querySelector('[data-inventory-learn-all]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-all]') === null,
       'no learn-all convenience when the budget is spent'
     );
     assertIdentityHeader(detail, { primaries: 0 });
@@ -1143,9 +1137,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       'the disabled button explains itself'
     );
     // The per-recipe enumeration chip is gone — requirements live in the book-level chips.
-    assert.equal(
-      detail.querySelector('[data-inventory-learn-blocked="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-blocked="r1"]') === null,
       'no per-recipe enumeration chip'
     );
   });
@@ -1160,9 +1153,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail.querySelector('[data-inventory-learned="r1"]'), 'renders a Learned chip');
-    assert.equal(
-      detail.querySelector('[data-inventory-learn="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learn="r1"]') === null,
       'no Learn button when learned'
     );
   });
@@ -1196,9 +1188,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.ok(detail.querySelector('[data-inventory-recipe-pager]'), 'renders the recipe pager');
 
     // The row description is collapsed until the header is toggled.
-    assert.equal(
-      detail.querySelector('[data-inventory-recipe-body="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-recipe-body="r1"]') === null,
       'description collapsed by default'
     );
     detail
@@ -1310,9 +1301,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
-    assert.equal(
-      detail.querySelector('[data-inventory-recipe-search]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-recipe-search]') === null,
       'no search for a small book'
     );
   });
@@ -1329,14 +1319,12 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail, 'the item-only book still renders in the inventory');
     assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
-    assert.equal(
-      detail.querySelector('[data-inventory-learn="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learn="r1"]') === null,
       'no Learn button in item-only mode'
     );
-    assert.equal(
-      detail.querySelector('[data-inventory-learned="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learned="r1"]') === null,
       'no Learned chip in item-only mode'
     );
   });
@@ -1359,17 +1347,15 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.ok(badge, 'shows the access badge');
     assert.match(badge.textContent, /NUses/, 'the badge reads the use cap');
     // No reveal CTA and no learn-all convenience in item mode.
-    assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
-    assert.equal(
-      detail.querySelector('[data-inventory-learn-all]'),
-      null,
+    assert.ok(detail.querySelector('[data-inventory-read-learn]') === null, 'no reveal CTA');
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-all]') === null,
       'no learn-all in item mode'
     );
 
     // The list is shown immediately with per-recipe Craft (not Learn), wired to navigate.
-    assert.equal(
-      detail.querySelector('[data-inventory-learn="r1"]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-learn="r1"]') === null,
       'no Learn button in item mode'
     );
     const craft = detail.querySelector('[data-inventory-craft="r1"]');
@@ -1417,7 +1403,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     );
     assert.ok(met.classList.contains('is-met'), 'met chip uses the success (met) tone');
     assert.equal(met.getAttribute('data-requirement-met'), 'true');
-    assert.equal(met.querySelector('button'), null, 'requirement chips are read-only');
+    assert.ok(met.querySelector('button') === null, 'requirement chips are read-only');
     // Non-colour state signals: a trailing status glyph + a stateful accessible name.
     assert.ok(
       met.querySelector('i.fa-circle-check[data-requirement-status="met"]'),
@@ -1452,9 +1438,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const target = await harness.mount({ services });
     await settle();
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    assert.equal(
-      detail.querySelector('[data-inventory-requirements]'),
-      null,
+    assert.ok(
+      detail.querySelector('[data-inventory-requirements]') === null,
       'no requirement row without requirements'
     );
   });
@@ -1539,7 +1524,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     // Roving tabindex, per the GatheringDetailTabs precedent.
     assert.equal(info.getAttribute('tabindex'), '0');
     assert.equal(salvage.getAttribute('tabindex'), '-1');
-    assert.equal(target.querySelector('[data-inventory-salvage-panel]'), null, 'Info is the body');
+    assert.ok(target.querySelector('[data-inventory-salvage-panel]') === null, 'Info is the body');
   });
 
   // AC1. Brokenness is about usability, not salvageability.
@@ -1565,8 +1550,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await harness.mount({ services });
     await settle();
 
-    assert.equal(target.querySelector('[role="tablist"]'), null);
-    assert.equal(target.querySelector('[data-inventory-detail-tab="salvage"]'), null);
+    assert.ok(target.querySelector('[role="tablist"]') === null);
+    assert.ok(target.querySelector('[data-inventory-detail-tab="salvage"]') === null);
   });
 
   it('moves focus and selection to the next tab on ArrowRight, through the shared strip', async () => {
@@ -1629,12 +1614,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="no-check"]'));
     assert.match(target.textContent, /Guaranteed/);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-loss-note]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-loss-note]') === null,
       'nothing can be lost without a roll'
     );
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'and there is no DC');
+    assert.ok(target.querySelector('[data-inventory-salvage-dc]') === null, 'and there is no DC');
     // The harness localizer echoes keys, so assert the KEY the footer selected.
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
@@ -1794,9 +1778,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-salvage-body="routed"]').dataset.inventoryRoutedType,
       'fixed'
     );
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-dc]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-dc]') === null,
       'a fixed check has no DC'
     );
     const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
@@ -1804,10 +1787,9 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       bands.map((node) => node.dataset.inventoryOutcomeBand),
       ['1–9', '10–20', '−2 – −1']
     );
-    assert.equal(target.querySelector('[data-inventory-outcome-threshold]'), null);
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-range]'),
-      null,
+    assert.ok(target.querySelector('[data-inventory-outcome-threshold]') === null);
+    assert.ok(
+      target.querySelector('[data-inventory-outcome-range]') === null,
       'no raw start–end attribute'
     );
     // Issue 1644: the shared ladder, its hooks carried by per-item props.
@@ -1875,9 +1857,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       threshold.matches('.fab-outcome-tier-heading > [data-outcome-band]'),
       "the tier's band"
     );
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-band]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-outcome-band]') === null,
       'no band for a relative threshold tier'
     );
   });
@@ -1938,7 +1919,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="misconfigured"]'));
-    assert.equal(target.querySelector('[data-inventory-salvage-outcomes]'), null);
+    assert.ok(target.querySelector('[data-inventory-salvage-outcomes]') === null);
     assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
   });
 
@@ -1962,9 +1943,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       !body.textContent.includes('MisconfiguredRouted'),
       'the routed copy is not rendered for a Simple misconfig'
     );
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-banner]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-banner]') === null,
       'the mode banner is suppressed when misconfigured'
     );
     assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
@@ -2044,9 +2024,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('renders no tools section when no tool is required', async () => {
     const { services } = salvageServices(salvageItem({ toolStates: [], toolsAvailable: true }));
     const target = await openSalvage(services);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-tools]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-tools]') === null,
       'no requirement, no section'
     );
   });
@@ -2093,9 +2072,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('AC3: the read-only summary renders only AFTER resolution', async () => {
     const { services, store } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
     let target = await openSalvage(services);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-summary]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-summary]') === null,
       'no summary before the roll - there is no pre-roll dice box'
     );
 
@@ -2150,9 +2128,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       rollValue: null,
     };
     target = await openSalvage(guaranteed.services);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-roll]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-roll]') === null,
       'a no-check salvage rolled nothing — no roll phrase'
     );
     assert.doesNotMatch(
@@ -2176,9 +2153,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
     assert.ok(!target.querySelector('[data-inventory-salvage-action]'), 'one-shot: no reroll');
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-depleted]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-depleted]') === null,
       'stock remains, so no depleted note'
     );
     target.querySelector('[data-inventory-salvage-again]').click();
@@ -2204,9 +2180,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-salvage-ribbon]'),
       'the result ribbon still shows'
     );
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-again]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-again]') === null,
       'nothing left to salvage — no way back to rolling'
     );
     assert.ok(
@@ -2235,12 +2210,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.ok(target.querySelector('[data-inventory-salvage-summary="waiting"]'));
     assert.match(target.textContent, /60s remaining/);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-ribbon]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-ribbon]') === null,
       'nothing was awarded'
     );
-    assert.equal(target.querySelector('[data-inventory-salvage-again]'), null);
+    assert.ok(target.querySelector('[data-inventory-salvage-again]') === null);
     assert.equal(
       target.querySelector('[data-inventory-salvage-action]').disabled,
       true,
@@ -2293,14 +2267,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     // The opt-in extension the salvage body passes.
     assert.ok(target.querySelector('[data-progressive-stage-state]'), 'renders a state chip');
     // And the one it must NOT: the fixture's authored `quantity: 2` renders nowhere.
-    assert.equal(
-      target.querySelector('[data-progressive-stage-quantity]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-progressive-stage-quantity]') === null,
       'no quantity is rendered — progressive results are quantity-less'
     );
     // No exclude affordance exists: the reconciliation contract guarantees a result is
     // never dropped, and there is nowhere to persist an exclusion.
-    assert.equal(target.querySelector('input[type="checkbox"]'), null, 'no exclude checkbox');
+    assert.ok(target.querySelector('input[type="checkbox"]') === null, 'no exclude checkbox');
 
     // Keyboard reorder routes through the store.
     target.querySelectorAll(MOVE_DOWN)[0].click();
@@ -2549,9 +2522,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       })
     );
     const target = await openSalvage(services);
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-reorder-reset]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-reorder-reset]') === null,
       'there is no player order to reset — the note itself does not apply'
     );
   });
@@ -2651,13 +2623,12 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the ribbon is up');
     assert.deepEqual(chipStates(target), ['recovered', 'short', 'unreachable']);
     // The regression this test exists for.
-    assert.equal(
-      target.querySelector('[data-progressive-stage-state="awaiting"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-progressive-stage-state="awaiting"]') === null,
       'no row still claims to await a roll beneath the success ribbon'
     );
     // The eyebrow reconciles too, rather than emptying out.
-    assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
+    assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]') === null);
     assert.equal(
       target.querySelector('[data-inventory-salvage-recovered-count]').textContent.trim(),
       'FABRICATE.App.Inventory.Salvage.RecoveredCount:{"recovered":1,"total":3}',
@@ -2683,8 +2654,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     });
     const target = await openSalvage(services);
     assert.deepEqual(chipStates(target), ['resolved', 'resolved', 'unreachable']);
-    assert.equal(target.querySelector('[data-inventory-salvage-recovered-count]'), null);
-    assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
+    assert.ok(target.querySelector('[data-inventory-salvage-recovered-count]') === null);
+    assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]') === null);
   });
 
   it('post-roll: reorder is FROZEN — the roll has already been spent down the list', async () => {
@@ -2765,7 +2736,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     });
     const target = await openSalvage(services);
     assert.deepEqual(chipStates(target), ['resolved', 'resolved', 'unreachable']);
-    assert.equal(target.querySelector('[data-progressive-stage-state="awaiting"]'), null);
+    assert.ok(target.querySelector('[data-progressive-stage-state="awaiting"]') === null);
   });
 
   it('routed: the rolled tier is marked "Your roll" only AFTER resolution', async () => {
@@ -2798,9 +2769,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     const before = salvageServices(salvageItem(routed));
     let target = await openSalvage(before.services);
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-your-roll]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-outcome-your-roll]') === null,
       'no tier is marked before a roll'
     );
 
@@ -3006,9 +2976,8 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     const target = await harness.mount({ services });
     await settle();
 
-    assert.equal(
-      target.querySelector('[data-inventory-system-selector]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-system-selector]') === null,
       'no selector node with a single participation'
     );
     const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
@@ -3219,9 +3188,8 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
 
     target.querySelector('[data-inventory-detail-tab="salvage"]').click();
     await settle();
-    assert.equal(
-      target.querySelector('[data-inventory-salvage-ribbon]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-ribbon]') === null,
       "System A's result must not surface a ribbon while System B is selected"
     );
   });

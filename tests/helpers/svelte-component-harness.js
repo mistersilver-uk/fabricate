@@ -30,6 +30,29 @@ function resolveLocalModule(repoRoot, importerPath, specifier) {
   return match ? toRepoPath(repoRoot, match) : null;
 }
 
+// Modules a component needs that no suite's list repeats, so the harness adds them beside it: the
+// one shared focus-tooltip lifecycle for its three users (issue 2868) and `Chip`'s root frame
+// (issue 2317).
+const COMPONENTS = 'src/ui/svelte/components';
+const FOCUS_TOOLTIP_MODULE = 'src/ui/svelte/util/focusTooltip.svelte.js';
+const CHIP_FRAME_MODULE = `${COMPONENTS}/ChipFrame.svelte`;
+const IMPLIED_MODULES = Object.freeze(
+  new Map([
+    ...['Button', 'IconButton', 'Stepper'].map((name) => [
+      `${COMPONENTS}/${name}.svelte`,
+      FOCUS_TOOLTIP_MODULE,
+    ]),
+    [`${COMPONENTS}/Chip.svelte`, CHIP_FRAME_MODULE],
+  ])
+);
+
+/** The modules a tree rendering `paths` needs beyond its lists, in `declared`'s list kind only. */
+function impliedModules(paths, declared, isKind) {
+  return [...new Set(paths.map((path) => IMPLIED_MODULES.get(path)).filter(Boolean))].filter(
+    (module) => isKind(module) && !declared.includes(module)
+  );
+}
+
 function declarationListFor(modulePath) {
   if (modulePath.endsWith('.svelte.js')) return 'runeModules';
   if (modulePath.endsWith('.svelte')) return 'compiledModules';
@@ -148,6 +171,11 @@ export function installComponentTestGlobals() {
  */
 export function createSvelteCompiler(repoRoot, getTempRoot) {
   function writeCompiledSvelte(sourcePath) {
+    // A suite compiling a component gets the modules it implies beside it (issues 2868, 2317).
+    for (const implied of impliedModules([sourcePath], [], () => true)) {
+      if (implied.endsWith('.svelte.js')) writeCompiledModule(implied);
+      else writeCompiledSvelte(implied);
+    }
     const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
     const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
     const destination = join(getTempRoot(), `${sourcePath}.js`);
@@ -687,7 +715,16 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string} [args.rootClass] application root class the mount target carries, for a component
  * whose production host is not the manager (see `mount()` below)
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath, rootClass = 'fabricate-manager' }) {
+export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules: declaredCompiledModules = [], runeModules: declaredRuneModules = [], componentPath, rootClass = 'fabricate-manager' }) {
+  const paths = [...declaredCompiledModules, componentPath];
+  const runeModules = [
+    ...declaredRuneModules,
+    ...impliedModules(paths, declaredRuneModules, (module) => module.endsWith('.svelte.js')),
+  ];
+  const compiledModules = [
+    ...declaredCompiledModules,
+    ...impliedModules(paths, declaredCompiledModules, (module) => !module.endsWith('.js')),
+  ];
   let tempRoot = null;
   let mounted = null;
   let target = null;

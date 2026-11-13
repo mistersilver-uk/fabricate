@@ -113,6 +113,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
   'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/ChipFrame.svelte',
   // Issue 2510: the requirement row family, each part on the states that draw it.
   'src/ui/svelte/components/ChoiceGroup.svelte',
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
@@ -1518,7 +1519,7 @@ test('(d) every shipped primitive still clears the membership bar', () => {
     assert.ok(
       !('callers' in row),
       `${row.path} is a member and carries a \`callers\` field. Members are held to the BAR, not ` +
-        'to an enumeration — `Chip` has 59 importers and an exact list there would be a manifest ' +
+        'to an enumeration — `Chip` has over a hundred importers and an exact list there would be a manifest ' +
         'edit on every unrelated PR that adds one usage. A half-filled field on some members and ' +
         'not others is the ambiguity this asymmetry is deliberate to avoid.'
     );

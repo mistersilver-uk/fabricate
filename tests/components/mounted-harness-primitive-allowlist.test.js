@@ -204,6 +204,9 @@ const ADJUDICATED_NON_MEMBERS = Object.freeze([
   // overturn condition rather than a preference.
   'src/ui/svelte/apps/manager/VocabularyShell.svelte',
   'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
+  // `Chip`'s root frame (issue 2317): the mounted harness compiles it beside `Chip`, so no suite
+  // names it and none can hang on its absence.
+  'src/ui/svelte/components/ChipFrame.svelte',
 ]);
 
 test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {

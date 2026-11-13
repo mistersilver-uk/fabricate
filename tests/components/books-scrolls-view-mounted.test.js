@@ -173,8 +173,8 @@ describe('BooksScrollsView (mounted)', () => {
 
     // The blank-window "Create recipe item" dialog is gone (issue 844).
     // the drop-zone below. There is no create button.
-    assert.equal(root.querySelector('[data-books-scrolls-create]'), null);
-    assert.equal(root.querySelector('[data-books-scrolls-empty-create]'), null);
+    assert.ok(root.querySelector('[data-books-scrolls-create]') === null);
+    assert.ok(root.querySelector('[data-books-scrolls-empty-create]') === null);
   });
 
   describe('creation drop-zone (issue 844)', () => {
@@ -182,8 +182,14 @@ describe('BooksScrollsView (mounted)', () => {
       const root = await harness.mount({ recipeItems: [makeItem()], visibilityMode: 'item', dropEnabled: true });
       const zone = root.querySelector('[data-books-scrolls-drop-zone]');
       assert.ok(zone, 'expected the creation drop-zone');
-      assert.equal(root.querySelector('[data-books-scrolls-create]'), null, 'the blank-dialog create button is gone');
-      assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null, 'no error before any drop');
+      assert.ok(
+        root.querySelector('[data-books-scrolls-create]') === null,
+        'the blank-dialog create button is gone'
+      );
+      assert.ok(
+        root.querySelector('[data-books-scrolls-drop-error]') === null,
+        'no error before any drop'
+      );
     });
 
     it('creates a recipe item from a dropped world Item uuid', async () => {
@@ -196,7 +202,7 @@ describe('BooksScrollsView (mounted)', () => {
       });
       fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item', uuid: 'Item.abc123' });
       assert.deepEqual(dropped, ['Item.abc123']);
-      assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null);
+      assert.ok(root.querySelector('[data-books-scrolls-drop-error]') === null);
     });
 
     it('creates a recipe item from a dropped compendium Item (pack + id, no uuid)', async () => {

@@ -90,7 +90,7 @@ describe('the published Medallion, text', () => {
     const node = tile();
     assert.equal(node.getAttribute('data-medallion'), 'text');
     assert.equal(node.querySelector('.fab-medallion-text').textContent, '3');
-    assert.equal(node.querySelector('i'), null);
+    assert.ok(node.querySelector('i') === null);
     assert.equal(handle.update({ ...TILE, text: 12 }), true);
     await settle();
     assert.ok(tile() === node, 'the same tile');
@@ -98,7 +98,7 @@ describe('the published Medallion, text', () => {
     assert.equal(handle.update({ ...TILE }), true);
     await settle();
     assert.equal(node.getAttribute('data-medallion'), 'glyph');
-    assert.equal(node.querySelector('.fab-medallion-text'), null);
+    assert.ok(node.querySelector('.fab-medallion-text') === null);
     assert.ok(node.querySelector('i'));
     handle.destroy();
   });
@@ -122,7 +122,7 @@ describe('the published Medallion, text', () => {
     ]) {
       const target = companionTarget(targets);
       assert.throws(() => seam.mount('Medallion', { target, props: { ...TILE, text } }), message);
-      assert.equal(target.querySelector('.fab-medallion'), null, 'nothing is drawn');
+      assert.ok(target.querySelector('.fab-medallion') === null, 'nothing is drawn');
     }
   });
 

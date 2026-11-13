@@ -35,7 +35,7 @@
 
   ── THE ERROR BRANCH IS A `Notice`, AND THE ROUTING RULE IS WHY ─────────────────────────────────
   It was a `Callout` and that was the wrong primitive by the library's own rule
-  (`library.html:1058`): a callout is DOCUMENTATION — always true, stays put — and a notice is
+  (`library.html`'s `<Callout>` entry): a callout is DOCUMENTATION — always true, stays put — and a notice is
   STATE, something that just happened. "Couldn't load your inventory." is state. So is the
   companion fault strip in `FabricateAppRoot.svelte`, which this same change routes to `Notice`
   for the same reason; routing the two the same way is the point of having the rule.
@@ -106,7 +106,7 @@
       <i class={branch.icon} aria-hidden="true"></i>
       <p>{branch.message}</p>
     {:else if branch.kind === 'error'}
-      <!-- `Notice`, NOT `Callout` (issue 1514). The routing rule at `library.html:1058` is
+      <!-- `Notice`, NOT `Callout` (issue 1514). The routing rule in `library.html`'s `<Callout>` entry is
            meaning first: a CALLOUT is documentation, always true and stays put; a NOTICE is
            STATE — it just happened. A view that failed to load is state, and it is the same
            reading `FabricateAppRoot` already applies to the companion fault strip two files

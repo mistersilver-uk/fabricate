@@ -190,7 +190,7 @@ describe('IngredientSetPanel essence requirements section', () => {
     const card = section.querySelector('.essence-card');
     assert.ok(card.querySelector('.essence-step-minus'));
     assert.ok(card.querySelector('.essence-step-plus'));
-    assert.equal(card.querySelector('.essence-remove'), null);
+    assert.ok(card.querySelector('.essence-remove') === null);
   });
 
   it('does not render the legacy add-essence row', () => {
@@ -200,7 +200,7 @@ describe('IngredientSetPanel essence requirements section', () => {
       true
     );
 
-    assert.equal(section.querySelector('.add-essence-row'), null);
+    assert.ok(section.querySelector('.add-essence-row') === null);
   });
 
   it('uses min=0 on quantity inputs', () => {

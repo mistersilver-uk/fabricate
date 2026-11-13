@@ -1056,7 +1056,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false
     });
-    assert.equal(root.querySelector('[data-check-trigger-presets]'), null);
+    assert.ok(root.querySelector('[data-check-trigger-presets]') === null);
   });
 });
 

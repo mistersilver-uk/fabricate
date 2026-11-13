@@ -667,7 +667,7 @@ describe('the odds histogram', () => {
       root.querySelector('[data-checks-odds-state]').getAttribute('data-checks-odds-state'),
       'not-enumerable'
     );
-    assert.equal(root.querySelector('[data-checks-odds-domain]'), null);
+    assert.ok(root.querySelector('[data-checks-odds-domain]') === null);
   });
 
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {

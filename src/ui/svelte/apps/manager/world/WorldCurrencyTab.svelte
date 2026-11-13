@@ -500,7 +500,7 @@
                read alike.
 
                A `<span>` RATHER THAN THE `<small>` THIS WAS, and the element is the whole
-               mechanism. `.fabricate-field.fabricate-field small` (`styles/fabricate.css:9859`)
+               mechanism. `.fabricate-field.fabricate-field small` (`styles/fabricate-manager-recipe-editor.css`)
                is ELEMENT-TYPED at (0,2,1) and `.fabricate-select-note` is (0,1,0), so on a
                `<small>` the class is out-ranked and adding it changes nothing at all — measured
                in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
@@ -1106,7 +1106,7 @@
 
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for EVERY converted
      control in this component. `.fabricate-field.fabricate-field select { width: 100% }`
-     (`styles/fabricate.css:8065`) painted them until they became `<button>`s, and
+     (the `.fabricate-field.fabricate-field select` rule in `styles/fabricate-manager-tool-editor-environments.css` and its siblings) painted them until they became `<button>`s, and
      `.fabricate-select-trigger` declares no width at all — a trigger's box belongs to the row it
      sits in. Without this rule the spend strategy measured 68.73px on "Macro" and 118.78px on
      "Actor data path" in a 654px column, the provider 214.64px, and the add-sub-unit control
@@ -1121,7 +1121,7 @@
      the descendant selector reaches them without naming either shape. Two anchors are needed
      because they sit in two blocks this component writes: `.manager-currency-strategy` holds the
      first two, and `.manager-currency-subunit-builder` — a `minmax(0, 1fr) auto` grid
-     (`styles/fabricate.css:3778-3782`) whose first track is full width — holds the third, which
+     (the `.manager-currency-subunit-builder` rule in `styles/fabricate-manager-checks-modifiers.css`) whose first track is full width — holds the third, which
      the strategy anchor cannot reach. Both `:global()`s are anchored at classes THIS component
      writes, so the rules keep a scoping hash rather than reaching every trigger in the document.
 

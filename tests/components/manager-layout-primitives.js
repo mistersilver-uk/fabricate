@@ -521,7 +521,7 @@ test('the shared callout keeps one shape and lets tone change only its colours',
       '  .manager-callout.is-warning .manager-callout-title'
   );
 
-  // The specimen's treatment — `library.html:219-220` — is the ONLY shape.
+  // The specimen's treatment — `library.html`'s `.k-callout` specimen — is the ONLY shape.
   for (const declaration of [
     'padding: var(--fab-space-3);',
     'font-size: 11.5px;',

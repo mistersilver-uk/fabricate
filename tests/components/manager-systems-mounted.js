@@ -154,14 +154,12 @@ export function registerSystemsCases() {
         craftingEffect: { summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge' },
       },
     });
-    assert.equal(
-      target.querySelector('[data-crafting-alchemy-checkmode-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-crafting-alchemy-checkmode-section]') === null,
       'the settings page does not render the alchemy check-mode sub-section'
     );
-    assert.equal(
-      target.querySelector('[data-crafting-alchemy-checkmode]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-crafting-alchemy-checkmode]') === null,
       'the settings page does not render the alchemy check-mode selector'
     );
     // The Recipe resolution card itself still renders on the settings page.
@@ -310,7 +308,7 @@ export function registerSystemsCases() {
       },
     });
     flushSync();
-    assert.equal(target.querySelector('[data-systems-gathering-conditions]'), null);
+    assert.ok(target.querySelector('[data-systems-gathering-conditions]') === null);
 
     unmount(mounted);
     mounted = null;
@@ -344,7 +342,7 @@ export function registerSystemsCases() {
       },
     });
     flushSync();
-    assert.equal(target.querySelector('[data-systems-gathering-conditions]'), null);
+    assert.ok(target.querySelector('[data-systems-gathering-conditions]') === null);
   });
 
   it('shows only the enabled Systems Library condition shortcut dimension', () => {
@@ -385,7 +383,7 @@ export function registerSystemsCases() {
     assert.ok(card);
     assert.equal(card.querySelectorAll('[data-systems-gathering-condition]').length, 1);
     assert.ok(card.querySelector('[data-systems-gathering-condition="weather"]'));
-    assert.equal(card.querySelector('[data-systems-gathering-condition="timeOfDay"]'), null);
+    assert.ok(card.querySelector('[data-systems-gathering-condition="timeOfDay"]') === null);
   });
 
   it('shows the unselected systems library only when no crafting systems exist', () => {
@@ -667,9 +665,8 @@ export function registerSystemsCases() {
       'the select names the selected system'
     );
     closeSelectPanel(target, '[data-manager-scope-select]');
-    assert.equal(
-      scopeCard.querySelector('.manager-scope-name'),
-      null,
+    assert.ok(
+      scopeCard.querySelector('.manager-scope-name') === null,
       'the static name span is retired, not merely hidden'
     );
 
@@ -961,9 +958,8 @@ export function registerSystemsCases() {
 
     // The Recipe Editor was removed, so the empty state no longer offers a
     // Create Recipe button.
-    assert.equal(
-      target.querySelector('.manager-table-scroll .fabricate-button.is-primary'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-table-scroll .fabricate-button.is-primary') === null,
       'empty recipe state should not offer a create button'
     );
     assert.ok(
@@ -1270,9 +1266,8 @@ export function registerSystemsCases() {
     flushSync();
 
     // Resolution mode moved to the gated Crafting > Settings page (issue 511).
-    assert.equal(
-      target.querySelector('#manager-system-resolution-mode'),
-      null,
+    assert.ok(
+      target.querySelector('#manager-system-resolution-mode') === null,
       'the resolution-mode card is no longer on System Overview'
     );
 
@@ -1287,9 +1282,8 @@ export function registerSystemsCases() {
       )
     );
     // Save re-publishes the projection, so the chip clears naturally (no reseed).
-    assert.equal(
-      target.querySelector('[data-system-details-dirty]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-system-details-dirty]') === null,
       'the Unsaved chip clears after Save persists'
     );
     assert.ok(
@@ -1374,9 +1368,8 @@ export function registerSystemsCases() {
       'Smithing',
       'the inputs reseed to the new system'
     );
-    assert.equal(
-      target.querySelector('[data-system-details-dirty]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-system-details-dirty]') === null,
       'the chip clears on the identity change'
     );
   });
@@ -1389,9 +1382,8 @@ export function registerSystemsCases() {
       !calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
       'a clean form does not raise the discard prompt'
     );
-    assert.equal(
-      target.querySelector('.manager-system-edit-form'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-system-edit-form') === null,
       'navigation proceeds off the settings form'
     );
   });
@@ -1430,9 +1422,8 @@ export function registerSystemsCases() {
       ),
       'Save persists the typed name/description from the lifted draft'
     );
-    assert.equal(
-      target.querySelector('.manager-system-edit-form'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-system-edit-form') === null,
       'navigation proceeds after a successful save'
     );
   });
@@ -1467,9 +1458,8 @@ export function registerSystemsCases() {
       'discard prompts'
     );
     assert.ok(!calls.some((call) => call[0] === 'saveSystemDetails'), 'discard does not save');
-    assert.equal(
-      target.querySelector('.manager-system-edit-form'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-system-edit-form') === null,
       'navigation proceeds after discard'
     );
 
@@ -1482,9 +1472,8 @@ export function registerSystemsCases() {
       'Alchemy',
       'the inputs revert to the persisted value'
     );
-    assert.equal(
-      target.querySelector('[data-system-details-dirty]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-system-details-dirty]') === null,
       'the chip is clear on re-entry'
     );
   });
@@ -1595,9 +1584,8 @@ export function registerSystemsCases() {
       target.querySelector('[data-system-edit-blocker]'),
       'the system-blocker banner stays on the Settings tab'
     );
-    assert.equal(
-      target.querySelector('[data-system-overview]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-system-overview]') === null,
       'the validation list is not rendered while Settings is active'
     );
     // The renamed nav item carries the open-issue count (critical + warning = 2), its unit read.
@@ -1799,9 +1787,8 @@ export function registerSystemsCases() {
         salvage: false,
       },
     });
-    assert.equal(
-      target.querySelector('[data-system-salvage-resolution-mode]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-system-salvage-resolution-mode]') === null,
       'the salvage resolution card is hidden when salvage is off'
     );
     const tile = target.querySelector('[data-feature-key="salvage"]');
@@ -1948,7 +1935,7 @@ export function registerSystemsCases() {
       'and each zone is bound to a declared slot'
     );
     // The removed nested inventory-mode select must not render.
-    assert.equal(target.querySelector('[data-world-currency-inventory-mode-select]'), null);
+    assert.ok(target.querySelector('[data-world-currency-inventory-mode-select]') === null);
   });
 
   it('gives each empty macro drop zone a field-specific accessible name', async () => {
@@ -2001,9 +1988,8 @@ export function registerSystemsCases() {
     });
 
     // No provider select is offered; the no-provider callout renders instead.
-    assert.equal(
-      target.querySelector('[data-world-currency-provider-select]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-world-currency-provider-select]') === null,
       'no provider select should render for a no-provider system'
     );
     assert.ok(
@@ -2011,9 +1997,8 @@ export function registerSystemsCases() {
       'the no-provider callout should appear, steering the GM to the macro strategy'
     );
     // The removed inventory-mode select must not render.
-    assert.equal(
-      target.querySelector('[data-world-currency-inventory-mode-select]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-world-currency-inventory-mode-select]') === null,
       'the nested inventory-mode select should be gone'
     );
     // Units stay GM-editable (not read-only) on a no-provider system.
@@ -2059,14 +2044,12 @@ export function registerSystemsCases() {
 
     // No sub-unit section renders (no heading, builder, chips, or warnings) and the macro-conversion
     // hint is shown instead.
-    assert.equal(
-      card.querySelector('.manager-currency-subunit-section'),
-      null,
+    assert.ok(
+      card.querySelector('.manager-currency-subunit-section') === null,
       'no sub-unit section in macro mode'
     );
-    assert.equal(
-      card.querySelector('.manager-currency-subunit-builder'),
-      null,
+    assert.ok(
+      card.querySelector('.manager-currency-subunit-builder') === null,
       'no add-sub-unit builder in macro mode'
     );
     assert.equal(
@@ -2290,11 +2273,10 @@ export function registerSystemsCases() {
       target.querySelector('[data-world-currency-provider-managed]'),
       'provider-managed callout should render'
     );
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '.manager-currency-unit-card .manager-character-modifier-card-header-actions'
-      ),
-      null,
+      ) === null,
       'Add and Seed header actions should be hidden in provider mode'
     );
     // Units render read-only: no pen/edit, delete, or remove controls, no editable amount inputs.
@@ -2513,9 +2495,9 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[data-feature-key="complexRecipes"]'), null);
-    assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
-    assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
+    assert.ok(target.querySelector('[data-feature-key="complexRecipes"]') === null);
+    assert.ok(target.querySelector('[data-feature-key="craftingChecks"]') === null);
+    assert.ok(target.querySelector('[data-feature-key="outcomeRouting"]') === null);
 
     // Resolution-mode rollback moved to the Crafting Settings page (issue 511).
     const gathering = target.querySelector('[data-feature-key="gathering"] .fabricate-toggle');

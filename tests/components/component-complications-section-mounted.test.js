@@ -357,11 +357,10 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /not progressive/,
       'the note is not spliced into the chip label'
     );
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '[data-complication-activity="crafting"] .fab-complication-activity-note'
-      ),
-      null,
+      ) === null,
       'and a progressive activity carries no note at all'
     );
   });
@@ -513,9 +512,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
         row.querySelector('.fab-complication-effect-reveal'),
         `${selector} reveals a strip for the rule to apply to`
       );
-      assert.equal(
-        row.querySelector('input[type="checkbox"]'),
-        null,
+      assert.ok(
+        row.querySelector('input[type="checkbox"]') === null,
         'and it has no checkbox, which is why the indent referred to nothing'
       );
     }

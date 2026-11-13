@@ -15,7 +15,11 @@ import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
 import { readDeclaration } from './helpers/apiConvention.js';
-import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
+import {
+  parseDesignLibrary,
+  primitiveNamesIn,
+  readDesignLibrary,
+} from './helpers/designLibrary.js';
 import { componentAstOf } from './helpers/parsedSource.js';
 import { PRIMITIVE_DIRECTORY, assertMovedByDiff, registerBase } from './helpers/registerBase.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
@@ -246,7 +250,6 @@ const MEMBER_STATUSES = ['target', 'shipped', 'divergent'];
 
 /** @see MEMBER_STATUSES */
 const BLOCK_STATUSES = [...MEMBER_STATUSES, 'prose'];
-
 
 /**
  * A block's own status, derived from the statuses of the names it declares.
@@ -857,6 +860,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+  // Issue 1481's essence quantity card: a tile, a name and a `Stepper`, which no specimen names.
+  'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
@@ -869,6 +874,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 2510: ChoiceGroupAwardHeader and the four PickerRow* parts below each have one caller.
+  // Issue 2317: `Chip`'s root frame, one caller; `<Chip>` specifies its parent.
+  'src/ui/svelte/components/ChipFrame.svelte',
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
@@ -953,7 +960,10 @@ test('every component the library cites by filename still exists', () => {
     (match) => match[0]
   );
   const cited = [...new Set(citations)].sort(byCodePoint);
-  assert.ok(cited.length > 20, `the library cites ${cited.length} components, so it stopped citing`);
+  assert.ok(
+    cited.length > 20,
+    `the library cites ${cited.length} components, so it stopped citing`
+  );
   for (const file of cited) {
     assert.ok(
       SHIPPED_COMPONENT_NAMES.has(path.basename(file, '.svelte')),
@@ -1076,9 +1086,7 @@ function selectorListsIn(css) {
 const STYLESHEET = 'styles/fabricate.css';
 
 /** Its rules, as selector lists. */
-const STYLESHEET_SELECTORS = selectorListsIn(
-  styleTextFor(STYLESHEET, readStylesheet())
-);
+const STYLESHEET_SELECTORS = selectorListsIn(styleTextFor(STYLESHEET, readStylesheet()));
 
 /**
  * A claim that the manifest makes about a class family in the shipped stylesheet.
@@ -1166,7 +1174,7 @@ test('every call-site override count the manifest asserts is re-derived from the
       claim.overrides,
       `${claim.row.path} states "${claim.text}" and ${STYLESHEET} has ${measured.length} such ` +
         'rules. The override share is what says the primitive owns the control and the caller owns ' +
-        'only its box, so a wrong figure misreports where the family\'s weight actually sits.'
+        "only its box, so a wrong figure misreports where the family's weight actually sits."
     );
   }
 });
@@ -1195,4 +1203,46 @@ test('every scoped rule count the manifest asserts is re-derived from that compo
         'a conversion, so the figure is the argument rather than a detail of it.'
     );
   }
+});
+
+/**
+ * A count of stylesheet or style-block rules, however a row words it: a numeral or a number word,
+ * up to three words of qualifier, then `rules`, `selectors`, `compounds` or `declarations`.
+ */
+const RULE_COUNT_PROSE =
+  /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:[^\s.;]+\s+){0,3}?(?:rules|selectors|compounds|declarations)\b/giu;
+
+/** The text of a row's `why` with every claim a property above re-derives taken out of it. */
+function withoutGuardedRuleClaims(why) {
+  return [FAMILY_RULE_CLAIM, TRIGGER_OVERRIDE_CLAIM, SCOPED_RULE_CLAIM].reduce(
+    (text, claim) => text.replace(claim, ' '),
+    why
+  );
+}
+
+test('no manifest row states a rule count outside the notation the properties above re-derive', () => {
+  // Issue 1556: a count spelled any other way ("of its 84 family selectors, 67 are now compounds")
+  // is read by no property, so it drifted and two such claims were overstated at review.
+  assert.deepEqual(
+    withoutGuardedRuleClaims('64 `.a-*` rules in `styles/fabricate.css`; 3 scoped rules').match(
+      RULE_COUNT_PROSE
+    ),
+    null
+  );
+  assert.deepEqual('of its 84 family selectors, 67 are now compounds'.match(RULE_COUNT_PROSE), [
+    '84 family selectors',
+    '67 are now compounds',
+  ]);
+  const unguarded = MANIFEST_ROWS.flatMap((row) =>
+    (withoutGuardedRuleClaims(row.why).match(RULE_COUNT_PROSE) ?? []).map(
+      (claim) => `${row.path}: "${claim}"`
+    )
+  );
+  assert.deepEqual(
+    unguarded,
+    [],
+    'a register row states a rule count nothing re-measures. Restate it in the notation a ' +
+      'property above states it as (N `.family-*` rules in `styles/fabricate.css`, optionally under a root; ' +
+      'N scoped rules), or leave the numeral out'
+  );
 });

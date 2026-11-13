@@ -88,7 +88,7 @@ describe('ShoppingList mounted behavior', () => {
       'three summary cards always shown'
     );
     assert.ok(target.querySelector('[data-crafting-shopping-empty]'), 'empty state shown');
-    assert.equal(target.querySelector('[data-shopping-entry]'), null, 'no queue entries');
+    assert.ok(target.querySelector('[data-shopping-entry]') === null, 'no queue entries');
     assert.equal(summaryCount(target, 'recipes'), '0');
   });
 
@@ -129,7 +129,10 @@ describe('ShoppingList mounted behavior', () => {
       allSatisfied: true
     });
     const target = await harness.mount({ aggregate: satisfied, entries: [ENTRY] });
-    assert.equal(target.querySelector('[data-shopping-acquire-components]'), null, 'no components card');
+    assert.ok(
+      target.querySelector('[data-shopping-acquire-components]') === null,
+      'no components card'
+    );
     assert.equal(summaryCount(target, 'components'), '0');
   });
 
@@ -185,7 +188,7 @@ describe('ShoppingList mounted behavior', () => {
     });
     const rows = target.querySelectorAll('.crafting-shopping-acquire-row');
     assert.ok(rows[0].querySelector('i').classList.contains('fa-mortar-pestle'));
-    assert.equal(rows[0].querySelector('img'), null);
+    assert.ok(rows[0].querySelector('img') === null);
     assert.equal(rows[1].querySelector('img').getAttribute('src'), 'icons/iron.webp');
   });
 
@@ -264,15 +267,14 @@ describe('ShoppingList mounted behavior', () => {
     assert.equal(row.tagName, 'LI', 'the queue row stays a listitem');
     assert.equal(row.getAttribute('role'), null, 'and carries no interactive role of its own');
     assert.equal(row.getAttribute('tabindex'), null, 'nor a hand-rolled tabindex');
-    assert.equal(row.closest('button'), null, 'the row is not inside a button');
+    assert.ok(row.closest('button') === null, 'the row is not inside a button');
 
     const entry = target.querySelector('[data-shopping-entry="recipe-1"]');
     assert.equal(entry.tagName, 'BUTTON', 'the actionable element is a real button');
     assert.equal(entry.getAttribute('type'), 'button', 'and never submits a form');
     assert.equal(entry.parentElement, row, 'it is a direct child of the row');
-    assert.equal(
-      entry.querySelector('button'),
-      null,
+    assert.ok(
+      entry.querySelector('button') === null,
       'the × must stay a SIBLING of the activation button — nesting it would be invalid HTML'
     );
     assert.equal(

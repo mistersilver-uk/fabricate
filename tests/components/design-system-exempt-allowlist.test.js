@@ -23,6 +23,11 @@ const OWN_REST = "the spread is this primitive's own rest, forwarded to the root
 /** Each reviewed reason, and how many of its markers each file states. */
 const ALLOWLIST = Object.freeze([
   [
+    'registers an existing two-importer component in the primitive register at `target`; it is not ' +
+      'a promotion into a primitive directory',
+    { 'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte': 1 },
+  ],
+  [
     PORTRAIT,
     {
       'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte': 2,
@@ -182,6 +187,7 @@ const ALLOWLIST = Object.freeze([
   [
     OWN_REST,
     {
+      'src/ui/svelte/components/Chip.svelte': 1,
       'src/ui/svelte/components/ModifierPillSelect.svelte': 1,
       'src/ui/svelte/components/SearchField.svelte': 1,
       'src/ui/svelte/components/ViewToggle.svelte': 1,

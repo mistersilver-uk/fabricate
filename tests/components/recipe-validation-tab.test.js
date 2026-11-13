@@ -160,9 +160,9 @@ describe('RecipeValidationTab (mounted)', () => {
     const target = await harness.mount({
       recipe: { name: 'Brew', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1' }] }
     });
-    assert.equal(target.querySelector('[data-issue]'), null, 'no issue rows rendered');
+    assert.ok(target.querySelector('[data-issue]') === null, 'no issue rows rendered');
     assert.ok(target.querySelector('[data-check].is-pass'), 'a passing check row renders');
-    assert.equal(target.querySelector('.is-block'), null, 'no blocking rows on a complete recipe');
+    assert.ok(target.querySelector('.is-block') === null, 'no blocking rows on a complete recipe');
     harness.remount();
   });
 
@@ -196,7 +196,10 @@ describe('RecipeValidationTab (mounted)', () => {
 
   it('does not warn about overlap when componentTagOptions are absent', async () => {
     const target = await harness.mount({ recipe: overlapRecipe });
-    assert.equal(target.querySelector('[data-issue="requirementOverlap"]'), null, 'no overlap issue without a catalogue');
+    assert.ok(
+      target.querySelector('[data-issue="requirementOverlap"]') === null,
+      'no overlap issue without a catalogue'
+    );
     const overlapCheck = target.querySelector('[data-check="noRequirementOverlap"]');
     assert.equal(overlapCheck.dataset.satisfied, 'true', 'overlap check passes with no catalogue');
     harness.remount();
@@ -321,8 +324,8 @@ describe('RecipeValidationTab (mounted)', () => {
       alchemy: { checkMode: 'simple' },
       signatureConflicts: []
     });
-    assert.equal(target.querySelector('[data-issue="alchemyResultSelection"]'), null);
-    assert.equal(target.querySelector('[data-issue="signatureCollision"]'), null);
+    assert.ok(target.querySelector('[data-issue="alchemyResultSelection"]') === null);
+    assert.ok(target.querySelector('[data-issue="signatureCollision"]') === null);
     assert.equal(target.querySelector('[data-check="noSignatureCollision"]').dataset.satisfied, 'true');
     assert.equal(target.querySelector('[data-check="alchemyResultSelection"]').dataset.satisfied, 'true');
     harness.remount();
@@ -441,9 +444,15 @@ describe('RecipeValidationTab (mounted)', () => {
       routingProvider: 'ingredientSet',
       routedOutcomeTierOptions
     });
-    assert.equal(target.querySelector('[data-issue="unroutedResultGroup"]'), null, 'no routed warning off check-mode');
-    assert.equal(target.querySelector('[data-issue="unproducedOutcomeTier"]'), null);
-    assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]'), null, 'no routed checklist entry off check-mode');
+    assert.ok(
+      target.querySelector('[data-issue="unroutedResultGroup"]') === null,
+      'no routed warning off check-mode'
+    );
+    assert.ok(target.querySelector('[data-issue="unproducedOutcomeTier"]') === null);
+    assert.ok(
+      target.querySelector('[data-check="routedResultGroupsRouted"]') === null,
+      'no routed checklist entry off check-mode'
+    );
     harness.remount();
   });
 

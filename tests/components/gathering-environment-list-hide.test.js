@@ -153,7 +153,10 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
       'toggle-on hides disabled + out-of-realm + blind-locked, keeps available + merely-blind'
     );
     // No locked teaser survives.
-    assert.equal(target.querySelector('[data-locked="true"]'), null, 'no locked card renders when hidden');
+    assert.ok(
+      target.querySelector('[data-locked="true"]') === null,
+      'no locked card renders when hidden'
+    );
   });
 
   it('invokes the services setter and hides locked cards when the pill switch is toggled on', async () => {
@@ -190,9 +193,8 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
     assert.equal(ids(target).length, 0, 'no cards render when every environment is hidden');
     const empty = target.querySelector('[data-gathering-env-empty="all-unavailable"]');
     assert.ok(empty, 'the toggle-emptied empty state carries the all-unavailable marker');
-    assert.equal(
-      target.querySelector('[data-gathering-env-empty="no-matches"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-env-empty="no-matches"]') === null,
       'the search no-matches branch is NOT used when the toggle emptied the list'
     );
 
@@ -204,9 +206,8 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
 
     assert.deepEqual(calls.set, [false], 'recovery control invokes the setter with false');
     assert.deepEqual(ids(target).sort(), ['env-a', 'env-b'], 'hidden cards return after recovery');
-    assert.equal(
-      target.querySelector('[data-gathering-env-empty="all-unavailable"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-env-empty="all-unavailable"]') === null,
       'the empty state clears once the toggle is off again'
     );
   });
@@ -227,9 +228,8 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
       target.querySelector('[data-gathering-env-empty="no-matches"]'),
       'a zero-result search uses the no-matches marker'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-env-empty="all-unavailable"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-env-empty="all-unavailable"]') === null,
       'search-zero does not use the toggle-emptied branch'
     );
   });

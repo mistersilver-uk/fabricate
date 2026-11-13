@@ -10,6 +10,7 @@ import { compile } from 'svelte/compiler';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { MANAGER_COLOR_TOKEN_KEYS } from '../../src/ui/svelte/util/managerColorTokens.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -101,10 +102,12 @@ const medallion = createMountedComponentHarness({
 
 /** The scoped CSS of the rendered primitives, compiled `external` so it can be injected beside the sheet. */
 function scopedCss() {
-  return COMPILED.map((modulePath) => {
-    const filename = resolve(repoRoot, modulePath);
-    return compile(readFileSync(filename, 'utf8'), { filename, css: 'external' }).css?.code ?? '';
-  }).join('\n');
+  return COMPILED.flatMap(styleSourcesOf)
+    .map((modulePath) => {
+      const filename = resolve(repoRoot, modulePath);
+      return compile(readFileSync(filename, 'utf8'), { filename, css: 'external' }).css?.code ?? '';
+    })
+    .join('\n');
 }
 
 /* THE TWO SURFACES A ROW CHIP STANDS ON. */

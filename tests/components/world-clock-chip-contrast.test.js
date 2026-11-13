@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { declaredToken, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
 
@@ -18,7 +19,7 @@ const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
 
 const token = (file, selector, property) =>
-  declaredToken(rulesIn(corpus[file]), selector, property, file);
+  declaredToken(rulesIn(styleTextOf(corpus, file)), selector, property, file);
 
 const GROUND = [
   token(CHIP, '.manager-chip.is-info', 'background'),

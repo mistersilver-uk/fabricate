@@ -13,6 +13,7 @@ import {
   componentScopeFor,
   createComponentScopeHarness,
 } from '../helpers/componentScopeMountModules.js';
+import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -21,9 +22,11 @@ const CHIP_PATH = 'src/ui/svelte/components/Chip.svelte';
 const ESSENCE_CHIP_PATH = 'src/ui/svelte/apps/manager/components/EssenceChip.svelte';
 const MEDALLION_PATH = 'src/ui/svelte/components/Medallion.svelte';
 
-const chipSource = readFileSync(resolve(repoRoot, CHIP_PATH), 'utf8');
 /** The REAL style block, sliced at the tag on its own line (see the chip characterization suite). */
-const chipStyleBlock = chipSource.slice(chipSource.search(/^<style>$/m));
+const chipStyleBlock = styleSourcesOf(CHIP_PATH)
+  .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+  .map((source) => source.slice(source.search(/^<style>$/m)))
+  .join('\n');
 
 function ruleFor(selector) {
   const open = chipStyleBlock.indexOf(`${selector} {`);

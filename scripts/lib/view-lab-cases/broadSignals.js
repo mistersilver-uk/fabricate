@@ -827,6 +827,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-narrow-status-row',
     'manager-recipes-inspector-cant-enable',
   ]),
+  // `Chip`'s root and every rule that paints it (issue 2317), so the same frames.
+  'src/ui/svelte/components/ChipFrame.svelte': Object.freeze([
+    'player-crafting-simple',
+    'manager-published-leaves-specimen',
+    'manager-published-chip-forms-specimen',
+    'manager-recipes-narrow-status-row',
+    'manager-recipes-inspector-cant-enable',
+  ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
   // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
   // the forms specimen (issue 2853), the companion forms specimens' roles (issue 2841) and the

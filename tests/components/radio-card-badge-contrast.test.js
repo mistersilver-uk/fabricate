@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { declaredToken, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
 
@@ -16,7 +17,7 @@ const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
 
 const chip = (tone, property) =>
-  declaredToken(rulesIn(corpus[CHIP]), `.manager-chip.is-${tone}`, property, CHIP);
+  declaredToken(rulesIn(styleTextOf(corpus, CHIP)), `.manager-chip.is-${tone}`, property, CHIP);
 const card = (selector, property) =>
   declaredToken(rulesIn(corpus[SHEET]), selector, property, SHEET);
 

@@ -432,7 +432,7 @@ for (const closeOnOutsideClick of [true, false]) {
         assert.equal(dialog.querySelectorAll('.manager-modal-footer').length, 1);
         assert.equal(dialog.querySelectorAll('[data-probe-body]').length, 1);
         assert.equal(dialog.querySelectorAll('[data-footer-button]').length, 1);
-        assert.equal(dialog.querySelector('form'), null);
+        assert.ok(dialog.querySelector('form') === null);
         assert.equal(dialog.querySelector('.manager-modal-form').tagName, 'DIV');
       });
 

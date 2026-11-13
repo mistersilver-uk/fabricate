@@ -140,7 +140,7 @@
     background: var(--fab-surface-soft);
   }
 
-  /* The caller's own flex row, kept: `library.html:955` draws the kicker as a plain span
+  /* The caller's own flex row, kept: `library.html`'s `<Kicker>` entry draws the kicker as a plain span
      inside a caller-owned row, and this one carries the leading accent glyph. Everything the
      kicker now owns — size, weight, case, tracking and ink — is gone from here. */
   .consumption-plan-title {

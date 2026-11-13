@@ -1357,7 +1357,7 @@ export function registerDowntimeCases() {
       target.querySelector('[data-breadcrumb-downtime-tab]').tagName.toLowerCase(),
       'span'
     );
-    assert.equal(target.querySelector('[data-breadcrumb-downtime-leaf]'), null);
+    assert.ok(target.querySelector('[data-breadcrumb-downtime-leaf]') === null);
 
     // DRILLED IN, it becomes a button — and pressing it reaches the companion's own handler.
     assert.equal(mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME), true);

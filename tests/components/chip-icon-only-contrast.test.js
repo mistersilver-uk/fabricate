@@ -9,13 +9,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { styleTextOf } from '../helpers/splitComponentStyles.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import { propertiesOf, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
 
 const CHIP = 'src/ui/svelte/components/Chip.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
-const rules = rulesIn(corpus[CHIP]);
+const rules = rulesIn(styleTextOf(corpus, CHIP));
 const GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']);
 /** The tones `Chip`'s published group names, and none. */
 const PUBLISHED_TONES = Object.freeze([
