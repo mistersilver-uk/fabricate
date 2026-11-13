@@ -110,6 +110,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/renderedManagerShell.js': 'fixture',
   'tests/helpers/renderedPageHead.js': 'fixture',
   'tests/helpers/scoped-component-css.js': 'fixture',
+  'tests/helpers/langKeyReferences.js': 'corpus',
   'tests/helpers/sourceScan.js': 'corpus',
   'tests/helpers/standaloneRootMeasurement.js': 'fixture',
   'tests/helpers/staticComponentPage.js': 'fixture',
