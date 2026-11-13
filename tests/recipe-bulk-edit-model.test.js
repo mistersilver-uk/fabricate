@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { resolveActiveCraftingCheckFormula } from '../src/systems/checkModifierResolver.js';
-import * as sharedSelection from '../src/utils/bulkSelectionModel.js';
 import { createRecipeBrowserState } from '../src/ui/model/recipeBrowserModel.js';
 import {
   RECIPE_CHECK_TIER_DEFAULT,
@@ -19,16 +18,12 @@ import {
   countRecipeBookMembership,
   createRecipeBulkDraft,
   describeRecipeCheckTierAxis,
-  describeRecipeSelection,
-  pruneRecipeSelection,
   setBulkRecipeBookOp,
   setBulkRecipeCategory,
   setBulkRecipeCheckTier,
   setBulkRecipeLock,
   setBulkRecipeStatus,
-  setRecipeSelection,
   toBulkRecipeEdit,
-  toggleRecipeSelection,
 } from '../src/ui/model/recipeBulkEditModel.js';
 
 /** The two book lists, the only part of a draft the membership cases care about. */
@@ -525,13 +520,6 @@ describe('recipe bulk edit model — countBlockedRecipeEnables', () => {
 });
 
 describe('recipe bulk edit model — the selection half', () => {
-  it('re-exports the SHARED selection helpers rather than owning a second copy', () => {
-    assert.equal(describeRecipeSelection, sharedSelection.describeBulkSelection);
-    assert.equal(toggleRecipeSelection, sharedSelection.toggleBulkSelection);
-    assert.equal(setRecipeSelection, sharedSelection.setBulkSelection);
-    assert.equal(pruneRecipeSelection, sharedSelection.pruneBulkSelection);
-  });
-
   it('seeds the lifted browser state with a FRESH, empty selection Set each call', () => {
     const first = createRecipeBrowserState();
     const second = createRecipeBrowserState();

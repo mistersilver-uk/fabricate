@@ -1868,11 +1868,9 @@ describe('CraftingSystemManager source contract', () => {
     renders: ['GatheringRuleLimitStepper', 'Select'],
   });
 
-  // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook
-  // (an unreachable arm, kept byte-faithful — deletion is a follow-up) and the empty-library setup
-  // card's title key are that file's own.
+  // The rail's own states moved with the branch chain (issue 1707 phase 3): the empty-library setup
+  // card's title key is that file's own. The unreachable placeholder arm was deleted (issue 1866).
   defineStructureContract('draws the gathering inspector rail', GATHERING_INSPECTOR_RAIL, {
-    writes: ['data-gathering-inspector-placeholder'],
     spellsExactly: [
       'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
       'https://mistersilver-uk.github.io/fabricate/gathering/environments',
