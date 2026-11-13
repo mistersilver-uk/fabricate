@@ -3948,7 +3948,6 @@
               "NoTrigger": "No trigger set — never fires"
             }
           },
-          "Salvage": "Salvage",
           "SalvageReorder": {
             "Title": "Allow player result re-ordering",
             "Sub": "Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.",
@@ -4007,17 +4006,6 @@
             "Edit": "Edit",
             "EditDcHint": "Difficulty and complications are set on this component in its editor"
           },
-          "SalvageQuantity": "{count} required",
-          "SalvageTools": "{count} tools",
-          "SalvageResults": "{count} result sets",
-          "SalvageOutcomes": "{count} outcomes",
-          "SalvageTime": "time",
-          "SalvageCost": "cost",
-          "UsageIngredient": "Ingredient usage",
-          "UsageResult": "Result usage",
-          "UsageTool": "Tool usage",
-          "UsageGathering": "Gathering usage",
-          "UsageSalvage": "Salvage usage",
           "Inspector": "Selected component inspector",
           "Selected": "Selected component",
           "CopySource": "Copy source UUID",
@@ -4079,10 +4067,8 @@
             "Title": "Tags",
             "AddTag": "Add tag",
             "AllSelected": "All tags selected",
-            "RemoveTag": "Remove {name}",
             "NoneSelected": "No tags applied",
             "NoTags": "No tags are defined for this system yet.",
-            "ApplyTag": "Apply {name}",
             "OwnGroup": "{system}’s tags",
             "SubtitleWorld": "The world record’s tags are listed here; {system}’s own are the ones in effect.",
             "SubtitleOwn": "{system}’s item tags. Another system’s tags are its own business."
@@ -5200,8 +5186,6 @@
           "Details": "Environment details",
           "DraftState": "Draft state",
           "ValidationCount": "{count} validation issues",
-          "SelectEnvironment": "Select an environment",
-          "InspectorHint": "The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.",
           "EmptySetup": {
             "Kicker": "Gathering setup",
             "Title": "Plan gathering content",
