@@ -1238,7 +1238,7 @@ test('no manifest row states a rule count outside the notation the properties ab
     unguarded,
     [],
     'a register row states a rule count nothing re-measures. Restate it in the notation a ' +
-      'property above reads (N `.family-*` rules in `styles/fabricate.css`, optionally under a root; ' +
+      'property above states it as (N `.family-*` rules in `styles/fabricate.css`, optionally under a root; ' +
       'N scoped rules), or leave the numeral out'
   );
 });
