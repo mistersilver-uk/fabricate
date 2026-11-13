@@ -860,6 +860,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+  // Issue 1481's essence quantity card: a tile, a name and a `Stepper`, which no specimen names.
+  'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
