@@ -593,6 +593,10 @@ The ones that bite in practice: `Math.random()` for an id or token (`S2245`, a M
 For GitHub Actions workflows the gate adds its own rules: no `${{ inputs.* }}` / `${{ github.* }}` interpolated into a `run:` block (`S7630` — pass them through `env:` and reference `$VAR`); declare `permissions:` at the **job** level on any new job (`S8264`); and SHA-pin third-party actions such as `aws-actions/*` (`S7637`; `actions/*` are allowlisted).
 A **composite action** (`.github/actions/release-setup/action.yml`) has **no `secrets`/`vars` context** — only `inputs`/`env`/`github`/`runner`/`steps`/`job` — so a `${{ vars.* }}` / `${{ secrets.* }}` moved into one resolves to an empty string silently; declare those as `inputs` the caller passes explicitly.
 
+When a mechanical check such as a grep is the acceptance for a change, prove it live before trusting a clean result.
+A pattern with a dead alternative, or a glob that matched no files, passes vacuously.
+Run `node scripts/assert-pattern-live.mjs 'foo|bar' $(git ls-files 'src/**/*.js')`, which fails naming each top-level `|` alternative that matches no line, and fails when given no files.
+
 ### Markdown linting (markdownlint)
 
 `npm run lint:md` runs [`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2) over every authored Markdown file, using the rules in `.markdownlint-cli2.jsonc`.
