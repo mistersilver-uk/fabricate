@@ -494,26 +494,25 @@ export function componentTags(file, ast) {
  * naming those props and the pinned tags by the child's path: it states one of them on the child's
  * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`published`
  * non-empty) may spread its rest local, which holds `data-*` keys alone (M13), and hand on one of
- * its own props the seam does not publish, which a closure can never set. A tag `drawn` answers no
- * published closure draws is not judged (issue 2454).
+ * its own props the seam does not publish, which a closure can never set, when that prop's default
+ * is absent or a literal naming one of the child's pinned tags. A tag `drawn` answers no published
+ * closure draws is not judged (issue 2454).
  */
 function passedFaults(file, ast, defaulted, published, drawn) {
   const rest = published.size > 0 ? restLocal(ast) : null;
-  const unpublished = new Set(
+  const unpublished = new Map(
     published.size > 0
       ? propLocals(ast)
-          .map(({ local }) => local)
-          .filter((local) => !published.has(local))
+          .filter(({ local }) => !published.has(local))
+          .map(({ local, fallback }) => [local, fallback])
       : []
   );
-  const handsOnUnpublished = ({ type, value }) => {
+  const handsOnUnpublished = ({ type, value }, tags) => {
     const [part, ...more] = [value].flat();
-    return (
-      type === 'Attribute' &&
-      more.length === 0 &&
-      part?.type === 'ExpressionTag' &&
-      unpublished.has(part.expression.name)
-    );
+    const local = part?.type === 'ExpressionTag' ? part.expression.name : undefined;
+    if (type !== 'Attribute' || more.length > 0 || !unpublished.has(local)) return false;
+    const fallback = unpublished.get(local);
+    return !fallback || (fallback.type === 'Literal' && tags.includes(fallback.value));
   };
   const tags = componentTags(file, ast).filter(([, node]) => drawn(file, node));
   return tags.flatMap(([child, node]) => {
@@ -525,7 +524,7 @@ function passedFaults(file, ast, defaulted, published, drawn) {
         ? !rest || attribute.expression?.name !== rest
         : keys.includes(attribute.name) &&
           !(attribute.type === 'Attribute' && literalTag(attribute.value)) &&
-          !handsOnUnpublished(attribute);
+          !handsOnUnpublished(attribute, tags);
     return node.attributes
       .filter((attribute) => passes(attribute))
       .map(
