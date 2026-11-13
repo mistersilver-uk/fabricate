@@ -92,6 +92,25 @@ const TOOL_STATE = (state) =>
 const STATION_CHIP = (text) =>
   `:has(.actor-bar-tool-chip .actor-bar-condition-label:text-is("${text}"))`;
 
+/** Issue 1526: Bend Horseshoe opened and queued on the shopping list, once or `times` over. */
+const QUEUE_CURRENCY_HORSESHOE = (times = 1) => [
+  { selector: '.crafting-browser-search input', fill: 'Bend Horseshoe' },
+  { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+  ...Array.from({ length: times }, () => ({
+    selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"] .crafting-recipe-row-add',
+  })),
+];
+/** The currency tile in the requirement rail, in the state a case is named for. */
+const CURRENCY_TILE = (state) =>
+  `[data-recipe-section="requirement-rail"] [data-requirement-slot="s1-currency"][data-slot-state="${state}"]`;
+/** What a currency cost's player-side surfaces are drawn from (issue 1526). `RequirementChooser` is a broad signal, which selects these frames already. */
+const CURRENCY_SOURCES = Object.freeze([
+  CRAFTING_SHARED,
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/util\/(?:requirementSlots|shoppingListAggregator)\.js$/,
+  /^src\/ui\/svelte\/stores\/craftingStore/,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
@@ -945,6 +964,71 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/(?:resultOutputRows|CraftingListingBuilder)\.js$/,
     ],
   }),
+  // Issue 1526: the player side of a currency requirement. Bend Horseshoe costs gold under a
+  // currency-enabled Smithing, and the four cases photograph the four states the rail and the
+  // shopping list draw for it.
+  playerCase({
+    id: 'player-crafting-currency-affordable',
+    label: 'Player app — Crafting currency cost the crafter can pay',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'currency-affordable' },
+    steps: QUEUE_CURRENCY_HORSESHOE(),
+    position: { width: 1280, height: 860 },
+    expectTab: 'crafting',
+    // A met tile with no have/need pip, and the queued recipe's shopping list drawing no currency chip.
+    expectSelector:
+      `.fabricate-app:has(${CURRENCY_TILE('met')}):not(:has([data-requirement-slot="s1-currency"] .fab-slot-pip))` +
+      ':has([data-shopping-entry="sm-r-horseshoe"]):not(:has([data-shopping-chip^="currency"]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: CURRENCY_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-currency-unaffordable',
+    label: 'Player app — Crafting currency cost the crafter cannot pay',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'currency-unaffordable' },
+    steps: QUEUE_CURRENCY_HORSESHOE(),
+    position: { width: 1280, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      `.fabricate-app:has(${CURRENCY_TILE('short')})` +
+      ':has([data-shopping-acquire-components] [data-shopping-chip="currency"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: CURRENCY_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-currency-unresolvable',
+    label: 'Player app — Crafting currency cost the world setup cannot resolve',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'currency-unresolvable' },
+    steps: QUEUE_CURRENCY_HORSESHOE(),
+    position: { width: 1280, height: 860 },
+    expectTab: 'crafting',
+    // The rail's reason line and the warning chip, and no affordability claim anywhere.
+    expectSelector:
+      '.fabricate-app:has([data-requirement-rail-issue])' +
+      ':has([data-shopping-acquire-components] [data-shopping-chip="currency-unavailable"])' +
+      ':not(:has([data-shopping-chip="currency"]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: CURRENCY_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-currency-repeated',
+    label: 'Player app — Crafting currency cost queued more than once',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'currency-affordable' },
+    steps: QUEUE_CURRENCY_HORSESHOE(2),
+    position: { width: 1280, height: 860 },
+    expectTab: 'crafting',
+    // Queued twice, only one craft's affordability was ever checked, so the chip withholds a verdict.
+    expectSelector: '[data-shopping-acquire-components] [data-shopping-chip="currency-unchecked"]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: CURRENCY_SOURCES,
+  }),
   // Issue 1773: a group the player chooses from previews who chooses and how many over its
   // alternatives, one Well beneath the plain result.
   playerCase({
@@ -1373,7 +1457,10 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-alternatives'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Forge Longsword' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' },
+    ],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
@@ -1662,6 +1749,7 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
+      { selector: '.crafting-browser-search input', fill: 'Forge a Pattern-Welded Blade' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
       // Scroll to the second step to show its own coal-only cost rather than step 1's Steel Ingot and Coal.
       { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },

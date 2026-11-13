@@ -65,9 +65,9 @@ import {
   switchesOntoEssence,
 } from '../util/requirementSlots.js';
 import { createListingLoad, createPageWindow, firstVisible } from './browseListing.svelte.js';
+import { CRAFTING_DEFAULT_PAGE_SIZE } from './craftingPaging.js';
 import { createPlayerResultOrder } from './playerResultOrder.svelte.js';
 
-const DEFAULT_PAGE_SIZE = 12;
 // Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (ui/presenters/CraftingListingBuilder.js). A
 // local copy keeps the store free of the builder import so its unit-test compiler
 // need not resolve that module graph.
@@ -230,7 +230,7 @@ export function createCraftingStore({ services } = {}) {
 
   const pageWindow = createPageWindow({
     items: () => visibleRecipes,
-    defaultPageSize: DEFAULT_PAGE_SIZE,
+    defaultPageSize: CRAFTING_DEFAULT_PAGE_SIZE,
   });
 
   const selectedSummary = $derived.by(() => {

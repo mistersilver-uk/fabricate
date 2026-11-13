@@ -21,6 +21,7 @@ import {
   FALLBACK_CASE_ID,
   LAB_SURFACE_CASES,
   LAB_SURFACE_CASE_IDS,
+  WORLD_SHAPING_LAB_FLAGS,
   VIEW_LAB_CASES,
   VIEW_LAB_CASE_FILES,
   caseIds,
@@ -67,6 +68,7 @@ import {
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 import { ACTION_TONES, managerHeaderActionClass } from '../src/ui/managerExtensions.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { CRAFTING_DEFAULT_PAGE_SIZE } from '../src/ui/svelte/stores/craftingPaging.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
@@ -4546,6 +4548,49 @@ test('system Travel Map no-regions evidence reaches its world through the lab fl
   assert.match(worldSource, /!noSceneRegions && worldHasInteractableSources/);
 });
 
+test('an unfiltered crafting row click targets a recipe provably on the first page', () => {
+  // The Crafting tab pages at `DEFAULT_PAGE_SIZE` rows sorted by name, so a recipe added to the lab
+  // world that sorts ahead of a target pushes it onto page 2 and the case fails in `capture`
+  // (issue 1911). A step that narrows the list first is immune. The rank is
+  // taken over EVERY enabled lab recipe, which can only overstate the position the actor's own
+  // visible list gives it, so the check never passes a row that could sink.
+  const rankById = new Map(
+    content.recipes
+      .filter((recipe) => recipe.enabled !== false)
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((recipe, index) => [recipe.id, index + 1])
+  );
+
+  const sunk = [];
+  let checked = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (viewCase.baseCaseId) continue;
+    let narrowed = false;
+    for (const step of viewCase.steps ?? []) {
+      if (typeof step !== 'object') continue;
+      if (step.selector?.includes('.crafting-browser-search input') && step.fill !== undefined) {
+        narrowed = true;
+      }
+      const recipeId = /\.crafting-recipe-row\[data-recipe-id="([^"]+)"\]/.exec(
+        step.selector ?? ''
+      )?.[1];
+      if (!recipeId || narrowed) continue;
+      checked += 1;
+      const rank = rankById.get(recipeId);
+      if (!(rank <= CRAFTING_DEFAULT_PAGE_SIZE))
+        sunk.push(`${viewCase.id}: ${recipeId} ranks ${rank ?? 'nowhere'}`);
+      break;
+    }
+  }
+  assert.ok(checked > 50, 'the sweep must reach the unfiltered crafting rows, not pass on none');
+  assert.deepEqual(
+    sunk,
+    [],
+    `these cases click a crafting row that can fall past page one (${CRAFTING_DEFAULT_PAGE_SIZE} rows) — fill ` +
+      'the crafting search with the recipe name first, as the filtered cases do'
+  );
+});
+
 test('every crafting case claims exactly the resolution-mode body it renders', () => {
   // The crafting cases carry a per-MODE `sourceMatches` pattern so that editing
   // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That
@@ -4607,8 +4652,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    139,
-    `expected the 139 crafting-path cases to be examined, saw ${examined.length}`
+    143,
+    `expected the 143 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -5537,10 +5582,8 @@ test('every lab input the registry cannot attribute selects surface coverage', (
   // The genuinely global inputs, plus a file nobody has ever heard of: the fail-safe is the
   // DEFAULT, so an input added under `tests/view-lab/` tomorrow is covered before anyone maps it.
   for (const file of [
-    'tests/view-lab/world/labContent.js',
     'tests/view-lab/world/labFlags.js',
     'tests/view-lab/world/labActors.js',
-    'tests/view-lab/world/labWorld.js',
     'tests/view-lab/foundry/installFoundryShim.js',
     'tests/view-lab/mount.js',
     'tests/view-lab/index.html',
@@ -5568,7 +5611,7 @@ test('every lab input the registry cannot attribute selects surface coverage', (
   }
 
   // The regression the whole rule exists to prevent, asserted as itself.
-  assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labContent.js']), []);
+  assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labFlags.js']), []);
   // …and the other direction, which is the point of coverage: it is a real narrowing, not the
   // corpus wearing a new name.
   assert.ok(coverage < publishableCases().length / 3, 'coverage must be a fraction of the corpus');
@@ -5772,8 +5815,8 @@ test('widening unions with what was already attributed, at every level it can ha
 
   // Two lab inputs in one change: one attributable, one not. (`selectAllLabInputCases`.)
   for (const order of [
-    [file.path, 'tests/view-lab/world/labContent.js'],
-    ['tests/view-lab/world/labContent.js', file.path],
+    [file.path, 'tests/view-lab/world/labFlags.js'],
+    ['tests/view-lab/world/labFlags.js', file.path],
   ]) {
     assert.deepEqual(
       selectedIds(order, file.patches([inside])),
@@ -5949,13 +5992,40 @@ test('no carrier quotes a registry count', () => {
 test('a lab-input-only change selects frames while leaving the evidence gate unarmed', () => {
   // The two answers are deliberately different, and the asymmetry looks like a bug in isolation —
   // which is why it is pinned.
-  const fixtureOnly = ['tests/view-lab/world/labContent.js'];
+  const fixtureOnly = ['tests/view-lab/world/labFlags.js'];
 
   assert.equal(hasUiChanges(fixtureOnly), false, 'a fixture-only change must not arm the gate');
   assert.deepEqual(
     selectedIds(fixtureOnly),
     coverageIds(),
     'and it must still select the frames the capture job verifies'
+  );
+});
+
+test('a fixture content edit selects coverage and every case built on a world-shaping flag', () => {
+  // Issue 1543: a flag builds a world that LACKS something the default fixture holds, so an edit
+  // that fills the gap breaks a case no surface frame would catch.
+  const flagged = publishableCases()
+    .filter((viewCase) => WORLD_SHAPING_LAB_FLAGS.some((flag) => viewCase.query?.[flag]))
+    .map((viewCase) => viewCase.id);
+  for (const flag of WORLD_SHAPING_LAB_FLAGS) {
+    assert.ok(
+      publishableCases().some((viewCase) => viewCase.query?.[flag]),
+      `no publishable case sets ${flag}, so it is a flag nothing photographs`
+    );
+  }
+  const expected = caseIds.filter((id) => [...LAB_SURFACE_CASE_IDS, ...flagged].includes(id));
+  for (const file of ['tests/view-lab/world/labContent.js', 'tests/view-lab/world/labWorld.js']) {
+    assert.deepEqual(
+      mapChangedFilesToCases([file]).map((viewCase) => viewCase.id),
+      expected,
+      file
+    );
+    assert.equal(hasUiChanges([file]), false, `${file} must not arm the gate`);
+  }
+  assert.ok(
+    flagged.some((id) => !LAB_SURFACE_CASE_IDS.includes(id)),
+    'at least one flagged case sits outside coverage, or this widening adds nothing'
   );
 });
 
@@ -6077,7 +6147,8 @@ test("a patch inside any case file attributes to that file's own case, and nothi
     for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
       assert.deepEqual(
         selectedIds([path], file.patches([caseIdLine(id)])),
-        [id],
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id)).map((entry) => entry.id),
         `a one-line patch at "${id}" in ${path} must select that case alone`
       );
       attributed.add(id);
