@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(comment-share): deleting the low-comment ComponentEditorRoot (issue 1779) lifted this directory over the cap without adding a comment line; issue 2184 condenses the directory and removes this marker -->
 <!--
   ActorSelectTopBar is the shared, content-width actor-selection bar above all
   unified-window tabs. Its left side is a portrait + caret trigger that opens a
@@ -7,30 +6,14 @@
   carries gathering-only context (current weather + time-of-day) and is empty on
   other tabs.
 
-  The picker is `SearchablePopover` (issue 1475), and this is that primitive's
-  FIRST player-window caller. It hand-rolled the same widget for its whole life —
-  `aria-haspopup="dialog"`, a search field over a `role="listbox"` of
-  `role="option"` rows, single selection, close-on-choose, dismiss-on-outside-click
-  — and could not adopt the shared one until three things landed: issue 1464
-  re-rooted the primitive's class family at `fabricate-picker` /
-  `fabricate-picker-popover` (it used to hang off `.fabricate-manager`, so the panel
-  drew entirely unstyled out here), issue 1466 replaced its hard-coded
-  `closest('.fabricate-manager')` portal host with `resolveOverlayHost`, whose root
-  set includes `fabricate-app`, and issue 1473 corrected the register that still
-  asserted both were blocking.
+  The picker is `SearchablePopover` (issue 1475), whose panel is PORTALED into the player window's
+  ApplicationV2 frame (`.fabricate-app`) and placed against its trigger by the primitive's own
+  layout pass, so no popover rules live in this file. `tests/components/overlay-portal-host-position.test.js`
+  measures that landing in a real browser, because the markup is identical whether the portal lands or not.
 
-  THE PANEL IS PORTALED NOW, not absolutely positioned inside this bar. It is
-  appended to the player window's ApplicationV2 frame (`.fabricate-app`) and placed
-  against its trigger by the primitive's own layout pass, so the popover rules that
-  used to live in this file's scoped block are gone rather than rewritten — the
-  primitive paints them. `tests/components/overlay-portal-host-position.test.js`
-  measures that landing in a real browser, because the markup is identical whether
-  the portal lands or not.
-
-  What stays here is the TRIGGER's chrome, which is this bar's own: a 40px portrait
-  in a 64px bar, not the primitive's 32px manager-row portrait. Those rules are
-  `:global()` because the button is `SearchablePopover`'s element now — see the
-  style block, which states each repair's specificity.
+  What stays here is the TRIGGER's chrome: a 40px portrait in a 64px bar, not the primitive's 32px
+  manager-row portrait. Those rules are `:global()` because the button is `SearchablePopover`'s
+  element now; the style block states each repair's specificity.
 
   All selection state lives in the shared `store` (services.actorBar); this
   component only renders it and calls back into it.

@@ -30,6 +30,18 @@ function resolveLocalModule(repoRoot, importerPath, specifier) {
   return match ? toRepoPath(repoRoot, match) : null;
 }
 
+// The one shared focus-tooltip lifecycle (issue 2868): every tree rendering one of its three users
+// needs it, so the harness adds it rather than each suite's module list repeating it.
+const FOCUS_TOOLTIP_MODULE = 'src/ui/svelte/util/focusTooltip.svelte.js';
+const FOCUS_TOOLTIP_USERS = new Set(
+  ['Button', 'IconButton', 'Stepper'].map((name) => `src/ui/svelte/components/${name}.svelte`)
+);
+
+function withFocusTooltip(runeModules, compiledModules, componentPath) {
+  const needed = [...compiledModules, componentPath].some((path) => FOCUS_TOOLTIP_USERS.has(path));
+  return needed && !runeModules.includes(FOCUS_TOOLTIP_MODULE) ? [...runeModules, FOCUS_TOOLTIP_MODULE] : runeModules;
+}
+
 function declarationListFor(modulePath) {
   if (modulePath.endsWith('.svelte.js')) return 'runeModules';
   if (modulePath.endsWith('.svelte')) return 'compiledModules';
@@ -148,6 +160,9 @@ export function installComponentTestGlobals() {
  */
 export function createSvelteCompiler(repoRoot, getTempRoot) {
   function writeCompiledSvelte(sourcePath) {
+    // A suite compiling one of the focus tooltip's users gets its lifecycle beside it (issue 2868).
+    // ratchet-exempt(source-pin): compiles a module into the temp tree to run it, not to assert its text
+    if (FOCUS_TOOLTIP_USERS.has(sourcePath)) writeCompiledModule(FOCUS_TOOLTIP_MODULE);
     const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
     const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
     const destination = join(getTempRoot(), `${sourcePath}.js`);
@@ -687,7 +702,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string} [args.rootClass] application root class the mount target carries, for a component
  * whose production host is not the manager (see `mount()` below)
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath, rootClass = 'fabricate-manager' }) {
+export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules: declaredRuneModules = [], componentPath, rootClass = 'fabricate-manager' }) {
+  const runeModules = withFocusTooltip(declaredRuneModules, compiledModules, componentPath);
   let tempRoot = null;
   let mounted = null;
   let target = null;
