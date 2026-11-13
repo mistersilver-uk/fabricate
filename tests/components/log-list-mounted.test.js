@@ -252,7 +252,7 @@ describe('LogList', () => {
     const root = await harness.mount({ entries: ENTRIES, ariaLabel: 'History' });
     const [first, second] = listIn(root).children;
     assert.equal(first.querySelector('.fab-log-list-when').textContent, 'Today');
-    assert.equal(second.querySelector('.fab-log-list-when'), null, 'an empty time draws no span');
+    assert.ok(second.querySelector('.fab-log-list-when') === null, 'an empty time draws no span');
   });
 
   it('titles each time with its whole text, so an ellipsized time can still be read', async () => {

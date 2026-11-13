@@ -1127,7 +1127,7 @@ export function registerRailCases() {
     const toggle = target.querySelector('#manager-nav-crafting + .manager-nav-toggle');
     assert.equal(toggle.getAttribute('aria-controls'), 'manager-crafting-submenu');
     assert.equal(toggle.getAttribute('aria-label'), 'Expand crafting menu');
-    assert.equal(target.querySelector('#manager-crafting-submenu'), null);
+    assert.ok(target.querySelector('#manager-crafting-submenu') === null);
 
     // Clicking the parent routes to Recipes and expands the submenu.
     parent.click();
@@ -1185,7 +1185,7 @@ export function registerRailCases() {
       'the recipe resolution-mode card renders on Crafting Settings'
     );
     // The inspector aside is suppressed on the crafting-settings route.
-    assert.equal(target.querySelector('.manager-inspector'), null);
+    assert.ok(target.querySelector('.manager-inspector') === null);
 
     // Recipes sub-item routes back to the recipes browser.
     craftingSubitem('Recipes').click();

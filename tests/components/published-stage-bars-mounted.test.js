@@ -281,9 +281,8 @@ describe('the stage bars View Lab specimen case against the DOM the fixture draw
   it('matches nothing once a section the selector names is not the one drawn', () => {
     for (const renamed of ['forge', 'brew', 'copy']) {
       const { mounted } = drawFixture((key) => (key === renamed ? `${key}-renamed` : key));
-      assert.equal(
-        document.querySelector(expectSelector),
-        null,
+      assert.ok(
+        document.querySelector(expectSelector) === null,
         `a section no longer keyed ${renamed} is not found`
       );
       for (const handle of mounted) handle.destroy();

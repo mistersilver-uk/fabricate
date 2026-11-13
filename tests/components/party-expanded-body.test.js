@@ -128,7 +128,7 @@ describe('PartyExpandedBody (mounted)', () => {
     // gate go together: no `aria-disabled`, and no hint standing in for the meta.
     assert.ok(!pill.hasAttribute('aria-disabled'), 'the pill is not gated');
     assert.equal(pill.getAttribute('aria-describedby'), null);
-    assert.equal(root.querySelector('#party-enable-gate-p1'), null, 'no gate hint element');
+    assert.ok(root.querySelector('#party-enable-gate-p1') === null, 'no gate hint element');
 
     // The consequence stays VISIBLE even though the configuration is allowed.
     const meta = root.querySelector('.manager-party-meta').textContent;
@@ -552,7 +552,7 @@ describe('PartyExpandedBody (mounted)', () => {
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
-    assert.equal(root.querySelector('[data-manager-party-actor-unlink-footer]'), null);
+    assert.ok(root.querySelector('[data-manager-party-actor-unlink-footer]') === null);
     assert.ok(root.querySelector('[data-manager-party-actor-unlink="p1"]'));
     // `.manager-travel-actor-popover` carries NO styling any more.
     assert.ok(
@@ -828,7 +828,7 @@ describe('PartyExpandedBody (mounted)', () => {
       Boolean(root.querySelector('.manager-travel-parties-override-trigger')),
       'the value-bearing trigger survives opening'
     );
-    assert.equal(root.querySelector('.manager-travel-picker-inline'), null, 'and is not inlined');
+    assert.ok(root.querySelector('.manager-travel-picker-inline') === null, 'and is not inlined');
   });
 
   it('renders the realm-override control in the card RIGHT COLUMN, not the inspector', async () => {

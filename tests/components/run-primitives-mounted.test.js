@@ -1113,7 +1113,10 @@ describe('run primitives mounted behavior', () => {
     );
     stageNavHarness.remount();
     const single = await stageNavHarness.mount({ stages: stages.slice(0, 1), current: 0, view: 0 });
-    assert.equal(single.querySelector('[data-stage-nav]'), null, 'one stage needs no navigation control');
+    assert.ok(
+      single.querySelector('[data-stage-nav]') === null,
+      'one stage needs no navigation control'
+    );
   });
 
   it('keeps inactive stage cards inert and uses worked-stage geometry only for current', async () => {

@@ -96,9 +96,8 @@ export function registerComponentsCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
     // The view renders NO page header of its own (issue 676).
-    assert.equal(
-      target.querySelector('.manager-main .manager-section-header'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-main .manager-section-header') === null,
       'the browser renders no second page header'
     );
     assert.ok(target.textContent.includes('Drop items to add components'));
@@ -134,26 +133,22 @@ export function registerComponentsCases() {
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
     // Issue 676: components group and filter by CATEGORY.
-    assert.equal(
-      target.querySelector('[aria-label="Filter components by tag"]'),
-      null,
+    assert.ok(
+      target.querySelector('[aria-label="Filter components by tag"]') === null,
       'the legacy tag dropdown is gone'
     );
-    assert.equal(
-      target.querySelector('[aria-label="Search component tags"]'),
-      null,
+    assert.ok(
+      target.querySelector('[aria-label="Search component tags"]') === null,
       'the tag search facet is gone — category is the grouping axis now'
     );
-    assert.equal(
-      target.querySelector('[data-component-tag-search]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-tag-search]') === null,
       'no tag search control'
     );
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '.manager-component-row .manager-chip-row .manager-chip:not(.manager-essence-compact-chip)'
-      ),
-      null,
+      ) === null,
       'rows render no tag chips'
     );
 
@@ -233,9 +228,8 @@ export function registerComponentsCases() {
     ]);
     [...target.querySelectorAll('[role="menuitem"]')][0].click();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-component-source-missing]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-source-missing]') === null,
       'resolved source should not show a missing-source warning'
     );
     const componentInspector = target.querySelector('[data-component-inspector]');
@@ -280,9 +274,8 @@ export function registerComponentsCases() {
       'the breadcrumb button should return to the components browser'
     );
     // Delete now fires from the INSPECTOR, not the row: the row carries one action.
-    assert.equal(
-      target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]') === null,
       'the row no longer carries a delete icon'
     );
     assert.equal(
@@ -457,9 +450,8 @@ export function registerComponentsCases() {
       target.querySelector('[data-component-edit-section="source"]'),
       'the source block renders inside the identity strip, not a rail inspector'
     );
-    assert.equal(
-      target.querySelector('.manager-inspector .fabricate-card'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-inspector .fabricate-card') === null,
       'the component editor renders no right-rail inspector card'
     );
     // This proves only that the selector can match. The real pair is the liveness test in
@@ -671,9 +663,8 @@ export function registerComponentsCases() {
       alchemyResolutionMode: 'routedByCheck',
       salvageResolutionMode: 'simple',
     });
-    assert.equal(
-      target.querySelector('[data-component-edit-section="difficulty"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-edit-section="difficulty"]') === null,
       'a difficulty control nothing reads is clutter and must stay hidden'
     );
   });
@@ -769,9 +760,8 @@ export function registerComponentsCases() {
       target.querySelector('[data-component-edit-section="source"]'),
       'source inspector should still render'
     );
-    assert.equal(
-      target.querySelector('[data-component-edit-section="difficulty"]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-component-edit-section="difficulty"]') === null,
       'difficulty inspector should be absent when crafting resolution mode is not progressive'
     );
   });
@@ -834,9 +824,8 @@ export function registerComponentsCases() {
     assert.ok(section, 'salvage authoring section should render when showSalvage is true');
 
     // Adding a result group reveals the group name input and an add-result button.
-    assert.equal(
-      section.querySelector('[data-salvage-group-name]'),
-      null,
+    assert.ok(
+      section.querySelector('[data-salvage-group-name]') === null,
       'no result group should exist before adding one'
     );
     section.querySelector('[data-add-salvage-group]').click();
@@ -935,9 +924,8 @@ export function registerComponentsCases() {
     await tick();
     flushSync();
 
-    assert.equal(
-      target.querySelector('[data-salvage-section]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-salvage-section]') === null,
       'salvage section should not render when showSalvage is false'
     );
   });
@@ -953,14 +941,12 @@ export function registerComponentsCases() {
       target.querySelector('[data-salvage-section] [data-add-salvage-group]'),
       'progressive mode should still allow authoring result groups'
     );
-    assert.equal(
-      target.querySelector('[data-salvage-routing]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-salvage-routing]') === null,
       'progressive mode has no routing'
     );
-    assert.equal(
-      target.querySelector('[data-salvage-dc-override]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-salvage-dc-override]') === null,
       'progressive mode has no DC override'
     );
   });

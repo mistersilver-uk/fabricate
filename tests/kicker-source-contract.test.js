@@ -83,7 +83,7 @@ test('the kicker renders one of three measured, non-interactive hosts, and nothi
       'rather than a feature'
   );
 });
-/** THE INK, WHICH IS THE SECOND CORRECTION TO `library.html:120` AND THE ONE A PALETTE HID. */
+/** THE INK, WHICH IS THE SECOND CORRECTION TO `library.html`'s `.k-kicker` rule AND THE ONE A PALETTE HID. */
 test('the kicker inks at the muted tone, which is the contrast correction the specimen carries too', () => {
   const source = readFileSync(resolve(import.meta.dirname, '..', PRIMITIVE), 'utf8');
   const base = source.slice(source.indexOf('.fab-kicker {'));

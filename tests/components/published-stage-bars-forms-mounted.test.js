@@ -278,7 +278,7 @@ describe('the published StageBars, a stage’s title (issue 2857)', () => {
         'Forge: <b>not</b> begun',
         null,
       ]);
-      assert.equal(bars.group().querySelector('b'), null, 'a title is never read as markup');
+      assert.ok(bars.group().querySelector('b') === null, 'a title is never read as markup');
       for (const tip of bars.group().querySelectorAll('[data-tooltip-text]')) {
         assert.equal(tip.getAttribute('role'), 'progressbar', 'only a bar carries it');
         assert.equal(tip.hasAttribute('tabindex'), false, 'and the bar takes no focus');

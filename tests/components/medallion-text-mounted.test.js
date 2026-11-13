@@ -128,14 +128,14 @@ describe('Medallion (mounted) — text', () => {
     const withArt = await tileOf({ art: 'icons/x.webp', alt: '', text: '1234' });
     assert.equal(withArt.getAttribute('data-medallion'), 'image');
     assert.ok(withArt.querySelector('img.fab-medallion-img'));
-    assert.equal(withArt.querySelector('.fab-medallion-text'), null);
+    assert.ok(withArt.querySelector('.fab-medallion-text') === null);
   });
 
   it('outranks both the art and the glyph, and draws no image or icon beside the text', async () => {
     const tile = await tileOf({ art: 'icons/x.webp', alt: 'Sword', icon: 'fas fa-gem', text: '3' });
     assert.equal(tile.getAttribute('data-medallion'), 'text');
-    assert.equal(tile.querySelector('img'), null);
-    assert.equal(tile.querySelector('i'), null);
+    assert.ok(tile.querySelector('img') === null);
+    assert.ok(tile.querySelector('i') === null);
     assert.equal(tile.textContent, '3');
   });
 

@@ -243,9 +243,8 @@ describe('SubjectModifierPicker (mounted)', () => {
       (node) => node.textContent.includes('Pick check modifiers')
     );
     assert.ok(Boolean(visible), 'the sentence still renders for sighted users');
-    assert.notEqual(
-      visible.closest('[aria-hidden="true"]'),
-      null,
+    assert.ok(
+      visible.closest('[aria-hidden="true"]') !== null,
       'and is out of the accessibility tree, so the control is announced once'
     );
   });

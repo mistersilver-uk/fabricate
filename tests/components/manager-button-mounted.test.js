@@ -152,10 +152,10 @@ describe('Button emits the element and classes its call sites are styled against
 
   it('draws no <i> for an empty icon, and none by default', async () => {
     await harness.mount({ icon: '' });
-    assert.equal(button().querySelector('i'), null);
+    assert.ok(button().querySelector('i') === null);
     harness.remount();
     await harness.mount({});
-    assert.equal(button().querySelector('i'), null);
+    assert.ok(button().querySelector('i') === null);
   });
 
   it('leaves the root class unchanged by an icon', async () => {

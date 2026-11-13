@@ -123,7 +123,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     });
     assert.ok(root.querySelector('[data-recipe-item-link]'), 'expected the filled link chip');
     // The raw UUID text is no longer shown — the Copy button carries it.
-    assert.equal(root.querySelector('[data-recipe-item-uuid]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-uuid]') === null);
     assert.ok(!root.querySelector('[data-item-drop-zone-uuid]'), 'nor does the zone draw it');
     assert.equal(
       root.querySelector('[data-recipe-item-name]').textContent.trim(),
@@ -135,7 +135,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     );
     assert.ok(root.querySelector('[data-recipe-item-copy-uuid]'));
     assert.ok(root.querySelector('[data-recipe-item-unlink]'));
-    assert.equal(root.querySelector('[data-recipe-item-dropzone]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-dropzone]') === null);
   });
 
   it('shows a drag-only drop zone and placeholder name when unlinked', async () => {
@@ -145,7 +145,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     });
     const dropzone = root.querySelector('[data-recipe-item-dropzone]');
     assert.ok(dropzone, 'expected the empty drop zone');
-    assert.equal(root.querySelector('[data-recipe-item-link]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-link]') === null);
     assert.equal(
       root.querySelector('[data-recipe-item-name]').textContent.trim(),
       'Untitled recipe item'
@@ -161,7 +161,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     });
     const dropzone = root.querySelector('[data-recipe-item-dropzone]');
     dropzone.click();
-    assert.equal(document.querySelector('.manager-item-picker-dialog'), null);
+    assert.ok(document.querySelector('.manager-item-picker-dialog') === null);
     assert.deepEqual(calls, []);
 
     const drop = new Event('drop', { bubbles: true, cancelable: true });

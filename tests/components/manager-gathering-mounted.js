@@ -1437,7 +1437,7 @@ export function registerGatheringCases() {
     assert.equal(addedDropRow.textContent.includes('Drop component'), false);
     assert.equal(addedDropRow.textContent.includes('Drop chance'), false);
     assert.equal(addedDropRow.textContent.includes('Quantity'), false);
-    assert.equal(addedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    assert.ok(addedDropRow.querySelector('[aria-label="Select drop rule"]') === null);
     target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
     await tick();
     flushSync();
@@ -1467,15 +1467,15 @@ export function registerGatheringCases() {
       ).value,
       '1'
     );
-    assert.equal(
+    assert.ok(
       target.querySelector(
         '[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate"]'
-      ),
-      null
+      ) === null
     );
-    assert.equal(
-      target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete"]'),
-      null
+    assert.ok(
+      target.querySelector(
+        '[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete"]'
+      ) === null
     );
 
     const inspectorSlider = target.querySelector(
@@ -1502,9 +1502,8 @@ export function registerGatheringCases() {
     target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete"]').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`),
-      null,
+    assert.ok(
+      target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`) === null,
       'delete should stage removal of the row'
     );
   });
@@ -1799,9 +1798,8 @@ export function registerGatheringCases() {
       '9',
       'per-page selector should reflect the chosen page size'
     );
-    assert.equal(
-      footer.querySelector('[data-pagination-next]'),
-      null,
+    assert.ok(
+      footer.querySelector('[data-pagination-next]') === null,
       'prev/next nav should hide when there is only one page'
     );
 
@@ -2046,7 +2044,7 @@ export function registerGatheringCases() {
       dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(),
       'Page 2 of 3'
     );
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]') === null);
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-6"]'));
   });
 
@@ -2410,9 +2408,8 @@ export function registerGatheringCases() {
       section.querySelector('[data-gathering-task-required-tools-library-empty]'),
       'library-empty placeholder should render when no tools exist'
     );
-    assert.equal(
-      section.querySelector('[data-gathering-task-required-tools-search]'),
-      null,
+    assert.ok(
+      section.querySelector('[data-gathering-task-required-tools-search]') === null,
       'search input should hide when library is empty'
     );
 
@@ -2572,7 +2569,7 @@ export function registerGatheringCases() {
   }
 
   function assertSaveErrorAbsent(selector, why) {
-    assert.equal(target.querySelector(selector), null, why);
+    assert.ok(target.querySelector(selector) === null, why);
     assert.equal(
       target.textContent.includes(alertMessage(selector)),
       false,

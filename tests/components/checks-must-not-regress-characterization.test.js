@@ -212,9 +212,8 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       target.querySelector('[data-checks-panel="crafting"] [data-check-dc]'),
       'routedByIngredients keeps the OPTIONAL pass/fail check on the shared simple slot'
     );
-    assert.equal(
-      target.querySelector('[data-check-outcomes]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-check-outcomes]') === null,
       'and it renders no outcome-tier editor: it routes on the ingredient set, not the check'
     );
     harness.remount();
@@ -231,9 +230,8 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       target.querySelector('[data-gathering-d100-readonly]'),
       'd100 explains itself rather than rendering an editor for a roll nobody authors'
     );
-    assert.equal(
-      target.querySelector('[data-gathering-d100-readonly] [data-check-roll-formula]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-gathering-d100-readonly] [data-check-roll-formula]') === null,
       'and it offers no formula field, because there is no formula'
     );
     harness.remount();
@@ -316,9 +314,8 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       },
       'outcomes'
     );
-    assert.equal(
-      withoutGate.querySelector('[data-outcome-row="tier-ruined"] [data-outcome-break]'),
-      null,
+    assert.ok(
+      withoutGate.querySelector('[data-outcome-row="tier-ruined"] [data-outcome-break]') === null,
       'and toolSpecific hides it'
     );
     harness.remount();

@@ -190,7 +190,7 @@ describe('Medallion (mounted)', () => {
 
     assert.equal(medallion.dataset.medallion, 'image');
     assert.equal(medallion.querySelector('img').getAttribute('src'), 'icons/svg/book.svg');
-    assert.equal(medallion.querySelector('i'), null);
+    assert.ok(medallion.querySelector('i') === null);
   });
 
   it('falls back to the glyph when art is falsy', async () => {
@@ -198,7 +198,7 @@ describe('Medallion (mounted)', () => {
     const medallion = root.querySelector('[data-medallion]');
 
     assert.equal(medallion.dataset.medallion, 'glyph');
-    assert.equal(medallion.querySelector('img'), null);
+    assert.ok(medallion.querySelector('img') === null);
     assert.ok(medallion.querySelector('i.fas.fa-flask'));
   });
 

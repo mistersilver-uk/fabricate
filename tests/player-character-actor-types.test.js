@@ -380,7 +380,7 @@ describe('buildActorTypeDialogContent', () => {
     // the id and label === id.
     const cleaned = cleanLikeClient(content());
     const row = cleaned.querySelector('input[value="quest-pages.quest"]').closest('label');
-    assert.equal(row.querySelector('.fabricate-actor-type-label'), null);
+    assert.ok(row.querySelector('.fabricate-actor-type-label') === null);
     const rawId = row.querySelector('.fabricate-actor-type-id');
     assert.equal(rawId.textContent, 'quest-pages.quest');
     assert.match(rawId.getAttribute('style'), /font-family:[^;]*monospace/);
@@ -419,8 +419,8 @@ describe('buildActorTypeDialogContent', () => {
         },
       ],
     });
-    assert.equal(container.querySelector('img'), null, 'no element was injected');
-    assert.equal(container.querySelector('script'), null);
+    assert.ok(container.querySelector('img') === null, 'no element was injected');
+    assert.ok(container.querySelector('script') === null);
     assert.equal(
       container.querySelector('input').getAttribute('value'),
       hostileId,

@@ -129,9 +129,8 @@ export function registerToolsCases() {
       !target.querySelector('[data-item-drop-zone="tool-create"]'),
       'the system Tool Rules list offers no creation surface at all'
     );
-    assert.equal(
-      target.querySelector('[data-manager-tools-search] .manager-chip'),
-      null,
+    assert.ok(
+      target.querySelector('[data-manager-tools-search] .manager-chip') === null,
       'the bare search control does not disguise the result count as a chip'
     );
     assert.match(
@@ -531,7 +530,7 @@ export function registerToolsCases() {
     // AN INLINE EDITOR is what this route must not restore.
     // inspector's own route into the tool-edit ROUTE is a different thing and is asserted in
     // its own test below; `[data-manager-tool-editor]` is the inline one.
-    assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
+    assert.ok(target.querySelector('[data-manager-tool-editor]') === null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
 
@@ -1297,9 +1296,8 @@ export function registerToolsCases() {
       'the composed tool-edit route has one identity/action header'
     );
     const editorHeader = target.querySelector('[data-tool-editor-header]');
-    assert.equal(
-      target.querySelector('.fabricate-manager > .manager-header'),
-      null,
+    assert.ok(
+      target.querySelector('.fabricate-manager > .manager-header') === null,
       'the editor does not pay for a separate root breadcrumb header'
     );
     // THE TITLE BAND RENDERS HERE TOO (issue 1373). Suppressing it left the Tool editor showing
@@ -1333,14 +1331,12 @@ export function registerToolsCases() {
     assert.ok(editorHeader.querySelector('[data-tool-editor-open-systems]'));
     assert.ok(editorHeader.querySelector('[data-tool-editor-open-system]'));
     assert.ok(editorHeader.querySelector('[data-tool-editor-open-tools]'));
-    assert.equal(
-      target.querySelector('.manager-heading > .manager-title'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-heading > .manager-title') === null,
       'the manager shell must not restore its generic Edit Tool heading above the editor'
     );
-    assert.equal(
-      target.querySelector('.manager-heading > .manager-subtitle'),
-      null,
+    assert.ok(
+      target.querySelector('.manager-heading > .manager-subtitle') === null,
       'the manager shell must not restore its generic Tool subtitle above the editor'
     );
     // THREE TABS AND NO `Delete` (issue 1373). Identity is world scope's.
@@ -1349,7 +1345,7 @@ export function registerToolsCases() {
     assert.ok(!editor.querySelector('[data-tool-editor-delete]'));
     assert.ok(editor.querySelector('[data-tool-editor-save]'));
     assert.ok(editor.querySelector('[data-tool-behavior-preview]'));
-    assert.equal(editor.querySelector('footer'), null);
+    assert.ok(editor.querySelector('footer') === null);
   });
 
   it('keeps replacement authoring Component-only, with no creation surface on this route', async () => {
@@ -1372,8 +1368,8 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('input[name="tool-replacement-type"]'), null);
-    assert.equal(target.querySelector('[data-item-drop-zone="tool-replacement"]'), null);
+    assert.ok(target.querySelector('input[name="tool-replacement-type"]') === null);
+    assert.ok(target.querySelector('[data-item-drop-zone="tool-replacement"]') === null);
     // Which picker, rather than "not a native select" (issue 1510). The replacement target is a
     // `SearchablePopover` because each row draws a Component's art; the shared one-of-N `Select`
     // draws a label and no image, so the two are told apart by the trigger the card renders.

@@ -164,7 +164,7 @@ describe('RecipeItemEditor (mounted)', () => {
   it('shows an empty state when no recipe item is supplied', async () => {
     const root = await harness.mount({ recipeItem: null });
     assert.ok(root.querySelector('.manager-empty'));
-    assert.equal(root.querySelector('[data-recipe-item-editor]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-editor]') === null);
   });
 
   it('renders the active tab panel and the right rail (with the embedded player preview)', async () => {
@@ -222,14 +222,12 @@ describe('RecipeItemEditor (mounted)', () => {
       preview.querySelector('[data-inventory-recipe-item]'),
       'still the real player book detail, not a re-implementation'
     );
-    assert.equal(
-      preview.querySelector('[data-inventory-detail-tab="salvage"]'),
-      null,
+    assert.ok(
+      preview.querySelector('[data-inventory-detail-tab="salvage"]') === null,
       'no Info | Salvage strip'
     );
-    assert.equal(
-      preview.querySelector('[data-inventory-salvage-panel]'),
-      null,
+    assert.ok(
+      preview.querySelector('[data-inventory-salvage-panel]') === null,
       'and no salvage panel'
     );
   });
@@ -243,7 +241,7 @@ describe('RecipeItemEditor (mounted)', () => {
       visibilityMode: 'item',
     });
     assert.ok(root.querySelector('[data-recipe-item-tab="limits"]'));
-    assert.equal(root.querySelector('[data-recipe-item-tab="overview"]'), null);
+    assert.ok(root.querySelector('[data-recipe-item-tab="overview"]') === null);
   });
 
   it('routes the tab strip selection through onSelectTab', async () => {
@@ -320,9 +318,8 @@ describe('RecipeItemEditor (mounted)', () => {
       preview.querySelector('[data-inventory-craft="r1"]'),
       'item-mode books show Craft (not Learn)'
     );
-    assert.equal(
-      preview.querySelector('[data-inventory-learn="r1"]'),
-      null,
+    assert.ok(
+      preview.querySelector('[data-inventory-learn="r1"]') === null,
       'no Learn affordance in item mode'
     );
     const rules = root.querySelector('[data-recipe-item-rules]').textContent;
@@ -413,8 +410,8 @@ describe('RecipeItemEditor (mounted)', () => {
       'the embedded detail still renders'
     );
     // No recipes ⇒ no Learn/Craft affordances (the embedded detail shows its empty note).
-    assert.equal(preview.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn affordance');
-    assert.equal(preview.querySelector('[data-inventory-craft="r1"]'), null, 'no Craft affordance');
+    assert.ok(preview.querySelector('[data-inventory-learn="r1"]') === null, 'no Learn affordance');
+    assert.ok(preview.querySelector('[data-inventory-craft="r1"]') === null, 'no Craft affordance');
   });
 
   it('surfaces requirements as "Needs:" effective-rules rows (each with a Satisfied? toggle) driving the embedded preview (issue 544)', async () => {
@@ -562,9 +559,8 @@ describe('RecipeItemEditor (mounted)', () => {
       activeTab: 'overview',
       visibilityMode: 'knowledge',
     });
-    assert.equal(
-      root.querySelector('[data-recipe-item-satisfied-toggle="r1"]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-satisfied-toggle="r1"]') === null,
       'no Satisfied? toggle when off'
     );
     assert.equal(
@@ -572,9 +568,8 @@ describe('RecipeItemEditor (mounted)', () => {
       false,
       'no Needs rules when off'
     );
-    assert.equal(
-      root.querySelector('[data-recipe-item-preview] [data-inventory-requirement]'),
-      null,
+    assert.ok(
+      root.querySelector('[data-recipe-item-preview] [data-inventory-requirement]') === null,
       'no preview requirement chips when off'
     );
   });

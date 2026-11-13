@@ -132,9 +132,8 @@ describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () =
       showTiers: true,
       section: '',
     });
-    assert.equal(
-      target.querySelector('[data-preview-against]'),
-      null,
+    assert.ok(
+      target.querySelector('[data-preview-against]') === null,
       'a selector with one option is not a choice'
     );
     assert.ok(
