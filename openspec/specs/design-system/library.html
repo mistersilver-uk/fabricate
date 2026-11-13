@@ -3491,7 +3491,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="delta warn"><b>Why the focus model is mandatory, not a preference.</b>
       Foundry treats an element as focused only if it is a form control, contentEditable, or a button with a form.
       Roving focus onto an option button re-arms the canvas bindings, so &uarr;&darr; would pan the map.
-      Keeping focus in the input is the only model that works — which is what the shipped popover already does, by design.<span class="cite"><b>components/SearchablePopover.svelte</b> <code>aria-activedescendant</code> (24 importing files) · <b>listboxNavigation.js</b> · <b>anchoredPopover.js</b> · <b>overlayBounds.js</b> · <b>iconPickerPopover.js</b> · <b>portal.js</b></span></div>
+      Keeping focus in the input is the only model that works — which is what the shipped popover already does, by design.<span class="cite"><b>components/SearchablePopover.svelte</b> <code>aria-activedescendant</code> (23 importing files) · <b>listboxNavigation.js</b> · <b>anchoredPopover.js</b> · <b>overlayBounds.js</b> · <b>iconPickerPopover.js</b> · <b>portal.js</b></span></div>
     <div class="delta"><b>Shipped, and what is still target.</b>
       The activedescendant model and the key map SHIPPED: the holder — the search field, or the trigger where there is none, at six call sites — carries <code>role="combobox"</code>, <code>aria-controls</code> and <code>aria-activedescendant</code>, and drops both while the empty branch renders in the list's place.
       The cursor is an inset accent outline, the same two declarations the grid form's own active tile draws above, because a listbox that also marks a current value has spent all three fill rungs.
@@ -3502,7 +3502,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       The player app’s component-sources picker uses it and commits on choose.
       The Journal’s run-type filter is a FILTER on the mode: search suppressed, so it announces a <code>listbox</code>; each row drawn through the <code>option</code> snippet as a decorative <code>&lt;Checkbox&gt;</code>, the kind’s glyph, its name and a bare mono count; and a <code>footer</code> clear action, “Show all run types”.
       It needed no new prop here, because the snippets already carry a row’s content and a footer action.
-      <b>source</b> (async), <b>loading</b> and <b>error</b> stay <span class="st st-target">target</span> on a measurement rather than a preference: zero of the 24 importers passes a promise.
+      <b>source</b> (async), <b>loading</b> and <b>error</b> stay <span class="st st-target">target</span> on a measurement rather than a preference: zero of the 23 importers passes a promise.
       <b>squareTiles</b>, <b>columns</b> from two to six, <b>keyHints</b> with its <b>footerAction</b>, and <b>anchor</b> ship, each default-off; a count with no title sits at the header&rsquo;s end, where every drawing here puts it.
       <b>squareTiles</b> draws the grid unit&rsquo;s tiles: square and text-free, each named by its label as both its <code>title</code> and its <code>aria-label</code>, the selected tile on <code>--fab-surface-active</code>, the cursor the inset outline and pointer hover an outset outline that never fills.
       A <b>columns</b> outside two to six draws and maps one column.
