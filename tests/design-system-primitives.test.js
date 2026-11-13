@@ -1517,7 +1517,7 @@ test('(d) every shipped primitive still clears the membership bar', () => {
     assert.ok(
       !('callers' in row),
       `${row.path} is a member and carries a \`callers\` field. Members are held to the BAR, not ` +
-        'to an enumeration — `Chip` has 59 importers and an exact list there would be a manifest ' +
+        'to an enumeration — `Chip` has over a hundred importers and an exact list there would be a manifest ' +
         'edit on every unrelated PR that adds one usage. A half-filled field on some members and ' +
         'not others is the ambiguity this asymmetry is deliberate to avoid.'
     );
