@@ -392,6 +392,21 @@ describe('the manager shell services bag', () => {
     expectGolden('manager.download.absent', absentJournal);
   });
 
+  // Issue 1904: `globalThis.FilePicker` and `saveDataToFile` are V13 aliases that warn on every read
+  // until V15 removes them, and the canonical spellings exist on V13 and V14 alike.
+  it('reads neither V13 back-compat alias, even at the end of the picker ladder', async () => {
+    for (const options of [{}, { filePicker: false }, { saveDataToFile: false }]) {
+      const world = buildManagerWorld(options);
+      const journal = await withManager(constructShell, world, async ({ services }) => {
+        await services.pickImagePath('worlds/current.webp');
+        await services.downloadFile('{"a":1}', 'system.json');
+        return [...world.journal];
+      });
+      const compat = journal.filter(([channel]) => channel.startsWith('compat.'));
+      assert.deepStrictEqual(compat, [], `alias read under ${JSON.stringify(options)}`);
+    }
+  });
+
   it('reports an import failure as a toast and a system import failure as a throw', async () => {
     const brokenStore = { refresh: async () => { throw new Error('refresh blew up'); } };
     const world = buildManagerWorld();

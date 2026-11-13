@@ -9,6 +9,16 @@ Job: `lint-commits` in `.github/workflows/ci.yml`
 Runs on every pull request.
 Validates all commits in the PR using `commitlint` and checks that the PR title itself also follows the Conventional Commits format.
 
+## Docs workflow
+
+File: `.github/workflows/deploy-docs.yml`
+
+Triggers: push to `main` touching `docs/**`, and a pull request touching `docs/**` or the workflow itself (issue #1734).
+
+Both triggers build the Jekyll site with `--strict_front_matter`, because without it a page whose front matter fails to parse builds green and silently drops out of the navigation.
+Only a push to `main` publishes: the Pages-artifact upload step and the `deploy` job are both gated to it, and the `build` job holds `contents: read` alone, so a pull request can build the site but never deploy it.
+A broken Kramdown callout such as `{: .warning }` still builds; the build does not catch it.
+
 ## Foundry integration workflow
 
 File: `.github/workflows/foundry-integration.yml`
