@@ -77,7 +77,8 @@ test('no SHARED_PRIMITIVES entry is removed without a recorded reason', (t) => {
       'Keep the entry, or add it to JUSTIFIED_REMOVALS in this file with the reason it may go.',
     { markers: false }
   );
-  if (result.compared) t.diagnostic(`compared with base ${result.base.slice(0, 12)}`);
+  assert.deepEqual(result.failures ?? [], [], 'no membership regression against base');
+  if (!result.skipped) t.diagnostic(`compared with base ${result.base.slice(0, 12)}`);
 });
 
 test('the list reads as a populated array, so the ratchet is not vacuous', () => {
