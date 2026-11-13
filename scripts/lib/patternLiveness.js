@@ -13,21 +13,24 @@ export function splitTopLevelAlternatives(pattern) {
   const alternatives = [];
   const state = { depth: 0, inClass: false };
   let start = 0;
-  for (let i = 0; i < pattern.length; i += 1) {
+  let i = 0;
+  while (i < pattern.length) {
     const ch = pattern[i];
+    let next = i + 1;
     if (ch === '\\') {
-      i += 1;
+      next = i + 2;
     } else if (state.inClass) {
       state.inClass = ch !== ']';
     } else if (ch === '[') {
       state.inClass = true;
-      i = skipLeadingClassMembers(pattern, i);
+      next = skipLeadingClassMembers(pattern, i) + 1;
     } else if (ch === '|' && state.depth === 0) {
       alternatives.push(pattern.slice(start, i));
-      start = i + 1;
+      start = next;
     } else {
       state.depth = nextDepth(state.depth, ch);
     }
+    i = next;
   }
   alternatives.push(pattern.slice(start));
   return alternatives;
