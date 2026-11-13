@@ -33,12 +33,12 @@ function resolveLocalModule(repoRoot, importerPath, specifier) {
 // The one shared focus-tooltip lifecycle (issue 2868): every tree rendering one of its three users
 // needs it, so the harness adds it rather than each suite's module list repeating it.
 const FOCUS_TOOLTIP_MODULE = 'src/ui/svelte/util/focusTooltip.svelte.js';
-const FOCUS_TOOLTIP_USERS = Object.freeze(
+const FOCUS_TOOLTIP_USERS = new Set(
   ['Button', 'IconButton', 'Stepper'].map((name) => `src/ui/svelte/components/${name}.svelte`)
 );
 
 function withFocusTooltip(runeModules, compiledModules, componentPath) {
-  const needed = [...compiledModules, componentPath].some((path) => FOCUS_TOOLTIP_USERS.includes(path));
+  const needed = [...compiledModules, componentPath].some((path) => FOCUS_TOOLTIP_USERS.has(path));
   return needed && !runeModules.includes(FOCUS_TOOLTIP_MODULE) ? [...runeModules, FOCUS_TOOLTIP_MODULE] : runeModules;
 }
 
@@ -161,7 +161,8 @@ export function installComponentTestGlobals() {
 export function createSvelteCompiler(repoRoot, getTempRoot) {
   function writeCompiledSvelte(sourcePath) {
     // A suite compiling one of the focus tooltip's users gets its lifecycle beside it (issue 2868).
-    if (FOCUS_TOOLTIP_USERS.includes(sourcePath)) writeCompiledModule(FOCUS_TOOLTIP_MODULE);
+    // ratchet-exempt(source-pin): compiles a module into the temp tree to run it, not to assert its text
+    if (FOCUS_TOOLTIP_USERS.has(sourcePath)) writeCompiledModule(FOCUS_TOOLTIP_MODULE);
     const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
     const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
     const destination = join(getTempRoot(), `${sourcePath}.js`);
