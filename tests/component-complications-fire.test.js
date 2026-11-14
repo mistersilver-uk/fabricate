@@ -8,13 +8,13 @@ import test from 'node:test';
 
 import { evaluateSideRoll } from '../src/systems/checkRoll.js';
 import {
-  buildGmComplicationCardContent,
   complicationReasons,
   fireComplications,
   gmComplicationCardEntries,
   gmComplications,
   rollGmComplicationEffect,
 } from '../src/systems/complicationRuntime.js';
+import { buildGmComplicationCardContent } from '../src/ui/presenters/ComplicationChatCard.js';
 import { planComplications } from '../src/utils/complicationPlan.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
