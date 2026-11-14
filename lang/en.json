@@ -4695,6 +4695,7 @@
           "Biome": "Biome",
           "BiomeFilterLabel": "Filter environments by biome",
           "BiomeAll": "All biomes",
+          "ActiveEnvironments": "Active environments",
           "GatheringTabs": {
             "Label": "Gathering sections",
             "Environments": "Environments",
@@ -4742,7 +4743,6 @@
             "OneDrop": "1 drop",
             "DropCount": "{count} drops",
             "Environments": "Environments",
-            "ActiveEnvironments": "Active environments",
             "EmptyTitle": "No gathering tasks yet",
             "EmptyHint": "Create gathering tasks before attaching them to environments.",
             "EmptySearchTitle": "No gathering tasks match these filters",
@@ -4995,7 +4995,6 @@
             "InspectorHint": "The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.",
             "Selected": "Selected gathering event",
             "Details": "Event details",
-            "ActiveEnvironments": "Active environments",
             "UsedInEnvironmentsCard": "Used in environments",
             "NotUsedInEnvironments": "Not used in any environments yet.",
             "EditTitle": "Edit gathering event",

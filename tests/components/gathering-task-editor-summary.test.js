@@ -108,6 +108,8 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(
       taskInspectorSource.includes('FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments')
     );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.ActiveEnvironments, 'Active environments');
+    assert.equal(keys.ActiveEnvironments, undefined, 'the Tasks copy of the shared key is folded away');
   });
 
   it('does not pass environments/selectedSystemId to the task editor mount', () => {

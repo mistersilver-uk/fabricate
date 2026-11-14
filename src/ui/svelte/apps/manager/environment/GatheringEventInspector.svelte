@@ -176,7 +176,7 @@
           ><strong>{activeGatheringEventEnvironmentCount(selectedEvent)}</strong>
           <span class="manager-fact-label"
             >{text(
-              'FABRICATE.Admin.Manager.Environment.Events.ActiveEnvironments',
+              'FABRICATE.Admin.Manager.Environment.ActiveEnvironments',
               'Active environments'
             )}</span
           ></span

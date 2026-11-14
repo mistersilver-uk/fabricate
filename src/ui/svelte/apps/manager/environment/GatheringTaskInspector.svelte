@@ -144,7 +144,7 @@
             ><strong>{activeGatheringTaskEnvironmentCount(task)}</strong>
             <span class="manager-fact-label"
               >{text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments',
+                'FABRICATE.Admin.Manager.Environment.ActiveEnvironments',
                 'Active environments'
               )}</span
             ></span
