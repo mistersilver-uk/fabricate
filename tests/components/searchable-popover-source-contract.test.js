@@ -224,9 +224,10 @@ function propsBlock() {
 /** The destructure's digest (issues 1719, 1507). */
 // Re-derived at issue 1782, which added `source`, `loading` and `error` after `options`, and at
 // issue 2459, which added `squareTiles` after `columns`, `keyHints` and `footerAction` after
-// `footer`, and `anchor` (default `undefined`, so its presence is the mode) after `bounds`.
-const PROPS_BLOCK_DIGEST = '7452c440d73141452e983d1231bc4b63fc64d39b25941d68f0ae76dc9170d824';
-const PROPS_BLOCK_NAMES = 66;
+// `footer`, and `anchor` (default `undefined`, so its presence is the mode) after `bounds`, and at
+// issue 1967, which added `measureContentWidth` (default `undefined`) after `measureListMetrics`.
+const PROPS_BLOCK_DIGEST = 'ee5420500620fb735fe71a88c2bcd99bd3124f3a0d8ad8915f5cc9a5dd396ea5';
+const PROPS_BLOCK_NAMES = 67;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
   // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this

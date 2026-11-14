@@ -1679,7 +1679,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-select-fill-specimen',
     label:
-      "Specimen, mounted through the published seam — four selects in 240px columns on the window's --fab-bg-1 ground, each beneath the text that names it, after one step: a press on the last. Reading top to bottom: an inline select with fill, 30px tall and as wide as its column, its long choice Oak heartwood from the northern grove, seasoned three winters, ending in an ellipsis before the chevron at the trailing edge; a toolbar select with fill, 34px tall and as wide as its column, reading Yew; a form select without fill reading Ash, hugging its label well short of its column; and a form select with fill reading Ash, as wide as its column, whose list is open beneath it in the ground, as wide as the trigger, reading Ash ticked and filled as the chosen row, then the long label and Yew",
+      "Specimen, mounted through the published seam — four selects in 240px columns on the window's --fab-bg-1 ground, each beneath the text that names it, after one step: a press on the last. Reading top to bottom: an inline select with fill, 30px tall and as wide as its column, its long choice Oak heartwood from the northern grove, seasoned three winters, ending in an ellipsis before the chevron at the trailing edge; a toolbar select with fill, 34px tall and as wide as its column, reading Yew; a form select without fill reading Ash, hugging its label well short of its column; and a form select with fill reading Ash, as wide as its column, whose list is open beneath it in the ground, wider than the trigger so the long label reads whole, reading Ash ticked and filled as the chosen row, then the long label and Yew",
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
@@ -1699,7 +1699,8 @@ export const CASES = Object.freeze([
     expectLayout: {
       controls: [
         // Each filled trigger as wide as its 240px column at its rung's height, the long value's
-        // ellipsis, and the list as wide as the filled form trigger, the form rung's floor.
+        // ellipsis, and the list grown past the filled form trigger's 240px floor to the long
+        // label's own width, inside the form rung's 340px ceiling (issue 1967).
         {
           selector: SELECT_FILL_PART('inline-long', SELECT_TRIGGER),
           styles: 'width: 240px; height: 30px',
@@ -1716,7 +1717,7 @@ export const CASES = Object.freeze([
           selector: SELECT_FILL_PART('form', SELECT_TRIGGER),
           styles: 'width: 240px; height: 38px',
         },
-        { selector: SELECT_FILL_LIST, styles: 'width: 240px; border-radius: 11px' },
+        { selector: SELECT_FILL_LIST, styles: 'width: 288px; border-radius: 11px' },
       ],
     },
     position: SELECT_FILL_WINDOW,

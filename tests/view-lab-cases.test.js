@@ -1803,7 +1803,8 @@ const BASE_NON_VERB_CONTROLS = Object.freeze({
     { selector: labSelectFill('form', SELECT_TRIGGER), styles: 'width: 240px; height: 38px' },
     {
       selector: '[data-lab-select-fill] > div > .fabricate-select-popover',
-      styles: 'width: 240px; border-radius: 11px',
+      // Grown past the 240px trigger to draw the long label whole (issue 1967).
+      styles: 'width: 288px; border-radius: 11px',
     },
   ],
   // The published field (issue 2601): the caption span's flex box and its kicker type, the
