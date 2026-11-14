@@ -355,6 +355,32 @@ test('a vanished entry nets an appeared one with the same file and value, and on
   assert.deepEqual(result.shrank, ['corpus/b.js: gamma y is gone (was 1)']);
 });
 
+test('a listed value also nets across files, so a split count is not new, and only that', () => {
+  const repo = repoWith({
+    'corpus/a.js': lines('alpha x 5', 'beta y'),
+    'corpus/b.js': lines('k z'),
+  });
+  repo.write({
+    'corpus/a.js': lines('alpha x 2', 'beta y'),
+    'corpus/b.js': lines('alpha x 3'),
+    'corpus/c.js': lines('fresh y'),
+  });
+  assert.deepEqual(compareToy(repo).failures, [
+    'corpus/b.js: alpha x is new (3)',
+    'corpus/c.js: fresh y is new (1)',
+  ]);
+  const result = compareToy(repo, { moveAcrossFiles: ['x'] });
+  assert.deepEqual(result.failures, ['corpus/c.js: fresh y is new (1)']);
+  assert.deepEqual(result.netted, [
+    'corpus/b.js: alpha x is new (3), offset by a fall of x in another file',
+  ]);
+  repo.write({ 'corpus/b.js': lines('alpha x 4') });
+  assert.deepEqual(compareToy(repo, { moveAcrossFiles: ['x'] }).failures, [
+    'corpus/b.js: alpha x is new (4)',
+    'corpus/c.js: fresh y is new (1)',
+  ]);
+});
+
 test('an entry in a renamed file is compared with its base path, not reported as new', () => {
   const repo = repoWith({ 'corpus/a.js': lines(...TEN, 'alpha x 5') });
   repo.git('mv', 'corpus/a.js', 'corpus/moved.js');

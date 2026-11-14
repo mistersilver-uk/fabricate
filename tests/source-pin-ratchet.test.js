@@ -198,7 +198,7 @@ function measureSourcePins(readFile, listFiles) {
   const { siteLines, texts } = analyseCorpus(listFiles(), readFile);
   const entries = [];
   for (const [file, lines] of siteLines) {
-    for (const line of lines) entries.push({ file, id: PIN_ID, lines: [line] });
+    for (const line of lines) entries.push({ file, id: PIN_ID, value: PIN_ID, lines: [line] });
   }
   const self = texts.get(SELF);
   for (const row of self === undefined ? [] : scanHelperRows(self)) {
@@ -218,6 +218,7 @@ const compareSourcePins = (options = {}) =>
     scope: 'corpus',
     headMarkers: false,
     siteMarkers: true,
+    moveAcrossFiles: [PIN_ID],
     ...options,
   });
 
@@ -757,6 +758,18 @@ test('a new pinning file and a file pinning more both fail against base', () => 
     `tests/c.test.js: ${PIN_ID} is new (2)`,
   ]);
   assert.throws(() => reportComparison(null, result, GUIDANCE), /source-pin: 2 regression/);
+});
+
+test('pins split from one test file into another are not new, and a split that adds one fails', () => {
+  const repo = repoWith(BASE_CORPUS);
+  repo.write({ 'tests/a.test.js': ['export const ok = 1;'], 'tests/c.test.js': PINNING });
+  const result = repo.compare();
+  assert.deepEqual(result.failures, []);
+  assert.deepEqual(result.netted, [
+    `tests/c.test.js: ${PIN_ID} is new (2), offset by a fall of ${PIN_ID} in another file`,
+  ]);
+  repo.write({ 'tests/c.test.js': [...PINNING, "export const also = source.includes('y');"] });
+  assert.deepEqual(repo.compare().failures, [`tests/c.test.js: ${PIN_ID} is new (3)`]);
 });
 
 test('a helper that starts handing out source raises the unchanged test that pins it', () => {
