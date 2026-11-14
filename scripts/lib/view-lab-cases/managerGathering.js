@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   BROWSER_LIST_STATE_MATCH,
+  ENVIRONMENT_BROWSE_FILES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
   ENVIRONMENT_EDITOR_STATE_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
@@ -93,7 +94,7 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
-      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      ENVIRONMENT_BROWSE_FILES,
       BROWSER_LIST_STATE_MATCH,
     ],
   }),

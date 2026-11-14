@@ -9813,6 +9813,11 @@ const ENVIRONMENT_DIRECTORY_CLAIMANTS = Object.freeze([
   'manager-environment-edit-automatic-force-add',
 ]);
 
+/** The directory's editor frames: the browse frame names only the files it renders (issue 1481). */
+const ENVIRONMENT_EDITOR_CLAIMANTS = ENVIRONMENT_DIRECTORY_CLAIMANTS.filter(
+  (id) => id !== 'manager-environments-browse-normal'
+);
+
 test('the environment validation tab selects the frame that opens it, and only that frame', () => {
   const selected = mapChangedFilesToCases([
     `${ENVIRONMENT_DIR}EnvironmentValidationTab.svelte`,
@@ -9840,7 +9845,7 @@ test('narrowing the environment claim leaves every sibling in that directory cla
     const selected = mapChangedFilesToCases([`${ENVIRONMENT_DIR}${sibling}`]).map(
       (viewCase) => viewCase.id
     );
-    for (const claimant of ENVIRONMENT_DIRECTORY_CLAIMANTS) {
+    for (const claimant of ENVIRONMENT_EDITOR_CLAIMANTS) {
       assert.ok(
         selected.includes(claimant),
         `${sibling} lost its claim on ${claimant}; the exclusion is too wide and now takes ` +
@@ -9855,6 +9860,29 @@ test('narrowing the environment claim leaves every sibling in that directory cla
   }
 });
 
+test('the browse frame claims the environment files it renders, not the editor-only CompositionList', () => {
+  const selectedFor = (file) =>
+    mapChangedFilesToCases([`${ENVIRONMENT_DIR}${file}`]).map((viewCase) => viewCase.id);
+  // The browse view's `environment/` imports are the condition panel, the empty actions and the
+  // time-of-day bar. CompositionList is mounted only by the editor's events and tasks tabs
+  // (issue 1481).
+  assert.ok(
+    !selectedFor('CompositionList.svelte').includes('manager-environments-browse-normal'),
+    'CompositionList is never rendered by the Environments browse view, so a change to it must ' +
+      'not select the browse frame'
+  );
+  for (const rendered of [
+    'GatheringConditionPanel.svelte',
+    'EnvironmentsEmptyActions.svelte',
+    'TimeOfDayBar.svelte',
+  ]) {
+    assert.ok(
+      selectedFor(rendered).includes('manager-environments-browse-normal'),
+      `${rendered} is rendered by the browse view, so a change to it must select the browse frame`
+    );
+  }
+});
+
 test('the environment readiness module selects the validation frame AND the badge frames', () => {
   // It is the producer of both: the tab strip's badge counts and the validation tab's own rows and
   // verdict read the same evaluator.
@@ -9865,7 +9893,7 @@ test('the environment readiness module selects the validation frame AND the badg
     selected.includes('manager-environment-validation'),
     `a readiness change must select the frame that draws its verdict; it selected ${JSON.stringify(selected)}`
   );
-  for (const claimant of ENVIRONMENT_DIRECTORY_CLAIMANTS) {
+  for (const claimant of ENVIRONMENT_EDITOR_CLAIMANTS) {
     assert.ok(
       selected.includes(claimant),
       `a readiness change must keep selecting ${claimant}, which draws its badge counts`
