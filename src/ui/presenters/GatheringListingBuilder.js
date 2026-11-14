@@ -4,9 +4,9 @@ import {
   cloneJson,
   idOf,
   normalizeActorList,
-  normalizeList,
+  iterableToArray,
   normalizeStringList,
-  numberOrNull,
+  laxNumberOrNull,
   plainObjectOrNull,
   redactRichEvidence,
   stringOrEmpty,
@@ -313,14 +313,14 @@ export class GatheringListingBuilder {
     const model = await this._buildEnvironmentListing({ environment, system, viewer, actor });
     if (model.visible !== true) return empty;
     const visibleIds = new Set(
-      [...normalizeList(model.tasks), ...normalizeList(model.discoveredTasks)]
+      [...iterableToArray(model.tasks), ...iterableToArray(model.discoveredTasks)]
         .map((taskModel) => stringOrNull(taskModel?.id))
         .filter(Boolean)
     );
     if (!visibleIds.has(String(taskId))) return empty;
 
     const task =
-      normalizeList(environment.tasks).find(
+      iterableToArray(environment.tasks).find(
         (entry) => stringOrNull(entry?.id) === String(taskId)
       ) ?? null;
     if (!task || task.resolutionMode !== 'd100')
@@ -334,7 +334,7 @@ export class GatheringListingBuilder {
       system,
     });
     const componentsById = this._componentsById(system);
-    const drops = normalizeList(preview?.drops).map((drop) => {
+    const drops = iterableToArray(preview?.drops).map((drop) => {
       const component = componentsById.get(stringOrNull(drop?.componentId));
       const name = stringOrNull(drop?.name) || stringOrNull(component?.name) || '';
       return { ...drop, name, img: stringOrNull(component?.img) || DEFAULT_DROP_IMG };
@@ -384,7 +384,7 @@ export class GatheringListingBuilder {
     if (!secret) return {};
     const environment = this._findEnvironment(model?.environmentId);
     const task =
-      normalizeList(environment?.tasks).find((entry) => entry?.id === secret.taskId) ??
+      iterableToArray(environment?.tasks).find((entry) => entry?.id === secret.taskId) ??
       plainObjectOrNull(secret.snapshot?.task);
     return {
       blindSecretPreview: true,
@@ -395,7 +395,7 @@ export class GatheringListingBuilder {
 
   _activeRunModels({ actor, viewer }) {
     return (
-      normalizeList(this.runManager?.getActiveRuns?.(actor))
+      iterableToArray(this.runManager?.getActiveRuns?.(actor))
         .filter((run) => run?.status === 'waitingTime')
         .map((run) => this._runModel({ run, viewer, terminal: false }))
         .filter(Boolean)
@@ -408,7 +408,7 @@ export class GatheringListingBuilder {
   }
 
   _historyModels({ actor, viewer }) {
-    return normalizeList(this.runManager?.getRunHistory?.(actor, 10))
+    return iterableToArray(this.runManager?.getRunHistory?.(actor, 10))
       .map((run) => this._runModel({ run, viewer, terminal: true }))
       .filter(Boolean);
   }
@@ -418,7 +418,7 @@ export class GatheringListingBuilder {
     const environment = this._findEnvironment(run.environmentId);
     const system = this._allSystems().get(String(run.craftingSystemId));
     const task = environment
-      ? (normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null)
+      ? (iterableToArray(environment.tasks).find((task) => task?.id === run.taskId) ?? null)
       : null;
     const opaqueBlind = this._isOpaqueBlindRun({ environment, run, viewer });
     const status = stringOrNull(run.status);
@@ -435,8 +435,8 @@ export class GatheringListingBuilder {
         ? this.localize(BLIND_TASK_LABEL_KEY)
         : stringOrEmpty(task?.name) || stringOrEmpty(environment?.name) || status,
       taskId: opaqueBlind ? null : stringOrNull(run.taskId),
-      startedAtWorldTime: numberOrNull(run.startedAtWorldTime),
-      updatedAtWorldTime: numberOrNull(run.updatedAtWorldTime),
+      startedAtWorldTime: laxNumberOrNull(run.startedAtWorldTime),
+      updatedAtWorldTime: laxNumberOrNull(run.updatedAtWorldTime),
     };
 
     const timeGate = plainObjectOrNull(run.timeGate);
@@ -457,10 +457,10 @@ export class GatheringListingBuilder {
     }
 
     if (terminal) {
-      model.completedAtWorldTime = numberOrNull(run.completedAtWorldTime);
+      model.completedAtWorldTime = laxNumberOrNull(run.completedAtWorldTime);
       if (!opaqueBlind) {
-        const createdResults = normalizeList(run.createdResults);
-        const usedTools = normalizeList(run.usedTools);
+        const createdResults = iterableToArray(run.createdResults);
+        const usedTools = iterableToArray(run.usedTools);
         model.createdResultCount = createdResults.length;
         model.usedToolCount = usedTools.length;
         model.createdResults = cloneJson(createdResults);
@@ -663,7 +663,7 @@ export class GatheringListingBuilder {
     const listedEvents =
       blindForViewer || eventVisibility !== 'full'
         ? []
-        : normalizeList(environment.events)
+        : iterableToArray(environment.events)
             .filter((event) => event?.enabled !== false)
             .map((event) => this._eventModel(event, environment));
 
@@ -887,7 +887,7 @@ export class GatheringListingBuilder {
    */
   _playerListingFields({ environment, actor, locked }) {
     const { policy: revealPolicy, scope } = this._resolveRevealPolicy(environment);
-    const composedTaskCount = locked ? 0 : normalizeList(environment.tasks).length;
+    const composedTaskCount = locked ? 0 : iterableToArray(environment.tasks).length;
     const discoveredTaskCount =
       locked || revealPolicy === 'never'
         ? 0
@@ -919,7 +919,7 @@ export class GatheringListingBuilder {
   _listRevealedTaskIds({ actor, environmentId, scope }) {
     if (typeof this.richState?.listRevealedTaskIds !== 'function') return [];
     try {
-      return normalizeList(this.richState.listRevealedTaskIds({ actor, environmentId, scope }));
+      return iterableToArray(this.richState.listRevealedTaskIds({ actor, environmentId, scope }));
     } catch {
       return [];
     }
@@ -939,7 +939,7 @@ export class GatheringListingBuilder {
    * @returns {number} A 0–1 fraction (0 when there are no events).
    */
   _environmentEventChance(environment) {
-    const events = normalizeList(environment?.events).filter((event) => event?.enabled !== false);
+    const events = iterableToArray(environment?.events).filter((event) => event?.enabled !== false);
     if (events.length === 0) return 0;
     const missAll = events.reduce((product, event) => {
       const rate = Math.min(100, Math.max(0, Number(event?.dropRate) || 0));
@@ -1052,7 +1052,7 @@ export class GatheringListingBuilder {
     const systems = this._allSystems();
     const ids = [
       ...new Set(
-        normalizeList(models)
+        iterableToArray(models)
           .map((model) => stringOrNull(model?.craftingSystemId))
           .filter(Boolean)
       ),

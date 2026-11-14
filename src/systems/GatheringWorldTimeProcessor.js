@@ -4,7 +4,7 @@ import {
 } from '../canvas/regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
 
-import { idOf, iterateCollection, normalizeList } from './gatheringEngineInternals.js';
+import { idOf, iterateCollection, iterableToArray } from './gatheringEngineInternals.js';
 
 /**
  * GM-gated, world-time-driven maintenance passes extracted from GatheringEngine
@@ -75,7 +75,7 @@ export class GatheringWorldTimeProcessor {
       (system) => this.richState.staminaEnabled?.(system.id) === true
     );
     if (staminaSystems.length === 0) return [];
-    const actors = normalizeList(this.getActors?.());
+    const actors = iterableToArray(this.getActors?.());
     const changed = [];
     for (const system of staminaSystems) {
       for (const actor of actors) {
@@ -109,7 +109,7 @@ export class GatheringWorldTimeProcessor {
     if (typeof this.richState?.respawnNodes !== 'function') return [];
     const systems = this.enabledGatheringSystems();
     const changed = [];
-    for (const environment of normalizeList(this.environmentStore?.list?.())) {
+    for (const environment of iterableToArray(this.environmentStore?.list?.())) {
       if (!systems.has(environment?.craftingSystemId)) continue;
       if (!this.richState.nodesEnabled?.(environment.craftingSystemId)) continue;
       try {
