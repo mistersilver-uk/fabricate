@@ -2,7 +2,10 @@
 // docs builds the Jekyll site, strictly, and can never deploy it.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
@@ -71,4 +74,44 @@ test('a pull request never uploads or deploys the site', () => {
 test('the build job holds only read scope; write scope stays on the deploy job', () => {
   assert.deepEqual(jobs.build.permissions, { contents: 'read' });
   assert.equal(jobs.deploy.permissions.pages, 'write');
+});
+
+/** The step that fails the build when a Kramdown attribute rendered as literal text (issue 1734). */
+function kramdownStep() {
+  const index = jobs.build.steps.findIndex((step) => /docs\/_site/.test(step.run));
+  assert.notEqual(index, -1, 'the build job checks the built site for rendered attributes');
+  return { index, step: jobs.build.steps[index] };
+}
+
+/** Run a step's shell body from a scratch repository holding `docs/_site/<page>` fixtures. */
+function runStepAgainst(body, pages) {
+  const root = mkdtempSync(path.join(tmpdir(), 'deploy-docs-step-'));
+  try {
+    if (pages) {
+      mkdirSync(path.join(root, 'docs/_site'), { recursive: true });
+      for (const [name, html] of Object.entries(pages)) {
+        writeFileSync(path.join(root, 'docs/_site', name), html);
+      }
+    }
+    execFileSync('bash', ['-e', '-c', body], { cwd: root, stdio: 'pipe' });
+    return 0;
+  } catch (error) {
+    return error.status;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('the build job fails when a Kramdown attribute rendered as literal text', () => {
+  const { index, step } = kramdownStep();
+  const buildIndex = jobs.build.steps.findIndex((other) => /jekyll build/.test(other.run));
+  assert.ok(index > buildIndex, 'the attribute check runs after the Jekyll build');
+  assert.equal(step.if, '', 'the attribute check runs on pull requests too');
+  assert.equal(runStepAgainst(step.run, { 'ok.html': '<p>plain</p>' }), 0, 'a clean site passes');
+  assert.notEqual(
+    runStepAgainst(step.run, { 'bad.html': '<p>{: .note }</p>' }),
+    0,
+    'a literal {: .note } must fail the build'
+  );
+  assert.notEqual(runStepAgainst(step.run, null), 0, 'a missing docs/_site must fail the build');
 });

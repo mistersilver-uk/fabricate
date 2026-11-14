@@ -12,7 +12,8 @@
 // color_schemes/fabricate. A token defined only in the scheme file but referenced from
 // custom.scss therefore fails the whole build, with an error naming a sheet nobody edited.
 //
-// Values mirror the module's own default `fabricate` theme block, styles/fabricate.css:194-350.
+// Values mirror the module's own default `fabricate` theme block, the `[data-fabricate-theme="fabricate"]`
+// block in styles/fabricate-tokens.css.
 // Assign plainly: support/_variables.scss has already bound the theme's own names with
 // !default, so a !default here would be a silent no-op.
 

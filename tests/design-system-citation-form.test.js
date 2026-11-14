@@ -50,10 +50,13 @@ for (const file of CITING_FILES) {
 /** The two files whose line numbers shift with every edit: the shared sheet and the library. */
 const SHIFTING_CITATION = /\b(?:fabricate[\w-]*\.css|library\.html):\d+/g;
 
-/** Where prose cites them: source, tests, scripts and the specifications (issue 1604). */
-const CITING_ROOTS = ['src/', 'tests/', 'scripts/', 'openspec/specs/'];
+/** Where prose cites them: source, tests, scripts, the specifications, the stylesheets and the docs theme (issue 1604). */
+const CITING_ROOTS = ['src/', 'tests/', 'scripts/', 'openspec/specs/', 'styles/', 'docs/_sass/'];
 
-const CITING_EXTENSIONS = /\.(?:svelte|m?js|css|json|md|html)$/;
+/** The built Jekyll site under `docs/_site` is generated output and quotes sources verbatim. */
+const GENERATED_ROOTS = ['docs/_site/'];
+
+const CITING_EXTENSIONS = /\.(?:svelte|m?js|css|scss|json|md|html)$/;
 
 /**
  * Files whose `name.css:N` text is a fixture and not a citation: this file and the register test
@@ -71,7 +74,10 @@ const DATA_LINE = /unlocated:/;
 const trackedFiles = execFileSync('git', ['ls-files'], { cwd: REPO_ROOT, encoding: 'utf8' })
   .split('\n')
   .filter(
-    (file) => CITING_ROOTS.some((root) => file.startsWith(root)) && CITING_EXTENSIONS.test(file)
+    (file) =>
+      CITING_ROOTS.some((root) => file.startsWith(root)) &&
+      !GENERATED_ROOTS.some((root) => file.startsWith(root)) &&
+      CITING_EXTENSIONS.test(file)
   );
 
 test('the shifting-citation pattern sees a sheet or library line and nothing else', () => {
