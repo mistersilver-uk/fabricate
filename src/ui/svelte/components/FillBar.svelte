@@ -260,6 +260,14 @@
       background: canvastext !important;
     }
 
+    /* Shares are all the text colour, so a 1px ground-coloured edge marks where each one meets the
+       one before. It is a border-box border drawn over the share's own fill, so no share changes
+       width, and it is an edge in a system colour rather than an elevation shadow. */
+    .fab-fill-bar-share + .fab-fill-bar-share {
+      box-sizing: border-box;
+      border-left: 1px solid canvas;
+    }
+
     .fab-fill-bar.has-neutral-band > .fab-fill-bar-fill.is-within-band {
       background: canvas !important;
       outline: 1px solid canvastext;

@@ -154,6 +154,14 @@
     }
   }
 
+  /* The current stage's track is told by an outline in the system highlight, as `aria-current`
+     tells it to a screen reader, where the fills are all the text colour. */
+  @media (forced-colors: active) {
+    .fab-stage-bars-track[aria-current] {
+      outline: 2px solid highlight;
+    }
+  }
+
   .fab-stage-bars-caption {
     overflow: hidden;
     color: var(--fab-text-muted);
