@@ -172,6 +172,9 @@ A spec is an ES module exporting:
 | `inventoryExemptions` | Accepted structural divergences, key → reason. |
 | `tolerances` | Optional; property → `{ px, reason }`, the ONE place exact equality is relaxed. |
 
+A spec's own `waitForSelector` on a prototype screen root must pass `{ state: 'attached' }`: those roots are `display: contents`, so Playwright's default visible wait never resolves.
+That code lives in the gitignored `tmp/` spec, so nothing here can gate it.
+
 A region declares property **groups** rather than properties, so adding a region cannot quietly record a narrower set than its siblings.
 The groups are in `lib/schema.js`; a spec may extend or replace them.
 
