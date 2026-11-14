@@ -67,20 +67,14 @@ test('a case no importer of the component selects is refused', () => {
 });
 
 /**
- * The entries no importer's own change selects, as of this clause: removal-only, so an entry that
- * starts to be reached must leave the list, and a new one may not join it. Each was written for a
- * frame the importer's `sourceMatches` does not name, which is an unproven claim rather than a
- * disproved one: the frame may draw the component through a route the patterns do not spell.
- * A stylesheet key has no importers, so it is outside this property.
+ * The entries no importer's own change selects. Removal-only: an entry that starts to be reached
+ * must leave the list, and a new one may not join it. Each of the five that were here named a frame
+ * the importer's `sourceMatches` did not spell. Each is now proven by naming the importer that draws
+ * it (issue 1603 part (a)), or repointed at a frame the importer already selects. A stylesheet key
+ * has no importers, so it is outside this property.
  */
 // tracked: issue 1603
-const UNPROVEN_BY_IMPORTERS = [
-  'src/ui/svelte/components/EditorTabs.svelte -> world-component-entry-validation',
-  'src/ui/svelte/components/NavSidebarRows.svelte -> manager-recipes-normal',
-  'src/ui/svelte/components/PageHeader.svelte -> manager-tool-parity-01-library-1280x720',
-  'src/ui/svelte/components/Rail.svelte -> manager-recipe-item-overview',
-  'src/ui/svelte/components/WorldClockChip.svelte -> fabricate-journal-lifecycle-ready-single',
-];
+const UNPROVEN_BY_IMPORTERS = [];
 
 test('every override names only frames that draw its component, bar the recorded baseline', () => {
   assert.deepEqual(
