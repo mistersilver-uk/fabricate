@@ -76,7 +76,7 @@ const trackedFiles = execFileSync('git', ['ls-files'], { cwd: REPO_ROOT, encodin
   .filter(
     (file) =>
       CITING_ROOTS.some((root) => file.startsWith(root)) &&
-      !GENERATED_ROOTS.some((root) => file.startsWith(root)) &&
+      GENERATED_ROOTS.every((root) => !file.startsWith(root)) &&
       CITING_EXTENSIONS.test(file)
   );
 
