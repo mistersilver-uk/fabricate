@@ -312,6 +312,11 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
         ringed.map(([token]) => token),
         ['rose']
       );
+      // Two tones: the dark inset ring and an outer ring in the text ink, in the cell's padding.
+      assert.match(
+        cells.rose.ring,
+        /^rgb\(32, 33, 36\) 0px 0px 0px 2px inset, rgb\(241, 209, 181\) 0px 0px 0px 2px$/u
+      );
       for (const [token, { outline }] of Object.entries(cells)) {
         assert.equal(outline, 'none', `${token} shows no focus outline at rest`);
       }
