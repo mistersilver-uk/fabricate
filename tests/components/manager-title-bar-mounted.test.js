@@ -114,13 +114,19 @@ describe('ManagerTitleBar', () => {
     assert.equal(badge.tagName, 'SPAN', 'the mark is a bare span, not a Chip');
     assert.ok(badge.classList.contains('manager-titlebar-badge'), 'it rides the gold badge rule');
     assert.equal(badge.parentElement, titleBarOf(root));
-    assert.equal(badge.children.length, 2, 'the mark and its hidden name, nothing else');
-    const [mark, name] = badge.children;
+    assert.equal(badge.children.length, 3, 'the mark, its hidden name and a hidden stop');
+    const [mark, name, stop] = badge.children;
     assert.equal(mark.textContent, titlebar.Premium);
     assert.equal(mark.getAttribute('aria-hidden'), 'true', 'the visible mark is not read');
     assert.ok(name.classList.contains('visually-hidden'), 'the read name is hidden text');
     assert.ok(!name.hasAttribute('aria-hidden'), 'and is read');
     assert.equal(name.textContent, titlebar.PremiumStatus);
+    assert.ok(stop.classList.contains('visually-hidden'), 'the stop that ends the name is hidden');
+    assert.equal(
+      stop.textContent,
+      '.',
+      'so the name is not read into the status prefix (issue 2422)'
+    );
     assert.equal(badge.getAttribute('title'), titlebar.PremiumStatus);
     assertNoAriaLabel(root);
   });
@@ -188,7 +194,8 @@ const BAR_OPEN = '<div class="manager-titlebar" data-manager-titlebar="">';
 const PREMIUM_MARK =
   '<span class="manager-titlebar-badge" data-manager-titlebar-premium="" title="Fabricate Premium is installed and connected">' +
   '<span aria-hidden="true">PREMIUM</span>' +
-  '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>';
+  '<span class="visually-hidden">Fabricate Premium is installed and connected</span>' +
+  '<span class="visually-hidden">.</span></span>';
 const statusLine = (caption) =>
   `<span class="manager-titlebar-status" data-manager-titlebar-status="" title="${caption}">` +
   '<span class="visually-hidden">Selected system resolution:</span> ' +
