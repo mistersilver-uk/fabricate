@@ -5,7 +5,7 @@
  * Issue 2841: on the danger fill over `--fab-bg-2` the muted ink falls short in four palettes, pinned
  * ratio for ratio. Every fill naming `--fab-danger-soft` in a published component's own block is
  * ledgered with the inks drawn on it, and every muted rule of a ledgered file, or of a component it
- * composes, is a pinned body, a part a ledgered rule overrides on the fill, or off the fill.
+ * composes, is a part a ledgered rule overrides on the fill, or off the fill.
  * Limit: the ledger reads the published components' scoped blocks, not the module sheet; it sees a
  * composed child by a direct `./<Name>.svelte` import, not content a companion draws in a slot.
  */
@@ -86,7 +86,6 @@ const glyphPart = (selector) => ({ selector, floor: 3 });
 
 /**
  * Each published component's own danger fill, by file and selector, with the parts drawn on it.
- * `pinned` names the muted parts the specimen keeps muted, whose shortfall is the token's own.
  */
 const DANGER_FILLS = Object.freeze({
   [`${COMPONENTS}/StatBox.svelte`]: {
@@ -100,7 +99,7 @@ const DANGER_FILLS = Object.freeze({
   [`${COMPONENTS}/Notice.svelte`]: {
     '.fab-notice': [
       textPart('.fab-notice-title'),
-      { ...textPart('.fab-notice-detail'), pinned: true },
+      textPart('.fab-notice.is-danger .fab-notice-detail'),
       textPart('.fab-notice-evidence'),
       glyphPart('.fab-notice > i'),
     ],
@@ -108,7 +107,7 @@ const DANGER_FILLS = Object.freeze({
   [`${COMPONENTS}/Callout.svelte`]: {
     '.manager-callout.is-danger': [
       textPart('.manager-callout.is-danger .manager-callout-title'),
-      { ...textPart('.manager-callout'), pinned: true },
+      textPart('.manager-callout.is-danger'),
       textPart('.manager-callout-item-lead'),
       glyphPart('.manager-callout.is-danger > i'),
     ],
@@ -164,18 +163,13 @@ test('the ledger names every danger fill a published component paints in its own
 for (const [file, fills] of Object.entries(DANGER_FILLS)) {
   const rules = rulesIn(styleTextOf(corpus, file));
   for (const [fill, parts] of Object.entries(fills)) {
-    test(`on ${fill}, every part clears its floor over the four grounds, or is a pinned muted body`, () => {
+    test(`on ${fill}, every part clears its floor over the four grounds and none inks muted`, () => {
       assert.equal(declaredToken(rules, fill, 'background', file), DANGER);
-      for (const { selector, floor, pinned } of parts) {
+      for (const { selector, floor } of parts) {
         const ink = declaredToken(rules, selector, 'color', file);
         const short = FOUR.flatMap((ground) => shortfalls(themes, ink, [DANGER, ground], floor));
-        if (pinned) {
-          assert.equal(ink, '--fab-text-muted', `${selector} is pinned as the muted body`);
-          assert.deepEqual(short, [...MUTED_ON_DANGER_BG2], selector);
-        } else {
-          assert.notEqual(ink, '--fab-text-muted', `${selector} inks muted on the danger fill`);
-          assert.deepEqual(short, [], selector);
-        }
+        assert.notEqual(ink, '--fab-text-muted', `${selector} inks muted on the danger fill`);
+        assert.deepEqual(short, [], selector);
       }
     });
   }
@@ -183,10 +177,9 @@ for (const [file, fills] of Object.entries(DANGER_FILLS)) {
 
 const MUTED = 'var(--fab-text-muted)';
 const byText = (a, b) => a.localeCompare(b);
-/** A muted rule the fill's rule `selector` re-inks there, the reason a muted rule is never on the fill, or a pinned body. */
+/** A muted rule the fill's rule `selector` re-inks there, or the reason a muted rule is never on the fill. */
 const overriddenBy = (selector) => ({ overriddenBy: selector });
 const offFill = (reason) => ({ offFill: reason });
-const PINNED = Object.freeze({ pinned: true });
 
 /** The components each ledgered file composes by import, whose muted rules it answers for. */
 const COMPOSED = Object.freeze({
@@ -200,8 +193,12 @@ const MUTED_RULES = Object.freeze({
     '.fab-stat-box-note': overriddenBy('.fab-stat-box.is-danger .fab-stat-box-note'),
     '.fab-kicker': overriddenBy('.fab-stat-box.is-danger > :global(.fab-kicker)'),
   },
-  [`${COMPONENTS}/Notice.svelte`]: { '.fab-notice-detail': PINNED },
-  [`${COMPONENTS}/Callout.svelte`]: { '.manager-callout': PINNED },
+  [`${COMPONENTS}/Notice.svelte`]: {
+    '.fab-notice-detail': overriddenBy('.fab-notice.is-danger .fab-notice-detail'),
+  },
+  [`${COMPONENTS}/Callout.svelte`]: {
+    '.manager-callout': overriddenBy('.manager-callout.is-danger'),
+  },
   [`${COMPONENTS}/Chip.svelte`]: {
     '.manager-chip.is-neutral': offFill('the neutral tone paints no danger fill'),
     '.manager-chip-remove': offFill(
@@ -244,7 +241,7 @@ test('each ledgered file composes exactly the components the ledger answers for'
 });
 
 for (const [file, classified] of Object.entries(MUTED_RULES)) {
-  test(`every muted rule of ${file} and what it composes is pinned, overridden on the fill or off it`, () => {
+  test(`every muted rule of ${file} and what it composes is overridden on the fill or off it`, () => {
     const found = [file, ...(COMPOSED[file] ?? [])].flatMap(mutedSelectorsOf);
     assert.deepEqual(
       found.toSorted(byText),
@@ -252,16 +249,8 @@ for (const [file, classified] of Object.entries(MUTED_RULES)) {
       'unclassified muted ink'
     );
     const rules = rulesIn(styleTextOf(corpus, file));
-    const parts = Object.values(DANGER_FILLS[file]).flat();
-    for (const [selector, { overriddenBy: over, offFill: reason, pinned }] of Object.entries(
-      classified
-    )) {
-      if (pinned) {
-        assert.ok(
-          parts.some((part) => part.selector === selector && part.pinned),
-          `${selector} is no pinned part`
-        );
-      } else if (reason) {
+    for (const [selector, { overriddenBy: over, offFill: reason }] of Object.entries(classified)) {
+      if (reason) {
         assert.ok(reason.length > 0, selector);
       } else {
         const rule = rules.find((entry) => splitSelectorList(entry.selector).includes(over));

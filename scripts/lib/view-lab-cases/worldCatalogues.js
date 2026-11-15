@@ -606,7 +606,11 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/ui\/model\/componentScopeValidation\.js$/],
+    sourceMatches: [
+      /^src\/ui\/model\/componentScopeValidation\.js$/,
+      // The entry page draws the tab strip (`EditorTabs`) that the validation tab opens from.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+    ],
   }),
   managerCase({
     // The shared entry frame stacks its rail below `max-width: 960px`, and nothing in the registry reached that state.

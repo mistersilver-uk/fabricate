@@ -798,6 +798,19 @@ export function registerChecksCases() {
     assert.equal(rows.length, 1, 'the persisted tier is rendered');
     assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
     assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
+    // A tier name clipped at narrow widths reads in full on hover, and follows a rename.
+    const nameField = rows[0].querySelector('[data-outcome-name]');
+    assert.equal(nameField.getAttribute('title'), 'Hit', 'the title is the tier name');
+    setInputValue(nameField, 'Critical hit');
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-outcome-name]').getAttribute('title'),
+      'Critical hit',
+      'the title follows the rename'
+    );
+    // Restore the name, so the editor is clean again for the save-state assertions below.
+    setInputValue(target.querySelector('[data-outcome-name]'), 'Hit');
+    flushSync();
 
     // The formula field lives on The roll, the tier rows on Outcomes (issue 1096).
     await openChecksSection('roll');
