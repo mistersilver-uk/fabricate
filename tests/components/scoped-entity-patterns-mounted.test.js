@@ -29,6 +29,7 @@ const SCOPED_RAW_MODULES = [
   'src/systems/essenceScope.js',
   'src/systems/toolScope.js',
   'src/systems/scopedDefinitions.js',
+  'src/systems/SettingsBackedStore.js',
   'src/systems/scopedDefinitionStore.js',
   'src/utils/scalars.js',
   // Issue 1370: the store now derives the DELETE half of the read union's key rule from the

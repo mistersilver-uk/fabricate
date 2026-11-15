@@ -484,6 +484,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/systems\/complicationRuntime\.js$/,
       /^src\/bootstrap\/socketRouter\.js$/,
+      /^src\/ui\/presenters\/ComplicationChatCard\.js$/,
       /^src\/ui\/presenters\/CraftingChatCard\.js$/,
     ],
   }),

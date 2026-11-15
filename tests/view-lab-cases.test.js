@@ -198,8 +198,8 @@ const DRIVER_HOOKS = [
   // `fabricate-manager` is deliberately NOT here.
 ];
 
-/** The one module outside `src/ui/` that renders a chat card: the GM-only complication card. */
-const CHAT_CARD_EMITTERS = new Set(['src/systems/complicationRuntime.js']);
+/** The one chat card outside `src/ui/presenters/`'s crafting family: the GM-only complication card. */
+const CHAT_CARD_EMITTERS = new Set(['src/ui/presenters/ComplicationChatCard.js']);
 
 /**
  * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
