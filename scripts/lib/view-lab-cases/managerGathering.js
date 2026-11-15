@@ -156,6 +156,8 @@ export const CASES = Object.freeze([
       // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
       // moved out of the root: without this the leaf publishes environment-editor frames instead.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      // The "Used in environments" card the task inspector mounts (issue 1851).
+      /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentUsageCard\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
       BROWSER_LIST_STATE_MATCH,
@@ -1077,6 +1079,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       // And drawn by the leaf they moved into (issue 1707 phase 2).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
+      // The "Used in environments" card the event inspector mounts (issue 1851).
+      /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentUsageCard\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
       BROWSER_LIST_STATE_MATCH,
