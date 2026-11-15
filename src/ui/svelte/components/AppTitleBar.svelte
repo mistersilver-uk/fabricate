@@ -31,7 +31,10 @@
     <span class="manager-titlebar-badge" data-manager-titlebar-premium title={premiumStatus}
       ><span aria-hidden="true"
         >{localizeOr('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-      ><span class="visually-hidden">{premiumStatus}</span></span
+      ><span class="visually-hidden">{premiumStatus}</span
+      ><!-- A hidden full stop ends the read name, so it does not run into the status prefix (issue 2422). --><span
+        class="visually-hidden">.</span
+      ></span
     >
   {/if}
   {#if statusLabel}

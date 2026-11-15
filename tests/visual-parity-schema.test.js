@@ -17,6 +17,7 @@ import {
   toleranceProblems,
 } from '../scripts/visual-parity/lib/schema.js';
 import { subjectProblems } from '../scripts/visual-parity/lib/subject.js';
+import { openViewLab } from '../scripts/visual-parity/lib/view-lab.js';
 
 // The visual-parity harness runs locally and never in CI, so the parts of it that CAN be tested in
 // the Node runner are the pure ones: the rules that keep a spec honest (issue 1096).
@@ -190,6 +191,27 @@ test('the subject is the real app, and a spec still carrying the mirror fails', 
 
   await subtests.test('a live subject passes', () => {
     assert.deepEqual(subjectProblems({ subject: { open() {}, navigate() {} } }), []);
+  });
+
+  await subtests.test('chromeSweep must be { selectors, forbidden }', () => {
+    const live = { open() {}, navigate() {} };
+    const good = { selectors: ['.a'], forbidden: [] };
+    assert.deepEqual(subjectProblems({ subject: { ...live, chromeSweep: good } }), []);
+    for (const wrong of [{ root: '.a', exemptions: [] }, { selectors: ['.a'] }, [], 'x']) {
+      const problems = subjectProblems({ subject: { ...live, chromeSweep: wrong } });
+      assert.ok(problems.some((problem) => problem.includes('chromeSweep')), JSON.stringify(wrong));
+    }
+  });
+
+  await subtests.test('requiredAncestors must be an array', () => {
+    const live = { open() {}, navigate() {} };
+    assert.deepEqual(subjectProblems({ subject: { ...live, requiredAncestors: ['main'] } }), []);
+    const problems = subjectProblems({ subject: { ...live, requiredAncestors: { main: true } } });
+    assert.ok(problems.some((problem) => problem.includes('requiredAncestors')));
+  });
+
+  await subtests.test('openViewLab refuses to boot without a repoRoot', async () => {
+    await assert.rejects(() => openViewLab({}, { app: 'x' }), /repoRoot/);
   });
 });
 

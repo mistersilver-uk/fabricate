@@ -1,6 +1,7 @@
 import { cloneJson } from '../utils/scalars.js';
 
 import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 import {
   ESSENCE_EFFECT_SOURCE_FIELDS,
   identityOf,
@@ -289,7 +290,7 @@ export function createScopedDefinitionStore({
 }
 
 /** @see createScopedDefinitionStore */
-class ScopedDefinitionStore {
+class ScopedDefinitionStore extends SettingsBackedStore {
   constructor({
     settingKey,
     getSetting,
@@ -298,15 +299,12 @@ class ScopedDefinitionStore {
     normalizeMemberships,
     normalizeExtras,
   }) {
-    this.settingKey = settingKey;
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey });
     this._normalizeDefaults = normalizeDefaults;
     this._normalizeMemberships = normalizeMemberships;
     this._normalizeExtras = normalizeExtras;
     this._corpus = null;
     this._entityIds = null;
-    this.loaded = false;
     this.seeded = { entities: false, defaults: false, membership: false };
   }
 
@@ -315,26 +313,16 @@ class ScopedDefinitionStore {
    * setting degrades to an unknown basis.
    */
   load() {
-    let raw;
-    try {
-      raw = this.getSetting(this.settingKey);
-    } catch {
-      raw = null;
-    }
+    const raw = this._readSettingGuarded();
     this.seeded = carriedSubKeys(raw);
     this._publish(this._normalize(raw));
     return this._corpus;
   }
 
   /** Replace the corpus wholesale; the union memo keys on its identity, so never edit in place. */
-  _publish(corpus) {
+  _setCache(corpus) {
     this._corpus = corpus;
     this._entityIds = null;
-    this.loaded = true;
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   _normalize(raw) {
@@ -411,10 +399,9 @@ class ScopedDefinitionStore {
 
   /** Publish the cache before awaiting the write, so an overlapping edit reads this one. */
   async _persist(next) {
-    this._publish(next);
     // A write is a real payload, so every sub-key is seeded from here on and a removed id prunes.
     this.seeded = { entities: true, defaults: true, membership: true };
-    await this.setSetting(this.settingKey, cloneJson(this._persistedShape(next)));
+    await this._publishThenWrite(next, cloneJson(this._persistedShape(next)));
     return this._corpus;
   }
 

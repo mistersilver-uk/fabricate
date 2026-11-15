@@ -76,6 +76,7 @@ const CHAT_SOURCES = [
 const CANVAS_STATION_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/gathering\//,
   /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+  /^src\/ui\/playerServices\.js$/,
   /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
   /^src\/ui\/presenters\/GatheringListingBuilder\.js$/,
   /^src\/gatheringToolRuntime\.js$/,
@@ -484,6 +485,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/systems\/complicationRuntime\.js$/,
       /^src\/bootstrap\/socketRouter\.js$/,
+      /^src\/ui\/presenters\/ComplicationChatCard\.js$/,
       /^src\/ui\/presenters\/CraftingChatCard\.js$/,
     ],
   }),

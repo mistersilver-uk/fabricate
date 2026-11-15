@@ -497,7 +497,7 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   });
 
   it('seeds a null respawn anchor at the current world time instead of granting a full restock (issue 403)', async () => {
-    // `_mergeNodeConfigState` rewrites the anchor through `numberOrNullStrict`, so a library-backed
+    // `_mergeNodeConfigState` rewrites the anchor through `numberOrNull`, so a library-backed
     // pool that has never been evaluated presents `null` — the NORMAL production shape.
     const { service, env } = libService({
       task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),

@@ -306,6 +306,7 @@ export const CASES = Object.freeze([
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalGatheringTools\.js$/,
       /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+      /^src\/ui\/playerServices\.js$/,
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
       /^src\/gatheringToolRuntime\.js$/,
       /^src\/systems\/stationPresence\.js$/,

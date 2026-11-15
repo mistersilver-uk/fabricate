@@ -18,6 +18,27 @@ export function subjectProblems(spec) {
         'is a screen it cannot measure'
     );
   }
+  const sweep = subject.chromeSweep;
+  if (sweep !== undefined && sweep !== null) {
+    const shaped =
+      typeof sweep === 'object' &&
+      Array.isArray(sweep.selectors) &&
+      Array.isArray(sweep.forbidden) &&
+      sweep.selectors.every((entry) => typeof entry === 'string');
+    if (!shaped) {
+      problems.push(
+        'spec.subject.chromeSweep must be `{ selectors: string[], forbidden: [] }`: the page ' +
+          'runtime iterates both, so any other shape sweeps nothing or throws mid-run'
+      );
+    }
+  }
+  const ancestors = subject.requiredAncestors;
+  if (ancestors !== undefined && ancestors !== null && !Array.isArray(ancestors)) {
+    problems.push(
+      'spec.subject.requiredAncestors must be an array of selectors: the comparator filters ' +
+        'it, so an object here fails at the first screen'
+    );
+  }
   for (const retired of ['screens', 'stylesheets']) {
     if (subject[retired]) {
       problems.push(

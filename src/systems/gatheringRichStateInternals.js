@@ -53,8 +53,4 @@ export function durationToSeconds(secondsPerUnit, count, unit) {
   return Math.max(0, Number(count || 0) * safe);
 }
 
-export {
-  arrayOrEmpty as normalizeList,
-  cloneJson,
-  numberOrNull as numberOrNullStrict,
-} from '../utils/scalars.js';
+export { arrayOrEmpty, cloneJson, numberOrNull } from '../utils/scalars.js';

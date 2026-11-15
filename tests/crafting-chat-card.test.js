@@ -12,9 +12,9 @@ import { chromium } from 'playwright';
 
 import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 import { chatModeOption } from '../src/systems/bulkChatVisibility.js';
-import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
 import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
 import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
+import { buildGmComplicationCardContent } from '../src/ui/presenters/ComplicationChatCard.js';
 import { buildCraftingChatContent, inertText } from '../src/ui/presenters/CraftingChatCard.js';
 import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';

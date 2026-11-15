@@ -286,6 +286,11 @@
     border: 0;
   }
 
+  /* Muted detail is under 4.5:1 on the danger fill, so the danger tone takes the secondary. */
+  .fab-notice.is-danger .fab-notice-detail {
+    color: var(--fab-text-secondary);
+  }
+
   .fab-notice.is-warning {
     border-color: var(--fab-warning-border);
     background: var(--fab-warning-soft);
