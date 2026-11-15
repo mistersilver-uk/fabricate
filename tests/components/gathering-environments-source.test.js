@@ -43,10 +43,6 @@ describe('Fabricate app wiring for the gathering tab', () => {
       false,
       'the per-attempt node-state override seam is removed; listing reads the env node directly'
     );
-    assert.ok(
-      appSource.includes('getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'),
-      'app should add the getGatheringDropBreakdown service'
-    );
     assert.ok(appSource.includes('services: this._services'), 'app should pass the services prop');
   });
 
@@ -61,6 +57,7 @@ describe('Fabricate app wiring for the gathering tab', () => {
       };
       globalThis.game.fabricate.listGatheringForActor = record;
       globalThis.game.fabricate.startGatheringAttempt = record;
+      globalThis.game.fabricate.getGatheringDropBreakdown = record;
       const services = app._buildServices();
       assert.equal(services.getActiveCanvasTool(), activeCanvasTool);
       services.listGatheringForActor();
@@ -68,6 +65,9 @@ describe('Fabricate app wiring for the gathering tab', () => {
       const presentTools = { systemId: 'survival', componentIds: [], toolIds: ['sickle'] };
       assert.deepEqual(received.map((opts) => opts.presentTools), [presentTools, presentTools]);
       assert.equal(received[1].taskId, 'herbs');
+      // The drop breakdown is a plain pass-through: it carries no station.
+      services.getGatheringDropBreakdown({ taskId: 'herbs' });
+      assert.deepEqual(received[2], { taskId: 'herbs' });
     });
   });
 

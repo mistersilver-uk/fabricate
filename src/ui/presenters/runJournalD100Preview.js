@@ -1,6 +1,6 @@
 import {
-  normalizeList,
-  numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   stringOrNull,
 } from '../../systems/gatheringEngineInternals.js';
 import { dropThreshold } from '../../systems/gatheringRichStateInternals.js';
@@ -13,17 +13,17 @@ import { dropThreshold } from '../../systems/gatheringRichStateInternals.js';
 export function d100PreviewEntries({ task, run, entryFor }) {
   const evaluatedRows = Array.isArray(run?.checkResult?.itemRows)
     ? run.checkResult.itemRows
-    : normalizeList(run?.checkResult?.items);
+    : iterableToArray(run?.checkResult?.items);
   const actualById = new Map(
     evaluatedRows
       .filter((item) => stringOrNull(item?.id))
       .map((item) => [stringOrNull(item.id), item])
   );
-  return normalizeList(task?.dropRows ?? task?.itemDrops)
+  return iterableToArray(task?.dropRows ?? task?.itemDrops)
     .filter((row) => row?.enabled !== false)
     .map((row, index) => {
       const actual = actualById.get(stringOrNull(row?.id));
-      const rate = numberOrNull(actual?.finalDropRate) ?? numberOrNull(row?.dropRate) ?? 0;
+      const rate = laxNumberOrNull(actual?.finalDropRate) ?? laxNumberOrNull(row?.dropRate) ?? 0;
       const chance = Math.min(100, Math.max(0, rate));
       return { ...entryFor(row, index, chance), threshold: dropThreshold(chance) };
     });

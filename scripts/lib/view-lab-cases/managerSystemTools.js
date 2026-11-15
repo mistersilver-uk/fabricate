@@ -25,7 +25,13 @@ export const CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES, BROWSER_LIST_STATE_MATCH],
+    // The header units draw inside the shell on every manager view (issue 1777), so this frame
+    // names the shell and each unit, as the other shell rows do.
+    sourceMatches: [
+      ...TOOL_LIST_MATCHES,
+      BROWSER_LIST_STATE_MATCH,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-adopted-world-tool-1280x720',

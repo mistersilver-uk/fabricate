@@ -26,6 +26,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   'src/systems/scopedDefinitions.js',
+  'src/systems/SettingsBackedStore.js',
   'src/systems/scopedDefinitionStore.js',
   'src/utils/scalars.js',
   'src/systems/componentScope.js',

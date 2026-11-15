@@ -163,6 +163,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/toolBreakageAuthority.js',
   'src/systems/toolScope.js',
   'src/systems/scopedDefinitions.js',
+  'src/systems/SettingsBackedStore.js',
   'src/systems/scopedDefinitionStore.js',
   'src/utils/scalars.js',
   // Issue 1370 (epic 1357, PR 8a): `toolBreakageRuntime.js` now reads the system's TOOL LIBRARY

@@ -6,8 +6,8 @@ import {
   actorToOption,
   idOf,
   isBlindWaitingTaskId,
-  normalizeList,
-  numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   plainObjectOrNull,
   stringOrEmpty,
   stringOrNull,
@@ -94,7 +94,7 @@ const DAY_SECONDS = 24 * 60 * 60;
  *  actor-free surface can know. The roll is read, never re-rolled. */
 function rolledAmountLabel(source, localize) {
   const rolled = plainObjectOrNull(source?.rolled);
-  const total = numberOrNull(rolled?.total);
+  const total = laxNumberOrNull(rolled?.total);
   if (stringOrNull(rolled?.formula) && total !== null) {
     return localize('FABRICATE.App.Journal.RolledAmount', { formula: rolled.formula, total });
   }
@@ -109,12 +109,12 @@ function gatheringActualAwards(run) {
     if (run.historySettlement?.awards === 'pending') return null;
     // Older failure normalization erased these refs; an empty list cannot prove zero.
     return run.status === 'failed' &&
-      normalizeList(run.createdResults).length === 0 &&
+      iterableToArray(run.createdResults).length === 0 &&
       run.historySettlement?.awards !== 'complete'
       ? null
       : run.createdResults;
   }
-  const effects = normalizeList(run.executionJournal?.effects).filter(
+  const effects = iterableToArray(run.executionJournal?.effects).filter(
     (effect) => effect?.effectId === 'results' && effect?.kind === 'createGatheredResults'
   );
   if (effects.length !== 1 || effects[0].phase !== 'applied') return null;
@@ -126,9 +126,9 @@ function historicalStepAttempted(step, run, index) {
   // Consumption alone is not an attempt: a stage START spends its inputs (D-026) and a
   // cancel hands them back, so only a RESOLVED stage records `consumedIngredients`.
   if (
-    normalizeList(step?.consumedIngredients).length > 0 ||
-    normalizeList(step?.createdResults).length > 0 ||
-    normalizeList(step?.usedTools).length > 0
+    iterableToArray(step?.consumedIngredients).length > 0 ||
+    iterableToArray(step?.createdResults).length > 0 ||
+    iterableToArray(step?.usedTools).length > 0
   ) {
     return true;
   }
@@ -136,7 +136,7 @@ function historicalStepAttempted(step, run, index) {
   // A stage START commits inputs; it does not attempt the stage. Only a resolution does,
   // and a cancelled run returns what its start spent.
   if (run?.executionJournal?.intent?.trigger === 'start') return false;
-  return normalizeList(run?.executionJournal?.effects).some(
+  return iterableToArray(run?.executionJournal?.effects).some(
     (effect) => effect?.phase === 'applied'
   );
 }
@@ -363,8 +363,8 @@ export class RunJournalBuilder {
     // and on an `item`-visibility-mode system that question re-enumerated the actor's whole
     // inventory PER RUN. One snapshot answers all of them; it needs the recipes anyway, for
     // their legacy book links.
-    const activeCraftingRuns = normalizeList(this._craftingRunManager?.getActiveRuns?.(actor));
-    const historyCraftingRuns = normalizeList(this._craftingRunManager?.getRunHistory?.(actor));
+    const activeCraftingRuns = iterableToArray(this._craftingRunManager?.getActiveRuns?.(actor));
+    const historyCraftingRuns = iterableToArray(this._craftingRunManager?.getRunHistory?.(actor));
     const recipesByRunId = this._craftingRunRecipes([
       ...activeCraftingRuns,
       ...historyCraftingRuns,
@@ -455,7 +455,7 @@ export class RunJournalBuilder {
     authority = null,
   }) {
     const actorUuid = this._actorUuid(actor);
-    const runs = normalizeList(
+    const runs = iterableToArray(
       craftingRuns ??
         (terminal
           ? this._craftingRunManager?.getRunHistory?.(actor)
@@ -498,7 +498,7 @@ export class RunJournalBuilder {
       })
     );
 
-    const salvage = normalizeList(
+    const salvage = iterableToArray(
       terminal
         ? this._salvageRunManager?.getRunHistory?.(actor)
         : this._salvageRunManager?.getActiveRuns?.(actor)
@@ -515,7 +515,7 @@ export class RunJournalBuilder {
       })
     );
 
-    const gathering = normalizeList(
+    const gathering = iterableToArray(
       terminal
         ? this._gatheringRunSource?.getRunHistory?.(actor)
         : this._gatheringRunSource?.getActiveRuns?.(actor)
@@ -581,12 +581,12 @@ export class RunJournalBuilder {
     const redacted = viewer?.isGM !== true && (!recipe || access?.visible === false);
     const historyEntitled = viewer?.isGM === true || access?.visible === true;
 
-    const runSteps = normalizeList(run.steps);
+    const runSteps = iterableToArray(run.steps);
     const recipeSteps =
       recipe && typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
     const stepCount = runSteps.length;
     const currentStepIndex =
-      run.currentStepIndex == null ? null : numberOrNull(run.currentStepIndex);
+      run.currentStepIndex == null ? null : laxNumberOrNull(run.currentStepIndex);
     const status = stringOrNull(run.status) || 'inProgress';
     const activeStep =
       !terminal && Number.isFinite(currentStepIndex) ? runSteps[currentStepIndex] : null;
@@ -703,9 +703,9 @@ export class RunJournalBuilder {
       steps,
       currentStep,
       timeGate: plainObjectOrNull(activeStep?.timeGate),
-      startedAt: numberOrNull(run.startedAt),
-      updatedAt: numberOrNull(run.updatedAt),
-      finishedAt: numberOrNull(run.finishedAt),
+      startedAt: laxNumberOrNull(run.startedAt),
+      updatedAt: laxNumberOrNull(run.updatedAt),
+      finishedAt: laxNumberOrNull(run.finishedAt),
       structureLabel: this.localize(
         multiStep
           ? 'FABRICATE.App.Journal.Structure.MultiStep'
@@ -795,12 +795,12 @@ export class RunJournalBuilder {
     const status = stringOrNull(run.status) || 'failed';
     const consumed =
       getRunLifecycleContract(run) === 'current'
-        ? normalizeList(run.executionJournal?.effects).flatMap((effect) =>
+        ? iterableToArray(run.executionJournal?.effects).flatMap((effect) =>
             effect.kind === 'consumeAlchemyItems' && effect.phase === 'applied'
-              ? normalizeList(effect.receipt?.items)
+              ? iterableToArray(effect.receipt?.items)
               : []
           )
-        : normalizeList(run.consumedIngredients);
+        : iterableToArray(run.consumedIngredients);
     return {
       id: stringOrNull(run.id),
       ...this._runLifecycleProjection({
@@ -833,9 +833,9 @@ export class RunJournalBuilder {
       steps: [],
       currentStep: null,
       timeGate: null,
-      startedAt: numberOrNull(run.startedAt),
-      updatedAt: numberOrNull(run.updatedAt),
-      finishedAt: numberOrNull(run.finishedAt),
+      startedAt: laxNumberOrNull(run.startedAt),
+      updatedAt: laxNumberOrNull(run.updatedAt),
+      finishedAt: laxNumberOrNull(run.finishedAt),
       structureLabel: '',
       resolutionModeLabel: this.localize(journalModeLabelKey('alchemy')),
       recipeId: null,
@@ -851,7 +851,7 @@ export class RunJournalBuilder {
       createdResultsRecorded:
         historyEntitled &&
         (run.historySettlement?.awards === 'complete' ||
-          normalizeList(run.executionJournal?.effects).some(
+          iterableToArray(run.executionJournal?.effects).some(
             (effect) =>
               effect.kind === 'awardResults' &&
               effect.phase === 'applied' &&
@@ -875,7 +875,7 @@ export class RunJournalBuilder {
   _deriveCraftingStatus({ status, activeStep, worldTime, run = null }) {
     if (TERMINAL_STATUSES.has(status)) return status;
     if (run?.pauseState) return 'paused';
-    const availableAt = numberOrNull(activeStep?.timeGate?.availableAt);
+    const availableAt = laxNumberOrNull(activeStep?.timeGate?.availableAt);
     if (availableAt !== null) {
       return availableAt <= worldTime ? 'ready' : 'waiting';
     }
@@ -963,20 +963,20 @@ export class RunJournalBuilder {
       lastCheckResult: this._stepCheckResult(runStep, system, recipe),
       // Requirements retain their authored identity; consumption retains physical receipts.
       // Only entitled consumption receives the separate historical metadata enrichment.
-      requirements: normalizeList(runStep?.requirements).map((entry) =>
+      requirements: iterableToArray(runStep?.requirements).map((entry) =>
         this._mapResult(entry, systemId)
       ),
       consumedIngredients: consumed.map((entry) =>
         this._mapResult(entry, systemId, !historyEntitled)
       ),
-      createdResults: normalizeList(historyEntitled ? runStep?.createdResults : null).map((entry) =>
-        this._mapResult(entry, systemId)
+      createdResults: iterableToArray(historyEntitled ? runStep?.createdResults : null).map(
+        (entry) => this._mapResult(entry, systemId)
       ),
       createdResultsRecorded:
         historyEntitled &&
         Array.isArray(runStep?.createdResults) &&
         !['pending', 'uncertain'].includes(runStep.historySettlement?.awards),
-      usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) =>
+      usedTools: iterableToArray(historyEntitled ? runStep?.usedTools : null).map((entry) =>
         this._historicalTool(entry, systemId)
       ),
       // A stage that has started spent its inputs and locked its choice (D-026/D-028).
@@ -1015,7 +1015,7 @@ export class RunJournalBuilder {
 
   /** A stage's recorded consumption, enriched from earlier terminal evidence when entitled. */
   _stageConsumedIngredients({ runStep, run, systemId, historyEntitled, entitledHistory }) {
-    if (!historyEntitled) return normalizeList(runStep?.consumedIngredients);
+    if (!historyEntitled) return iterableToArray(runStep?.consumedIngredients);
     return enrichHistoricalConsumption(runStep, {
       earlierItems: historicalItemSources(
         entitledHistory,
@@ -1065,13 +1065,13 @@ export class RunJournalBuilder {
     const prepared = isCurrent ? plainObjectOrNull(runStep?.preparedConsumption) : null;
     if (!prepared) return null;
     return {
-      materials: normalizeList(prepared.consumedSummary).map((entry) =>
+      materials: iterableToArray(prepared.consumedSummary).map((entry) =>
         this._mapResult(entry, systemId)
       ),
       essence: craftingStepHistoryEvidence(prepared).essenceSpend ?? null,
-      currencySpends: normalizeList(prepared.currencySpends).map((spend) => ({
+      currencySpends: iterableToArray(prepared.currencySpends).map((spend) => ({
         unit: stringOrEmpty(spend?.unit),
-        amount: numberOrNull(spend?.amount),
+        amount: laxNumberOrNull(spend?.amount),
       })),
     };
   }
@@ -1099,14 +1099,14 @@ export class RunJournalBuilder {
       success: true,
       // Its inputs are spent and its choice is locked, but tools are never consumed and are
       // re-validated live at resolve time: one sold during the wait still refuses the stage.
-      blocker: normalizeList(toolStates).some((tool) => tool?.available !== true)
+      blocker: iterableToArray(toolStates).some((tool) => tool?.available !== true)
         ? STAGE_BLOCKERS.tool
         : null,
       awaitingChoice: false,
       knownMaterialShortfall: false,
       missingGroups: [],
       choices: [],
-      requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
+      requirements: iterableToArray(ingredientSet.ingredientGroups).map((group) =>
         this._requirementPresentation({
           group,
           recipe,
@@ -1138,7 +1138,7 @@ export class RunJournalBuilder {
       stageIndex: index,
       mode: 'routedByIngredients',
       presentation: 'routes',
-      routes: normalizeList(recipeStep?.ingredientSets).map((set) => ({
+      routes: iterableToArray(recipeStep?.ingredientSets).map((set) => ({
         id: stringOrNull(set?.id),
         name: stringOrEmpty(set?.name),
         entries:
@@ -1157,13 +1157,13 @@ export class RunJournalBuilder {
     return {
       source: 'preview',
       stageIndex: index,
-      routes: normalizeList(recipeStep?.ingredientSets).map((set) => ({
+      routes: iterableToArray(recipeStep?.ingredientSets).map((set) => ({
         id: stringOrNull(set?.id),
         name: stringOrEmpty(set?.name),
-        groups: normalizeList(set?.ingredientGroups).map((group) => ({
+        groups: iterableToArray(set?.ingredientGroups).map((group) => ({
           id: stringOrNull(group?.id),
           name: stringOrEmpty(group?.name),
-          options: normalizeList(group?.options).map((option, optionIndex) => {
+          options: iterableToArray(group?.options).map((option, optionIndex) => {
             const { id, kind, name, img, icon, colorToken, need } =
               this._ingredientOptionPresentation({
                 group,
@@ -1217,7 +1217,7 @@ export class RunJournalBuilder {
       ...base,
       presentation: 'entries',
       entries: groups.flatMap((group) =>
-        normalizeList(group?.results).map((result, resultIndex) =>
+        iterableToArray(group?.results).map((result, resultIndex) =>
           this._yieldEntry(result, systemId, resultIndex, 100)
         )
       ),
@@ -1233,7 +1233,7 @@ export class RunJournalBuilder {
       if (!ingredientSet) return null;
     }
     try {
-      return normalizeList(
+      return iterableToArray(
         resolve.call(this._resolutionModeService, {
           recipe,
           step: recipeStep,
@@ -1253,7 +1253,7 @@ export class RunJournalBuilder {
     );
     if (!selectedId) return null;
     return (
-      normalizeList(recipeStep?.ingredientSets).find(
+      iterableToArray(recipeStep?.ingredientSets).find(
         (ingredientSet) => stringOrNull(ingredientSet?.id) === selectedId
       ) ?? null
     );
@@ -1265,8 +1265,8 @@ export class RunJournalBuilder {
     const routed = plainObjectOrNull(system?.craftingCheck?.routed) ?? {};
     const outcomes =
       routed.type === 'fixed'
-        ? normalizeList(routed.fixedOutcomes)
-        : normalizeList(routed.relativeOutcomes);
+        ? iterableToArray(routed.fixedOutcomes)
+        : iterableToArray(routed.relativeOutcomes);
     const permitsFailure = activityPermitsFailureResults(system, 'crafting');
     const systemId = stringOrNull(recipe.craftingSystemId);
     const dc = journalCheckAnchor({ config: routed, recipe, mode });
@@ -1282,8 +1282,8 @@ export class RunJournalBuilder {
                 step: recipeStep,
                 checkResult: { success: !fail, outcome: stringOrNull(outcome?.name) },
               });
-        const results = normalizeList(resolved?.groups).flatMap((group) =>
-          normalizeList(group?.results)
+        const results = iterableToArray(resolved?.groups).flatMap((group) =>
+          iterableToArray(group?.results)
         );
         return {
           id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
@@ -1307,7 +1307,7 @@ export class RunJournalBuilder {
     try {
       return {
         awardMode: stringOrNull(system?.craftingCheck?.progressive?.awardMode) || 'equal',
-        stages: normalizeList(
+        stages: iterableToArray(
           occurrences.call(this._resolutionModeService, { recipe, step: recipeStep })
         ).map((occurrence, index) => {
           const componentId = stringOrNull(occurrence?.componentId);
@@ -1323,7 +1323,7 @@ export class RunJournalBuilder {
             icon: stringOrNull(component?.icon),
             tint: stringOrNull(component?.tint ?? component?.colorToken),
             quantity: '×1',
-            cost: numberOrNull(component?.difficulty),
+            cost: laxNumberOrNull(component?.difficulty),
           });
         }),
       };
@@ -1341,7 +1341,7 @@ export class RunJournalBuilder {
   _stageAvailability({ actor, run, recipe, fallback }) {
     let sourceActors;
     try {
-      sourceActors = normalizeList(this._getComponentSourceActors({ actor, run }));
+      sourceActors = iterableToArray(this._getComponentSourceActors({ actor, run }));
     } catch {
       sourceActors = [];
     }
@@ -1355,7 +1355,7 @@ export class RunJournalBuilder {
         stringOrNull(source?.uuid)
       )
     );
-    const sourcesUnresolvable = normalizeList(run?.componentSourceActorUuids).some(
+    const sourcesUnresolvable = iterableToArray(run?.componentSourceActorUuids).some(
       (uuid) => !resolved.has(stringOrNull(uuid))
     );
     if (sourceActors.length === 0) {
@@ -1383,7 +1383,7 @@ export class RunJournalBuilder {
     probeTools = () => null,
   }) {
     const plan = runStep?.selectionPlan;
-    const sets = normalizeList(recipeStep?.ingredientSets);
+    const sets = iterableToArray(recipeStep?.ingredientSets);
     // One authored route is not a choice, so a stage that has not chosen yet still reads as
     // the only route it could take rather than as a stale selection.
     const setId =
@@ -1431,7 +1431,7 @@ export class RunJournalBuilder {
       essenceAllocation,
     });
     const system = this._getSystem(stringOrNull(recipe?.craftingSystemId));
-    const choices = normalizeList(ingredientSet.ingredientGroups).map((group) =>
+    const choices = iterableToArray(ingredientSet.ingredientGroups).map((group) =>
       this._choiceAvailability({
         group,
         ingredientSet,
@@ -1466,7 +1466,7 @@ export class RunJournalBuilder {
     const readiness = classifyStageReadiness({
       selection,
       inputsComplete: stageSelectionInputsComplete(ingredientSet, plan, runStep?.stepId),
-      toolsAvailable: normalizeList(toolStates).every((tool) => tool?.available === true),
+      toolsAvailable: iterableToArray(toolStates).every((tool) => tool?.available === true),
       currencyAffordable: this._affordsCurrencySpends({ actor, recipe, selection }),
     });
     // An unresolvable source set means every verdict above was reached against the wrong
@@ -1481,9 +1481,9 @@ export class RunJournalBuilder {
       blocker,
       awaitingChoice: isChoiceBlocker(blocker),
       knownMaterialShortfall: blocker === STAGE_BLOCKERS.material,
-      missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
+      missingGroups: iterableToArray(selection?.missingGroups).map(safeMissingGroup),
       choices,
-      requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
+      requirements: iterableToArray(ingredientSet.ingredientGroups).map((group) =>
         this._requirementPresentation({
           group,
           recipe,
@@ -1534,7 +1534,7 @@ export class RunJournalBuilder {
    * @private
    */
   _affordsCurrencySpends({ actor, recipe, selection }) {
-    const currencySpends = normalizeList(selection?.currencySpends);
+    const currencySpends = iterableToArray(selection?.currencySpends);
     if (currencySpends.length === 0 || !this._affordCurrencySpends) return true;
     try {
       return this._affordCurrencySpends({ actor, recipe, currencySpends }) !== false;
@@ -1554,7 +1554,7 @@ export class RunJournalBuilder {
   }) {
     // The shared resolver treats invalid overrides as absent for legacy callers.
     // Persisted Journal intent must instead remain blocked until explicitly replaced.
-    const invalidGroups = normalizeList(ingredientSet.ingredientGroups).filter(
+    const invalidGroups = iterableToArray(ingredientSet.ingredientGroups).filter(
       (group) => ingredientOverrideIndex(group, optionOverrides) === null
     );
     if (invalidGroups.length > 0 && !editFeasibility) {
@@ -1645,8 +1645,8 @@ export class RunJournalBuilder {
   _requirementPresentation({ group, recipe, items, optionOverrides, selection, system, choice }) {
     const groupId = stringOrNull(group?.id);
     const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
-    const option = normalizeList(group?.options)[selectedOptionIndex] ?? null;
-    const selectedMissing = normalizeList(selection?.missingGroups).some(
+    const option = iterableToArray(group?.options)[selectedOptionIndex] ?? null;
+    const selectedMissing = iterableToArray(selection?.missingGroups).some(
       (missing) => missingGroupId(missing) === groupId
     );
     const presentation =
@@ -1727,7 +1727,7 @@ export class RunJournalBuilder {
       resolvedEssencesFor(system).map((definition) => [stringOrNull(definition?.id), definition])
     );
     return {
-      requirements: normalizeList(pool.requirements).map((requirement) => {
+      requirements: iterableToArray(pool.requirements).map((requirement) => {
         const definition = definitions.get(stringOrNull(requirement?.essenceId));
         return {
           groupId: stringOrNull(requirement?.groupId),
@@ -1735,19 +1735,19 @@ export class RunJournalBuilder {
           name: stringOrEmpty(definition?.name) || stringOrEmpty(requirement?.essenceId),
           icon: essenceIconOrNull(definition?.icon),
           colorToken: stringOrNull(definition?.colorToken),
-          need: numberOrNull(requirement?.need) ?? 0,
-          delivered: numberOrNull(requirement?.delivered) ?? 0,
-          owned: numberOrNull(requirement?.owned) ?? 0,
+          need: laxNumberOrNull(requirement?.need) ?? 0,
+          delivered: laxNumberOrNull(requirement?.delivered) ?? 0,
+          owned: laxNumberOrNull(requirement?.owned) ?? 0,
           satisfied: requirement?.satisfied === true,
         };
       }),
-      carriers: normalizeList(pool.carriers).map((carrier) => ({
+      carriers: iterableToArray(pool.carriers).map((carrier) => ({
         itemKey: stringOrNull(carrier?.itemKey),
         name: stringOrNull(carrier?.item?.name),
         img: stringOrNull(carrier?.item?.img),
         perUnit: cloneJson(carrier?.perUnit) ?? {},
-        ownedUnits: numberOrNull(carrier?.ownedUnits) ?? 0,
-        allocatedUnits: numberOrNull(carrier?.allocatedUnits) ?? 0,
+        ownedUnits: laxNumberOrNull(carrier?.ownedUnits) ?? 0,
+        allocatedUnits: laxNumberOrNull(carrier?.allocatedUnits) ?? 0,
       })),
       allocation: cloneJson(pool.allocation) ?? {},
       suggested: cloneJson(pool.suggested) ?? {},
@@ -1785,7 +1785,7 @@ export class RunJournalBuilder {
     // stage. An authored-only view has no held state to resolve and keeps the authored list.
     const tools =
       toolStates ??
-      normalizeList(recipeStep?.toolIds)
+      iterableToArray(recipeStep?.toolIds)
         .map((toolId) => this._getTool(systemId, toolId))
         .filter((tool) => stringOrEmpty(tool?.name))
         .map((tool) => ({
@@ -1794,7 +1794,7 @@ export class RunJournalBuilder {
           img: stringOrNull(tool.img),
         }));
     const requiredSeconds =
-      numberOrNull(runStep?.timeGate?.requiredSeconds) ??
+      laxNumberOrNull(runStep?.timeGate?.requiredSeconds) ??
       durationToSeconds(recipeStep?.timeRequirement);
     const failureReason = stringOrNull(runStep?.failureReason);
     return {
@@ -1870,7 +1870,7 @@ export class RunJournalBuilder {
   }
 
   _craftingFailureReason(runSteps) {
-    const failed = normalizeList(runSteps).find((step) => step?.status === 'failed');
+    const failed = iterableToArray(runSteps).find((step) => step?.status === 'failed');
     return stringOrNull(failed?.failureReason);
   }
 
@@ -1932,8 +1932,8 @@ export class RunJournalBuilder {
 
   _craftingResults(runSteps, redacted, systemId = null) {
     if (redacted) return { createdResults: [], createdResultCount: 0 };
-    const createdResults = normalizeList(runSteps).flatMap((step) =>
-      normalizeList(step?.createdResults).map((result) => this._mapResult(result, systemId))
+    const createdResults = iterableToArray(runSteps).flatMap((step) =>
+      iterableToArray(step?.createdResults).map((result) => this._mapResult(result, systemId))
     );
     return { createdResults, createdResultCount: createdResults.length };
   }
@@ -2098,7 +2098,7 @@ export class RunJournalBuilder {
       ...(historyEntitled && historyEvidenceFields(run)),
       consumedIngredients:
         historyEntitled && runType === 'salvage'
-          ? normalizeList(run.consumedComponents).map((entry) =>
+          ? iterableToArray(run.consumedComponents).map((entry) =>
               this._mapResult(entry, run.craftingSystemId, false)
             )
           : [],
@@ -2324,8 +2324,8 @@ export class RunJournalBuilder {
   }
 
   _straightYieldEntries(task, systemId) {
-    return normalizeList(task?.resultGroups).flatMap((group) =>
-      normalizeList(group?.results).map((result, index) =>
+    return iterableToArray(task?.resultGroups).flatMap((group) =>
+      iterableToArray(group?.results).map((result, index) =>
         this._yieldEntry(result, systemId, index, 100)
       )
     );
@@ -2344,7 +2344,7 @@ export class RunJournalBuilder {
       icon: stringOrNull(result?.icon),
       tint: stringOrNull(result?.tint ?? result?.colorToken),
       // The expression rides BESIDE the number: an absent `qty` reads as "not recorded" instead.
-      qty: numberOrNull(result?.quantity) ?? 1,
+      qty: laxNumberOrNull(result?.quantity) ?? 1,
       amountLabel: mapped.amountLabel ?? null,
       chance,
     });
@@ -2360,10 +2360,10 @@ export class RunJournalBuilder {
     const routed = plainObjectOrNull(system?.gatheringCraftingCheck?.routed) ?? {};
     const outcomes =
       routed.type === 'fixed'
-        ? normalizeList(routed.fixedOutcomes)
-        : normalizeList(routed.relativeOutcomes);
+        ? iterableToArray(routed.fixedOutcomes)
+        : iterableToArray(routed.relativeOutcomes);
     const groupsByName = new Map();
-    for (const group of normalizeList(task?.resultGroups)) {
+    for (const group of iterableToArray(task?.resultGroups)) {
       const name = normalizeName(group?.name);
       groupsByName.set(name, [...(groupsByName.get(name) ?? []), group]);
     }
@@ -2372,7 +2372,7 @@ export class RunJournalBuilder {
       const fail = outcome?.success !== true;
       const groups = groupsByName.get(normalizeName(outcome?.name)) ?? [];
       const results =
-        fail && !permitFailure ? [] : groups.flatMap((group) => normalizeList(group?.results));
+        fail && !permitFailure ? [] : groups.flatMap((group) => iterableToArray(group?.results));
       return {
         id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
         name: stringOrEmpty(outcome?.name).trim(),
@@ -2389,7 +2389,7 @@ export class RunJournalBuilder {
 
   _tierYield(result, systemId, index) {
     const mapped = this._mapResult(result, systemId);
-    const quantity = mapped.amountLabel ?? numberOrNull(result?.quantity) ?? 1;
+    const quantity = mapped.amountLabel ?? laxNumberOrNull(result?.quantity) ?? 1;
     return compactPresentation({
       id:
         stringOrNull(result?.id) ||
@@ -2429,7 +2429,7 @@ export class RunJournalBuilder {
    * @private
    */
   _passthroughResults(createdResults, systemId = null) {
-    const results = normalizeList(createdResults).map((result) =>
+    const results = iterableToArray(createdResults).map((result) =>
       this._mapResult(result, systemId)
     );
     return { createdResults: results, createdResultCount: results.length };
@@ -2438,7 +2438,7 @@ export class RunJournalBuilder {
   _derivePassthroughStatus({ status, timeGate, worldTime, run = null }) {
     if (TERMINAL_STATUSES.has(status)) return status;
     if (run?.pauseState) return 'paused';
-    const availableAt = numberOrNull(timeGate?.availableAt);
+    const availableAt = laxNumberOrNull(timeGate?.availableAt);
     if (availableAt !== null) {
       return availableAt <= worldTime ? 'ready' : 'waiting';
     }
@@ -2478,7 +2478,7 @@ export class RunJournalBuilder {
       requestKind: stringOrNull(value?.requestKind),
       failureReason: stringOrNull(value?.failureReason),
       failureMessage: stringOrNull(value?.failureMessage),
-      claimedAt: numberOrNull(value?.claimedAt),
+      claimedAt: laxNumberOrNull(value?.claimedAt),
     };
   }
 
@@ -2704,7 +2704,7 @@ export class RunJournalBuilder {
     const rawStatus = stringOrNull(journal.status);
     if (!EXECUTION_JOURNAL_STATUSES.has(rawStatus)) return null;
     const status = rawStatus;
-    const effects = normalizeList(journal.effects).map((effect, index) => ({
+    const effects = iterableToArray(journal.effects).map((effect, index) => ({
       index,
       kind: entitled && SAFE_EXECUTION_EFFECT_KINDS.has(effect?.kind) ? effect.kind : 'other',
       phase: EXECUTION_EFFECT_PHASES.has(effect?.phase) ? effect.phase : 'unknown',
@@ -2757,7 +2757,7 @@ export class RunJournalBuilder {
     const receipt = effect?.receipt;
     if (!receipt || typeof receipt !== 'object') return null;
     let entries = [];
-    if (receipt.uncertain === true) entries = normalizeList(receipt.confirmed);
+    if (receipt.uncertain === true) entries = iterableToArray(receipt.confirmed);
     else if (
       [
         'consumeIngredients',
@@ -2766,17 +2766,17 @@ export class RunJournalBuilder {
         'consumeAlchemyItems',
       ].includes(effect.kind)
     ) {
-      entries = normalizeList(receipt.items);
+      entries = iterableToArray(receipt.items);
     } else if (['awardResults', 'awardItems'].includes(effect.kind)) {
-      entries = normalizeList(receipt.results);
+      entries = iterableToArray(receipt.results);
     } else if (effect.kind === 'createGatheredResults') {
-      entries = normalizeList(receipt);
+      entries = iterableToArray(receipt);
     } else if (['awardRewards', 'awardChoice'].includes(effect.kind)) {
       entries = [receipt.createdResults, receipt.currencyCredits, receipt.knowledgeGrants].flatMap(
-        normalizeList
+        iterableToArray
       );
     }
-    const spends = effect.kind === 'spendCurrency' ? normalizeList(receipt.settledSpends) : [];
+    const spends = effect.kind === 'spendCurrency' ? iterableToArray(receipt.settledSpends) : [];
     return this._receiptProjection(entries, systemId, { spends });
   }
 
@@ -2793,7 +2793,7 @@ export class RunJournalBuilder {
       items: items.map((entry) => this._mapResult(entry, systemId, resolveMetadata)),
       currencies: [...spends, ...currencyCredits].map((entry) => ({
         unit: stringOrEmpty(entry?.unit),
-        amount: numberOrNull(entry?.amount),
+        amount: laxNumberOrNull(entry?.amount),
       })),
       ...(grants.length > 0 && { grants }),
     };
@@ -2803,9 +2803,9 @@ export class RunJournalBuilder {
 function passthroughTimes(run, runType) {
   const gathering = runType === 'gathering';
   return {
-    startedAt: numberOrNull(gathering ? run.startedAtWorldTime : run.startedAt),
-    updatedAt: numberOrNull(gathering ? run.updatedAtWorldTime : run.updatedAt),
-    finishedAt: numberOrNull(gathering ? run.completedAtWorldTime : run.finishedAt),
+    startedAt: laxNumberOrNull(gathering ? run.startedAtWorldTime : run.startedAt),
+    updatedAt: laxNumberOrNull(gathering ? run.updatedAtWorldTime : run.updatedAt),
+    finishedAt: laxNumberOrNull(gathering ? run.completedAtWorldTime : run.finishedAt),
   };
 }
 

@@ -11,16 +11,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
-// Issue 1707 phase 2 moved the event inspector branch out of the root into this leaf.
-const eventInspectorPath = resolve(
+// Issue 1851: the usage card both inspectors mount is one component, so its hook strings are pinned
+// in its own source and the event inspector pins only how it mounts it.
+const envUsageCardPath = resolve(
   repoRoot,
-  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
+  'src/ui/svelte/apps/manager/environment/EnvironmentUsageCard.svelte'
 );
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
-const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
+const envUsageCardSource = readFileSync(envUsageCardPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readStylesheet();
 
@@ -190,10 +191,10 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('renders a "Used in environments" inspector card identical to the task one', () => {
-    assert.ok(eventInspectorSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
-    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
-    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
-    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
+    assert.ok(envUsageCardSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
+    assert.ok(envUsageCardSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
+    assert.ok(envUsageCardSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
+    assert.ok(envUsageCardSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');
     assert.equal(events.NotUsedInEnvironments, 'Not used in any environments yet.');

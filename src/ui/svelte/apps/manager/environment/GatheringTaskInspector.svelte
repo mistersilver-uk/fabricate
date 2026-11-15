@@ -14,6 +14,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import Field from '../../../components/Field.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import EnvironmentUsageCard from './EnvironmentUsageCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
   import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -144,7 +145,7 @@
             ><strong>{activeGatheringTaskEnvironmentCount(task)}</strong>
             <span class="manager-fact-label"
               >{text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments',
+                'FABRICATE.Admin.Manager.Environment.ActiveEnvironments',
                 'Active environments'
               )}</span
             ></span
@@ -181,37 +182,14 @@
       {/if}
     </InspectorCard>
 
-    <InspectorCard class="manager-task-environment-usage-card" data-task-environment-usage="">
-      <h3 class="manager-card-title">
-        {text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard',
-          'Used in environments'
-        )}
-      </h3>
-      {#if gatheringTaskReferencingEnvironments(task).length === 0}
-        <p class="manager-muted" data-task-environment-usage-empty>
-          {text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments',
-            'Not used in any environments yet.'
-          )}
-        </p>
-      {:else}
-        <div class="manager-task-environment-usage-grid" data-task-environment-usage-chips>
-          {#each gatheringTaskReferencingEnvironments(task) as environment (environment.id)}
-            <article class="manager-task-environment-usage-card">
-              <img
-                class="manager-task-environment-usage-thumb"
-                src={environmentImage(environment)}
-                alt=""
-              />
-              <span class="manager-task-environment-usage-name" title={environmentName(environment)}
-                >{environmentName(environment)}</span
-              >
-            </article>
-          {/each}
-        </div>
-      {/if}
-    </InspectorCard>
+    <EnvironmentUsageCard
+      subject="task"
+      environments={gatheringTaskReferencingEnvironments(task)}
+      {environmentImage}
+      {environmentName}
+      titleKey="FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard"
+      emptyKey="FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments"
+    />
   {/if}
 
   {#if editing}

@@ -138,6 +138,28 @@ function matchFunctions(baseUnits, headUnits) {
   };
 }
 
+/**
+ * Leftover units across files: one removed from a file and added in another, matched by symbol
+ * and then size, is a move, so it compares with where it came from rather than reading as new.
+ */
+function matchMoves(removed, added) {
+  const byName = (units) => Map.groupBy(units, (unit) => unit.symbol.replace(/#\d+$/u, ''));
+  const removedGroups = byName(removed);
+  const result = { pairs: [], baseLeft: [], headLeft: [] };
+  for (const [name, heads] of byName(added)) {
+    const sources = (removedGroups.get(name) ?? []).filter((unit) =>
+      heads.some((head) => head.file !== unit.file)
+    );
+    const matched = pairBySize(sources, heads);
+    result.pairs.push(...matched.pairs);
+    result.baseLeft.push(...matched.baseLeft);
+    result.headLeft.push(...matched.headLeft);
+    removedGroups.delete(name);
+  }
+  for (const units of removedGroups.values()) result.baseLeft.push(...units);
+  return result;
+}
+
 /** A new oversized unit in a file whose oversized functions lost lines was split out of them. */
 function addedId(unit, shrunk) {
   const sources = shrunk.filter((was) => was.file === unit.file).map((was) => was.symbol);
@@ -161,7 +183,11 @@ function pairUnits(baseEntries, headEntries) {
     ...pairs.filter(([was, now]) => oversized(was) && now.amount < was.amount).map(([was]) => was),
     ...removed,
   ]);
-  for (const { pairs, added, removed } of matches) {
+  const moved = matchMoves(
+    matches.flatMap(({ removed }) => removed),
+    matches.flatMap(({ added }) => added.filter(oversized))
+  );
+  for (const { pairs } of matches) {
     for (const [was, now] of pairs) {
       if (!oversized(now)) {
         if (oversized(was)) base.push(was);
@@ -171,11 +197,13 @@ function pairUnits(baseEntries, headEntries) {
       head.push({ ...now, id });
       if (oversized(was)) base.push({ ...was, id });
     }
-    base.push(...removed);
-    for (const unit of added) {
-      if (oversized(unit)) head.push({ ...unit, id: addedId(unit, shrunk) });
-    }
   }
+  for (const [was, now] of moved.pairs) {
+    head.push(now);
+    base.push({ ...was, file: now.file, id: now.id });
+  }
+  base.push(...moved.baseLeft);
+  for (const unit of moved.headLeft) head.push({ ...unit, id: addedId(unit, shrunk) });
   return { base, head };
 }
 
@@ -268,6 +296,19 @@ test('a brand-new oversized unit fails, and an oversized one that grows by a lin
     'src/fresh.js: file is new (801)',
     'src/long.js: file rose from 820 to 821',
   ]);
+});
+
+test('an oversized function moved to another file is not new, but one that grew or is new is', () => {
+  const repo = srcRepo({
+    'src/a.js': moduleOf(fn('mover', 120), fn('small', 5)),
+    'src/b.js': moduleOf(fn('other', 5)),
+  });
+  repo.write({ 'src/a.js': moduleOf(fn('small', 5)), 'src/b.js': moduleOf(fn('mover', 120)) });
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({ 'src/b.js': moduleOf(fn('mover', 121)) });
+  assert.deepEqual(repo.compare().failures, ['src/b.js: function mover rose from 120 to 121']);
+  repo.write({ 'src/b.js': moduleOf(fn('mover', 120), fn('fresh', 110)) });
+  assert.deepEqual(repo.compare().failures, ['src/b.js: function fresh is new (110)']);
 });
 
 test('a shrink passes and is reported, whether the unit stays oversized or not', () => {
