@@ -13,6 +13,7 @@ import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { WITHHELD_VALUES } from '../../src/ui/publishedComponentProps.js';
+import { assertClassSet } from '../helpers/classSet.js';
 import { settle } from '../helpers/publishedComponentModules.js';
 import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 
@@ -74,12 +75,12 @@ describe('the published SearchField density', () => {
       await settle();
       const root = shell();
       const control = input();
-      assert.equal(root.className, `fabricate-search ${written}`);
+      assertClassSet(root, `fabricate-search ${written}`);
       control.focus();
       assert.equal(handle.update(NAMED), true);
       await settle();
       assert.ok(shell() === root && input() === control, 'the same shell and input');
-      assert.equal(root.className, 'fabricate-search', 'the default writes no class');
+      assertClassSet(root, 'fabricate-search', 'the default writes no class');
       assert.ok(document.activeElement === control, 'and the input keeps focus');
       handle.destroy();
     });
@@ -89,7 +90,7 @@ describe('the published SearchField density', () => {
     it(`draws the default shell for ${JSON.stringify(density)}, never the compact one`, async () => {
       const { handle, shell } = mountSearch({ density });
       await settle();
-      assert.equal(shell().className, 'fabricate-search');
+      assertClassSet(shell(), 'fabricate-search');
       handle.destroy();
     });
   }
@@ -114,7 +115,7 @@ describe('the published SearchField density', () => {
     await settle();
     assert.equal(handle.update({ ...NAMED, density: 'compact' }), true);
     await settle();
-    assert.equal(shell().className, 'fabricate-search');
+    assertClassSet(shell(), 'fabricate-search');
     handle.destroy();
   });
 });

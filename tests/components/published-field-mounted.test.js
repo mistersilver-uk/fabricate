@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { assertClassSet } from '../helpers/classSet.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -147,7 +148,7 @@ describe('the published Field draws its column', () => {
       await settle();
       assert.equal(target.children.length, 1, 'one root in target');
       assert.equal(root().localName, 'div');
-      assert.equal(root().className, 'fabricate-field');
+      assertClassSet(root(), 'fabricate-field');
       assert.equal(root().getAttribute('data-companion-field'), 'name', 'rest on the root');
       const slot = handle.slot('children');
       assert.equal(slot.localName, 'div');
@@ -277,7 +278,7 @@ describe('the published Field in a companion’s own shell', () => {
     const { handle } = mountField(COLUMN, target);
     await settle();
     const column = standaloneRootIn(target).firstElementChild;
-    assert.equal(column.className, 'fabricate-field');
+    assertClassSet(column, 'fabricate-field');
     const { input } = drawCaptionAndInput(handle.slot('children'));
     assert.ok(target.querySelector(FOCUSABLE) === input, 'the companion’s input is all it focuses');
     handle.destroy();
