@@ -40,6 +40,10 @@ export async function openViewLab(browser, options) {
     afterOpen = null,
   } = options;
 
+  if (typeof repoRoot !== 'string' || repoRoot.length === 0) {
+    throw new TypeError("openViewLab requires `repoRoot`: it locates the lab's Vite config");
+  }
+
   // Attach to a lab that is already running rather than fighting it for the port.
   const running = await labIsServing(port);
   const { createServer } = running ? {} : await import(VITE_MODULE);
