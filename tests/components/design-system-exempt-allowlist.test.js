@@ -23,6 +23,16 @@ const OWN_REST = "the spread is this primitive's own rest, forwarded to the root
 /** Each reviewed reason, and how many of its markers each file states. */
 const ALLOWLIST = Object.freeze([
   [
+    'a composition of the existing InspectorCard member for exactly the gathering task and event ' +
+      'inspectors (issue 1851); it adds no vocabulary of its own, so it is not a primitive candidate.',
+    { 'src/ui/svelte/apps/manager/environment/EnvironmentUsageCard.svelte': 1 },
+  ],
+  [
+    "the spread carries exactly one `data-*` hook, the subject's `cardAttr` from the frozen HOOKS " +
+      'table, and nothing else.',
+    { 'src/ui/svelte/apps/manager/environment/EnvironmentUsageCard.svelte': 1 },
+  ],
+  [
     'registers an existing two-importer component in the primitive register at `target`; it is not ' +
       'a promotion into a primitive directory',
     { 'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte': 1 },

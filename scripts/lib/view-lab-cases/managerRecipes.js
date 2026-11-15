@@ -49,6 +49,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+      // The app navigation's labelled groups, including the open Crafting group (issue 2257 E3).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
       BROWSER_LIST_STATE_MATCH,
@@ -825,6 +827,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      // The editor draws its preview rail, a `Rail`, on every tab.
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
   }),

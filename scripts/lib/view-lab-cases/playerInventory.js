@@ -140,6 +140,8 @@ export const CASES = Object.freeze([
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+      // The service bag the shell builds its stores through (issue 1906).
+      /^src\/ui\/playerServices\.js$/,
       // The bar this frame draws, named explicitly as of issue 1500 rather than arriving by broad signal.
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
       PLAYER_VIEW_STATE,

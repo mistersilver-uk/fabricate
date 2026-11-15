@@ -21,6 +21,12 @@ const eventInspectorPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
 );
+// Issue 1851: the "Used in environments" card both inspectors mount is one component, so the hook
+// strings it draws are pinned in its source and the inspectors pin only how they mount it.
+const envUsageCardPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/environment/EnvironmentUsageCard.svelte'
+);
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 // The editor with the tabs and cards it renders (issue 1522), read as one source.
@@ -36,6 +42,8 @@ const editorSource = [
 const economySource = readFileSync(economyPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const taskInspectorSource = readFileSync(taskInspectorPath, 'utf8');
+// ratchet-exempt(source-pin): the usage card's hook strings moved here from the inspector (issue 1851); this read is the one site the move adds, and the pins it carries are the ones the inspector held.
+const envUsageCardSource = readFileSync(envUsageCardPath, 'utf8');
 const inspectorSource = `${taskInspectorSource}\n${readFileSync(eventInspectorPath, 'utf8')}`;
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -51,16 +59,16 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(taskInspectorSource.includes('data-task-drops-summary'), 'task inspector should expose the drops summary card');
     assert.ok(taskInspectorSource.includes('data-task-drops-summary-list'), 'drop summary list should expose a data attribute');
     assert.ok(taskInspectorSource.includes('data-task-drop-summary-chip'), 'each drop chip should expose a data attribute');
-    assert.ok(taskInspectorSource.includes('data-task-environment-usage'), 'environment usage block should expose a data attribute');
+    assert.ok(envUsageCardSource.includes('data-task-environment-usage'), 'environment usage block should expose a data attribute');
     assert.ok(taskInspectorSource.includes('manager-task-drop-summary-thumb'), 'drop chip should include a thumbnail image');
-    assert.ok(taskInspectorSource.includes('manager-task-environment-usage-card'), 'environment usage should render tiled cards');
-    assert.ok(taskInspectorSource.includes('manager-task-environment-usage-thumb'), 'environment tile should include a thumbnail image');
-    assert.ok(taskInspectorSource.includes('manager-task-environment-usage-grid'), 'environment tiles should sit in a grid container');
+    assert.ok(envUsageCardSource.includes('manager-task-environment-usage-card'), 'environment usage should render tiled cards');
+    assert.ok(envUsageCardSource.includes('manager-task-environment-usage-thumb'), 'environment tile should include a thumbnail image');
+    assert.ok(envUsageCardSource.includes('manager-task-environment-usage-grid'), 'environment tiles should sit in a grid container');
   });
 
   it('renders the environment usage as its own inspector card after the drops summary card', () => {
     const dropsIdx = taskInspectorSource.indexOf('data-task-drops-summary');
-    const usageIdx = taskInspectorSource.indexOf('data-task-environment-usage');
+    const usageIdx = taskInspectorSource.indexOf('<EnvironmentUsageCard');
     assert.ok(dropsIdx >= 0, 'drops summary attribute should exist');
     assert.ok(usageIdx > dropsIdx, 'environment usage should appear after the drops summary');
     // The card pin above already fixes the tile class; this test owns the order of the two cards,
@@ -85,8 +93,8 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
   it('reads drop labels/images and environment names from existing task helpers', () => {
     assert.ok(taskInspectorSource.includes('gatheringDropImage(drop)'), 'inspector should reuse gatheringDropImage for the drop thumb');
     assert.ok(taskInspectorSource.includes('gatheringDropName(drop)'), 'inspector should reuse gatheringDropName for the drop label');
-    assert.ok(taskInspectorSource.includes('environmentImage(environment)'), 'inspector should reuse environmentImage helper');
-    assert.ok(taskInspectorSource.includes('environmentName(environment)'), 'inspector should reuse environmentName helper');
+    assert.ok(envUsageCardSource.includes('environmentImage(environment)'), 'inspector should reuse environmentImage helper');
+    assert.ok(envUsageCardSource.includes('environmentName(environment)'), 'inspector should reuse environmentName helper');
   });
 
   it('removes the drops summary from the task editor view', () => {
@@ -108,6 +116,8 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(
       taskInspectorSource.includes('FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments')
     );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.ActiveEnvironments, 'Active environments');
+    assert.equal(keys.ActiveEnvironments, undefined, 'the Tasks copy of the shared key is folded away');
   });
 
   it('does not pass environments/selectedSystemId to the task editor mount', () => {

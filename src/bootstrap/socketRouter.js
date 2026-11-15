@@ -8,7 +8,6 @@ import { handleInteractableSocketMessage } from '../canvas/interactableSocketBri
 import { applyBulkChatVisibility } from '../systems/bulkChatVisibility.js';
 import { COMPANION_OPERATION_SOCKET_KIND } from '../systems/companionOperationAuthority.js';
 import {
-  buildGmComplicationCardContent,
   gmComplicationCardEntries,
   rollGmComplicationEffect,
 } from '../systems/complicationRuntime.js';
@@ -33,6 +32,7 @@ import {
   routeGatheringNodeDepleteMessage,
 } from '../systems/gatheringNodeSocket.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../systems/journalRunCommands.js';
+import { buildGmComplicationCardContent } from '../ui/presenters/ComplicationChatCard.js';
 import { renderDialog, viewScene } from '../ui/svelte/util/foundryBridge.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 

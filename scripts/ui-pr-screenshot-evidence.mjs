@@ -827,7 +827,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-gathering-stacked',
     label: 'Player gathering — narrow window stacked columns (#330)',
     smokeLabels: ['player-gathering-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/gathering\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+    matches: [/^src\/ui\/svelte\/apps\/gathering\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/playerServices\.js$/],
   },
   {
     id: 'player-crafting',
@@ -894,7 +894,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-stacked',
     label: 'Player crafting — narrow window stacked columns',
     smokeLabels: ['player-crafting-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/playerServices\.js$/],
   },
   // Issue 752: the roll-result box (awarded pills + outcome) after a craft (evidence for #727's
   // pill fix).
@@ -928,7 +928,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-progressive-stacked',
     label: 'Player crafting — progressive stage list, narrow window',
     smokeLabels: ['player-crafting-progressive-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/playerServices\.js$/],
   },
   // The explicit multi-step simple recipe detail (issue 765): per-step material blocks, the
   // multi-step hint strip, one terminal produces row, and no check card.
@@ -981,7 +981,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-alchemy-stacked',
     label: 'Player alchemy — narrow window stacked columns',
     smokeLabels: ['player-alchemy-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/alchemy\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/playerServices\.js$/],
   },
   {
     id: 'fabricate-journal',
@@ -1048,7 +1048,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],
-    matches: [/^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
+    matches: [
+      /^src\/ui\/SvelteFabricateApp\.svelte\.js$/,
+      /^src\/ui\/playerServices\.js$/,
+      /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+    ],
   },
   // Issue 752: the crafting result card posted to chat after a craft (evidence for #727's
   // roll-total fix).

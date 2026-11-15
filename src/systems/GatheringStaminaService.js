@@ -5,8 +5,8 @@ import {
   durationToSeconds,
   FLAG_NAMESPACE,
   nonNegativeNumber,
-  normalizeList,
-  numberOrNullStrict,
+  arrayOrEmpty,
+  numberOrNull,
   readState,
   STATE_FLAG_KEY,
   writeState,
@@ -65,10 +65,10 @@ export class GatheringStaminaService {
     // expressions are rolled once into numbers), so this stays synchronous and
     // simply reads the stored values. A character with no pool reads `null`.
     // `max` is the rolled value; an optional GM `maxOverride` layers over it.
-    const rolledMax = numberOrNullStrict(stamina.max);
-    const maxOverride = numberOrNullStrict(stamina.maxOverride);
+    const rolledMax = numberOrNull(stamina.max);
+    const maxOverride = numberOrNull(stamina.maxOverride);
     const max = maxOverride ?? rolledMax; // effective cap
-    const storedCurrent = numberOrNullStrict(stamina.current);
+    const storedCurrent = numberOrNull(stamina.current);
     const current = storedCurrent ?? max;
     return {
       current,
@@ -105,7 +105,7 @@ export class GatheringStaminaService {
 
     const state = readState(actor);
     const existing = state.stamina?.[key];
-    if (!force && existing && numberOrNullStrict(existing.max) != null) {
+    if (!force && existing && numberOrNull(existing.max) != null) {
       return cloneJson(existing);
     }
 
@@ -139,7 +139,7 @@ export class GatheringStaminaService {
     state.stamina = { ...state.stamina, [key]: entry };
     state.history = [
       this.historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
-      ...normalizeList(state.history),
+      ...arrayOrEmpty(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
     this.callHook('fabricate.gathering.staminaSeeded', {
@@ -229,8 +229,8 @@ export class GatheringStaminaService {
         : maxReadOnly === true;
     const priorMaxReadOnly = previous.maxReadOnly === true || previous.provider === 'external';
     const effectiveMaxReadOnly = argMaxReadOnly === undefined ? priorMaxReadOnly : argMaxReadOnly;
-    const priorMax = numberOrNullStrict(previous.max);
-    const providedMax = numberOrNullStrict(max);
+    const priorMax = numberOrNull(previous.max);
+    const providedMax = numberOrNull(max);
     // `max` is the rolled cap. When omitted, the prior rolled max is preserved
     // (the panel only edits current + override). When provided: writable pools
     // accept it freely; a read-only-max pool's maximum is fixed once
@@ -241,7 +241,7 @@ export class GatheringStaminaService {
     // sets it; null/'' clears it. The effective cap is the override, else rolled.
     const override =
       maxOverride === undefined
-        ? numberOrNullStrict(previous.maxOverride)
+        ? numberOrNull(previous.maxOverride)
         : maxOverride === null || maxOverride === ''
           ? null
           : nonNegativeNumber(maxOverride, 0);
@@ -269,7 +269,7 @@ export class GatheringStaminaService {
         max: next.max,
         maxOverride: override,
       }),
-      ...normalizeList(state.history),
+      ...arrayOrEmpty(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
     this.callHook('fabricate.gathering.staminaAdjusted', {
@@ -289,12 +289,12 @@ export class GatheringStaminaService {
     const previous = state.stamina?.[key] || {};
     // Preserve the stored max verbatim (null stays null) so the system default
     // max stays authoritative when no per-actor override exists.
-    const previousOverride = numberOrNullStrict(previous.maxOverride);
+    const previousOverride = numberOrNull(previous.maxOverride);
     const entry = {
       maxReadOnly: previous.maxReadOnly === true || previous.provider === 'external',
       regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
       current: clamped,
-      max: numberOrNullStrict(previous.max),
+      max: numberOrNull(previous.max),
       ...(!(previousOverride == null) && { maxOverride: previousOverride }),
       ...(!(previous.lastRegenWorldTime === undefined) && {
         lastRegenWorldTime: previous.lastRegenWorldTime,
@@ -308,7 +308,7 @@ export class GatheringStaminaService {
         delta: Number(delta || 0),
         current: clamped,
       }),
-      ...normalizeList(state.history),
+      ...arrayOrEmpty(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
     this.callHook('fabricate.gathering.staminaAdjusted', {
@@ -364,7 +364,7 @@ export class GatheringStaminaService {
     const entry = state.stamina?.[key];
     if (!entry) return null; // regen only tops up materialized pools, never creates them
     // Effective cap: the GM override if set, else the rolled max.
-    const max = numberOrNullStrict(entry.maxOverride) ?? numberOrNullStrict(entry.max);
+    const max = numberOrNull(entry.maxOverride) ?? numberOrNull(entry.max);
     if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
@@ -413,7 +413,7 @@ export class GatheringStaminaService {
         current: nextCurrent,
         max,
       }),
-      ...normalizeList(state.history),
+      ...arrayOrEmpty(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
     this.callHook('fabricate.gathering.staminaRegenerated', {

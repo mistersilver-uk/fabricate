@@ -5,8 +5,8 @@ import {
   cloneJson,
   durationToSeconds,
   nonNegativeInteger,
-  normalizeList,
-  numberOrNullStrict,
+  arrayOrEmpty,
+  numberOrNull,
 } from './gatheringRichStateInternals.js';
 import { resolveAccrualAnchor, respawnNodeOnce } from './nodeRespawnMath.js';
 
@@ -87,7 +87,7 @@ export class GatheringNodeService {
     const libraryTasks =
       this.getConfig().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
     const config = normalizeNodeConfig(
-      normalizeList(libraryTasks).find((task) => task?.id === taskId)?.nodes
+      arrayOrEmpty(libraryTasks).find((task) => task?.id === taskId)?.nodes
     );
     return config ? { ...config, current: config.max } : null;
   }
@@ -257,8 +257,8 @@ export class GatheringNodeService {
         : libNode.current,
       respawn: {
         ...cloneJson(libNode.respawn || { policy: 'manual' }),
-        lastEvaluatedWorldTime: numberOrNullStrict(storedRespawn.lastEvaluatedWorldTime),
-        nextEvaluationWorldTime: numberOrNullStrict(storedRespawn.nextEvaluationWorldTime),
+        lastEvaluatedWorldTime: numberOrNull(storedRespawn.lastEvaluatedWorldTime),
+        nextEvaluationWorldTime: numberOrNull(storedRespawn.nextEvaluationWorldTime),
         lastRoll:
           storedRespawn.lastRoll && typeof storedRespawn.lastRoll === 'object'
             ? cloneJson(storedRespawn.lastRoll)
