@@ -19,6 +19,7 @@
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../gatheringImageDefaults.js';
 
 import { renderComplications } from './CraftingChatCard.js';
+import { esc } from './htmlEscape.js';
 
 const COMPONENT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 const EVENT_FALLBACK_IMG = DEFAULT_GATHERING_EVENT_IMG;
@@ -44,15 +45,6 @@ const STAT_ICONS = Object.freeze({
   stamina: 'fas fa-bolt',
   nodes: 'fas fa-mountain',
 });
-
-/** Escape text destined for HTML so user-authored names cannot inject markup. */
-function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
 
 /**
  * Render one image-backed entry (component, event, or broken tool) as a list

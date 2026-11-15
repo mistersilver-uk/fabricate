@@ -11,7 +11,7 @@ import { better } from './checkEvaluation.js';
 import { sumGrading } from './checkRouting.js';
 import { activeCheckEvaluation } from './checkTarget.js';
 import { countRequired } from './countCheck.js';
-import { normalizeList, numberOrNull } from './gatheringEngineInternals.js';
+import { iterableToArray, laxNumberOrNull } from './gatheringEngineInternals.js';
 
 /** The boundary glyphs a band states, by direction and comparison. */
 const GLYPHS = Object.freeze({
@@ -22,8 +22,8 @@ const GLYPHS = Object.freeze({
 /** Band for one routed GATHERING tier. */
 export function routedOutcomeBand(outcome, routed, task, labels = {}) {
   if (routed?.type === 'fixed') {
-    const start = numberOrNull(outcome?.start) ?? 0;
-    const end = numberOrNull(outcome?.end) ?? start;
+    const start = laxNumberOrNull(outcome?.start) ?? 0;
+    const end = laxNumberOrNull(outcome?.end) ?? start;
     return netRange(start, end);
   }
   const evaluation = activeCheckEvaluation(routed);
@@ -33,7 +33,7 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
   // Mirrors GatheringEngine._resolveGatheringRoutedDc exactly: a finite task
   // override, then the routed slot's DC, then its canonical legacy fallback.
-  const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
+  const baseDc = laxNumberOrNull(task?.dcOverride) ?? laxNumberOrNull(routed?.dc) ?? 15;
   const threshold = tierThreshold(baseDc, outcome, grading);
   const { lowest, next } = outcomeBandPosition(routed, threshold, baseDc, grading);
   const { at, short } = glyphs(routed, grading);
@@ -75,7 +75,7 @@ function glyphs(routed, grading) {
 
 /** Under, a tier's step lowers the target it must stay under: `base − dc` (checkRouting). */
 function tierThreshold(base, outcome, grading) {
-  const step = numberOrNull(outcome?.dc) ?? 0;
+  const step = laxNumberOrNull(outcome?.dc) ?? 0;
   return grading.direction === 'under' ? base - step : base + step;
 }
 
@@ -87,7 +87,8 @@ const namedBand = (tier, adjustment) => `${tier} · ${adjustment}`;
  */
 function adjustmentBand(outcome, grading, { otherwise = 'Otherwise', named = namedBand } = {}) {
   let adjustment;
-  if (!grading.multiply) adjustment = formatCheckAdjustment('add', numberOrNull(outcome?.dc) ?? 0);
+  if (!grading.multiply)
+    adjustment = formatCheckAdjustment('add', laxNumberOrNull(outcome?.dc) ?? 0);
   else if (outcome?.adjustment == null) adjustment = otherwise;
   else adjustment = formatCheckAdjustment('multiply', outcome.adjustment);
   const tier = String(outcome?.name ?? '').trim();
@@ -113,7 +114,7 @@ export function ladderRule(routed) {
  */
 function outcomeBandPosition(routed, threshold, base, grading) {
   const { direction } = grading;
-  const thresholds = normalizeList(routed?.relativeOutcomes).map((entry) =>
+  const thresholds = iterableToArray(routed?.relativeOutcomes).map((entry) =>
     tierThreshold(base, entry, grading)
   );
   const harder = thresholds.filter((value) => better(value, threshold, direction));
@@ -136,8 +137,8 @@ function craftingThreshold(threshold, dc, grading) {
 
 /** A relative count ladder's thresholds, `required + outcome.dc`, in authored order. */
 function countThresholds(routed, required) {
-  return normalizeList(routed?.relativeOutcomes).map(
-    (entry) => required + (numberOrNull(entry?.dc) ?? 0)
+  return iterableToArray(routed?.relativeOutcomes).map(
+    (entry) => required + (laxNumberOrNull(entry?.dc) ?? 0)
   );
 }
 
@@ -153,7 +154,7 @@ export function taskCountRequired(routed, task) {
  * from its threshold up to the next tier's, the best met winning as the runner routes it.
  */
 function countBand(outcome, routed, required) {
-  const threshold = required + (numberOrNull(outcome?.dc) ?? 0);
+  const threshold = required + (laxNumberOrNull(outcome?.dc) ?? 0);
   const thresholds = countThresholds(routed, required);
   const higher = thresholds.filter((value) => value > threshold);
   const next = higher.length > 0 ? Math.min(...higher) : null;
@@ -185,7 +186,7 @@ function lowestTierStart(routed, threshold, next) {
  * summed DC reads: `<Needed` for the least demanding tier, `Needed+2+` above it.
  */
 function relativeCountBand(outcome, routed, word) {
-  const offset = numberOrNull(outcome?.dc) ?? 0;
+  const offset = laxNumberOrNull(outcome?.dc) ?? 0;
   const thresholds = countThresholds(routed, 0);
   const higher = thresholds.filter((value) => value > offset);
   if (thresholds.some((value) => value < offset)) return `${offsetFrom(word, offset)}+`;

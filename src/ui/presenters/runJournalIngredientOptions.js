@@ -3,8 +3,8 @@
  * much of it a stage needs, and the name it is shown by.
  */
 import {
-  normalizeList,
-  numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   plainObjectOrNull,
   stringOrEmpty,
   stringOrNull,
@@ -19,16 +19,16 @@ export function ingredientOverrideIndex(group, optionOverrides) {
     return null;
   }
   const index = Number(raw);
-  return Number.isSafeInteger(index) && index >= 0 && index < normalizeList(group?.options).length
+  return Number.isSafeInteger(index) && index >= 0 && index < iterableToArray(group?.options).length
     ? index
     : null;
 }
 
 export function selectedIngredientIndex(group, optionOverrides, selection) {
-  const options = normalizeList(group?.options);
+  const options = iterableToArray(group?.options);
   const override = ingredientOverrideIndex(group, optionOverrides);
   if (override !== undefined) return override;
-  const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
+  const selected = iterableToArray(selection?.selectedIngredients).find((ingredient) =>
     options.includes(ingredient)
   );
   const selectedIndex = options.indexOf(selected);
@@ -38,9 +38,9 @@ export function selectedIngredientIndex(group, optionOverrides, selection) {
 export function ingredientNeed(option) {
   const match = plainObjectOrNull(option?.match);
   if (match?.type === 'essence' || match?.type === 'currency') {
-    return Math.max(0, numberOrNull(match.amount) ?? 0);
+    return Math.max(0, laxNumberOrNull(match.amount) ?? 0);
   }
-  return Math.max(0, numberOrNull(option?.quantity) ?? 1);
+  return Math.max(0, laxNumberOrNull(option?.quantity) ?? 1);
 }
 
 export function ingredientOptionName({ group, option, kind, match, definition, component }) {
@@ -55,7 +55,7 @@ export function ingredientOptionName({ group, option, kind, match, definition, c
     return `${ingredientNeed(option)} ${stringOrEmpty(match?.unit)}`.trim();
   }
   if (kind === 'tag') {
-    const tags = normalizeList(match?.tags).map(stringOrEmpty).filter(Boolean);
+    const tags = iterableToArray(match?.tags).map(stringOrEmpty).filter(Boolean);
     return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
   }
   return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);

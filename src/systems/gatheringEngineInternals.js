@@ -3,12 +3,7 @@
  * definition; the duplication gate forbids a copy.
  */
 
-import {
-  cloneJson,
-  iterableToArray as normalizeList,
-  stringOrEmpty,
-  stringOrNull,
-} from '../utils/scalars.js';
+import { cloneJson, iterableToArray, stringOrEmpty, stringOrNull } from '../utils/scalars.js';
 
 /**
  * The `taskId` prefix an opaque-blind waiting run persists instead of the drawn task (issue 901):
@@ -49,16 +44,22 @@ export function mergeCharacterModifierSnapshots(base, environmental) {
   const baseSnapshot = plainObjectOrNull(base) ?? {};
   const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
   return {
-    rows: normalizeList(baseSnapshot.rows),
-    events: normalizeList(environmentalSnapshot.events),
+    rows: iterableToArray(baseSnapshot.rows),
+    events: iterableToArray(environmentalSnapshot.events),
   };
+}
+
+/** `value` as a list: an array as itself, a truthy scalar as one element, anything else as none. */
+function listOf(value) {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
 }
 
 /** De-duplicated trimmed non-empty strings; a scalar is a one-element list. */
 export function normalizeStringList(value) {
   return [
     ...new Set(
-      normalizeList(Array.isArray(value) ? value : value ? [value] : [])
+      iterableToArray(listOf(value))
         .map((entry) => stringOrEmpty(entry))
         .filter(Boolean)
     ),
@@ -102,7 +103,7 @@ export function sameActorUuid(actor, actorUuid) {
 }
 
 export function normalizeActorList(value) {
-  return normalizeList(value).filter(Boolean);
+  return iterableToArray(value).filter(Boolean);
 }
 
 /** Call an optional collaborator, or resolve `[]` when it is absent. */
@@ -139,15 +140,15 @@ export function redactRichEvidence(evidence = {}) {
     typeof redacted.characterModifierSnapshot === 'object'
   ) {
     redacted.characterModifierSnapshot = {
-      rows: normalizeList(redacted.characterModifierSnapshot.rows).map((row) => ({
+      rows: iterableToArray(redacted.characterModifierSnapshot.rows).map((row) => ({
         rowId: null,
-        contributions: normalizeList(row?.contributions).map((entry) => ({
+        contributions: iterableToArray(row?.contributions).map((entry) => ({
           contribution: Number(entry?.contribution ?? 0),
         })),
       })),
-      events: normalizeList(redacted.characterModifierSnapshot.events).map((event) => ({
+      events: iterableToArray(redacted.characterModifierSnapshot.events).map((event) => ({
         eventId: null,
-        contributions: normalizeList(event?.contributions).map((entry) => ({
+        contributions: iterableToArray(event?.contributions).map((entry) => ({
           contribution: Number(entry?.contribution ?? 0),
         })),
       })),
@@ -176,8 +177,8 @@ export function stripRuntimeSnapshotFromRun(run) {
 
 export {
   cloneJson,
-  iterableToArray as normalizeList,
-  laxNumberOrNull as numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   stringOrEmpty,
   stringOrNull,
 } from '../utils/scalars.js';
