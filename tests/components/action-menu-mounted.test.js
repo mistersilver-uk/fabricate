@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { assertClassSet } from '../helpers/classSet.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -95,8 +96,8 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     const button = trigger(target);
     assert.ok(Boolean(button), 'the trigger announces `aria-haspopup="menu"`');
     assert.equal(button.getAttribute('aria-expanded'), 'false');
-    assert.equal(
-      button.className,
+    assertClassSet(
+      button,
       'fabricate-icon-button',
       'the trigger IS the shared IconButton, root class first (issue 1502)'
     );
@@ -155,7 +156,8 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     assert.ok(!target.querySelector('[role="dialog"]'), 'no dialog');
     assert.ok(!target.querySelector('[aria-selected]'), 'nothing is selected');
     assert.ok(
-      !menu.hasAttribute('aria-activedescendant') && !trigger(target).hasAttribute('aria-activedescendant'),
+      !menu.hasAttribute('aria-activedescendant') &&
+        !trigger(target).hasAttribute('aria-activedescendant'),
       'a menu MOVES focus to its items rather than pointing at them, so nothing here points'
     );
     harness.remount();
@@ -165,7 +167,11 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     const target = await open(await harness.mount(props()));
     const forced = target.querySelector('[data-action="force-include"]');
     assert.ok(Boolean(forced), 'the per-item `data` map is stamped on the item button');
-    assert.equal(forced.getAttribute('role'), 'menuitem', 'and cannot overwrite the primitive’s own role');
+    assert.equal(
+      forced.getAttribute('role'),
+      'menuitem',
+      'and cannot overwrite the primitive’s own role'
+    );
     assert.ok(
       target.querySelector('.manager-action-menu-item.is-danger'),
       'a danger verb keeps its modifier class'
@@ -417,7 +423,10 @@ describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
       enabledItems(doc)[1].click();
       await flushRender();
       assert.deepEqual(chosen, ['middle']);
-      assert.ok(doc.activeElement === hostTrigger(target), 'focus comes back to the caller’s button');
+      assert.ok(
+        doc.activeElement === hostTrigger(target),
+        'focus comes back to the caller’s button'
+      );
     });
   });
 

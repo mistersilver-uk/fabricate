@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { assertClassSet } from '../helpers/classSet.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -52,7 +53,7 @@ describe('2540 a popover trigger forwards its class onto the button primitive', 
     });
     const trigger = harness.target.querySelector('button');
     assert.ok(Boolean(trigger), 'the picker renders its trigger');
-    assert.equal(trigger.className, `${ROOT} is-dashed manager-recipe-tools-trigger`);
+    assertClassSet(trigger, `${ROOT} is-dashed manager-recipe-tools-trigger`);
     assert.equal(trigger.dataset.keyboardFocus, 'true', 'the primitive’s own Foundry focus flag');
   });
 

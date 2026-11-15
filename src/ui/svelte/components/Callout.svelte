@@ -194,7 +194,7 @@
     align-items: stretch;
   }
 
-  /* The body stays `--fab-text-muted` at every tone, as the specimen has it. */
+  /* The body stays `--fab-text-muted` at every tone but danger, where muted is under 4.5:1 on the fill. */
   .manager-callout.is-info {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
@@ -242,6 +242,7 @@
 
   .manager-callout.is-danger {
     border-color: var(--fab-danger-border);
+    color: var(--fab-text-secondary);
     background: var(--fab-danger-soft);
   }
 

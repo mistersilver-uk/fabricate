@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { assertClassSet } from '../helpers/classSet.js';
 import { settle } from '../helpers/publishedComponentModules.js';
 import { publishedEntrySeam } from '../helpers/publishedEntrySeam.js';
 
@@ -82,12 +83,12 @@ for (const [key, { drawn, defaulted }] of Object.entries(FORMS)) {
       it(`writes ${written} for ${JSON.stringify(value)}, and an update without it removes it in the same column`, async () => {
         const { handle, input, column } = await mountField({ [key]: value });
         const root = column();
-        assert.equal(root.className, `fabricate-field ${written}`);
+        assertClassSet(root, `fabricate-field ${written}`);
         input.focus();
         assert.equal(handle.update(COLUMN), true);
         await settle();
         assert.ok(column() === root, 'the same column');
-        assert.equal(root.className, 'fabricate-field', 'the default writes no class');
+        assertClassSet(root, 'fabricate-field', 'the default writes no class');
         assert.ok(handle.slot('children').contains(input), 'the control stays in the slot');
         assert.ok(document.activeElement === input, 'and keeps focus');
         handle.destroy();
@@ -97,7 +98,7 @@ for (const [key, { drawn, defaulted }] of Object.entries(FORMS)) {
     for (const value of defaulted) {
       it(`draws the default for ${JSON.stringify(value)}`, async () => {
         const { handle, column } = await mountField({ [key]: value });
-        assert.equal(column().className, 'fabricate-field');
+        assertClassSet(column(), 'fabricate-field');
         handle.destroy();
       });
     }
@@ -111,7 +112,7 @@ describe('the published Field updates a form key in place', () => {
     assert.ok(input.matches(CHROME('is-size-26')), 'the 26 rung reaches the number input');
     assert.equal(handle.update({ ...COLUMN, size: 34 }), true);
     await settle();
-    assert.equal(root.className, 'fabricate-field is-size-34');
+    assertClassSet(root, 'fabricate-field is-size-34');
     const all = {
       ...COLUMN,
       size: 28,
@@ -124,8 +125,8 @@ describe('the published Field updates a form key in place', () => {
     assert.equal(handle.update(all), true);
     await settle();
     assert.ok(column() === root, 'the same column');
-    assert.equal(
-      root.className,
+    assertClassSet(
+      root,
       'fabricate-field is-size-28 is-face-mono is-type-number is-invalid is-align-end is-readonly',
       'each key writes its own class'
     );
