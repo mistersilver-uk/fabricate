@@ -1,7 +1,7 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 import {
-  laxNumberOrNull as numberOrNull,
+  laxNumberOrNull,
   normalizeConditionId,
   normalizeTag,
   normalizeTagList,
@@ -22,8 +22,8 @@ import {
   dropThreshold,
   nonNegativeInteger,
   nonNegativeNumber,
-  normalizeList,
-  numberOrNullStrict,
+  arrayOrEmpty,
+  numberOrNull,
   readState,
   writeState,
 } from './gatheringRichStateInternals.js';
@@ -288,7 +288,7 @@ export class GatheringRichStateService {
         });
     const compositionMode = resolveGatheringCompositionMode(environment);
     const tasks = sortRecordsByOrder(
-      normalizeList(libraries.tasks)
+      arrayOrEmpty(libraries.tasks)
         .filter((task) => task?.enabled !== false)
         .filter((task) =>
           environmentComposesRecord(
@@ -305,7 +305,7 @@ export class GatheringRichStateService {
       environment?.taskOrder
     ).map((task) => this._libraryTaskToRuntimeTask(task, environment));
     const events = sortRecordsByOrder(
-      normalizeList(libraries.events)
+      arrayOrEmpty(libraries.events)
         .filter((event) => event?.enabled !== false)
         .filter((event) =>
           environmentComposesRecord(
@@ -326,7 +326,7 @@ export class GatheringRichStateService {
     // serves check modifiers and these d100 references. The gathering config's old
     // `characterModifiers` copy is retired by the 1.23.0 migration, with no read alias.
     const libraryCharacterModifiers = new Map();
-    for (const entry of normalizeList(this._worldModifierLibrary(system))) {
+    for (const entry of arrayOrEmpty(this._worldModifierLibrary(system))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
@@ -338,7 +338,7 @@ export class GatheringRichStateService {
           globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)
         );
     const libraryTools = new Map();
-    for (const tool of normalizeList(toolSource)) {
+    for (const tool of arrayOrEmpty(toolSource)) {
       if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
     }
 
@@ -474,7 +474,7 @@ export class GatheringRichStateService {
       environment?.__libraryCharacterModifiers instanceof Map
         ? environment.__libraryCharacterModifiers
         : new Map();
-    const enabledRows = normalizeList(task?.dropRows ?? task?.itemDrops)
+    const enabledRows = arrayOrEmpty(task?.dropRows ?? task?.itemDrops)
       .filter((row) => row?.enabled !== false)
       .map((row) => normalizeItemDrop(row));
     const rowSnapshots = [];
@@ -484,7 +484,7 @@ export class GatheringRichStateService {
     for (const row of enabledRows) {
       const contributions = [];
       const rowEvidence = [];
-      for (const reference of normalizeList(row.characterModifiers)) {
+      for (const reference of arrayOrEmpty(row.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
           reference,
@@ -595,7 +595,7 @@ export class GatheringRichStateService {
       environment?.__libraryCharacterModifiers instanceof Map
         ? environment.__libraryCharacterModifiers
         : new Map();
-    const enabledEvents = normalizeList(environment?.events)
+    const enabledEvents = arrayOrEmpty(environment?.events)
       .filter((event) => event?.enabled !== false)
       .map((event) => normalizeEvent(event));
     const eventSnapshots = [];
@@ -612,7 +612,7 @@ export class GatheringRichStateService {
       }
       const contributions = [];
       const eventEvidence = [];
-      for (const reference of normalizeList(event.characterModifiers)) {
+      for (const reference of arrayOrEmpty(event.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
           reference,
@@ -700,7 +700,7 @@ export class GatheringRichStateService {
       eventPolicy: rules.eventPolicy,
     };
     if (task?.resolutionMode !== 'd100') return empty;
-    const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
+    const rows = arrayOrEmpty(task?.dropRows ?? task?.itemDrops)
       .filter((row) => row?.enabled !== false)
       .map((row) => normalizeItemDrop(row));
     if (rows.length === 0) return empty;
@@ -718,7 +718,7 @@ export class GatheringRichStateService {
     for (const row of rows) {
       const character = [];
       const characterEntries = [];
-      for (const reference of normalizeList(row.characterModifiers)) {
+      for (const reference of arrayOrEmpty(row.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
           reference,
@@ -807,7 +807,7 @@ export class GatheringRichStateService {
    */
   taskSuccessChance(task, environment) {
     if (task?.resolutionMode !== 'd100') return null;
-    const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
+    const rows = arrayOrEmpty(task?.dropRows ?? task?.itemDrops)
       .filter((row) => row?.enabled !== false)
       .map((row) => normalizeItemDrop(row));
     if (rows.length === 0) return null;
@@ -862,8 +862,8 @@ export class GatheringRichStateService {
     // The single system mode; clamping and operator signing are identical in both modes, only
     // aggregation differs.
     const effectiveMode = resolveDropModifierMode(dropModifierMode);
-    const min = numberOrNullStrict(reference?.min);
-    const max = numberOrNullStrict(reference?.max);
+    const min = numberOrNull(reference?.min);
+    const max = numberOrNull(reference?.max);
 
     const expressionOverride = stringOrFallback(reference?.expressionOverride, '');
 
@@ -1053,8 +1053,8 @@ export class GatheringRichStateService {
         resolveSystemConditionSettings(this._config(), environment?.craftingSystemId)
       ),
       events: opaqueBlind
-        ? normalizeList(environment?.events).map(() => ({ matched: true }))
-        : normalizeList(environment?.events).map((event) => ({
+        ? arrayOrEmpty(environment?.events).map(() => ({ matched: true }))
+        : arrayOrEmpty(environment?.events).map((event) => ({
             id: event.id,
             name: event.name,
             dropRate: event.dropRate,
@@ -1524,7 +1524,7 @@ export class GatheringRichStateService {
   async _effectiveStaminaCost({ actor, system, environment, task, viewer = null } = {}) {
     const base = Number(task?.staminaCost || 0);
     if (base <= 0) return 0;
-    const references = normalizeList(task?.staminaCostModifiers);
+    const references = arrayOrEmpty(task?.staminaCostModifiers);
     if (references.length === 0) return Math.max(0, Math.round(base));
     const library = this._modifierLibrary({ environment, system });
     let total = base;
@@ -1682,9 +1682,9 @@ function normalizeGatheringConfig(raw = {}) {
         conditions: { weather, timeOfDay },
       }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
-      tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
-      tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean), // ratchet-exempt(world-scope): not-a-system
-      events: normalizeList(config?.events).map(normalizeEvent),
+      tasks: arrayOrEmpty(config?.tasks).map(normalizeLibraryTask),
+      tools: arrayOrEmpty(config?.tools).map(normalizeLibraryTool).filter(Boolean), // ratchet-exempt(world-scope): not-a-system
+      events: arrayOrEmpty(config?.events).map(normalizeEvent),
       // `characterModifiers` is not emitted (issue 1117): this allowlist rebuild retires it.
       economy: normalizeGatheringEconomy(config?.economy),
     };
@@ -1787,7 +1787,7 @@ function normalizeLibraryTask(task = {}) {
       ? task.resolutionMode
       : 'd100',
     resultGroups: normalizeGatheringResultGroups(task.resultGroups, { fallbackPrefix: id }),
-    dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
+    dropRows: arrayOrEmpty(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     staminaCostModifiers: normalizeCharacterModifierReferenceList(task.staminaCostModifiers),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
@@ -1996,8 +1996,8 @@ function normalizeCharacterModifierReference(ref, index) {
     id: stringOrFallback(ref.id, `char-mod-${modifierId}-${index + 1}`),
     modifierId,
     operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
-    min: numberOrNullStrict(ref.min),
-    max: numberOrNullStrict(ref.max),
+    min: numberOrNull(ref.min),
+    max: numberOrNull(ref.max),
     expressionOverride: stringOrFallback(ref.expressionOverride, ''),
   };
 }
@@ -2006,7 +2006,7 @@ function normalizeModifierProvider(provider = null) {
   if (!provider || typeof provider !== 'object') return null;
   return {
     provider: stringOrFallback(provider.provider, ''),
-    value: numberOrNull(provider.value),
+    value: laxNumberOrNull(provider.value),
     formula: stringOrFallback(provider.formula, ''),
     macroUuid: stringOrFallback(provider.macroUuid, ''),
   };
@@ -2489,8 +2489,8 @@ function revealKey({ environmentId, taskId, scope, actor, userId }) {
 
 /** Stable-sort records by an ordered id list; unlisted records keep library order after them. */
 function sortRecordsByOrder(records, order) {
-  const list = normalizeList(records);
-  const orderIndex = new Map(normalizeList(order).map((id, index) => [String(id), index]));
+  const list = arrayOrEmpty(records);
+  const orderIndex = new Map(arrayOrEmpty(order).map((id, index) => [String(id), index]));
   if (orderIndex.size === 0) return list;
   return list
     .map((record, index) => ({ record, index }))

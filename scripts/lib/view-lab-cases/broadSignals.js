@@ -58,8 +58,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-paused',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
   ]),
+  // The journal tab's clock, drawn by `FabricateAppRoot` on every journal frame. This compact-
+  // history frame is one that `FabricateAppRoot` selects (issue 1603).
   'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
-    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-history-batch-full-1240',
   ]),
   // Issue 1644: the read-only row, and every frame that paints a partly delivered essence.
   'src/ui/svelte/components/SlotRow.svelte': Object.freeze([

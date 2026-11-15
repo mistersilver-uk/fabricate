@@ -1,3 +1,4 @@
+// ratchet-exempt(file-size): the hub-alias rename (issue 1786) spells `normalizeList` as the longer canonical `iterableToArray`, which Prettier wraps onto five more lines; no logic was added. Taking this file under 2,000 lines is #1921.
 import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
 import {
   classifyGatheringToolStates,
@@ -68,7 +69,7 @@ import {
   mergeCharacterModifierSnapshots,
   normalizeActorList,
   normalizeInteractableRef,
-  normalizeList,
+  iterableToArray,
   normalizeStringList,
   plainObjectOrNull,
   redactRichEvidence,
@@ -371,8 +372,8 @@ export class GatheringEngine {
       if (stringOrNull(task?.resolutionMode) !== 'progressive') return null;
       const meta = outcome?.checkResult?.resolutionMeta;
       if (!Array.isArray(meta?.awardedResultIds)) return null;
-      const group = normalizeList(task?.resultGroups)[0];
-      const stages = normalizeList(group?.results).map((result) => {
+      const group = iterableToArray(task?.resultGroups)[0];
+      const stages = iterableToArray(group?.results).map((result) => {
         const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
         return {
           resultId: stringOrNull(result?.id),
@@ -391,7 +392,7 @@ export class GatheringEngine {
           remaining: Number(meta.remaining ?? 0),
           partialResult: meta.partialResultId ?? null,
           haltedResult: meta.haltedResultId ?? null,
-          skippedResults: normalizeList(meta.skippedResultIds),
+          skippedResults: iterableToArray(meta.skippedResultIds),
         },
         ...resolveCheckTriggerMatches(
           system?.gatheringCraftingCheck?.progressive?.checkBreakage,
@@ -510,8 +511,8 @@ export class GatheringEngine {
 
   _findVersionedStartRun({ actor, operationId, requestId }) {
     const runs = [
-      ...normalizeList(this.runManager?.getActiveRuns?.(actor)),
-      ...normalizeList(this.runManager?.getRunHistory?.(actor)),
+      ...iterableToArray(this.runManager?.getActiveRuns?.(actor)),
+      ...iterableToArray(this.runManager?.getRunHistory?.(actor)),
     ];
     return (
       runs.find(
@@ -870,8 +871,8 @@ export class GatheringEngine {
           ...(count && { count }),
           thresholdMode: stringOrNull(config?.thresholdMode),
           type: stringOrNull(config?.type),
-          relativeOutcomes: cloneJson(normalizeList(config?.relativeOutcomes)),
-          fixedOutcomes: cloneJson(normalizeList(config?.fixedOutcomes)),
+          relativeOutcomes: cloneJson(iterableToArray(config?.relativeOutcomes)),
+          fixedOutcomes: cloneJson(iterableToArray(config?.fixedOutcomes)),
           clampToNearest: mode === 'routed',
           minOutcomeId: null,
         },
@@ -913,7 +914,7 @@ export class GatheringEngine {
     // lock; ungated, two clients would double-apply every maturation effect. Uses the fail-open
     // `resumeTimedRuns`, not the `isPrimaryGM` maintenance gate.
     const readyRuns = this.resumeTimedRuns()
-      ? normalizeList(await this.runManager?.getMaturedWaitingRuns?.(worldTime))
+      ? iterableToArray(await this.runManager?.getMaturedWaitingRuns?.(worldTime))
       : [];
 
     for (const entry of readyRuns) {
@@ -1457,7 +1458,7 @@ export class GatheringEngine {
             plainObjectOrNull(run?.conditionSnapshot) ||
             plainObjectOrNull(environment?.conditions) ||
             {},
-          events: normalizeList(snapshot?.events),
+          events: iterableToArray(snapshot?.events),
           rules: plainObjectOrNull(snapshot?.rules) || plainObjectOrNull(environment?.rules) || {},
           useLegacyTaskItemSelectionMode: snapshot?.useLegacyTaskItemSelectionMode === true,
           eventSelectionMode:
@@ -1477,7 +1478,7 @@ export class GatheringEngine {
       });
     }
     const currentTask =
-      normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null;
+      iterableToArray(environment.tasks).find((task) => task?.id === run.taskId) ?? null;
     const task = snapshotTask || currentTask;
     if (!task) {
       return { missingReference: 'task', system, environment };
@@ -1509,7 +1510,7 @@ export class GatheringEngine {
   }
 
   _allSystems() {
-    const systems = normalizeList(
+    const systems = iterableToArray(
       typeof this.getSystems === 'function' ? this.getSystems() : this.systemManager?.getSystems?.()
     );
 
@@ -1519,7 +1520,7 @@ export class GatheringEngine {
   }
 
   _playerCandidateEnvironments(systems, viewer) {
-    const environments = normalizeList(this.environmentStore?.list?.());
+    const environments = iterableToArray(this.environmentStore?.list?.());
     // System-validity gate: a `blocks: 'system'` issue hides the system's environments from
     // non-GMs; GMs bypass to fix it. Computed at most once per system per listing.
     const isGM = viewer?.isGM === true;
@@ -1576,7 +1577,7 @@ export class GatheringEngine {
    */
   _taskSuccessChance(task) {
     if (task?.resolutionMode !== 'd100') return null;
-    const rows = normalizeList(task.dropRows).filter((row) => row?.enabled !== false);
+    const rows = iterableToArray(task.dropRows).filter((row) => row?.enabled !== false);
     if (rows.length === 0) return null;
     const missAll = rows.reduce((product, row) => {
       const rate = Math.min(100, Math.max(0, Number(row?.dropRate) || 0));
@@ -1586,7 +1587,9 @@ export class GatheringEngine {
   }
 
   async _visibleTaskListings({ environment, system, viewer, actor }) {
-    const enabledTasks = normalizeList(environment.tasks).filter((task) => task?.enabled !== false);
+    const enabledTasks = iterableToArray(environment.tasks).filter(
+      (task) => task?.enabled !== false
+    );
     const visibleTasks = [];
     for (const task of enabledTasks) {
       const visibility = viewer?.isGM
@@ -1794,7 +1797,7 @@ export class GatheringEngine {
   }) {
     const realmEnabledSystemIds = [
       ...new Set(
-        normalizeList(environmentModels)
+        iterableToArray(environmentModels)
           .filter((model) => model?.realmsEnabled === true)
           .map((model) => stringOrNull(model?.craftingSystemId))
           .filter(Boolean)
@@ -1806,7 +1809,7 @@ export class GatheringEngine {
       return { enabled: false, realms: [], systemId: null };
     }
     const systemId = realmEnabledSystemIds[0];
-    const environment = normalizeList(environments).find(
+    const environment = iterableToArray(environments).find(
       (candidate) => stringOrNull(candidate?.craftingSystemId) === systemId
     );
     const summary = this._currentRealmSummary({
@@ -1953,7 +1956,7 @@ export class GatheringEngine {
       tools.push(tool);
     }
 
-    tools.push(...normalizeList(task?.tools)); // ratchet-exempt(world-scope): not-a-system
+    tools.push(...iterableToArray(task?.tools)); // ratchet-exempt(world-scope): not-a-system
     return { tools, missingToolIds, disabledToolIds };
   }
 
@@ -1996,7 +1999,10 @@ export class GatheringEngine {
     });
 
     // Unresolved and disabled tool refs cannot be matched, so they show as missing by raw id.
-    for (const toolId of [...normalizeList(missingToolIds), ...normalizeList(disabledToolIds)]) {
+    for (const toolId of [
+      ...iterableToArray(missingToolIds),
+      ...iterableToArray(disabledToolIds),
+    ]) {
       const id = stringOrNull(toolId);
       if (!id) continue;
       resolved.push({
@@ -2019,9 +2025,9 @@ export class GatheringEngine {
     let components;
     try {
       if (typeof this.systemManager?.getComponentsForSystem === 'function') {
-        components = normalizeList(this.systemManager.getComponentsForSystem(system.id));
+        components = iterableToArray(this.systemManager.getComponentsForSystem(system.id));
       } else if (typeof this.systemManager?.getItems === 'function') {
-        components = normalizeList(this.systemManager.getItems(system.id));
+        components = iterableToArray(this.systemManager.getItems(system.id));
       } else {
         components = resolvedComponentsFor(system);
       }
@@ -2037,18 +2043,18 @@ export class GatheringEngine {
 
   _hasBlockedToolReferences(resolvedTools) {
     return (
-      normalizeList(resolvedTools?.missingToolIds).length > 0 ||
-      normalizeList(resolvedTools?.disabledToolIds).length > 0
+      iterableToArray(resolvedTools?.missingToolIds).length > 0 ||
+      iterableToArray(resolvedTools?.disabledToolIds).length > 0
     );
   }
 
   _toolBlockedData({ task, resolvedTools, toolResult = null }) {
     return {
       taskId: stringOrNull(task?.id),
-      missingToolIds: normalizeList(resolvedTools?.missingToolIds),
-      disabledToolIds: normalizeList(resolvedTools?.disabledToolIds),
-      missing: normalizeList(toolResult?.missing),
-      failedRequirements: normalizeList(toolResult?.failedRequirements),
+      missingToolIds: iterableToArray(resolvedTools?.missingToolIds),
+      disabledToolIds: iterableToArray(resolvedTools?.disabledToolIds),
+      missing: iterableToArray(toolResult?.missing),
+      failedRequirements: iterableToArray(toolResult?.failedRequirements),
     };
   }
 
@@ -2220,7 +2226,7 @@ export class GatheringEngine {
     });
     const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     return {
-      blockedReasons: normalizeList(result?.blockedReasons).map((reason) =>
+      blockedReasons: iterableToArray(result?.blockedReasons).map((reason) =>
         this._blockedReason(reason.code || 'BLOCKED', {
           messageKey: reason.messageKey,
           message: reason.message,
@@ -2263,7 +2269,7 @@ export class GatheringEngine {
     if (typeof this.richState?.listRevealedTaskIds !== 'function') return true;
     const { scope } = this._resolveRevealPolicy(environment);
     try {
-      return normalizeList(
+      return iterableToArray(
         this.richState.listRevealedTaskIds({ actor, environmentId, scope })
       ).every((id) => String(id) !== taskId);
     } catch {
@@ -2327,7 +2333,7 @@ export class GatheringEngine {
   _blindStartPersistsRun({ environment, taskId }) {
     const targeted = this._findStartTask({ environment, taskId });
     if (targeted) return hasTimeRequirement(targeted);
-    return normalizeList(environment?.tasks).some((task) => hasTimeRequirement(task));
+    return iterableToArray(environment?.tasks).some((task) => hasTimeRequirement(task));
   }
 
   /** A start handed to the active GM: accepted, with no run id until the GM's write replicates. */
@@ -2441,7 +2447,7 @@ export class GatheringEngine {
       }
     }
     const environment =
-      normalizeList(this.environmentStore?.list?.()).find(
+      iterableToArray(this.environmentStore?.list?.()).find(
         (environment) => environment?.id === id
       ) ?? null;
     if (!environment) return null;
@@ -2450,7 +2456,7 @@ export class GatheringEngine {
   }
 
   _findStartTask({ environment, taskId }) {
-    const tasks = normalizeList(environment?.tasks);
+    const tasks = iterableToArray(environment?.tasks);
     const id = stringOrNull(taskId);
     if (!id) return null;
     return tasks.find((task) => task?.id === id) ?? null;
@@ -3109,7 +3115,7 @@ export class GatheringEngine {
       case 'straight': {
         outcome = {
           status: 'succeeded',
-          resultGroups: normalizeList(task.resultGroups),
+          resultGroups: iterableToArray(task.resultGroups),
           checkResult: null,
         };
         break;
@@ -3173,7 +3179,7 @@ export class GatheringEngine {
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
         code: 'CHARACTER_MODIFIER_MISCONFIGURED',
-        diagnostics: normalizeList(resolved.diagnostics),
+        diagnostics: iterableToArray(resolved.diagnostics),
       });
     }
 
@@ -3187,7 +3193,7 @@ export class GatheringEngine {
       characterModifierSnapshot,
       checkResult: {
         ...plainObjectOrNull(outcome.checkResult),
-        events: normalizeList(resolved?.events),
+        events: iterableToArray(resolved?.events),
         eventPolicy: stringOrNull(resolved?.eventPolicy),
         characterModifierSnapshot,
       },
@@ -3325,7 +3331,7 @@ export class GatheringEngine {
   _runtimeSnapshot({ environment, task }) {
     return {
       task: cloneJson(task),
-      events: normalizeList(environment?.events).map((event) => cloneJson(event)),
+      events: iterableToArray(environment?.events).map((event) => cloneJson(event)),
       rules: plainObjectOrNull(environment?.rules) || {},
       useLegacyTaskItemSelectionMode: environment?.useLegacyTaskItemSelectionMode === true,
       eventSelectionMode: stringOrNull(environment?.eventSelectionMode),
@@ -3426,7 +3432,7 @@ export class GatheringEngine {
     return versionedEffect('tools', 'applyGatheringTools', safeTools, async () => {
       const tools = { viewer, actor, system, environment, task, outcome, presentTools };
       const applied = await this._applyTerminalTools(tools);
-      const actual = cloneJson(normalizeList(applied));
+      const actual = cloneJson(iterableToArray(applied));
       return opaqueBlind ? { count: actual.length } : actual;
     });
   }
@@ -3519,7 +3525,7 @@ export class GatheringEngine {
         });
         const receipt = {
           applied: true,
-          eventCount: normalizeList(checkResult?.events).length,
+          eventCount: iterableToArray(checkResult?.events).length,
         };
         if (!opaqueBlind && applied !== undefined) receipt.result = cloneJson(applied);
         return receipt;
@@ -3622,7 +3628,7 @@ export class GatheringEngine {
       richEvidence = await this._commitRichAttempt(context);
       ({ createdResults, complications } = await this._commitTerminalSideEffects(context));
     } catch (error) {
-      createdResults = normalizeList(error.receipts).map(itemReceipt);
+      createdResults = iterableToArray(error.receipts).map(itemReceipt);
       failure = error;
     }
     const settled = await this.runManager.settleHistory(context.actor, run.id, {
@@ -3790,7 +3796,7 @@ export class GatheringEngine {
     // carries nothing and never awards.
     if (rolled.success !== true || !outcomeName) {
       const failureGroups = outcomeName
-        ? matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
+        ? matchResultGroupsByName(outcomeName, iterableToArray(task.resultGroups), {
             firstOnly: false,
           })
         : [];
@@ -3809,7 +3815,7 @@ export class GatheringEngine {
         { retainFailureResultGroups: true }
       );
     }
-    const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
+    const matched = matchResultGroupsByName(outcomeName, iterableToArray(task.resultGroups), {
       firstOnly: false,
     });
     // A success tier matching no group is reported misconfigured, which blocks the start at no
@@ -3929,14 +3935,14 @@ export class GatheringEngine {
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
         code: 'CHARACTER_MODIFIER_MISCONFIGURED',
-        diagnostics: normalizeList(resolved.diagnostics),
+        diagnostics: iterableToArray(resolved.diagnostics),
       });
     }
     const resultGroups = [
       {
         id: `${task.id}-d100-results`,
         name: task.name || 'Gathered',
-        results: normalizeList(resolved?.items).map((item) => ({
+        results: iterableToArray(resolved?.items).map((item) => ({
           id: item.id,
           resultRowId: item.resultRowId,
           componentId: stringOrNull(item.componentId),
@@ -3952,9 +3958,9 @@ export class GatheringEngine {
       checkResult: {
         provider: 'd100',
         roll: Number.isFinite(resolved?.roll) ? resolved.roll : null,
-        itemRows: normalizeList(resolved?.itemRows),
-        items: normalizeList(resolved?.items),
-        events: normalizeList(resolved?.events),
+        itemRows: iterableToArray(resolved?.itemRows),
+        items: iterableToArray(resolved?.items),
+        events: iterableToArray(resolved?.events),
         eventPolicy: stringOrNull(resolved?.eventPolicy),
         characterModifierSnapshot: resolved?.characterModifierSnapshot || null,
       },
@@ -4113,7 +4119,7 @@ export class GatheringEngine {
     ) {
       throw unconfirmedHistoryError(
         'Invalid gathering creation receipts',
-        normalizeList(created).filter((entry) => receiptQuantity(entry?.quantity) !== null)
+        iterableToArray(created).filter((entry) => receiptQuantity(entry?.quantity) !== null)
       );
     }
     return created.map(itemReceipt);
@@ -4158,8 +4164,8 @@ export class GatheringEngine {
         diagnostics: [
           {
             code: 'TOOL_REFERENCE_UNRESOLVED',
-            missingToolIds: normalizeList(resolvedTools.missingToolIds),
-            disabledToolIds: normalizeList(resolvedTools.disabledToolIds),
+            missingToolIds: iterableToArray(resolvedTools.missingToolIds),
+            disabledToolIds: iterableToArray(resolvedTools.disabledToolIds),
           },
         ],
       });
@@ -4368,12 +4374,12 @@ export class GatheringEngine {
     try {
       const componentsById = this._componentsById(system);
       const itemsByUuid = new Map();
-      for (const item of normalizeList(checkResult?.items)) {
+      for (const item of iterableToArray(checkResult?.items)) {
         const uuid = stringOrNull(item?.itemUuid);
         if (uuid) itemsByUuid.set(uuid, item);
       }
 
-      const components = normalizeList(createdResults).map((entry) => {
+      const components = iterableToArray(createdResults).map((entry) => {
         const itemUuid = stringOrNull(entry?.itemUuid);
         // Prefer the award's own identity: a component-sourced award has no uuid to join on
         // before its document exists.
@@ -4397,12 +4403,12 @@ export class GatheringEngine {
         };
       });
 
-      const events = normalizeList(checkResult?.events).map((event) => ({
+      const events = iterableToArray(checkResult?.events).map((event) => ({
         name: stringOrEmpty(event?.name),
         img: stringOrNull(event?.img) || DEFAULT_GATHERING_EVENT_IMG,
       }));
 
-      const brokenTools = normalizeList(usedTools)
+      const brokenTools = iterableToArray(usedTools)
         .filter((entry) => entry?.broken === true)
         .map((entry) => {
           const component = componentsById.get(stringOrNull(entry?.componentId));
@@ -4420,7 +4426,7 @@ export class GatheringEngine {
 
       // `position` is the firing's place in the authored stage list, letting the renderer tell
       // two firings of one complication apart.
-      const complicationRows = normalizeList(complications).map((entry) => ({
+      const complicationRows = iterableToArray(complications).map((entry) => ({
         name: stringOrEmpty(entry?.name),
         description: stringOrEmpty(entry?.description),
         severity: stringOrEmpty(entry?.severity),
@@ -4690,7 +4696,7 @@ export class GatheringEngine {
         viewer,
         outcome: outcome ?? {
           code: 'TASK_MISCONFIGURED',
-          diagnostics: normalizeList(errors).map((error) => ({
+          diagnostics: iterableToArray(errors).map((error) => ({
             code: 'TASK_MISCONFIGURED',
             message: error,
           })),
@@ -4947,8 +4953,8 @@ function normalizeToolResult(result) {
   }
   return {
     available: result.available === true,
-    missing: normalizeList(result.missing),
-    failedRequirements: normalizeList(result.failedRequirements),
+    missing: iterableToArray(result.missing),
+    failedRequirements: iterableToArray(result.failedRequirements),
   };
 }
 
@@ -5030,7 +5036,7 @@ function normalizeTerminalOutcome(raw, { retainFailureResultGroups = false } = {
 }
 
 function normalizeOutcomeGroups(raw) {
-  const groups = normalizeList(raw.resultGroups ?? raw.groups);
+  const groups = iterableToArray(raw.resultGroups ?? raw.groups);
   if (groups.length > 0) return groups;
   const group = raw.resultGroup ?? raw.group;
   return group && typeof group === 'object' ? [group] : [];
@@ -5085,7 +5091,7 @@ function normalizeCheckStatus(status) {
 }
 
 function hasOutcomeDiagnostics(raw) {
-  return Boolean(raw.diagnostic) || normalizeList(raw.diagnostics).length > 0;
+  return Boolean(raw.diagnostic) || iterableToArray(raw.diagnostics).length > 0;
 }
 
 /** A dismissed or refused roll's outcome: the attempt aborts with zero mutation. */
@@ -5119,7 +5125,7 @@ function misconfiguredOutcome({
     checkResult:
       checkResult && typeof checkResult === 'object' ? cloneJson(checkResult) : undefined,
   };
-  const normalizedDiagnostics = normalizeList(diagnostics);
+  const normalizedDiagnostics = iterableToArray(diagnostics);
   if (diagnostic) normalizedDiagnostics.push(diagnostic);
   if (message || normalizedDiagnostics.length > 0) {
     outcome.diagnostics = [
@@ -5131,7 +5137,7 @@ function misconfiguredOutcome({
 }
 
 function resolveProgressiveAward({ system, task, checkResult }) {
-  const group = normalizeList(task.resultGroups)[0];
+  const group = iterableToArray(task.resultGroups)[0];
   if (!group) {
     return misconfiguredOutcome({
       code: 'MISSING_RESULT_GROUP',
@@ -5159,7 +5165,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
   // misconfiguration; the budget is zeroed after a `partial` tail award.
   const { awarded, remaining, invalidResultId, partialResult, haltedResult, skippedResults } =
     resolveProgressiveAwardLoop({
-      results: normalizeList(group.results),
+      results: iterableToArray(group.results),
       initialRemaining: Math.max(0, value),
       costFor: (result) => difficultyForResult(system, result),
       awardMode,
@@ -5204,7 +5210,7 @@ function difficultyForResult(system, result) {
 }
 
 function hasAwardedResults(resultGroups) {
-  return normalizeList(resultGroups).some((group) => normalizeList(group?.results).length > 0);
+  return iterableToArray(resultGroups).some((group) => iterableToArray(group?.results).length > 0);
 }
 
 /**
@@ -5222,7 +5228,7 @@ function awardsResultsFor(outcome, system) {
   if (outcome?.status !== 'failed') return false;
   if (outcome?.failureAward !== true) return false;
   if (!activityPermitsFailureResults(system, 'gathering')) return false;
-  return normalizeList(outcome?.resultGroups).length > 0;
+  return iterableToArray(outcome?.resultGroups).length > 0;
 }
 
 function normalizeVisibilityResult(result) {
@@ -5258,7 +5264,7 @@ function routedGroupMatchError({ outcomeName, matched, task, checkResult, allowM
 function validateTaskConfiguration(task, system = null) {
   const errors = [];
   const resolutionMode = stringOrNull(task?.resolutionMode);
-  const resultGroups = normalizeList(task?.resultGroups);
+  const resultGroups = iterableToArray(task?.resultGroups);
 
   if (
     resolutionMode !== 'straight' &&
@@ -5282,7 +5288,7 @@ function validateTaskConfiguration(task, system = null) {
   }
 
   if (resolutionMode === 'd100') {
-    const rows = normalizeList(task?.dropRows ?? task?.itemDrops).filter(
+    const rows = iterableToArray(task?.dropRows ?? task?.itemDrops).filter(
       (row) => row?.enabled !== false
     );
     if (rows.length === 0) {
@@ -5307,7 +5313,7 @@ function validateTaskConfiguration(task, system = null) {
     if (resultGroups.length !== 1) {
       errors.push('Straight gathering task requires exactly one result group');
     }
-    if (resultGroups.length === 1 && normalizeList(resultGroups[0]?.results).length === 0) {
+    if (resultGroups.length === 1 && iterableToArray(resultGroups[0]?.results).length === 0) {
       errors.push('Straight gathering task requires at least one result');
     }
   }
@@ -5325,7 +5331,7 @@ function validateTaskConfiguration(task, system = null) {
     if (resultGroups.length !== 1) {
       errors.push('Progressive gathering task requires exactly one result group');
     }
-    if (resultGroups.length === 1 && normalizeList(resultGroups[0]?.results).length === 0) {
+    if (resultGroups.length === 1 && iterableToArray(resultGroups[0]?.results).length === 0) {
       errors.push('Progressive gathering task requires at least one result');
     }
   }
@@ -5346,7 +5352,7 @@ function validateTaskConfiguration(task, system = null) {
 
 function hasInvalidFixedResultQuantity(resultGroups) {
   return resultGroups.some((group) =>
-    normalizeList(group?.results).some((result) => {
+    iterableToArray(group?.results).some((result) => {
       if (!result || typeof result !== 'object' || !Object.hasOwn(result, 'quantity')) return false;
       return (
         typeof result.quantity !== 'number' ||
@@ -5460,11 +5466,11 @@ function normalizeTimeRequirement(timeRequirement = null) {
 function runHasDiagnostics(run) {
   if (!run || typeof run !== 'object') return false;
   if (run.diagnostic) return true;
-  return normalizeList(run.diagnostics).length > 0;
+  return iterableToArray(run.diagnostics).length > 0;
 }
 
 function sanitizeDiagnostics(diagnostics) {
-  return normalizeList(diagnostics)
+  return iterableToArray(diagnostics)
     .map((diagnostic) => {
       if (!diagnostic || typeof diagnostic !== 'object') return null;
       return {
@@ -5515,15 +5521,15 @@ function redactCharacterModifierSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return snapshot;
   if (!snapshot?.rows && !snapshot?.events) return snapshot;
   return {
-    rows: normalizeList(snapshot.rows).map((row) => ({
+    rows: iterableToArray(snapshot.rows).map((row) => ({
       rowId: null,
-      contributions: normalizeList(row?.contributions).map((entry) => ({
+      contributions: iterableToArray(row?.contributions).map((entry) => ({
         contribution: Number(entry?.contribution ?? 0),
       })),
     })),
-    events: normalizeList(snapshot.events).map((event) => ({
+    events: iterableToArray(snapshot.events).map((event) => ({
       eventId: null,
-      contributions: normalizeList(event?.contributions).map((entry) => ({
+      contributions: iterableToArray(event?.contributions).map((entry) => ({
         contribution: Number(entry?.contribution ?? 0),
       })),
     })),
@@ -5540,7 +5546,7 @@ function hasRichGatheringData(environment, task) {
       stringOrNull(value)
     ) ||
     task?.nodes ||
-    normalizeList(environment?.events).length > 0 ||
+    iterableToArray(environment?.events).length > 0 ||
     Number(task?.staminaCost || 0) > 0 ||
     stringOrNull(task?.riskOverride) ||
     task?.encounters ||
@@ -5550,7 +5556,7 @@ function hasRichGatheringData(environment, task) {
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
-  return normalizeList(items)
+  return iterableToArray(items)
     .filter((item) => item && typeof item === 'object')
     .map((item) => {
       const source = item.item ?? item;
