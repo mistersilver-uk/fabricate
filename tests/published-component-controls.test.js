@@ -1536,7 +1536,7 @@ const SCOPED_RINGS = Object.freeze({
   },
   'src/ui/svelte/components/TintSwatches.svelte': {
     statedBy:
-      "The `TintSwatches` swatch keeps its own ring, the picker's 2px accent outline inset by 2px on the swatch's edge, so it composes with the checked swatch's inset ring.",
+      "The `TintSwatches` swatch keeps its own ring, the picker's 2px accent outline inset by 2px on the swatch's edge, so it composes with the checked swatch's two-tone ring.",
     rules: [
       {
         selector: '.fabricate-tint-swatch:focus-visible',

@@ -70,15 +70,59 @@ function measure(ink, fills) {
   return { lowest: Math.min(...lowest), short };
 }
 
-test('a colour swatch rings in the dark ink at 3:1 on all ten swatches in every theme', (t) => {
-  const ink = ringInk(SWATCH_RING);
-  assert.equal(ink, '--fab-biome-icon-foreground');
+/** The two inks of the strip's selected swatch: its inset dark ring and its outer text-ink ring. */
+function twoToneInks() {
+  const layers = declared(SWATCHES, SWATCH_RING, 'box-shadow')
+    .split(/,\s*/u)
+    .map((layer) => layer.match(/^(inset )?0 0 0 2px var\((--fab-[\w-]+)\)$/u));
+  assert.equal(layers.length, 2, `${SWATCH_RING} is not a two-layer 2px ring`);
+  assert.ok(layers.every(Boolean), `${SWATCH_RING} draws a layer that is not a 2px ring`);
+  assert.deepEqual(
+    layers.map((layer) => Boolean(layer[1])),
+    [true, false],
+    'the dark ring is inset and the outer one is not'
+  );
+  return { inner: layers[0][2], outer: layers[1][2] };
+}
+
+/** Each inline caller's ground under the strip, as a palette stack per theme. */
+function stripGrounds() {
+  return Object.values(INLINE_GROUNDS).map((selectors) =>
+    selectors.map((ground) => {
+      const [selector, property] = Array.isArray(ground) ? ground : [ground, 'background'];
+      return declaredToken(sheet, selector, property, SHEET);
+    })
+  );
+}
+
+test('a colour swatch rings in two tones, and one clears 3:1 on every tint and ground in every theme', (t) => {
+  const { inner, outer } = twoToneInks();
+  assert.deepEqual([inner, outer], ['--fab-biome-icon-foreground', '--fab-text']);
   const fills = MANAGER_COLOR_TOKEN_KEYS.map((token) => `--fab-tag-${token}`);
   assert.equal(fills.length, 10);
-  const { lowest, short } = measure(ink, fills);
-  t.diagnostic(`lowest swatch ring ratio ${lowest.toFixed(2)}:1`);
+  assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
+  const short = [];
+  let lowest = Infinity;
+  for (const [theme, tokens] of themes) {
+    for (const stack of stripGrounds()) {
+      const ground = stackGround(tokens, stack);
+      const outside = contrast(tokens.get(outer), ground);
+      for (const fill of fills) {
+        const best = Math.max(contrast(tokens.get(inner), tokens.get(fill)), outside);
+        lowest = Math.min(lowest, best);
+        if (best < 3)
+          short.push(`${theme}: ${fill} on ${stack.join(' over ')} ${best.toFixed(2)}:1`);
+      }
+    }
+  }
+  t.diagnostic(`lowest better-of-two swatch ring ratio ${lowest.toFixed(2)}:1`);
   assert.deepEqual(short, [], 'a selected swatch would be under WCAG 1.4.11');
-  assert.equal(ringInk(TILE_RING, SHEET), ink, "the popover's selected tile rings in the same ink");
+  // The dark ring alone is still the popover tile's, which has no outer ring.
+  assert.equal(
+    ringInk(TILE_RING, SHEET),
+    inner,
+    "the popover's selected tile rings in the same ink"
+  );
 });
 
 test('the No-colour cell rings in the text ink at 3:1 on its own fill in every theme', (t) => {

@@ -63,6 +63,22 @@ const measure = () =>
   tab.evaluate(() => {
     const probe = getComputedStyle(document.querySelector('[data-probe]')).backgroundColor;
     const text = getComputedStyle(document.querySelector('[data-probe-text]')).backgroundColor;
+    const highlight = (() => {
+      const el = document.createElement('span');
+      el.style.cssText = 'color:highlight;forced-color-adjust:none';
+      document.body.append(el);
+      const colour = getComputedStyle(el).color;
+      el.remove();
+      return colour;
+    })();
+    const canvas = (() => {
+      const el = document.createElement('span');
+      el.style.cssText = 'color:canvas;forced-color-adjust:none';
+      document.body.append(el);
+      const colour = getComputedStyle(el).color;
+      el.remove();
+      return colour;
+    })();
     const rows = Object.fromEntries(
       [...document.querySelectorAll('[data-row]')].map((row) => [
         row.dataset.row,
@@ -76,6 +92,18 @@ const measure = () =>
             border: ['Top', 'Right', 'Bottom', 'Left'].map((side) => style[`border${side}Width`]),
             borderColor: style.borderTopColor,
             outline: style.outlineStyle,
+            current: track.hasAttribute('aria-current'),
+            trackOutline: [
+              getComputedStyle(track).outlineStyle,
+              getComputedStyle(track).outlineWidth,
+              getComputedStyle(track).outlineColor,
+            ],
+            dividers: [...bar.querySelectorAll('.fab-fill-bar-share')].map((share) => {
+              const style = getComputedStyle(share);
+              return style.borderLeftStyle === 'none'
+                ? 'none'
+                : `${style.borderLeftColor} ${style.borderLeftWidth} ${style.borderLeftStyle}`;
+            }),
             background: style.backgroundColor,
             fill: fill.getBoundingClientRect().height,
             fillBackground: getComputedStyle(fill).backgroundColor,
@@ -88,7 +116,7 @@ const measure = () =>
         }),
       ])
     );
-    return { probe, text, rows };
+    return { probe, text, highlight, canvas, rows };
   });
 
 let rest;
@@ -174,6 +202,31 @@ describe('StageBars forms, rendered (issue 2837)', () => {
       assert.notEqual(rgb(full.fillBackground), rgb(full.background), `${id}: the fill is seen`);
       assert.equal(full.fillBackground, forced.text, `${id}: in the text colour`);
       assert.notEqual(rest.rows[id][0].fillBackground, rest.rows[id][0].background);
+    }
+  });
+
+  it('outlines only the current stage’s track in Highlight under forced colours, on either track', () => {
+    for (const id of ['default', 'thin']) {
+      for (const [index, bar] of forced.rows[id].entries()) {
+        assert.equal(bar.current, index === 1);
+        if (index === 1) {
+          assert.deepEqual(bar.trackOutline.slice(0, 2), ['solid', '2px'], id);
+          assert.equal(bar.trackOutline[2], forced.highlight, `${id}: in Highlight`);
+        } else {
+          assert.equal(bar.trackOutline[0], 'none', `${id}: stage ${index}`);
+        }
+      }
+      for (const bar of rest.rows[id]) assert.equal(bar.trackOutline[0], 'none', `${id} at rest`);
+    }
+  });
+
+  it('draws a 1px Canvas divider between adjacent shares under forced colours only', () => {
+    for (const id of ['default', 'thin']) {
+      const [first, second] = forced.rows[id][1].dividers;
+      assert.equal(first, 'none', `${id}: the first share has nothing before it`);
+      assert.ok(second.startsWith(forced.canvas), `${id}: Canvas, got ${second}`);
+      assert.match(second, / 1px solid$/u, `${id}: a 1px solid edge`);
+      assert.deepEqual(rest.rows[id][1].dividers, ['none', 'none'], `${id} at rest`);
     }
   });
 });
