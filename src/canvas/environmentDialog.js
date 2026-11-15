@@ -5,6 +5,8 @@
  * the resolution logic stays unit-testable.
  */
 
+import { esc } from '../ui/presenters/htmlEscape.js';
+
 /**
  * Prompt the GM for a gathering environment. Null when they cancel or close, or when the system
  * has no environments to offer.
@@ -27,18 +29,18 @@ export async function promptDropEnvironment({
   const options = list
     .map((env) => {
       const isSelected = env.id === selected ? ' selected' : '';
-      return `<option value="${escapeHtml(env.id)}"${isSelected}>${escapeHtml(env.name || env.id)}</option>`;
+      return `<option value="${esc(env.id)}"${isSelected}>${esc(env.name || env.id)}</option>`;
     })
     .join('');
   const label = t('FABRICATE.Canvas.Interactable.EnvironmentDialogLabel', 'Environment');
   // ratchet-exempt(design-system): a one-shot GM pick that gates the drop; DialogV2 re-serialises its body, so the select stays native
   const select = `<select name="environmentId">${options}</select>`;
   const content = `<div class="fabricate-canvas-env-dialog">
-    <p>${escapeHtml(t('FABRICATE.Canvas.Interactable.EnvironmentDialogHint', 'Choose the gathering environment for this resource node.'))}</p>
-    <label>${escapeHtml(label)}
+    <p>${esc(t('FABRICATE.Canvas.Interactable.EnvironmentDialogHint', 'Choose the gathering environment for this resource node.'))}</p>
+    <label>${esc(label)}
       ${select}
     </label>
-    <p class="fabricate-canvas-env-dialog-modifier-hint">${escapeHtml(t('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.'))}</p>
+    <p class="fabricate-canvas-env-dialog-modifier-hint">${esc(t('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.'))}</p>
   </div>`;
 
   try {
@@ -62,12 +64,4 @@ export async function promptDropEnvironment({
     // Cancel / close ⇒ abort the spawn.
     return null;
   }
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
 }
