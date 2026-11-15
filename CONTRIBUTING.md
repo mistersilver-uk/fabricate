@@ -461,25 +461,33 @@ The module root `.fabricate` carries one **paired block** for the player app and
 ```
 
 Write the element list **flat**, not as `.fabricate :is(a, button, …):focus`.
-`:is()` takes the specificity of its most specific argument — `[tabindex]` here — so the `:is()` form is 0,3,0 and would newly beat every per-component ring in the sheet, which is exactly what the ladder below keeps it from doing.
+`:is()` takes the specificity of its most specific argument — `[tabindex]` here — so the `:is()` form is 0,3,0 and would newly outrank every other focus rule in the sheet's own layer, which is exactly what the ladder below keeps it from doing.
 
 `:focus` vs `:focus-visible` is load-bearing.
 Handle `:focus-visible` **explicitly**.
 A button lands in the `:focus-visible` state after a sibling/panel re-render — for example the player nav's tab panel swapping content on click.
 A `:focus:not(:focus-visible)` rule alone strips the ring on a plain mouse click but leaves it in exactly that "clicked-away, panel re-rendered" state, which is the symptom that originally got reported.
 
-**Specificity ladder.**
-Keep the block at **single root-class** specificity so per-component focus rings still win:
+**Cascade layers come before specificity.**
+Foundry loads the module stylesheet into a cascade layer (`layer(modules)`; `tests/view-lab/cascade.css` mirrors it), while Svelte's `css: 'injected'` scoped styles land **unlayered**.
+The cascade resolves layers first: an unlayered author declaration beats every layered one **at any specificity**, and specificity only arbitrates between rules in the same layer.
+So a `styles/fabricate.css` rule can never beat a scoped rule that sets the same property, however many classes it stacks; only a rule inside the component (or `!important`) can.
 
-| Selector | Specificity | Role |
-| --- | --- | --- |
-| `.fabricate button:focus-visible` | 0,2,1 | module default — strips/repaints Foundry's ring |
-| `.fabricate-button:focus-visible` | 0,2,0 | shared-primitive family ring — global sheet, below the module default |
-| `.some-widget:focus-visible` (scoped Svelte, `+ .svelte-hash`) | 0,3,0 | per-component ring (custom offset, inset, color) |
-| `.fabricate.fabricate-app button:focus-visible` | 0,3,1 | ❌ clobbers the per-component ring |
+The shared browser fixtures load the sheet the way the product does — `tests/helpers/renderedPageHead.js` and `tests/helpers/staticComponentPage.js` wrap it in `@layer modules {…}` and inject each component's scoped CSS unlayered.
+A fixture that loads the sheet unlayered (about 20 still do, tracked in issue 1316) models neither, so there a global rule can appear to beat a scoped one and a rule that is inert in the product measures as live.
+When the two disagree, the layered fixture and real Foundry are right.
 
-Using the doubled root class (`.fabricate.fabricate-app …`) raises the module default to 0,3,1, which overrides component-scoped rings (e.g. gathering rows that intentionally use `outline-offset: -2px`).
-Use the single class (`.fabricate …`) — matching how `.fabricate-interactables-manager` and the other three blocks issue 1520 owns are written — so component rings at 0,3,0 stay authoritative.
+Within one layer, keep the block at **single root-class** specificity so the module default stays below the shared-primitive family rings:
+
+| Selector | Layer | Specificity | Role |
+| --- | --- | --- | --- |
+| `.fabricate button:focus-visible` | `modules` | 0,2,1 | module default — strips/repaints Foundry's ring |
+| `.fabricate-button:focus-visible` | `modules` | 0,2,0 | shared-primitive family ring — global sheet, below the module default |
+| `.some-widget:focus-visible` (scoped Svelte, `+ .svelte-hash`) | unlayered | 0,3,0 | per-component ring (custom offset, inset, color) — wins over every row above by layer, not by specificity |
+| `.fabricate.fabricate-app button:focus-visible` | `modules` | 0,3,1 | ❌ outranks the 0,2,x rows in its own layer; it loses to the scoped ring in the product but beats it in an unlayered fixture |
+
+Using the doubled root class (`.fabricate.fabricate-app …`) raises the module default to 0,3,1, which overrides component-scoped rings in any context where the layer is absent (an unlayered fixture, a dev build) and the shared-primitive rings (0,2,0) everywhere.
+Use the single class (`.fabricate …`) — matching how `.fabricate-interactables-manager` and the other three blocks issue 1520 owns are written.
 
 **Checklist when adding/auditing a control or surface:**
 
@@ -487,7 +495,7 @@ Use the single class (`.fabricate …`) — matching how `.fabricate-interactabl
 - Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so the module default still wins where it applies.
 A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host carrying no Fabricate root at all.
 - Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — the module block already handles it.
-Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the module default doesn't fight them.
+Reserve scoped focus CSS for genuinely per-widget rings, and keep them in the component's own scoped block, which is unlayered and so already wins over the module default.
 - Custom-content button clipping? Apply the layout fix in Instance 1.
 - Verify both in real Foundry (`npm run test:foundry`) — Foundry's global cascade is not reproduced by compiled-source inspection or unit tests.
 

@@ -512,7 +512,7 @@ const valueKey = (entry) => (entry.value === undefined ? null : `${entry.file}\u
  * Net offences against falls of the same `(file, value)`, so a value that moved between ids in one
  * file (a rename, a reformat) is not an offender. Offences are netted greedily in code-point order.
  */
-function netByValue(offences, falls) {
+function netByValue(offences, falls, movable = []) {
   const pools = new Map();
   for (const fall of falls) {
     const group = valueKey(fall.entry);
@@ -520,13 +520,32 @@ function netByValue(offences, falls) {
   }
   const spent = new Set();
   const netted = [];
-  const remaining = offences.filter((offence) => {
+  const sameFile = offences.filter((offence) => {
     const group = valueKey(offence.entry);
     const pool = group === null ? 0 : (pools.get(group) ?? 0);
     if (offence.excess > pool) return true;
     pools.set(group, pool - offence.excess);
     spent.add(group);
     netted.push(`${offence.text}, offset by a fall of ${offence.entry.value} in the same file`);
+    return false;
+  });
+  // A value listed in `movable` also nets across files, so a count one change splits is not new.
+  const remaining = sameFile.filter((offence) => {
+    const { value, file } = offence.entry;
+    if (!movable.includes(value)) return true;
+    const donors = [...pools].filter(
+      ([group, pool]) =>
+        pool > 0 && group.endsWith(`\u{0}${value}`) && !group.startsWith(`${file}\u{0}`)
+    );
+    if (donors.reduce((sum, [, pool]) => sum + pool, 0) < offence.excess) return true;
+    let owed = offence.excess;
+    for (const [group, pool] of donors) {
+      const take = Math.min(pool, owed);
+      pools.set(group, pool - take);
+      spent.add(group);
+      owed -= take;
+    }
+    netted.push(`${offence.text}, offset by a fall of ${value} in another file`);
     return false;
   });
   // A fall wholly spent on offsetting a move is reported as the move, not as a shrink.
@@ -596,6 +615,8 @@ function skipped(code, reason, corpusRoot, changedCount) {
  * false` stops a file-head marker exempting an entry, for a family whose markers excuse one site.
  * `siteMarkers` makes each entry one site, excused at its first line only when it is new relative
  * to base (`siteMarkers.js`); a function `(entry, marker)` narrows which markers excuse. Both
+ * `moveAcrossFiles` lists `value`s whose falls also offset another file's offences (a count one
+ * change splits across files). Both
  * sides see the module sheet as one logical `styles/fabricate.css` (`logicalStylesheet.js`).
  *
  * @returns {{compared: true, family: string, base: string, changedCount: number,
@@ -612,6 +633,7 @@ export function compareToBase({
   pair = (baseEntries, headEntries) => ({ base: baseEntries, head: headEntries }),
   headMarkers = true,
   siteMarkers = false,
+  moveAcrossFiles = [],
   cwd = REPO_ROOT,
   env = process.env,
   base = resolveRatchetBase({ cwd, env }),
@@ -658,7 +680,7 @@ export function compareToBase({
   const baseIndex = tally(net.base, family);
   const headIndex = tally(net.head, family);
   const { offences, falls } = difference(baseIndex, headIndex, ceiling);
-  const { remaining, netted, shrank } = netByValue(offences, falls);
+  const { remaining, netted, shrank } = netByValue(offences, falls, moveAcrossFiles);
   const exempts = !siteMarkers;
   const { failures, exempted } = judge(remaining, family, readHead, { headMarkers, exempts });
   for (const entry of net.fresh) {

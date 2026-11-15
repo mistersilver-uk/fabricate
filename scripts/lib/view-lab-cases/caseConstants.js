@@ -215,6 +215,10 @@ export const REQUIREMENT_SUGGESTION =
 export const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
   /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
 
+/** The environment files the browse view renders, from its import graph (issue 1481). */
+export const ENVIRONMENT_BROWSE_FILES =
+  /^src\/ui\/svelte\/apps\/manager\/environment\/(?:EnvironmentsEmptyActions\.svelte|GatheringConditionPanel\.svelte|TimeOfDayBar\.svelte|timeOfDayBandModel\.js)$/;
+
 /** A count check's default advantage footer (issue 2007): one die either way around the one Roll. */
 export const COUNT_ADVANTAGE_FOOTER =
   ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1 die"))' +
