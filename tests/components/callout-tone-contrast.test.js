@@ -2,7 +2,8 @@
  * Issue 2601: the published `Callout`'s inks over each tone's translucent fill, in all seven
  * themes, on the four grounds its group names. The title, an item's lead and the glyphs clear their
  * floors at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title
- * not on `--fab-bg-3`; the muted body's shortfalls are pinned ratio for ratio, and a published
+ * not on `--fab-bg-3`; the muted body's shortfalls off the danger tone are pinned ratio for ratio, the
+ * danger body inks `--fab-text-secondary` and clears 4.5:1 on all four grounds (issue 2876), and a published
  * `Button`'s ring clears 3:1 on every fill. Every ink and fill is read off the shipped rules.
  */
 import assert from 'node:assert/strict';
@@ -53,14 +54,16 @@ const TONES = Object.freeze({
   ),
 });
 const BODY = token('.manager-callout', 'color');
+const DANGER_BODY = token('.manager-callout.is-danger', 'color');
 const LEAD = token('.manager-callout-item-lead', 'color');
 
 /** The palettes where `ink` reads under `floor` on `tone`'s fill over `ground`. */
 const shortOn = (ink, tone, ground, floor = 4.5) =>
   shortfalls(themes, ink, [TONES[tone].fill, ground], floor).map((line) => line.split(':', 1)[0]);
 
-test('the body inks --fab-text-muted at every tone, which its text and items inherit', () => {
+test('the body inks --fab-text-muted at every tone but danger, which its text and items inherit', () => {
   assert.equal(BODY, '--fab-text-muted');
+  assert.equal(DANGER_BODY, '--fab-text-secondary');
   const inked = rules.flatMap((rule) =>
     propertiesOf(rule).has('color') ? splitSelectorList(rule.selector) : []
   );
@@ -73,6 +76,7 @@ test('the body inks --fab-text-muted at every tone, which its text and items inh
       '.manager-callout-title',
       '.manager-callout-item-lead',
       ...TINTED.flatMap((tone) => [
+        ...(tone === 'danger' ? ['.manager-callout.is-danger'] : []),
         `.manager-callout.is-${tone} > i`,
         `.manager-callout.is-${tone} .manager-callout-item > i`,
         `.manager-callout.is-${tone} .manager-callout-title`,
@@ -116,10 +120,10 @@ for (const tone of Object.keys(TONES)) {
   });
 }
 
-test('the body clears 4.5:1 in every theme at neutral on the four grounds, and at danger off --fab-bg-2', () => {
-  for (const ground of GROUNDS) assert.deepEqual(shortOn(BODY, 'neutral', ground), [], ground);
-  for (const ground of GROUNDS.slice(0, 3)) {
-    assert.deepEqual(shortOn(BODY, 'danger', ground), [], ground);
+test('the body clears 4.5:1 in every theme at neutral, and the secondary danger body on all four grounds', () => {
+  for (const ground of GROUNDS) {
+    assert.deepEqual(shortOn(BODY, 'neutral', ground), [], ground);
+    assert.deepEqual(shortOn(DANGER_BODY, 'danger', ground), [], ground);
   }
 });
 
@@ -146,12 +150,12 @@ test('off --fab-bg-2 the body falls short in the default palette alone, at these
   }
 });
 
-test('on --fab-bg-2 the body falls short at every tinted tone in up to six palettes, the default among them', () => {
-  const counts = { info: 5, accent: 6, warning: 6, success: 6, danger: 4 };
-  for (const tone of TINTED) {
+test('on --fab-bg-2 the muted body falls short at every tinted tone but danger in up to six palettes, the default among them', () => {
+  const counts = { info: 5, accent: 6, warning: 6, success: 6 };
+  for (const [tone, count] of Object.entries(counts)) {
     const palettes = shortOn(BODY, tone, '--fab-bg-2');
     assert.ok(palettes.includes(DEFAULT_FABRICATE_THEME), tone);
-    assert.equal(palettes.length, counts[tone], tone);
+    assert.equal(palettes.length, count, tone);
   }
 });
 

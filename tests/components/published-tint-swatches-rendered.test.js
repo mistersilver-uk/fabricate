@@ -214,6 +214,7 @@ async function marksIn(theme) {
       return {
         fills,
         ring: /^(rgb\([^)]+\))/u.exec(ring)?.[1] ?? ring,
+        outer: /, (rgb\([^)]+\)) 0px 0px 0px 2px$/u.exec(ring)?.[1] ?? ring,
         accent: style.getPropertyValue('--fab-accent').trim(),
         grounds: grounds.map((token) => style.getPropertyValue(token).trim()),
       };
@@ -303,17 +304,22 @@ describe('the marks the published TintSwatches draws', () => {
     await page.mouse.move(0, 0);
   });
 
-  it('rings the checked swatch at 3:1 on every tint and draws the accent marks at 3:1 on each ground, in all seven palettes', async (t) => {
+  it('rings the checked swatch in two tones, one at 3:1 on every tint and ground, and draws the accent marks at 3:1 on each ground, in all seven palettes', async (t) => {
     const lows = [];
     for (const palette of PALETTES) {
-      const { fills, ring, accent, grounds } = await marksIn(palette);
+      const { fills, ring, outer, accent, grounds } = await marksIn(palette);
       assert.equal(fills.length, 10);
-      const ringRatios = fills.map((fill) => contrast(spaced(ring), spaced(fill)));
+      // The dark inset ring is read against the tint and the outer text-ink ring against the
+      // ground, so the better of the two is the mark's contrast on that tint and ground.
+      const outerRatios = grounds.map((ground) => contrast(spaced(outer), spaced(ground)));
+      const ringRatios = fills.flatMap((fill) =>
+        outerRatios.map((outside) => Math.max(contrast(spaced(ring), spaced(fill)), outside))
+      );
       const accentRatios = grounds.map((ground) => contrast(spaced(accent), spaced(ground)));
       lows.push(
         `${palette} ring ${Math.min(...ringRatios).toFixed(2)} accent ${Math.min(...accentRatios).toFixed(2)}`
       );
-      assert.ok(Math.min(...ringRatios) >= 3, `${palette}: the checked ring on a tint`);
+      assert.ok(Math.min(...ringRatios) >= 3, `${palette}: the checked ring on a tint and ground`);
       assert.ok(Math.min(...accentRatios) >= 3, `${palette}: the accent on a ground`);
     }
     t.diagnostic(lows.join('; '));
@@ -345,6 +351,7 @@ describe('the marks the published TintSwatches draws', () => {
       assert.equal(new Set(read.map(({ fill }) => fill)).size, 10, 'ten tints, not the backplate');
       const checked = read.find(({ checked }) => checked === 'true');
       assert.match(checked.ring, /inset/u, 'the checked ring is kept');
+      assert.equal(checked.ring.split(/,\s*(?=rgb)/u).length, 2, 'the checked ring has two tones');
       assert.equal(checked.edge, highlight, 'the checked edge is the system highlight');
       assert.ok(
         read.filter(({ checked }) => checked === 'false').every(({ ring }) => ring === 'none'),

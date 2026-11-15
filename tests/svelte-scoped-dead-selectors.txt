@@ -1,0 +1,7 @@
+# Scoped selectors that tests/svelte-scoped-dead-selectors.test.js measures as matching nothing
+# (issue 1573). Format: <component path>, two spaces, <selector>.
+# REMOVAL-ONLY: delete a line when the rule is deleted or becomes live. Never add one.
+# Measured empty at introduction, once each component's evidence included its callers and the
+# helpers it reaches. The scan is generous by design (any class prefix built by interpolation
+# counts, state classes included), so an empty table means no PROVEN-dead rule, not that every
+# rule is live.

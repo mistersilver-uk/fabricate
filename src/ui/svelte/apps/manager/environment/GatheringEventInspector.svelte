@@ -12,6 +12,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import EnvironmentUsageCard from './EnvironmentUsageCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -176,7 +177,7 @@
           ><strong>{activeGatheringEventEnvironmentCount(selectedEvent)}</strong>
           <span class="manager-fact-label"
             >{text(
-              'FABRICATE.Admin.Manager.Environment.Events.ActiveEnvironments',
+              'FABRICATE.Admin.Manager.Environment.ActiveEnvironments',
               'Active environments'
             )}</span
           ></span
@@ -185,37 +186,14 @@
     </div>
   </InspectorCard>
 
-  <InspectorCard class="manager-event-environment-usage-card" data-event-environment-usage="">
-    <h3 class="manager-card-title">
-      {text(
-        'FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard',
-        'Used in environments'
-      )}
-    </h3>
-    {#if gatheringEventReferencingEnvironments(selectedEvent).length === 0}
-      <p class="manager-muted" data-event-environment-usage-empty>
-        {text(
-          'FABRICATE.Admin.Manager.Environment.Events.NotUsedInEnvironments',
-          'Not used in any environments yet.'
-        )}
-      </p>
-    {:else}
-      <div class="manager-event-environment-usage-grid" data-event-environment-usage-chips>
-        {#each gatheringEventReferencingEnvironments(selectedEvent) as environment (environment.id)}
-          <article class="manager-event-environment-usage-card">
-            <img
-              class="manager-event-environment-usage-thumb"
-              src={environmentImage(environment)}
-              alt=""
-            />
-            <span class="manager-event-environment-usage-name" title={environmentName(environment)}
-              >{environmentName(environment)}</span
-            >
-          </article>
-        {/each}
-      </div>
-    {/if}
-  </InspectorCard>
+  <EnvironmentUsageCard
+    subject="event"
+    environments={gatheringEventReferencingEnvironments(selectedEvent)}
+    {environmentImage}
+    {environmentName}
+    titleKey="FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard"
+    emptyKey="FABRICATE.Admin.Manager.Environment.Events.NotUsedInEnvironments"
+  />
 {:else if !editing}
   <EmptyState
     fill

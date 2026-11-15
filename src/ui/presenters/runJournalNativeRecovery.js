@@ -2,7 +2,7 @@
  * Native Reconciliation's read side: a legacy run's native recovery evidence, whether the viewer
  * may close it, and the closed record a history entry carries.
  */
-import { normalizeList } from '../../systems/gatheringEngineInternals.js';
+import { iterableToArray } from '../../systems/gatheringEngineInternals.js';
 import {
   gmReconciliationRecord,
   holdsUncertainSettlement,
@@ -25,15 +25,15 @@ function closedRecord(run) {
 /** The closed stage, else on a live run the first uncertain stage, else the current one. */
 function settlementOwner(run, { closed, live }) {
   if (run.historySettlement) return run;
-  const steps = normalizeList(run.steps);
+  const steps = iterableToArray(run.steps);
   const fallback = steps[closed ? closed.stepIndex : run.currentStepIndex] ?? null;
   return (live && steps.find(holdsUncertainSettlement)) || fallback;
 }
 
 function ownerReceipts(owner, key) {
   return key === 'consumption'
-    ? normalizeList(owner.consumedIngredients ?? owner.consumedComponents)
-    : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(normalizeList);
+    ? iterableToArray(owner.consumedIngredients ?? owner.consumedComponents)
+    : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(iterableToArray);
 }
 
 function recoveryEvidence(owner, { closed, entitled, project }) {
@@ -65,7 +65,7 @@ function recoveryEvidence(owner, { closed, entitled, project }) {
 /** Whether the seam would accept this run: salvage settles on the run, crafting on its stages. */
 function reconcilable(run, runType) {
   if (runType === 'salvage') return holdsUncertainSettlement(run);
-  return runType === 'crafting' && normalizeList(run.steps).some(holdsUncertainSettlement);
+  return runType === 'crafting' && iterableToArray(run.steps).some(holdsUncertainSettlement);
 }
 
 /**

@@ -89,7 +89,7 @@
   font-weight: 700;
 }
 
-/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38). The tone is mixed into the chat's own ink, so the pill reads on parchment and on a dark chat theme alike. Its geometry is the design system's tag-run chip (`library.html:977`): a 6px by 12px pad at line-height 1, 600 weight and a 9px glyph, which sets frame 38's 26px pill. */
+/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38). The tone is mixed into the chat's own ink, so the pill reads on parchment and on a dark chat theme alike. Its geometry is the design system's tag-run chip (the "densities — seven scales, one chip" unit in `openspec/specs/design-system/library.html`): a 6px by 12px pad at line-height 1, 600 weight and a 9px glyph, which sets frame 38's 26px pill. */
 .fabricate-craft-chat__result {
   --fabricate-craft-chat-tone: var(--fab-success);
 

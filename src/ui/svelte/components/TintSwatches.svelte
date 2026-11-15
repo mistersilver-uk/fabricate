@@ -201,8 +201,12 @@
     font-size: 0.6rem;
   }
 
+  /* A two-tone ring: the dark inset ring reads on a light tint, the outer text-ink ring, drawn in
+     the cell's 2px of padding, reads on the ground, so one of the two clears 3:1 on any tint. */
   .fabricate-tint-swatch.is-selected .fabricate-tint-swatch-fill {
-    box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
+    box-shadow:
+      inset 0 0 0 2px var(--fab-biome-icon-foreground),
+      0 0 0 2px var(--fab-text);
   }
 
   .fabricate-tint-swatch.is-none.is-selected .fabricate-tint-swatch-fill {

@@ -6,8 +6,8 @@
  */
 import {
   idOf,
-  normalizeList,
-  numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   stringOrEmpty,
   stringOrNull,
 } from '../../systems/gatheringEngineInternals.js';
@@ -24,20 +24,20 @@ export function missingGroupId(group) {
 }
 
 function withGroups(ingredientSet, groups) {
-  return groups.length === normalizeList(ingredientSet.ingredientGroups).length
+  return groups.length === iterableToArray(ingredientSet.ingredientGroups).length
     ? ingredientSet
     : Object.create(ingredientSet, { ingredientGroups: { value: groups } });
 }
 
 /** The other groups that resolve together once every group they report missing is set aside. */
 function satisfiableRemainder(ingredientSet, group, resolve) {
-  let groups = normalizeList(ingredientSet.ingredientGroups).filter((entry) => entry !== group);
+  let groups = iterableToArray(ingredientSet.ingredientGroups).filter((entry) => entry !== group);
   for (;;) {
     const resolved = resolve(withGroups(ingredientSet, groups));
-    const missing = new Set(normalizeList(resolved?.missingGroups).map(missingGroupId));
+    const missing = new Set(iterableToArray(resolved?.missingGroups).map(missingGroupId));
     const kept = groups.filter((entry) => !missing.has(stringOrNull(entry?.id)));
     if (resolved?.success === true || kept.length === groups.length) {
-      return { groups, plan: normalizeList(resolved?.plan) };
+      return { groups, plan: iterableToArray(resolved?.plan) };
     }
     groups = kept;
   }
@@ -77,19 +77,19 @@ export function choiceAvailability({
   );
   const stage = withGroups(
     ingredientSet,
-    normalizeList(ingredientSet.ingredientGroups).filter(
+    iterableToArray(ingredientSet.ingredientGroups).filter(
       (entry) => entry === group || remainder.groups.includes(entry)
     )
   );
   const probe = (override) => resolve(stage, { ...optionOverrides, [groupId]: override });
-  const options = normalizeList(group?.options).map((option, index) => {
+  const options = iterableToArray(group?.options).map((option, index) => {
     const presentation = present(option, index, probe({ optionIndex: index })?.success === true);
     presentation.candidates = presentation.candidates.map((item) => {
       const resolved = probe({ optionIndex: index, heldItemId: item.itemId });
       const available = resolved?.success === true;
       // Feasible: only what the solver routed elsewhere. Refused: what the remainder takes.
       const claims = available
-        ? normalizeList(resolved.plan).filter((entry) => entry.ingredient !== option)
+        ? iterableToArray(resolved.plan).filter((entry) => entry.ingredient !== option)
         : remainder.plan;
       return { ...item, claimed: unitsOf(claims, item.itemId), available };
     });
@@ -106,7 +106,7 @@ export function choiceAvailability({
 /** The consumed items a started stage has not fully removed, for the tool exclusion. */
 export function startedStageItems(runStep, items) {
   const uuids = new Set(
-    normalizeList(runStep?.preparedConsumption?.consumedSummary)
+    iterableToArray(runStep?.preparedConsumption?.consumedSummary)
       .map((entry) => stringOrNull(entry?.itemUuid))
       .filter(Boolean)
   );
@@ -139,7 +139,7 @@ export function unchosenRouteAvailability(setId, routes, started = false) {
  */
 export function acquisitionShortfallCount(selection) {
   const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
-  return normalizeList(selection?.missingGroups).filter(
+  return iterableToArray(selection?.missingGroups).filter(
     (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
   ).length;
 }
@@ -150,7 +150,7 @@ export function safeMissingGroup(group) {
     id,
     name: stringOrEmpty(group?.group?.name ?? group?.name),
     ingredientId: stringOrNull(group?.ingredient?.id),
-    need: numberOrNull(group?.need),
-    have: numberOrNull(group?.have),
+    need: laxNumberOrNull(group?.need),
+    have: laxNumberOrNull(group?.have),
   };
 }

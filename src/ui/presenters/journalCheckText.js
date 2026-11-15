@@ -8,8 +8,8 @@ import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierRe
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
 import {
-  normalizeList,
-  numberOrNull,
+  iterableToArray,
+  laxNumberOrNull,
   stringOrNull,
 } from '../../systems/gatheringEngineInternals.js';
 import { taskCountRequired } from '../../systems/runJournalOutcomeBands.js';
@@ -78,13 +78,13 @@ function routedRequired(data, derived, need) {
   if (data.type === 'fixed' || derived === null || !need) return null;
   const tier = need.outcomes.find((entry) => entry?.id === data.outcomeId);
   if (!tier) return null;
-  return derived - (numberOrNull(tier.dc) ?? 0) === need.required ? need.required : null;
+  return derived - (laxNumberOrNull(tier.dc) ?? 0) === need.required ? need.required : null;
 }
 
 /** A routed count's current need: its successes needed and the tiers whose offsets it records. */
 function routedCountNeed(routed, required) {
   if (!Number.isInteger(required)) return null;
-  return { required, outcomes: normalizeList(routed?.relativeOutcomes) };
+  return { required, outcomes: iterableToArray(routed?.relativeOutcomes) };
 }
 
 /** A routed gathering count's current need, from the task's override else the pool's. */
@@ -95,7 +95,7 @@ export function taskCountNeed(routed, task) {
 /** A recorded number, or null for anything else, a blank string included. */
 export function recordedNumber(value) {
   if (typeof value !== 'number' && typeof value !== 'string') return null;
-  return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
+  return typeof value === 'string' && value.trim() === '' ? null : laxNumberOrNull(value);
 }
 
 /** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
@@ -124,7 +124,7 @@ export function journalCheckAnchor({ config, recipe, mode }) {
   if (mode === 'progressive') return null;
   if (config?.dcMode === 'dynamic') return null;
   const tierId = stringOrNull(recipe?.checkTierId);
-  const tier = tierId && normalizeList(config?.tiers).find((entry) => entry?.id === tierId);
+  const tier = tierId && iterableToArray(config?.tiers).find((entry) => entry?.id === tierId);
   const evaluation = activeCheckEvaluation(config);
   if (evaluation.product === 'count') return countRequired(evaluation, tier?.successes);
   const tierDc = Number(tier?.dc);

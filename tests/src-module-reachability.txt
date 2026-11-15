@@ -1,0 +1,13 @@
+# src/ modules unreachable from src/main.js (issue 1732). Exact and removal-only: delete a row when
+# the file is deleted or wired in; never add one. Sorted by code point.
+src/systems/companionEffectKinds.js
+src/systems/companionOperationEffects.js
+src/ui/recipeAvailability.js
+src/ui/svelte/apps/journal/AboutThisRun.svelte
+src/ui/svelte/apps/journal/JournalCard.svelte
+src/ui/svelte/apps/journal/JournalTips.svelte
+src/ui/svelte/apps/journal/RecentResults.svelte
+src/ui/svelte/apps/journal/StepTimeline.svelte
+src/ui/svelte/apps/journal/WhatToExpect.svelte
+src/ui/svelte/apps/manager/scoped/ScopedPlaceholderPage.svelte
+src/ui/svelte/util/autoFillResolver.js
