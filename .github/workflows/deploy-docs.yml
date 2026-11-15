@@ -30,6 +30,15 @@ jobs:
       # silently loses its layout and navigation entry.
       - name: Build Jekyll site
         run: cd docs && bundle exec jekyll build --strict_front_matter
+      # Issue 1734: a Kramdown attribute line that does not bind to its block builds green and
+      # renders as literal text, so any brace-colon left in the built HTML fails the job.
+      - name: Fail on a Kramdown attribute that rendered as text
+        run: |
+          test -d docs/_site || { echo "::error::docs/_site was not built"; exit 1; }
+          if grep -rl '{:' docs/_site --include=*.html; then
+            echo "::error::a Kramdown attribute rendered as literal text on the pages listed above"
+            exit 1
+          fi
       - if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v4
         with:
