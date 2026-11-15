@@ -55,13 +55,26 @@ describe('AppTitleBar', () => {
     const mark = markOf(root);
     assert.equal(mark.tagName, 'SPAN', 'the mark is a bare span, not a Chip');
     assert.ok(mark.classList.contains('manager-titlebar-badge'), 'it rides the gold badge rule');
-    assert.equal(mark.children.length, 2, 'the word and its hidden name, nothing else');
-    const [word, name] = mark.children;
+    assert.equal(mark.children.length, 3, 'the word, its hidden name and a hidden stop');
+    const [word, name, stop] = mark.children;
     assert.equal(word.getAttribute('aria-hidden'), 'true', 'the visible word is not read');
     assert.equal(word.textContent, WORDS['FABRICATE.Admin.Manager.Titlebar.Premium']);
     assert.ok(name.classList.contains('visually-hidden'), 'the read name is hidden text');
     assert.equal(name.textContent, WORDS['FABRICATE.Admin.Manager.Titlebar.PremiumStatus']);
     assert.equal(mark.getAttribute('title'), name.textContent, 'the title is the read name');
+    assert.ok(stop.classList.contains('visually-hidden'), 'the stop is hidden text');
+    assert.equal(stop.textContent, '.', 'a full stop ends the read name');
+  });
+
+  it('reads the mark name and the status prefix as two phrases, not one run-on (issue 2422)', async () => {
+    const root = await harness.mount({ premiumInstalled: true, statusLabel: 'Simple' });
+    const read = barOf(root).textContent.replaceAll(/\s+/g, ' ').trim();
+    const name = WORDS['FABRICATE.Admin.Manager.Titlebar.PremiumStatus'];
+    const prefix = WORDS['FABRICATE.Admin.Manager.Titlebar.Status'];
+    assert.ok(
+      read.includes(`${name}. ${prefix}`),
+      `the name ends with a stop before the prefix: “${read}”`
+    );
   });
 
   it('draws a caller’s caption verbatim after a hidden prefix and an information glyph', async () => {
