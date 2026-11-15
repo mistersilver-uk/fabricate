@@ -378,11 +378,15 @@ describe('SvelteFabricateApp shell window', () => {
       );
     });
 
-    it('exposes the active canvas tool through the services bag', () => {
-      assert.ok(
-        appSource.includes('getActiveCanvasTool: () => this._activeCanvasTool ?? null'),
-        '_buildServices should expose getActiveCanvasTool'
-      );
+    it('exposes the active canvas tool through the services bag', async () => {
+      await withFabricateLifecycleReplay(async ({ loadModule }) => {
+        const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+        const app = Object.create(SvelteFabricateApp.prototype);
+        const services = app._buildServices();
+        assert.equal(services.getActiveCanvasTool(), null);
+        app._activeCanvasTool = { systemId: 'survival', toolId: 'sickle' };
+        assert.equal(services.getActiveCanvasTool(), app._activeCanvasTool);
+      });
     });
 
     it('clears the active canvas tool on close() and the _onClose safety net', () => {
@@ -634,25 +638,32 @@ describe('SvelteFabricateApp shell window', () => {
     });
   });
 
-  it('wires the player Inventory tab seam, store, and cross-tab navigation', () => {
-    assert.ok(
-      appSource.includes(
-        'listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts)'
-      ),
-      '_buildServices should expose the listInventoryForActor seam'
-    );
-    assert.ok(
-      appSource.includes('services.inventory = createInventoryStore({ services })'),
-      'the inventory store should be instantiated as a shared singleton'
-    );
-    assert.ok(
-      appSource.includes('services.navigateToCraftingRecipe ='),
-      'a cross-tab navigation seam should be exposed for Pin for Crafting'
-    );
-    assert.ok(
-      appSource.includes("this._selectTab('crafting')"),
-      'navigation should switch to the Crafting tab'
-    );
+  it('wires the player Inventory tab seam, store, and cross-tab navigation', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const received = [];
+      globalThis.game.fabricate.listInventoryForActor = (opts) => {
+        received.push(opts);
+      };
+      const services = app._buildServices();
+      services.listInventoryForActor({ actorId: 'actor-1' });
+      assert.deepEqual(received, [{ actorId: 'actor-1' }], 'the Inventory seam reaches the facade');
+      assert.ok(services.inventory, 'the inventory store should be instantiated as a singleton');
+      const tabs = [];
+      const selected = [];
+      services.crafting = {
+        select: (id) => {
+          selected.push(id);
+        },
+      };
+      app._selectTab = (tab) => {
+        tabs.push(tab);
+      };
+      services.navigateToCraftingRecipe('recipe-1');
+      assert.deepEqual(selected, ['recipe-1']);
+      assert.deepEqual(tabs, ['crafting'], 'navigation should switch to the Crafting tab');
+    });
   });
 
   it('computes and live-refreshes Alchemy tab availability', () => {
