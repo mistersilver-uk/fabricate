@@ -1,0 +1,79 @@
+{
+  "artifact": "https://claude.ai/artifact/HNtwK7q8hEyNNeVSCXb2xp",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-15T10:13:09Z"
+  },
+  "groups": ["Logos", "Relics", "Licences"],
+  "assetGroups": {
+    "Logos": {
+      "name": "Logos",
+      "tile": "l",
+      "order": ["fabricate-logo.jpg"],
+      "files": {
+        "fabricate-logo.jpg": {
+          "name": "fabricate-logo.jpg",
+          "blob": "a19b1fd77baa65cc4bbd1326a315e20e",
+          "size": 801028,
+          "type": "image/jpeg"
+        }
+      }
+    },
+    "Relics": {
+      "name": "Relics",
+      "tile": "s",
+      "order": [
+        "relic-blood.webp",
+        "relic-catalyst.webp",
+        "relic-entropy.webp",
+        "relic-formula.webp",
+        "relic-stone.webp",
+        "relic-verdant.webp"
+      ],
+      "files": {
+        "relic-blood.webp": {
+          "name": "relic-blood.webp",
+          "blob": "52fef92e31e4b4b2de7027a78cb23414",
+          "size": 1820,
+          "type": "image/webp"
+        },
+        "relic-catalyst.webp": {
+          "name": "relic-catalyst.webp",
+          "blob": "b614f944928b7bd6290e845597cb4c6c",
+          "size": 1810,
+          "type": "image/webp"
+        },
+        "relic-entropy.webp": {
+          "name": "relic-entropy.webp",
+          "blob": "7dd7281b97f05459fc981917dec95356",
+          "size": 2324,
+          "type": "image/webp"
+        },
+        "relic-formula.webp": {
+          "name": "relic-formula.webp",
+          "blob": "671dd72f1ddf106d62c537e97eeedc09",
+          "size": 1372,
+          "type": "image/webp"
+        },
+        "relic-stone.webp": {
+          "name": "relic-stone.webp",
+          "blob": "a8af060868c1dfd837c3b161a7d4179d",
+          "size": 2070,
+          "type": "image/webp"
+        },
+        "relic-verdant.webp": {
+          "name": "relic-verdant.webp",
+          "blob": "1e251e4e1adb87841bbf80f0717ae8cf",
+          "size": 1800,
+          "type": "image/webp"
+        }
+      }
+    },
+    "Licences": {
+      "name": "Licences",
+      "tile": "s",
+      "order": [],
+      "files": {}
+    }
+  }
+}

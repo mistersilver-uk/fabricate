@@ -1062,3 +1062,26 @@ Generation needs the harvested chrome, which never leaves your machine, so CI bu
 
 A Foundry chrome rotation or a Playwright resolution change rewrites the whole set with no visual change to review.
 The map's provenance header makes that identifiable, and such a rewrite lands as its own commit, separate from any content change.
+
+## Design System artifact
+
+`design-system-artifact.mjs` builds the files of the Fabricate Design System artifact, the shared design system Fabricate prototypes are built in, from this repository's own design-system sources.
+It reads the theme tokens in `styles/fabricate-tokens.css`, the build reference `openspec/specs/design-system/library.html` (its kit CSS and specimens become `components/bundle.css` and one card per entry), `scripts/lib/designSystemPrimitives.json` (each card's shipped Svelte file), and the self-hosted fonts and licences under `assets/fonts/`.
+The hand-written brand book, the cover and the asset-group notes live under `design-system-artifact/static/` and are copied over the generated tree.
+
+```bash
+node scripts/design-system-artifact.mjs --out /tmp/fabricate-ds --measure
+```
+
+Useful options:
+
+| Option | Description |
+|---|---|
+| `--out <dir>` | Required: writes `<dir>/project/**`, the artifact's files at their served paths, and `<dir>/files.json`, the `files` map for one publish. |
+| `--measure` | Renders every card in Chromium through Playwright and writes its measured height into the card's `@dsCard` marker. |
+| `--chromium <path>` | Launches that Chromium binary instead of Playwright's own download. |
+
+The output is a build product and is never committed.
+Republish it to the artifact named in `design-system-artifact/assets.json` with `root` set to `<dir>`, `file_path` set to `<dir>/project/design-system.json`, and `files` set to `files.json`.
+Before that publish, read the live `project/design-system.json` and carry its `createdOnFiles` and asset records over, because a person can add an asset on the page between runs.
+The images (the logo and the premium relic art) are uploads in the artifact's asset store rather than files, recorded in `assets.json`; a new image is uploaded first and its record added there.

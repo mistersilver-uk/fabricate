@@ -1,0 +1,96 @@
+<!-- @dsCard height=288 -->
+<div class="cover">
+  <style>
+    html,
+    body {
+      margin: 0;
+    }
+    .cover {
+      position: relative;
+      width: 960px;
+      height: 288px;
+      background: var(--fab-bg-0);
+      overflow: hidden;
+    }
+    .art {
+      position: absolute;
+      left: 480px;
+      top: 0;
+    }
+    .r {
+      rx: var(--fab-radius-card);
+    }
+    .b-accent {
+      fill: var(--fab-accent);
+    }
+    .b-deep {
+      fill: var(--fab-bg-3);
+    }
+    .b-success {
+      fill: var(--fab-success);
+    }
+    .b-info {
+      fill: var(--fab-info);
+    }
+    .ring-ink {
+      fill: none;
+      stroke: var(--fab-on-accent);
+      stroke-width: 2;
+    }
+    .axis-ink {
+      stroke: var(--fab-on-accent);
+      stroke-width: 1;
+    }
+    .ring-accent {
+      fill: none;
+      stroke: var(--fab-accent);
+      stroke-width: 2;
+    }
+    .name {
+      position: absolute;
+      left: 40px;
+      bottom: 40px;
+      max-width: 440px;
+    }
+    .title {
+      font-family: var(--font-serif);
+      font-weight: 600;
+      font-size: 80px;
+      line-height: 0.95;
+      color: var(--fab-text);
+      letter-spacing: -0.01em;
+    }
+    .tag {
+      margin-top: 12px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--fab-text-muted);
+    }
+  </style>
+  <!--
+    blocks: fab-accent slab 192×240, fab-bg-3 field 224×112, fab-success 104×112, fab-info 104×112; corners fab-radius-card (11)
+    arrangement: one tall accent slab with three satellites, flush on a 16px (fab-space-4) gutter, 24px (fab-space-6) inset
+    pattern: roundels (rings), from the mark's four elemental roundels — "a literal motif" row; rings stroke 2px like the mark
+    steps: fab-space-4 16, fab-space-6 24; radii fab-radius-card 11, rings r 22 / 56
+  -->
+  <svg class="art" viewBox="0 0 480 288" width="480" height="288" aria-hidden="true">
+    <rect class="b-accent r" x="24" y="24" width="192" height="240" />
+    <rect class="b-deep r" x="232" y="24" width="224" height="112" />
+    <rect class="b-success r" x="232" y="152" width="104" height="112" />
+    <rect class="b-info r" x="352" y="152" width="104" height="112" />
+    <circle class="ring-ink" cx="120" cy="144" r="56" />
+    <line class="axis-ink" x1="80" y1="104" x2="160" y2="184" />
+    <line class="axis-ink" x1="160" y1="104" x2="80" y2="184" />
+    <circle class="ring-accent" cx="288" cy="80" r="22" />
+    <circle class="ring-accent" cx="344" cy="80" r="22" />
+    <circle class="ring-accent" cx="400" cy="80" r="22" />
+  </svg>
+  <div class="name">
+    <div class="title">Fabricate</div>
+    <div class="tag">
+      Crafting, gathering and downtime for Foundry VTT — one ladder, seven palettes.
+    </div>
+  </div>
+</div>
+<script></script>
