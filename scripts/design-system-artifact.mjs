@@ -29,6 +29,8 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { stylesheetSources } from './lib/stylesheetSource.js';
+
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STATIC = join(REPO, 'scripts/design-system-artifact/static');
 const ASSETS = join(REPO, 'scripts/design-system-artifact/assets.json');
@@ -1068,7 +1070,11 @@ async function main() {
   const git = (...a) => execFileSync('git', ['-C', REPO, ...a], { encoding: 'utf8' }).trim();
   const ref = `${git('rev-parse', '--abbrev-ref', 'HEAD')}@${git('rev-parse', '--short', 'HEAD')}`;
 
-  const tokens = buildTokens(readFileSync(join(REPO, 'styles/fabricate-tokens.css'), 'utf8'), ref);
+  const tokensPart = stylesheetSources().parts.find(
+    (p) => p.file === 'styles/fabricate-tokens.css'
+  );
+  if (!tokensPart?.text) throw new Error('The module sheet imports no styles/fabricate-tokens.css');
+  const tokens = buildTokens(tokensPart.text, ref);
   write('tokens.json', `${JSON.stringify(tokens, null, 2)}\n`);
   write('tokens.css', buildTokensCss(tokens));
 
