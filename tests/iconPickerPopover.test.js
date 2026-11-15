@@ -194,3 +194,29 @@ test('the in-list margin can cost a ROW as well as gaining the list its own heig
     'the panel still contains the list, which is the half a bare add-back would lose'
   );
 });
+
+test('contentWidth is opt-in: absent or zero leaves every width as before (issue 1967)', () => {
+  const rect = { top: 120, bottom: 152, left: 220, right: 420, width: 200, height: 32 };
+  const viewport = { width: 1280, height: 900 };
+  const baseline = computeIconPickerPopoverLayout(rect, viewport, { minWidth: 160, maxWidth: 320 });
+  assert.equal(baseline.width, 200);
+  for (const contentWidth of [undefined, 0, -5, NaN]) {
+    const layout = computeIconPickerPopoverLayout(rect, viewport, {
+      minWidth: 160,
+      maxWidth: 320,
+      contentWidth,
+    });
+    assert.deepEqual(layout, baseline, `contentWidth ${contentWidth} changes nothing`);
+  }
+});
+
+test('contentWidth grows the panel past the trigger and clamps at maxWidth (issue 1967)', () => {
+  const rect = { top: 120, bottom: 152, left: 220, right: 420, width: 200, height: 32 };
+  const viewport = { width: 1280, height: 900 };
+  const bands = { minWidth: 160, maxWidth: 320 };
+  const width = (contentWidth) =>
+    computeIconPickerPopoverLayout(rect, viewport, { ...bands, contentWidth }).width;
+  assert.equal(width(150), 200, 'content below the trigger changes nothing');
+  assert.equal(width(280), 280, 'content above the trigger grows the panel');
+  assert.equal(width(900), 320, 'content above the ceiling clamps to maxWidth');
+});

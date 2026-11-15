@@ -267,6 +267,18 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
+    it('carries each option`s full label as its row title (issue 1967)', async () => {
+      const long = 'A category name that is thirty-eight';
+      await mountSelect({
+        options: [{ value: 'long', label: long }, ...MODES],
+        value: 'long',
+      });
+      trigger().focus();
+      await openPanel();
+      assert.equal(optionRows()[0].getAttribute('title'), long, 'a truncated row stays readable');
+      harness.remount();
+    });
+
     it('Escape closes and returns focus; Enter commits the caller`s own typed value', async () => {
       await mountSelect({ options: PAGE_SIZES, value: 10 });
       trigger().focus();

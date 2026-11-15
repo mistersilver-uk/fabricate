@@ -15,7 +15,7 @@
   | `size` | `'form'` \| `'inline'` \| `'toolbar'` | `'form'` | 38px/radius 9/12.5px/`--fab-surface-soft`, 30px/radius 7/11.5px/`--fab-bg-2`, 34px/radius 9/11.5px at 600/`--fab-bg-1`. It names a height, a corner, a type size AND a fill, because the fill is its own axis. The trigger's width is its slot's, not a rung's: see `fill`. |
   | `fill` | boolean | `false` | Only the literal `true` stretches the picker root and its trigger to the width of the slot they sit in (issue 2904), so a choice never changes the trigger's width; the value ellipsises and the chevron keeps the trailing edge. Other per-site skin is still a descendant rule of the caller's own wrapper class. |
   | `showTick` / `placeholder` | boolean / string | `true` / `''` | The selected column, a property of the LIST rather than of an option and with callers on both polarities; and the trigger's text while `value` is null. |
-  | `minWidth` / `maxWidth` | px | `0` | The PANEL's width band; `0` takes the rung's own. Either DECIDES a measured panel's box, because `anchoredPopover` resolves the band into one width and writes it as both bounds; `SIZES` is the single source of the numbers. |
+  | `minWidth` / `maxWidth` | px | `0` | The PANEL's width band; `0` takes the rung's own. Either DECIDES a measured panel's box, because `anchoredPopover` resolves the band into one width and writes it as both bounds; `SIZES` is the single source of the numbers. An open panel also grows toward `maxWidth` to draw its widest option label whole (issue 1967), and a label still clipped at the ceiling is carried whole as the row's `title`. |
   | `triggerProps` / `triggerTitle` | `{ 'data-x': 'value' }` / string | `{}` / `''` | Hooks stamped verbatim on the trigger button, and the only route to a native `title` on it. `triggerProps` cannot carry a name or a tooltip: `SearchablePopover` spreads it first and then writes `title`, `aria-label` and `aria-labelledby` from its own props. |
   | `label` / `hint` / `error` | strings | `''` | Any renders the whole control inside `<Field as="div">`, with a caption span before the trigger and the note span after it. |
   | `ariaLabel` / `ariaLabelledBy` | string / id list | `''` | The accessible name when there is no `label`. ONE OF THE THREE IS REQUIRED, and `ariaLabel` IS NEVER PASSED BESIDE `ariaLabelledBy`, which wins and would leave the string dead text free to drift. All three name the OPEN PANEL as well as the trigger, so a control given only a `hint` or an `error` would open an unnamed dialog wrapping an unnamed list. |
@@ -48,6 +48,7 @@
   import Chip from './Chip.svelte';
   import Field from './Field.svelte';
   import SearchablePopover from './SearchablePopover.svelte';
+  import { measureWidestOptionLabel } from '../util/iconPickerPopover.js';
 
   const UNCHANGED_OPTION_ID = '__unchanged__';
 
@@ -247,6 +248,7 @@
     panelLabelledBy={ariaLabelledBy}
     minWidth={minWidth || band.minWidth}
     maxWidth={maxWidth || band.maxWidth}
+    measureContentWidth={measureWidestOptionLabel}
     {disabled}
     option={optionRow}
     onSelect={choose}

@@ -746,6 +746,36 @@ describe('a converted manager trigger keeps the width its native select had (iss
     }
   });
 
+  it('draws a 38-character category whole in a panel wider than its capped trigger (issue 1967)', async () => {
+    const page = await openFixture('components-browser-long-category');
+    const hook = '[data-component-category-filter]';
+    const category = 'Rare alchemical reagents and tinctures';
+    try {
+      assert.equal(category.length, 38, 'the fixture string is the issue`s 38 characters');
+      await pressPointerOn(page, hook);
+      const measured = await page.evaluate(
+        ({ selector, text }) => {
+          const panel = document.querySelector('.fabricate-select-popover');
+          const row = panel.querySelector(`[data-popover-option="${text}"]`);
+          const label = row.querySelector('.fabricate-select-label');
+          return {
+            panel: panel.getBoundingClientRect().width,
+            trigger: document.querySelector(selector).getBoundingClientRect().width,
+            ellipsised: label.scrollWidth > label.clientWidth,
+          };
+        },
+        { selector: hook, text: category }
+      );
+      assert.ok(
+        measured.panel > measured.trigger + EPSILON,
+        `the panel measured ${measured.panel}px against a ${measured.trigger}px trigger, so it did not widen`
+      );
+      assert.equal(measured.ellipsised, false, 'and the 38-character label draws whole');
+    } finally {
+      await page.close();
+    }
+  });
+
   it('inks the component toolbar triggers in the secondary text colour the reference draws', async () => {
     // `proto:1054`, `proto:1056` and `proto:1066` ink all three `--text2`. A route rule keyed on
     // `data-manager-view="components"` states it; the essence sort, on no such route, is the

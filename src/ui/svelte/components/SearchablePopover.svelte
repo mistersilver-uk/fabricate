@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(file-size): the `measureContentWidth` prop and its pass-through (issue 1967) are the panel's one content-width seam, which only Select opts into; the layout lives in iconPickerPopover.js, so there is no cohesive unit to extract here. -->
 <!--
   THE app's searchable popover picker: a trigger, a portaled panel, an optional query field and a
   `role="listbox"` of options. The panel is portaled to the nearest Fabricate application root
@@ -31,6 +32,7 @@
   | `horizontalAlign` / `bounds` / `ignoreScrollWithin` | `'left'` \| `'right'` / selector, element or resolver / boolean | `'left'` / `pickerScrollerBounds` / `false` | Which of the panel's edges meets the trigger's, the clipping boundary it is clamped inside, and whether to drop viewport events that started INSIDE the panel, which is anchored to the trigger and moves with neither. A shared component must not name an area's own scroller, so the `bounds` default comes from `util/overlayBounds.js`. |
   | `emptyHint` / `emptyDetail` / `noMatchesHint` | localized strings | `''` / `''` / `FABRICATE.Common.Picker.NoMatches` | THE TWO EMPTINESSES ARE DIFFERENT FACTS. `emptyHint` is for a list that holds NOTHING and feeds `EmptyState`'s `title` slot, so it stays SHORT; `emptyDetail` feeds the `hint` slot and is suppressed with `emptyHint`. A filtered emptiness gets `noMatchesHint`. This is the OPPOSITE slot mapping from `VocabularyPanel`. |
   | `filterOptions(options, query)` | function | label-substring | Replaces this component's own filter, called with the raw options and the normalized query. IT IS CALLED ON EVERY PASS, INCLUDING AN EMPTY QUERY, and the DEFAULT short-circuits rather than the seam, so a pinned resolved row is not silently dropped. It is the only place a caller can see the query, and so the only home for alias matching and ranking; it may return NEW row objects, and its result is coerced to an array. |
+  | `measureContentWidth({ popover })` | function | `undefined` | Opt-in. Returns `{ contentWidth }` on every layout pass; the panel width becomes `clamp(max(trigger, minWidth, contentWidth), minWidth, maxWidth)`. Only `Select` passes it. |
   | `measureListMetrics({ popover, list, search })` / `triggerOnKeydown` | functions | `undefined` | The first returns `{ rowPitch, rowGap, chromeHeight, listExtra, minUsableHeight }` on EVERY layout pass, measured from the rendered box: `listExtra` is height inside the list no pitch can see, subtracted from the budget and added back to the list, and `minUsableHeight` the room below which the panel flips. The second is a caller keydown handler COMPOSED AFTER this component's own — a prop rather than a spread key, because in the search-suppressed shape the trigger holds the key map and an overridden `onkeydown` would delete the focus model. |
   | `open` / `anchor` | bindable boolean / element or resolver | `false` / `undefined` | Bind `open` to open the picker from something other than the trigger, or to force it shut from outside. With an `anchor` the caller owns, for a control whose opening gesture belongs to another, no trigger renders and every trigger prop is a no-op: the caller binds `open` and writes the anchor's own ARIA, the panel positions against the anchor, outside-click dismissal counts it inside, and `close()` returns focus to it while it is connected. Anchor mode is the prop's presence, not its truthiness: an element-form caller initialises its binding to `null`, which renders no trigger before the element mounts. An anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists; prefer the resolver form where the anchor can unmount. |
   | `onSelect(id)` | callback | no-op | The chosen option's id. Committing on select is the caller's business: the primitive holds no selection of its own and emits one call per click, in every mode. |
@@ -157,6 +159,7 @@
     optionClass = '',
     filterOptions = labelSubstringFilter,
     measureListMetrics = undefined,
+    measureContentWidth = undefined,
     ignoreScrollWithin = false,
     triggerOnKeydown = undefined,
     horizontalAlign = 'left',
@@ -497,6 +500,7 @@
       {bounds}
       {ignoreScrollWithin}
       {measureListMetrics}
+      {measureContentWidth}
       {popoverTitle}
       {showFilteredCount}
       {filteredCount}

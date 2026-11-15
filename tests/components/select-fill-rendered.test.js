@@ -174,19 +174,32 @@ describe('the list a filled published Select opens', () => {
           await pressPointerOn(page, trigger);
           await page.locator(listOf).waitFor();
           await twoFrames(page);
-          const [panel, anchor] = await page.evaluate(
-            ([list, button]) =>
-              [list, button].map((selector) => {
+          const [panel, anchor, clipped] = await page.evaluate(
+            ([list, button]) => [
+              ...[list, button].map((selector) => {
                 const { left, top, bottom, width } = document
                   .querySelector(selector)
                   .getBoundingClientRect();
                 return { left, top, bottom, width };
               }),
+              [...document.querySelectorAll(`${list} .fabricate-select-label`)].some(
+                (label) => label.scrollWidth > label.clientWidth
+              ),
+            ],
             [listOf, trigger]
           );
           const { minWidth, maxWidth } = RUNGS[size];
-          const wanted = Math.min(Math.max(anchor.width, minWidth), maxWidth);
-          near(panel.width, wanted, `${id} list width`);
+          // The trigger's width within the band is the floor; the list grows past it only to draw a
+          // label whole (issue 1967), so a wider list clips no label or has reached the ceiling.
+          const floor = Math.min(Math.max(anchor.width, minWidth), maxWidth);
+          assert.ok(panel.width >= floor - 0.5, `${id} list width ${panel.width} under ${floor}`);
+          assert.ok(
+            panel.width <= maxWidth + 0.5,
+            `${id} list width ${panel.width} over ${maxWidth}`
+          );
+          if (panel.width > floor + 0.5) {
+            assert.ok(!clipped || panel.width >= maxWidth - 0.5, `${id} grew yet clips a label`);
+          }
           if (dir === 'ltr') near(panel.left, anchor.left, `${id} list left edge`);
           assert.ok(panel.top >= anchor.bottom, `${id} list below the trigger`);
           await page.keyboard.press('Escape');

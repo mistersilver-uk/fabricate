@@ -88,7 +88,10 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
   const minWidth = Math.min(requestedMinWidth, availableWidth);
   const maxWidth = Math.max(minWidth, Math.min(requestedMaxWidth, availableWidth));
   const triggerWidth = Math.max(0, Number(resolvedRect.width) || 0);
-  const width = clamp(Math.max(triggerWidth, minWidth), minWidth, maxWidth);
+  // OPT-IN (issue 1967): a caller that measures its content passes `contentWidth`, and the panel
+  // grows to it before the ceiling clips it. Absent, it is 0 and the width is the previous one.
+  const contentWidth = Math.max(0, Number(options.contentWidth) || 0);
+  const width = clamp(Math.max(triggerWidth, minWidth, contentWidth), minWidth, maxWidth);
 
   const triggerLeft = Number(resolvedRect.left) || 0;
   const triggerRight = Number(resolvedRect.right) || 0;
@@ -132,4 +135,24 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
     maxHeight,
     listMaxHeight
   };
+}
+
+/**
+ * The width a Select panel needs to draw its widest option label whole (issue 1967).
+ *
+ * `.fabricate-select-label` clips with an ellipsis, so a label's `scrollWidth` exceeds its
+ * `clientWidth` by exactly the pixels it lacks. The panel needs its CURRENT width plus the largest
+ * such shortfall, which keeps the row chrome (padding, tick, badge) out of the arithmetic.
+ *
+ * @param {{popover?: Element|null}} [targets] The panel element.
+ * @returns {{contentWidth: number}} `0` when nothing is measurable, which leaves the layout alone.
+ */
+export function measureWidestOptionLabel({ popover } = {}) {
+  if (!popover?.querySelectorAll) return { contentWidth: 0 };
+  let shortfall = 0;
+  for (const label of popover.querySelectorAll('.fabricate-select-label')) {
+    shortfall = Math.max(shortfall, label.scrollWidth - label.clientWidth);
+  }
+  const current = popover.getBoundingClientRect().width;
+  return { contentWidth: shortfall > 0 ? Math.ceil(current + shortfall) : 0 };
 }

@@ -42,6 +42,7 @@
     bounds = undefined,
     ignoreScrollWithin = false,
     measureListMetrics = undefined,
+    measureContentWidth = undefined,
     popoverTitle = '',
     showFilteredCount = false,
     filteredCount = '',
@@ -118,6 +119,7 @@
       horizontalAlign,
       minWidth,
       maxWidth,
+      ...(measureContentWidth?.({ popover }) ?? {}),
       ...(measureListMetrics?.({
         popover,
         list: optionsList,
