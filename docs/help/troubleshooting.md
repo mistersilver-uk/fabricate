@@ -841,7 +841,7 @@ Using up only part of a stack is not affected, because that reduces the item's q
 
 **Cause:**
 
-The **Foundry Graph** module causes this when a Gamemaster performs the attempt.
+The [Foundry Graph](https://github.com/gioppoluca/foundry-graph) module causes this when a Gamemaster performs the attempt.
 It blocks every Actor, Item, and Scene deletion a Gamemaster makes, through Foundry's `preDeleteItem`, `preDeleteActor`, and `preDeleteScene` hooks, then checks its graphs in the background and deletes the document again itself.
 
 Under Foundry's API, a blocked deletion means the document was not deleted, and the code that asked for the deletion is told so.
@@ -854,7 +854,9 @@ Fabricate relies on Foundry's API behaving as Foundry documents it, so it does n
 1. Disable Foundry Graph while you craft or salvage in Fabricate, or remove it from the world.
 2. If an attempt already removed an item without granting its results, grant the results by hand.
    Fabricate recorded the attempt as refused, so nothing is left in progress and the next attempt runs normally.
-3. Report the problem to Foundry Graph's author, so that its deletion check stops blocking deletions it later carries out itself.
+3. The problem is already reported to Foundry Graph's author in [Foundry Graph issue 19](https://github.com/gioppoluca/foundry-graph/issues/19).
+   Add a comment there asking for it to be fixed, rather than opening a new issue with Fabricate or with Foundry Graph.
+   The fix belongs in Foundry Graph, so a report to Fabricate cannot resolve it.
 
 ---
 
