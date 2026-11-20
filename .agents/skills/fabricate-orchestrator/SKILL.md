@@ -145,7 +145,7 @@ Plan the merge order, and rebase whichever merges second to reconcile the shared
 - **Never** accept another module breaking the Foundry VTT public API as a reason to change Fabricate, and **never** plan support for such a module.
 A module breaks that API when it subverts a documented core contract, for example a hook veto that it later reverses, a document operation whose result no longer reports what happened, or an operation dispatched outside the call that asked for it.
 For that module, plan no shim, guard, detection branch, setting or special case, and no loosening of a Fabricate contract so that the broken behaviour passes.
-The plan is instead: confirm the diagnosis from that module's own source, add an entry to the **Known Issues** help page, and draft an issue for that module's repository that the maintainer files.
+The plan is instead: confirm the diagnosis from that module's own source, add an entry to the **Troubleshooting** help page, which is where known issues are documented, and draft an issue for that module's repository that the maintainer files.
 This holds even when the symptom a user reports appears in Fabricate.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/help/quickstart.md`.
