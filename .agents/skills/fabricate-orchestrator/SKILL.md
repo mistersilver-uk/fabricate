@@ -142,6 +142,11 @@ Resolve by restacking bottom-up — after each base merges, rebase the next chil
 Before rebasing any branch, check whether its own PR already merged (`gh pr view --json state`): a squash-merged branch is dead, so delete it rather than rebase it, which would replay its landed commits into conflicts.
 When two parallel (not stacked) PRs off `main` touch the SAME file or cite each other's paths, GitHub's `mergeable` flag checks only for a TEXTUAL conflict, so a clean merge can still leave a semantic duplicate or a dangling path reference that fails `validate:agents`.
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
+- **Never** accept another module breaking the Foundry VTT public API as a reason to change Fabricate, and **never** plan support for such a module.
+A module breaks that API when it subverts a documented core contract, for example a hook veto that it later reverses, a document operation whose result no longer reports what happened, or an operation dispatched outside the call that asked for it.
+For that module, plan no shim, guard, detection branch, setting or special case, and no loosening of a Fabricate contract so that the broken behaviour passes.
+The plan is instead: confirm the diagnosis from that module's own source, add an entry to the **Troubleshooting** help page, which is where known issues are documented, and draft an issue for that module's repository that the maintainer files.
+This holds even when the symptom a user reports appears in Fabricate.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/help/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.

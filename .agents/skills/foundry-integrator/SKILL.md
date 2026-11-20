@@ -60,6 +60,7 @@ Audit the issue's `openspec-delta` for Foundry-integration soundness:
 - confirm every Foundry API call, hook, document/`ApplicationV2`/`DialogV2`/sheet usage, and lifecycle timing the design assumes actually exists and behaves that way in the target version.
 - flag deprecated or removed APIs, wrong hook timing, runtime-global misuse, missing settings/flag namespacing, and missing or wrong `module.json` compatibility metadata for any new API requirement.
 - propose the correct Foundry-native approach when the plan reaches for a custom path Foundry already provides.
+- when a defect traces to another module subverting a documented Foundry contract, report the module, the contract it breaks and its source as the finding, and return `NEEDS_CHANGES` on any plan that adapts Fabricate to it; the orchestrator's coordination rules state what the plan does instead.
 - emit a verdict on the first line: `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, followed by findings tied to the delta with their cited sources.
 
 ## Implementation-review duty
