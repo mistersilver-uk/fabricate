@@ -336,7 +336,7 @@ It opens only for a GM, and only when a claim is retained.
 While the claim is still live, the refusal notice asks you to wait and no prompt opens.
 Once the claim is past its 60 second live window, the next refused start opens the prompt.
 Only the active GM's choice is accepted.
-Any other GM sees a notice that the claim could not be released, which asks them to check that they are the active GM.
+Any other GM sees a notice that the active GM must process the change, and should ask the active GM to release the claim.
 Players see a notice that a GM must release the claim.
 Releasing the claim does not repeat the Craft, Brew or Attempt you made.
 

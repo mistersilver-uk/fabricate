@@ -917,13 +917,14 @@ Realms the destination world already has keep their own definitions; only realms
 
 **Cause:**
 
-An earlier Journal operation was interrupted, for example by a closed tab or a lost connection, and its execution claim stayed in place.
+An earlier Journal operation was interrupted before it finished, and its execution claim stayed in place.
 Fabricate cannot tell whether that operation changed anything, so it keeps the claim until the active GM records what they found.
 A refused start creates no run, so the Journal has no run to open for it.
 
 **Fix:**
 
-1. A player asks their GM to start the same Craft, Brew or Attempt from the Crafting, Alchemy or Gathering tab.
+1. A player asks their GM to start any Craft, Brew or Attempt from the Crafting, Alchemy or Gathering tab.
+   A GM can do this directly.
 2. While the claim is still live, the notice asks you to wait and no prompt opens.
    Once the claim is past its 60 second live window, the next refused start opens **Release the retained execution claim** for the GM.
 3. Check the affected actors' items and currency, then choose **I checked it — release** or **Abandon it — release**.
@@ -931,8 +932,8 @@ A refused start creates no run, so the Journal has no run to open for it.
    **Not yet** closes the prompt and records nothing.
 4. Start the Craft, Brew or Attempt again.
    Releasing the claim does not repeat the one that was refused.
-5. A GM who is not the active GM sees a notice that the claim could not be released.
-   Check that you are the active GM and try again.
+5. A GM who is not the active GM sees a notice that the active GM must process the change.
+   Ask the active GM to release the claim.
 
 **See also:** [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery) covers retained claims and the Release claim… control on a run.
 
