@@ -1503,7 +1503,7 @@
           "ClaimDetail": "An interrupted Journal operation kept the world's execution claim: {failure}",
           "UnknownFailure": "Fabricate recorded no reason for it.",
           "Inspect": "Fabricate cannot tell whether that operation changed anything. Check the affected actors' items and currency before you decide.",
-          "Effect": "Both choices do the same thing to the interrupted operation: nothing. Neither applies, undoes nor repeats it. They release the claim so Fabricate can start runs again, and record which of the two you chose.",
+          "Effect": "Both choices do the same thing to the interrupted operation: nothing. Neither applies, undoes nor repeats it. They release the claim so Fabricate can start and continue runs again, and record which of the two you chose.",
           "Reconciled": "I checked it — release",
           "Abandoned": "Abandon it — release",
           "Cancel": "Not yet",
