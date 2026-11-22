@@ -267,6 +267,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8')
     );
 
+    // The retained-claim release a refused Attempt offers a GM, and its notice wording.
+    for (const modulePath of [
+      'src/ui/svelte/apps/journal/runRecovery.js',
+      'src/ui/svelte/apps/journal/runStateNotice.js',
+    ]) {
+      const recoveryDestination = join(tempRoot, modulePath);
+      mkdirSync(dirname(recoveryDestination), { recursive: true });
+      writeFileSync(recoveryDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+    }
+
     // Issue 2008: GatheringView words an additional-dice notice through the prompt presenter.
     for (const modulePath of [
       ...FOUNDRY_BRIDGE_RAW_MODULES,
@@ -1711,6 +1721,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       assert.equal(calls.attempts.length, 1, 'second press is a no-op while busy');
 
       releaseAttempt({ accepted: true });
+      // The attempt awaits the retained-claim offer before it re-reads the listing.
+      await settle();
       await settle();
       assert.equal(calls.attempts.length, 1, 'still exactly one attempt after settle');
       assert.equal(calls.list, 2, 'listing re-fetched once after the attempt resolves');

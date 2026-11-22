@@ -700,6 +700,7 @@
     "getRecipeManager": {
       "answeredBy": "getRecipeManager"
     },
+    "getRetainedJournalClaim": null,
     "getSelectedActorId": {
       "answeredBy": "getSelectedGatheringActorId"
     },

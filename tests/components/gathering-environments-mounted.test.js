@@ -102,6 +102,16 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(reasonsDestination), { recursive: true });
     writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
 
+    // The retained-claim release a refused Attempt offers a GM, and its notice wording.
+    for (const modulePath of [
+      'src/ui/svelte/apps/journal/runRecovery.js',
+      'src/ui/svelte/apps/journal/runStateNotice.js',
+    ]) {
+      const recoveryDestination = join(tempRoot, modulePath);
+      mkdirSync(dirname(recoveryDestination), { recursive: true });
+      writeFileSync(recoveryDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+    }
+
     // Issue 2008: GatheringView words an additional-dice notice through the prompt presenter.
     for (const modulePath of [
       ...FOUNDRY_BRIDGE_RAW_MODULES,

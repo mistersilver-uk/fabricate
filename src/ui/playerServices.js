@@ -14,13 +14,14 @@ import {
 } from '../systems/journalRunCommands.js';
 import { withStationPresence } from '../systems/stationPresence.js';
 
+import { projectRetainedClaim } from './presenters/retainedClaimProjection.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
 import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
-import { confirmDialog, localize, notifyWarn } from './svelte/util/foundryBridge.js';
+import { confirmDialog, isGameMaster, localize, notifyWarn } from './svelte/util/foundryBridge.js';
 
 /** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
  *  (issue 1773). */
@@ -125,6 +126,12 @@ function gameForwardingServices() {
       game?.fabricate?.getDismissedJournalRunKeys?.(opts) ?? new Set(),
     getJournalRunAuthorityAvailability: () =>
       game?.fabricate?.getJournalRunAuthorityAvailability?.() ?? authorityUnavailableAvailability(),
+    // The cached retained claim a GM may release, `null` for a player or when none is retained;
+    // `reconcileJournalRunAuthority` stays the authorization boundary.
+    getRetainedJournalClaim: () =>
+      isGameMaster()
+        ? projectRetainedClaim(game?.fabricate?.getJournalRunAuthorityAvailability?.()?.retained)
+        : null,
     // Active-GM manual dispositions of a retained claim (issue 1648) and of an uncertain legacy
     // run. Each command refuses a non-active-GM caller, so these seams add no authorization.
     reconcileJournalRunAuthority: activeGmCommand('reconcileJournalRunAuthority'),

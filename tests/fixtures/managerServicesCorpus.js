@@ -159,6 +159,7 @@ export const PLAYER_SERVICE_KEYS = Object.freeze([
   'getJournalRunAuthorityAvailability',
   'getProgressiveResultOrder',
   'getRecipeManager',
+  'getRetainedJournalClaim',
   'getSelectedActorId',
   'getSelectedAlchemySystemId',
   'getSelectedCraftingActorId',

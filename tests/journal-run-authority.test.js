@@ -1173,6 +1173,74 @@ describe('journal run authority ledger', () => {
     assert.equal(world.ledger.claim?.claimId, 'orphan');
   });
 
+  describe('the retained identity a refusal caches (what a GM release prompt reads)', () => {
+    const plantRetained = (world, claimId = 'orphan') => {
+      world.ledger.state.requests['abandoned-command'] = { kind: 'command', status: 'processing' };
+      world.ledger.claim = {
+        id: JOURNAL_RUN_CLAIM_PAGE_ID,
+        claimId,
+        requestId: 'abandoned-command',
+        acquiredAt: 1000,
+      };
+      world.setNow(1000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS + 1);
+    };
+    const retained = (claimId) => ({
+      claimId,
+      requestId: 'abandoned-command',
+      requestKind: 'command',
+      requestStatus: 'processing',
+      failureReason: null,
+      failureMessage: null,
+      claimedAt: 1000,
+    });
+    const next = { requestId: 'next', senderId: 'player', sessionId: 'one' };
+
+    it('is present after a refused run()', async () => {
+      const world = sharedAuthorityWorld();
+      const authority = world.realm();
+      await authority.setup();
+      plantRetained(world);
+      assert.equal((await authority.run(next, async () => ({ success: true }))).reason, 'recovery-required');
+      assert.deepEqual(authority.availability(), {
+        available: false,
+        reason: 'recovery-required',
+        retained: retained('orphan'),
+      });
+    });
+
+    it('is present after a refused bootstrapRecovery()', async () => {
+      const world = sharedAuthorityWorld();
+      await world.realm().setup();
+      plantRetained(world);
+      const booting = world.realm();
+      assert.equal((await booting.bootstrapRecovery()).reason, 'recovery-required');
+      assert.deepEqual(booting.availability(), {
+        available: false,
+        reason: 'recovery-required',
+        retained: retained('orphan'),
+      });
+    });
+
+    it('is absent after a command that must recover, until the next refused run()', async () => {
+      const world = sharedAuthorityWorld();
+      const authority = world.realm();
+      await authority.setup();
+      const settled = await authority.run(next, async () => ({ success: false, recoveryRequired: true }));
+      assert.equal(settled.recoveryRequired, true);
+      assert.deepEqual(authority.availability(), { available: false, reason: 'recovery-required' });
+
+      const again = { ...next, requestId: 'again' };
+      assert.equal((await authority.run(again, async () => ({ success: true }))).reason, 'claim-held');
+      assert.ok(!('retained' in authority.availability()), 'a live claim is held, not offered');
+
+      world.setNow(world.ledger.claim.acquiredAt + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS + 1);
+      assert.equal((await authority.run(again, async () => ({ success: true }))).reason, 'recovery-required');
+      const cached = authority.availability();
+      assert.equal(cached.reason, 'recovery-required');
+      assert.equal(cached.retained.claimId, world.ledger.claim.claimId);
+    });
+  });
+
   it('reports a claim inside its live window as held, and never touches it', async () => {
     const world = sharedAuthorityWorld();
     const authority = world.realm();
