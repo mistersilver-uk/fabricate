@@ -1860,7 +1860,7 @@ Every versioned mutation requires the active GM and exactly one ledger, even for
 Its explicit Journal setup action requires the active GM to confirm that all other GM sessions, including other tabs for the same user, are closed; setup never replaces an existing ledger or resolves duplicates.
 **Claim Reconciliation** records the active GM's manual disposition of a retained claim after inspecting the effects and reconstructing its matching run evidence.
 `reconcileJournalRunAuthority({ claimId, disposition })` accepts `reconciled` or `abandoned`, releases only that claim after durable recording, and never makes the old request or uncertain effect replayable.
-Until then the claim can block other runs as well, and need belong to no run: boot reconstruction acquires one under a request that guards no run, and a start it refuses creates none, so a GM is also offered the disposition from a refused Gathering Attempt; ordinary Journal refresh does not reconstruct a potentially live execution.
+Until then the claim can block other runs as well, and need belong to no run: boot reconstruction acquires one under a request that guards no run, and a start it refuses creates none, so a GM is also offered the disposition from a refused Craft, Brew or Gathering Attempt; ordinary Journal refresh does not reconstruct a potentially live execution.
 
 The **Journal** derives safe run models from actor history; **Finished** is its sole history browser, and dismissal is a per-user, per-world hiding preference rather than deletion of that history.
 Native `runType` remains crafting, gathering or salvage, while derived `activityKind` distinguishes alchemy for browsing.

@@ -899,6 +899,45 @@ Realms the destination world already has keep their own definitions; only realms
 
 ---
 
+## A Craft, Brew or Attempt Is Refused Until a GM Releases a Claim
+
+**Symptom:**
+
+- Starting a Craft, a Brew or a gathering Attempt shows this notice and nothing else happens:
+
+  <!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+  ```text
+  An interrupted Journal operation left the execution claim in place. A GM must release it before Fabricate can do this.
+  ```
+
+  <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- Nothing is spent, and every Craft, Brew and Attempt in the world is refused the same way.
+
+**Cause:**
+
+An earlier Journal operation was interrupted, for example by a closed tab or a lost connection, and its execution claim stayed in place.
+Fabricate cannot tell whether that operation changed anything, so it keeps the claim until the active GM records what they found.
+A refused start creates no run, so the Journal has no run to open for it.
+
+**Fix:**
+
+1. A player asks their GM to start the same Craft, Brew or Attempt from the Crafting, Alchemy or Gathering tab.
+2. While the claim is still live, the notice asks you to wait and no prompt opens.
+   Once the claim is past its 60 second live window, the next refused start opens **Release the retained execution claim** for the GM.
+3. Check the affected actors' items and currency, then choose **I checked it — release** or **Abandon it — release**.
+   Both choices release the claim and do nothing to the interrupted operation, and they differ only in what is recorded.
+   **Not yet** closes the prompt and records nothing.
+4. Start the Craft, Brew or Attempt again.
+   Releasing the claim does not repeat the one that was refused.
+5. A GM who is not the active GM sees a notice that the claim could not be released.
+   Check that you are the active GM and try again.
+
+**See also:** [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery) covers retained claims and the Release claim… control on a run.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

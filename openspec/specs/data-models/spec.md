@@ -3407,6 +3407,11 @@ A retained claim can block other versioned runs, and its availability reason MUS
 The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
 A retained claim need not belong to any run: boot reconstruction acquires it under a request that guards no run, and a start the claim refuses creates none.
 The affordance that clears it is therefore not confined to a live run's view.
+When a GM's Craft, Brew or Gathering Attempt is refused with `recovery-required` while the authority's cached availability carries a retained claim, that surface MUST offer the same disposition prompt.
+The prompt MUST default to cancelling, a chosen `reconciled` or `abandoned` MUST be recorded through `reconcileJournalRunAuthority({ claimId, disposition })`, and cancelling MUST record nothing.
+The surface MUST stay busy while the prompt is open, so a second start cannot open a second prompt.
+Releasing the claim MUST NOT replay the refused start.
+A player, a GM when no claim is retained, and a refusal for any other reason see only the refusal notice.
 A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and a viewer who is not a GM is never offered one.
 A GM who is not the active GM may be offered it, and `reconcileJournalRunAuthority` refuses that release.
 Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim.
