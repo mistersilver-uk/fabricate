@@ -153,7 +153,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
       'src/systems/countEvaluation.js',
       'src/utils/fillPlaceholders.js',
       // The retained-claim release a refused Attempt offers a GM, and the notice wording it
-      // reads. Omitting either HANGS this suite (# cancelled).
+      // reads. Omitting either hangs this suite as `# cancelled`.
       'src/ui/svelte/apps/journal/runRecovery.js',
       'src/ui/svelte/apps/journal/runStateNotice.js',
     ]) {
@@ -963,7 +963,6 @@ describe('GatheringView ↔ actor bar wiring', () => {
       await inWorld({ answer: press('reconciled') }, async ({ dialogs, calls, state, click }) => {
         await click();
         assert.equal(dialogs.length, 1);
-        state.reply = BARE;
         await click();
         assert.equal(count(calls, 'start'), 2);
         assert.equal(dialogs.length, 1, 'the released claim is no longer offered');

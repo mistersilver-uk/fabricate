@@ -329,6 +329,12 @@ The prompt explains what releasing it does and does not do, then asks the GM to 
 While a claim is still live, meaning another operation is genuinely in progress, the Journal asks you to wait instead of offering the control.
 The prompt defaults to **Not yet**, so pressing Enter releases nothing.
 
+A retained execution claim can also refuse an Attempt that starts no run, so the Journal has no run to open.
+When a GM attempts a gathering task from the Gathering tab and that refusal comes back, the same prompt, **Release the retained execution claim**, opens there.
+It opens only for a GM, and only when a claim is retained.
+It opens only once the claim is past its 60 second live window, so the first Attempt after a failure shows only the refusal notice.
+Only the active GM's choice is accepted, and releasing the claim does not repeat the Attempt you made.
+
 ### Stuck or uncertain runs
 
 The Run Authority journal entry is automatic.
@@ -351,12 +357,6 @@ The prompt has no field for a note.
 A macro can record one through the [Run Manager API]({% link api/run-manager.md %}).
 A recorded note shows beside **GM note** on the closed entry.
 The note is stored on the actor and readable by every user permitted on it, so it is not a GM-private field.
-
-A retained execution claim can also refuse an Attempt that starts no run, so the Journal has no run to open.
-When the active GM attempts a gathering task from the Gathering tab and that refusal comes back, the same **Release claim…** prompt opens there.
-It opens only for a GM, and only when a claim is retained.
-It opens only once the claim is past its 60 second live window, so the first Attempt after a failure shows only the refusal notice.
-The prompt defaults to **Not yet**, and releasing the claim does not repeat the Attempt you made.
 
 ### Hidden identity and private checks
 
