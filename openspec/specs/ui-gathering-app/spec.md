@@ -194,6 +194,10 @@ A blocked Attempt stays a disabled primary with its visible label, in the pane's
 An Attempt in flight, the task inspector's and a blind environment's alike, is busy rather than disabled: the pressed button keeps focus, announces `aria-busy`, reads "Attempting…" and ignores a second press.
 Its reason is a visible warning notice directly under the header, "Can't attempt — {reason}", which the Attempt references by `aria-describedby`.
 A blind environment's header Attempt states only the generic reason, because its blockers may be derived from tasks the player cannot see.
+When an Attempt is refused with `recovery-required` while the authority's cached availability carries a retained claim, a GM viewer MUST be offered the retained-claim disposition prompt from the Gathering view.
+The prompt MUST default to cancelling, choosing `reconciled` or `abandoned` MUST record that disposition through `reconcileJournalRunAuthority({ claimId, disposition })`, and cancelling MUST record nothing.
+A player, or a GM when no claim is retained, MUST see only the refusal notice.
+Releasing the claim MUST NOT replay the refused Attempt.
 
 If `task.timeRequirement` is absent:
 

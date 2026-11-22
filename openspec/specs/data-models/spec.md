@@ -3405,10 +3405,12 @@ It MUST reconstruct that claim's matching execution evidence and durably record 
 Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
 A retained claim can block other versioned runs, and its availability reason MUST remain visible.
 The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
+A retained claim need not belong to any run: boot reconstruction acquires it under a request that guards no run, and a start the claim refuses creates none.
+The affordance that clears it is therefore not confined to a live run's view.
 A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and no viewer who may not reconcile is ever offered one.
 Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim.
 Unlike claim reconciliation, it ends that run's recovery-required state while its settlement stays `uncertain`.
-The retained-claim affordance is unchanged.
+Native Reconciliation leaves the retained-claim affordance unchanged.
 
 A published availability answer is a cached derivation, not a fact a surface may hold indefinitely.
 A refusal is true while it holds and MAY be published freely, but when it LIFTS the authority MUST announce the lift, because that is the moment every reading taken of it became false.
