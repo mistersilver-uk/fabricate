@@ -839,7 +839,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
       it(`offers the GM the prompt on ${shape} and records a reconciled release`, async () => {
         await inWorld({ reply, answer: press('reconciled') }, async ({ dialogs, calls, notes, warns, click }) => {
           await click();
-          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.RecoveryRequired']);
+          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.ClaimRetained']);
           assert.equal(dialogs.length, 1);
           assert.equal(dialogs[0].window.title, 'FABRICATE.App.Journal.Recovery.Title');
           assert.equal(
@@ -940,7 +940,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
           await click();
           assert.equal(dialogs.length, 0);
           assert.equal(count(calls, 'reconcile'), 0);
-          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.RecoveryRequired']);
+          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.ClaimRetained']);
         });
       });
     }
