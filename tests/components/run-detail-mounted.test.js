@@ -1283,13 +1283,17 @@ describe('RunDetail mounted behavior', () => {
       const calls = [];
       const bag = {
         ...services(),
-        notify: (message) => calls.push(['notify', message]),
+        notify: (message) => {
+          calls.push(['notify', message]);
+        },
         reconcileJournalRunAuthority: (options) => {
           calls.push(['reconcile', options]);
           return reconcile(options);
         },
       };
-      bag.journal.load = (quiet) => calls.push(['load', quiet]);
+      bag.journal.load = (quiet) => {
+        calls.push(['load', quiet]);
+      };
       return { bag, calls };
     }
 

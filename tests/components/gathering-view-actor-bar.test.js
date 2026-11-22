@@ -20,8 +20,8 @@ import {
   STATUS_TONE_RAW_MODULES,
   createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -134,10 +134,6 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // Issue 1648: the authority-refusal wording GatheringView falls back to when a
     // versioned start is refused. Omitting it HANGS this suite (# cancelled).
     copyModule('src/ui/svelte/util/journalRunReasons.js');
-    // The retained-claim release a refused Attempt offers a GM, and the notice wording it reads.
-    // Omitting either HANGS this suite (# cancelled).
-    copyModule('src/ui/svelte/apps/journal/runRecovery.js');
-    copyModule('src/ui/svelte/apps/journal/runStateNotice.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
@@ -156,6 +152,10 @@ describe('GatheringView ↔ actor bar wiring', () => {
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',
       'src/utils/fillPlaceholders.js',
+      // The retained-claim release a refused Attempt offers a GM, and the notice wording it
+      // reads. Omitting either HANGS this suite (# cancelled).
+      'src/ui/svelte/apps/journal/runRecovery.js',
+      'src/ui/svelte/apps/journal/runStateNotice.js',
     ]) {
       copyModule(modulePath);
     }
@@ -802,7 +802,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
             calls.push(['start']);
             return Promise.resolve(state.reply);
           },
-          notify: (message) => notes.push(message),
+          notify: (message) => {
+            notes.push(message);
+          },
           reconcileJournalRunAuthority:
             reconcile ??
             ((options) => {
@@ -818,7 +820,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
         services.actorBar = store;
         await mountView(services);
         const click = async () => {
-          target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+          target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
           await new Promise((resolve) => setTimeout(resolve, 0));
           await settle();
         };

@@ -37,7 +37,7 @@ describe('projectRetainedClaim', () => {
     ['absent', undefined],
     ['null', null],
     ['without a claim id', { requestKind: 'command' }],
-    ['with a blank claim id', { claimId: '   ' }],
+    ['with a blank claim id', { claimId: '\t' }],
   ]) {
     it(`answers null for a value ${label}`, () => {
       assert.equal(projectRetainedClaim(value), null);
