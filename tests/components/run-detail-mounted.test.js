@@ -1325,6 +1325,10 @@ describe('RunDetail mounted behavior', () => {
     for (const [label, respond] of [
       ['Cancel', press('cancel')],
       ['closing the window', (options) => options.close?.()],
+      [
+        'Enter, which presses the default',
+        (options) => options.buttons.find((button) => button.default)?.callback?.(),
+      ],
     ]) {
       it(`records, notifies and re-reads nothing on ${label}`, async () => {
         const { bag, calls } = claimServices(() => Promise.resolve({ success: true }));

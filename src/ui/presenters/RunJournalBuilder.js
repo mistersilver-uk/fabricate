@@ -58,6 +58,7 @@ import {
   taskCountNeed,
 } from './journalCheckText.js';
 import { taughtNameReader } from './resultOutputRows.js';
+import { projectRetainedClaim } from './retainedClaimProjection.js';
 import {
   awardChoiceFields,
   awardHeldAvailability,
@@ -2458,7 +2459,7 @@ export class RunJournalBuilder {
   _actionAvailability(viewer = null) {
     try {
       const value = this._getJournalActionAvailability();
-      const retained = viewer?.isGM === true ? this._retainedClaim(value?.retained) : null;
+      const retained = viewer?.isGM === true ? projectRetainedClaim(value?.retained) : null;
       const availability = {
         available: value?.available !== false,
         reason: stringOrNull(value?.reason),
@@ -2468,18 +2469,6 @@ export class RunJournalBuilder {
     } catch {
       return { available: false, reason: 'authorityUnavailable' };
     }
-  }
-
-  _retainedClaim(value) {
-    const claimId = stringOrNull(value?.claimId);
-    if (!claimId) return null;
-    return {
-      claimId,
-      requestKind: stringOrNull(value?.requestKind),
-      failureReason: stringOrNull(value?.failureReason),
-      failureMessage: stringOrNull(value?.failureMessage),
-      claimedAt: laxNumberOrNull(value?.claimedAt),
-    };
   }
 
   _dismissedRunKeys(actor, viewer) {
