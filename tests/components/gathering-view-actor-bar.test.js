@@ -960,7 +960,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     });
 
     it('offers no prompt on the next Attempt once the claim is released', async () => {
-      await inWorld({ answer: press('reconciled') }, async ({ dialogs, calls, state, click }) => {
+      await inWorld({ answer: press('reconciled') }, async ({ dialogs, calls, click }) => {
         await click();
         assert.equal(dialogs.length, 1);
         await click();

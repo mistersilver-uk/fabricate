@@ -144,6 +144,7 @@ See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-
 Current-lifecycle starts and changes require active GM authority.
 The Journal explains missing authority and offers the active GM its setup action when the ledger is missing.
 If an interrupted operation needs recovery, ask the GM to inspect the recorded effects rather than repeating the attempt.
+A GM whose Attempt is refused for this reason is offered the **Release the retained execution claim** prompt right there, with the choices described under [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery).
 Older timed gathering runs keep their automatic completion behavior.
 
 {% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with one of its task rows selected." %}

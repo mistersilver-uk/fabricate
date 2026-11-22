@@ -3407,7 +3407,8 @@ A retained claim can block other versioned runs, and its availability reason MUS
 The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
 A retained claim need not belong to any run: boot reconstruction acquires it under a request that guards no run, and a start the claim refuses creates none.
 The affordance that clears it is therefore not confined to a live run's view.
-A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and no viewer who may not reconcile is ever offered one.
+A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and a viewer who is not a GM is never offered one.
+A GM who is not the active GM may be offered it, and `reconcileJournalRunAuthority` refuses that release.
 Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim.
 Unlike claim reconciliation, it ends that run's recovery-required state while its settlement stays `uncertain`.
 Native Reconciliation leaves the retained-claim affordance unchanged.

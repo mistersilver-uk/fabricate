@@ -83,7 +83,8 @@ export async function reconcileRetainedClaim({ claim, disposition, services, loc
  * recording, never the open dialog, and `onRecorded` runs after the outcome is notified. Cancel
  * or a closed window records nothing.
  *
- * @returns {Promise<{recorded: boolean, released: boolean}>}
+ * @returns {Promise<{recorded: boolean, released: boolean}>} `recorded` is true once the GM chose
+ *   a disposition. `released` is true only when the authority accepted it.
  */
 export async function offerRetainedClaimRelease({
   claim,
