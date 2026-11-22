@@ -135,17 +135,21 @@ const ALCHEMY_LISTING = {
   fizzleKeys: [],
 };
 
+const press = (action) => (options) =>
+  options.buttons.find((button) => button.action === action)?.callback?.();
+
 /**
- * Drive the real player bag's `crafting.craft` or `alchemy.brew` against a facade that refuses the
- * start with `recovery-required`, with the GM answering the prompt with `choose`.
+ * Drive the real player bag's `crafting.craft` and/or `alchemy.brew` (`kind` is `craft`, `brew` or
+ * `both`, started together) against a facade that refuses the start with `reason`. The viewer
+ * answers the prompt with `choose`, and with none the dialog stays open until `dialogs` is read.
  */
-async function refusedStart({ kind, choose }) {
+async function refusedStart({ kind, choose = null, isGM = true, reason = 'recovery-required' }) {
   const out = {};
   await withFabricateLifecycleReplay(async ({ loadModule }) => {
     const { createPlayerServices } = await loadModule('/src/ui/playerServices.js');
     const world = buildPlayerWorld();
-    world.game.user.isGM = true;
-    const refused = { success: false, reason: 'recovery-required' };
+    world.game.user.isGM = isGM;
+    const refused = { success: false, reason };
     world.game.fabricate = {
       getJournalRunAuthorityAvailability: () => ({
         available: false,
@@ -165,24 +169,29 @@ async function refusedStart({ kind, choose }) {
     };
     const restore = installPlayerWorld(world);
     try {
-      await withDialog(
-        (options) => options.buttons.find((button) => button.action === choose)?.callback?.(),
-        async (dialogs) => {
-          const services = createPlayerServices({
-            activeCanvasTool: () => null,
-            scopedInteractableRef: () => null,
-            selectTab: () => {},
-          });
-          if (kind === 'craft') {
-            await services.crafting.craft({ id: 'r1' });
-          } else {
-            await services.alchemy.load();
-            services.alchemy.add('ashsalt');
-            await services.alchemy.brew();
-          }
-          out.dialogs = dialogs;
+      await withDialog(choose ? press(choose) : () => {}, async (dialogs) => {
+        const services = createPlayerServices({
+          activeCanvasTool: () => null,
+          scopedInteractableRef: () => null,
+          selectTab: () => {},
+        });
+        const craft = () => services.crafting.craft({ id: 'r1' });
+        const brew = async () => {
+          await services.alchemy.load();
+          services.alchemy.add('ashsalt');
+          return services.alchemy.brew();
+        };
+        if (kind === 'both') {
+          const started = [craft(), brew()];
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          out.openedWhilePending = dialogs.length;
+          for (const options of dialogs) press('cancel')(options);
+          out.results = await Promise.all(started);
+        } else {
+          await (kind === 'craft' ? craft() : brew());
         }
-      );
+        out.dialogs = dialogs;
+      });
       out.journal = world.journal.filter(
         ([channel]) => channel === 'reconcile' || channel === 'notify.warn'
       );
@@ -219,6 +228,40 @@ describe('a start refused by a retained claim, through the real player bag', () 
         journal.map(([channel]) => channel),
         ['notify.warn']
       );
+    });
+  }
+
+  it('opens one prompt when a Craft and a Brew are both refused while it is open', async () => {
+    const { dialogs, openedWhilePending, results, journal } = await refusedStart({ kind: 'both' });
+    assert.equal(openedWhilePending, 1, 'the second refusal awaits the open prompt');
+    assert.equal(dialogs.length, 1);
+    assert.deepEqual(
+      results.map((result) => result?.reason),
+      ['recovery-required', 'recovery-required'],
+      'both starts resolve with their refusal'
+    );
+    assert.deepEqual(
+      journal.map(([channel]) => channel),
+      ['notify.warn', 'notify.warn'],
+      'each refusal is toasted and nothing is recorded'
+    );
+  });
+
+  for (const kind of ['craft', 'brew']) {
+    it(`shows a player only the ${kind} refusal`, async () => {
+      const { dialogs, journal } = await refusedStart({ kind, choose: 'reconciled', isGM: false });
+      assert.deepEqual(dialogs, []);
+      assert.deepEqual(journal, [['notify.warn', '[FABRICATE.App.Journal.Actions.ClaimRetained]']]);
+    });
+
+    it(`opens no prompt for a ${kind} refused for another reason`, async () => {
+      const { dialogs, journal } = await refusedStart({
+        kind,
+        choose: 'reconciled',
+        reason: 'ledger-missing',
+      });
+      assert.deepEqual(dialogs, []);
+      assert.deepEqual(journal, [['notify.warn', '[FABRICATE.App.Journal.Actions.LedgerMissing]']]);
     });
   }
 });

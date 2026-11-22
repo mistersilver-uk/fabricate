@@ -199,10 +199,9 @@ export function createAlchemyStore({ services } = {}) {
   });
 
   /**
-   * Whether the bench satisfies an ESSENCE-ONLY recipe's requirement. Mirrors the
-   * engine (`_matchAlchemySignature`), which satisfies an essence when the
-   * submitted total is at LEAST the required quantity — so surplus essences still
-   * match and must still read as `ready`.
+   * Whether the bench satisfies an ESSENCE-ONLY recipe's requirement. Mirrors the engine
+   * (`_matchAlchemySignature`), which satisfies an essence when the submitted total is at LEAST
+   * the required quantity — so surplus essences still match and must still read as `ready`.
    */
   function essencesSatisfied(requirement) {
     return requirement.every(
@@ -251,11 +250,10 @@ export function createAlchemyStore({ services } = {}) {
   }
 
   /**
-   * The unique MOST-SPECIFIC concrete recipe among candidates the bench contains:
-   * the single one no other candidate strictly contains. Returns null on an empty
-   * set OR a non-unique maximum (incomparable siblings / duplicate signatures),
-   * mirroring the engine's fail-safe fizzle so the client never promises a brew the
-   * engine would fizzle.
+   * The unique MOST-SPECIFIC concrete recipe among candidates the bench contains: the single one
+   * no other candidate strictly contains. Returns null on an empty set OR a non-unique maximum
+   * (incomparable siblings / duplicate signatures), mirroring the engine's fail-safe fizzle so the
+   * client never promises a brew the engine would fizzle.
    */
   function mostSpecificConcrete(candidates) {
     if (candidates.length === 0) return null;
@@ -475,7 +473,8 @@ export function createAlchemyStore({ services } = {}) {
   /**
    * Brew the current bench through the engine (authoritative). Guards re-entrancy. A roll dismissed
    * or a start refused with `recovery-required` spent nothing, so the bench stays; otherwise it
-   * clears the bench and reloads. A refusal offers the GM's claim release.
+   * clears the bench and reloads. A refusal offers the GM's claim release, and a released claim
+   * clears the refusal banner.
    */
   async function brew() {
     if (brewInFlight || !brewEnabled) return null;
@@ -509,7 +508,8 @@ export function createAlchemyStore({ services } = {}) {
       });
       lastBrew = banner.lastBrew;
       if (banner.notice) services?.notify?.(banner.notice);
-      await services?.offerReleaseForRefusal?.(result);
+      const outcome = await services?.offerReleaseForRefusal?.(result);
+      if (outcome?.released) lastBrew = null;
       return result ?? null;
     } catch (err) {
       // The start may already have spent the bench, so the bench stays and no copy claims either.

@@ -1160,7 +1160,6 @@ describe('alchemyStore', () => {
           assert.equal(world.dialogs.length, 1);
           assert.deepEqual(world.reconciles, [{ claimId: CLAIM.claimId, disposition }]);
           assert.deepEqual(notify, [refusalText, releasedText]);
-          assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', refusalText]);
         });
       });
     }
@@ -1253,13 +1252,16 @@ describe('alchemyStore', () => {
 
     it('raises no second toast when the dialog fails, and frees the brew', async () => {
       const consoleError = console.error;
-      console.error = () => {};
+      const logged = [];
+      console.error = (...args) => logged.push(args);
       try {
-        await inWorld({ answer: dialogFailure }, async ({ store, notify }) => {
+        await inWorld({ answer: dialogFailure }, async ({ store, world, notify }) => {
           const result = await store.brew();
           flushSync();
           assert.equal(result.reason, 'recovery-required', 'the refusal is still what comes back');
           assert.deepEqual(notify, [refusalText], 'a plain refusal is never re-reported as unknown');
+          assert.equal(world.dialogs.length, 1, 'the dialog was attempted once');
+          assert.equal(logged.length, 1, 'the failure is logged once');
           assert.equal(store.brewInFlight, false);
           assert.equal(store.benchEmpty, false);
         });
@@ -1267,5 +1269,33 @@ describe('alchemyStore', () => {
         console.error = consoleError;
       }
     });
+
+    // The banner reads "A GM must release it", which is false once the claim is released.
+    it('clears the refusal banner once the claim is released', async () => {
+      await inWorld({ answer: press('reconciled') }, async ({ store }) => {
+        await store.brew();
+        flushSync();
+        assert.equal(store.lastBrew, null);
+      });
+    });
+
+    for (const [label, wiring] of [
+      ['the GM cancels', { answer: press('cancel') }],
+      [
+        'the authority refuses the release',
+        {
+          answer: press('reconciled'),
+          reconcile: async () => ({ success: false, reason: 'claim-held' }),
+        },
+      ],
+    ]) {
+      it(`keeps the refusal banner when ${label}`, async () => {
+        await inWorld(wiring, async ({ store }) => {
+          await store.brew();
+          flushSync();
+          assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', refusalText]);
+        });
+      });
+    }
   });
 });

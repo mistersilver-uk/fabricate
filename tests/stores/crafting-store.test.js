@@ -1849,7 +1849,7 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
     };
 
     /** Craft once against a world answering `reply`; `body` reads what the GM and the store saw. */
-    async function inWorld({ reply = REFUSED, seam = true, ...wiring } = {}, body) {
+    async function inWorld({ reply = REFUSED, seam = true, tweak = null, ...wiring } = {}, body) {
       const calls = { started: 0 };
       const harness = makeServices({
         craftRecipe: async () => {
@@ -1858,6 +1858,7 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
         },
       });
       const world = seam ? wireRetainedClaim(harness.services, wiring) : null;
+      tweak?.(harness.services);
       try {
         const store = createCraftingStore({ services: harness.services });
         await store.load();
@@ -1961,14 +1962,41 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
 
     it('raises no second toast when the dialog fails, and frees the craft', async () => {
       const consoleError = console.error;
-      console.error = () => {};
+      const logged = [];
+      console.error = (...args) => logged.push(args);
       try {
-        await inWorld({ answer: dialogFailure }, async ({ store, notify }) => {
+        await inWorld({ answer: dialogFailure }, async ({ store, world, notify }) => {
           const result = await store.craft({ id: 'r1' });
           flushSync();
           assert.equal(result.reason, 'recovery-required', 'the refusal is still what comes back');
           assert.deepEqual(notify, [refusalText], 'a plain refusal is never re-reported as unknown');
+          assert.equal(world.dialogs.length, 1, 'the dialog was attempted once');
+          assert.equal(logged.length, 1, 'the failure is logged once');
           assert.equal(store.craftInFlight, false);
+        });
+      } finally {
+        console.error = consoleError;
+      }
+    });
+
+    it('still reloads when reporting a successful release throws', async () => {
+      const consoleError = console.error;
+      const logged = [];
+      console.error = (...args) => logged.push(args);
+      const tweak = (services) => {
+        const notify = services.notify;
+        services.notify = (message) => {
+          notify(message);
+          if (message === releasedText) throw new Error('toast failed');
+        };
+      };
+      try {
+        await inWorld({ answer: press('reconciled'), tweak }, async ({ store, world, loads, base }) => {
+          const result = await store.craft({ id: 'r1' });
+          assert.equal(result.reason, 'recovery-required');
+          assert.equal(world.reconciles.length, 1, 'the release was recorded');
+          assert.equal(loads(), base + 1, 'the recorded release still reloads the listing');
+          assert.equal(logged.length, 1, 'the failed report is logged once');
         });
       } finally {
         console.error = consoleError;

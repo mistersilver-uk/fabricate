@@ -81,7 +81,7 @@ export async function reconcileRetainedClaim({ claim, disposition, services, loc
 /**
  * Ask the GM how to release one retained claim and record the choice. `onBusy` brackets only the
  * recording, never the open dialog, and `onRecorded` runs after the outcome is notified. Cancel
- * or a closed window records nothing.
+ * or a closed window records nothing. A throw while reporting never hides a recorded release.
  *
  * @returns {Promise<{recorded: boolean, released: boolean}>} `recorded` is true once the GM chose
  *   a disposition. `released` is true only when the authority accepted it.
@@ -98,12 +98,27 @@ export async function offerRetainedClaimRelease({
   onBusy(true);
   try {
     const outcome = await reconcileRetainedClaim({ claim, disposition, services, localize });
-    services?.notify?.(outcome.message);
-    await onRecorded();
+    try {
+      services?.notify?.(outcome.message);
+      await onRecorded();
+    } catch (error) {
+      console.error('Fabricate | Error reporting the claim release:', error);
+    }
     return { recorded: true, released: outcome.success };
   } finally {
     onBusy(false);
   }
+}
+
+const openPrompts = new Map();
+
+/** One prompt per claim: a second caller awaits the open prompt's outcome instead of opening another. */
+function releaseOnce(claim, open) {
+  const shared = openPrompts.get(claim.claimId);
+  if (shared) return shared;
+  const pending = open().finally(() => openPrompts.delete(claim.claimId));
+  openPrompts.set(claim.claimId, pending);
+  return pending;
 }
 
 /**
@@ -119,7 +134,7 @@ export async function offerReleaseForRefusal({ result, services, localize }) {
   try {
     const claim = services?.getRetainedJournalClaim?.();
     if (!claim) return nothing;
-    return await offerRetainedClaimRelease({ claim, services, localize });
+    return await releaseOnce(claim, () => offerRetainedClaimRelease({ claim, services, localize }));
   } catch (error) {
     console.error('Fabricate | Error offering the retained claim release:', error);
     return nothing;
