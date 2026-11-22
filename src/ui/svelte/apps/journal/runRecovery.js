@@ -108,13 +108,22 @@ export async function offerRetainedClaimRelease({
 
 /**
  * Offer the release prompt for a start the authority refused with `recovery-required`, when the
- * viewer's seam reports a retained claim. Any other refusal, or no claim, does nothing.
+ * viewer's seam reports a retained claim. Any other refusal, or no claim, does nothing. A throw is
+ * logged and swallowed, so a caller's own `catch` never re-reports a plain refusal as unknown.
+ *
+ * @returns {Promise<{recorded: boolean, released: boolean}>} Both false when nothing was recorded.
  */
 export async function offerReleaseForRefusal({ result, services, localize }) {
-  if (result?.reason !== 'recovery-required') return;
-  const claim = services?.getRetainedJournalClaim?.();
-  if (!claim) return;
-  await offerRetainedClaimRelease({ claim, services, localize });
+  const nothing = { recorded: false, released: false };
+  if (result?.reason !== 'recovery-required') return nothing;
+  try {
+    const claim = services?.getRetainedJournalClaim?.();
+    if (!claim) return nothing;
+    return await offerRetainedClaimRelease({ claim, services, localize });
+  } catch (error) {
+    console.error('Fabricate | Error offering the retained claim release:', error);
+    return nothing;
+  }
 }
 
 /** Native Reconciliation's `choiceDialog` descriptor. Cancel is the default, so Enter closes nothing. */

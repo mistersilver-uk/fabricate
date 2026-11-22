@@ -748,6 +748,10 @@
     "navigateToCraftingRecipe": "<undefined>",
     "navigateToJournalRun": "<undefined>",
     "notify": "<undefined>",
+    "offerReleaseForRefusal": {
+      "recorded": false,
+      "released": false
+    },
     "progressiveOrderRevertMessage": "[FABRICATE.App.Crafting.Detail.StageOrderSaveFailed]",
     "reconcileJournalRunAuthority": {
       "answeredBy": "reconcileJournalRunAuthority"

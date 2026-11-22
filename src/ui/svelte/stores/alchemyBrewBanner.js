@@ -13,7 +13,7 @@ import { journalCommandRefusal } from '../../presenters/additionalDicePrompt.js'
 import { isResolvedFailureOutcome } from '../util/journalRunReasons.js';
 
 /** Whether the reply carries the run a version-1 start left behind. */
-function startedRun(result) {
+export function startedRun(result) {
   return (
     typeof result?.runId === 'string' &&
     result.runId !== '' &&

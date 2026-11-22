@@ -10,6 +10,7 @@ import { SignatureValidator } from '../../src/systems/SignatureValidator.js';
 import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { CLAIM, press, wireRetainedClaim } from '../helpers/retainedClaimDialogWorld.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 
 let compiler;
@@ -1114,6 +1115,157 @@ describe('alchemyStore', () => {
       store.add('voidichor');
       flushSync();
       assert.equal(store.mode, 'untried');
+    });
+  });
+
+  // A refusal the retained claim causes: a GM is offered the release prompt before the brew returns.
+  describe('a brew refused by a retained claim', () => {
+    const REFUSED = { success: false, reason: 'recovery-required' };
+    const refusalText = langLeaf('FABRICATE.App.Journal.Actions.ClaimRetained');
+    const releasedText = langLeaf('FABRICATE.App.Journal.Recovery.Released');
+    const dialogFailure = () => {
+      throw new Error('dialog failed');
+    };
+
+    /** Brew once from a recipe-loaded bench against a world answering `reply`. */
+    async function inWorld({ reply = REFUSED, seam = true, ...wiring } = {}, body) {
+      const calls = { started: 0 };
+      const harness = makeServices({
+        submitAlchemyAttempt: async () => {
+          calls.started += 1;
+          return reply;
+        },
+      });
+      const world = seam ? wireRetainedClaim(harness.services, wiring) : null;
+      try {
+        const store = createAlchemyStore({ services: harness.services });
+        await store.load();
+        store.selectRecipe('vigor');
+        flushSync();
+        await body({ store, world, notify: harness.calls.notify, started: calls });
+      } finally {
+        world?.restore();
+      }
+    }
+
+    for (const [label, disposition] of [
+      ['checked', 'reconciled'],
+      ['abandoned', 'abandoned'],
+    ]) {
+      it(`records ${label} as the release, and notifies the refusal first`, async () => {
+        await inWorld({ answer: press(disposition) }, async ({ store, world, notify }) => {
+          const result = await store.brew();
+          flushSync();
+          assert.equal(result.reason, 'recovery-required');
+          assert.equal(world.dialogs.length, 1);
+          assert.deepEqual(world.reconciles, [{ claimId: CLAIM.claimId, disposition }]);
+          assert.deepEqual(notify, [refusalText, releasedText]);
+          assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', refusalText]);
+        });
+      });
+    }
+
+    it('keeps the bench and the selection, because nothing was spent', async () => {
+      await inWorld({ answer: press('cancel') }, async ({ store }) => {
+        await store.brew();
+        flushSync();
+        assert.equal(store.benchEmpty, false);
+        assert.equal(store.selectedRecipeId, 'vigor');
+      });
+    });
+
+    it('still clears the bench when a started run was refused at its execute', async () => {
+      const reply = afterStart({ success: false, reason: 'recovery-required' });
+      await inWorld({ reply, answer: press('reconciled') }, async ({ store, world, notify }) => {
+        await store.brew();
+        flushSync();
+        assert.equal(store.benchEmpty, true, 'the start spent the bench');
+        assert.equal(store.selectedRecipeId, null);
+        assert.equal(world.dialogs.length, 1, 'the merged refusal still prompts');
+        assert.equal(world.reconciles.length, 1);
+        assert.equal(notify.length, 2, 'the refusal, then the release');
+      });
+    });
+
+    for (const [label, answer] of [
+      ['Cancel', press('cancel')],
+      ['closing the window', (options) => options.close?.()],
+    ]) {
+      it(`records nothing on ${label}`, async () => {
+        await inWorld({ answer }, async ({ store, world, notify }) => {
+          await store.brew();
+          assert.equal(world.dialogs.length, 1);
+          assert.deepEqual(world.reconciles, []);
+          assert.deepEqual(notify, [refusalText]);
+        });
+      });
+    }
+
+    for (const [label, wiring] of [
+      ['a player or a GM with no claim, whose seam answers null', { claim: null }],
+      ['a bag without the seam', { seam: false }],
+    ]) {
+      it(`shows ${label} only the refusal`, async () => {
+        await inWorld({ ...wiring, answer: press('reconciled') }, async ({ store, world, notify }) => {
+          await store.brew();
+          assert.deepEqual(world?.dialogs ?? [], []);
+          assert.deepEqual(notify, [refusalText]);
+        });
+      });
+    }
+
+    for (const reason of ['claim-held', 'ledger-missing', 'reconstruction-failed']) {
+      it(`opens no dialog for a ${reason} refusal, even with a claim cached`, async () => {
+        await inWorld({ reply: { success: false, reason }, answer: press('reconciled') }, async ({ store, world, notify }) => {
+          await store.brew();
+          assert.deepEqual(world.dialogs, []);
+          assert.equal(notify.length, 1, 'only the refusal toast');
+        });
+      });
+    }
+
+    for (const [label, reply] of [
+      ['a success', afterStart(executeReply({ success: true, disposition: 'succeeded' }))],
+      ['a resolved failed check', afterStart(executeReply({ success: false, disposition: 'failed' }))],
+    ]) {
+      it(`opens no dialog for ${label}`, async () => {
+        await inWorld({ reply, answer: press('reconciled') }, async ({ store, world }) => {
+          await store.brew();
+          assert.deepEqual(world.dialogs, []);
+        });
+      });
+    }
+
+    it('starts one brew and opens one dialog for a second press while the dialog is open', async () => {
+      await inWorld({}, async ({ store, world, started }) => {
+        const first = store.brew();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(world.dialogs.length, 1, 'the prompt is open');
+        assert.equal(await store.brew(), null, 'the second press is refused');
+        assert.equal(started.started, 1);
+        assert.equal(world.dialogs.length, 1);
+        press('cancel')(world.dialogs[0]);
+        await first;
+        flushSync();
+        assert.equal(store.brewInFlight, false);
+      });
+    });
+
+    it('raises no second toast when the dialog fails, and frees the brew', async () => {
+      const consoleError = console.error;
+      console.error = () => {};
+      try {
+        await inWorld({ answer: dialogFailure }, async ({ store, notify }) => {
+          const result = await store.brew();
+          flushSync();
+          assert.equal(result.reason, 'recovery-required', 'the refusal is still what comes back');
+          assert.deepEqual(notify, [refusalText], 'a plain refusal is never re-reported as unknown');
+          assert.equal(store.brewInFlight, false);
+          assert.equal(store.benchEmpty, false);
+        });
+      } finally {
+        console.error = consoleError;
+      }
     });
   });
 });

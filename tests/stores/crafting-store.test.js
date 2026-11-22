@@ -9,10 +9,11 @@ import {
   withSpentAdditionalDice,
 } from '../../src/systems/journalPreparedCheck.js';
 import { executePublicCraft } from '../../src/systems/journalRunCommands.js';
-import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
-import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
-import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
+import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
+import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { CLAIM, press, wireRetainedClaim } from '../helpers/retainedClaimDialogWorld.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 
 const EN = JSON.parse(
   readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
@@ -1836,5 +1837,142 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
       '2 Momentum spent; the roll could not be completed.',
       'The check is misconfigured.',
     ]);
+  });
+
+  // A refusal the retained claim causes: a GM is offered the release prompt before the craft returns.
+  describe('a craft refused by a retained claim', () => {
+    const REFUSED = { success: false, reason: 'recovery-required' };
+    const refusalText = langLeaf('FABRICATE.App.Journal.Actions.ClaimRetained');
+    const releasedText = langLeaf('FABRICATE.App.Journal.Recovery.Released');
+    const dialogFailure = () => {
+      throw new Error('dialog failed');
+    };
+
+    /** Craft once against a world answering `reply`; `body` reads what the GM and the store saw. */
+    async function inWorld({ reply = REFUSED, seam = true, ...wiring } = {}, body) {
+      const calls = { started: 0 };
+      const harness = makeServices({
+        craftRecipe: async () => {
+          calls.started += 1;
+          return reply;
+        },
+      });
+      const world = seam ? wireRetainedClaim(harness.services, wiring) : null;
+      try {
+        const store = createCraftingStore({ services: harness.services });
+        await store.load();
+        const loads = () => harness.calls.listCraftingForActor.length;
+        await body({ store, world, notify: harness.calls.notify, started: calls, loads, base: loads() });
+      } finally {
+        world?.restore();
+      }
+    }
+
+    for (const [label, disposition] of [
+      ['checked', 'reconciled'],
+      ['abandoned', 'abandoned'],
+    ]) {
+      it(`records ${label} as the release, notifies it and reloads the listing`, async () => {
+        await inWorld({ answer: press(disposition) }, async ({ store, world, notify, loads, base }) => {
+          const result = await store.craft({ id: 'r1' });
+          assert.equal(result.reason, 'recovery-required');
+          assert.equal(world.dialogs.length, 1);
+          assert.deepEqual(world.reconciles, [{ claimId: CLAIM.claimId, disposition }]);
+          assert.deepEqual(notify, [refusalText, releasedText], 'the refusal comes first');
+          assert.equal(loads(), base + 1, 'the released claim makes the listing stale');
+        });
+      });
+    }
+
+    for (const [label, answer] of [
+      ['Cancel', press('cancel')],
+      ['closing the window', (options) => options.close?.()],
+    ]) {
+      it(`records and reloads nothing on ${label}`, async () => {
+        await inWorld({ answer }, async ({ store, world, notify, loads, base }) => {
+          await store.craft({ id: 'r1' });
+          assert.equal(world.dialogs.length, 1);
+          assert.deepEqual(world.reconciles, []);
+          assert.deepEqual(notify, [refusalText]);
+          assert.equal(loads(), base);
+        });
+      });
+    }
+
+    it('keeps the listing when the authority refuses the release', async () => {
+      const reconcile = async () => ({ success: false, reason: 'claim-held' });
+      await inWorld({ answer: press('reconciled'), reconcile }, async ({ store, notify, loads, base }) => {
+        await store.craft({ id: 'r1' });
+        assert.deepEqual(notify, [refusalText, langLeaf('FABRICATE.App.Journal.Actions.ClaimHeld')]);
+        assert.equal(loads(), base, 'nothing was released, so nothing is stale');
+      });
+    });
+
+    for (const [label, wiring] of [
+      ['a player or a GM with no claim, whose seam answers null', { claim: null }],
+      ['a bag without the seam', { seam: false }],
+    ]) {
+      it(`shows ${label} only the refusal`, async () => {
+        await inWorld({ ...wiring, answer: press('reconciled') }, async ({ store, world, notify }) => {
+          const result = await store.craft({ id: 'r1' });
+          assert.equal(result.reason, 'recovery-required');
+          assert.deepEqual(world?.dialogs ?? [], []);
+          assert.deepEqual(notify, [refusalText]);
+        });
+      });
+    }
+
+    for (const reason of ['claim-held', 'ledger-missing', 'reconstruction-failed']) {
+      it(`opens no dialog for a ${reason} refusal, even with a claim cached`, async () => {
+        await inWorld({ reply: { success: false, reason }, answer: press('reconciled') }, async ({ store, world, notify }) => {
+          await store.craft({ id: 'r1' });
+          assert.deepEqual(world.dialogs, []);
+          assert.equal(notify.length, 1, 'only the refusal toast');
+        });
+      });
+    }
+
+    for (const [label, reply] of [
+      ['a success', { success: true, results: [] }],
+      ['a resolved failed check', { success: false, runId: 'run-1', status: 'failed', reason: null, disposition: 'failed', terminal: true, createdResultUuids: [] }],
+    ]) {
+      it(`opens no dialog for ${label}`, async () => {
+        await inWorld({ reply, answer: press('reconciled') }, async ({ store, world }) => {
+          await store.craft({ id: 'r1' });
+          assert.deepEqual(world.dialogs, []);
+        });
+      });
+    }
+
+    it('starts one craft and opens one dialog for a second press while the dialog is open', async () => {
+      await inWorld({}, async ({ store, world, started }) => {
+        const first = store.craft({ id: 'r1' });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(world.dialogs.length, 1, 'the prompt is open');
+        assert.equal(await store.craft({ id: 'r1' }), null, 'the second press is refused');
+        assert.equal(started.started, 1);
+        assert.equal(world.dialogs.length, 1);
+        press('cancel')(world.dialogs[0]);
+        await first;
+        flushSync();
+        assert.equal(store.craftInFlight, false);
+      });
+    });
+
+    it('raises no second toast when the dialog fails, and frees the craft', async () => {
+      const consoleError = console.error;
+      console.error = () => {};
+      try {
+        await inWorld({ answer: dialogFailure }, async ({ store, notify }) => {
+          const result = await store.craft({ id: 'r1' });
+          flushSync();
+          assert.equal(result.reason, 'recovery-required', 'the refusal is still what comes back');
+          assert.deepEqual(notify, [refusalText], 'a plain refusal is never re-reported as unknown');
+          assert.equal(store.craftInFlight, false);
+        });
+      } finally {
+        console.error = consoleError;
+      }
+    });
   });
 });

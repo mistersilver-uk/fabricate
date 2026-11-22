@@ -15,6 +15,7 @@ import {
 import { withStationPresence } from '../systems/stationPresence.js';
 
 import { projectRetainedClaim } from './presenters/retainedClaimProjection.js';
+import { offerReleaseForRefusal } from './svelte/apps/journal/runRecovery.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
@@ -205,6 +206,8 @@ export function createPlayerServices({ activeCanvasTool, scopedInteractableRef, 
     advanceCraftingRun: (opts = {}) =>
       game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
     ...gameForwardingServices(),
+    // The stores stay clear of `apps/journal/`, so the GM's release prompt reaches them as a seam.
+    offerReleaseForRefusal: (result) => offerReleaseForRefusal({ result, services, localize }),
   };
   // One instance across renders, so the shell and the gathering tab share one selection state.
   services.actorBar = createActorBarStore({ services });
