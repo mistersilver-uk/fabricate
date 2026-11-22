@@ -1253,7 +1253,9 @@ describe('alchemyStore', () => {
     it('raises no second toast when the dialog fails, and frees the brew', async () => {
       const consoleError = console.error;
       const logged = [];
-      console.error = (...args) => logged.push(args);
+      console.error = (...args) => {
+        logged.push(args);
+      };
       try {
         await inWorld({ answer: dialogFailure }, async ({ store, world, notify }) => {
           const result = await store.brew();

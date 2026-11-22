@@ -1963,7 +1963,9 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
     it('raises no second toast when the dialog fails, and frees the craft', async () => {
       const consoleError = console.error;
       const logged = [];
-      console.error = (...args) => logged.push(args);
+      console.error = (...args) => {
+        logged.push(args);
+      };
       try {
         await inWorld({ answer: dialogFailure }, async ({ store, world, notify }) => {
           const result = await store.craft({ id: 'r1' });
@@ -1982,7 +1984,9 @@ describe('craftingStore additional-dice notices (issue 2008)', () => {
     it('still reloads when reporting a successful release throws', async () => {
       const consoleError = console.error;
       const logged = [];
-      console.error = (...args) => logged.push(args);
+      console.error = (...args) => {
+        logged.push(args);
+      };
       const tweak = (services) => {
         const notify = services.notify;
         services.notify = (message) => {
