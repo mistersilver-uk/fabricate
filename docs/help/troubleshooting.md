@@ -939,6 +939,44 @@ A refused start creates no run, so the Journal has no run to open for it.
 
 ---
 
+## A Gathering Attempt Says the Task Needs GM Configuration
+
+**Symptom:**
+
+- Starting a gathering Attempt shows this notice and nothing else happens:
+
+  <!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+  ```text
+  Can't attempt — This gathering task needs GM configuration before it can be used.
+  ```
+
+  <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- Nothing is spent, no run starts, and the Attempt is refused again every time.
+
+**Cause:**
+
+The task's configuration fails one of Fabricate's checks, so the task cannot resolve.
+Typical examples are:
+
+- A **Check** task whose crafting system has no gathering check roll formula.
+- Two result sets in one task with the same name once case and surrounding spaces are ignored.
+- A d100 task with no item drop rows.
+
+**Fix:**
+
+1. A GM repeats the Attempt and reads the **To fix:** part of the notice.
+   It names up to two problems, then a count such as "(+1 more)" for any others.
+2. Correct each one in the Gathering Task editor, using its **Validation** tab to find the blocking rows.
+   For a missing roll formula, add the gathering check under **Checks › Gathering**.
+3. Attempt again.
+4. A player asks their GM, because a player's notice states only that the task needs GM configuration.
+
+**See also:** [The Validation tab]({% link gathering/tasks.md %}#the-validation-tab) lists the rows that block saving a task, and [Gathering Checks]({% link checks/gathering.md %}) covers the system-level check.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:
