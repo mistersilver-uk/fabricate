@@ -25,7 +25,7 @@
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
 import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 
-import { classifyBrewReply, isQuietDismissal } from './alchemyBrewBanner.js';
+import { classifyBrewReply, isQuietDismissal, startedRun } from './alchemyBrewBanner.js';
 import { createListingLoad } from './browseListing.svelte.js';
 
 /** The brewing actor's name, which an additional-dice notice names (issue 2008). */
@@ -92,9 +92,8 @@ export function createAlchemyStore({ services } = {}) {
   const undiscoveredCount = $derived(Number(listing?.undiscoveredCount ?? 0));
   const fizzleKeys = $derived(new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : []));
 
-  // True when the actor owns any component in this discipline, regardless of the
-  // component-name search. The column uses this to tell the onboarding "acquire
-  // components" empty state apart from the "no matches" filtered-empty state.
+  // True when the actor owns any component in this discipline, regardless of the component-name
+  // search: it tells the "acquire components" empty state from the "no matches" filtered one.
   const hasOwnedComponents = $derived(
     Array.isArray(listing?.components) && listing.components.length > 0
   );
@@ -154,12 +153,11 @@ export function createAlchemyStore({ services } = {}) {
   const benchKey = $derived(signatureKey(workbench));
 
   /**
-   * The aggregate essence profile of everything on the bench: each placed
-   * component's PER-UNIT essences multiplied by its placed quantity, summed by
-   * essence id. This mirrors the engine's `accumulateItemEssences`, which counts
-   * one occurrence per submitted unit. It drives both the bench readout and the
-   * essence-aware `ready`/`assembling` resolution below. Zero/absent essences drop
-   * out, so the readout renders only where it is meaningful.
+   * The aggregate essence profile of everything on the bench: each placed component's PER-UNIT
+   * essences multiplied by its placed quantity, summed by essence id. This mirrors the engine's
+   * `accumulateItemEssences`, which counts one occurrence per submitted unit. It drives both the
+   * bench readout and the essence-aware `ready`/`assembling` resolution below. Zero/absent
+   * essences drop out, so the readout renders only where it is meaningful.
    */
   const benchEssences = $derived.by(() => {
     const totals = new Map();
@@ -201,10 +199,9 @@ export function createAlchemyStore({ services } = {}) {
   });
 
   /**
-   * Whether the bench satisfies an ESSENCE-ONLY recipe's requirement. Mirrors the
-   * engine (`_matchAlchemySignature`), which satisfies an essence when the
-   * submitted total is at LEAST the required quantity — so surplus essences still
-   * match and must still read as `ready`.
+   * Whether the bench satisfies an ESSENCE-ONLY recipe's requirement. Mirrors the engine
+   * (`_matchAlchemySignature`), which satisfies an essence when the submitted total is at LEAST
+   * the required quantity — so surplus essences still match and must still read as `ready`.
    */
   function essencesSatisfied(requirement) {
     return requirement.every(
@@ -253,11 +250,10 @@ export function createAlchemyStore({ services } = {}) {
   }
 
   /**
-   * The unique MOST-SPECIFIC concrete recipe among candidates the bench contains:
-   * the single one no other candidate strictly contains. Returns null on an empty
-   * set OR a non-unique maximum (incomparable siblings / duplicate signatures),
-   * mirroring the engine's fail-safe fizzle so the client never promises a brew the
-   * engine would fizzle.
+   * The unique MOST-SPECIFIC concrete recipe among candidates the bench contains: the single one
+   * no other candidate strictly contains. Returns null on an empty set OR a non-unique maximum
+   * (incomparable siblings / duplicate signatures), mirroring the engine's fail-safe fizzle so the
+   * client never promises a brew the engine would fizzle.
    */
   function mostSpecificConcrete(candidates) {
     if (candidates.length === 0) return null;
@@ -346,9 +342,8 @@ export function createAlchemyStore({ services } = {}) {
   const mode = $derived(resolution.mode);
   const target = $derived(resolution.target);
   const missing = $derived(resolution.missing);
-  // Brew is enabled when the player can act: a ready known recipe, or an
-  // experiment on an untried / remembered-fizzle set. `empty` and `assembling`
-  // (mid-build toward a selected recipe) are disabled.
+  // Brew is enabled for a ready known recipe, or an experiment on an untried / remembered-fizzle
+  // set; `empty` and `assembling` (mid-build toward a selected recipe) are disabled.
   const brewEnabled = $derived(mode === 'ready' || mode === 'untried' || mode === 'no-reaction');
 
   /** Fetch the alchemy listing for the current actor + sources scoped to the active system. */
@@ -476,9 +471,10 @@ export function createAlchemyStore({ services } = {}) {
   }
 
   /**
-   * Brew the current bench through the engine (authoritative). Guards re-entrancy; a roll dismissed
-   * before anything was spent is returned quietly. Otherwise it records the banner, clears the
-   * bench, and reloads so newly learned recipes and fizzle keys refresh.
+   * Brew the current bench through the engine (authoritative). Guards re-entrancy. A roll dismissed
+   * or a start refused with `recovery-required` spent nothing, so the bench stays; otherwise it
+   * clears the bench and reloads. A refusal offers the GM's claim release, and a released claim
+   * clears the refusal banner.
    */
   async function brew() {
     if (brewInFlight || !brewEnabled) return null;
@@ -497,8 +493,10 @@ export function createAlchemyStore({ services } = {}) {
       });
       notifyAdditionalDice(result, services, actorNameOf(services, currentActorId()));
       if (isQuietDismissal(result)) return result;
-      workbench = {};
-      selectedRecipeId = null;
+      if (result?.reason !== 'recovery-required' || startedRun(result)) {
+        workbench = {};
+        selectedRecipeId = null;
+      }
       await load(true);
       const nowKnown = Array.isArray(listing?.recipes) ? listing.recipes : [];
       const discovered = nowKnown.find((recipe) => !priorKnown.has(recipe.id)) ?? null;
@@ -510,6 +508,8 @@ export function createAlchemyStore({ services } = {}) {
       });
       lastBrew = banner.lastBrew;
       if (banner.notice) services?.notify?.(banner.notice);
+      const outcome = await services?.offerReleaseForRefusal?.(result);
+      if (outcome?.released) lastBrew = null;
       return result ?? null;
     } catch (err) {
       // The start may already have spent the bench, so the bench stays and no copy claims either.

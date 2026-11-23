@@ -377,6 +377,25 @@ describe('CraftingView mounted behavior', () => {
       );
     });
   }
+
+  // A retained claim belongs to no run, so the callout names the claim and never this run.
+  it('words a retained claim as the claim, not as a run needing recovery', async () => {
+    const store = fakeCraftingStore({ recipes: [recipe()] });
+    const retained = { claimId: 'claim-9', requestKind: 'recovery', claimedAt: 4000 };
+    const target = await harness.mount({
+      services: services(store, {
+        getJournalRunAuthorityAvailability: () => ({
+          available: false,
+          reason: 'recovery-required',
+          retained,
+        }),
+      }),
+    });
+    const notice = target.querySelector('[data-recipe-blocking]');
+    assert.equal(notice.getAttribute('data-recipe-authority-blocked'), 'true');
+    assert.ok(notice.textContent.includes('FABRICATE.App.Journal.Actions.ClaimRetained'));
+    assert.ok(!notice.textContent.includes('FABRICATE.App.Journal.Actions.RecoveryRequired'));
+  });
 });
 
 /** THE CRAFTING TAB'S ADOPTION OF THE SHARED PRIMITIVES. */

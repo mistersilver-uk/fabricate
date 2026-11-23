@@ -26,6 +26,7 @@ The selected item, recipe, environment, or run leads with a header naming it bes
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+A Craft, a Brew or an Attempt can be refused until a GM releases an interrupted operation's execution claim, as [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery) describes.
 A **Shopping List** sits alongside the Crafting tab, so a player can queue several recipes and see one consolidated list of what they still need.
 See [Shopping List]({% link player-app/shopping-list.md %}).
 

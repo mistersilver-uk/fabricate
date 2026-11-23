@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { choiceDialog, localize } from '../../util/foundryBridge.js';
+  import { localize } from '../../util/foundryBridge.js';
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
@@ -30,7 +30,7 @@
     previewTiers,
     quantityText,
   } from './runDetailPresentation.js';
-  import { reconcileRetainedClaim, retainedClaimPrompt } from './runRecovery.js';
+  import { offerRetainedClaimRelease } from './runRecovery.js';
   import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
   import RunAwardChoice from './RunAwardChoice.svelte';
@@ -192,16 +192,13 @@
   async function releaseRetainedClaim() {
     const claim = stateNotice?.claim;
     if (!claim || reconciling) return;
-    const disposition = await choiceDialog(retainedClaimPrompt(claim, localize));
-    if (disposition !== 'reconciled' && disposition !== 'abandoned') return;
-    reconciling = true;
-    try {
-      const outcome = await reconcileRetainedClaim({ claim, disposition, services, localize });
-      services?.notify?.(outcome.message);
-      await journal?.load?.(true);
-    } finally {
-      reconciling = false;
-    }
+    await offerRetainedClaimRelease({
+      claim,
+      services,
+      localize,
+      onBusy: (busy) => (reconciling = busy),
+      onRecorded: () => journal?.load?.(true),
+    });
   }
 
   const showActions = $derived(

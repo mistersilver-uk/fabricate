@@ -130,6 +130,25 @@ describe('journal run reason vocabulary', () => {
     assert.equal(journalRunReasonMessage('ledger-missing', null), '', 'no localize means no guess');
   });
 
+  // A refused start creates no run and a claim can belong to none, so the claim's refusal must
+  // never speak of a run, while the run-level blocker keeps its own wording.
+  it('words the retained claim apart from the run-level recovery blocker', () => {
+    const claimText = journalRunReasonMessage('recovery-required', localizeFromLang);
+    const runText = journalRunReasonMessage('recoveryRequired', localizeFromLang);
+    assert.equal(claimText, langLeaf('FABRICATE.App.Journal.Actions.ClaimRetained'));
+    assert.equal(runText, langLeaf('FABRICATE.App.Journal.Actions.RecoveryRequired'));
+    assert.notEqual(claimText, runText);
+    assert.doesNotMatch(claimText, /\brun\b/i, 'a refused start has no run to name');
+  });
+
+  it('words the retained-claim prompt for the claim, never for a run', () => {
+    const words = Object.values(langLeaf('FABRICATE.App.Journal.Recovery')).filter(
+      (value) => typeof value === 'string'
+    );
+    assert.ok(words.length >= 10, 'positive control: the prompt vocabulary was read');
+    for (const text of words) assert.doesNotMatch(text, /\bthis run\b/i, text);
+  });
+
   // Issue 1648, M15: the two causes must not be conflated, so each maps to its own distinct
   // sentence — an unmade choice is not worded as "complete the current stage requirements".
   it('words an unmade choice apart from a known material shortfall', () => {
