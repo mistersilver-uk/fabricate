@@ -2153,7 +2153,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       ['ledger-ambiguous', 'LedgerAmbiguous'],
       ['active-gm-missing', 'AuthorityUnavailable'],
       ['active-gm-required', 'ActiveGmRequired'],
-      ['recovery-required', 'RecoveryRequired'],
+      ['recovery-required', 'ClaimRetained'],
       ['claim-held', 'ClaimHeld'],
       ['claim-release-failed', 'ClaimReleaseFailed'],
       ['secure-random-unavailable', 'SecureRandomUnavailable'],

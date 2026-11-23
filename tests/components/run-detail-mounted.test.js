@@ -1102,7 +1102,7 @@ describe('RunDetail mounted behavior', () => {
     );
     assert.match(
       notice.querySelector('.fab-notice-title').textContent,
-      /Actions\.RecoveryRequired/,
+      /Actions\.ClaimRetained/,
       'the refusal leads, because it is the part a reader can act on'
     );
     assert.match(notice.querySelector('.fab-notice-detail').textContent, /Notice\.PausedInline/);
