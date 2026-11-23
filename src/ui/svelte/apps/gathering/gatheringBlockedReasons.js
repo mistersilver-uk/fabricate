@@ -118,25 +118,26 @@ export function localizeBlockedReasons(reasons, localize) {
 }
 
 const nonEmptyStrings = (list) => list.filter((entry) => typeof entry === 'string' && entry !== '');
-const unlessGeneric = (code, localize) => {
+const unlessGeneric = (code, localize, raw) => {
   if (typeof code !== 'string' || code === '' || code === MISCONFIGURED_CODE) return [];
-  return [Object.hasOwn(DIAGNOSTIC_LABEL_KEYS, code) ? localize(DIAGNOSTIC_LABEL_KEYS[code]) : code];
+  const label = !raw && Object.hasOwn(DIAGNOSTIC_LABEL_KEYS, code);
+  return [label ? localize(DIAGNOSTIC_LABEL_KEYS[code]) : code];
 };
 
 // The misconfiguration entries one reason carries: the start-path `errors` strings, else the
 // resolution-path `diagnostics` (localized message key, else the code's label, else the bare
-// code); a lone `data.code` backs both.
-function entriesOf(data, localize) {
+// code); a lone `data.code` backs both. `raw` keeps the codes unlabelled, for the console.
+function entriesOf(data, localize, raw = false) {
   if (!data || typeof data !== 'object') return [];
   const fromDiagnostics = () =>
     (Array.isArray(data.diagnostics) ? data.diagnostics : []).flatMap((entry) => {
       if (!entry || typeof entry !== 'object') return [];
       if (typeof entry.messageKey === 'string' && entry.messageKey !== '')
         return [localize(entry.messageKey)];
-      return unlessGeneric(entry.code, localize);
+      return unlessGeneric(entry.code, localize, raw);
     });
   const entries = nonEmptyStrings(Array.isArray(data.errors) ? data.errors : fromDiagnostics());
-  return entries.length > 0 ? entries : unlessGeneric(data.code, localize);
+  return entries.length > 0 ? entries : unlessGeneric(data.code, localize, raw);
 }
 
 const misconfiguredReasons = (reasons) =>
@@ -171,7 +172,7 @@ export function misconfigurationDetail(reasons, localize) {
  */
 export function logMisconfiguration(reasons) {
   for (const reason of misconfiguredReasons(reasons)) {
-    const errors = [...new Set(entriesOf(reason.data, (key) => key))];
+    const errors = [...new Set(entriesOf(reason.data, (key) => key, true))];
     console.warn('Fabricate | Gathering task needs configuration:', {
       taskId: reason.data?.taskId,
       errors,

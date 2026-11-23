@@ -304,5 +304,26 @@ describe('gatheringBlockedReasons', () => {
         console.warn = original;
       }
     });
+
+    it('writes a mapped diagnostic as its bare code, not its label key', () => {
+      const calls = [];
+      const original = console.warn;
+      console.warn = (...args) => {
+        calls.push(args);
+      };
+      try {
+        logMisconfiguration([
+          {
+            code: 'TASK_MISCONFIGURED',
+            data: { taskId: 't2', diagnostics: [{ code: 'MISSING_CHARACTER_MODIFIER', messageKey: null }] }
+          }
+        ]);
+        assert.deepEqual(calls, [
+          ['Fabricate | Gathering task needs configuration:', { taskId: 't2', errors: ['MISSING_CHARACTER_MODIFIER'] }]
+        ]);
+      } finally {
+        console.warn = original;
+      }
+    });
   });
 });
