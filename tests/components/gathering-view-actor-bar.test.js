@@ -18,6 +18,7 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -154,6 +155,10 @@ describe('GatheringView ↔ actor bar wiring', () => {
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',
       'src/utils/fillPlaceholders.js',
+      // The retained-claim release a refused Attempt offers a GM, and the notice wording it
+      // reads. Omitting either hangs this suite as `# cancelled`.
+      'src/ui/svelte/apps/journal/runRecovery.js',
+      'src/ui/svelte/apps/journal/runStateNotice.js',
     ]) {
       copyModule(modulePath);
     }
@@ -753,5 +758,218 @@ describe('GatheringView ↔ actor bar wiring', () => {
         delete globalThis.ui;
       }
     }
+  });
+  // The retained claim a refused start leaves: a GM is offered the disposition prompt here.
+  describe('releasing a retained claim from a refused Attempt', () => {
+    const CLAIM = {
+      claimId: 'claim-7',
+      requestKind: 'command',
+      failureReason: 'operation-failed',
+      failureMessage: 'No ledger',
+      claimedAt: 1000,
+    };
+    const BARE = { success: false, reason: 'recovery-required' };
+    const MERGED = { accepted: true, success: false, reason: 'recovery-required', runId: 'run-1' };
+    const press = (action) => (options) =>
+      options.buttons.find((button) => button.action === action)?.callback?.();
+
+    /**
+     * Mount the view against a recording world and hand `body` its controls. `answer` responds
+     * to each dialog render; with none the dialog stays open.
+     */
+    async function inWorld(
+      { reply = BARE, claim = CLAIM, seam = true, answer = null, reconcile = null } = {},
+      body
+    ) {
+      const dialogs = [];
+      const calls = [];
+      const notes = [];
+      const state = { claim, reply };
+      class FakeDialog {
+        constructor(options) {
+          this.options = options;
+        }
+        render() {
+          dialogs.push(this.options);
+          answer?.(this.options);
+        }
+      }
+      const env = installFoundryBridgeEnv({ labels: globalThis.game.i18n, dialog: FakeDialog });
+      try {
+        const services = {
+          listGatheringForActor: () => {
+            calls.push(['list']);
+            return Promise.resolve(listing([attemptableEnv()], 'a1'));
+          },
+          startGatheringAttempt: () => {
+            calls.push(['start']);
+            return Promise.resolve(state.reply);
+          },
+          notify: (message) => {
+            notes.push(message);
+          },
+          reconcileJournalRunAuthority:
+            reconcile ??
+            ((options) => {
+              calls.push(['reconcile', options]);
+              state.claim = null;
+              return Promise.resolve({ success: true });
+            }),
+        };
+        if (seam) services.getRetainedJournalClaim = () => state.claim;
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+        const click = async () => {
+          target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          await settle();
+        };
+        await body({ dialogs, calls, notes, warns: env.notifications.warn, state, click });
+      } finally {
+        env.restore();
+      }
+    }
+
+    const count = (calls, kind) => calls.filter(([name]) => name === kind).length;
+
+    for (const [shape, reply] of [
+      ['a bare refusal', BARE],
+      ['an accepted start whose execute was refused', MERGED],
+    ]) {
+      it(`offers the GM the prompt on ${shape} and records a reconciled release`, async () => {
+        await inWorld({ reply, answer: press('reconciled') }, async ({ dialogs, calls, notes, warns, click }) => {
+          await click();
+          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.ClaimRetained']);
+          assert.equal(dialogs.length, 1);
+          assert.equal(dialogs[0].window.title, 'FABRICATE.App.Journal.Recovery.Title');
+          assert.equal(
+            dialogs[0].content,
+            '<p>FABRICATE.App.Journal.Recovery.ClaimDetail:{&quot;failure&quot;:&quot;No ledger&quot;}</p>' +
+              '<p>FABRICATE.App.Journal.Recovery.Inspect</p><p>FABRICATE.App.Journal.Recovery.Effect</p>'
+          );
+          assert.deepEqual(
+            dialogs[0].buttons.map(({ action, label, icon, default: isDefault }) => ({ action, label, icon, isDefault })),
+            [
+              { action: 'reconciled', label: 'FABRICATE.App.Journal.Recovery.Reconciled', icon: 'fas fa-clipboard-check', isDefault: false },
+              { action: 'abandoned', label: 'FABRICATE.App.Journal.Recovery.Abandoned', icon: 'fas fa-ban', isDefault: false },
+              { action: 'cancel', label: 'FABRICATE.App.Journal.Recovery.Cancel', icon: 'fas fa-xmark', isDefault: true },
+            ],
+            'Cancel is the default, so Enter releases nothing'
+          );
+          assert.deepEqual(calls, [
+            ['list'],
+            ['start'],
+            ['reconcile', { claimId: 'claim-7', disposition: 'reconciled' }],
+            ['list'],
+          ]);
+          assert.deepEqual(notes, [
+            'FABRICATE.App.Journal.Recovery.Released:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.reconciled"}',
+          ]);
+        });
+      });
+    }
+
+    it('records an abandoned release', async () => {
+      await inWorld({ answer: press('abandoned') }, async ({ calls, notes, click }) => {
+        await click();
+        assert.deepEqual(calls.find(([name]) => name === 'reconcile'), [
+          'reconcile',
+          { claimId: 'claim-7', disposition: 'abandoned' },
+        ]);
+        assert.match(notes[0], /Recovery\.Released.*Disposition\.abandoned/);
+      });
+    });
+
+    for (const [label, respond] of [
+      ['Cancel', press('cancel')],
+      ['closing the window', (options) => options.close?.()],
+      ['Enter, which presses the default', (options) => options.buttons.find((button) => button.default)?.callback?.()],
+    ]) {
+      it(`records nothing on ${label}, and the refusal is still toasted`, async () => {
+        await inWorld({ answer: respond }, async ({ dialogs, calls, notes, warns, click }) => {
+          await click();
+          assert.equal(dialogs.length, 1);
+          assert.equal(count(calls, 'reconcile'), 0);
+          assert.deepEqual(notes, []);
+          assert.equal(warns.length, 1);
+          assert.equal(count(calls, 'list'), 2, 'the listing is still re-read');
+        });
+      });
+    }
+
+    it('notifies the authority refusal when the release is refused, and keeps the claim', async () => {
+      const reconcile = () => Promise.resolve({ success: false, reason: 'reconstruction-failed' });
+      await inWorld({ answer: press('reconciled'), reconcile }, async ({ notes, state, click }) => {
+        await click();
+        assert.deepEqual(notes, ['FABRICATE.App.Journal.Reason.ReconstructionFailed']);
+        assert.equal(state.claim, CLAIM);
+      });
+    });
+
+    it('notifies the release-failed wording when the release throws', async () => {
+      const reconcile = () => Promise.reject(new Error('boom'));
+      const consoleError = console.error;
+      console.error = () => {};
+      try {
+        await inWorld({ answer: press('reconciled'), reconcile }, async ({ notes, click }) => {
+          await click();
+          assert.deepEqual(notes, ['FABRICATE.App.Journal.Recovery.ReleaseFailed']);
+        });
+      } finally {
+        console.error = consoleError;
+      }
+    });
+
+    for (const reason of ['claim-held', 'ledger-missing', 'reconstruction-failed']) {
+      it(`offers no prompt for a ${reason} refusal, even with a claim cached`, async () => {
+        await inWorld({ reply: { success: false, reason }, answer: press('reconciled') }, async ({ dialogs, calls, warns, click }) => {
+          await click();
+          assert.equal(dialogs.length, 0);
+          assert.equal(count(calls, 'reconcile'), 0);
+          assert.equal(warns.length, 1, 'only the refusal toast');
+        });
+      });
+    }
+
+    for (const [label, options] of [
+      ['a player, whose seam answers null', { claim: null }],
+      ['a seam the bag does not carry', { seam: false }],
+    ]) {
+      it(`shows ${label} only the refusal toast`, async () => {
+        await inWorld({ ...options, answer: press('reconciled') }, async ({ dialogs, calls, warns, click }) => {
+          await click();
+          assert.equal(dialogs.length, 0);
+          assert.equal(count(calls, 'reconcile'), 0);
+          assert.deepEqual(warns, ['FABRICATE.App.Journal.Actions.ClaimRetained']);
+        });
+      });
+    }
+
+    it('opens one dialog and starts one attempt for a second Attempt while it is open', async () => {
+      await inWorld({}, async ({ dialogs, calls, click }) => {
+        const first = click();
+        await settle();
+        await click();
+        assert.equal(dialogs.length, 1);
+        assert.equal(count(calls, 'start'), 1);
+        press('cancel')(dialogs[0]);
+        await first;
+        await settle();
+        assert.equal(count(calls, 'start'), 1);
+      });
+    });
+
+    it('offers no prompt on the next Attempt once the claim is released', async () => {
+      await inWorld({ answer: press('reconciled') }, async ({ dialogs, calls, click }) => {
+        await click();
+        assert.equal(dialogs.length, 1);
+        await click();
+        assert.equal(count(calls, 'start'), 2);
+        assert.equal(dialogs.length, 1, 'the released claim is no longer offered');
+      });
+    });
   });
 });

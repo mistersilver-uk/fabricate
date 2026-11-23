@@ -109,6 +109,37 @@ export async function offerRetainedClaimRelease({
   }
 }
 
+const openPrompts = new Map();
+
+/** One prompt per claim: a second caller awaits the open prompt's outcome instead of opening another. */
+function releaseOnce(claim, open) {
+  const shared = openPrompts.get(claim.claimId);
+  if (shared) return shared;
+  const pending = open().finally(() => openPrompts.delete(claim.claimId));
+  openPrompts.set(claim.claimId, pending);
+  return pending;
+}
+
+/**
+ * Offer the release prompt for a start the authority refused with `recovery-required`, when the
+ * viewer's seam reports a retained claim. Any other refusal, or no claim, does nothing. A throw is
+ * logged and swallowed, so a caller's own `catch` never re-reports a plain refusal as unknown.
+ *
+ * @returns {Promise<{recorded: boolean, released: boolean}>} Both false when nothing was recorded.
+ */
+export async function offerReleaseForRefusal({ result, services, localize }) {
+  const nothing = { recorded: false, released: false };
+  if (result?.reason !== 'recovery-required') return nothing;
+  try {
+    const claim = services?.getRetainedJournalClaim?.();
+    if (!claim) return nothing;
+    return await releaseOnce(claim, () => offerRetainedClaimRelease({ claim, services, localize }));
+  } catch (error) {
+    console.error('Fabricate | Error offering the retained claim release:', error);
+    return nothing;
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')

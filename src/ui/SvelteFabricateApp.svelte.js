@@ -1,3 +1,5 @@
+import { projectRetainedClaim } from './presenters/retainedClaimProjection.js';
+import { offerReleaseForRefusal } from './svelte/apps/journal/runRecovery.js';
 import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
@@ -8,7 +10,7 @@ import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore
 import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
-import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge.js';
+import { notifyWarn, localize, confirmDialog, isGameMaster } from './svelte/util/foundryBridge.js';
 // Reused rather than re-authored, so the bulk salvage/destroy progress toast cannot drift from the
 // compendium import's (issue 859).
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
@@ -80,6 +82,13 @@ function journalRunNavigator(services, selectTab) {
     if (runId) services.journal?.select?.(runId, 'crafting');
     selectTab('journal');
   };
+}
+
+// The cached retained claim a GM may release, `null` for a player or when none is retained;
+// `reconcileJournalRunAuthority` stays the authorization boundary.
+function retainedJournalClaim() {
+  if (!isGameMaster()) return null;
+  return projectRetainedClaim(game?.fabricate?.getJournalRunAuthorityAvailability?.()?.retained);
 }
 
 // componentId is a per-system id, so the system is carried with it: a station from system A must
@@ -293,11 +302,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         localize('FABRICATE.App.Crafting.Detail.StageOrderSaveFailed'),
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
-      // For a THROWN craft: the engine can throw on the currency-payment macro path, with no
-      // result message to report.
+      // For a THROWN craft (the currency-payment macro path), which has no result message.
       craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
-      // The stores stay Foundry-free, so the i18n lookup an authority refusal needs
-      // (`{success:false, reason}` carries no `message`) arrives as a seam too.
+      // The i18n lookup an authority refusal needs, since `{success:false, reason}` has no `message`.
       localize: (key, data) => localize(key, data),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
@@ -319,11 +326,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getJournalRunAuthorityAvailability: () =>
         game?.fabricate?.getJournalRunAuthorityAvailability?.()
         ?? authorityUnavailableAvailability(),
-      // Active-GM manual disposition of a retained execution claim (issue 1648). The
-      // authority itself refuses a non-active-GM caller, so this seam adds no authorization.
+      getRetainedJournalClaim: () => retainedJournalClaim(),
+      // Active-GM disposition of a retained claim (issue 1648), which the authority refuses any
+      // other caller, and its release prompt as a seam, so the stores stay clear of `apps/journal/`.
       reconcileJournalRunAuthority: (opts = {}) =>
         game?.fabricate?.reconcileJournalRunAuthority?.(opts)
         ?? Promise.resolve(authorityUnavailableRefusal()),
+      offerReleaseForRefusal: (result) => offerReleaseForRefusal({ result, services, localize }),
       advanceCraftingRun: (opts = {}) =>
         game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,

@@ -703,18 +703,15 @@ export function createCraftingStore({ services } = {}) {
         ingredientSetId: selectedIngredientSetId ?? recipe?.defaultSetId ?? null,
         // Per-group overrides (issue 552): the engine consumes the option/stack the tiles show.
         ingredientOptionOverrides: selectedIngredientOptions,
-        // The player's essence funding for the ACTIVE step's set (issue 917), so the
-        // block consumes exactly the carriers the pool bars showed.
+        // The essence funding for the ACTIVE step's set (issue 917), as the pool bars showed.
         ingredientEssenceAllocation: essenceAllocationPayload(recipe),
         componentSourceActorIds: currentSourceIds(),
-        // UI-triggered craft: prompt an interactive roll dialog + post the roll to
-        // chat (Dice So Nice). Automation/macros omit this and stay silent.
+        // UI-triggered craft: an interactive roll posted to chat; macros omit this and stay silent.
         interactive: true,
       });
       const actor = resolveCraftingActorFrom(services?.getCraftingSourceActors?.() ?? []);
       notifyAdditionalDice(result, services, actor?.name);
-      // A dismissal is a choice, not a failure: a cancelled result (also `success: false`) returns
-      // first and quietly, its only notice a refused additional-dice choice's (issue 2008).
+      // A dismissal is a choice, not a failure: a cancelled result returns first and quietly (issue 2008).
       if (result?.cancelled === true) return result;
       // An authority refusal carries `reason` and NO `message`; refused dice already said why.
       if (result && result.success === false && !isResolvedFailureOutcome(result)) {
@@ -728,6 +725,9 @@ export function createCraftingStore({ services } = {}) {
             Object.entries(lastRollResult).filter(([id]) => id !== recipeId)
           );
         }
+        // A GM may release a retained claim the refusal names; the release makes the listing stale.
+        const outcome = await services?.offerReleaseForRefusal?.(result);
+        if (outcome?.released) await load(true);
         return result;
       }
       // A resolved failure falls THROUGH: the check ran and may have spent materials, so the

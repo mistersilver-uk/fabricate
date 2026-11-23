@@ -22,6 +22,7 @@
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { journalRefusalMessage } from '../../util/journalRunReasons.js';
+  import { offerReleaseForRefusal } from '../journal/runRecovery.js';
   import { notifyAdditionalDice } from '../../../presenters/additionalDicePrompt.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -248,10 +249,8 @@
     if (busy || !environmentId) return;
     busy = true;
     try {
-      // Thread the live bar selection so the attempt resolves the SAME actor the
-      // listing/availability was computed for. Without it the engine falls back to
-      // the first owned actor, which can differ from the selected character and
-      // silently fail location/ownership gating (the "nothing happens" bug).
+      // Thread the live bar selection so the attempt resolves the actor the listing was
+      // computed for; the first-owned-actor fallback can differ and fail gating.
       const result = await services?.startGatheringAttempt?.({
         environmentId,
         taskId,
@@ -271,6 +270,7 @@
         // `message`, so it missed the branch above and the attempt was a silent no-op.
         notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
+      await offerReleaseForRefusal({ result, services, localize });
       await load();
     } finally {
       busy = false;
