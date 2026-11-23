@@ -859,6 +859,86 @@ Realms the destination world already has keep their own definitions; only realms
 
 ---
 
+## A Craft, Brew or Attempt Is Refused Until a GM Releases a Claim
+
+**Symptom:**
+
+- Starting a Craft, a Brew or a gathering Attempt shows this notice and nothing else happens:
+
+  <!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+  ```text
+  An interrupted Journal operation left the execution claim in place. A GM must release it before Fabricate can do this.
+  ```
+
+  <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- Nothing is spent, and every Craft, Brew and Attempt in the world is refused the same way.
+
+**Cause:**
+
+An earlier Journal operation was interrupted before it finished, and its execution claim stayed in place.
+Fabricate cannot tell whether that operation changed anything, so it keeps the claim until the active GM records what they found.
+A refused start creates no run, so the Journal has no run to open for it.
+
+**Fix:**
+
+1. A player asks their GM to start any Craft, Brew or Attempt from the Crafting, Alchemy or Gathering tab.
+   A GM can do this directly.
+2. While the claim is still live, the notice asks you to wait and no prompt opens.
+   Once the claim is past its 60 second live window, the next refused start opens **Release the retained execution claim** for the GM.
+3. Check the affected actors' items and currency, then choose **I checked it — release** or **Abandon it — release**.
+   Both choices release the claim and do nothing to the interrupted operation, and they differ only in what is recorded.
+   **Not yet** closes the prompt and records nothing.
+4. Start the Craft, Brew or Attempt again.
+   Releasing the claim does not repeat the one that was refused.
+5. A GM who is not the active GM sees a notice that the active GM must process the change.
+   Ask the active GM to release the claim.
+
+**See also:** [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery) covers retained claims and the Release claim… control on a run.
+
+---
+
+## A Gathering Attempt Says the Task Needs GM Configuration
+
+**Symptom:**
+
+- Starting a gathering Attempt shows this notice and nothing else happens:
+
+  <!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+  ```text
+  Can't attempt — This gathering task needs GM configuration before it can be used.
+  ```
+
+  <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- Nothing is spent, no run starts, and the Attempt is refused again every time.
+
+**Cause:**
+
+The task's configuration fails one of Fabricate's checks, so the task cannot resolve.
+Typical examples are:
+
+- A **Check** task whose crafting system has no gathering check roll formula.
+- Two result sets in one task with the same name once case and surrounding spaces are ignored.
+- A d100 task with no item drop rows.
+- A character modifier that the task, its drop rows or its events use is missing from the character modifier library.
+
+**Fix:**
+
+1. A GM repeats the Attempt and reads the **To fix:** part of the notice.
+   It names up to two problems, then a count such as "(+1 more)" for any others.
+   A problem Fabricate recognises reads as a plain sentence, and any other reads as its code.
+2. Correct each one in the Gathering Task editor, using its **Validation** tab to find the blocking rows.
+   For a missing roll formula, add the gathering check under **Checks › Gathering**.
+3. Attempt again.
+4. A player asks their GM, because a player's notice states only that the task needs GM configuration.
+
+**See also:** [The Validation tab]({% link gathering/tasks.md %}#the-validation-tab) lists the rows that block saving a task, and [Gathering Checks]({% link checks/gathering.md %}) covers the system-level check.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

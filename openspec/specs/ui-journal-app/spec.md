@@ -229,6 +229,11 @@ The authority ledger is provisioned automatically (`data-models/spec.md` _Author
 Every authority refusal MUST instead be reported as a readable localized reason drawn from one shared vocabulary, so a refusal never surfaces as `undefined`, as a raw reason code, or as silence.
 A refusal reports the result's own message when it has one, then its localized reason, then the caller's generic failure text.
 An unmapped reason MUST fall through to that generic rather than render its own slug.
+A refusal naming the world's execution claim, `recovery-required`, MUST speak of a Journal operation and never of a run, because a refused start creates no run and a claim can belong to none.
+It reads "An interrupted Journal operation left the execution claim in place.
+A GM must release it before Fabricate can do this."
+The run-level `recoveryRequired` blocker, which is about that run's own uncertain effect, keeps its run wording.
+The retained-claim prompt is worded for the claim and not for a run.
 Every surface that can mint a refusal reason keeps that vocabulary as its single home, including the module edges that report an absent command service, so the drift guard that re-derives the vocabulary can see every code a player may read.
 An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
 

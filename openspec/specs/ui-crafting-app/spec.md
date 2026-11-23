@@ -141,6 +141,7 @@ and the browse half is the one that scales with the corpus.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
   bridge refreshes calendar-aware durations and re-fetches the listing quietly when
   the GM advances the clock.
+- A GM whose Craft or Brew is refused with `recovery-required` is offered the retained-claim disposition prompt from the Crafting or Alchemy tab after the refusal notice, as `data-models/spec.md` _Authority Ledger and Recovery Boundary_ requires.
 
 ### Salvage Execution
 
