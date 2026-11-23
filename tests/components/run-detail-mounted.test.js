@@ -151,6 +151,36 @@ async function projectGatheringRecord(payload, status = 'succeeded', executionJo
   }).history[0];
 }
 
+/** Installs a DialogV2 that answers each render with `respond(options)`, and records them. */
+async function withDialog(respond, body) {
+  const dialogs = [];
+  const priorFoundry = globalThis.foundry;
+  Reflect.set(globalThis, 'foundry', {
+    utils: { deepClone: (value) => ({ ...value }) },
+    applications: {
+      api: {
+        DialogV2: class {
+          constructor(options) {
+            this.options = options;
+          }
+          render() {
+            dialogs.push(this.options);
+            respond(this.options);
+          }
+        },
+      },
+    },
+  });
+  try {
+    await body(dialogs);
+  } finally {
+    Reflect.set(globalThis, 'foundry', priorFoundry);
+  }
+}
+
+const press = (action) => (options) =>
+  options.buttons.find((button) => button.action === action)?.callback?.();
+
 describe('RunDetail mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
@@ -1206,6 +1236,133 @@ describe('RunDetail mounted behavior', () => {
     } finally {
       globalThis.foundry = priorFoundry;
     }
+  });
+
+  describe('the retained-claim release flow', () => {
+    const CLAIM = {
+      claimId: 'claim-7',
+      requestKind: 'command',
+      failureReason: 'operation-failed',
+      failureMessage: 'The run is already paused',
+      claimedAt: 1000,
+    };
+    const tick = () => new Promise((settle) => setTimeout(settle, 0));
+
+    function claimServices(reconcile) {
+      const calls = [];
+      const bag = {
+        ...services(),
+        notify: (message) => {
+          calls.push(['notify', message]);
+        },
+        reconcileJournalRunAuthority: (options) => {
+          calls.push(['reconcile', options]);
+          return reconcile(options);
+        },
+      };
+      bag.journal.load = (quiet) => {
+        calls.push(['load', quiet]);
+      };
+      return { bag, calls };
+    }
+
+    async function openRelease(bag) {
+      const target = await harness.mount({
+        run: blockedPausedRun({ recoveryClaim: CLAIM }),
+        now: 0,
+        services: bag,
+        journal: bag.journal,
+      });
+      const action = target.querySelector('[data-notice-action]');
+      action.click();
+      await tick();
+      await tick();
+      return action;
+    }
+
+    it('records the abandoned disposition, notifies it and re-reads the Journal', async () => {
+      const { bag, calls } = claimServices(() => Promise.resolve({ success: true }));
+      await withDialog(press('abandoned'), async () => {
+        await openRelease(bag);
+        assert.deepEqual(calls, [
+          ['reconcile', { claimId: 'claim-7', disposition: 'abandoned' }],
+          [
+            'notify',
+            'FABRICATE.App.Journal.Recovery.Released:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.abandoned"}',
+          ],
+          ['load', true],
+        ]);
+      });
+    });
+
+    for (const [label, respond] of [
+      ['Cancel', press('cancel')],
+      ['closing the window', (options) => options.close?.()],
+      [
+        'Enter, which presses the default',
+        (options) => options.buttons.find((button) => button.default)?.callback?.(),
+      ],
+    ]) {
+      it(`records, notifies and re-reads nothing on ${label}`, async () => {
+        const { bag, calls } = claimServices(() => Promise.resolve({ success: true }));
+        await withDialog(respond, async (dialogs) => {
+          await openRelease(bag);
+          assert.equal(dialogs.length, 1);
+          assert.deepEqual(calls, []);
+        });
+      });
+    }
+
+    it('notifies the refusal by its localized reason and still re-reads the Journal', async () => {
+      const { bag, calls } = claimServices(() =>
+        Promise.resolve({ success: false, reason: 'claim-mismatch' })
+      );
+      await withDialog(press('reconciled'), async () => {
+        await openRelease(bag);
+        assert.deepEqual(calls.slice(1), [
+          ['notify', 'FABRICATE.App.Journal.Reason.ClaimMismatch'],
+          ['load', true],
+        ]);
+      });
+    });
+
+    it('notifies the release-failed wording when the reconcile throws', async () => {
+      const { bag, calls } = claimServices(() => Promise.reject(new Error('boom')));
+      const consoleError = console.error;
+      console.error = () => {};
+      try {
+        await withDialog(press('reconciled'), async () => {
+          await openRelease(bag);
+          assert.deepEqual(calls.slice(1), [
+            ['notify', 'FABRICATE.App.Journal.Recovery.ReleaseFailed'],
+            ['load', true],
+          ]);
+        });
+      } finally {
+        console.error = consoleError;
+      }
+    });
+
+    it('opens no second dialog while a release is recording, and one again after', async () => {
+      let settleRelease = null;
+      const { bag, calls } = claimServices(
+        () => new Promise((settle) => (settleRelease = () => settle({ success: true })))
+      );
+      await withDialog(press('reconciled'), async (dialogs) => {
+        const action = await openRelease(bag);
+        assert.equal(dialogs.length, 1);
+        action.click();
+        await tick();
+        assert.equal(dialogs.length, 1, 'a click while recording opens no dialog');
+        settleRelease();
+        await tick();
+        await tick();
+        assert.equal(calls.filter(([kind]) => kind === 'reconcile').length, 1);
+        action.click();
+        await tick();
+        assert.equal(dialogs.length, 2, 'the control is live again once the release settles');
+      });
+    });
   });
 
   it('renders no action or stage for an absent run (the Journal owns the empty state)', async () => {
