@@ -13,6 +13,7 @@
   import {
     localize,
     notifyWarn,
+    isGameMaster,
     subscribeSceneChange,
     subscribeTravelMarkerMove,
     subscribeInventoryChange,
@@ -20,7 +21,7 @@
     subscribeGatheringDataChange,
   } from '../../util/foundryBridge.js';
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
-  import { describeBlockedReasons } from './gatheringBlockedReasons.js';
+  import { describeBlockedReasons, logMisconfiguration } from './gatheringBlockedReasons.js';
   import { journalRefusalMessage } from '../../util/journalRunReasons.js';
   import { offerReleaseForRefusal } from '../journal/runRecovery.js';
   import { notifyAdditionalDice } from '../../../presenters/additionalDicePrompt.js';
@@ -249,10 +250,8 @@
     if (busy || !environmentId) return;
     busy = true;
     try {
-      // Thread the live bar selection so the attempt resolves the SAME actor the
-      // listing/availability was computed for. Without it the engine falls back to
-      // the first owned actor, which can differ from the selected character and
-      // silently fail location/ownership gating (the "nothing happens" bug).
+      // Thread the live bar selection so the attempt resolves the actor the listing was
+      // computed for; the first-owned-actor fallback can differ and fail gating.
       const result = await services?.startGatheringAttempt?.({
         environmentId,
         taskId,
@@ -260,12 +259,13 @@
         // A player check (an untimed d100, routed or progressive task) opens the roll prompt.
         interactive: true,
       });
-      // A rejected attempt always says why; the chat card reports an accepted one. A dismissed
-      // roll prompt notifies only a refused additional-dice choice (issue 2008) and reloads.
+      // A rejected attempt says why; a dismissed roll prompt notifies only a refused additional-dice choice.
       notifyAdditionalDice(result, { notify: notifyWarn, localize }, store?.selectedActor?.name);
       if (result?.cancelled === true) return await load();
       if (result && result.accepted === false) {
-        notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
+        const gm = isGameMaster();
+        if (gm) logMisconfiguration(result.blockedReasons);
+        notifyWarn(describeBlockedReasons(result.blockedReasons, localize, { includeDetail: gm }));
       } else if (result && result.success === false && !result.additionalDiceRefusal) {
         // A versioned start's refusal is `{success:false, reason}` with no `accepted` or `message`.
         notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));

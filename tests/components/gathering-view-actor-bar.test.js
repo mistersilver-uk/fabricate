@@ -969,4 +969,100 @@ describe('GatheringView ↔ actor bar wiring', () => {
       });
     });
   });
+
+  describe('a refused Attempt on a misconfigured task', () => {
+    const MESSAGE = 'The task needs GM configuration.';
+    const CANNOT = 'FABRICATE.App.Gathering.Detail.CannotAttempt';
+    const DETAIL = 'FABRICATE.App.Gathering.Detail.CannotAttemptDetail';
+    const MORE = 'FABRICATE.App.Gathering.Detail.CannotAttemptMore';
+    const generic = `${CANNOT}:${JSON.stringify({ reason: MESSAGE })}`;
+    const detailed = (details) => `${DETAIL}:${JSON.stringify({ reason: MESSAGE, details })}`;
+    const refusal = (data) => ({
+      accepted: false,
+      blockedReasons: [{ code: 'TASK_MISCONFIGURED', message: MESSAGE, data }],
+    });
+    const blindEnv = () =>
+      environment({
+        id: 'env-blind',
+        selectionMode: 'blind',
+        revealPolicy: 'onAttempt',
+        attemptable: true,
+        tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
+      });
+
+    /** Attempt once as a GM or a player and hand back what the client notified and logged. */
+    async function refuse(reply, { gm, blind = false }) {
+      const warns = [];
+      const logs = [];
+      const originalWarn = console.warn;
+      const originalUser = globalThis.game.user;
+      globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+      globalThis.game.user = { isGM: gm };
+      console.warn = (...args) => logs.push(args);
+      try {
+        const services = {
+          listGatheringForActor: () =>
+            Promise.resolve(listing([blind ? blindEnv() : attemptableEnv()], 'a1')),
+          startGatheringAttempt: () => Promise.resolve(reply),
+        };
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+        const button = blind ? '[data-gathering-blind-attempt]' : '[data-gathering-task-detail] [data-gathering-attempt]';
+        target.querySelector(button).click();
+        await settle();
+        return { warns, logs };
+      } finally {
+        console.warn = originalWarn;
+        globalThis.game.user = originalUser;
+        delete globalThis.ui;
+      }
+    }
+
+    it('names the start-path errors to a GM, and logs the full list', async () => {
+      const errors = ['No roll formula.', 'Duplicate group "Herbs".', 'No item drop rows.'];
+      const { warns, logs } = await refuse(refusal({ taskId: 'task-1', errors }), { gm: true });
+      assert.deepEqual(warns, [
+        detailed(`${MORE}:${JSON.stringify({ details: 'No roll formula.; Duplicate group "Herbs".', count: 1 })}`),
+      ]);
+      assert.deepEqual(logs, [['Fabricate | Gathering task needs configuration:', { taskId: 'task-1', errors }]]);
+    });
+
+    it('localizes the resolution-path diagnostics for a GM, from the merged execute reply', async () => {
+      const started = { accepted: true, requiresExecution: true, canExecuteImmediately: true, runId: 'run-1', blockedReasons: [] };
+      const settled = refusal({
+        taskId: 'task-1',
+        code: 'RESULT_PLAN_DIAGNOSTIC',
+        diagnostics: [
+          { code: 'RESULT_SOURCE_UNRESOLVED', messageKey: 'FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved' },
+        ],
+      });
+      const { warns } = await refuse({ ...started, ...settled }, { gm: true });
+      assert.deepEqual(warns, [detailed('FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved')]);
+    });
+
+    it('names the errors to a GM in a blind environment', async () => {
+      const { warns } = await refuse(refusal({ taskId: 'task-1', errors: ['No roll formula.'] }), {
+        gm: true,
+        blind: true,
+      });
+      assert.deepEqual(warns, [detailed('No roll formula.')]);
+    });
+
+    it('states only the generic reason when the GM reply carries no data (defensive)', async () => {
+      const { warns, logs } = await refuse(refusal(null), { gm: true });
+      assert.deepEqual(warns, [generic]);
+      assert.deepEqual(logs, [['Fabricate | Gathering task needs configuration:', { taskId: undefined, errors: [] }]]);
+    });
+
+    it('states only the generic reason to a player, whatever the reply carries', async () => {
+      const { warns, logs } = await refuse(refusal({ taskId: 'task-1', errors: ['No roll formula.'] }), {
+        gm: false,
+      });
+      assert.deepEqual(warns, [generic]);
+      assert.deepEqual(logs, []);
+    });
+  });
 });

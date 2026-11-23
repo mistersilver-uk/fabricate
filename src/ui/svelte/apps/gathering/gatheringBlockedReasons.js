@@ -29,6 +29,11 @@ export const BLOCK_LABEL_KEYS = Object.freeze({
 
 const GENERIC_BLOCKED_KEY = 'FABRICATE.App.Gathering.Detail.Blocked';
 const CANNOT_ATTEMPT_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttempt';
+const CANNOT_ATTEMPT_DETAIL_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttemptDetail';
+const CANNOT_ATTEMPT_MORE_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttemptMore';
+const MISCONFIGURED_CODE = 'TASK_MISCONFIGURED';
+const DETAIL_SHOWN = 2;
+const DETAIL_MAX_LENGTH = 90;
 
 /**
  * Icon/tone presentation for the blocked-reason codes that surface as per-task
@@ -100,17 +105,86 @@ export function localizeBlockedReasons(reasons, localize) {
   return labels;
 }
 
+const nonEmptyStrings = (list) => list.filter((entry) => typeof entry === 'string' && entry !== '');
+const unlessGeneric = (code) =>
+  typeof code === 'string' && code !== '' && code !== MISCONFIGURED_CODE ? [code] : [];
+
+// The misconfiguration entries one reason carries: the start-path `errors` strings, else the
+// resolution-path `diagnostics` (localized message key, else code); a lone `data.code` backs both.
+function entriesOf(data, localize) {
+  if (!data || typeof data !== 'object') return [];
+  const fromDiagnostics = () =>
+    (Array.isArray(data.diagnostics) ? data.diagnostics : []).flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return [];
+      if (typeof entry.messageKey === 'string' && entry.messageKey !== '')
+        return [localize(entry.messageKey)];
+      return unlessGeneric(entry.code);
+    });
+  const entries = nonEmptyStrings(Array.isArray(data.errors) ? data.errors : fromDiagnostics());
+  return entries.length > 0 ? entries : unlessGeneric(data.code);
+}
+
+const misconfiguredReasons = (reasons) =>
+  (Array.isArray(reasons) ? reasons : []).filter((reason) => reason?.code === MISCONFIGURED_CODE);
+
+// A group name inside a rule string is GM-authored, so angle brackets never reach a notification.
+function toastSafe(text) {
+  const plain = text.replaceAll(/[<>]/g, '');
+  return plain.length > DETAIL_MAX_LENGTH ? `${plain.slice(0, DETAIL_MAX_LENGTH - 1)}…` : plain;
+}
+
+/**
+ * The misconfiguration details of the `TASK_MISCONFIGURED` reasons: distinct, angle-bracket
+ * free, each capped at 90 characters. Other reason codes never contribute.
+ *
+ * @param {Array<{code?: string, data?: object|null}>} reasons
+ * @param {(key: string, data?: object) => string} localize
+ * @returns {string[]}
+ */
+export function misconfigurationDetail(reasons, localize) {
+  const entries = misconfiguredReasons(reasons).flatMap((reason) =>
+    entriesOf(reason.data, localize)
+  );
+  return [...new Set(entries.map(toastSafe).filter((entry) => entry !== ''))];
+}
+
+/**
+ * Write each `TASK_MISCONFIGURED` reason's full, uncapped entry list to the console, so a
+ * GM can read every failing rule that the notification truncates.
+ *
+ * @param {Array<{code?: string, data?: object|null}>} reasons
+ */
+export function logMisconfiguration(reasons) {
+  for (const reason of misconfiguredReasons(reasons)) {
+    const errors = [...new Set(entriesOf(reason.data, (key) => key))];
+    console.warn('Fabricate | Gathering task needs configuration:', {
+      taskId: reason.data?.taskId,
+      errors,
+    });
+  }
+}
+
 /**
  * Build a single ready-to-show "Can't attempt — …" sentence for a set of blocked
  * reasons, or the generic "currently unavailable" label when none resolve. Used
  * by the task inspector callout and the blocked-attempt notification alike.
+ * With `includeDetail`, a `TASK_MISCONFIGURED` reason's first two details follow
+ * the label, with a count of the rest.
  *
- * @param {Array<{code?: string, message?: string}>} reasons
+ * @param {Array<{code?: string, message?: string, data?: object|null}>} reasons
  * @param {(key: string, data?: object) => string} localize
+ * @param {{includeDetail?: boolean}} [options]
  * @returns {string} Localized blocked-reason sentence.
  */
-export function describeBlockedReasons(reasons, localize) {
+export function describeBlockedReasons(reasons, localize, { includeDetail = false } = {}) {
   const labels = localizeBlockedReasons(reasons, localize);
   if (labels.length === 0) return localize(GENERIC_BLOCKED_KEY);
-  return localize(CANNOT_ATTEMPT_KEY, { reason: labels.join(', ') });
+  const reason = labels.join(', ');
+  const items = includeDetail ? misconfigurationDetail(reasons, localize) : [];
+  if (items.length === 0) return localize(CANNOT_ATTEMPT_KEY, { reason });
+  let details = items.slice(0, DETAIL_SHOWN).join('; ');
+  if (items.length > DETAIL_SHOWN) {
+    details = localize(CANNOT_ATTEMPT_MORE_KEY, { details, count: items.length - DETAIL_SHOWN });
+  }
+  return localize(CANNOT_ATTEMPT_DETAIL_KEY, { reason, details });
 }
