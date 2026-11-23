@@ -239,7 +239,9 @@ describe('gatheringBlockedReasons', () => {
     it('writes the full uncapped, unlocalized list with the task id', () => {
       const calls = [];
       const original = console.warn;
-      console.warn = (...args) => calls.push(args);
+      console.warn = (...args) => {
+        calls.push(args);
+      };
       try {
         const errors = ['A <b>.', 'B.', 'C.', 'C.', 'D.'];
         logMisconfiguration([

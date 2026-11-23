@@ -996,9 +996,17 @@ describe('GatheringView ↔ actor bar wiring', () => {
       const logs = [];
       const originalWarn = console.warn;
       const originalUser = globalThis.game.user;
-      globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+      Reflect.set(globalThis, 'ui', {
+        notifications: {
+          warn: (msg) => {
+            warns.push(msg);
+          },
+        },
+      });
       globalThis.game.user = { isGM: gm };
-      console.warn = (...args) => logs.push(args);
+      console.warn = (...args) => {
+        logs.push(args);
+      };
       try {
         const services = {
           listGatheringForActor: () =>
