@@ -2001,3 +2001,92 @@ test('timed nodes-mode maturity does not decrement the environment node on a fai
   assert.equal(result.completed[0].state, 'failed');
   assert.equal(env.nodeRuntime?.['task-a'], undefined, 'no node state is written for a failed onSuccess gather');
 });
+
+// The run's `economyEvidence.runtimeSnapshot` rebuilds the environment at resume, and a spread drops
+// the non-enumerable composition libraries, so the world-owned modifier library must be carried over.
+const MODIFIER_LIBRARY = [{ id: 'str', label: 'Strength', expression: '@str' }];
+
+function modifierRef() {
+  return { id: 'ref-1', modifierId: 'str', operator: '+' };
+}
+
+/** A timed library task and a real rich-state service whose composed environment carries the library. */
+function modifierWorld({ events = [], task = null, evaluateCalls = [] } = {}) {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const libraryTask = task ?? nodesLibraryTask({
+    nodes: undefined,
+    dropRows: [{ id: 'row-a', componentId: 'comp-a', quantity: 2, dropRate: 100, enabled: true, characterModifiers: [modifierRef()] }]
+  });
+  const env = environment([], { compositionMode: 'automatic', tasks: [] });
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { 'system-a': { tasks: [libraryTask], events } } }]]);
+  const richState = new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    rollD100: () => 1,
+    hooks: { callAll: () => {} },
+    evaluateExpression: async (payload) => { evaluateCalls.push(payload); return 3; }
+  });
+  const engine = makeEngine({
+    runManager,
+    environments: [env],
+    richState,
+    systems: [system({ modifiers: MODIFIER_LIBRARY })],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }]
+  });
+  return { engine, runManager, mature: () => engine.processWorldTime((worldTime = 1060)) };
+}
+
+test('a resumed run keeps the composed modifier and tool libraries on its snapshot environment', async () => {
+  const { engine, runManager } = modifierWorld();
+  const started = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  assert.equal(started.state, 'waitingTime');
+  const run = runManager.getActiveRuns(actor)[0];
+  assert.ok(run.economyEvidence.runtimeSnapshot.task, 'positive control: the run carries a snapshot');
+
+  const context = engine._resolveWaitingRunContext({ actor, run });
+  const composed = engine._findEnvironment('env-a');
+
+  assert.notEqual(context.environment, composed, 'the snapshot environment is a rebuilt copy');
+  assert.ok(context.environment.__libraryCharacterModifiers instanceof Map);
+  assert.deepEqual([...context.environment.__libraryCharacterModifiers.keys()], ['str']);
+  assert.deepEqual(context.environment.__libraryCharacterModifiers, composed.__libraryCharacterModifiers);
+  assert.ok(context.environment.__libraryTools instanceof Map, 'the composed tool library is carried too');
+  assert.deepEqual(context.environment.__libraryTools, composed.__libraryTools);
+  assert.equal(Object.keys(context.environment).some(key => key.startsWith('__')), false, 'the libraries stay hidden');
+});
+
+test('a matured d100 drop row resolves its library modifier instead of misconfiguring', async () => {
+  const evaluateCalls = [];
+  const { engine, runManager, mature } = modifierWorld({ evaluateCalls });
+  await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  const result = await mature();
+
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'succeeded');
+  assert.equal(runManager.getRunHistory(actor).length, 1);
+  assert.ok(evaluateCalls.some(call => call.kind === 'characterModifier' && call.expression === '@str'), 'the modifier was applied');
+});
+
+test('a matured non-d100 run resolves an event that references a library modifier', async () => {
+  const evaluateCalls = [];
+  const task = timedTask({ resolutionMode: 'straight' });
+  const event = {
+    id: 'event-a',
+    name: 'Rockfall',
+    enabled: true,
+    triggerChance: 100,
+    characterModifiers: [modifierRef()]
+  };
+  const { engine, mature } = modifierWorld({ events: [event], task, evaluateCalls });
+  await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  const result = await mature();
+
+  assert.equal(result.completed.length, 1);
+  assert.notEqual(result.completed[0].state, 'misconfigured');
+  assert.ok(evaluateCalls.some(call => call.kind === 'characterModifier' && call.expression === '@str'), 'the event modifier was applied');
+});

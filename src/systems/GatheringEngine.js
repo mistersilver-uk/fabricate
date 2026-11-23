@@ -1460,13 +1460,11 @@ export class GatheringEngine {
             stringOrNull(snapshot?.eventPolicy) || stringOrNull(environment?.eventPolicy),
         }
       : null;
-    if (snapshotEnvironment && environment?.__libraryTools instanceof Map) {
-      Object.defineProperty(snapshotEnvironment, '__libraryTools', {
-        value: environment.__libraryTools,
-        enumerable: false,
-        configurable: true,
-        writable: true,
-      });
+    // A spread drops the composition libraries (modifiers, tools) that `composeEnvironment` hides.
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(environment))) {
+      if (snapshotEnvironment && !descriptor.enumerable) {
+        Object.defineProperty(snapshotEnvironment, key, descriptor);
+      }
     }
     const currentTask =
       normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null;
