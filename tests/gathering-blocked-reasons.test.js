@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   BLOCK_LABEL_KEYS,
@@ -124,6 +126,53 @@ describe('gatheringBlockedReasons', () => {
         'FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved',
         'ROUTED_TIER_UNROUTED'
       ]);
+    });
+
+    const DIAGNOSTIC = 'FABRICATE.App.Gathering.Detail.Diagnostic';
+    const MAPPED_CODES = [
+      'MISSING_CHARACTER_MODIFIER',
+      'INVALID_CHARACTER_MODIFIER_BOUNDS',
+      'CHARACTER_MODIFIER_NON_FINITE',
+      'MISSING_ROUTED_CHECK',
+      'MISSING_GATHERING_CHECK',
+      'INVALID_PROGRESSIVE_DIFFICULTY',
+      'MALFORMED_CHECK_RESULT',
+      'CHECK_MODE_MISMATCH'
+    ];
+
+    for (const code of MAPPED_CODES) {
+      it(`words the ${code} diagnostic in plain language, never as the bare code`, () => {
+        const reasons = [misconfigured({ code: 'RESULT_PLAN_DIAGNOSTIC', diagnostics: [{ code, messageKey: null }] })];
+        assert.deepEqual(misconfigurationDetail(reasons, localize), [`${DIAGNOSTIC}.${code}`]);
+        const en = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
+        const sentenceText = en.FABRICATE.App.Gathering.Detail.Diagnostic[code];
+        assert.equal(typeof sentenceText, 'string', 'the label is shipped');
+        assert.ok(sentenceText.length <= 90, 'the label fits the toast without truncation');
+        assert.deepEqual(
+          misconfigurationDetail(reasons, (key) => key.split('.').reduce((node, part) => node?.[part], en)),
+          [sentenceText]
+        );
+      });
+    }
+
+    it('words a lone data.code the same way, when no diagnostic yielded', () => {
+      assert.deepEqual(misconfigurationDetail([misconfigured({ code: 'MISSING_ROUTED_CHECK' })], localize), [
+        `${DIAGNOSTIC}.MISSING_ROUTED_CHECK`
+      ]);
+    });
+
+    it('lets a diagnostic message key win over its code label', () => {
+      const reasons = [
+        misconfigured({
+          diagnostics: [{ code: 'MISSING_CHARACTER_MODIFIER', messageKey: 'FABRICATE.Gathering.Diagnostics.Own' }]
+        })
+      ];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['FABRICATE.Gathering.Diagnostics.Own']);
+    });
+
+    it('falls back to the bare code for a code with no label, and never for inherited names', () => {
+      const reasons = [misconfigured({ diagnostics: [{ code: 'NOT_A_KNOWN_CODE' }, { code: 'constructor' }] })];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['NOT_A_KNOWN_CODE', 'constructor']);
     });
 
     it('prefers the errors over the diagnostics when both are present', () => {

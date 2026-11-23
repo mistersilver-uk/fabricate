@@ -963,11 +963,13 @@ Typical examples are:
 - A **Check** task whose crafting system has no gathering check roll formula.
 - Two result sets in one task with the same name once case and surrounding spaces are ignored.
 - A d100 task with no item drop rows.
+- A character modifier that the task, its drop rows or its events use is missing from the character modifier library.
 
 **Fix:**
 
 1. A GM repeats the Attempt and reads the **To fix:** part of the notice.
    It names up to two problems, then a count such as "(+1 more)" for any others.
+   A problem Fabricate recognises reads as a plain sentence, and any other reads as its code.
 2. Correct each one in the Gathering Task editor, using its **Validation** tab to find the blocking rows.
    For a missing roll formula, add the gathering check under **Checks › Gathering**.
 3. Attempt again.

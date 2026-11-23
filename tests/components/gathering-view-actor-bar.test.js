@@ -1051,6 +1051,18 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.deepEqual(warns, [detailed('FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved')]);
     });
 
+    it('words the captured character-modifier refusal in plain language for a GM', async () => {
+      const captured = refusal({
+        taskId: 'task-1',
+        code: 'CHARACTER_MODIFIER_MISCONFIGURED',
+        diagnostics: [{ code: 'MISSING_CHARACTER_MODIFIER', messageKey: null }],
+      });
+      const { warns } = await refuse(captured, { gm: true });
+      assert.deepEqual(warns, [
+        detailed('FABRICATE.App.Gathering.Detail.Diagnostic.MISSING_CHARACTER_MODIFIER'),
+      ]);
+    });
+
     it('names the errors to a GM in a blind environment', async () => {
       const { warns } = await refuse(refusal({ taskId: 'task-1', errors: ['No roll formula.'] }), {
         gm: true,

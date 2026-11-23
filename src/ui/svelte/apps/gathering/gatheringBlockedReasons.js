@@ -32,6 +32,18 @@ const CANNOT_ATTEMPT_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttempt';
 const CANNOT_ATTEMPT_DETAIL_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttemptDetail';
 const CANNOT_ATTEMPT_MORE_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttemptMore';
 const MISCONFIGURED_CODE = 'TASK_MISCONFIGURED';
+
+/** Resolution-path diagnostic codes the engine emits, each with its plain-language label key. */
+const DIAGNOSTIC_LABEL_KEYS = Object.freeze({
+  MISSING_CHARACTER_MODIFIER: 'FABRICATE.App.Gathering.Detail.Diagnostic.MISSING_CHARACTER_MODIFIER',
+  INVALID_CHARACTER_MODIFIER_BOUNDS: 'FABRICATE.App.Gathering.Detail.Diagnostic.INVALID_CHARACTER_MODIFIER_BOUNDS',
+  CHARACTER_MODIFIER_NON_FINITE: 'FABRICATE.App.Gathering.Detail.Diagnostic.CHARACTER_MODIFIER_NON_FINITE',
+  MISSING_ROUTED_CHECK: 'FABRICATE.App.Gathering.Detail.Diagnostic.MISSING_ROUTED_CHECK',
+  MISSING_GATHERING_CHECK: 'FABRICATE.App.Gathering.Detail.Diagnostic.MISSING_GATHERING_CHECK',
+  INVALID_PROGRESSIVE_DIFFICULTY: 'FABRICATE.App.Gathering.Detail.Diagnostic.INVALID_PROGRESSIVE_DIFFICULTY',
+  MALFORMED_CHECK_RESULT: 'FABRICATE.App.Gathering.Detail.Diagnostic.MALFORMED_CHECK_RESULT',
+  CHECK_MODE_MISMATCH: 'FABRICATE.App.Gathering.Detail.Diagnostic.CHECK_MODE_MISMATCH',
+});
 const DETAIL_SHOWN = 2;
 const DETAIL_MAX_LENGTH = 90;
 
@@ -106,11 +118,14 @@ export function localizeBlockedReasons(reasons, localize) {
 }
 
 const nonEmptyStrings = (list) => list.filter((entry) => typeof entry === 'string' && entry !== '');
-const unlessGeneric = (code) =>
-  typeof code === 'string' && code !== '' && code !== MISCONFIGURED_CODE ? [code] : [];
+const unlessGeneric = (code, localize) => {
+  if (typeof code !== 'string' || code === '' || code === MISCONFIGURED_CODE) return [];
+  return [Object.hasOwn(DIAGNOSTIC_LABEL_KEYS, code) ? localize(DIAGNOSTIC_LABEL_KEYS[code]) : code];
+};
 
 // The misconfiguration entries one reason carries: the start-path `errors` strings, else the
-// resolution-path `diagnostics` (localized message key, else code); a lone `data.code` backs both.
+// resolution-path `diagnostics` (localized message key, else the code's label, else the bare
+// code); a lone `data.code` backs both.
 function entriesOf(data, localize) {
   if (!data || typeof data !== 'object') return [];
   const fromDiagnostics = () =>
@@ -118,10 +133,10 @@ function entriesOf(data, localize) {
       if (!entry || typeof entry !== 'object') return [];
       if (typeof entry.messageKey === 'string' && entry.messageKey !== '')
         return [localize(entry.messageKey)];
-      return unlessGeneric(entry.code);
+      return unlessGeneric(entry.code, localize);
     });
   const entries = nonEmptyStrings(Array.isArray(data.errors) ? data.errors : fromDiagnostics());
-  return entries.length > 0 ? entries : unlessGeneric(data.code);
+  return entries.length > 0 ? entries : unlessGeneric(data.code, localize);
 }
 
 const misconfiguredReasons = (reasons) =>

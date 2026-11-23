@@ -1778,6 +1778,16 @@
           "CannotAttempt": "Can't attempt — {reason}",
           "CannotAttemptDetail": "Can't attempt — {reason} To fix: {details}",
           "CannotAttemptMore": "{details} (+{count} more)",
+          "Diagnostic": {
+            "MISSING_CHARACTER_MODIFIER": "A character modifier this task uses is not in the character modifier library.",
+            "INVALID_CHARACTER_MODIFIER_BOUNDS": "A character modifier has a minimum above its maximum.",
+            "CHARACTER_MODIFIER_NON_FINITE": "A character modifier did not resolve to a number.",
+            "MISSING_ROUTED_CHECK": "The system's routed gathering check has no roll formula.",
+            "MISSING_GATHERING_CHECK": "The system's progressive gathering check has no roll formula.",
+            "INVALID_PROGRESSIVE_DIFFICULTY": "A progressive result in this task has no valid difficulty.",
+            "MALFORMED_CHECK_RESULT": "The progressive gathering check did not return a number.",
+            "CHECK_MODE_MISMATCH": "A d100 check result reached a task that is not a d100 task."
+          },
           "BlindHint": "This is a blind gathering site. Attempt a gather to discover what it yields.",
           "TargetedHint": "Choose a task below to attempt.",
           "SceneGateHint": "You can't gather here until you visit the linked scene below.",
