@@ -13,6 +13,7 @@
   import {
     localize,
     notifyWarn,
+    isGameMaster,
     subscribeSceneChange,
     subscribeTravelMarkerMove,
     subscribeInventoryChange,
@@ -20,7 +21,7 @@
     subscribeGatheringDataChange,
   } from '../../util/foundryBridge.js';
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
-  import { describeBlockedReasons } from './gatheringBlockedReasons.js';
+  import { describeBlockedReasons, logMisconfiguration } from './gatheringBlockedReasons.js';
   import { journalRefusalMessage } from '../../util/journalRunReasons.js';
   import { offerReleaseForRefusal } from '../journal/runRecovery.js';
   import { notifyAdditionalDice } from '../../../presenters/additionalDicePrompt.js';
@@ -258,16 +259,15 @@
         // A player check (an untimed d100, routed or progressive task) opens the roll prompt.
         interactive: true,
       });
-      // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be a silent
-      // no-op; the chat card reports an accepted one. A dismissed roll prompt's only notice is a
-      // refused additional-dice choice's (issue 2008); its run waits ready, so the listing reloads.
+      // A rejected attempt says why; a dismissed roll prompt notifies only a refused additional-dice choice.
       notifyAdditionalDice(result, { notify: notifyWarn, localize }, store?.selectedActor?.name);
       if (result?.cancelled === true) return await load();
       if (result && result.accepted === false) {
-        notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
+        const gm = isGameMaster();
+        if (gm) logMisconfiguration(result.blockedReasons);
+        notifyWarn(describeBlockedReasons(result.blockedReasons, localize, { includeDetail: gm }));
       } else if (result && result.success === false && !result.additionalDiceRefusal) {
-        // A versioned start's refusal is `{success:false, reason}` with NO `accepted` and no
-        // `message`, so it missed the branch above and the attempt was a silent no-op.
+        // A versioned start's refusal is `{success:false, reason}` with no `accepted` or `message`.
         notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
       await offerReleaseForRefusal({ result, services, localize });
