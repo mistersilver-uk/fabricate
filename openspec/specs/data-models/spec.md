@@ -3354,6 +3354,7 @@ Every version-1 start or mutation, and every cancellation of a legacy crafting r
 The authority refuses every other command on a run whose lifecycle contract is not current — legacy or unsupported — with the reason `unsupported-version`.
 The authority MUST re-resolve the actor, sender ownership, source actors, run revision and executable stage under its execution claim before applying the operation.
 The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
+A cancel restores consumed inputs only onto the crafting actor or the run's recorded component sources, which the sender's ownership was checked against; any other target refuses the cancel before reversal.
 A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
 
 The authority requires exactly one GM-owned JournalEntry ledger.
