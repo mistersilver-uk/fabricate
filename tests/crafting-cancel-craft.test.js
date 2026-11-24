@@ -2,8 +2,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { craftingFacade } from '../src/bootstrap/craftingFacade.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import {
+  createJournalRunCommandService,
+  installCraftingJournalRunAuthority,
+} from '../src/systems/journalRunCommands.js';
+
+import { replicatedAuthorityFixture } from './helpers/replicatedJournalAuthority.js';
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -228,6 +235,109 @@ function makeEngine(runManager) {
     runManager,
     null
   );
+}
+
+/**
+ * The active GM's command service, executing crafting cancels on its own engine and run manager
+ * over `actor`, as the Journal wires them; `sent` records every command a client sends.
+ */
+function gmCancelAuthority(actor) {
+  const gm = { id: 'gm', isGM: true };
+  const runManager = new CraftingRunManager();
+  const engine = makeEngine(runManager);
+  let requests = 0;
+  const service = createJournalRunCommandService({
+    authority: replicatedAuthorityFixture().authority,
+    currentUser: () => gm,
+    activeGM: () => gm,
+    getUser: (userId) => (userId === gm.id ? gm : null),
+    resolveUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
+    emit: () => {},
+    randomId: () => `request-${++requests}`,
+    operations: {
+      crafting: {
+        getRun: ({ actor: target, runId }) => {
+          runManager.invalidateCache(target.id);
+          return runManager.getRun(target, runId);
+        },
+        cancel: (command) => engine.cancelVersionedRun(command),
+      },
+    },
+  });
+  installCraftingJournalRunAuthority({ engine, service });
+  const sent = [];
+  const client = (clientEngine) =>
+    installCraftingJournalRunAuthority({
+      engine: clientEngine,
+      service: {
+        executeJournalRunCommand: (command) => {
+          sent.push(command);
+          return service.executeJournalRunCommand(command);
+        },
+        consumeExecutionGrant: () => null,
+      },
+    });
+  return { client, sent };
+}
+
+test('two clients cancelling one legacy run restore its consumption once (issue 900)', async () => {
+  const system = makeSystem();
+  const craftingActor = new FakeActor('Crafter', { gp: 0 });
+  const sourceActor = new FakeActor('Source', { gp: 0 });
+  setupGame(system, { sourceActor });
+  const run = await seedConsumedRun(new CraftingRunManager(), craftingActor, sourceActor);
+  const { client, sent } = gmCancelAuthority(craftingActor);
+  const clients = [0, 1].map(() => client(makeEngine(new CraftingRunManager())));
+
+  const results = await Promise.all(
+    clients.map((engine) => engine.cancelCraft(craftingActor, [sourceActor], run.id))
+  );
+
+  assert.equal(sourceActor.created.length, 1, 'the consumed wood is restored once');
+  assert.equal(craftingActor.system.currency.gp, 5, 'the 5 gp is refunded once');
+  assert.deepEqual(
+    sent.map(({ action, runId, expectedRevision }) => [action, runId, expectedRevision]),
+    [
+      ['cancel', run.id, 0],
+      ['cancel', run.id, 0],
+    ],
+    'neither client reverses locally; both ask the authority at revision 0'
+  );
+  assert.equal(results.filter((result) => result.success === true).length, 1);
+  const history = new CraftingRunManager().getRunHistory(craftingActor);
+  assert.deepEqual(
+    history.map((entry) => [entry.id, entry.status]),
+    [[run.id, 'cancelled']]
+  );
+  assert.equal(Object.hasOwn(history[0], 'lifecycleVersion'), false, 'the run stays legacy');
+  assert.equal(Object.hasOwn(history[0], 'runRevision'), false);
+});
+
+for (const { failUpdate, key } of [
+  { failUpdate: false, key: 'FABRICATE.App.Journal.Actions.CancelledRefunded' },
+  { failUpdate: true, key: 'FABRICATE.App.Journal.Actions.CancelledPartial' },
+]) {
+  test(`the facade words an authority legacy cancel from its top-level refund fields (${key})`, async () => {
+    const system = makeSystem();
+    const craftingActor = new FakeActor('Crafter', { gp: 0, failUpdate });
+    const sourceActor = new FakeActor('Source', { gp: 0 });
+    setupGame(system, { sourceActor });
+    game.actors = { get: (id) => (id === craftingActor.id ? craftingActor : null) };
+    const runManager = new CraftingRunManager();
+    const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
+    const engine = gmCancelAuthority(craftingActor).client(makeEngine(runManager));
+    const facade = { _requireReady() {}, craftingRunManager: runManager, craftingEngine: engine };
+
+    const result = await craftingFacade.cancelCraftingRun.call(facade, {
+      actorId: craftingActor.id,
+      runId: run.id,
+    });
+
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(result.refunded, !failUpdate);
+    assert.equal(result.partialRefund, failUpdate);
+    assert.equal(result.message, key);
+  });
 }
 
 test('cancel with refund ON restores ingredients, refunds currency, removes the run, produces nothing', async () => {

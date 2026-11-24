@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import {
+  assertNoStaleRunWrite,
+  runContainerBaseline,
   reconcileRunContainer,
   reconcileActiveRuns,
   reconcileRunHistory,
@@ -117,4 +120,119 @@ test('reconcileRunContainer: composes active + history reconciliation', () => {
 test('historyIdsOf: collects ids and ignores id-less entries', () => {
   assert.deepEqual(historyIdsOf([{ id: 'a' }, {}, { id: 'b' }]), ['a', 'b']);
   assert.deepEqual(historyIdsOf(null), []);
+});
+
+/** A version-1 run at `runRevision`, merged with `extra`. */
+const v1 = (id, runRevision, extra = {}) => ({ id, lifecycleVersion: 1, runRevision, ...extra });
+const staleRefusal = { code: 'STALE_RUN_REVISION' };
+
+test('assertNoStaleRunWrite refuses a version-1 copy older than the stored one, active or archived', () => {
+  const current = { active: { a: v1('a', 2) }, history: [v1('h', 4)] };
+  assert.throws(() => assertNoStaleRunWrite(current, { active: { a: v1('a', 1) } }), staleRefusal);
+  assert.throws(() => assertNoStaleRunWrite(current, { history: [v1('h', 3)] }), staleRefusal);
+  assert.throws(() => assertNoStaleRunWrite(current, { active: { h: v1('h', 3) } }), staleRefusal);
+});
+
+test('assertNoStaleRunWrite refuses an archive that does not advance the stored active revision', () => {
+  const current = { active: { a: v1('a', 2) }, history: [] };
+  assert.throws(
+    () => assertNoStaleRunWrite(current, { active: {}, history: [v1('a', 2)] }),
+    staleRefusal
+  );
+  assert.doesNotThrow(() => assertNoStaleRunWrite(current, { active: {}, history: [v1('a', 3)] }));
+});
+
+test('assertNoStaleRunWrite refuses an equal-revision stale increment and a stale removal', () => {
+  const baseline = runContainerBaseline({ active: { a: v1('a', 0) }, history: [v1('h', 0)] });
+  const current = { active: { a: v1('a', 1) }, history: [v1('h', 1)] };
+  // Both writers advanced revision 0 to 1, so only the baseline shows this one is stale.
+  assert.throws(
+    () =>
+      assertNoStaleRunWrite(
+        current,
+        { active: { a: v1('a', 1) }, history: [v1('h', 1)] },
+        baseline
+      ),
+    staleRefusal
+  );
+  assert.throws(
+    () => assertNoStaleRunWrite(current, { active: {}, history: [v1('h', 1)] }, baseline),
+    staleRefusal
+  );
+  assert.throws(
+    () => assertNoStaleRunWrite(current, { active: { a: v1('a', 1) } }, baseline),
+    staleRefusal
+  );
+});
+
+test('assertNoStaleRunWrite passes an unchanged equal copy and a run the stored container lacks', () => {
+  const container = { active: { a: v1('a', 3) }, history: [v1('h', 1)] };
+  const baseline = runContainerBaseline(container);
+  assert.doesNotThrow(() => assertNoStaleRunWrite(container, structuredClone(container), baseline));
+  const next = { active: { ...container.active, b: v1('b', 0) }, history: container.history };
+  assert.doesNotThrow(() => assertNoStaleRunWrite(container, next, baseline));
+  // Another writer removed `a`; there is no stored copy to be stale against.
+  assert.doesNotThrow(() =>
+    assertNoStaleRunWrite({ active: {}, history: [] }, { active: {} }, baseline)
+  );
+});
+
+test('assertNoStaleRunWrite never compares legacy, unsupported or no-baseline copies', () => {
+  const legacy = { id: 'a', runRevision: 5 };
+  const future = { id: 'a', lifecycleVersion: 2, runRevision: 5 };
+  for (const stored of [legacy, future, v1('a', 5)]) {
+    for (const written of [legacy, future, v1('a', 0)]) {
+      if (stored.lifecycleVersion === 1 && written.lifecycleVersion === 1) continue;
+      const current = { active: { a: stored }, history: [] };
+      assert.doesNotThrow(() =>
+        assertNoStaleRunWrite(current, { active: { a: { ...written, runRevision: 0 } } })
+      );
+      assert.doesNotThrow(() => assertNoStaleRunWrite(current, { active: {}, history: [written] }));
+    }
+  }
+  assert.deepEqual([...runContainerBaseline({ active: { a: legacy, f: future } }).revisions], []);
+  // With no baseline, an equal revision cannot be told from an unchanged copy.
+  const current = { active: { a: v1('a', 1) }, history: [] };
+  assert.doesNotThrow(() => assertNoStaleRunWrite(current, { active: { a: v1('a', 1) } }));
+  assert.doesNotThrow(() => assertNoStaleRunWrite(current, { active: { a: v1('a', 1) } }, {}));
+});
+
+test('a version-1 gathering archive from a stale cached copy is refused with the flag unchanged', async () => {
+  const flags = {};
+  const writes = [];
+  const actor = {
+    id: 'gatherer',
+    uuid: 'Actor.gatherer',
+    getFlag: (scope, key) => flags[scope]?.[key],
+    async setFlag(scope, key, value) {
+      writes.push(key);
+      flags[scope] ??= {};
+      flags[scope][key] = structuredClone(value);
+      return this;
+    },
+  };
+  let id = 0;
+  const manager = () =>
+    new GatheringRunManager({
+      randomID: () => `run-${++id}`,
+      nowWorldTime: () => 1000,
+      getUserId: () => 'user-1',
+    });
+  const stale = manager();
+  const run = await stale.createRun(actor, {
+    craftingSystemId: 'system-1',
+    environmentId: 'env-1',
+    taskId: 'task-1',
+    lifecycleVersion: 1,
+  });
+  await manager().setCompletionMode(actor, run.id, 'worldTime', { expectedRevision: 0 });
+  const stored = structuredClone(flags);
+  writes.length = 0;
+
+  await assert.rejects(() => stale.completeRun(actor, run, 'succeeded'), {
+    code: 'STALE_RUN_REVISION',
+  });
+  assert.deepEqual(writes, [], 'no flag write is dispatched');
+  assert.deepEqual(flags, stored);
+  assert.equal(manager().getActiveRun(actor, run.id).completionMode, 'worldTime');
 });
