@@ -263,7 +263,8 @@ function normalizePauseState(value) {
   return { pausedAt, remainingSeconds: Math.max(0, remainingSeconds) };
 }
 
-function normalizeRevision(value) {
+/** A stored revision as a non-negative safe integer, else 0. */
+export function normalizeRevision(value) {
   const revision = Number(value);
   return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
 }

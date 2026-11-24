@@ -7,7 +7,11 @@
  */
 
 import { trimRunHistory } from './choiceGroupAward.js';
-import { getRunLifecycleContract, RunLifecycleError } from './runLifecycleState.js';
+import {
+  getRunLifecycleContract,
+  normalizeRevision,
+  RunLifecycleError,
+} from './runLifecycleState.js';
 
 function isRunMap(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
@@ -114,7 +118,7 @@ function versionedRevisions(container) {
     new Map(
       entries
         .filter(([id, run]) => id != null && getRunLifecycleContract(run) === 'current')
-        .map(([id, run]) => [id, Number(run.runRevision) || 0])
+        .map(([id, run]) => [id, normalizeRevision(run.runRevision)])
     );
   const active = isRunMap(container?.active) ? Object.entries(container.active) : [];
   const history = Array.isArray(container?.history) ? container.history : [];
