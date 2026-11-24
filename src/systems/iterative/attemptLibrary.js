@@ -95,3 +95,9 @@ export function combineHolds(combine, conditions) {
   if (conditions.length === 0) return true;
   return combine === 'any' ? conditions.some(Boolean) : conditions.every(Boolean);
 }
+
+/** Whether an effect's `when` reads the check: an outcome id, `success` or `value`. */
+export const namesCheckFact = (when) =>
+  arrayOrEmpty(when?.checkOutcomeIds).length > 0 ||
+  typeof when?.success === 'boolean' ||
+  when?.value != null;

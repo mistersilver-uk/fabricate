@@ -1205,6 +1205,14 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeUnknownCheckOutcome`: an effect's `checkOutcomeIds` names a tier the routed crafting check does not define.
   - `iterativeVersionUnsupported`: the library's `version` is above the build's, reported alone because the block cannot be read, with `entityKind: 'system'` and `entityId: null`.
 - `counterRuleFault`, `iterativeEntryFault` and `producedWhenLineFault` judge every rule and entry, for the normalizers and the readiness codes alike.
+- Expression codes judge every cost and effect amount and every start formula by the analysis the resolver's evaluator shares, so readiness and resolution agree on what parses.
+  - `iterativeInvalidExpression`: a library cost or effect amount fails its profile, as a syntax fault, a die or `@check` in a cost, an unknown function, a forbidden root, a dice count past 1000, or a reserved root in braces or with extra segments.
+    A recipe start formula that fails the start profile raises it as a recipe issue.
+  - `iterativeExplodeUnbounded`: an amount or start formula explodes a die on a face it can never leave, which is `x` on a die of fewer than two faces or a comparison every face meets.
+  - `iterativeUnknownCounter` also fires when a reserved root id names no library counter, and on a recipe when it names no Counter Instance on a step that allows the action or in a start formula.
+  - `iterativeExpressionBoundUnset`: a recipe expression reads `@min`, `@max` or `@target` of a Counter Instance that leaves that side unbounded or unset.
+  - `iterativeCheckFactWithoutCheck`: a `check: 'none'` action has an effect that reads `@check.value` or whose `when` names `checkOutcomeIds`, `success` or `value`.
+- A library warning has no `blocks`, and the other new codes follow their kind's severity and blocking above.
 - `iterativeNoCounters` and `iterativeNoSuccessRule` form the derived "Needs iterative setup" tier (`needsIterativeSetup`), and no setup marker is persisted.
 - Each code carries headless English from `ITERATIVE_READINESS_MESSAGES`, so no `message` equals its code.
 - A recipe with a critical recipe-scoped issue, or that allows an action with a critical library issue, or in a system reporting `iterativeVersionUnsupported`, refuses a new start.

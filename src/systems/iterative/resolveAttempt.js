@@ -12,6 +12,7 @@ import {
   combineHolds,
   effectiveBounds,
   expressionRoots,
+  namesCheckFact,
   stateFacts,
 } from './attemptLibrary.js';
 import { evaluateCounterRule } from './counterRule.js';
@@ -128,11 +129,6 @@ function costsPhase(ctx) {
     ctx.paid.add(counterId, -amount);
   }
 }
-
-const namesCheckFact = (when) =>
-  arrayOrEmpty(when?.checkOutcomeIds).length > 0 ||
-  typeof when?.success === 'boolean' ||
-  when?.value != null;
 
 /** A comparison of the check value, read through the rule evaluator with the value as the one fact. */
 const checkValueHolds = (comparison, value) =>

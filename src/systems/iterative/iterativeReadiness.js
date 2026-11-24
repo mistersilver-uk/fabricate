@@ -22,6 +22,7 @@ import {
 import { hasActiveCheck } from '../salvageCheckUsability.js';
 
 import { counterRuleFault } from './counterRule.js';
+import { libraryExpressionCodes, recipeExpressionCodes } from './expressionReadiness.js';
 
 /** Headless English per code; the manager localizes by `code`. */
 export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
@@ -40,6 +41,11 @@ export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
   iterativeFinalStepProducesNothing: 'Nothing is produced when the final step succeeds.',
   iterativeUnknownCheckOutcome: 'An effect names a crafting-check outcome that does not exist.',
   iterativeVersionUnsupported: 'The iterative settings were made by a newer version of Fabricate.',
+  iterativeInvalidExpression: 'An amount or start formula cannot be read as an expression here.',
+  iterativeExplodeUnbounded: 'An exploding die in an expression can never stop.',
+  iterativeExpressionBoundUnset:
+    'An expression reads a counter minimum, maximum or target that is not set.',
+  iterativeCheckFactWithoutCheck: 'An action with no check reads a check result in an effect.',
 });
 
 export const ITERATIVE_READINESS_CODES = Object.freeze(Object.keys(ITERATIVE_READINESS_MESSAGES));
@@ -48,6 +54,7 @@ const SETUP_CODES = new Set(['iterativeNoCounters', 'iterativeNoSuccessRule']);
 const WARNING_CODES = new Set([
   'iterativeSuccessLineOnFailureGroup',
   'iterativeFinalStepProducesNothing',
+  'iterativeCheckFactWithoutCheck',
 ]);
 
 /** The derived "Needs iterative setup" tier; nothing about it is persisted. */
@@ -121,6 +128,7 @@ function actionCodes(action, context) {
       : []),
     ...(outcomeIds.some((id) => !tierIds.has(id)) ? ['iterativeUnknownCheckOutcome'] : []),
     ...ruleCodes(rules, { counterIds: libraryCounterIds, actionIds: context.libraryActionIds }),
+    ...libraryExpressionCodes(action, context),
   ];
 }
 
@@ -134,7 +142,7 @@ function libraryIssue(system, record, code, entityKind) {
     entityKind,
     entityId: record?.id ?? null,
     entityName: trimString(record?.label) || record?.id || trimString(system?.name) || 'system',
-    severity: 'critical',
+    severity: WARNING_CODES.has(code) ? 'warning' : 'critical',
     blocks: undefined,
     code,
     message: ITERATIVE_READINESS_MESSAGES[code],
@@ -238,6 +246,11 @@ function recipeCodes(recipe, system, context) {
     ...views.flatMap((view) => view.resultGroups.flatMap((g) => producedWhenCodes(g, references))),
     ...(multiStep && system?.features?.multiStepRecipes !== true ? ['iterativeMultiStepOff'] : []),
     ...(producesOnSuccess(views.at(-1).resultGroups) ? [] : ['iterativeFinalStepProducesNothing']),
+    ...recipeExpressionCodes({
+      library: context.library,
+      instances,
+      actions: views.flatMap((view) => allowedActions(view.iterative, context)),
+    }),
   ];
 }
 
