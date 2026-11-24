@@ -384,6 +384,7 @@ A missing chat message is not a reason to repeat spending or awards.
 Runs created under the older lifecycle keep their original behavior.
 Older crafting runs still advance manually.
 Cancelling one also requires an active GM, who carries it out, and your system's refund setting still decides whether its consumed materials come back.
+Cancelling twice never returns materials twice, and they are returned only to the crafting character or the sources the run recorded.
 When the cancel is refused, for example because no GM is online, the Journal shows one warning, offers no **Retry**, and leaves the run active, so you cancel again once a GM is available.
 Older timed gathering and salvage resolve automatically as world time advances.
 Salvage has not moved to the new pause and manual-collection lifecycle.
