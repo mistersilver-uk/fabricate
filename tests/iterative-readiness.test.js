@@ -324,6 +324,34 @@ describe('the other inputs each code reads', () => {
         library.actions[0].availability.combine = 'most';
       },
     ],
+    'a non-array hiddenCounterIds': [
+      'iterativeInvalidEntry',
+      ON_RECIPE,
+      ({ recipe }) => {
+        step(recipe).hiddenCounterIds = 'heat';
+      },
+    ],
+    'a lockedCounterIds entry that is not an id': [
+      'iterativeInvalidEntry',
+      ON_RECIPE,
+      ({ recipe }) => {
+        step(recipe).lockedCounterIds = ['heat', 5];
+      },
+    ],
+    'a non-array actions.actionIds under only': [
+      'iterativeInvalidEntry',
+      ON_RECIPE,
+      ({ recipe }) => {
+        Object.assign(step(recipe).actions, { mode: 'only', actionIds: 'stoke' });
+      },
+    ],
+    'an actions.actionIds entry that is not an id': [
+      'iterativeInvalidEntry',
+      ON_RECIPE,
+      ({ recipe }) => {
+        step(recipe).actions.actionIds = ['stoke', 'Bad id'];
+      },
+    ],
     'an out-of-enum actions.mode': [
       'iterativeInvalidEntry',
       ON_RECIPE,

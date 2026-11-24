@@ -5,6 +5,7 @@
  */
 import {
   enumOrDefault,
+  isIterativeId,
   iterativeNumber,
   keepKnownKeys,
   normalizeAmount,
@@ -12,7 +13,7 @@ import {
   optionalNumber,
   uniqueIdentified,
 } from '../systems/iterative/counterRule.js';
-import { arrayOrEmpty, isPlainObject, stringOnlyIdList } from '../utils/scalars.js';
+import { arrayOrEmpty, cloneJson, isPlainObject, stringOnlyIdList } from '../utils/scalars.js';
 
 export const STEP_ACTION_MODES = Object.freeze(['all', 'only']);
 export const PRODUCED_WHEN_ENDS = Object.freeze(['success', 'failure']);
@@ -40,6 +41,15 @@ function normalizeCounterInstance(raw) {
   };
 }
 
+/** `true` for a present id list that is not an array or holds an entry that is not an id. */
+export function stepIdListFault(value) {
+  if (value == null) return false;
+  return !Array.isArray(value) || !value.every(isIterativeId);
+}
+
+/** A list that does not parse is kept as authored, so it still blocks; an absent one is `[]`. */
+const stepIdList = (value) => (stepIdListFault(value) ? cloneJson(value) : stringOnlyIdList(value));
+
 /** `{ actions: { mode, actionIds }, hiddenCounterIds, lockedCounterIds, success, failure }`, or `null`. */
 export function normalizeStepIterative(raw) {
   if (!isPlainObject(raw)) return null;
@@ -47,10 +57,10 @@ export function normalizeStepIterative(raw) {
   return {
     actions: {
       mode: enumOrDefault(actions.mode, 'all'),
-      actionIds: stringOnlyIdList(actions.actionIds),
+      actionIds: stepIdList(actions.actionIds),
     },
-    hiddenCounterIds: stringOnlyIdList(raw.hiddenCounterIds),
-    lockedCounterIds: stringOnlyIdList(raw.lockedCounterIds),
+    hiddenCounterIds: stepIdList(raw.hiddenCounterIds),
+    lockedCounterIds: stepIdList(raw.lockedCounterIds),
     success: normalizeCounterRuleList(raw.success),
     failure: normalizeCounterRuleList(raw.failure),
   };

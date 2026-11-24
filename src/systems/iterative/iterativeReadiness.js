@@ -7,6 +7,7 @@ import {
   iterativeStepsOf,
   producedWhenLineFault,
   STEP_ACTION_MODES,
+  stepIdListFault,
 } from '../../models/iterativeStepConfig.js';
 import { buildRecipeActivationIssue } from '../../utils/recipeActivationMessages.js';
 import { routedOutcomeTierOptions } from '../../utils/routedOutcomeKeywords.js';
@@ -179,6 +180,12 @@ function allowedActions(config, context) {
   return arrayOrEmpty(context.library.actions).filter((action) => ids.has(action.id));
 }
 
+/** `true` when the step's action mode and its three id lists all parse. */
+function stepEntriesHold(config) {
+  const lists = [config.actions?.actionIds, config.hiddenCounterIds, config.lockedCounterIds];
+  return STEP_ACTION_MODES.includes(config.actions?.mode) && !lists.some(stepIdListFault);
+}
+
 function stepConfigCodes(config, references, context) {
   if (!config) return ['iterativeNoSuccessRule'];
   const named = [
@@ -188,7 +195,7 @@ function stepConfigCodes(config, references, context) {
   const rolls = allowedActions(config, context).some((action) => action.check === 'roll');
   return [
     ...(arrayOrEmpty(config.success).length === 0 ? ['iterativeNoSuccessRule'] : []),
-    ...(STEP_ACTION_MODES.includes(config.actions?.mode) ? [] : ['iterativeInvalidEntry']),
+    ...(stepEntriesHold(config) ? [] : ['iterativeInvalidEntry']),
     ...(arrayOrEmpty(config.actions?.actionIds).some((id) => !references.actionIds.has(id))
       ? ['iterativeUnknownAction']
       : []),

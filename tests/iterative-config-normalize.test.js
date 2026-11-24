@@ -647,6 +647,14 @@ describe('normalization is idempotent across the corpus', () => {
           },
           resultGroups: [{ id: 'g', producedWhen: [null] }],
         },
+        {
+          id: 's-2',
+          iterative: {
+            actions: { mode: 'only', actionIds: 'stoke' },
+            hiddenCounterIds: { heat: true },
+            lockedCounterIds: ['heat', 5, 'Bad id'],
+          },
+        },
       ],
     },
   ];
@@ -663,6 +671,23 @@ describe('normalization is idempotent across the corpus', () => {
       const once = recipeJson(recipe);
       assert.deepEqual(recipeJson(JSON.parse(JSON.stringify(once))), once);
     }
+  });
+
+  it('keeps a mistyped step id list as authored and a valid one deduplicated', () => {
+    const json = recipeJson(recipes[1]);
+    assert.deepEqual(json.steps[1].iterative.actions, { mode: 'only', actionIds: 'stoke' });
+    assert.deepEqual(json.steps[1].iterative.hiddenCounterIds, { heat: true });
+    assert.deepEqual(json.steps[1].iterative.lockedCounterIds, ['heat', 5, 'Bad id']);
+    assert.deepEqual(
+      normalizeStepIterative({ hiddenCounterIds: ['heat', 'heat'], lockedCounterIds: null }),
+      {
+        actions: { mode: 'all', actionIds: [] },
+        hiddenCounterIds: ['heat'],
+        lockedCounterIds: [],
+        success: [],
+        failure: [],
+      }
+    );
   });
 
   it('keeps the noisy recipe unparseable entries with only their known keys', () => {
