@@ -17,6 +17,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
   'src/systems/checkEvaluation.js',
+  'src/systems/expressionReader.js',
   'src/systems/checkTarget.js',
   'src/systems/countEvaluation.js',
   'src/utils/localizeWithFallback.js',

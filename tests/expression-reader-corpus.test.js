@@ -11,6 +11,7 @@ import {
   firstUnresolvedPath,
   resolveDeterministicExpression,
 } from '../src/systems/checkEvaluation.js';
+import { createExpressionReader, readStrictPath } from '../src/systems/expressionReader.js';
 
 import {
   ROLL_DATA,
@@ -96,4 +97,36 @@ test('the generated token sweep keeps its row count, accept count and result str
   }
   assert.equal(golden.sweep.strict.rows, expectedRows);
   assert.equal(golden.sweep.foundry.rows, expectedRows);
+});
+
+test('the default reader agrees with every golden row it can read', () => {
+  let accepted = 0;
+  let refused = 0;
+  for (const [index, row] of ROWS.entries()) {
+    if (typeof row.expression !== 'string' || !row.expression.trim()) continue;
+    const expected = golden.rows[index].resolve.strict;
+    if (!expected.ok && expected.reason !== 'invalid') continue;
+    const data = ROLL_DATA[row.data];
+    const reader = createExpressionReader(row.expression.trim(), {
+      readPath: (token) => readStrictPath(token, data),
+    });
+    let value;
+    let stoppedShort = false;
+    let threw = false;
+    try {
+      value = reader.parseExpression();
+      stoppedShort = !reader.atEnd();
+    } catch {
+      threw = true;
+    }
+    if (expected.ok) {
+      accepted += 1;
+      assert.equal(threw || stoppedShort, false, row.expression);
+      assert.deepEqual(recorded(value), expected.value, row.expression);
+    } else {
+      refused += 1;
+      assert.equal(threw || stoppedShort, true, row.expression);
+    }
+  }
+  assert.ok(accepted >= 50 && refused >= 50, `${accepted} accepted, ${refused} refused`);
 });

@@ -114,6 +114,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The Formula card's advantage notes (issue 2007).
   'src/ui/svelte/apps/manager/checks/checkAdvantageCopy.js',
   'src/systems/checkEvaluation.js',
+  'src/systems/expressionReader.js',
   'src/systems/checkRoll.js',
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
   'src/systems/checkTarget.js',

@@ -174,6 +174,7 @@ describe('alchemyStore', () => {
       'src/systems/countTriggerReach.js',
       'src/systems/countEvaluation.js',
       'src/systems/checkEvaluation.js',
+      'src/systems/expressionReader.js',
       'src/systems/checkTarget.js',
       'src/systems/normalize/checkEvaluation.js',
       'src/utils/fillPlaceholders.js',

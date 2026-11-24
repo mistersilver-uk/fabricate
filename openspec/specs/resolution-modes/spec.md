@@ -381,7 +381,8 @@ A deterministic expression accepts finite numbers, roll-data paths, arithmetic, 
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
 A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
 It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path.
-That strict own-key reader stays the default for every caller that grades a check; `checkTarget.js` and `countEvaluation.js` are the two runtime resolvers that pass the Foundry path mode instead, matched by their own preview and readiness counterparts in the Studio so a previewed reading agrees with a rolled one.
+That strict own-key reader stays the default for every caller that grades a check; `checkTarget.js`, `countEvaluation.js` and the iterative expression evaluator are the three runtime readers that pass the Foundry path mode instead, matched by their own preview and readiness counterparts in the Studio so a previewed reading agrees with a rolled one, and the iterative evaluator grades no check.
+The deterministic expression is read by the shared expression reader, which grows only through function and token tables a caller injects into its own reader instance, so the deterministic grammar accepts and refuses exactly what it does today.
 
 ### Structured Count Evaluation
 

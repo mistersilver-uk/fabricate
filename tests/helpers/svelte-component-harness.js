@@ -444,6 +444,7 @@ export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
 export const CHECK_TARGET_RAW_MODULES = Object.freeze([
   'src/systems/checkTarget.js',
   'src/systems/checkEvaluation.js',
+  'src/systems/expressionReader.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/utils/localizeWithFallback.js',
 ]);
