@@ -143,14 +143,14 @@ export function readFoundryPath(token, rollData) {
   const value = foundryProperty(rollData, token.replaceAll(/^@\{?|\}?$/g, ''));
   if (value === undefined || value === null) throw 'unresolved-path';
   if (typeof value === 'function' || serializesAsData(value)) throw 'invalid';
-  const text = String(value).trim();
-  if (!text) throw 'unresolved-path';
-  if (DECIMAL_STRING.test(text) || NON_FINITE_TEXT.test(text)) {
-    const number = Number(text);
+  const trimmed = String(value).trim();
+  if (!trimmed) throw 'unresolved-path';
+  if (DECIMAL_STRING.test(trimmed) || NON_FINITE_TEXT.test(trimmed)) {
+    const number = Number(trimmed);
     if (Number.isFinite(number)) return number;
     throw 'non-finite';
   }
-  throw DICE_TERM.test(text.replaceAll(PATH_TOKEN, '0')) ? 'dice' : 'invalid';
+  throw DICE_TERM.test(trimmed.replaceAll(PATH_TOKEN, '0')) ? 'dice' : 'invalid';
 }
 
 /** `foundry.utils.getProperty`: the whole key first, then an `in` walk that stops at a non-object. */
