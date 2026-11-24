@@ -13,10 +13,7 @@ import {
 } from '../toolBreakageRuntime.js';
 import { buildCraftingChatContent } from '../ui/presenters/CraftingChatCard.js';
 import { buildSalvageChatContent } from '../ui/presenters/SalvageChatCard.js';
-import {
-  buildInteractiveRollOptions,
-  checkFlavorSuffix,
-} from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
@@ -40,28 +37,16 @@ import {
 import { automaticStageBlocker, stageIngredientSet } from './automaticStageBlocker.js';
 import { AWARD_CHOICE_PENDING, AwardChoiceSettler } from './awardChoiceSettle.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
-import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
+import { authoredOfferOptions } from './checkAdvantage.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
   makeRollDataExpressionResolver,
   resolveActiveCraftingCheckFormula,
-  resolveCheckModifierContribution,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
 import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
-import {
-  resolveCheckFormulaDisplay,
-  resolveRolledFormula,
-  runFormulaPassFail,
-  runFormulaProgressive,
-  runFormulaRouted,
-} from './checkRoll.js';
-import {
-  attributeTargetPromptField,
-  countPromptFields,
-  underTargetPromptFields,
-} from './checkRollDecision.js';
+import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -72,12 +57,7 @@ import {
 import { awardRoutedResults, memberResultRow } from './choiceGroupAward.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
-import {
-  countDecisionPolicy,
-  countRequired,
-  progressiveCheckRefusal,
-  resolveActivityCheck,
-} from './countCheck.js';
+import { countRequired, progressiveCheckRefusal, resolveActivityCheck } from './countCheck.js';
 import { checkRequest, checkRequestOptions } from './countCheckRoll.js';
 import {
   checkDisplayForCard,
@@ -95,7 +75,6 @@ import {
   craftingCheckAnchorDc,
   resolveActiveCheckTarget,
   resolveCraftingCheckTarget,
-  selectedCheckTier,
 } from './craftingCheckRefusal.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
@@ -219,6 +198,11 @@ import {
   ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
 import {
+  describeVersionedCheck,
+  promptTargetBasis,
+  resolvedTargetTerms,
+} from './versionedCheckDescriptor.js';
+import {
   authorityUnavailableResult,
   versionedFailure,
   versionedTransitionResult,
@@ -240,12 +224,6 @@ function checkRollOptions(options, { contributions, evaluation }, config) {
 /** The prompt options `input` builds, with its `interactive` request's own roll options. */
 function requestRollOptions(input) {
   return { ...buildInteractiveRollOptions(input), ...checkRequestOptions(input.interactive) };
-}
-
-/** The executed target's opening terms: the resolution's, unless a dynamic macro replaced its
- * number, which then stands as the anchor. */
-function resolvedTargetTerms(target, dc) {
-  return dc === target.target ? target.terms : [{ kind: 'anchor', value: dc }];
 }
 
 /**
@@ -468,92 +446,34 @@ export class CraftingEngine {
         'STAGE_NOT_EXECUTABLE'
       );
     }
-    const system = this._getRecipeSystem(recipe);
-    const activeCheck = resolveActiveCraftingCheckFormula(system);
-    const checkTarget = this._versionedCheckTarget(activeCheck, recipe, actor);
-    const prepared = await this._versionedStagePreparation({
-      started: this._versionedStageStarted(run, stepIndex),
-      run,
+    return describeVersionedCheck(this, {
       actor,
       componentSourceActors,
       recipe,
       step,
       stepIndex,
       selectedSet,
-      selectionPlan: lockedSelection,
-    });
-    if (!prepared.valid) {
-      throw new CraftingLifecycleExecutionError(
-        prepared.message || 'The crafting stage inputs are stale',
-        'STALE_RUN_STAGE'
-      );
-    }
-    const { evaluation } = checkTarget;
-    const preparedTools = await this._prepareToolCheckBonuses(
-      activeCheck.rollFormula,
-      prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
-      evaluation
-    );
-    const rollFormula = preparedTools.formula;
-    const modifierContext = capturePreparedModifierContext(
-      buildCheckModifierContext(system, 'crafting', recipe),
-      actor
-    );
-    const modifierChoice = this._buildInteractiveModifierChoice(
-      rollFormula,
-      modifierContext,
-      actor,
-      true,
-      evaluation
-    );
-    const dc =
-      checkTarget.target === null
-        ? null
-        : await this._resolveSimpleCheckDc(
-            system,
-            activeCheck.config,
-            recipe,
-            selectedSet,
-            actor,
-            checkTarget.target
+      prepareTools: async () => {
+        const prepared = await this._versionedStagePreparation({
+          started: this._versionedStageStarted(run, stepIndex),
+          run,
+          actor,
+          componentSourceActors,
+          recipe,
+          step,
+          stepIndex,
+          selectedSet,
+          selectionPlan: lockedSelection,
+        });
+        if (!prepared.valid) {
+          throw new CraftingLifecycleExecutionError(
+            prepared.message || 'The crafting stage inputs are stale',
+            'STALE_RUN_STAGE'
           );
-    return {
-      required: activeCheck.checkUsable || activeCheck.requiresCheck,
-      publicPrompt: versionedCheckPrompt({
-        activeCheck,
-        recipe,
-        step,
-        actor,
-        rollFormula,
-        dc,
-        checkTarget,
-        modifierContext,
-        modifierChoice,
-        toolContributions: preparedTools.contributions,
-      }),
-      privateEvaluation: {
-        actorUuid: actor?.uuid ?? null,
-        flavor: `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${checkFlavorSuffix(dc, evaluation)}`,
-        speaker: cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
-        componentSourceActorUuids: (componentSourceActors || [])
-          .map((source) => source?.uuid)
-          .filter(Boolean),
-        recipeId: recipe.id,
-        stepIndex,
-        stepId: step.id ?? null,
-        selectedIngredientSetId: selectedSet.id,
-        mode: activeCheck.mode,
-        slot: activeCheck.slot,
-        rollFormula,
-        checkConfig: {
-          ...cloneJsonValue(activeCheck.config),
-          craftingModifier: cloneJsonValue(modifierContext),
-          modifierChoice: cloneJsonValue(modifierChoice),
-          toolContributions: cloneJsonValue(preparedTools.contributions),
-        },
-        decisionPolicy: versionedDecisionPolicy(activeCheck, recipe, dc, checkTarget),
+        }
+        return prepared.toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       },
-    };
+    });
   }
 
   /** The descriptor's evaluation and target, and a count check's resolved pool, before any Tool
@@ -7120,135 +7040,6 @@ function findItemByUuid(actors, itemUuid) {
     if (item) return item;
   }
   return null;
-}
-
-/**
- * The prepared check's private routing policy. `dc` stays fixed-only and `target` is the resolved
- * pre-modifier target after any macro, so a later actor or config edit cannot move either; a
- * count check has neither and captures its resolved pool as `count` instead.
- */
-function versionedDecisionPolicy(activeCheck, recipe, dc, checkTarget) {
-  const { evaluation, policy, source } = checkTarget;
-  const count = policy ? countDecisionPolicy(evaluation, policy, dc) : null;
-  const target = !count && Number.isFinite(dc) ? dc : null;
-  return {
-    dc: source === 'fixed' ? target : null,
-    target,
-    targetSource: target === null ? null : source,
-    targetTerms: target === null ? null : resolvedTargetTerms(checkTarget, target),
-    ...(count && { count }),
-    thresholdMode: activeCheck.config?.thresholdMode ?? null,
-    type: activeCheck.config?.type ?? null,
-    relativeOutcomes: cloneJsonValue(activeCheck.config?.relativeOutcomes) ?? [],
-    fixedOutcomes: cloneJsonValue(activeCheck.config?.fixedOutcomes) ?? [],
-    clampToNearest: activeCheck.slot === 'routed',
-    minOutcomeId:
-      activeCheck.mode === 'routedByCheck' ? (recipe.minSuccessOutcomeId ?? null) : null,
-  };
-}
-
-/** The character-value basis a roll prompt names its target by, unless a DC macro moved the
- * target off what that basis resolves to. */
-function promptTargetBasis(config, recipe, actor, target, dc) {
-  if (dc !== target.target) return null;
-  const tier = selectedCheckTier(config, recipe);
-  return attributeTargetBasis(config, {
-    override: tier?.adjustment,
-    label: tier?.name ?? '',
-    readRollData: () => actorRollData(actor),
-  });
-}
-
-function capturePreparedModifierContext(context, actor) {
-  const resolveExpression = makeRollDataExpressionResolver(actor);
-  return {
-    ...cloneJsonValue(context),
-    catalogue: (context?.catalogue ?? []).map((entry) => ({
-      ...cloneJsonValue(entry),
-      expression: resolveExpression(entry?.expression) ?? '',
-    })),
-  };
-}
-
-function versionedCheckPrompt({
-  activeCheck,
-  recipe,
-  step,
-  actor,
-  rollFormula,
-  dc,
-  checkTarget,
-  modifierContext,
-  modifierChoice,
-  toolContributions,
-}) {
-  const { evaluation, policy: countPolicy } = checkTarget;
-  const selectedModifiers = modifierChoice
-    ? []
-    : resolveCheckModifierContribution(modifierContext, makeRollDataExpressionResolver(actor))
-        .selected.filter((entry) => !entry.blocked)
-        .map(publicModifierDisplay);
-  const counts = evaluation.product === 'count';
-  // A count check's retained formula is inert, so its prompt never shows it.
-  const shown = counts ? '' : rollFormula;
-  const formula = modifierChoice
-    ? shown
-    : resolveRolledFormula(shown, actor, modifierContext, undefined, evaluation);
-  const target = !counts && activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
-  const routedFixed = activeCheck.slot === 'routed' && activeCheck.config?.type === 'fixed';
-  const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  const activityKey = 'FABRICATE.App.Nav.Crafting';
-  const localizedActivity = globalThis.game?.i18n?.localize?.(activityKey);
-  return {
-    label: recipe.name || step.name || 'Crafting',
-    activity:
-      localizedActivity && localizedActivity !== activityKey ? localizedActivity : 'Crafting',
-    subject: recipe.name || step.name || '',
-    actorName: actor?.name ?? '',
-    img: resolveRecipeImage(recipe),
-    formula,
-    resolvedFormula:
-      resolveCheckFormulaDisplay(formula, actor, null, undefined, evaluation)?.display ?? null,
-    // The itemised `selectedModifiers` are chips, so the prompt's formula omits their terms.
-    displayFormula:
-      resolveCheckFormulaDisplay(shown, actor, null, undefined, evaluation)?.display ?? shown,
-    target,
-    direction: target === null ? null : evaluation.direction,
-    comparison: target === null ? null : comparison,
-    ...(target !== null && attributeTargetPromptField(evaluation)),
-    ...(target !== null &&
-      underTargetPromptFields(evaluation, {
-        targetBasis: promptTargetBasis(activeCheck.config, recipe, actor, checkTarget, dc),
-        toolContributions,
-      })),
-    selectedModifiers,
-    mode: activeCheck.mode,
-    allowsSituationalModifier: activeCheck.checkUsable,
-    offerSituationalBonus: activeCheck.config?.offerSituationalBonus !== false,
-    ...advantageOfferFields(activeCheck.config, evaluation, activeCheck.rollFormula),
-    modifierChoice: publicModifierChoice(modifierChoice),
-    // The pool with any Tool bonus folded in, and the macro's required count; fixed ranges read none.
-    ...(counts &&
-      countPromptFields(evaluation, countPolicy, routedFixed ? null : dc, toolContributions)),
-  };
-}
-
-/** `value` is the flat number `display` already shows, so a roll-under prompt can add it up. */
-function publicModifierDisplay({ label, icon, display, value }) {
-  return { label, icon, display, value: Number.isFinite(value) ? value : null };
-}
-
-function publicModifierChoice(choice) {
-  if (!choice) return null;
-  return {
-    modifiers: choice.modifiers.map((modifier) => ({
-      id: modifier.id,
-      ...publicModifierDisplay(modifier),
-    })),
-    maxPicks: choice.maxPicks,
-    defaultSelectedIds: choice.defaultSelectedIds,
-    defaultSelectedId: choice.defaultSelectedId,
-  };
 }
 
 function cloneJsonValue(value) {
