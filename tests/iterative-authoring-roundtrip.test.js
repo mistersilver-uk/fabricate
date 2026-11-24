@@ -61,10 +61,13 @@ describe('keep-mode round trip of an iterative system', () => {
     const validation = validateImportData(first);
     assert.equal(validation.valid, true, validation.errors.join('; '));
 
-    await importerFor(h).importFromPackData(prepareForImport(first, 'keep'), {
+    const summary = await importerFor(h).importFromPackData(prepareForImport(first, 'keep'), {
       overwriteExisting: true,
       selectableModes: RESOLUTION_MODES,
     });
+    assert.equal(summary.system.skipped, false, 'the import overwrote the system');
+    assert.equal(summary.recipes.imported, first.recipes.length);
+    assert.deepEqual(summary.recipes.errors, []);
     const second = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
     assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
