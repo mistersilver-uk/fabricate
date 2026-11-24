@@ -7,7 +7,7 @@ import {
 } from './journalPreparedCheck.js';
 import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
 import { authorizeAwardChoice, validAwardChoicePayload } from './journalRunAwardChoice.js';
-import { MUTATING_ACTIONS } from './journalRunCommandActions.js';
+import { CHECKED_ACTIONS, MUTATING_ACTIONS, releasedAction } from './journalRunCommandActions.js';
 import { createJournalRunDismissals } from './journalRunDismissals.js';
 import { serializedOperationResult, validText } from './journalRunReply.js';
 import { decisionAdditionalDice } from './preparedDecisionPolicy.js';
@@ -590,7 +590,8 @@ export function createJournalRunCommandService({
   async function executeOperation(request, context, helpers, spent) {
     const { actor, operation, run } = context;
     const binding = {
-      operation: request.action === 'releaseCheck' ? 'execute' : request.action,
+      operation:
+        request.action === 'releaseCheck' ? releasedAction(request.payload) : request.action,
       actorUuid: request.actorUuid,
       runType: request.runType,
       runId: request.runId,
@@ -628,7 +629,7 @@ export function createJournalRunCommandService({
       preparedPayload = prepared?.payload ?? preparedPayload;
       executionOperation = prepared?.executionOperation ?? executionOperation;
     }
-    if (request.action === 'execute' && request.payload?.prepareToken) {
+    if (CHECKED_ACTIONS.has(request.action) && request.payload?.prepareToken) {
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
       const { consumePrepareToken } = helpers;
@@ -657,7 +658,10 @@ export function createJournalRunCommandService({
         payload: request.payload ?? {},
       });
       trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
-    } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
+    } else if (
+      CHECKED_ACTIONS.has(request.action) &&
+      typeof operation.describeCheck === 'function'
+    ) {
       const described = await describePreparedJournalCheck({
         request,
         context,
