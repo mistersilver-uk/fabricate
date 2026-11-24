@@ -880,6 +880,7 @@ Requirements:
 4. The report computation is pure — no Foundry runtime globals, store reads, or
    I/O — so it is unit-testable and reusable from both the synchronous visibility
    hot-path and the GM overview view.
+5. An `iterative` system adds the iterative readiness codes (`resolution-modes` § Iterative Validation), as `kind: 'recipe'` or `kind: 'system'`, none carrying `blocks: 'system'` or `blocks: 'visibility'`.
 
 ## CurrencyConfig
 

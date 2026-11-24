@@ -14,6 +14,7 @@ import {
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
 
+import { iterativeStepModeIssues } from './iterative/iterativeReadiness.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
@@ -255,43 +256,54 @@ export class ResolutionModeService {
     }
 
     if (mode === 'alchemy') {
-      // Exactly one ingredient set; group cardinality follows `alchemy.checkMode`.
-      const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
-      const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
-      if (requireComplete && setsTop.length === 0)
-        plain('Alchemy recipe must have at least 1 ingredient set');
-      if (requireComplete && setsTop.length > 1)
-        plain('Alchemy recipe must have exactly 1 ingredient set');
-      // No explicit steps allowed
-      const explicitSteps =
-        typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
-      const hasExplicitSteps =
-        explicitSteps.length > 1 ||
-        (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
-      if (hasExplicitSteps) plain('Alchemy recipe must not have explicit steps');
-
-      const checkMode = system?.alchemy?.checkMode || 'none';
-      if (checkMode === 'tiered') {
-        // Tiered validates like `routedByCheck`, labelled by recipe name or position 1; tier
-        // assignment completeness is a system-level warning.
-        if (requireComplete && groupsTop.length === 0)
-          plain('Alchemy recipe must have at least 1 result group');
-        this._validateRoutedGroupNames(groupsTop, this._entityLabel(recipe, 0), issues);
-      } else {
-        // One success group; the reserved failure group may be absent after a None→Simple flip.
-        const successGroups = groupsTop.filter((group) => group?.role !== 'failure');
-        if (requireComplete && successGroups.length === 0)
-          plain('Alchemy recipe must have at least 1 result group');
-        if (requireComplete && successGroups.length > 1)
-          plain('Alchemy recipe must have exactly 1 result group');
-      }
+      issues.push(...this._alchemyRecipeIssues(recipe, system, requireComplete));
     }
+    if (mode === 'iterative') issues.push(...iterativeStepModeIssues(steps, { requireComplete }));
 
     return {
       valid: issues.length === 0,
       errors: issues.map((issue) => issue.message),
       issues,
     };
+  }
+
+  /** An alchemy recipe's issues: exactly one ingredient set and no explicit steps, with group
+   *  cardinality following `alchemy.checkMode`. */
+  _alchemyRecipeIssues(recipe, system, requireComplete) {
+    const issues = [];
+    const plain = (message) => {
+      issues.push({ code: null, params: {}, message });
+    };
+    const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
+    const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
+    if (requireComplete && setsTop.length === 0)
+      plain('Alchemy recipe must have at least 1 ingredient set');
+    if (requireComplete && setsTop.length > 1)
+      plain('Alchemy recipe must have exactly 1 ingredient set');
+    // No explicit steps allowed
+    const explicitSteps =
+      typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+    const hasExplicitSteps =
+      explicitSteps.length > 1 ||
+      (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
+    if (hasExplicitSteps) plain('Alchemy recipe must not have explicit steps');
+
+    const checkMode = system?.alchemy?.checkMode || 'none';
+    if (checkMode === 'tiered') {
+      // Tiered validates like `routedByCheck`, labelled by recipe name or position 1; tier
+      // assignment completeness is a system-level warning.
+      if (requireComplete && groupsTop.length === 0)
+        plain('Alchemy recipe must have at least 1 result group');
+      this._validateRoutedGroupNames(groupsTop, this._entityLabel(recipe, 0), issues);
+    } else {
+      // One success group; the reserved failure group may be absent after a None→Simple flip.
+      const successGroups = groupsTop.filter((group) => group?.role !== 'failure');
+      if (requireComplete && successGroups.length === 0)
+        plain('Alchemy recipe must have at least 1 result group');
+      if (requireComplete && successGroups.length > 1)
+        plain('Alchemy recipe must have exactly 1 result group');
+    }
+    return issues;
   }
 
   validateSalvage(component, system) {

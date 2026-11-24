@@ -59,6 +59,7 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
 | `alchemy`             | exactly 1       | per `checkMode` (see below) | none / required-when-simple / required-when-tiered | system `alchemy.checkMode`          |
+| `iterative`           | exactly 1 per step | zero or more, each selected by `producedWhen` | required when an allowed action has `check: 'roll'` | `ResultGroup.producedWhen` at the step's end |
 
 ## Result-Side Choice Groups
 
@@ -1105,6 +1106,34 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - Until Iterative Attempts ship, every existing craft path refuses a recipe in an `iterative` system before it creates a run, consumes, spends, rolls or awards.
   That covers the legacy `craft`, the versioned start, and every fresh or started versioned stage preparation, each refusing with `Iterative crafting is not available in this version of Fabricate.`
 - `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
+
+### Iterative Validation
+
+- Each iterative step has exactly one ingredient set (`stepIngredientSetCountExact`, raised with mode `iterative`), and the check is waived under `requireComplete: false`.
+- The structural readiness codes are the recipe-scoped and library codes of `src/systems/iterative/iterativeReadiness.js`, evaluated only for an `iterative` system and added to the system-validation report.
+- Recipe-scoped codes are `kind: 'recipe'`, `severity: 'critical'` and `blocks: 'enable'`:
+  - `iterativeNoCounters`: the recipe has no Counter Instance.
+  - `iterativeNoSuccessRule`: a step has no success rule, so it never succeeds vacuously.
+  - `iterativeUnknownCounter`: a Counter Instance names no library counter, or a hidden or locked id or a rule names no Counter Instance.
+  - `iterativeUnknownAction`: an allowed or `previousAction` id names no library action.
+  - `iterativeInvalidNumber`: a `null` start, bound or target.
+  - `iterativeBoundsInverted`: a `perRecipe` Counter Instance's effective `min` is above its effective `max`.
+  - `iterativeInvalidRule`: a `CounterRule` kept as authored.
+  - `iterativeInvalidEntry`: a `producedWhen` line kept as authored, or an `actions.mode` outside its enum.
+  - `iterativeCheckUnavailable`: an allowed action has `check: 'roll'` and the routed crafting check has no active roll.
+  - `iterativeMultiStepOff`: the recipe has explicit steps while `features.multiStepRecipes` is off.
+- Two recipe-scoped codes are warnings with no `blocks`:
+  - `iterativeSuccessLineOnFailureGroup`: an `end: 'success'` line on the `role: 'failure'` group.
+  - `iterativeFinalStepProducesNothing`: no final-step group has an `end: 'success'` line.
+- Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id:
+  - `iterativeUnknownCounter`, `iterativeUnknownAction`, `iterativeInvalidNumber`, `iterativeBoundsInverted` and `iterativeInvalidRule` over availability rules, costs and effect targets.
+  - `iterativeInvalidEntry`: a cost or effect kept as authored, or a `check`, `limit` or `combine` outside its enum.
+  - `iterativeUnknownCheckOutcome`: an effect's `checkOutcomeIds` names a tier the routed crafting check does not define.
+  - `iterativeVersionUnsupported`: the library's `version` is above the build's, reported alone because the block cannot be read.
+- `counterRuleFault` and `iterativeEntryFault` judge every rule and entry, for the normalizers and the readiness codes alike.
+- `iterativeNoCounters` and `iterativeNoSuccessRule` form the derived "Needs iterative setup" tier (`needsIterativeSetup`), and no setup marker is persisted.
+- Each code carries headless English from `ITERATIVE_READINESS_MESSAGES`, so no `message` equals its code.
+- A recipe with a critical recipe-scoped issue, or that allows an action with a critical library issue, or in a system reporting `iterativeVersionUnsupported`, refuses a new start.
 
 ## Testing Requirements
 
