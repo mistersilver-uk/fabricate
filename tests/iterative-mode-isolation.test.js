@@ -30,7 +30,7 @@ const systemIn = (resolutionMode, iterative) =>
 const LIBRARY = {
   counters: [
     { id: 'heat', label: 'Heat' },
-    { id: 'cold', limit: 'sideways' },
+    { id: 'cold', label: 'Cold', limit: 'sideways' },
   ],
   actions: [{ id: 'stoke', label: '  ', check: 'never' }],
 };
@@ -77,10 +77,22 @@ describe('the system report carries every iterative issue in full', () => {
     for (const issue of issues) {
       assert.deepEqual(
         Object.keys(issue).sort((a, b) => a.localeCompare(b)),
-        ['blocks', 'code', 'entityId', 'entityName', 'kind', 'message', 'nav', 'severity'],
+        [
+          'blocks',
+          'code',
+          'entityId',
+          'entityKind',
+          'entityName',
+          'kind',
+          'message',
+          'nav',
+          'severity',
+        ],
         issue.code
       );
       assert.ok(['recipe', 'system'].includes(issue.kind));
+      const entityKinds = issue.kind === 'recipe' ? ['recipe'] : ['counter', 'action', 'system'];
+      assert.ok(entityKinds.includes(issue.entityKind), `${issue.code} ${issue.entityKind}`);
       assert.ok(['critical', 'warning'].includes(issue.severity));
       assert.ok([undefined, 'enable'].includes(issue.blocks), issue.code);
       assert.ok(issue.entityName.length > 0);
@@ -95,7 +107,7 @@ describe('the system report carries every iterative issue in full', () => {
     assert.deepEqual(
       library.map((issue) => [issue.entityId, issue.entityName, issue.code]),
       [
-        ['cold', 'cold', 'iterativeInvalidEntry'],
+        ['cold', 'Cold', 'iterativeInvalidEntry'],
         ['stoke', 'stoke', 'iterativeInvalidEntry'],
       ]
     );
@@ -140,7 +152,7 @@ describe('iterative differs from progressive for the same recipe', () => {
     assert.ok(progressive.every((code) => !ITERATIVE_CODE.test(code)));
   });
 
-  it('validateRecipeForPersistence applies the amount floor, which progressive waives', () => {
+  it('validateRecipeForPersistence applies the amount floor, which progressive waives (guard)', () => {
     class UnrollableRoll {
       constructor() {
         throw new Error('unrollable');

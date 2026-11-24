@@ -1111,12 +1111,12 @@ The gate evaluates a candidate as though its activation had already landed, whet
 
 - Each iterative step has exactly one ingredient set (`stepIngredientSetCountExact`, raised with mode `iterative`), and the check is waived under `requireComplete: false`.
 - The structural readiness codes are the recipe-scoped and library codes of `src/systems/iterative/iterativeReadiness.js`, evaluated only for an `iterative` system and added to the system-validation report.
-- Recipe-scoped codes are `kind: 'recipe'`, `severity: 'critical'` and `blocks: 'enable'`:
+- Recipe-scoped codes are `kind: 'recipe'` and `entityKind: 'recipe'`, `severity: 'critical'` and `blocks: 'enable'`:
   - `iterativeNoCounters`: the recipe has no Counter Instance.
   - `iterativeNoSuccessRule`: a step has no success rule, so it never succeeds vacuously.
   - `iterativeUnknownCounter`: a Counter Instance names no library counter, or a hidden or locked id or a rule names no Counter Instance.
   - `iterativeUnknownAction`: an allowed or `previousAction` id names no library action.
-  - `iterativeInvalidNumber`: a `null` start, bound or target.
+  - `iterativeInvalidNumber`: a `null` start, `startFormula`, bound or target.
   - `iterativeBoundsInverted`: a `perRecipe` Counter Instance's effective `min` is above its effective `max`.
   - `iterativeInvalidRule`: a `CounterRule` kept as authored.
   - `iterativeInvalidEntry`: a `producedWhen` line kept as authored, or an `actions.mode` outside its enum.
@@ -1125,20 +1125,22 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - Two recipe-scoped codes are warnings with no `blocks`:
   - `iterativeSuccessLineOnFailureGroup`: an `end: 'success'` line on the `role: 'failure'` group.
   - `iterativeFinalStepProducesNothing`: no final-step group has an `end: 'success'` line.
-- Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id:
-  - `iterativeUnknownCounter`, `iterativeUnknownAction`, `iterativeInvalidNumber`, `iterativeBoundsInverted` and `iterativeInvalidRule` over availability rules, costs and effect targets.
-  - `iterativeInvalidEntry`: a cost or effect kept as authored, or a `check`, `limit` or `combine` outside its enum.
+- Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id.
+  Each carries `entityKind: 'counter'` or `'action'` for the record it names:
+  - `iterativeUnknownCounter`, `iterativeUnknownAction`, `iterativeInvalidNumber` and `iterativeInvalidRule` over availability rules, costs and effect targets.
+  - `iterativeBoundsInverted`: a counter whose `min` is above its `max`, except under `limit: 'none'`, whose bounds are unread.
+  - `iterativeInvalidEntry`: a cost, effect, `availability`, `availability.rules`, `costs` or `effects` kept as authored, or a `check`, `limit` or `combine` outside its enum.
   - `iterativeUnknownCheckOutcome`: an effect's `checkOutcomeIds` names a tier the routed crafting check does not define.
-  - `iterativeVersionUnsupported`: the library's `version` is above the build's, reported alone because the block cannot be read.
-- `counterRuleFault` and `iterativeEntryFault` judge every rule and entry, for the normalizers and the readiness codes alike.
+  - `iterativeVersionUnsupported`: the library's `version` is above the build's, reported alone because the block cannot be read, with `entityKind: 'system'` and `entityId: null`.
+- `counterRuleFault`, `iterativeEntryFault` and `producedWhenLineFault` judge every rule and entry, for the normalizers and the readiness codes alike.
 - `iterativeNoCounters` and `iterativeNoSuccessRule` form the derived "Needs iterative setup" tier (`needsIterativeSetup`), and no setup marker is persisted.
 - Each code carries headless English from `ITERATIVE_READINESS_MESSAGES`, so no `message` equals its code.
 - A recipe with a critical recipe-scoped issue, or that allows an action with a critical library issue, or in a system reporting `iterativeVersionUnsupported`, refuses a new start.
+  `iterativeStartBlockers(issues, recipe)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
 
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
-
 - Unit tests for mode-specific routed behavior (`routedByIngredients`, `routedByCheck`) and the alchemy check-mode matrix (`none`, `simple` pass/fail incl. the reserved failure-group path, `tiered`).
 - Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).

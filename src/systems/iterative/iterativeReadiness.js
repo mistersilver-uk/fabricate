@@ -3,7 +3,11 @@
  * Recipe issues block enabling and never the system or its visibility; library issues block
  * nothing. Every rule and entry is judged by the same fault helpers the normalizers use.
  */
-import { iterativeStepsOf, STEP_ACTION_MODES } from '../../models/iterativeStepConfig.js';
+import {
+  iterativeStepsOf,
+  producedWhenLineFault,
+  STEP_ACTION_MODES,
+} from '../../models/iterativeStepConfig.js';
 import { buildRecipeActivationIssue } from '../../utils/recipeActivationMessages.js';
 import { routedOutcomeTierOptions } from '../../utils/routedOutcomeKeywords.js';
 import { arrayOrEmpty, trimString } from '../../utils/scalars.js';
@@ -11,7 +15,6 @@ import {
   ACTION_CHECKS,
   actionEntryFaults,
   COUNTER_LIMITS,
-  iterativeEntryFault,
   iterativeLibraryVersionUnsupported,
   RULE_COMBINES,
 } from '../normalize/iterativeLibrary.js';
@@ -25,7 +28,7 @@ export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
   iterativeNoSuccessRule: 'A step has no success rule yet, so it needs iterative setup.',
   iterativeUnknownCounter: 'A counter reference names a counter that does not exist.',
   iterativeUnknownAction: 'An action reference names a crafting action that does not exist.',
-  iterativeInvalidNumber: 'A counter start, bound or target is not a number.',
+  iterativeInvalidNumber: 'A counter start, start formula, bound or target cannot be read.',
   iterativeBoundsInverted: 'A counter minimum is above its maximum.',
   iterativeInvalidRule: 'A counter rule cannot be read.',
   iterativeInvalidEntry: 'An iterative setting cannot be read.',
@@ -87,7 +90,9 @@ function counterCodes(counter) {
   return [
     ...(COUNTER_LIMITS.includes(counter.limit) ? [] : ['iterativeInvalidEntry']),
     ...(hasNull(counter, ['min', 'max']) ? ['iterativeInvalidNumber'] : []),
-    ...(boundsInverted(counter.min, counter.max) ? ['iterativeBoundsInverted'] : []),
+    ...(counter.limit !== 'none' && boundsInverted(counter.min, counter.max)
+      ? ['iterativeBoundsInverted']
+      : []),
   ];
 }
 
@@ -105,8 +110,11 @@ function actionCodes(action, context) {
     ...arrayOrEmpty(action.availability?.rules),
     ...effects.flatMap((effect) => arrayOrEmpty(effect?.when?.rules)),
   ];
+  const listsHold = [action.availability?.rules, action.costs, action.effects].every(Array.isArray);
   return [
-    ...(enumsHold && actionEntryFaults(action).length === 0 ? [] : ['iterativeInvalidEntry']),
+    ...(enumsHold && listsHold && actionEntryFaults(action).length === 0
+      ? []
+      : ['iterativeInvalidEntry']),
     ...(targets.some((id) => typeof id === 'string' && !libraryCounterIds.has(id))
       ? ['iterativeUnknownCounter']
       : []),
@@ -118,9 +126,11 @@ function actionCodes(action, context) {
 /** One issue per code, in first-raised order. */
 const uniqueCodes = (codes) => [...new Set(codes)];
 
-function libraryIssue(system, record, code) {
+/** `entityKind` is `'counter'`, `'action'`, or `'system'` for the library as a whole. */
+function libraryIssue(system, record, code, entityKind) {
   return {
     kind: 'system',
+    entityKind,
     entityId: record?.id ?? null,
     entityName: trimString(record?.label) || record?.id || trimString(system?.name) || 'system',
     severity: 'critical',
@@ -135,10 +145,14 @@ function libraryIssues(system, context) {
   const { library } = context;
   return [
     ...arrayOrEmpty(library.counters).flatMap((counter) =>
-      uniqueCodes(counterCodes(counter)).map((code) => libraryIssue(system, counter, code))
+      uniqueCodes(counterCodes(counter)).map((code) =>
+        libraryIssue(system, counter, code, 'counter')
+      )
     ),
     ...arrayOrEmpty(library.actions).flatMap((action) =>
-      uniqueCodes(actionCodes(action, context)).map((code) => libraryIssue(system, action, code))
+      uniqueCodes(actionCodes(action, context)).map((code) =>
+        libraryIssue(system, action, code, 'action')
+      )
     ),
   ];
 }
@@ -150,7 +164,9 @@ function instanceCodes(instance, context) {
   const max = instance.max ?? counter?.max;
   return [
     ...(counter ? [] : ['iterativeUnknownCounter']),
-    ...(hasNull(instance, ['start', 'min', 'max', 'target']) ? ['iterativeInvalidNumber'] : []),
+    ...(hasNull(instance, ['start', 'startFormula', 'min', 'max', 'target'])
+      ? ['iterativeInvalidNumber']
+      : []),
     ...(perRecipe && boundsInverted(min, max) ? ['iterativeBoundsInverted'] : []),
   ];
 }
@@ -184,7 +200,7 @@ function stepConfigCodes(config, references, context) {
 
 function producedWhenCodes(group, references) {
   return arrayOrEmpty(group.producedWhen).flatMap((line) => {
-    if (iterativeEntryFault('producedWhen', line)) return ['iterativeInvalidEntry'];
+    if (producedWhenLineFault(line)) return ['iterativeInvalidEntry'];
     const misplaced = group.role === 'failure' && line.end === 'success';
     return [
       ...ruleCodes(line.rules, references),
@@ -218,6 +234,7 @@ function recipeIssue(recipe, code) {
   const severity = WARNING_CODES.has(code) ? 'warning' : 'critical';
   return {
     kind: 'recipe',
+    entityKind: 'recipe',
     entityId: recipe?.id ?? null,
     entityName: trimString(recipe?.name) || recipe?.id || 'recipe',
     severity,
@@ -249,7 +266,7 @@ function readinessContext(system) {
 export function evaluateIterativeReadiness(system, recipes) {
   if (system?.resolutionMode !== 'iterative') return [];
   if (iterativeLibraryVersionUnsupported(system.iterative)) {
-    return [libraryIssue(system, null, 'iterativeVersionUnsupported')];
+    return [libraryIssue(system, null, 'iterativeVersionUnsupported', 'system')];
   }
   const context = readinessContext(system);
   return [
@@ -258,4 +275,26 @@ export function evaluateIterativeReadiness(system, recipes) {
       uniqueCodes(recipeCodes(recipe, system, context)).map((code) => recipeIssue(recipe, code))
     ),
   ];
+}
+
+/** A predicate on the action ids a recipe's steps allow: every one unless each step names its own. */
+function recipeAllowsAction(recipe) {
+  const configs = iterativeStepsOf(recipe).map((view) => view.iterative);
+  if (configs.some((config) => config?.actions?.mode !== 'only')) return () => true;
+  const named = new Set(configs.flatMap((config) => arrayOrEmpty(config.actions.actionIds)));
+  return (actionId) => named.has(actionId);
+}
+
+/**
+ * The critical issues that refuse a new start of `recipe`: its own recipe-scoped ones, those on an
+ * action one of its steps allows, and `iterativeVersionUnsupported`.
+ */
+export function iterativeStartBlockers(issues, recipe) {
+  const allows = recipeAllowsAction(recipe);
+  return arrayOrEmpty(issues).filter((issue) => {
+    if (issue?.severity !== 'critical') return false;
+    if (issue.code === 'iterativeVersionUnsupported') return true;
+    if (issue.entityKind === 'recipe') return issue.entityId === recipe?.id;
+    return issue.entityKind === 'action' && allows(issue.entityId);
+  });
 }

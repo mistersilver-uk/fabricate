@@ -2,9 +2,9 @@
  * The system's iterative library, `CraftingSystem.iterative = { version, counters, actions }`,
  * rebuilt with a fixed key set at every level (`data-models` CraftingSystem 37). A counter or action
  * whose id is missing, malformed or repeated is dropped; a cost or effect that does not parse is
- * kept with only its known keys. A block whose `version` is above this build's is kept verbatim.
+ * kept with only its known keys, and a present non-array `availability.rules`, `costs` or `effects`
+ * is kept as authored. A block whose `version` is above this build's is kept verbatim.
  */
-import { producedWhenLineFault } from '../../models/iterativeStepConfig.js';
 import { cloneJson, isPlainObject, stringOnlyIdList, trimString } from '../../utils/scalars.js';
 import {
   comparisonFault,
@@ -29,6 +29,7 @@ export const EFFECT_OPS = Object.freeze(['add', 'subtract', 'set']);
 const COST_KEYS = Object.freeze(['id', 'counterId', 'amount', 'needsEnough']);
 const EFFECT_KEYS = Object.freeze(['id', 'name', 'description', 'when', 'target', 'op', 'amount']);
 const TARGET_KEYS = Object.freeze(['kind', 'counterId']);
+const WHEN_KEYS = Object.freeze(['combine', 'checkOutcomeIds', 'success', 'value', 'rules']);
 
 export function iterativeLibraryVersionUnsupported(library) {
   return isPlainObject(library) && Number(library.version) > ITERATIVE_LIBRARY_VERSION;
@@ -48,11 +49,16 @@ export function normalizeEffectWhen(raw) {
   };
 }
 
+const presentNonArray = (value) => value != null && !Array.isArray(value);
+
+/** `'when'` for a `when` that does not parse, including a present key of the wrong type. */
 function effectWhenFault(raw) {
   if (raw == null) return null;
   if (!isPlainObject(raw) || !(raw.combine == null || RULE_COMBINES.includes(raw.combine))) {
     return 'when';
   }
+  if (raw.success != null && typeof raw.success !== 'boolean') return 'when';
+  if (presentNonArray(raw.checkOutcomeIds) || presentNonArray(raw.rules)) return 'when';
   return raw.value == null || comparisonFault(raw.value) === null ? null : 'when';
 }
 
@@ -73,15 +79,11 @@ function effectFault(raw) {
   return effectWhenFault(raw.when);
 }
 
-const ENTRY_FAULTS = Object.freeze({
-  cost: costFault,
-  effect: effectFault,
-  producedWhen: producedWhenLineFault,
-});
+const ENTRY_FAULTS = Object.freeze({ cost: costFault, effect: effectFault });
 
 /**
- * `null` for a well-formed `'cost'`, `'effect'` or `'producedWhen'` line, else a short fault code.
- * A repeated id is a fault only within its list (`actionEntryFaults`).
+ * `null` for a well-formed `'cost'` or `'effect'`, else a short fault code. A repeated id is a
+ * fault only within its list (`actionEntryFaults`).
  */
 export function iterativeEntryFault(kind, entry) {
   return ENTRY_FAULTS[kind](entry);
@@ -106,10 +108,21 @@ function normalizeCost(entry, fault) {
   };
 }
 
+/**
+ * The `when` of an effect kept as authored: its known keys, with an object `value` and an array
+ * of `rules` re-normalized, so a second pass raises the same fault.
+ */
+function keptWhen(raw) {
+  const when = keepKnownKeys(raw, WHEN_KEYS);
+  if (isPlainObject(when.value)) when.value = normalizeComparison(raw.value);
+  if (Array.isArray(when.rules)) when.rules = normalizeCounterRuleList(raw.rules);
+  return when;
+}
+
 function normalizeEffect(entry, fault) {
   if (fault) {
     const kept = keepKnownKeys(entry, EFFECT_KEYS);
-    if (isPlainObject(entry?.when)) kept.when = normalizeEffectWhen(entry.when);
+    if (isPlainObject(entry?.when)) kept.when = keptWhen(entry.when);
     if (isPlainObject(entry?.target)) kept.target = keepKnownKeys(entry.target, TARGET_KEYS);
     return kept;
   }
@@ -135,13 +148,24 @@ function normalizeCounter(raw) {
   };
 }
 
+/** `normalize(raw)` for an absent or array `raw`; a present non-array is kept as authored. */
+const listOrAuthored = (raw, normalize) => (presentNonArray(raw) ? cloneJson(raw) : normalize(raw));
+
+/** The default for an absent `availability`; a present non-object one is kept as authored. */
 function normalizeAvailability(raw) {
-  const availability = isPlainObject(raw) ? raw : {};
+  if (raw != null && !isPlainObject(raw)) return cloneJson(raw);
+  const availability = raw ?? {};
   return {
     combine: enumOrDefault(availability.combine, 'all'),
-    rules: normalizeCounterRuleList(availability.rules),
+    rules: listOrAuthored(availability.rules, normalizeCounterRuleList),
   };
 }
+
+const normalizeCosts = (raw) =>
+  entryFaults(raw, costFault).map(({ entry, fault }) => normalizeCost(entry, fault));
+
+const normalizeEffects = (raw) =>
+  entryFaults(raw, effectFault).map(({ entry, fault }) => normalizeEffect(entry, fault));
 
 function normalizeAction(raw) {
   return {
@@ -152,11 +176,9 @@ function normalizeAction(raw) {
     categories: stringOnlyIdList(raw.categories),
     usesSession: raw.usesSession !== false,
     availability: normalizeAvailability(raw.availability),
-    costs: entryFaults(raw.costs, costFault).map(({ entry, fault }) => normalizeCost(entry, fault)),
+    costs: listOrAuthored(raw.costs, normalizeCosts),
     check: enumOrDefault(raw.check, 'none'),
-    effects: entryFaults(raw.effects, effectFault).map(({ entry, fault }) =>
-      normalizeEffect(entry, fault)
-    ),
+    effects: listOrAuthored(raw.effects, normalizeEffects),
   };
 }
 

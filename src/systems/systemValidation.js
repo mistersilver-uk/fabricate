@@ -27,10 +27,7 @@ import {
 } from '../utils/routedOutcomeKeywords.js';
 import { trimString as trimmed } from '../utils/scalars.js';
 
-import {
-  evaluateIterativeReadiness,
-  ITERATIVE_READINESS_MESSAGES,
-} from './iterative/iterativeReadiness.js';
+import { evaluateIterativeReadiness } from './iterative/iterativeReadiness.js';
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -140,7 +137,7 @@ const READINESS_ISSUE_MESSAGES = {
 };
 
 function readinessMessage(code) {
-  return READINESS_ISSUE_MESSAGES[code] || ITERATIVE_READINESS_MESSAGES[code] || code;
+  return READINESS_ISSUE_MESSAGES[code] || code;
 }
 
 /** A recipe readiness issue, deep-linking to its `recipe-edit` tab. */

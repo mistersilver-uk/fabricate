@@ -17,13 +17,22 @@ import { arrayOrEmpty, isPlainObject, stringOnlyIdList } from '../utils/scalars.
 export const STEP_ACTION_MODES = Object.freeze(['all', 'only']);
 export const PRODUCED_WHEN_ENDS = Object.freeze(['success', 'failure']);
 
-/** An instance's `startFormula` replaces `start` when present; an empty one is absent. */
+/**
+ * `{ startFormula }` for an authored expression, `{ startFormula: null }` for a present one that is
+ * not an expression (a persisted `null` included), and `{}` for an absent or empty one.
+ */
+function startFormulaEntry(value) {
+  if (value === undefined) return {};
+  const startFormula = value === null ? null : normalizeAmount(value);
+  return startFormula === '' ? {} : { startFormula };
+}
+
+/** An instance's `startFormula` replaces `start` when present. */
 function normalizeCounterInstance(raw) {
-  const startFormula = normalizeAmount(raw.startFormula);
   return {
     counterId: raw.counterId,
     start: raw.start === undefined ? 0 : iterativeNumber(raw.start),
-    ...(startFormula && { startFormula }),
+    ...startFormulaEntry(raw.startFormula),
     ...optionalNumber('min', raw.min),
     ...optionalNumber('max', raw.max),
     ...optionalNumber('target', raw.target),

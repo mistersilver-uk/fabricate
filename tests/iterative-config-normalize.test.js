@@ -21,6 +21,7 @@ const { counterRuleFault } = await import('../src/systems/iterative/counterRule.
 const {
   iterativeStepsOf,
   normalizeProducedWhen,
+  producedWhenLineFault,
   normalizeRecipeIterative,
   normalizeStepIterative,
 } = await import('../src/models/iterativeStepConfig.js');
@@ -30,6 +31,7 @@ const normalizeSystem = (system) => manager._normalizeSystem({ id: 'sys-it', ...
 const recipeJson = (data) => new Recipe({ id: 'r-it', name: 'Iterative', ...data }).toJSON();
 
 const RULE_HEAT = { source: 'counter', counterId: 'heat', op: '>=', value: 10 };
+const WARM_EFFECT = { target: { kind: 'counter', counterId: 'heat' }, op: 'add', amount: '1' };
 
 /** A library authored with one unknown key at every level. */
 const NOISY_LIBRARY = {
@@ -209,11 +211,55 @@ describe('the library normalizer', () => {
     assert.equal(library.actions[0].availability.combine, 'most');
   });
 
-  it('normalizes a present non-finite bound to null and leaves an absent one absent', () => {
-    const [counter] = normalizeIterativeLibrary({
-      counters: [{ id: 'heat', min: 'lots', max: NaN }],
+  it('keeps a mistyped when key as authored, so the effect never widens', () => {
+    const effect = { id: 'warm', target: { kind: 'counter', counterId: 'heat' }, op: 'add' };
+    const whens = [
+      { success: 'true', junk: 1 },
+      { checkOutcomeIds: 'hit' },
+      { rules: { source: 'sessionCount', op: '<', value: 3 } },
+    ];
+    const [action] = normalizeIterativeLibrary({
+      actions: [
+        { id: 'stoke', effects: whens.map((when, i) => ({ ...effect, id: `e${i}`, when })) },
+      ],
+    }).actions;
+    assert.deepEqual(
+      action.effects.map((kept) => kept.when),
+      [{ success: 'true' }, { checkOutcomeIds: 'hit' }, { rules: whens[2].rules }]
+    );
+  });
+
+  it('keeps a present non-array availability rule list, cost list or effect list as authored', () => {
+    const [kept, opaque] = normalizeIterativeLibrary({
+      actions: [
+        {
+          id: 'stoke',
+          availability: { rules: { source: 'counter', counterId: 'heat', op: '>', value: 1 } },
+          costs: {},
+          effects: 'warm',
+        },
+        { id: 'quench', availability: 'locked' },
+      ],
+    }).actions;
+    assert.deepEqual(kept.availability.rules, {
+      source: 'counter',
+      counterId: 'heat',
+      op: '>',
+      value: 1,
+    });
+    assert.deepEqual([kept.costs, kept.effects], [{}, 'warm']);
+    assert.equal(opaque.availability, 'locked');
+  });
+
+  it('normalizes a present non-finite or blank bound to null and leaves an absent one absent', () => {
+    const [counter, blank] = normalizeIterativeLibrary({
+      counters: [
+        { id: 'heat', min: 'lots', max: NaN },
+        { id: 'cold', min: '  ', max: ' 4 ' },
+      ],
     }).counters;
     assert.deepEqual(counter, { id: 'heat', label: '', limit: 'none', min: null, max: null });
+    assert.deepEqual(blank, { id: 'cold', label: '', limit: 'none', min: null, max: 4 });
   });
 
   it('keeps a library whose version is above this build verbatim', () => {
@@ -282,7 +328,7 @@ describe('the fault helpers name why an entry is kept as authored', () => {
     );
   });
 
-  it('iterativeEntryFault names the fault of a cost, an effect and a routing line', () => {
+  it('iterativeEntryFault and producedWhenLineFault name the fault of an entry or a line', () => {
     const effect = { id: 'warm', target: { kind: 'counter', counterId: 'heat' }, op: 'add' };
     assert.equal(iterativeEntryFault('cost', { id: 'fuel', counterId: 'heat', amount: 1 }), null);
     assert.equal(iterativeEntryFault('cost', { id: 'fuel', amount: '1' }), 'counterId');
@@ -295,10 +341,17 @@ describe('the fault helpers name why an entry is kept as authored', () => {
     assert.equal(iterativeEntryFault('effect', { ...effect, target: { kind: 'aura' } }), 'target');
     assert.equal(iterativeEntryFault('effect', { ...effect, op: 'multiply' }), 'op');
     assert.equal(iterativeEntryFault('effect', { ...effect, when: { combine: 'most' } }), 'when');
-    assert.equal(iterativeEntryFault('producedWhen', { end: 'success' }), null);
-    assert.equal(iterativeEntryFault('producedWhen', { end: 'sideways' }), 'end');
-    assert.equal(iterativeEntryFault('producedWhen', { end: 'failure', rules: {} }), 'rules');
-    assert.equal(iterativeEntryFault('producedWhen', 'success'), 'line');
+    for (const when of [{ success: 'true' }, { checkOutcomeIds: 'hit' }, { rules: {} }]) {
+      assert.equal(
+        iterativeEntryFault('effect', { ...effect, when }),
+        'when',
+        Object.keys(when)[0]
+      );
+    }
+    assert.equal(producedWhenLineFault({ end: 'success' }), null);
+    assert.equal(producedWhenLineFault({ end: 'sideways' }), 'end');
+    assert.equal(producedWhenLineFault({ end: 'failure', rules: {} }), 'rules');
+    assert.equal(producedWhenLineFault('success'), 'line');
   });
 
   it('actionEntryFaults reports a repeated id as a fault the single-entry helper cannot see', () => {
@@ -383,6 +436,19 @@ describe('the recipe and step normalizers', () => {
     assert.deepEqual(iterative.counters, [{ counterId: 'heat', start: 1, visible: true }]);
   });
 
+  it('nulls a present startFormula that is not an expression, and keeps a persisted null', () => {
+    const counters = normalizeRecipeIterative({
+      counters: [{}, true, NaN, null].map((startFormula, i) => ({
+        counterId: `c${i}`,
+        startFormula,
+      })),
+    }).counters;
+    assert.deepEqual(
+      counters.map((instance) => instance.startFormula),
+      [null, null, null, null]
+    );
+  });
+
   it('keeps start under a formula, drops an empty formula, and nulls a non-finite number', () => {
     const [formula, empty, broken] = normalizeRecipeIterative({
       counters: [
@@ -390,7 +456,7 @@ describe('the recipe and step normalizers', () => {
         { counterId: 'cold', startFormula: '  ' },
         {
           counterId: 'rust',
-          start: 'warm',
+          start: '  ',
           min: null,
           max: NaN,
           target: 'high',
@@ -526,12 +592,34 @@ describe('normalization is idempotent across the corpus', () => {
         ],
       },
     },
+    {
+      iterative: {
+        actions: [
+          {
+            id: 'stoke',
+            availability: { rules: { source: 'counter', junk: 1 } },
+            costs: { fuel: 1 },
+            effects: [
+              { ...WARM_EFFECT, id: 'a', when: { success: 'yes', value: { op: '>', junk: 1 } } },
+              { ...WARM_EFFECT, id: 'b', when: { checkOutcomeIds: 'hit', junk: 1 } },
+              { ...WARM_EFFECT, id: 'c', when: { rules: { source: 'x' } } },
+              { ...WARM_EFFECT, id: 'd', when: { rules: [{ source: 'x', junk: 1 }], success: 1 } },
+            ],
+          },
+          { id: 'quench', availability: ['locked'], effects: 'warm' },
+        ],
+      },
+    },
   ];
   const recipes = [
     NOISY_RECIPE,
     {
       iterative: {
-        counters: [{ counterId: 'heat', start: NaN, startFormula: 2 }],
+        counters: [
+          { counterId: 'heat', start: NaN, startFormula: 2 },
+          { counterId: 'cold', start: ' ', startFormula: {} },
+          { counterId: 'rust', startFormula: null },
+        ],
         step: { actions: { mode: 'some' } },
       },
       steps: [

@@ -11,6 +11,7 @@ const { normalizeIterativeLibrary } = await import('../src/systems/normalize/ite
 const {
   evaluateIterativeReadiness,
   ITERATIVE_READINESS_CODES,
+  iterativeStartBlockers,
   iterativeStepModeIssues,
   needsIterativeSetup,
 } = await import('../src/systems/iterative/iterativeReadiness.js');
@@ -88,13 +89,32 @@ function system({ library = LIBRARY, multiStep = true, routed = true } = {}) {
   };
 }
 
-/** The codes a world raises, after `edit` mutates a copy of the library and the recipe. */
-function codesAfter(edit = () => {}, options = {}) {
+/** The issues a world raises, after `edit` mutates a copy of the library and the recipe. */
+function issuesAfter(edit = () => {}, options = {}) {
   const library = clone(LIBRARY);
   const recipe = clone(RECIPE);
   const overrides = edit({ library, recipe }) ?? {};
   const sys = { ...system({ library, ...options }), ...overrides };
-  return evaluateIterativeReadiness(sys, [new Recipe(recipe)]).map((issue) => issue.code);
+  return evaluateIterativeReadiness(sys, [new Recipe(recipe)]);
+}
+
+function codesAfter(edit = () => {}, options = {}) {
+  return issuesAfter(edit, options).map((issue) => issue.code);
+}
+
+/** The scope of an issue on the recipe, or on the library counter or action `entityId`. */
+const ON_RECIPE = { kind: 'recipe', entityKind: 'recipe', entityId: 'r-blade' };
+const onLibrary = (entityKind, entityId) => ({ kind: 'system', entityKind, entityId });
+const ON_HEAT = onLibrary('counter', 'heat');
+const ON_STOKE = onLibrary('action', 'stoke');
+
+/** Asserts `edit` raises `code` on exactly the record `scope` names. */
+function assertRaisedOn(edit, code, scope) {
+  const issues = issuesAfter(edit);
+  const scoped = (issue) =>
+    issue.code === code && Object.entries(scope).every(([key, value]) => issue[key] === value);
+  const raised = issues.map((issue) => `${issue.code}@${issue.entityKind}:${issue.entityId}`);
+  assert.ok(issues.some(scoped), raised.join(', ') || 'no issue');
 }
 
 const step = (recipe) => recipe.iterative.step;
@@ -164,84 +184,155 @@ describe('each readiness code fires on its minimal input and not on its correcte
 });
 
 describe('the other inputs each code reads', () => {
+  const effect = (library) => library.actions[0].effects[0];
   const cases = {
     'a Counter Instance naming no library counter': [
       'iterativeUnknownCounter',
+      ON_RECIPE,
       ({ recipe }) => {
         recipe.iterative.counters.push({ counterId: 'cold' });
       },
     ],
     'a rule naming no Counter Instance': [
       'iterativeUnknownCounter',
+      ON_RECIPE,
       ({ recipe }) => {
         step(recipe).success.push({ ...HEAT_AT_TEN, counterId: 'cold' });
       },
     ],
     'a library cost naming no counter': [
       'iterativeUnknownCounter',
+      ON_STOKE,
       ({ library }) => {
         cost(library).counterId = 'cold';
       },
     ],
     'a previousAction naming no action': [
       'iterativeUnknownAction',
+      ON_RECIPE,
       ({ recipe }) => {
         step(recipe).failure.push({ source: 'previousAction', actionIds: ['quench'] });
       },
     ],
+    'a Counter Instance startFormula that is not an expression': [
+      'iterativeInvalidNumber',
+      ON_RECIPE,
+      ({ recipe }) => {
+        recipe.iterative.counters[0].startFormula = {};
+      },
+    ],
     'a library counter with a non-finite bound': [
       'iterativeInvalidNumber',
+      ON_HEAT,
       ({ library }) => {
         library.counters[0].max = 'lots';
       },
     ],
     'a library counter whose bounds are inverted': [
       'iterativeBoundsInverted',
+      ON_HEAT,
       ({ library }) => Object.assign(library.counters[0], { min: 30, max: 20 }),
     ],
     'an unparseable availability rule': [
       'iterativeInvalidRule',
+      ON_STOKE,
       ({ library }) => {
         library.actions[0].availability.rules.push({ source: 'counter', op: '>' });
       },
     ],
     'an unparseable cost': [
       'iterativeInvalidEntry',
+      ON_STOKE,
       ({ library }) => {
         cost(library).counterId = 'Bad id';
       },
     ],
+    'a non-boolean effect success': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        effect(library).when.success = 'true';
+      },
+    ],
+    'a non-array effect checkOutcomeIds': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        effect(library).when.checkOutcomeIds = 'hit';
+      },
+    ],
+    'a non-array effect rule list': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        effect(library).when.rules = HEAT_AT_TEN;
+      },
+    ],
+    'a non-array availability rule list': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        library.actions[0].availability.rules = HEAT_AT_TEN;
+      },
+    ],
+    'a non-array cost list': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        library.actions[0].costs = {};
+      },
+    ],
+    'a non-array effect list': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        library.actions[0].effects = 'warm';
+      },
+    ],
     'an out-of-enum check': [
       'iterativeInvalidEntry',
+      ON_STOKE,
       ({ library }) => {
         library.actions[0].check = 'always';
       },
     ],
     'an out-of-enum limit': [
       'iterativeInvalidEntry',
+      ON_HEAT,
       ({ library }) => {
         library.counters[0].limit = 'unbounded';
       },
     ],
     'an out-of-enum combine': [
       'iterativeInvalidEntry',
+      ON_STOKE,
       ({ library }) => {
         library.actions[0].availability.combine = 'most';
       },
     ],
     'an out-of-enum actions.mode': [
       'iterativeInvalidEntry',
+      ON_RECIPE,
       ({ recipe }) => {
         step(recipe).actions.mode = 'some';
       },
     ],
   };
 
-  for (const [name, [code, edit]] of Object.entries(cases)) {
+  for (const [name, [code, scope, edit]] of Object.entries(cases)) {
     it(`${code}: ${name}`, () => {
-      assert.ok(codesAfter(edit).includes(code), codesAfter(edit).join(', ') || 'no issue');
+      assertRaisedOn(edit, code, scope);
     });
   }
+
+  it('raises no library bounds issue under limit none, whose bounds are unread', () => {
+    const unread = ({ library }) =>
+      Object.assign(library.counters[0], { limit: 'none', min: 30, max: 20 });
+    assert.ok(
+      !codesAfter(unread).includes('iterativeBoundsInverted'),
+      codesAfter(unread).join(', ')
+    );
+  });
 
   it('reads the effective perRecipe bounds, and not the unread ones under none', () => {
     const inverted = ({ recipe }) => Object.assign(recipe.iterative.counters[0], { max: -1 });
@@ -261,6 +352,57 @@ describe('the other inputs each code reads', () => {
     const recipe = clone(RECIPE);
     recipe.iterative.counters = [];
     assert.deepEqual(evaluateIterativeReadiness(sys, [new Recipe(recipe)]), []);
+  });
+});
+
+describe('iterativeStartBlockers', () => {
+  const tag = (issue) => `${issue.code}@${issue.entityKind}:${issue.entityId}`;
+
+  /** Every issue of a world whose library and recipes each raise one issue of every scope. */
+  function world(mode) {
+    const library = clone(LIBRARY);
+    library.counters[0].limit = 'sideways';
+    library.actions.push({ id: 'quench', label: 'Quench', check: 'always' });
+    const recipe = clone(RECIPE);
+    step(recipe).actions.mode = mode;
+    step(recipe).lockedCounterIds = ['cold'];
+    recipe.resultGroups[1].producedWhen = [{ end: 'success' }];
+    const other = { ...clone(RECIPE), id: 'r-other' };
+    other.iterative.counters = [];
+    const recipes = [new Recipe(recipe), new Recipe(other)];
+    return { issues: evaluateIterativeReadiness(system({ library }), recipes), recipe: recipes[0] };
+  }
+
+  it('the premise: the world raises counter, action, warning and other-recipe issues', () => {
+    const { issues } = world('all');
+    assert.deepEqual(issues.map(tag), [
+      'iterativeInvalidEntry@counter:heat',
+      'iterativeInvalidEntry@action:quench',
+      'iterativeUnknownCounter@recipe:r-blade',
+      'iterativeSuccessLineOnFailureGroup@recipe:r-blade',
+      'iterativeNoCounters@recipe:r-other',
+      'iterativeUnknownCounter@recipe:r-other',
+    ]);
+  });
+
+  it("answers the recipe's own criticals and those on an action one of its steps allows", () => {
+    const blockers = (mode) => {
+      const { issues, recipe } = world(mode);
+      return iterativeStartBlockers(issues, recipe).map(tag);
+    };
+    assert.deepEqual(blockers('only'), ['iterativeUnknownCounter@recipe:r-blade']);
+    assert.deepEqual(blockers('all'), [
+      'iterativeInvalidEntry@action:quench',
+      'iterativeUnknownCounter@recipe:r-blade',
+    ]);
+  });
+
+  it('answers iterativeVersionUnsupported for every recipe', () => {
+    const sys = { ...system(), iterative: { version: 2 } };
+    const issues = evaluateIterativeReadiness(sys, [new Recipe(clone(RECIPE))]);
+    assert.deepEqual(iterativeStartBlockers(issues, clone(RECIPE)).map(tag), [
+      'iterativeVersionUnsupported@system:null',
+    ]);
   });
 });
 

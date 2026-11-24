@@ -808,6 +808,8 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
     - A `CounterRule` is `{ source: 'counter', counterId, op, value }`, `{ source: 'sessionCount', op, value }` or `{ source: 'previousAction', actionIds }`, where `op` is one of `>=`, `<=`, `>`, `<`, `=` and `value` is finite.
     - `EffectWhen` is `{ combine, checkOutcomeIds?, success?, value?: { op, value }, rules? }`, with `combine` (`'all' | 'any'`) defaulting to `'all'`.
       `checkOutcomeIds` and `rules` are emitted only when non-empty, `success` only as a boolean, and `value` only as `{ op, value }`.
+      A present `success` that is not a boolean, or a present `checkOutcomeIds` or `rules` that is not an array, makes the `when` not parse, so its effect is kept as authored.
+    - A present `availability` that is not an object, or a present `availability.rules`, `costs` or `effects` that is not an array, is kept as authored and raises `iterativeInvalidEntry`, so a malformed restriction never widens to none.
     - Inside an iterative record every non-optional key is emitted at its default, as a deliberate exception to Recipe requirement 18, because the record is absent unless authored and its readers are new.
       Optional keys are omitted when absent.
     - No normalizer prunes a cross-record reference, so a dangling id survives and is a readiness issue.
@@ -881,6 +883,7 @@ Requirements:
    I/O — so it is unit-testable and reusable from both the synchronous visibility
    hot-path and the GM overview view.
 5. An `iterative` system adds the iterative readiness codes (`resolution-modes` § Iterative Validation), as `kind: 'recipe'` or `kind: 'system'`, none carrying `blocks: 'system'` or `blocks: 'visibility'`.
+   Each iterative issue also carries `entityKind: 'recipe' | 'counter' | 'action' | 'system'`, naming the record its `entityId` identifies, because counter ids and action ids are unique only within their own list.
 
 ## CurrencyConfig
 
@@ -1835,9 +1838,10 @@ StepIterative = {
     - A Counter Instance is `{ counterId, start, startFormula?, min?, max?, target?, visible }`, unique by `counterId`, with `start` defaulting to `0` and `visible` to `true`.
     - A Counter Instance with a missing, malformed or repeated `counterId` is dropped (the first wins).
     - When present, `startFormula` replaces `start`, which is kept so switching back to a fixed start restores it.
-      An empty `startFormula` normalizes to absent.
+      An empty `startFormula` normalizes to absent, and a present one that is not an expression normalizes to `null`, which is a blocking readiness issue.
     - A Counter Instance's `min` and `max` override the counter's only under `perRecipe`, and are kept but unread under `none` and `global`.
     - A present non-finite `start`, `min`, `max` or `target` normalizes to `null` and is a blocking readiness issue, and an absent optional number stays absent.
+      A blank string is not a number.
     - `Recipe.iterative.step` configures a recipe with no explicit steps and is dropped on one with explicit steps.
     - A write that gives a recipe its first explicit step moves `Recipe.iterative.step` to that step's `Step.iterative` in the same write, and the reverse when the last explicit step is removed, because the normalizer drops it.
     - `getExecutionSteps()` gives the implicit step that configuration, and plain-JSON readers use `iterativeStepsOf`.
