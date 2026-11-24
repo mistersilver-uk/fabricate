@@ -24,6 +24,7 @@ import {
 } from '../../../systems/CraftingSystemExporter.js';
 import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
 import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
+import { modeChangeRefusal } from '../../../systems/resolutionModeAvailability.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../model/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
@@ -139,7 +140,7 @@ import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
-import { modeChangeConfirmContent } from './modeChangeConfirm.js';
+import { modeChangeConfirmOptions } from './modeChangeConfirm.js';
 import { createWorldScopeActions } from './worldScopeActions.js';
 import {
   buildWorldScopeState as _buildWorldScopeState,
@@ -3953,25 +3954,13 @@ export function createAdminStore(services) {
     const nextMode = String(resolutionMode || '').trim() || 'simple';
     const currentMode = system.resolutionMode || 'simple';
     if (nextMode === currentMode) return true;
+    if (modeChangeRefusal(nextMode)) return false;
 
     // Dry-run the migration so the GM sees what is migrated, deleted and dropped before committing.
     const affectedRecipes = recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || [];
     const summary = summarizeModeChange(affectedRecipes, currentMode, nextMode, system);
-    const localizeFn = services.localize;
-    const confirmed = await services.confirmDialog({
-      title:
-        localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
-        'Change Resolution Mode?',
-      content: modeChangeConfirmContent(summary, nextMode, localizeFn),
-      yes: {
-        label:
-          localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeConfirm') ||
-          'Change mode',
-        callback: () => true,
-      },
-      no: { callback: () => false },
-    });
-    if (!confirmed) return false;
+    const options = modeChangeConfirmOptions(summary, nextMode, services.localize);
+    if (!(await services.confirmDialog(options))) return false;
 
     await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
     await refresh();

@@ -1091,9 +1091,25 @@ The retired provider required/enum rules no longer apply (issue 554).
 - All recipes must satisfy alchemy-wide signature separability invariants; a signature collision — now narrowed to an INSEPARABLE (symmetric-transversal) pair, no longer a mere subset/superset — blocks save/import operations system-wide until resolved.
 The gate evaluates a candidate as though its activation had already landed, whether or not the recipe is stored yet, so a create or an import that would introduce a collision is refused at that moment rather than at the next reconciliation (see `data-models/spec.md` §Alchemy Signature Uniqueness).
 
+## Iterative Mode
+
+### Iterative Mode Availability
+
+- `iterative` is in `RESOLUTION_MODES` (`src/systems/resolutionModeAvailability.js`), which the system normalizer accepts on read and write, so the mode persists.
+- `iterative` is selectable only once `SELECTABLE_RESOLUTION_MODES` includes it.
+- `isResolutionModeSelectable(mode, selectable = SELECTABLE_RESOLUTION_MODES)` is the one predicate the admin store's mode change and the importer consult, and either caller may inject the set.
+- `resolutionModeOptions.js` omits `iterative`, so the Crafting Settings card never offers it.
+- The admin store refuses, before its confirm and writing nothing, a change to a known mode outside the selectable set, or to a token that is neither a mode nor a legacy alias.
+  A legacy alias keeps today's path, and re-selecting the current mode is still a no-op that succeeds.
+- Fixtures and tests may write the mode directly through `createSystem` or `updateSystem`, which are not gated.
+- Until Iterative Attempts ship, every existing craft path refuses a recipe in an `iterative` system before it creates a run, consumes, spends, rolls or awards.
+  That covers the legacy `craft`, the versioned start, and every fresh or started versioned stage preparation, each refusing with `Iterative crafting is not available in this version of Fabricate.`
+- `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
+
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
+
 - Unit tests for mode-specific routed behavior (`routedByIngredients`, `routedByCheck`) and the alchemy check-mode matrix (`none`, `simple` pass/fail incl. the reserved failure-group path, `tiered`).
 - Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).

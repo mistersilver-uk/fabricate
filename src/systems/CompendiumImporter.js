@@ -11,7 +11,9 @@ import {
   WORLD_SCOPE_ENTITY_TYPES,
   WORLD_SCOPE_SLICE_KEYS,
 } from './importReferenceResolver.js';
+import { createImportSummary } from './importSummary.js';
 import { pruneOrphanedRecipes } from './orphanRecipePrune.js';
+import { importModeRefusal } from './resolutionModeAvailability.js';
 import { membershipKey } from './scopedDefinitions.js';
 import {
   membershipKeySet,
@@ -230,6 +232,8 @@ export class CompendiumImporter {
     if (!this._isGM()) {
       throw new Error('Only a GM can import a crafting system (world-scope write).');
     }
+    const modeRefusal = importModeRefusal(packData.system, options.selectableModes);
+    if (modeRefusal) throw modeRefusal;
 
     const {
       overwriteExisting = false,
@@ -241,17 +245,7 @@ export class CompendiumImporter {
     const systemData = packData.system;
     const recipesData = Array.isArray(packData.recipes) ? packData.recipes : [];
 
-    const summary = {
-      system: { id: null, name: systemData.name || '', created: false, skipped: false },
-      components: { total: 0, remapped: [], retained: [], unresolved: [] },
-      recipes: { total: recipesData.length, imported: 0, skipped: 0, pruned: 0, errors: [] },
-      collisions: [],
-      // Recipes of the target system absent from the payload, under overwrite: `pruned` when
-      // provenance-matched, else `reported`.
-      orphans: [],
-      // The cross-reference report surfaced to the GM.
-      unresolvedReferences: [],
-    };
+    const summary = createImportSummary(systemData, recipesData);
 
     // A fresh reporter per RUN, since the default carries per-toast state.
     this._activeProgressReporter = this._reportProgress ?? createDefaultProgressReporter();

@@ -6,6 +6,7 @@ import {
 import { localizeWith } from '../utils/localizeWithFallback.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 
+import { iterativeCraftRefusal } from './iterative/iterativeCraftGate.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 
 /**
@@ -115,9 +116,13 @@ export function resultGroupRefusals(groups, options = {}) {
 /**
  * A stage's own `resultGroupRefusals` against the world as it is now, as its preparation's refusal,
  * or `null`: a GM change since run start refuses before the stage consumes or awards (issue 1773).
+ * An iterative recipe refuses first.
  */
 export function stageResultRefusal({ actor, recipe, step }, modeService, refusals = {}) {
-  const progressive = modeService?.getMode?.(recipe) === 'progressive';
+  const mode = modeService?.getMode?.(recipe);
+  const iterative = iterativeCraftRefusal(mode);
+  if (iterative) return { valid: false, message: `Invalid recipe: ${iterative}` };
+  const progressive = mode === 'progressive';
   const context = { actor, recipe, progressive, ...refusals };
   const errors = resultGroupRefusals(step?.resultGroups, context);
   return errors.length > 0
@@ -126,15 +131,18 @@ export function stageResultRefusal({ actor, recipe, step }, modeService, refusal
 }
 
 /**
- * `recipe.validate({ Roll })`, then `resultGroupRefusals` over every result group the recipe and
+ * The iterative refusal, then `recipe.validate({ Roll })`, then `resultGroupRefusals` over every result group the recipe and
  * its steps author, against `actor`; `refusals` carries its `refuseRewards` and
  * `refusePlayerChoices`. A progressive award drops every formula (`ResolutionModeService`), so the
  * amount refusals skip it there; `refuseRewards` still refuses any currency, knowledge or group.
  */
 export function validateCraft(recipe, actor, modeService, refusals = {}) {
-  const Roll = diceEngine();
   const modes = modeService ?? globalThis.game?.fabricate?.getResolutionModeService?.();
-  const progressive = modes?.getMode?.(recipe) === 'progressive';
+  const mode = modes?.getMode?.(recipe);
+  const iterative = iterativeCraftRefusal(mode);
+  if (iterative) return { valid: false, errors: [iterative] };
+  const Roll = diceEngine();
+  const progressive = mode === 'progressive';
   const validation = recipe.validate?.({ Roll, progressive }) ?? { valid: true, errors: [] };
   if (!validation.valid) return validation;
   const groups = [

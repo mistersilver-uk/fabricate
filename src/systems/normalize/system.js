@@ -8,6 +8,7 @@ import { normalizeCategoryIconMap } from '../../utils/categoryIcons.js';
 import { normalizeCharacterPrerequisiteList } from '../characterPrerequisites.js';
 import { normalizeGatheringRealmSettings } from '../gatheringRealms.js';
 import { normalizeModifierLibrary } from '../modifierLibrary.js';
+import { RESOLUTION_MODES, resolveResolutionModeAlias } from '../resolutionModeAvailability.js';
 
 import { normalizeComponent } from './components.js';
 import {
@@ -50,15 +51,10 @@ function _iconAllowance(icons, vocabulary) {
   return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
 }
 
+/** A known mode or legacy alias, else `simple`; selectability is not the normalizer's concern. */
 function _normalizeResolutionMode(raw) {
-  if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-  // Legacy mode token aliases: `mapped` and bare `routed` → `routedByIngredients` (the 1.9.0
-  // migration's tie-break), `tiered` → `routedByCheck`.
-  if (raw === 'mapped' || raw === 'routed') return 'routedByIngredients';
-  if (raw === 'tiered') return 'routedByCheck';
-  return ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'].includes(raw)
-    ? raw
-    : 'simple';
+  const mode = resolveResolutionModeAlias(raw);
+  return RESOLUTION_MODES.includes(mode) ? mode : 'simple';
 }
 
 /** Tool-breakage authority (issue 419), absence-preserving since 1.30.0 (issue 1363) so the world

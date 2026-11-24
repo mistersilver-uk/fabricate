@@ -176,6 +176,16 @@ A bump still cannot remove the seed residual, because a schema-`6` bundle export
 A bundle above the current schema, written by a newer build, still takes the legacy branch and is stamped down to the current marker, but neither derivation runs on it.
 It is idempotent, because a second pass finds the mark already non-empty and returns at the same test that made it so.
 
+`CompendiumImporter.importFromPackData`, which file and pack imports both reach, MUST refuse an export it cannot read before any write or progress toast, right after its GM gate.
+It refuses a system whose `resolutionMode` names a known mode outside the selectable set (`reason: 'resolutionModeUnavailable'`), and one whose `iterative.version` is above the build's (`reason: 'iterativeVersionUnsupported'`).
+The refusal is an `Error` whose `message` is plain English that never shows the `reason` code:
+
+- `resolutionModeUnavailable`: "This export uses the Iterative resolution mode, which this version of Fabricate cannot import yet."
+- `iterativeVersionUnsupported`: "This export's iterative settings were made by a newer version of Fabricate."
+
+`options.selectableModes` injects the selectable set, and it defaults to `SELECTABLE_RESOLUTION_MODES` (`resolution-modes` § Iterative Mode Availability).
+A legacy alias and an unknown token are not refused, and normalize as before.
+
 ### Currency configuration merge on import
 
 Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.
