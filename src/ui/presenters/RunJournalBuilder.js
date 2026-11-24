@@ -733,10 +733,10 @@ export class RunJournalBuilder {
       // ingredients. The advance itself is authorized downstream by
       // `resolveAdvanceSources`, which owns the ownership check.
       manualAdvance: true,
-      // A player may cancel their own in-progress craft (issue 848) only on an OWNED
-      // actor (the engine writes items with no GM relay) and only while the run is
-      // live. Redaction is deliberately NOT a condition (issue 966): a crafter who
-      // cannot see what they started still gets to abandon it. `refundOnCancel`
+      // A player may cancel their own in-progress craft (issue 848) only on an OWNED actor (the
+      // request is owner-scoped; the active GM executes it under the command authority) and only
+      // while the run is live. Redaction is deliberately NOT a condition (issue 966): a crafter
+      // who cannot see what they started still gets to abandon it. `refundOnCancel`
       // mirrors the owning system's `features.refundOnPlayerCancel` (default ON) so
       // the UI can tell the player whether inputs will be returned before they confirm.
       canCancel: lifecycleProjection.actions.cancel,

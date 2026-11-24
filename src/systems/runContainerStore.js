@@ -37,8 +37,8 @@ export class RunContainerManagerBase {
     this._flagKey = flagKey;
     this._settlementOwners = settlementOwners;
     this._cache = new Map(); // actorId -> container
-    // actorId -> the `{ activeKeys, historyIds }` last observed, so `_persist` removes only what
-    // THIS writer dropped, never another client's concurrent run (see runContainerCoherence).
+    // actorId -> the `{ activeKeys, historyIds }` and version-1 `revisions` last observed, so
+    // `_persist` removes only what THIS writer dropped and refuses a stale version-1 write.
     this._baseline = new Map();
   }
 

@@ -59,9 +59,9 @@ export class GatheringRunManager {
     this.getUserId = getUserId;
     this.getActors = getActors;
     this._cache = new Map();
-    // actorKey -> { activeKeys, historyIds } this manager last observed, so `_persist`
-    // can reconcile against the document and remove only what THIS writer dropped
-    // (never another client's concurrently-added run). See runContainerCoherence.
+    // actorKey -> { activeKeys, historyIds } and version-1 `revisions` this manager last
+    // observed, so `_persist` removes only what THIS writer dropped (never another client's
+    // concurrently-added run) and refuses a stale version-1 write. See runContainerCoherence.
     this._baseline = new Map();
   }
 
