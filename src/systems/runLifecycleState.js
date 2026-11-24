@@ -41,6 +41,16 @@ export function getRunLifecycleContract(run) {
 }
 
 /**
+ * Whether the command authority may act on `run` for `request`: any command on a current run, and
+ * on a legacy run only a crafting `cancel`, which keeps its legacy refund semantics.
+ */
+export function commandAdmitsRun(run, request) {
+  const contract = getRunLifecycleContract(run);
+  if (contract === 'current') return true;
+  return contract === 'legacy' && request?.runType === 'crafting' && request?.action === 'cancel';
+}
+
+/**
  * Build explicitly opted-in lifecycle fields with revision zero and manual completion by default.
  * Unstamped callers receive no lifecycle fields. Unsupported versions throw.
  */

@@ -696,6 +696,32 @@ describe('journal run command protocol', () => {
     }
   });
 
+  for (const { label, run, runType = 'crafting', action = 'cancel', expectedRevision = 0, reason } of [
+    { label: 'admits a legacy crafting cancel', run: { id: 'run-1' }, reason: null },
+    { label: 'refuses a legacy crafting execute', run: { id: 'run-1' }, action: 'execute',
+      reason: 'unsupported-version' },
+    { label: 'refuses a legacy gathering cancel', run: { id: 'run-1' }, runType: 'gathering',
+      reason: 'unsupported-version' },
+    { label: 'refuses an unsupported-version crafting cancel', run: { id: 'run-1', lifecycleVersion: 2 },
+      reason: 'unsupported-version' },
+    { label: 'refuses a legacy cancel at a revision it never had', run: { id: 'run-1' }, expectedRevision: 1,
+      reason: 'stale-run' },
+  ]) {
+    it(`${label} (issue 900)`, async () => {
+      const executed = [];
+      const record = (name) => async () => {
+        executed.push(name);
+        return { success: true };
+      };
+      const operation = { getRun: () => run, execute: record('execute'), cancel: record('cancel') };
+      const { service, actor } = commandHarness({ currentUserId: 'gm', operations: { [runType]: operation } });
+      const response = await service.executeJournalRunCommand({ actorUuid: actor.uuid, runType,
+        runId: run.id, expectedRevision, action, payload: {} });
+      assert.equal(response.reason ?? null, reason, JSON.stringify(response));
+      assert.deepEqual(executed, reason ? [] : [action], 'a refusal reaches no operation');
+    });
+  }
+
   it('replays a resent version-1 cancel and refuses a fresh one at the old revision', async () => {
     const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
     const executed = [];

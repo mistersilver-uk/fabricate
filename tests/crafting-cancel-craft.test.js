@@ -280,6 +280,20 @@ function gmCancelAuthority(actor) {
   return { client, sent };
 }
 
+/** Cancel `runId` on the GM executor, as the authority does for an admitted legacy command. */
+async function cancelAsAuthority(engine, actor, runId) {
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: `cancel-${runId}` }),
+  });
+  return engine.cancelVersionedRun({
+    actor,
+    runId,
+    expectedRevision: 0,
+    executionGrant: 'grant',
+    requestId: `cancel-${runId}`,
+  });
+}
+
 test('two clients cancelling one legacy run restore its consumption once (issue 900)', async () => {
   const system = makeSystem();
   const craftingActor = new FakeActor('Crafter', { gp: 0 });
@@ -350,7 +364,7 @@ test('cancel with refund ON restores ingredients, refunds currency, removes the 
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   assert.equal(result.success, true);
   assert.equal(result.cancelled, true);
@@ -381,8 +395,9 @@ test('cancel with refund OFF removes the run without restoring ingredients or cu
   const runManager = new CraftingRunManager();
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
+  system.features.refundOnPlayerCancel = false;
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: false });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   assert.equal(result.success, true);
   assert.equal(result.refunded, false);
@@ -393,7 +408,7 @@ test('cancel with refund OFF removes the run without restoring ingredients or cu
   assert.equal(runManager.getRunHistory(craftingActor)[0].status, 'cancelled');
 });
 
-test('cancel reads the system feature flag when no explicit refund override is given', async () => {
+test('cancel reads the system feature flag, which no caller can override', async () => {
   const system = makeSystem();
   system.features.refundOnPlayerCancel = false; // GM forfeits inputs on cancel
   const craftingActor = new FakeActor('Crafter', { gp: 0 });
@@ -404,12 +419,12 @@ test('cancel reads the system feature flag when no explicit refund override is g
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id);
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
   assert.equal(result.refunded, false, 'the system flag (false) forfeits inputs');
   assert.equal(sourceActor.created.length, 0);
 });
 
-test('cancel is refused for a non-owned crafting actor (owner-scoped, no GM relay)', async () => {
+test('cancel is refused for a non-owned crafting actor (owner-scoped)', async () => {
   const system = makeSystem();
   const craftingActor = new FakeActor('Crafter', { isOwner: false, gp: 0 });
   const sourceActor = new FakeActor('Source', { gp: 0 });
@@ -419,7 +434,7 @@ test('cancel is refused for a non-owned crafting actor (owner-scoped, no GM rela
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id);
   assert.equal(result.success, false, 'a non-owner cannot cancel');
   assert.match(result.message, /own/i);
   assert.equal(runManager.getActiveRuns(craftingActor).length, 1, 'the run is untouched');
@@ -437,12 +452,12 @@ test('a finished/absent run cannot be cancelled (idempotent)', async () => {
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
   // First cancel succeeds and archives the run.
-  const first = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const first = await cancelAsAuthority(engine, craftingActor, run.id);
   assert.equal(first.success, true);
   const refundsAfterFirst = sourceActor.created.length;
 
   // A second cancel of the same (now-archived) run is a no-op refusal — no double refund.
-  const second = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const second = await cancelAsAuthority(engine, craftingActor, run.id);
   assert.equal(second.success, false, 'no active run to cancel a second time');
   assert.equal(sourceActor.created.length, refundsAfterFirst, 'no double restore');
   assert.equal(craftingActor.system.currency.gp, 5, 'no double refund');
@@ -459,7 +474,7 @@ test('cancel reports refunded:false (and partialRefund) when the currency refund
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   // Truthful outcome: the ingredient came back but the currency refund failed, so this
   // is NOT reported as a full refund (issue 848 finding #2).
@@ -482,7 +497,7 @@ test('a mid-reversal RESTORE failure cannot double-restore: run is archived, not
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
   // The restore throw is swallowed (best-effort) rather than propagating out of cancel.
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
   assert.equal(result.success, true, 'the cancel completes despite the restore failure');
   assert.equal(result.refunded, false, 'a failed restore is not reported as a full refund');
   assert.equal(result.partialRefund, true, 'partial: currency refunded but the ingredient did not');
@@ -495,7 +510,7 @@ test('a mid-reversal RESTORE failure cannot double-restore: run is archived, not
     0,
     'the run is archived, not left active'
   );
-  const second = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const second = await cancelAsAuthority(engine, craftingActor, run.id);
   assert.equal(second.success, false, 'the archived run cannot be re-cancelled');
 });
 
@@ -515,7 +530,7 @@ test('a reversal that recovers NOTHING (no currency recorded) reports partialRef
     currencySpends: [],
   });
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   assert.equal(result.success, true, 'the cancel still completes');
   assert.equal(result.refunded, false, 'nothing was recovered');
@@ -540,7 +555,7 @@ test('a reversal whose restore AND currency refund both fail reports partialRefu
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   assert.equal(result.success, true);
   assert.equal(result.refunded, false);
@@ -594,7 +609,7 @@ test('multi-step cancel reverses ONLY the consumed-but-unresolved step, never a 
   const run = await seedMultiStepRun(runManager, craftingActor, sourceActor);
   const step0ResultsBefore = JSON.stringify(run.steps[0].createdResults);
 
-  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+  const result = await cancelAsAuthority(engine, craftingActor, run.id);
 
   assert.equal(result.success, true);
   assert.equal(result.refunded, true);
@@ -638,9 +653,7 @@ async function cancelWithRefund({ currencyUnits, schemaPaths }) {
   const realError = console.error;
   console.error = (...args) => errors.push(args.join(' '));
   try {
-    const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, {
-      refund: true,
-    });
+    const result = await cancelAsAuthority(engine, craftingActor, run.id);
     return { result, errors, craftingActor, sourceActor };
   } finally {
     console.error = realError;
