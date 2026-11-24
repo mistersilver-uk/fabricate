@@ -1,18 +1,16 @@
 import { settleCardRolls } from './checkCardRolls.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
+  describePreparedJournalCheck,
   evaluatePreparedJournalCheck,
-  withPreparedAdditionalDiceOffer,
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
 import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
-import {
-  authorizeAwardChoice,
-  awardChoiceDismissalRefusal,
-  validAwardChoicePayload,
-} from './journalRunAwardChoice.js';
-import { serializedOperationResult, terminalRun, validText } from './journalRunReply.js';
-import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
+import { authorizeAwardChoice, validAwardChoicePayload } from './journalRunAwardChoice.js';
+import { MUTATING_ACTIONS } from './journalRunCommandActions.js';
+import { createJournalRunDismissals } from './journalRunDismissals.js';
+import { serializedOperationResult, validText } from './journalRunReply.js';
+import { decisionAdditionalDice } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation, commandAdmitsRun } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -27,18 +25,8 @@ export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
  * `tests/journal-run-authority.test.js` pins the two together.
  */
 export const JOURNAL_RUN_COMMAND_TIMEOUT_MS = 15_000;
-const DISMISSAL_LIMIT = 500;
-const MUTATING_ACTIONS = new Set([
-  'start',
-  'beginStep',
-  'execute',
-  'pause',
-  'resume',
-  'setCompletionMode',
-  'setSelection',
-  'cancel',
-  'chooseAward',
-]);
+
+export { journalRunDismissalKey, normalizeJournalRunDismissals } from './journalRunDismissals.js';
 
 function failure(reason, extra = {}) {
   return { success: false, reason, ...extra };
@@ -65,34 +53,6 @@ function replyMatches(pending, payload) {
     pending.runId === payload.runId &&
     pending.expectedRevision === payload.expectedRevision
   );
-}
-
-/**
- * The JSON tuple key hiding one native run per user and world, never deleting actor history;
- * alchemy uses its native `crafting` run type.
- */
-export function journalRunDismissalKey({ actorUuid, runType, runId }) {
-  return JSON.stringify([String(actorUuid ?? ''), String(runType ?? ''), String(runId ?? '')]);
-}
-
-/**
- * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs, as a new
- * map for the replacing user-setting write.
- */
-export function normalizeJournalRunDismissals(value) {
-  const entries = Object.entries(value && typeof value === 'object' ? value : {})
-    .filter(([key, hiddenAt]) => {
-      if (!validText(key) || !Number.isFinite(Number(hiddenAt))) return false;
-      try {
-        const tuple = JSON.parse(key);
-        return Array.isArray(tuple) && tuple.length === 3 && tuple.every(validText);
-      } catch {
-        return false;
-      }
-    })
-    .sort((left, right) => Number(right[1]) - Number(left[1]))
-    .slice(0, DISMISSAL_LIMIT);
-  return Object.fromEntries(entries);
 }
 
 /**
@@ -574,6 +534,15 @@ export function createJournalRunCommandService({
 }) {
   const sessionId = randomId();
   const pending = new Map();
+  const dismissals = createJournalRunDismissals({
+    operations,
+    currentUser,
+    resolveUuid,
+    getDismissals,
+    setDismissals,
+    now,
+    onDismissalsChanged,
+  });
   const currentRealmIsActiveGm = () => {
     const user = currentUser?.();
     return user?.isGM === true && Boolean(user.id) && user.id === activeGM?.()?.id;
@@ -689,44 +658,15 @@ export function createJournalRunCommandService({
       });
       trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
-      const preparationGrant = helpers.createExecutionGrant({
-        ...binding,
-        operation: 'describeCheck',
-        expectedRevision: null,
+      const described = await describePreparedJournalCheck({
+        request,
+        context,
+        helpers,
+        binding,
+        now,
       });
-      const descriptor = await operation.describeCheck({
-        actor,
-        run,
-        sender: context.sender,
-        payload: request.payload ?? {},
-        preparationGrant,
-        requestId: request.requestId,
-      });
-      if (descriptor?.blocked) return failure(descriptor.blocked, descriptor.detail);
-      if (descriptor?.required) {
-        const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
-        const token = helpers.issuePrepareToken(
-          {
-            ...binding,
-            privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: preparedDecisionPolicy(publicPrompt),
-          },
-          { expiresAt: now() + 60_000 }
-        );
-        return {
-          success: true,
-          checkRequired: true,
-          promptDescriptor: publicPrompt ?? {},
-          prepareToken: token,
-        };
-      }
-      trustedContext.resolvedCheckResult = {
-        success: true,
-        outcome: null,
-        value: null,
-        data: {},
-        engineEvaluated: true,
-      };
+      if (described.response) return described.response;
+      trustedContext.resolvedCheckResult = described.resolvedCheckResult;
     }
 
     const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
@@ -894,38 +834,9 @@ export function createJournalRunCommandService({
     return settlePromptedCheck(command, first, seams);
   }
 
-  function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {
-    if (viewerId && viewerId !== currentUser?.()?.id) return new Set();
-    const normalized = normalizeJournalRunDismissals(getDismissals());
-    const actorPrefix = JSON.stringify([String(actorUuid ?? '')]).slice(0, -1) + ',';
-    return new Set(Object.keys(normalized).filter((key) => key.startsWith(actorPrefix)));
-  }
-
-  async function dismissJournalRun({ actorUuid, runType, runId } = {}) {
-    const operation = operations[runType];
-    if (!operation || !validText(actorUuid) || !validText(runId))
-      return failure('invalid-dismissal');
-    let actor;
-    try {
-      actor = await resolveUuid(actorUuid);
-    } catch {
-      return failure('actor-not-found');
-    }
-    const run = actor ? await operation.getRun?.({ actor, runId, includeHistory: true }) : null;
-    if (!run) return failure('run-not-found');
-    const refused = terminalRun(run) ? awardChoiceDismissalRefusal(run) : failure('active-run');
-    if (refused) return refused;
-    const key = journalRunDismissalKey({ actorUuid, runType, runId });
-    const next = normalizeJournalRunDismissals({ ...getDismissals(), [key]: now() });
-    await setDismissals(next);
-    onDismissalsChanged({ actorUuid, runType, runId });
-    return { success: true, key };
-  }
-
   return {
     executeJournalRunCommand,
-    dismissJournalRun,
-    getDismissedJournalRunKeys,
+    ...dismissals,
     getJournalRunAuthorityAvailability: () => authority.availability(),
     setupJournalRunAuthority: () => authority.setup(),
     reconcileJournalRunAuthority: (options) => authority.reconcile(options),
