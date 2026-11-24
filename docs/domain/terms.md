@@ -704,7 +704,7 @@ An edit to an already-`alchemy` system that would introduce a collision is **har
 Notifications are aggregated (one migrated summary, one deleted-recipes warning when any were deleted) with a single `recipesChanged` emission.
 The migration helper is pure and reuses the `_clone` idiom from `migrateLegacyResolutionModes.js` (it no longer seeds an alchemy provider; `_seedProvider` survives only for the recipe editor's per-recipe seeding path, retained but off the mode-change pass).
 
-Canonical mapping: `migrateRecipeForModeChange`/`classifyModeChange` in `src/systems/migrateRecipeForModeChange.js`; `CraftingSystemManager.updateSystem`/`_migrateRecipesForModeChange`/`_assertNoAlchemySignatureCollisions`; `summarizeModeChange` in the same file; `modeChangeConfirmContent` in `src/ui/svelte/stores/modeChangeConfirm.js`, which `adminStore.setResolutionMode` passes to the confirm dialog
+Canonical mapping: `migrateRecipeForModeChange`/`classifyModeChange` in `src/systems/migrateRecipeForModeChange.js`; `CraftingSystemManager.updateSystem`/`_migrateRecipesForModeChange`/`_assertNoAlchemySignatureCollisions`; `summarizeModeChange` in the same file; `modeChangeConfirmOptions` (its content from `modeChangeConfirmContent`) in `src/ui/svelte/stores/modeChangeConfirm.js`, which `adminStore.setResolutionMode` passes to the confirm dialog after `modeChangeRefusal` in `src/systems/resolutionModeAvailability.js` has refused an unknown or unselectable mode
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/destructive-changes-and-migrations/spec.md, openspec/specs/recipe-visibility/spec.md
 
