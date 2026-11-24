@@ -3314,6 +3314,7 @@ RunLifecycle = {
 ### Requirements
 
 1. Only an absent `lifecycleVersion` selects legacy behavior, preserving existing consumption, refunds and automatic progression without migration or restamping.
+A legacy crafting run's cancellation keeps its legacy refund semantics but is executed by the active-GM command authority; its command carries an expected revision of 0, and the run never gains `lifecycleVersion` or `runRevision`.
 A present unsupported version remains readable and preserved, but mutation entrypoints refuse it before effects.
 2. New applicable runs explicitly request version 1; ordinary legacy manager callers remain unstamped.
 Accepted versioned mutations advance `runRevision`, and a stale expected revision is refused.
@@ -3349,7 +3350,8 @@ Reload reconstruction reads `awardChoiceJournal` as it reads `executionJournal`,
 
 ### Authority Ledger and Recovery Boundary
 
-Every version-1 start or mutation MUST pass through the active-GM command authority, including an immediately executable public craft.
+Every version-1 start or mutation, and every cancellation of a legacy crafting run, MUST pass through the active-GM command authority, including an immediately executable public craft.
+The authority refuses every other command on a run whose lifecycle contract is not current — legacy or unsupported — with the reason `unsupported-version`.
 The authority MUST re-resolve the actor, sender ownership, source actors, run revision and executable stage under its execution claim before applying the operation.
 The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
 A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
@@ -3414,7 +3416,7 @@ Releasing the claim MUST NOT replay the refused start.
 A player, a GM when no claim is retained, and a refusal for any other reason see only the refusal notice.
 A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and a viewer who is not a GM is never offered one.
 A GM who is not the active GM may be offered it, and `reconcileJournalRunAuthority` refuses that release.
-Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim.
+Native Reconciliation is distinct from Claim Reconciliation: it applies only to a legacy run, which holds no claim at rest; a legacy cancel that fails by throwing retains the authority's claim like any other command, and Claim Reconciliation clears that claim.
 Unlike claim reconciliation, it ends that run's recovery-required state while its settlement stays `uncertain`.
 Native Reconciliation leaves the retained-claim affordance unchanged.
 
@@ -3759,6 +3761,11 @@ Requirements:
    The same cap applies to that union and keeps such a run.
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
    The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
+   A write MUST NOT replace a stored version-1 run, active or in history, with a copy carrying a lower `runRevision`, and a write that moves a version-1 run from `active` to `history` MUST carry a `runRevision` greater than the stored active copy's.
+   Such a write is refused with `STALE_RUN_REVISION` before the flag write is dispatched, leaving the flag unchanged; it is a pre-write refusal only when no earlier effect of its operation was written (§ Authority Ledger and Recovery Boundary).
+   Only `runRevision` is compared, and only when both copies are version 1; legacy and unsupported runs, and therefore every salvage run, are never compared.
+   The stored copy is the actor's flag as the writing client last received it, read with no intervening `await` before the write.
+   Foundry has no conditional update, so the check closes races between writers on one client and only narrows races with another client's write; the active-GM command authority, not this check, serialises cross-client writers.
 
 ### Gathering Runs Flag
 
@@ -3782,6 +3789,7 @@ Requirements:
    A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
    A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
+   The stale-revision refusal of Crafting Runs Flag requirement 6 applies identically to version-1 gathering runs.
 
 ### Learned Recipes Flag
 
@@ -3949,9 +3957,9 @@ RunModel = {
 ```
 
 A **legacy player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
-It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
+The requesting edge is owner-scoped, so it blocks a non-owner exactly as the advance edge does, and the active GM executes the cancel under the command authority's claim (§ Authority Ledger and Recovery Boundary), so a legacy cancel requires an active GM.
 When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
-The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
+The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned — and the run is archived even then; a later cancel of that run, read fresh under the claim, restores nothing.
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
 Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
 

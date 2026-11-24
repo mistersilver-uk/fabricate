@@ -283,6 +283,13 @@ Legacy actions retain the projection's `manualAdvance` contract:
   It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
   Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_); the final-step variant is copy-only and re-enters the same advance flow.
 - **Legacy gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because those matured runs auto-resolve on world time.
+- **Legacy crafting cancel** is executed by the active-GM command authority.
+  Its control stays offered as before.
+  A refusal (no active GM, a held claim, a timeout, a stale or already-gone run) MUST be reported as one localized warning notification drawn from the shared refusal chain (_Authority Reasons and Recovery_), never silently and never as a raw code.
+  It is not recorded as a persistent command error and offers no Retry; the player cancels again to retry.
+  While the request is in flight the run's controls show the busy state.
+  Confirming a cancel disarms the confirmation immediately whatever the outcome, and the Journal re-reads on completion.
+  A success keeps the existing Cancelled, Cancelled and refunded, or Cancelled, partial refund notification.
 
 ### World-Time Disclosure
 
