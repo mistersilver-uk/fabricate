@@ -1,0 +1,5712 @@
+{
+  "rows": [
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 4.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 4.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 8
+        },
+        "foundry": {
+          "ok": true,
+          "value": 8
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 12
+        },
+        "foundry": {
+          "ok": true,
+          "value": 12
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@skill",
+        "foundry": "@skill"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 12
+        },
+        "foundry": {
+          "ok": true,
+          "value": 12
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 12
+        },
+        "foundry": {
+          "ok": true,
+          "value": 12
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 11
+        },
+        "foundry": {
+          "ok": true,
+          "value": 11
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 7
+        },
+        "foundry": {
+          "ok": true,
+          "value": 7
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -2.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": -2.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@name.length",
+        "foundry": "@name.length"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@toString",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 8
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@actor.level",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@inherited.v",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 40
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@skills.craft",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 7
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@actor.level",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@inherited.v",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing.value",
+        "foundry": "@missing.value"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@nested.zero.value",
+        "foundry": "@nested.zero.value"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@name.length",
+        "foundry": "@name.length"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -4
+        },
+        "foundry": {
+          "ok": true,
+          "value": -4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 6
+        },
+        "foundry": {
+          "ok": true,
+          "value": 6
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 100
+        },
+        "foundry": {
+          "ok": true,
+          "value": 100
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 8
+        },
+        "foundry": {
+          "ok": true,
+          "value": 8
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 7
+        },
+        "foundry": {
+          "ok": true,
+          "value": 7
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -5
+        },
+        "foundry": {
+          "ok": true,
+          "value": -5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -3
+        },
+        "foundry": {
+          "ok": true,
+          "value": -3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 42
+        },
+        "foundry": {
+          "ok": true,
+          "value": 42
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 7
+        },
+        "foundry": {
+          "ok": true,
+          "value": 7
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1000
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1000
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1000
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1000
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1000
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1000
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0.001
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0.001
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 500
+        },
+        "foundry": {
+          "ok": true,
+          "value": 500
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 7
+        },
+        "foundry": {
+          "ok": true,
+          "value": 7
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 6
+        },
+        "foundry": {
+          "ok": true,
+          "value": 6
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 14
+        },
+        "foundry": {
+          "ok": true,
+          "value": 14
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 20
+        },
+        "foundry": {
+          "ok": true,
+          "value": 20
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -6
+        },
+        "foundry": {
+          "ok": true,
+          "value": -6
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 6
+        },
+        "foundry": {
+          "ok": true,
+          "value": 6
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -3
+        },
+        "foundry": {
+          "ok": true,
+          "value": -3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -3
+        },
+        "foundry": {
+          "ok": true,
+          "value": -3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 21
+        },
+        "foundry": {
+          "ok": true,
+          "value": 21
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -2
+        },
+        "foundry": {
+          "ok": true,
+          "value": -2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -1
+        },
+        "foundry": {
+          "ok": true,
+          "value": -1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a-1",
+        "foundry": "@a-1"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 2
+        },
+        "foundry": {
+          "ok": true,
+          "value": 2
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a-",
+        "foundry": "@a-"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a-",
+        "foundry": "@a-"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 6
+        },
+        "foundry": {
+          "ok": true,
+          "value": 6
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1.5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1.5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@{a.b}",
+        "foundry": "@{a.b}"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 4
+        },
+        "foundry": {
+          "ok": true,
+          "value": 4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a.b",
+        "foundry": "@a.b"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 4
+        },
+        "foundry": {
+          "ok": true,
+          "value": 4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a.b.c",
+        "foundry": "@a.b.c"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a.",
+        "foundry": "@a."
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@.a",
+        "foundry": "@.a"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@a..b",
+        "foundry": "@a..b"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@-a",
+        "foundry": "@-a"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@-1",
+        "foundry": "@-1"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@1",
+        "foundry": "@1"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@d6",
+        "foundry": "@d6"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 4
+        },
+        "foundry": {
+          "ok": true,
+          "value": 4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 4
+        },
+        "foundry": {
+          "ok": true,
+          "value": 4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 16
+        },
+        "foundry": {
+          "ok": true,
+          "value": 16
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 0
+        },
+        "foundry": {
+          "ok": true,
+          "value": 0
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": -4
+        },
+        "foundry": {
+          "ok": true,
+          "value": -4
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 16
+        },
+        "foundry": {
+          "ok": true,
+          "value": 16
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 5
+        },
+        "foundry": {
+          "ok": true,
+          "value": 5
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "non-finite"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@name.length",
+        "foundry": "@name.length"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 13
+        },
+        "foundry": {
+          "ok": true,
+          "value": 13
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@abilities.int.value.x",
+        "foundry": "@abilities.int.value.x"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@abilities.wis.value",
+        "foundry": "@abilities.wis.value"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 13
+        },
+        "foundry": {
+          "ok": true,
+          "value": 13
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 15
+        },
+        "foundry": {
+          "ok": true,
+          "value": 15
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 15
+        },
+        "foundry": {
+          "ok": true,
+          "value": 15
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 40
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@skills.craft",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": true,
+          "value": 40
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@{skills.craft}",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing.value",
+        "foundry": "@missing.value"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing1",
+        "foundry": "@missing1"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "non-finite"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@missing",
+        "foundry": "@missing"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@constructor",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@__proto__",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@hasOwnProperty",
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@v",
+        "foundry": "@v"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "unresolved-path"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "unresolved-path"
+        }
+      },
+      "firstUnresolved": {
+        "strict": "@ad6",
+        "foundry": "@ad6"
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "dice"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "dice"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 3
+        },
+        "foundry": {
+          "ok": true,
+          "value": 3
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": true,
+          "value": 1
+        },
+        "foundry": {
+          "ok": true,
+          "value": 1
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    },
+    {
+      "resolve": {
+        "strict": {
+          "ok": false,
+          "reason": "invalid"
+        },
+        "foundry": {
+          "ok": false,
+          "reason": "invalid"
+        }
+      },
+      "firstUnresolved": {
+        "strict": null,
+        "foundry": null
+      }
+    }
+  ],
+  "sweep": {
+    "strict": {
+      "rows": 41370,
+      "accepts": 1117,
+      "sha256": "0819e368bb02f2b181380c41542fb9558ee24131eb6e8b786d9aa8d6a0475e32"
+    },
+    "foundry": {
+      "rows": 41370,
+      "accepts": 1117,
+      "sha256": "0819e368bb02f2b181380c41542fb9558ee24131eb6e8b786d9aa8d6a0475e32"
+    }
+  }
+}
