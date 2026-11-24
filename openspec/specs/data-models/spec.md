@@ -3566,8 +3566,12 @@ CraftingRun = {
 
   componentSourceActorUuids: string[],
 
-  // The recipe and crafting-check terms the run accepted at start; see requirement 5.
-  termsSnapshot?: { recipe: object, craftingCheck: object | null },
+  // The recipe, crafting-check and iterative terms the run accepted at start; see requirement 5.
+  termsSnapshot?: {
+    recipe: object,
+    craftingCheck: object | null,
+    iterative?: { version: number, counters: object[], actions: object[] },
+  },
 
   // Native Reconciliation's record; see requirement 6.
   gmReconciliation?: { disposition, userId, userName, note?, stepIndex: number },
@@ -3584,6 +3588,9 @@ CraftingRun = {
    It is written once, at run creation, and is never updated by a later edit to the live recipe or system.
    It is absent for a recipe that could not serialize itself and for any run begun before this field existed, and resolution for such a run falls back to the live recipe (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms).
    It is removed from the run record when the run completes, before the record is archived to history, so a history entry never carries it.
+   `termsSnapshot` also carries `iterative`, written only for an iterative system as `{ version, counters, actions }`, the library subset the recipe's steps can reach.
+   Its `actions` are the union of the actions each step allows, where a step allowing `all` reaches every action, and its `counters` are those a Counter Instance or a reachable action names, in library order.
+   It is absent for every other system, and it is removed at archive with the rest of the snapshot.
 6. `gmReconciliation` is written only by Native Reconciliation of an uncertain legacy stage, only on a `cancelled` history entry.
    Its `disposition` is `reconciled` or `abandoned`, `userName` is `null` when unknown, and `note` is trimmed, at most 500 characters and omitted when blank.
    `stepIndex` names the stage whose uncertain settlement was closed, because archiving nulls `currentStepIndex`.
@@ -3629,6 +3636,9 @@ CraftingRunStepState = {
     },
   },
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
+
+  // A started step of an iterative run; see Iterative Step State below.
+  iterative?: IterativeStepState,
 
   // Optional permitted historical meaning and purpose; never a live narrative lookup.
   resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum" | "count", direction?: "over" | "under" },
@@ -3806,6 +3816,54 @@ CraftingRunStepState = {
    While an unsettled choice has a claimable alternative, a later stage's start and execute refuse with the blocker `awardChoicePending`, and the world-time sweep skips the run by that same predicate.
    A run holding an unsettled choice survives the history limit, and a prune that would drop it forfeits the choice instead (Crafting Runs Flag, requirement 5).
    A versioned step carries no `historySettlement`, so nothing reads an owed step's awards as complete before the settle.
+
+#### Iterative Step State
+
+```js
+IterativeStepState = {
+  version: number,
+  counters: Array<{ counterId: string, value: number }>,
+  attemptCount: number,
+  sessionCount: number,
+  startedWith: Array<{ counterId, value, formulaValue: number | null, rolls: number[], clamped }>,
+  log: AttemptEntry[],
+  compacted: null | { attempts, sessions, paid: CounterTotal[], changed: CounterTotal[] },
+  labels: null | { counters: Array<{ id, label }>, actions: Array<{ id, label }> },
+  toolBreakOwed: null | { attempt: number },
+  terminal: null | { kind: "success" | "failure", attempt: number, resultGroupId: string | null },
+}
+
+AttemptEntry = {
+  attempt: number,
+  sessionNumber: number | null,
+  actionId: string,
+  requestId: string, // the Attempt id
+  check: null | { success: boolean, outcomeId: string | null, value: number },
+  rolls: Array<{ effectId: string, total: number }>,
+  paid: Array<{ counterId: string, delta: number }>,
+  changed: Array<{ counterId: string, delta: number }>,
+}
+
+CounterTotal = { counterId: string, total: number }
+```
+
+1. `CraftingRunStepState.iterative` is present only on a started step of an iterative run, and it is rebuilt with exactly this key set on every write.
+2. `counters` holds one row per Counter Instance, in instance order.
+   A later step starts with the previous step's final values verbatim, and `attemptCount` and `sessionCount` start at 0 on every step.
+3. `startedWith` holds one row per Counter Instance.
+   Start formulas resolve once, when the first step starts, and a fixed or carried start records `formulaValue: null` and `rolls: []`.
+4. An `AttemptEntry` holds ids and numbers only.
+   `attempt` restarts at 1 on each step, `rolls` holds one total per dice-bearing effect, and `requestId` is the Attempt id, unique within the run.
+5. `toolBreakOwed` is set by the first checked Iterative Attempt whose `checkBreakage` trigger fires, and it never moves afterwards.
+6. `terminal` is set once, by the terminal Iterative Attempt.
+7. While the run is active, `log` holds at most its newest 25 entries, oldest first.
+   Each older entry folds into `compacted`: `attempts` counts the folded entries, `sessions` counts those whose `sessionNumber` is not `null`, and `paid` and `changed` sum each counter's deltas in first-touch order, so `log` and `compacted` together equal the unbounded totals.
+8. When the run is archived, each step state's `log` is trimmed to its newest 10 entries the same way, and `labels` is written once from the terms snapshot.
+9. `compacted`, `labels`, `toolBreakOwed`, `terminal` and `terminal.resultGroupId` are written as explicit `null` when empty, so every stored state has the closed key set.
+   Foundry's flag merge replaces the `steps` array whole, so a step-state key is never resurrected.
+10. Each Iterative Attempt's flag write resends the run's whole `steps` array, including finished steps' logs, so one write can carry up to about 8 KiB per started step.
+11. A step state whose `version` is above the build's is preserved verbatim, is never trimmed, is readable, and refuses every Iterative Attempt.
+12. Hidden counters are stored unfiltered, and presentation decides what a non-GM viewer sees.
 
 #### Optional historical evidence
 

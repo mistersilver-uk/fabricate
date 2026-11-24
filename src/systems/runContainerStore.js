@@ -17,6 +17,15 @@ import { getRunLifecycleContract } from './runLifecycleState.js';
 
 const HISTORY_LIMIT = 50;
 
+/** The run `runId` names in a container, active or archived, and which of the two it is. */
+export function findRunLocation(container, runId) {
+  const id = String(runId ?? '').trim();
+  if (!id) return null;
+  if (container.active?.[id]) return { run: container.active[id], terminal: false };
+  const run = (container.history || []).find((entry) => entry?.id === id);
+  return run ? { run, terminal: true } : null;
+}
+
 /**
  * Shared actor-scoped run-container plumbing for the doubly-nested Fabricate run
  * managers (crafting + salvage). Owns the per-actor in-memory cache, the last-observed
