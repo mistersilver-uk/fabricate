@@ -2024,7 +2024,7 @@ Step = {
 3. Runtime execution normalises duration fields to a world-time target timestamp for gate evaluation.
 4. `Step.iterative`, when present, is `{ actions: { mode: 'all' | 'only', actionIds }, hiddenCounterIds, lockedCounterIds, success, failure }` with every key emitted at its default.
    `{ mode: 'only', actionIds: [] }` allows no action.
-   A present `actionIds`, `hiddenCounterIds` or `lockedCounterIds` that is not an array of ids is kept as authored, never narrowed to a looser list, and blocks its recipe with `iterativeInvalidEntry`.
+   A present `actions` that is not an object, and a present `actionIds`, `hiddenCounterIds` or `lockedCounterIds` that is not an array of ids, is kept as authored, never narrowed to a looser list, and blocks its recipe with `iterativeInvalidEntry`.
 
 ## IngredientSet
 

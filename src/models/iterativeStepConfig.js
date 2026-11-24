@@ -50,15 +50,21 @@ export function stepIdListFault(value) {
 /** A list that does not parse is kept as authored, so it still blocks; an absent one is `[]`. */
 const stepIdList = (value) => (stepIdListFault(value) ? cloneJson(value) : stringOnlyIdList(value));
 
+/** A present `actions` that is not an object is kept as authored, so it still blocks. */
+function stepActions(raw) {
+  if (raw != null && !isPlainObject(raw)) return cloneJson(raw);
+  const actions = raw ?? {};
+  return {
+    mode: enumOrDefault(actions.mode, 'all'),
+    actionIds: stepIdList(actions.actionIds),
+  };
+}
+
 /** `{ actions: { mode, actionIds }, hiddenCounterIds, lockedCounterIds, success, failure }`, or `null`. */
 export function normalizeStepIterative(raw) {
   if (!isPlainObject(raw)) return null;
-  const actions = isPlainObject(raw.actions) ? raw.actions : {};
   return {
-    actions: {
-      mode: enumOrDefault(actions.mode, 'all'),
-      actionIds: stepIdList(actions.actionIds),
-    },
+    actions: stepActions(raw.actions),
     hiddenCounterIds: stepIdList(raw.hiddenCounterIds),
     lockedCounterIds: stepIdList(raw.lockedCounterIds),
     success: normalizeCounterRuleList(raw.success),

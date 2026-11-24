@@ -655,6 +655,8 @@ describe('normalization is idempotent across the corpus', () => {
             lockedCounterIds: ['heat', 5, 'Bad id'],
           },
         },
+        { id: 's-3', iterative: { actions: 'all' } },
+        { id: 's-4', iterative: { actions: ['stoke'] } },
       ],
     },
   ];
@@ -678,6 +680,12 @@ describe('normalization is idempotent across the corpus', () => {
     assert.deepEqual(json.steps[1].iterative.actions, { mode: 'only', actionIds: 'stoke' });
     assert.deepEqual(json.steps[1].iterative.hiddenCounterIds, { heat: true });
     assert.deepEqual(json.steps[1].iterative.lockedCounterIds, ['heat', 5, 'Bad id']);
+    assert.equal(json.steps[2].iterative.actions, 'all');
+    assert.deepEqual(json.steps[3].iterative.actions, ['stoke']);
+    assert.deepEqual(normalizeStepIterative({ actions: null }).actions, {
+      mode: 'all',
+      actionIds: [],
+    });
     assert.deepEqual(
       normalizeStepIterative({ hiddenCounterIds: ['heat', 'heat'], lockedCounterIds: null }),
       {

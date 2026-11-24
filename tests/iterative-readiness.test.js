@@ -352,6 +352,13 @@ describe('the other inputs each code reads', () => {
         step(recipe).actions.actionIds = ['stoke', 'Bad id'];
       },
     ],
+    'an actions value that is not an object': [
+      'iterativeInvalidEntry',
+      ON_RECIPE,
+      ({ recipe }) => {
+        step(recipe).actions = 'all';
+      },
+    ],
     'an out-of-enum actions.mode': [
       'iterativeInvalidEntry',
       ON_RECIPE,

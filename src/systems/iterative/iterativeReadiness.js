@@ -11,7 +11,7 @@ import {
 } from '../../models/iterativeStepConfig.js';
 import { buildRecipeActivationIssue } from '../../utils/recipeActivationMessages.js';
 import { routedOutcomeTierOptions } from '../../utils/routedOutcomeKeywords.js';
-import { arrayOrEmpty, trimString } from '../../utils/scalars.js';
+import { arrayOrEmpty, isPlainObject, trimString } from '../../utils/scalars.js';
 import {
   ACTION_CHECKS,
   actionEntryFaults,
@@ -180,10 +180,14 @@ function allowedActions(config, context) {
   return arrayOrEmpty(context.library.actions).filter((action) => ids.has(action.id));
 }
 
-/** `true` when the step's action mode and its three id lists all parse. */
+/** `true` when the step's `actions` object, its mode and its three id lists all parse. */
 function stepEntriesHold(config) {
   const lists = [config.actions?.actionIds, config.hiddenCounterIds, config.lockedCounterIds];
-  return STEP_ACTION_MODES.includes(config.actions?.mode) && !lists.some(stepIdListFault);
+  return (
+    isPlainObject(config.actions) &&
+    STEP_ACTION_MODES.includes(config.actions.mode) &&
+    !lists.some(stepIdListFault)
+  );
 }
 
 function stepConfigCodes(config, references, context) {
