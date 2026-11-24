@@ -685,7 +685,8 @@ describe('journal run command protocol', () => {
       assert.equal(first.cancelled, true);
       assert.equal(first.refunded, true);
       assert.equal(second.success, false, JSON.stringify(second));
-      assert.equal(second.message, 'There is no in-progress craft to cancel.');
+      assert.equal(second.reason, 'run-not-found');
+      assert.equal(second.message, null, 'reason-only, so the Journal localizes it');
       assert.deepEqual(restored.map((entry) => [entry.name, entry.system.quantity]), [['Herb', 2]],
         'the consumption is restored once');
       const archived = runManager.getRun(actor, run.id);

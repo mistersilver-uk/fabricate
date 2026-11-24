@@ -1081,8 +1081,20 @@ describe('journalStore', () => {
     await store.retryCommandError();
     assert.equal(setup.calls.cancel.length, 1, 'no Retry re-sends the cancel');
     assert.deepEqual(setup.calls.command, []);
-    assert.equal(setup.calls.list, 2, 'the Journal re-reads on completion');
+    assert.equal(setup.calls.list, 2, 'the Journal re-reads after a settled reply');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it("shows a legacy cancel refusal's engine sentence ahead of its localized reason", async () => {
+    const message = 'This craft has invoked effects and cannot be cancelled.';
+    const setup = makeServices({ cancelResult: { success: false, reason: 'run-not-found', message } });
+    const store = await loadedStore(setup);
+
+    await store.cancel({ id: 'b' });
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, [message]);
+    assert.equal(store.commandError, null);
   });
 
   it('falls back to the generic error for an unmapped legacy cancel refusal', async () => {

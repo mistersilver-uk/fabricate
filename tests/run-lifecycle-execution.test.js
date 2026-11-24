@@ -1082,8 +1082,49 @@ test('CraftingEngine sends a legacy cancel to the authority and executes it unde
   container.active[legacy.id] = { ...archived, status: 'inProgress' };
   runManager.invalidateCache(actor.id);
   const twin = await cancel(legacy.id);
-  assert.equal(twin.success, false);
-  assert.equal(twin.message, 'There is no in-progress craft to cancel.');
+  assert.deepEqual(twin, { success: false, reason: 'run-not-found' }, 'reason-only, so it localizes');
+});
+
+test('CraftingEngine refuses a cancel that would restore onto an actor outside its sources', async () => {
+  const { engine, recipe, runManager } = setupEngineFixture();
+  const actor = new FakeActor('crafter');
+  const source = new FakeActor('source');
+  const stranger = new FakeActor('stranger');
+  const created = [];
+  for (const target of [actor, source, stranger]) {
+    target.createEmbeddedDocuments = async (_type, data) => {
+      created.push([target.id, ...data.map((entry) => entry.name)]);
+      return data;
+    };
+  }
+  const originalFromUuidSync = globalThis.fromUuidSync;
+  Object.assign(globalThis, {
+    fromUuidSync: (uuid) => [actor, source, stranger].find((a) => a.uuid === uuid) ?? null,
+  });
+  try {
+    engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({ operationId: 'op' }) });
+    const preparedRun = async (actorUuid) => {
+      const run = await runManager.createRun(actor, recipe, [source], 'user-1');
+      await runManager.markStepPrepared(actor, run, 0, { selectedIngredientSetId: 'set-1',
+        currencySpends: [], consumedSummary: [{ actorUuid, quantity: 2, name: 'Herb' }] });
+      return run;
+    };
+    const cancel = (run) =>
+      engine.cancelVersionedRun({ actor, runId: run.id, expectedRevision: 0, executionGrant: 'grant' });
+
+    const foreign = await preparedRun(stranger.uuid);
+    const refused = await cancel(foreign);
+    assert.equal(refused.success, false);
+    assert.equal(refused.message, 'This craft names a source this character cannot restore to.');
+    assert.deepEqual(created, [], 'nothing is restored');
+    assert.equal(runManager.getActiveRun(actor, foreign.id).status, 'inProgress', 'the run stays active');
+
+    // A recorded source is a permitted target, so the same shape restores onto it.
+    assert.equal((await cancel(await preparedRun(source.uuid))).success, true);
+    assert.deepEqual(created, [['source', 'Herb']]);
+  } finally {
+    Object.assign(globalThis, { fromUuidSync: originalFromUuidSync });
+  }
 });
 
 test('CraftingEngine routes versioned alchemy before local matching or consumption', async () => {

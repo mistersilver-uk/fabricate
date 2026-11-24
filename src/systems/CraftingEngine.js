@@ -1254,24 +1254,20 @@ export class CraftingEngine {
     const runManager = this._craftingRunManager();
     runManager?.invalidateCache?.(actor?.id);
     const run = runManager?.getActiveRun?.(actor, runId) ?? null;
-    if (!run) return versionedFailure('There is no in-progress craft to cancel.');
+    if (!run) return runNotFound();
     const contract = getRunLifecycleContract(run);
     if (contract === 'unsupported') {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
     // A legacy run holds no revision: the claim and this fresh read serialise its cancels.
-    if (contract === 'legacy') {
-      const refusal = legacyCancelRefusal(run, runManager.getRunHistory(actor));
-      if (refusal) return refusal;
-    } else if (Number(expectedRevision) !== Number(run.runRevision)) {
+    if (contract !== 'legacy' && Number(expectedRevision) !== Number(run.runRevision)) {
       throw new CraftingLifecycleExecutionError(
         'The crafting run revision is stale',
         'STALE_RUN_REVISION'
       );
     }
-    if (run.executionJournal?.status === 'recoveryRequired') {
-      return versionedFailure('The crafting run requires recovery.');
-    }
+    const refusal = cancelRefusal(run, actor, runManager);
+    if (refusal) return refusal;
     // A started stage already spent its materials, so cancelling returns them through the
     // shared reversal; only a run that spent nothing reports nothing returned.
     const refundIntended = this._shouldRefundOnCancel(run);
@@ -4364,9 +4360,8 @@ export class CraftingEngine {
     };
     const steps = Array.isArray(run?.steps) ? run.steps : [];
     for (const step of steps) {
-      const prepared = step?.preparedConsumption;
-      // Only a consumed-but-unresolved step holds recoverable inputs.
-      if (!prepared || step.status === 'succeeded' || step.status === 'failed') continue;
+      if (!holdsRecoverableInputs(step)) continue;
+      const prepared = step.preparedConsumption;
       const outcome = await this._restoreConsumedIngredients(
         craftingActor,
         run?.craftingSystemId,
@@ -6962,16 +6957,35 @@ export class CraftingEngine {
   }
 }
 
-/** A legacy cancel's refusal before any reversal: its run already archived, or a stage's settlement
- *  still pending or uncertain, returned so the authority releases its claim. */
-function legacyCancelRefusal(run, history) {
-  if (history.some((entry) => entry?.id === run.id)) {
-    return versionedFailure('There is no in-progress craft to cancel.');
+/** A cancel's refusal before any reversal, returned so the authority releases its claim: a legacy
+ *  run already archived (reason-only, so the Journal localizes it) or with a settlement pending or
+ *  uncertain, a run requiring recovery, or a restore onto an actor outside the crafting actor and
+ *  the run's recorded sources, the set the sender's ownership was checked against. */
+function cancelRefusal(run, actor, runManager) {
+  if (getRunLifecycleContract(run) === 'legacy') {
+    if (runManager.getRunHistory(actor).some((entry) => entry?.id === run.id)) return runNotFound();
+    if ((run.steps ?? []).some(hasInvokedNativeEffects)) {
+      return versionedFailure('This craft has invoked effects and cannot be cancelled.');
+    }
   }
-  if ((run.steps ?? []).some(hasInvokedNativeEffects)) {
-    return versionedFailure('This craft has invoked effects and cannot be cancelled.');
+  if (run.executionJournal?.status === 'recoveryRequired') {
+    return versionedFailure('The crafting run requires recovery.');
   }
-  return null;
+  const sources = Array.isArray(run.componentSourceActorUuids) ? run.componentSourceActorUuids : [];
+  const allowed = new Set([actor?.uuid, ...sources]);
+  const outside = (run.steps ?? [])
+    .filter(holdsRecoverableInputs)
+    .flatMap((step) => step.preparedConsumption.consumedSummary)
+    .some((entry) => entry?.actorUuid && !allowed.has(entry.actorUuid));
+  if (!outside) return null;
+  return versionedFailure('This craft names a source this character cannot restore to.');
+}
+
+const runNotFound = () => ({ success: false, reason: 'run-not-found' });
+
+/** Only a consumed-but-unresolved step holds recoverable inputs. */
+function holdsRecoverableInputs(step) {
+  return Boolean(step?.preparedConsumption) && !['succeeded', 'failed'].includes(step.status);
 }
 
 function snapshotRequirementSet(ingredientSet) {
