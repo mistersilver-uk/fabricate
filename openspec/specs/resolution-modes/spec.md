@@ -1108,6 +1108,34 @@ The gate evaluates a candidate as though its activation had already landed, whet
   That covers the legacy `craft`, the versioned start, and every fresh or started versioned stage preparation, each refusing with `Iterative crafting is not available in this version of Fabricate.`
 - `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
 
+### Iterative Expression Grammar and Field Profiles
+
+- An iterative expression accepts the deterministic grammar plus `abs` of one argument, `min` and `max` of one or more, and `NdF` dice with an optional `x` and then an optional `kh` or `kl`.
+  The shared deterministic expression never accepts them, and a default reader still refuses `abs(1)` and `2d6`.
+- A dice count and a face count are integers of at least 1, and a count defaults to 1.
+- `x` explodes on the maximum face unless a comparison is given.
+  `xK` explodes on `K`, and `x>=K`, `x>K`, `x<=K` and `x<K` explode on that comparison.
+  Each new die is checked in turn, and a term whose base dice come first draws its explosions in the order they are appended.
+- `kh` and `kl` keep the highest or lowest results, a count defaults to 1, and a count above the results keeps them all.
+  `x` placed after `kh` or `kl`, and every other dice form (`d%`, `dF`, `r`, `xo`, `cs`), is invalid.
+- A dice term whose count exceeds 1000 refuses as `explode-limit` before any draw, as does a term whose results would pass 1000.
+- A die source returns an integer from 1 to the face count, and any other value or a throw refuses as `roll-unavailable`.
+- The reserved roots `@counter.<id>`, `@min.<id>`, `@max.<id>`, `@target.<id>`, `@sessionCount` and `@check.value` resolve before actor roll data and are never shadowed by it.
+  A reserved root ends at the first character that cannot continue it, so `@counter.heat-1` is the counter minus one.
+  A reserved root in braces or with extra segments, and an unknown id under one, is an unresolved path.
+- An unbounded side of `@min` or `@max`, and an absent `@target`, is an unresolved path.
+- `@recipe`, `@circumstance` and `@status` are reserved roots that refuse as `forbidden-root` until their extensions define them.
+  `@check.value` is the only check fact an expression reads, and any other check form is `forbidden-root`.
+- Every other root reads actor roll data in the Foundry path mode, so a roll-data string such as "2d6" refuses as dice.
+- Each expression field has a profile.
+  A cost reads no dice and no `@check`.
+  A start formula rolls its dice once, reads no `@counter`, `@sessionCount` or `@check`, and reads `@min`, `@max` and `@target`.
+  An effect reads everything, and an Action Adjustment reads no dice.
+- An evaluation returns the value with each dice term's faces, results and value, or one reason: `invalid`, `dice`, `forbidden-root`, `unresolved-path`, `non-finite`, `explode-limit` or `roll-unavailable`.
+- An analysis needs no roll data and no dice.
+  It reports the same syntax, profile and limit faults, the reserved roots and ids an expression reads, and whether an explosion could never stop.
+- A counter's effective bounds are its own under `global`, the Counter Instance's over the counter's under `perRecipe`, and none under `none`.
+
 ### Iterative Validation
 
 - Each iterative step has exactly one ingredient set (`stepIngredientSetCountExact`, raised with mode `iterative`), and the check is waived under `requireComplete: false`.
