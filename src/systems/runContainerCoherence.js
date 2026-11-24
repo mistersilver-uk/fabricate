@@ -7,6 +7,7 @@
  */
 
 import { trimRunHistory } from './choiceGroupAward.js';
+import { getRunLifecycleContract, RunLifecycleError } from './runLifecycleState.js';
 
 function isRunMap(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
@@ -94,15 +95,68 @@ export function reconcileRunContainer({
   };
 }
 
-/** The active keys and history ids a manager records, to tell a removal from another's addition. */
+/**
+ * The active keys and history ids a manager records, to tell a removal from another's addition,
+ * and the `revisions` of its version-1 runs, to tell a stale write from a fresh one.
+ */
 export function runContainerBaseline(container) {
+  const { active, history } = versionedRevisions(container);
   return {
     activeKeys: Object.keys(container?.active || {}),
     historyIds: historyIdsOf(container?.history),
+    revisions: new Map([...history, ...active]),
   };
 }
 
-/** `reconcileRunContainer` against the writer's baseline, or the current document without one. */
+/** Each version-1 run's `runRevision`, by active key and by history id. */
+function versionedRevisions(container) {
+  const revisionsOf = (entries) =>
+    new Map(
+      entries
+        .filter(([id, run]) => id != null && getRunLifecycleContract(run) === 'current')
+        .map(([id, run]) => [id, Number(run.runRevision) || 0])
+    );
+  const active = isRunMap(container?.active) ? Object.entries(container.active) : [];
+  const history = Array.isArray(container?.history) ? container.history : [];
+  return {
+    active: revisionsOf(active),
+    history: revisionsOf(history.map((run) => [run?.id, run])),
+  };
+}
+
+/**
+ * Refuse a write that would replace a stored version-1 run with an older copy: a lower revision,
+ * an archive that does not advance the stored active revision, or a change or removal made from a
+ * `baseline` the stored run has since moved past. Legacy and unsupported runs are never compared.
+ * @throws {RunLifecycleError} `STALE_RUN_REVISION`, before anything is written.
+ */
+export function assertNoStaleRunWrite(current, next, baseline = null) {
+  const stored = versionedRevisions(current);
+  const written = versionedRevisions(next);
+  const storedRevision = (id) => stored.active.get(id) ?? stored.history.get(id);
+  const writtenRevision = (id) => written.active.get(id) ?? written.history.get(id);
+  const stale = [...written.active, ...written.history].some(
+    ([id, revision]) => revision < (storedRevision(id) ?? revision)
+  );
+  const unadvancedArchive = [...written.history].some(
+    ([id, revision]) =>
+      stored.active.has(id) && !stored.history.has(id) && revision <= stored.active.get(id)
+  );
+  const movedSinceBaseline = [...(baseline?.revisions ?? [])].some(([id, revision]) => {
+    const storedNow = storedRevision(id);
+    if (storedNow === undefined || storedNow === revision) return false;
+    const writtenNow = writtenRevision(id);
+    return writtenNow === undefined || writtenNow > revision;
+  });
+  if (stale || unadvancedArchive || movedSinceBaseline) {
+    throw new RunLifecycleError('The run revision is stale', 'STALE_RUN_REVISION');
+  }
+}
+
+/**
+ * `reconcileRunContainer` against the writer's baseline, or the current document without one,
+ * after refusing a stale version-1 write with {@link assertNoStaleRunWrite}.
+ */
 export function reconcileAgainstDocument({
   current,
   next,
@@ -110,6 +164,7 @@ export function reconcileAgainstDocument({
   compareHistory,
   historyLimit = 0,
 } = {}) {
+  assertNoStaleRunWrite(current, next, baseline);
   return reconcileRunContainer({
     current,
     next,

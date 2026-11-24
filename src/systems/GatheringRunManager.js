@@ -487,22 +487,22 @@ export class GatheringRunManager {
     // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
     // runs written out-of-band by another client/session or the world-time resume
     // (issues 733 + 739): union history by id, keep other writers' active runs.
-    const reconciled = reconcileAgainstDocument({
-      current,
-      next: normalized,
-      baseline: this._baseline.get(key),
-      compareHistory: compareNewestFirst,
-      historyLimit: HISTORY_LIMIT,
-    });
-    for (const run of reconciled.history) delete reconciled.active[run.id];
     try {
+      const reconciled = reconcileAgainstDocument({
+        current,
+        next: normalized,
+        baseline: this._baseline.get(key),
+        compareHistory: compareNewestFirst,
+        historyLimit: HISTORY_LIMIT,
+      });
+      for (const run of reconciled.history) delete reconciled.active[run.id];
       await writeAcknowledgedRunContainer(actor, FLAG_NAMESPACE, FLAG_KEY, current, reconciled);
+      this._cache.set(key, reconciled);
+      this._recordBaseline(key, reconciled);
     } catch (error) {
       this.invalidateCache(key);
       throw error;
     }
-    this._cache.set(key, reconciled);
-    this._recordBaseline(key, reconciled);
   }
 
   _normalizeContainer(raw = {}, actor = null) {

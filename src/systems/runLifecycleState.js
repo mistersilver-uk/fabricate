@@ -16,10 +16,10 @@ export class RunLifecycleError extends Error {
 
 /**
  * Run a guarded persistence call, returning its refusal instead of throwing it.
- * Every guard here runs in memory before the location persists, so a `RunLifecycleError`
- * escaping `mutate` provably wrote nothing; any other error may have half-applied and is
- * rethrown so the authority keeps its claim for reconciliation.
- * @param {Function} mutate Async call ending in `location.persist()`.
+ * Every guard here, and the persist's stale-revision refusal, runs before the flag write, so a
+ * `RunLifecycleError` escaping `mutate` provably wrote nothing; any other error may have
+ * half-applied and is rethrown so the authority keeps its claim for reconciliation.
+ * @param {Function} mutate Async call ending in its one `location.persist()`.
  * @returns {Promise<{run?: object|null, refused?: {code: string, message: string}}>}
  */
 export async function applyGuardedRunMutation(mutate) {
