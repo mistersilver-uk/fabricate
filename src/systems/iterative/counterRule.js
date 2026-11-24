@@ -20,9 +20,10 @@ export function isIterativeId(value) {
   return typeof value === 'string' && ITERATIVE_ID_PATTERN.test(value);
 }
 
-/** A finite number from a number or a numeric string, else `null`. */
+/** A finite number from a number or a numeric string, else `null`; a blank string is `null`. */
 export function iterativeNumber(value) {
-  return typeof value === 'number' || typeof value === 'string' ? numberOrNull(value) : null;
+  if (typeof value === 'number') return numberOrNull(value);
+  return typeof value === 'string' ? numberOrNull(trimString(value)) : null;
 }
 
 /** `raw`'s present `keys`, cloned as authored: the shape of an entry that does not parse. */
@@ -38,8 +39,8 @@ export function enumOrDefault(raw, fallback) {
 }
 
 export function optionalText(key, value) {
-  const text = trimString(value);
-  return text ? { [key]: text } : {};
+  const trimmed = trimString(value);
+  return trimmed ? { [key]: trimmed } : {};
 }
 
 /** An authored optional number, `null` when it is not finite; an absent one stays absent. */
