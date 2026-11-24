@@ -3,13 +3,13 @@
  * pure: it refuses with nothing spent, or returns the cost amounts the attempt will pay, so the
  * executor can run it before it prepares a check and the resolver can run it again.
  */
-import { STEP_ACTION_MODES } from '../../models/iterativeStepConfig.js';
+import { producedWhenLineFault, STEP_ACTION_MODES } from '../../models/iterativeStepConfig.js';
 import { arrayOrEmpty } from '../../utils/scalars.js';
 import {
   ACTION_CHECKS,
   actionEntryFaults,
+  COUNTER_LIMITS,
   ITERATIVE_LIBRARY_VERSION,
-  iterativeEntryFault,
   RULE_COMBINES,
 } from '../normalize/iterativeLibrary.js';
 
@@ -76,6 +76,20 @@ function enumFault(action, step) {
   return STEP_ACTION_MODES.includes(step.actions?.mode) ? null : { entryId: null, kind: 'step' };
 }
 
+/** An `availability.rules`, `costs` or `effects` kept as authored because it is not a list. */
+function listFault(action) {
+  const lists = [action?.availability?.rules, action?.costs, action?.effects];
+  return lists.every(Array.isArray) ? null : { entryId: action?.id ?? null, kind: 'action' };
+}
+
+/** The first counter whose `limit` is outside its enum. */
+function limitFault(library) {
+  const bad = arrayOrEmpty(library?.counters).find(
+    (entry) => !COUNTER_LIMITS.includes(entry?.limit)
+  );
+  return bad ? { entryId: bad.id ?? null, kind: 'counter' } : null;
+}
+
 function entryFault(action) {
   const [bad] = actionEntryFaults(action);
   return bad ? { entryId: bad.entry?.id ?? null, kind: bad.kind, fault: bad.fault } : null;
@@ -84,7 +98,7 @@ function entryFault(action) {
 function producedWhenFault(library) {
   for (const group of arrayOrEmpty(library?.resultGroups)) {
     for (const line of arrayOrEmpty(group?.producedWhen)) {
-      const fault = iterativeEntryFault('producedWhen', line);
+      const fault = producedWhenLineFault(line);
       if (fault) return { entryId: group?.id ?? null, kind: 'producedWhen', fault };
     }
   }
@@ -102,7 +116,7 @@ function ruleFault(action, step, library) {
 /** The first Counter Instance, or counter bound, whose number is `null`: a value that did not parse. */
 export function nullNumberFault(library) {
   const nullInstance = arrayOrEmpty(library?.instances).find((entry) =>
-    ['start', 'min', 'max', 'target'].some((key) => entry?.[key] === null)
+    ['start', 'startFormula', 'min', 'max', 'target'].some((key) => entry?.[key] === null)
   );
   if (nullInstance) return { entryId: nullInstance.counterId, kind: 'instance' };
   const nullCounter = arrayOrEmpty(library?.counters).find(
@@ -129,10 +143,12 @@ function invalidEntry({ state, action, library }) {
   const step = stepOf(library);
   return (
     enumFault(action, step) ??
+    listFault(action) ??
     entryFault(action) ??
     producedWhenFault(library) ??
     ruleFault(action, step, library) ??
     nullNumberFault(library) ??
+    limitFault(library) ??
     stateFault(state, library)
   );
 }

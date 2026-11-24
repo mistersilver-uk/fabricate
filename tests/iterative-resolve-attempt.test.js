@@ -129,6 +129,11 @@ const REFUSALS = [
     'invalid-entry',
     { library: { counters: [{ id: 'heat', label: 'H', limit: 'global', min: null }] } },
   ],
+  ['invalid-entry', { library: { instances: [instance('heat', { startFormula: null })] } }],
+  ['invalid-entry', { library: { counters: [{ id: 'heat', label: 'H', limit: 'sideways' }] } }],
+  ['invalid-entry', { action: { costs: 'free' } }],
+  ['invalid-entry', { action: { effects: 'none' } }],
+  ['invalid-entry', { action: { availability: { combine: 'all', rules: 'always' } } }],
   ['invalid-entry', { state: { values: { heat: null } } }],
   ['invalid-entry', { state: { attemptCount: 'one' } }],
   ['action-not-allowed', { library: { step: step({ actions: { mode: 'only', actionIds: [] } }) } }],
@@ -262,6 +267,10 @@ describe('invalid-entry agrees with the C2 fault helpers', () => {
     ['effect', { ...effect('e', 'heat', 'add', '1'), op: 'mul' }],
     ['effect', { ...effect('e', 'heat', 'add', '1'), when: { combine: 'maybe' } }],
     ['effect', { ...effect('e', 'heat', 'add', '1'), target: { kind: 'tool' } }],
+    ['effect', { ...effect('e', 'heat', 'add', '1'), when: { success: 'yes' } }],
+    ['effect', { ...effect('e', 'heat', 'add', '1'), when: { checkOutcomeIds: 'hit' } }],
+    ['effect', { ...effect('e', 'heat', 'add', '1'), when: { checkOutcomeIds: ['hit', ' '] } }],
+    ['effect', { ...effect('e', 'heat', 'add', '1'), when: { rules: 'always' } }],
   ];
   for (const [kind, entry] of bads) {
     it(`refuses a ${kind} that iterativeEntryFault faults`, () => {

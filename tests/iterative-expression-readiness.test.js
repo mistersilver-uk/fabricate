@@ -9,7 +9,7 @@ installFoundryEnv();
 const { Recipe } = await import('../src/models/Recipe.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { normalizeIterativeLibrary } = await import('../src/systems/normalize/iterativeLibrary.js');
-const { evaluateIterativeReadiness, ITERATIVE_READINESS_MESSAGES } =
+const { evaluateIterativeReadiness, ITERATIVE_READINESS_MESSAGES, iterativeStartBlockers } =
   await import('../src/systems/iterative/iterativeReadiness.js');
 const { evaluateSystemValidation } = await import('../src/systems/systemValidation.js');
 
@@ -533,12 +533,51 @@ describe('through evaluateSystemValidation', () => {
     for (const issue of issues) {
       assert.deepEqual(
         Object.keys(issue).sort((a, b) => a.localeCompare(b)),
-        ['blocks', 'code', 'entityId', 'entityName', 'kind', 'message', 'nav', 'severity']
+        [
+          'blocks',
+          'code',
+          'entityId',
+          'entityKind',
+          'entityName',
+          'kind',
+          'message',
+          'nav',
+          'severity',
+        ]
       );
+      assert.ok(['recipe', 'counter', 'action'].includes(issue.entityKind), issue.code);
       assert.ok(issue.message.length > 0 && issue.message !== issue.code, issue.code);
       assert.ok(/^[A-Z][^.]*\.$/u.test(issue.message), issue.message);
       assert.equal(issue.message, ITERATIVE_READINESS_MESSAGES[issue.code]);
       assert.equal(typeof issue.nav.view, 'string');
     }
+  });
+});
+
+describe('iterativeStartBlockers over the expression codes', () => {
+  const tag = (issue) => `${issue.code}@${issue.entityKind}:${issue.entityId}`;
+  const blockers = (mode) => {
+    const library = clone(LIBRARY);
+    stoke(library).costs[0].amount = '1d4';
+    inspect(library).effects[0].amount = '@check.value';
+    const recipe = clone(RECIPE);
+    recipe.iterative.counters[0].startFormula = '1 +';
+    recipe.iterative.step.actions.mode = mode;
+    const issues = evaluateIterativeReadiness(system(library), [new Recipe(recipe)]);
+    return iterativeStartBlockers(issues, recipe).map(tag);
+  };
+
+  it('blocks on a critical expression code of the recipe and of an allowed action', () => {
+    assert.deepEqual(blockers('only'), [
+      'iterativeInvalidExpression@action:stoke',
+      'iterativeInvalidExpression@recipe:r-blade',
+    ]);
+  });
+
+  it('never blocks on the check-fact warning, even when its action is allowed', () => {
+    assert.deepEqual(blockers('all'), [
+      'iterativeInvalidExpression@action:stoke',
+      'iterativeInvalidExpression@recipe:r-blade',
+    ]);
   });
 });
