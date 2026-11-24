@@ -1242,6 +1242,8 @@ export class CraftingEngine {
     }
   }
 
+  /** Execute a cancel under the authority's claim, archiving the run `cancelled`; a legacy run
+   *  keeps its legacy refund semantics and never gains a revision. */
   async cancelVersionedRun({ actor, runId, expectedRevision, executionGrant, requestId }) {
     const trusted = await this._consumeVersionedGrant(executionGrant, {
       operation: 'cancel',
@@ -4406,12 +4408,9 @@ export class CraftingEngine {
     return { attempted, refundedGroups, status };
   }
 
-  /**
-   * Cancel a player's in-progress craft (issue 848). Owner-scoped; the active-GM command authority
-   * executes it, legacy or version 1, through {@link cancelVersionedRun}, which archives the run
-   * `cancelled` and, with `features.refundOnPlayerCancel` (default on), restores its START
-   * consumption through {@link reverseRunConsumption}.
-   */
+  /** Cancel a player's in-progress craft: owner-scoped, and executed by the active GM through
+   *  {@link cancelVersionedRun}, on a legacy or a version 1 run, which honours
+   *  `features.refundOnPlayerCancel` (default on) and no caller override. */
   async cancelCraft(craftingActor, componentSourceActors, runId) {
     // Owner scope, failing closed for a non-owner reaching the engine directly.
     if (craftingActor?.isOwner === false) {

@@ -305,6 +305,7 @@ The preference is retained when blocked, and eligible stages needing no further 
 ## GM authority and recovery
 
 Current-lifecycle run changes require an active GM and a single private authority ledger.
+Cancelling an older-lifecycle crafting run requires an active GM too.
 Fabricate creates that ledger for you.
 The active GM's client provisions it on load and again before the first run change, so there is no setup step and nothing to click.
 If two GM sessions start at the same moment, Fabricate keeps one ledger and removes the unused duplicate.
@@ -344,7 +345,8 @@ Releasing the claim does not repeat the Craft, Brew or Attempt you made.
 
 The Run Authority journal entry is automatic.
 Fabricate creates and maintains it, it is blank by design, and you should leave it alone.
-Older-lifecycle crafting and salvage runs never use it, because those runs live in the actor's flags.
+Older-lifecycle salvage runs never use it.
+An older-lifecycle crafting run uses it only when it is cancelled, and otherwise lives in the actor's flags.
 
 Such a run can stop after Fabricate confirmed some of its effects but could not tell whether the rest happened.
 It then shows **This run needs GM attention** with its receipts, and it cannot be repeated, cancelled or resumed.
@@ -380,7 +382,9 @@ A missing chat message is not a reason to repeat spending or awards.
 ## Older runs and salvage
 
 Runs created under the older lifecycle keep their original behavior.
-Older crafting runs still advance manually and retain their existing cancellation and refund rules.
+Older crafting runs still advance manually.
+Cancelling one also requires an active GM, who carries it out, and your system's refund setting still decides whether its consumed materials come back.
+When the cancel is refused, for example because no GM is online, the Journal shows one warning, offers no **Retry**, and leaves the run active, so you cancel again once a GM is available.
 Older timed gathering and salvage resolve automatically as world time advances.
 Salvage has not moved to the new pause and manual-collection lifecycle.
 
