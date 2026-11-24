@@ -3763,6 +3763,7 @@ Requirements:
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
    The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
    A write MUST NOT replace a stored version-1 run, active or in history, with a copy carrying a lower `runRevision`, and a write that moves a version-1 run from `active` to `history` MUST carry a `runRevision` greater than the stored active copy's.
+   A write MUST NOT change or drop a version-1 run whose stored `runRevision` differs from the revision the writer last read, even when the written copy's revision equals the stored one; a run with no stored copy is not compared this way.
    Such a write is refused with `STALE_RUN_REVISION` before the flag write is dispatched, leaving the flag unchanged; it is a pre-write refusal only when no earlier effect of its operation was written (§ Authority Ledger and Recovery Boundary).
    Only `runRevision` is compared, and only when both copies are version 1; legacy and unsupported runs, and therefore every salvage run, are never compared.
    The stored copy is the actor's flag as the writing client last received it, read with no intervening `await` before the write.

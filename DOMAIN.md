@@ -1802,6 +1802,7 @@ graph TD
 **Run Lifecycle Version** distinguishes persisted execution contracts: an absent `lifecycleVersion` is legacy, numeric `1` is current, and every other present value is unsupported and read-only.
 New public crafting starts, including alchemy, macros and slash commands, use version 1; existing legacy records are never restamped, and salvage retains its own contract.
 The low-level managers preserve unstamped callers rather than implicitly upgrading their records.
+The active-GM command authority executes a legacy crafting cancel and never restamps it.
 A valid version-1 instant run can wait for a manual action and is not a legacy phantom for `pruneInstantaneousActiveRuns` to remove.
 
 **Stage** is the Journal's presentation of an execution **Step**, not a new aggregate.
