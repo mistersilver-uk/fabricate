@@ -808,7 +808,7 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
     - A `CounterRule` is `{ source: 'counter', counterId, op, value }`, `{ source: 'sessionCount', op, value }` or `{ source: 'previousAction', actionIds }`, where `op` is one of `>=`, `<=`, `>`, `<`, `=` and `value` is finite.
     - `EffectWhen` is `{ combine, checkOutcomeIds?, success?, value?: { op, value }, rules? }`, with `combine` (`'all' | 'any'`) defaulting to `'all'`.
       `checkOutcomeIds` and `rules` are emitted only when non-empty, `success` only as a boolean, and `value` only as `{ op, value }`.
-      A present `success` that is not a boolean, or a present `checkOutcomeIds` or `rules` that is not an array, makes the `when` not parse, so its effect is kept as authored.
+      A present `success` that is not a boolean, a present `checkOutcomeIds` or `rules` that is not an array, or a `checkOutcomeIds` entry that is not a non-empty string makes the `when` not parse, so its effect is kept as authored and never narrowed.
     - A present `availability` that is not an object, or a present `availability.rules`, `costs` or `effects` that is not an array, is kept as authored and raises `iterativeInvalidEntry`, so a malformed restriction never widens to none.
     - Inside an iterative record every non-optional key is emitted at its default, as a deliberate exception to Recipe requirement 18, because the record is absent unless authored and its readers are new.
       Optional keys are omitted when absent.

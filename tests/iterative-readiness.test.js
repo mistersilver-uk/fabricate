@@ -261,6 +261,20 @@ describe('the other inputs each code reads', () => {
         effect(library).when.checkOutcomeIds = 'hit';
       },
     ],
+    'an effect checkOutcomeIds entry that is not an id': [
+      'iterativeInvalidEntry',
+      ON_STOKE,
+      ({ library }) => {
+        effect(library).when.checkOutcomeIds = ['hit', 5];
+      },
+    ],
+    'a previousAction id that is not an id': [
+      'iterativeInvalidRule',
+      ON_RECIPE,
+      ({ recipe }) => {
+        step(recipe).failure = [{ source: 'previousAction', actionIds: ['stoke', 5] }];
+      },
+    ],
     'a non-array effect rule list': [
       'iterativeInvalidEntry',
       ON_STOKE,

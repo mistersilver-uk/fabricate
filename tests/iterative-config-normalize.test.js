@@ -217,6 +217,7 @@ describe('the library normalizer', () => {
       { success: 'true', junk: 1 },
       { checkOutcomeIds: 'hit' },
       { rules: { source: 'sessionCount', op: '<', value: 3 } },
+      { checkOutcomeIds: [5, null] },
     ];
     const [action] = normalizeIterativeLibrary({
       actions: [
@@ -225,7 +226,12 @@ describe('the library normalizer', () => {
     }).actions;
     assert.deepEqual(
       action.effects.map((kept) => kept.when),
-      [{ success: 'true' }, { checkOutcomeIds: 'hit' }, { rules: whens[2].rules }]
+      [
+        { success: 'true' },
+        { checkOutcomeIds: 'hit' },
+        { rules: whens[2].rules },
+        { checkOutcomeIds: [5, null] },
+      ]
     );
   });
 
@@ -278,6 +284,7 @@ describe('the counter rule normalizer', () => {
         { source: 'sessionCount', op: '<', value: 'many' },
         { source: 'previousAction', actionIds: [] },
         { source: 'previousAction', actionIds: ['Stoke'] },
+        { source: 'previousAction', actionIds: ['stoke', 5] },
         null,
       ],
     });
@@ -288,6 +295,7 @@ describe('the counter rule normalizer', () => {
       { source: 'sessionCount', op: '<', value: 'many' },
       { source: 'previousAction', actionIds: [] },
       { source: 'previousAction', actionIds: ['Stoke'] },
+      { source: 'previousAction', actionIds: ['stoke', 5] },
       {},
     ]);
   });
@@ -341,13 +349,20 @@ describe('the fault helpers name why an entry is kept as authored', () => {
     assert.equal(iterativeEntryFault('effect', { ...effect, target: { kind: 'aura' } }), 'target');
     assert.equal(iterativeEntryFault('effect', { ...effect, op: 'multiply' }), 'op');
     assert.equal(iterativeEntryFault('effect', { ...effect, when: { combine: 'most' } }), 'when');
-    for (const when of [{ success: 'true' }, { checkOutcomeIds: 'hit' }, { rules: {} }]) {
+    for (const when of [
+      { success: 'true' },
+      { checkOutcomeIds: 'hit' },
+      { checkOutcomeIds: ['hit', 5] },
+      { checkOutcomeIds: ['  '] },
+      { rules: {} },
+    ]) {
       assert.equal(
         iterativeEntryFault('effect', { ...effect, when }),
         'when',
-        Object.keys(when)[0]
+        JSON.stringify(when)
       );
     }
+    assert.equal(iterativeEntryFault('effect', { ...effect, when: { checkOutcomeIds: [] } }), null);
     assert.equal(producedWhenLineFault({ end: 'success' }), null);
     assert.equal(producedWhenLineFault({ end: 'sideways' }), 'end');
     assert.equal(producedWhenLineFault({ end: 'failure', rules: {} }), 'rules');
@@ -604,6 +619,7 @@ describe('normalization is idempotent across the corpus', () => {
               { ...WARM_EFFECT, id: 'b', when: { checkOutcomeIds: 'hit', junk: 1 } },
               { ...WARM_EFFECT, id: 'c', when: { rules: { source: 'x' } } },
               { ...WARM_EFFECT, id: 'd', when: { rules: [{ source: 'x', junk: 1 }], success: 1 } },
+              { ...WARM_EFFECT, id: 'e', when: { checkOutcomeIds: ['hit', 7, ''] } },
             ],
           },
           { id: 'quench', availability: ['locked'], effects: 'warm' },
@@ -625,7 +641,10 @@ describe('normalization is idempotent across the corpus', () => {
       steps: [
         {
           id: 's-1',
-          iterative: { success: [null] },
+          iterative: {
+            success: [null],
+            failure: [{ source: 'previousAction', actionIds: ['stoke', 5, ' '] }],
+          },
           resultGroups: [{ id: 'g', producedWhen: [null] }],
         },
       ],

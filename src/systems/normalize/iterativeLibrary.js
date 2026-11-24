@@ -50,15 +50,20 @@ export function normalizeEffectWhen(raw) {
 }
 
 const presentNonArray = (value) => value != null && !Array.isArray(value);
+const holdsNonId = (value) => Array.isArray(value) && value.some((id) => trimString(id) === '');
 
-/** `'when'` for a `when` that does not parse, including a present key of the wrong type. */
+/**
+ * `'when'` for a `when` that does not parse, including a present key of the wrong type and a
+ * `checkOutcomeIds` entry that is not a non-empty string.
+ */
 function effectWhenFault(raw) {
   if (raw == null) return null;
   if (!isPlainObject(raw) || !(raw.combine == null || RULE_COMBINES.includes(raw.combine))) {
     return 'when';
   }
   if (raw.success != null && typeof raw.success !== 'boolean') return 'when';
-  if (presentNonArray(raw.checkOutcomeIds) || presentNonArray(raw.rules)) return 'when';
+  if (presentNonArray(raw.checkOutcomeIds) || holdsNonId(raw.checkOutcomeIds)) return 'when';
+  if (presentNonArray(raw.rules)) return 'when';
   return raw.value == null || comparisonFault(raw.value) === null ? null : 'when';
 }
 
