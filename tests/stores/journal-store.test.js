@@ -1066,6 +1066,36 @@ describe('journalStore', () => {
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });
 
+  // Issue 900: the active GM executes a legacy cancel, so it can be refused with only a `reason`.
+  it('words a legacy cancel refusal as one localized toast with no command error or Retry', async () => {
+    const setup = makeServices({ cancelResult: { success: false, reason: 'active-gm-missing' } });
+    const store = await loadedStore(setup);
+
+    await store.cancel({ id: 'b' });
+    flushSync();
+
+    const expected = langLeaf('FABRICATE.App.Journal.Actions.AuthorityUnavailable');
+    assert.ok(expected, 'the refusal has a shipped string');
+    assert.deepEqual(setup.calls.notify, [expected], 'a refused cancel is never silent');
+    assert.equal(store.commandError, null, 'no persistent command error');
+    await store.retryCommandError();
+    assert.equal(setup.calls.cancel.length, 1, 'no Retry re-sends the cancel');
+    assert.deepEqual(setup.calls.command, []);
+    assert.equal(setup.calls.list, 2, 'the Journal re-reads on completion');
+    assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it('falls back to the generic error for an unmapped legacy cancel refusal', async () => {
+    const setup = makeServices({ cancelResult: { success: false, reason: 'a-reason-nobody-mapped' } });
+    const store = await loadedStore(setup);
+
+    await store.cancel({ id: 'b' });
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
+    assert.equal(store.commandError, null);
+  });
+
   // A throw from the Foundry edge is caught, so the click handler cannot reject silently.
   it('advance surfaces a thrown error and clears busy instead of rejecting', async () => {
     const setup = makeServices({ advanceThrows: true });
