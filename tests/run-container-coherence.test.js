@@ -232,6 +232,11 @@ test('a version-1 gathering archive from a stale cached copy is refused with the
   await assert.rejects(() => stale.completeRun(actor, run, 'succeeded'), {
     code: 'STALE_RUN_REVISION',
   });
+  assert.equal(
+    stale.getActiveRun(actor, run.id).completionMode,
+    'worldTime',
+    'the refusal invalidated the stale cache'
+  );
   assert.deepEqual(writes, [], 'no flag write is dispatched');
   assert.deepEqual(flags, stored);
   assert.equal(manager().getActiveRun(actor, run.id).completionMode, 'worldTime');

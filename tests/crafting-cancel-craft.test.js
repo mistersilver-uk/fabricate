@@ -10,6 +10,7 @@ import {
   installCraftingJournalRunAuthority,
 } from '../src/systems/journalRunCommands.js';
 
+import { cancelAsAuthority } from './helpers/legacyCancelAuthority.js';
 import { replicatedAuthorityFixture } from './helpers/replicatedJournalAuthority.js';
 
 function getProperty(object, path) {
@@ -280,20 +281,6 @@ function gmCancelAuthority(actor) {
   return { client, sent };
 }
 
-/** Cancel `runId` on the GM executor, as the authority does for an admitted legacy command. */
-async function cancelAsAuthority(engine, actor, runId) {
-  engine.installVersionedRunAuthority({
-    consumeExecutionGrant: async () => ({ operationId: `cancel-${runId}` }),
-  });
-  return engine.cancelVersionedRun({
-    actor,
-    runId,
-    expectedRevision: 0,
-    executionGrant: 'grant',
-    requestId: `cancel-${runId}`,
-  });
-}
-
 test('two clients cancelling one legacy run restore its consumption once (issue 900)', async () => {
   const system = makeSystem();
   const craftingActor = new FakeActor('Crafter', { gp: 0 });
@@ -419,9 +406,13 @@ test('cancel reads the system feature flag, which no caller can override', async
   const engine = makeEngine(runManager);
   const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
 
-  const result = await cancelAsAuthority(engine, craftingActor, run.id);
+  const result = await cancelAsAuthority(engine, craftingActor, run.id, {
+    refund: true,
+    payload: { refund: true },
+  });
   assert.equal(result.refunded, false, 'the system flag (false) forfeits inputs');
-  assert.equal(sourceActor.created.length, 0);
+  assert.equal(sourceActor.created.length, 0, 'a refund field on the command restores nothing');
+  assert.equal(craftingActor.system.currency.gp, 0, 'and refunds no currency');
 });
 
 test('cancel is refused for a non-owned crafting actor (owner-scoped)', async () => {

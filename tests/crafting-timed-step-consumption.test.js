@@ -8,6 +8,7 @@ import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { cancelAsAuthority } from './helpers/legacyCancelAuthority.js';
 
 for (const timed of [false, true]) {
   for (const [checked, failLast] of [[true, false], [true, true], [false, false]]) {
@@ -1438,20 +1439,6 @@ async function startTimedCurrencyCraft({
   };
 }
 
-/** Cancel the context's legacy run on its engine as the GM executor, at revision 0. */
-async function cancelAsAuthority({ engine, craftingActor, run }) {
-  engine.installVersionedRunAuthority({
-    consumeExecutionGrant: async () => ({ operationId: `cancel-${run.id}` }),
-  });
-  return engine.cancelVersionedRun({
-    actor: craftingActor,
-    runId: run.id,
-    expectedRevision: 0,
-    executionGrant: 'grant',
-    requestId: `cancel-${run.id}`,
-  });
-}
-
 test('START records the FULL plan when every currency group settles (positive control)', async (t) => {
   const currencySpends = [
     { unit: 'gp', amount: 2 },
@@ -1479,7 +1466,7 @@ test('START records the FULL plan when every currency group settles (positive co
 
   // The same fixture's full-success cancel: the refund seam is demonstrably live and the
   // balance actually INCREASES back to the starting values.
-  const cancel = await cancelAsAuthority(context);
+  const cancel = await cancelAsAuthority(context.engine, context.craftingActor, context.run.id);
   assert.equal(cancel.success, true);
   assert.equal(cancel.refunded, true);
   assert.equal(context.spy.refundCalls.length, 2, 'both recorded groups are refunded');
@@ -1510,7 +1497,7 @@ test('START records [] when the only currency group fails, and the cancel mints 
   );
   assert.equal(context.craftingActor.updates.length, 0, 'no currency left the actor at START');
 
-  const cancel = await cancelAsAuthority(context);
+  const cancel = await cancelAsAuthority(context.engine, context.craftingActor, context.run.id);
 
   // The reversal demonstrably EXECUTED: the consumed ingredient came back and the run
   // was archived. An unchanged balance is therefore a result, not a skipped path.
@@ -1553,7 +1540,7 @@ test('START records exactly the SETTLED group when the second of two groups fail
   assert.equal(context.craftingActor.system.currency.gp, 45, 'the settled group was deducted');
   assert.equal(context.craftingActor.system.currency.gem, 9, 'the failed group deducted nothing');
 
-  const cancel = await cancelAsAuthority(context);
+  const cancel = await cancelAsAuthority(context.engine, context.craftingActor, context.run.id);
   assert.equal(cancel.success, true);
   assert.equal(context.spy.refundCalls.length, 1, 'only the settled group is refunded');
   assert.equal(context.craftingActor.system.currency.gp, 47, 'the settled spend is returned');
@@ -1622,7 +1609,7 @@ test('cancel reports refunded:false + partialRefund:true when one currency group
     'the fixture must aggregate to TWO terminal base units, not collapse to one'
   );
 
-  const cancel = await cancelAsAuthority(context);
+  const cancel = await cancelAsAuthority(context.engine, context.craftingActor, context.run.id);
 
   assert.equal(cancel.success, true, 'the cancel still completes');
   assert.equal(
