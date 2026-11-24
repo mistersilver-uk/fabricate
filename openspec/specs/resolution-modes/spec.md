@@ -1136,6 +1136,48 @@ The gate evaluates a candidate as though its activation had already landed, whet
   It reports the same syntax, profile and limit faults, the reserved roots and ids an expression reads, and whether an explosion could never stop.
 - A counter's effective bounds are its own under `global`, the Counter Instance's over the counter's under `perRecipe`, and none under `none`.
 
+### Iterative Attempt Resolution
+
+- An Iterative Attempt is resolved by a pure, synchronous function of the step state, the action, the attempt library, the actor roll data, the check summary and an injected die source.
+  It never rolls the check, and it never mutates an input.
+- Its phases run in a fixed order: preflight, check, costs, effects, clamp, terminal, every-session effects, reclamp, countdown and routing.
+  Every extension phase exists as a no-op until its extension defines it.
+- Preflight, costs and effects read the step state, including `sessionCount`, as it stood when the attempt began.
+  The terminal check and later phases read the post-clamp draft, whose `sessionCount` already counts this Crafting Session.
+- A `previousAction` rule reads the newest log entry before the attempt in preflight, costs and effects, and the current action from the terminal check on.
+  An empty log matches no `previousAction` rule.
+- Preflight refuses, with nothing spent and in this order, an unsupported version, an ended step, an invalid entry, a disallowed action, an unknown counter, an unavailable action, an invalid cost amount and an unaffordable cost.
+  An entry is invalid when `counterRuleFault` or `iterativeEntryFault` faults it, or when a bound, target, start or state value is `null`, so the resolver and readiness agree on what is kept as authored.
+- Preflight evaluates every cost amount before any check is prepared, and a negative amount refuses as an invalid expression.
+  Each `needsEnough` cost refuses on its own when its counter holds less than its amount, so two costs on one counter are each checked alone.
+  A locked counter ignores every cost and effect aimed at it.
+- The check summary is `null` exactly when the action has no check, and otherwise holds a success flag, an outcome id or `null`, and a finite value.
+  Any other pairing refuses as a mismatched check.
+- Effects apply in authored order, `add` and `subtract` accumulate, and `set` replaces.
+  An effect is skipped when its `when` fails, and on an attempt with no check summary it is also skipped when its `when` names a check fact or its amount reads `@check`.
+- Every counter is then held to its effective bounds.
+- A failed check is not terminal.
+  The step ends in success only when it has at least one success rule and every success rule holds, and otherwise in failure when any failure rule holds.
+- At a terminal the attempt records the outcome, its attempt number and the selected result group, with an explicit `null` when none matches.
+- Dice are drawn in a fixed order: start formulas in Counter Instance order at step start, then effects in authored order, each amount's dice terms left to right, and each term's base dice before its explosions.
+  A skipped effect draws nothing, and a cost draws nothing.
+- A refused attempt changes no counter, no attempt count and no session count.
+  Its reasons are an unsupported version, an ended step, an invalid entry, a disallowed or unavailable action, an unknown counter, an invalid expression, an unaffordable cost, a mismatched check and an unavailable die.
+- An expression failure refuses as an invalid expression naming the entry and the failing reason, and an unavailable die refuses on its own naming the entry.
+- A resolved attempt returns the next state, a log entry and the terminal.
+  The next state holds exactly the persisted step-state keys, with its counters, attempt count, session count and terminal updated and every other key carried unchanged.
+  The entry holds the attempt number, the session number (`null` for a free action), the action, the check summary, one total per effect that drew dice, and the paid and changed deltas.
+  Paid deltas are negative, a `set` delta is taken against the draft at that point, and both are recorded before the clamp, per counter in first-touch order with zeros omitted.
+- Start values resolve once, in Counter Instance order, each clamped to its effective bounds.
+  Each is recorded with its formula value, one dice total per term and whether it was clamped, and a plain start records no formula value and no dice.
+
+### Iterative Terminal Routing
+
+- At a terminal outcome, the step's result groups are read in order, and the first with a `producedWhen` line for that outcome whose rules all hold is selected.
+- An empty rule list always holds, and nothing is selected when no line matches.
+- A group with no `producedWhen` is never selected, and the failure group is selected only by its `producedWhen`, never by its role.
+- A counter rule reads a counter value, the session count or the previous action, and a rule that does not parse, or names a counter with no value, holds nothing.
+
 ### Iterative Validation
 
 - Each iterative step has exactly one ingredient set (`stepIngredientSetCountExact`, raised with mode `iterative`), and the check is waived under `requireComplete: false`.
