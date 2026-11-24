@@ -800,10 +800,10 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
       They are read only under `perRecipe`, as defaults a Counter Instance overrides, and under `global`, as fixed bounds.
     - A counter or action with a missing, malformed or repeated id is dropped (the first wins), because every reference to it then reports as unknown.
     - A cost, effect or `CounterRule` that does not parse is kept as authored, with only its record's known keys, and is never dropped.
-      Not parsing means a missing, malformed or repeated id, an unknown `source`, `op` or `target.kind`, a missing reference id, an empty `previousAction.actionIds`, or a non-finite `value`.
+      Not parsing means a missing, malformed or repeated id, a missing or malformed reference id, an unknown `source`, `op` or `target.kind`, an empty or malformed `previousAction.actionIds`, a non-finite `value`, or an `amount` that is neither a string nor a finite number.
     - A `CounterRule` that does not parse raises `iterativeInvalidRule`, and any other entry that does not parse raises `iterativeInvalidEntry`.
       Both are blocking.
-    - An absent enum value takes its default.
+    - An absent or `null` enum value takes its default.
       A present value outside the enum (`check`, `limit`, `combine`) is kept as authored and raises `iterativeInvalidEntry`, never falling back to the default.
     - A `CounterRule` is `{ source: 'counter', counterId, op, value }`, `{ source: 'sessionCount', op, value }` or `{ source: 'previousAction', actionIds }`, where `op` is one of `>=`, `<=`, `>`, `<`, `=` and `value` is finite.
     - `EffectWhen` is `{ combine, checkOutcomeIds?, success?, value?: { op, value }, rules? }`, with `combine` (`'all' | 'any'`) defaulting to `'all'`.
@@ -1838,7 +1838,7 @@ StepIterative = {
     - A Counter Instance is `{ counterId, start, startFormula?, min?, max?, target?, visible }`, unique by `counterId`, with `start` defaulting to `0` and `visible` to `true`.
     - A Counter Instance with a missing, malformed or repeated `counterId` is dropped (the first wins).
     - When present, `startFormula` replaces `start`, which is kept so switching back to a fixed start restores it.
-      An empty `startFormula` normalizes to absent, and a present one that is not an expression normalizes to `null`, which is a blocking readiness issue.
+      An empty `startFormula` normalizes to absent, and a present one that is neither a string nor a finite number, a persisted `null` included, normalizes to `null`, which is a blocking readiness issue.
     - A Counter Instance's `min` and `max` override the counter's only under `perRecipe`, and are kept but unread under `none` and `global`.
     - A present non-finite `start`, `min`, `max` or `target` normalizes to `null` and is a blocking readiness issue, and an absent optional number stays absent.
       A blank string is not a number.
@@ -1848,6 +1848,7 @@ StepIterative = {
     - `iterativeStepsOf` answers one `{ stepIndex, iterative, resultGroups }` per execution step, the implicit step included, where `resultGroups` holds each group's `id`, `role` and `producedWhen`, and an implicit step's groups are the recipe-level groups.
     - `toJSON()` emits `iterative` and each step's `iterative` as deep clones, so `termsSnapshot.recipe` carries them.
     - An out-of-enum `actions.mode`, and a `producedWhen` line that does not parse, are kept as authored and raise `iterativeInvalidEntry`.
+      A `producedWhen` line does not parse when it is not an object, its `end` is not `success` or `failure`, or a present `rules` is not an array.
     - The record follows CraftingSystem requirement 37's rules for unknown keys, defaults, ids and `CounterRule`.
 
 ### Validation Guidance

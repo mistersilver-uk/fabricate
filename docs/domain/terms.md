@@ -665,6 +665,79 @@ Canonical mapping: `resolutionMode: "alchemy"`, `alchemy.checkMode`, `visibility
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipe-visibility/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/ui-entity-editors/spec.md
 
+## Iterative
+
+Each step has exactly one ingredient set, and its result groups are selected by **Produced When** at the step's end.
+It is not **Progressive**: Progressive spends one rolled value against ordered thresholds, while Iterative repeats player-chosen Crafting Actions against Counters.
+It reuses the routed crafting check only for an action with `check: 'roll'`, reading the check's outcome tiers in an effect's `when` and never routing on them.
+`RESOLUTION_MODES` holds the mode, so the system normalizer accepts it on read and write.
+`SELECTABLE_RESOLUTION_MODES` leaves it out, so the admin store's mode change and the importer refuse it, and the settings surfaces do not offer it.
+Fixtures and tests write the mode directly through `createSystem` or `updateSystem`.
+Every existing craft path (the legacy craft, the versioned start and every versioned stage preparation) refuses a recipe in an iterative system before it creates a run, consumes, spends, rolls or awards.
+Iterative data is kept, inert, in a system of any other mode.
+Its structural readiness runs only for an iterative system, and no iterative issue blocks the system or visibility, so a recipe stays listed and refuses a start.
+A recipe with no Counter Instance or a step with no success rule is in the derived "Needs iterative setup" tier, and no setup marker is persisted.
+
+Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`)
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md
+
+## Counter
+
+A counter is `{ id, label, description?, limit, min?, max? }`, and its id matches `^[a-z][A-Za-z0-9]*$`, is unique within the library and is never minted or rewritten.
+`limit` decides how its bounds are read: `none` reads no bounds, `perRecipe` reads `min` and `max` as defaults a **Counter Instance** overrides, and `global` reads them as fixed bounds.
+`min` and `max` are kept under every limit, so switching the limit back restores them.
+A counter with a missing, malformed or repeated id is dropped, the first one winning, because every reference to it then reports `iterativeUnknownCounter`.
+A Counter is configuration, and a recipe gives it a start value through a Counter Instance.
+It is distinct from a Tool's usage counter, the per-item `flags.fabricate.toolUsage.timesUsed` that `limitedUses` breakage reads, and from a **Count Check**, which counts dice successes.
+Counter ids are local to their system, and a copy-mode import preserves them even when one equals a component id.
+
+Canonical mapping: `CraftingSystem.iterative.counters[]`, `COUNTER_LIMITS` and `normalizeIterativeLibrary` (`src/systems/normalize/iterativeLibrary.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md
+
+## Counter Instance
+
+A Counter Instance is `{ counterId, start, startFormula?, min?, max?, target?, visible }`, unique by `counterId`, with `start` defaulting to `0` and `visible` to `true`.
+When present, `startFormula` replaces `start`, which is kept so switching back to a fixed start restores it, and an empty `startFormula` normalizes to absent.
+Its `min` and `max` override the counter's only under `perRecipe`, and are kept but unread under `none` and `global`.
+A present start, start formula, bound or target that cannot be read normalizes to `null` and raises the blocking `iterativeInvalidNumber`.
+An instance with a missing, malformed or repeated `counterId` is dropped, and one naming no library counter raises `iterativeUnknownCounter`.
+A step's `hiddenCounterIds` and `lockedCounterIds` name Counter Instances, and a recipe with none raises `iterativeNoCounters`.
+
+Canonical mapping: `Recipe.iterative.counters[]`, `normalizeRecipeIterative` (`src/models/iterativeStepConfig.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Crafting Action
+
+An action is `{ id, label, description?, icon?, categories, usesSession, availability, costs, check, effects }`, and its id follows the Counter id rules.
+`usesSession` defaults to `true`, and an action with `usesSession: false` is a free action.
+`availability` is `{ combine, rules }` over Counter Rules, defaulting to `{ combine: 'all', rules: [] }`.
+A cost is `{ id, counterId, amount, needsEnough }`, with `needsEnough` defaulting to `true`.
+`check` is `'roll'` or `'none'` (the default), and a `'roll'` action reads the routed crafting check, so an allowed one raises `iterativeCheckUnavailable` when that check has no active roll.
+An effect changes one counter by `add`, `subtract` or `set` with an `amount`, under an `EffectWhen` that may read check outcome tiers, the check's success, a rolled value and Counter Rules.
+A step allows every action under `actions.mode: 'all'` and only the named ones under `'only'`, so `{ mode: 'only', actionIds: [] }` allows none.
+A cost or effect that does not parse is kept as authored and raises the blocking `iterativeInvalidEntry`, and is never dropped.
+The term is always written in full, because a bare "action" already names UI and run-control actions.
+
+Canonical mapping: `CraftingSystem.iterative.actions[]`, `ACTION_CHECKS`, `EFFECT_OPS`, `normalizeEffectWhen`, `iterativeEntryFault` and `actionEntryFaults` (`src/systems/normalize/iterativeLibrary.js`), `Step.iterative.actions` (`src/models/iterativeStepConfig.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Produced When
+
+`producedWhen` is `[{ end: 'success' | 'failure', rules: CounterRule[] }]` on a recipe or step result group, and it is the iterative routing basis.
+A Counter Rule is `{ source: 'counter', counterId, op, value }`, `{ source: 'sessionCount', op, value }` or `{ source: 'previousAction', actionIds }`, with `op` one of `>=`, `<=`, `>`, `<` and `=`.
+It is normalized on recipe and step groups only, salvage and gathering normalizers drop it, and it is emitted only when it holds a line.
+In iterative mode the reserved `role: 'failure'` group is selected only by its `producedWhen`, never by its role.
+A line that does not parse is kept as authored and raises the blocking `iterativeInvalidEntry`.
+An `end: 'success'` line on the failure group raises the warning `iterativeSuccessLineOnFailureGroup`, and a final step with no `end: 'success'` line raises `iterativeFinalStepProducesNothing`.
+
+Canonical mapping: `ResultGroup.producedWhen`, `PRODUCED_WHEN_ENDS`, `normalizeProducedWhen`, `producedWhenLineFault` and `iterativeStepsOf` (`src/models/iterativeStepConfig.js`), `CounterRule` and `counterRuleFault` (`src/systems/iterative/counterRule.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
 ## Legacy Resolution Mode (`mapped` / `tiered`)
 
 They are **not live modes** and have no runtime, editor, or validation branch: they are accepted **only as one-time migration inputs**.
@@ -1432,7 +1505,9 @@ It refuses `knowledgeNotObservable` and performs **zero writes** where **Learned
 It is **idempotent**: an already-known recipe (read through the entry-boundary reader, never a bare index, so a dot-expanded legacy id is not re-granted) answers `success: true` with outcome `alreadyKnown` and zero writes, because the caller is an automation tick that may legitimately re-run and a bare `success: false` would make a correct re-run read as a failure.
 The written entry is four scalars — `{ learnedAt, sourceItemUuid: null, granted: true, grantedBy }` — spread over the raw persisted map exactly as `learnRecipeOnCraft` already does, so no second write shape is introduced.
 `granted` is the **display discriminant**: stamped `true` and never `false` (absence means not granted, so no migration touches the existing corpus), and kept separate from the presence of a label because a label-less grant — the likely common case, a macro with nothing meaningful to say — must still render as a grant rather than falling through to "Learned by crafting".
-`grantedBy` is an optional, caller-supplied provenance label — a trimmed string of at most 64 characters, or `null` — **refused, never coerced or truncated**, on the reasoning `normalizeGrantedBy` states and the **Alignment Findings** table records: see that table for why the field is `grantedBy` and not `source`.
+`grantedBy` is an optional, caller-supplied provenance label — a trimmed string of at most 64 characters, or `null` — **refused, never coerced or truncated**, on the reasoning `normalizeGrantedBy` states and the **Alignment Findings** table records.
+It is named `grantedBy` and not `source`, because a learned entry's `source*` family (`sourceItemUuid`, `sourceOwned`, `sourceItemName`, `sourceDefinitionName`, `sourceCapped`, `sourceKind`, `sourceName`) already means the book a copy was learned from.
+A bare `source` beside those would read as a sixth book-provenance field on an entry that has no book at all, reintroducing at the field-naming level the false provenance this write path removes.
 Distinct from the pre-existing **Recipe Access Grant** and **Knowledge Access Grant** terms, both of which name **read-side** visibility/access evaluation; this term names the one **write** path a companion or a GM macro reaches with no book in play.
 
 Canonical mapping: `grantRecipeKnowledge` (`src/systems/companionKnowledgeGrant.js`); `Fabricate.grantRecipeKnowledge`/`Fabricate._requireGmActor` (`src/bootstrap/companionFacade.js`); `game.fabricate.api.companion`; `normalizeGrantedBy`/`GRANTED_BY_MAX_LENGTH` (`src/systems/companionContract.js`)
@@ -1460,6 +1535,9 @@ Three neighbours it is deliberately NOT.
 **Award Item Stacking** is the _gathering_ award's own stacking rule set (`gathering-and-harvesting/spec.md`), whose fallback is shared raw source references rather than a name match at all — two capabilities one word apart, and the cross-reference each way is what stops the wrong rule being applied to either.
 `awardMode` (the progressive gathering `equal` / `partial` / `exceed` policy, in the gathering lifecycle notes below) decides how much a progressive roll awards; it is a QUANTITY concept a reader of a member that takes `quantity` will reach for, and it is not this.
 And `CURRENCY_SPEND_CALLERS.award` is a **currency-path caller scope** meaning "this currency question came from the companion path" — true of a **Currency Credit** and of `checkAffordability`, and NEVER produced by a Component Award, the one member actually named for it.
+It is named `award` rather than `grant` or `place`.
+`grant` is bound to the knowledge domain and to a different write shape (**Knowledge Grant**, with `granted`, `grantedBy` and `alreadyKnown`), so one verb for two unrelated published writes would be exactly the collision the **Alignment Findings** table exists to prevent.
+`place` mints a verb with no precedent in the tree and orphans the `awarded` outcome token the member answers with.
 
 Canonical mapping: `awardComponents` (`src/systems/companionComponentAward.js`); `Fabricate.awardComponents` (`src/bootstrap/companionFacade.js`); `COMPONENT_AWARD_MESSAGE_KEYS` / `COMPONENT_AWARD_ENTRY_OUTCOMES` / `AWARD_ENTRIES_MAX` (`src/systems/companionContract.js`)
 
@@ -1470,7 +1548,9 @@ Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/gathering-a
 It is the first world-scoped currency member that WRITES: it resolves the denomination through the same resolution `checkAffordability` uses, so the check and the credit cannot disagree about what a unit is; it requires a positive safe-integer amount rather than truncating one; and it reaches the configured coin spender's `refund` directly, never `refundCurrencySpends`, which for a recipe-less request returns a silent `{ valid: true, groups: [] }` success that credits nothing.
 Its `credited` scalar carries THREE values across four outcomes: the amount when Fabricate observed the credit, `0` for `creditNotConfigured` and for every refusal taken before any mechanism ran, and `null` for `creditFailed` and `creditUnavailable` alike — `0` means Fabricate can PROVE nothing moved and `null` means it cannot say.
 Under `spendStrategy: "macro"` it runs the GM's `increment` macro with `caller: "award"`, the first companion-reachable occasion for that key and the second occasion for that macro.
-Named `credit` rather than `award`; see **Alignment Findings** for why.
+It is named `credit` rather than `award`, because `CURRENCY_SPEND_CALLERS.award` is already set by `checkAffordability` (`currencyAffordance.js`).
+An `awardCurrency` member would make `caller: 'award'` true of a member named `checkAffordability` and of one named `awardCurrency`, distinctive of neither and a live overload of a token a GM's macro branches on.
+`creditCurrency` also keeps the rule that every `stable` member's success outcome is its own verb (`granted`, `affordable`, `rolled`, `decided`).
 
 Canonical mapping: `creditWorldCurrency` (`src/systems/currencyAffordance.js`); `Fabricate.creditCurrency` (`src/bootstrap/companionFacade.js`); `CURRENCY_CREDIT_MESSAGE_KEYS` / `currencyCreditResult` (`src/systems/companionContract.js`)
 

@@ -1099,7 +1099,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - `iterative` is in `RESOLUTION_MODES` (`src/systems/resolutionModeAvailability.js`), which the system normalizer accepts on read and write, so the mode persists.
 - `iterative` is selectable only once `SELECTABLE_RESOLUTION_MODES` includes it.
 - `isResolutionModeSelectable(mode, selectable = SELECTABLE_RESOLUTION_MODES)` is the one predicate the admin store's mode change and the importer consult, and either caller may inject the set.
-- `resolutionModeOptions.js` omits `iterative`, so the Crafting Settings card never offers it.
+- `resolutionModeOptions.js` omits `iterative`, so neither System Settings nor Crafting Settings offers it.
 - The admin store refuses, before its confirm and writing nothing, a change to a known mode outside the selectable set, or to a token that is neither a mode nor a legacy alias.
   A legacy alias keeps today's path, and re-selecting the current mode is still a no-op that succeeds.
 - Fixtures and tests may write the mode directly through `createSystem` or `updateSystem`, which are not gated.
@@ -1127,7 +1127,8 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeFinalStepProducesNothing`: no final-step group has an `end: 'success'` line.
 - Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id.
   Each carries `entityKind: 'counter'` or `'action'` for the record it names:
-  - `iterativeUnknownCounter`, `iterativeUnknownAction`, `iterativeInvalidNumber` and `iterativeInvalidRule` over availability rules, costs and effect targets.
+  - `iterativeUnknownCounter`, `iterativeUnknownAction` and `iterativeInvalidRule` over availability rules, effect `when` rules, cost counters and effect targets.
+  - `iterativeInvalidNumber`: a counter's `null` `min` or `max`.
   - `iterativeBoundsInverted`: a counter whose `min` is above its `max`, except under `limit: 'none'`, whose bounds are unread.
   - `iterativeInvalidEntry`: a cost, effect, `availability`, `availability.rules`, `costs` or `effects` kept as authored, or a `check`, `limit` or `combine` outside its enum.
   - `iterativeUnknownCheckOutcome`: an effect's `checkOutcomeIds` names a tier the routed crafting check does not define.

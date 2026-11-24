@@ -19,10 +19,10 @@
 | bare "component" for both the managed **Component** and a connected component of the contention graph | **Contention Component** always written in full, with bare **Component** reserved for the managed aggregate | `ingredientAssignment.js` uses both senses in neighbouring docblocks (`component/tag group` beside `contentionComponents`), so the short form silently reads as the aggregate |
 | a bare `tier` for the cheap/expensive split a paged browse surface makes over one row | **Projection Tier** (`summary` / `detail`), always qualified | An unqualified _tier_ already means an **Outcome Tier** — the check band `checkTierId` names and a **Recipe Check Tier** points at — and issue 1081's own row projection resolves a `checkSummary.dc` (an outcome tier) inside its summary tier, so the two axes collide in one line of code and the qualifier is what keeps "the detail tier" and "the DC tier" apart |
 | `settled` as the **Valid Id Basis** predicate | **known-complete** | SETTLED is taken by the currency domain for what a deduction actually took as against what was intended (`data-models/spec.md:1554`, `:1931` and `:2008`, and `DOMAIN.md` (**Prepared Consumption**)'s own "records what the deduction actually **SETTLED**, never what was intended"), so the gate reads _known-complete_ instead |
-| bare `source` considered for the **Knowledge Grant**'s provenance field | **`grantedBy`** | A learned entry's `source*` family — `sourceItemUuid`, `sourceOwned`, `sourceItemName`, `sourceDefinitionName`, `sourceCapped`, `sourceKind`, `sourceName` — already means THE BOOK a copy was learned from; a bare `source` field written beside those would read as a sixth book-provenance field on an entry that has no book at all, reintroducing at the FIELD-NAMING level the exact false provenance issue 1289 exists to remove at the write level |
-| `grantComponents` / `placeComponents` for the component award, and `awardCurrency` for the currency credit | **`awardComponents`** and **`creditCurrency`** | `grant` is bound to the knowledge domain and to a different write shape (**Knowledge Grant**; `granted`, `grantedBy`, `alreadyKnown`), so one verb for two unrelated published writes is exactly the collision this table exists to prevent; `place` mints a verb with no precedent in tree and orphans the `awarded` outcome token the member answers with; and `awardCurrency` fails on the sharper ground that `CURRENCY_SPEND_CALLERS.award` is ALREADY set by `checkAffordability` (`currencyAffordance.js`), so shipping it would make `caller: 'award'` true of a member named `checkAffordability` AND of one named `awardCurrency`, distinctive of neither and a live overload of a token a GM's macro branches on, while `creditCurrency` also keeps the shipped rule that every `stable` member's success outcome is its own verb (`granted`, `affordable`, `rolled`, `decided`) |
-| `addSystemModifier` / `seedSystemModifierPresets` / `_saveSystemModifierLibrary` / `seedCharacterPrerequisitePresetsForSystem` / `_persistSystemCharacterPrerequisites` / `GatheringRichStateService._systemModifierLibrary` | drop the `System` / `ForSystem` qualifier — `addModifier`, `seedModifierPresets`, `saveModifierLibrary`, `seedCharacterPrerequisitePresets`, `persistCharacterPrerequisites`, `_modifierLibrary` | Issue 1308 moved both libraries to WORLD scope and removed the leading `systemId` argument from every one of these, yet the names still assert an ownership the code no longer has — reading as though a per-system copy survives, which is exactly the drift this document exists to catch — and the rename is deliberately deferred to the follow-up change that relocates both editors to a World route, so that the same call sites are not churned twice. |
-| `settle*` for a craft-pipeline failure-outcome or announcement function name | `resolve*` for a failure outcome, `publish*` for the announcement side | `settle*` is already reserved twice over: by the currency domain's own `settled` (this table's `settled` row, resolved to `known-complete`) and by **History Settlement**, whose `historySettlement` field the craft pipeline's phantom-run discard guard reads, so `craftPipeline.js`'s failure functions take `resolve*` (`resolveCheckFailure`, `resolveModeValidationFailure`), matching the in-span precedent `_resolveAlchemySimpleFailure`, and the result-announcement function takes `publish*` (`publishCraftSuccess`, its internal `publishCheckFailure`), the verb `recipes-and-steps/spec.md` already uses for a step's result publication |
+| bare `source` considered for the **Knowledge Grant**'s provenance field | **`grantedBy`** | A learned entry's `source*` family already names the book a copy was learned from, so a bare `source` would claim a book the grant does not have; see **Knowledge Grant** |
+| `grantComponents` / `placeComponents` for the component award, and `awardCurrency` for the currency credit | **`awardComponents`** and **`creditCurrency`** | `grant` is the **Knowledge Grant**'s verb, `place` has no precedent, and `caller: 'award'` already covers `checkAffordability`; see **Component Award** and **Currency Credit** |
+| `addSystemModifier` / `seedSystemModifierPresets` / `_saveSystemModifierLibrary` / `seedCharacterPrerequisitePresetsForSystem` / `_persistSystemCharacterPrerequisites` / `GatheringRichStateService._systemModifierLibrary` | drop the `System` / `ForSystem` qualifier — `addModifier`, `seedModifierPresets`, `saveModifierLibrary`, `seedCharacterPrerequisitePresets`, `persistCharacterPrerequisites`, `_modifierLibrary` | Both libraries are world-scoped and take no `systemId`, so the qualifier asserts an ownership the code no longer has, and the rename waits for the change that moves both editors to a World route, so the same call sites churn once |
+| `settle*` for a craft-pipeline failure-outcome or announcement function name | `resolve*` for a failure outcome, `publish*` for the announcement side | `settle*` is reserved by the currency domain's `settled` and by **History Settlement**, whose field the phantom-run discard guard reads, so failure functions take `resolve*` (`resolveCheckFailure`, `resolveModeValidationFailure`, after `_resolveAlchemySimpleFailure`) and the announcement takes `publish*` (`publishCraftSuccess`, `publishCheckFailure`), the verb `recipes-and-steps/spec.md` uses for a step's results |
 
 ## Ubiquitous Language
 
@@ -737,6 +737,39 @@ Ordered cumulative resolution driven by a numeric value and difficulty threshold
 Blind ingredient submission with signature matching and optional learn-on-craft discovery.
 
 [Notes](docs/domain/terms.md#alchemy)
+
+#### Iterative
+
+The resolution mode in which a player applies Crafting Actions that move a step's Counters until a success or failure rule holds.
+It persists but is not yet selectable, and every craft path refuses a recipe in an iterative system.
+
+[Notes](docs/domain/terms.md#iterative)
+
+#### Counter
+
+A system-defined numeric track in `CraftingSystem.iterative.counters[]` that Crafting Actions change and iterative rules read.
+It is distinct from a Tool's usage counter (`flags.fabricate.toolUsage`), which counts uses toward breakage.
+
+[Notes](docs/domain/terms.md#counter)
+
+#### Counter Instance
+
+A recipe's configuration of one Counter in `Recipe.iterative.counters[]`, keyed by `counterId`, giving its start, optional bounds and target, and whether the player sees it.
+
+[Notes](docs/domain/terms.md#counter-instance)
+
+#### Crafting Action
+
+A system-owned reusable choice in `CraftingSystem.iterative.actions[]` a player applies to an iterative step, with its availability rules, counter costs, optional check and counter effects.
+
+[Notes](docs/domain/terms.md#crafting-action)
+
+#### Produced When
+
+The `ResultGroup.producedWhen` routing lines that select which result groups an iterative step produces when it ends in success or failure.
+Its lines are OR'd, each line's Counter Rules are AND'd, and a line with no rules always matches.
+
+[Notes](docs/domain/terms.md#produced-when)
 
 #### Legacy Resolution Mode (`mapped` / `tiered`)
 
