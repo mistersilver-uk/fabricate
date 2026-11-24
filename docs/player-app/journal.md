@@ -325,8 +325,20 @@ It never retries the uncertain effect, makes the old request replayable, or auto
 The uncertain run remains marked as requiring recovery.
 
 When a GM can see that a claim is no longer live, meaning no other operation is still working, Fabricate offers **Release claim…** on any run the claim is blocking, not only the run that originally ran into it.
-The prompt explains what releasing it does and does not do, then asks the GM to record whether they checked the actor's items and currency first or are abandoning that check, before releasing the claim.
+The prompt explains what releasing it does and does not do.
+It then asks the GM to choose **I checked it — release** or **Abandon it — release** to record whether they checked the affected actors' items and currency first or are abandoning that check.
 While a claim is still live, meaning another operation is genuinely in progress, the Journal asks you to wait instead of offering the control.
+The prompt defaults to **Not yet**, so pressing Enter releases nothing.
+
+A retained execution claim can also refuse a Craft, a Brew or a gathering Attempt, which starts no run, so the Journal has no run to open.
+When a GM starts one from the Crafting, Alchemy or Gathering tab and that refusal comes back, the same prompt, **Release the retained execution claim**, opens there.
+It opens only for a GM, and only when a claim is retained.
+While the claim is still live, the refusal notice asks you to wait and no prompt opens.
+Once the claim is past its 60 second live window, the next refused start opens the prompt.
+Only the active GM's choice is accepted.
+Any other GM sees a notice that the active GM must process the change, and should ask the active GM to release the claim.
+Players see a notice that a GM must release the claim.
+Releasing the claim does not repeat the Craft, Brew or Attempt you made.
 
 ### Stuck or uncertain runs
 

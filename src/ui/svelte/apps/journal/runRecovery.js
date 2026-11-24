@@ -19,7 +19,8 @@ const DISPOSITIONS = Object.freeze(['reconciled', 'abandoned']);
  *
  * @param {object} claim `run.actions.recoveryClaim`.
  * @param {(key: string, data?: object) => string} localize
- * @returns {{title: string, content: string, choices: Array<{action: string, label: string}>}}
+ * @returns {{title: string, content: string, choices: Array<{action: string, label: string}>,
+ *   defaultAction: string}} Cancel is the default, so an unsolicited dialog never defaults to a release.
  */
 export function retainedClaimPrompt(claim, localize) {
   const text = (key, ...data) => localize(`FABRICATE.App.Journal.Recovery.${key}`, ...data);
@@ -36,6 +37,7 @@ export function retainedClaimPrompt(claim, localize) {
       { action: 'abandoned', label: text('Abandoned'), icon: 'fas fa-ban' },
       { action: 'cancel', label: text('Cancel'), icon: 'fas fa-xmark' },
     ],
+    defaultAction: 'cancel',
   };
 }
 
@@ -74,6 +76,69 @@ export async function reconcileRetainedClaim({ claim, disposition, services, loc
     success: false,
     message: journalRefusalMessage(result, localize, text('ReleaseFailed')),
   };
+}
+
+/**
+ * Ask the GM how to release one retained claim and record the choice. `onBusy` brackets only the
+ * recording, never the open dialog, and `onRecorded` runs after the outcome is notified. Cancel
+ * or a closed window records nothing. A throw while reporting never hides a recorded release.
+ *
+ * @returns {Promise<{recorded: boolean, released: boolean}>} `recorded` is true once the GM chose
+ *   a disposition. `released` is true only when the authority accepted it.
+ */
+export async function offerRetainedClaimRelease({
+  claim,
+  services,
+  localize,
+  onBusy = () => {},
+  onRecorded = async () => {},
+}) {
+  const disposition = await choiceDialog(retainedClaimPrompt(claim, localize));
+  if (!DISPOSITIONS.includes(disposition)) return { recorded: false, released: false };
+  onBusy(true);
+  try {
+    const outcome = await reconcileRetainedClaim({ claim, disposition, services, localize });
+    try {
+      services?.notify?.(outcome.message);
+      await onRecorded();
+    } catch (error) {
+      console.error('Fabricate | Error reporting the claim release:', error);
+    }
+    return { recorded: true, released: outcome.success };
+  } finally {
+    onBusy(false);
+  }
+}
+
+const openPrompts = new Map();
+
+/** One prompt per claim: a second caller awaits the open prompt's outcome instead of opening another. */
+function releaseOnce(claim, open) {
+  const shared = openPrompts.get(claim.claimId);
+  if (shared) return shared;
+  const pending = open().finally(() => openPrompts.delete(claim.claimId));
+  openPrompts.set(claim.claimId, pending);
+  return pending;
+}
+
+/**
+ * Offer the release prompt for a start the authority refused with `recovery-required`, when the
+ * viewer's seam reports a retained claim. Any other refusal, or no claim, does nothing. A throw is
+ * logged and swallowed, so a caller's own `catch` never re-reports a plain refusal as unknown.
+ *
+ * @returns {Promise<{recorded: boolean, released: boolean}>} Both false when nothing was recorded.
+ */
+export async function offerReleaseForRefusal({ result, services, localize }) {
+  const nothing = { recorded: false, released: false };
+  if (result?.reason !== 'recovery-required') return nothing;
+  try {
+    const claim = services?.getRetainedJournalClaim?.();
+    if (!claim) return nothing;
+    return await releaseOnce(claim, () => offerRetainedClaimRelease({ claim, services, localize }));
+  } catch (error) {
+    console.error('Fabricate | Error offering the retained claim release:', error);
+    return nothing;
+  }
 }
 
 /** Native Reconciliation's `choiceDialog` descriptor. Cancel is the default, so Enter closes nothing. */

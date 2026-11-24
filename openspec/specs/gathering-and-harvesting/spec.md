@@ -2154,6 +2154,10 @@ Misconfiguration-aborted attempts:
 Resume-time misconfiguration for an existing waiting run additionally removes the active run so the actor is not permanently blocked by one-active-run-per-task semantics.
 After the GM repairs the task, the player must start a fresh gathering attempt; the cleared run is not resumed.
 
+A start-path `TASK_MISCONFIGURED` blocked reason carries `data.errors`, the task-configuration messages, and a resolution-path one carries `data.diagnostics`, which holds diagnostic codes and message keys and never raw messages.
+Both are `null` for a non-GM viewer of a blind environment.
+Only a GM's client surfaces them in the refusal notification.
+
 ## Run Tracking and Persistence
 
 ### Actor History

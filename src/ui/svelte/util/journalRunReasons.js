@@ -35,7 +35,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'claim-held': 'FABRICATE.App.Journal.Actions.ClaimHeld',
   'claim-mismatch': 'FABRICATE.App.Journal.Reason.ClaimMismatch',
   'claim-release-failed': 'FABRICATE.App.Journal.Actions.ClaimReleaseFailed',
-  'recovery-required': 'FABRICATE.App.Journal.Actions.RecoveryRequired',
+  'recovery-required': 'FABRICATE.App.Journal.Actions.ClaimRetained',
   'recovery-pending': 'FABRICATE.App.Journal.Reason.RecoveryPending',
   'reconstruction-failed': 'FABRICATE.App.Journal.Reason.ReconstructionFailed',
   'reconstruction-unavailable': 'FABRICATE.App.Journal.Reason.ReconstructionUnavailable',

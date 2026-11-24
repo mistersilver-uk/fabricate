@@ -86,6 +86,9 @@ How the rest of the column reads depends on the selection mode:
   Selecting a discovered task opens it in the right-hand column with that task's own Attempt button.
   Before anything has been revealed the section reads as nothing discovered yet.
 
+When a refused Attempt says that the task needs GM configuration, a GM's notification also names what to fix.
+Players see only that the task needs GM configuration.
+
 The success-chance bar shows the chance that at least one item drops.
 It is not the chance the whole attempt succeeds, so it can read high while an attempt is still blocked or fails a skill check.
 Tasks that have no enabled drop rows carry no bar.
@@ -144,6 +147,7 @@ See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-
 Current-lifecycle starts and changes require active GM authority.
 The Journal explains missing authority and offers the active GM its setup action when the ledger is missing.
 If an interrupted operation needs recovery, ask the GM to inspect the recorded effects rather than repeating the attempt.
+A GM whose Attempt is refused for this reason is offered the **Release the retained execution claim** prompt right there, with the choices described under [GM authority and recovery]({% link player-app/journal.md %}#gm-authority-and-recovery).
 Older timed gathering runs keep their automatic completion behavior.
 
 {% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with one of its task rows selected." %}

@@ -1,10 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   BLOCK_LABEL_KEYS,
   localizeBlockedReasons,
   describeBlockedReasons,
+  misconfigurationDetail,
+  logMisconfiguration,
   calloutFor
 } from '../src/ui/svelte/apps/gathering/gatheringBlockedReasons.js';
 
@@ -90,6 +94,236 @@ describe('gatheringBlockedReasons', () => {
       icon: 'fa-triangle-exclamation',
       tone: 'warning',
       label: 'FABRICATE.App.Gathering.Detail.Blocked'
+    });
+  });
+
+  describe('misconfiguration details', () => {
+    const MESSAGE = 'The task needs GM configuration.';
+    const misconfigured = (data) => ({ code: 'TASK_MISCONFIGURED', message: MESSAGE, data });
+    const DETAIL = 'FABRICATE.App.Gathering.Detail.CannotAttemptDetail';
+    const MORE = 'FABRICATE.App.Gathering.Detail.CannotAttemptMore';
+    const CANNOT = 'FABRICATE.App.Gathering.Detail.CannotAttempt';
+    const detailed = (reasons) => describeBlockedReasons(reasons, localize, { includeDetail: true });
+    const sentence = (details) => `${DETAIL}:${JSON.stringify({ reason: MESSAGE, details })}`;
+
+    it('lists the start-path errors', () => {
+      const reasons = [misconfigured({ taskId: 't1', errors: ['No roll formula.', 'Duplicate group.'] })];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['No roll formula.', 'Duplicate group.']);
+      assert.equal(detailed(reasons), sentence('No roll formula.; Duplicate group.'));
+    });
+
+    it('localizes a diagnostic message key and falls back to its code', () => {
+      const reasons = [
+        misconfigured({
+          code: 'RESULT_PLAN_DIAGNOSTIC',
+          diagnostics: [
+            { code: 'RESULT_SOURCE_UNRESOLVED', messageKey: 'FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved' },
+            { code: 'ROUTED_TIER_UNROUTED' }
+          ]
+        })
+      ];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), [
+        'FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved',
+        'ROUTED_TIER_UNROUTED'
+      ]);
+    });
+
+    const DIAGNOSTIC = 'FABRICATE.App.Gathering.Detail.Diagnostic';
+    const MAPPED_CODES = [
+      'MISSING_CHARACTER_MODIFIER',
+      'INVALID_CHARACTER_MODIFIER_BOUNDS',
+      'CHARACTER_MODIFIER_NON_FINITE',
+      'MISSING_ROUTED_CHECK',
+      'MISSING_GATHERING_CHECK',
+      'INVALID_PROGRESSIVE_DIFFICULTY',
+      'MALFORMED_CHECK_RESULT',
+      'CHECK_MODE_MISMATCH'
+    ];
+
+    for (const code of MAPPED_CODES) {
+      it(`words the ${code} diagnostic in plain language, never as the bare code`, () => {
+        const reasons = [misconfigured({ code: 'RESULT_PLAN_DIAGNOSTIC', diagnostics: [{ code, messageKey: null }] })];
+        assert.deepEqual(misconfigurationDetail(reasons, localize), [`${DIAGNOSTIC}.${code}`]);
+        const en = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
+        const sentenceText = en.FABRICATE.App.Gathering.Detail.Diagnostic[code];
+        assert.equal(typeof sentenceText, 'string', 'the label is shipped');
+        assert.ok(sentenceText.length <= 90, 'the label fits the toast without truncation');
+        assert.deepEqual(
+          misconfigurationDetail(reasons, (key) => key.split('.').reduce((node, part) => node?.[part], en)),
+          [sentenceText]
+        );
+      });
+    }
+
+    it('words a lone data.code the same way, when no diagnostic yielded', () => {
+      assert.deepEqual(misconfigurationDetail([misconfigured({ code: 'MISSING_ROUTED_CHECK' })], localize), [
+        `${DIAGNOSTIC}.MISSING_ROUTED_CHECK`
+      ]);
+    });
+
+    it('lets a diagnostic message key win over its code label', () => {
+      const reasons = [
+        misconfigured({
+          diagnostics: [{ code: 'MISSING_CHARACTER_MODIFIER', messageKey: 'FABRICATE.Gathering.Diagnostics.Own' }]
+        })
+      ];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['FABRICATE.Gathering.Diagnostics.Own']);
+    });
+
+    it('falls back to the bare code for a code with no label, and never for inherited names', () => {
+      const reasons = [misconfigured({ diagnostics: [{ code: 'NOT_A_KNOWN_CODE' }, { code: 'constructor' }] })];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['NOT_A_KNOWN_CODE', 'constructor']);
+    });
+
+    it('prefers the errors over the diagnostics when both are present', () => {
+      const reasons = [misconfigured({ errors: ['Real rule.'], diagnostics: [{ code: 'OTHER' }] })];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['Real rule.']);
+    });
+
+    it('names nothing for diagnostics that carry only the generic code', () => {
+      const reasons = [
+        misconfigured({ code: 'TASK_MISCONFIGURED', diagnostics: [{ code: 'TASK_MISCONFIGURED' }] })
+      ];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), []);
+      assert.equal(detailed(reasons), `${CANNOT}:${JSON.stringify({ reason: MESSAGE })}`);
+    });
+
+    it('uses data.code only when no entry yielded and it is not the generic code', () => {
+      assert.deepEqual(
+        misconfigurationDetail([misconfigured({ code: 'RESULT_PLAN_DIAGNOSTIC' })], localize),
+        ['RESULT_PLAN_DIAGNOSTIC']
+      );
+      assert.deepEqual(
+        misconfigurationDetail(
+          [misconfigured({ code: 'RESULT_PLAN_DIAGNOSTIC', diagnostics: [{ code: 'ROUTED_TIER_UNROUTED' }] })],
+          localize
+        ),
+        ['ROUTED_TIER_UNROUTED']
+      );
+      assert.deepEqual(misconfigurationDetail([misconfigured({ code: 'TASK_MISCONFIGURED' })], localize), []);
+    });
+
+    it('dedupes a repeated string and a code shared across reasons', () => {
+      assert.deepEqual(
+        misconfigurationDetail([misconfigured({ errors: ['Same.', 'Same.', 'Other.'] })], localize),
+        ['Same.', 'Other.']
+      );
+      assert.deepEqual(
+        misconfigurationDetail(
+          [
+            misconfigured({ diagnostics: [{ code: 'SHARED' }] }),
+            misconfigured({ code: 'SHARED' }),
+            misconfigured({ errors: ['SHARED'] })
+          ],
+          localize
+        ),
+        ['SHARED']
+      );
+    });
+
+    it('shows two entries without a remainder, then counts the rest', () => {
+      const names = (n) => Array.from({ length: n }, (_, i) => `Rule ${i + 1}.`);
+      assert.equal(detailed([misconfigured({ errors: names(2) })]), sentence('Rule 1.; Rule 2.'));
+      for (const [total, more] of [[3, 1], [5, 3]]) {
+        const details = `${MORE}:${JSON.stringify({ details: 'Rule 1.; Rule 2.', count: more })}`;
+        assert.equal(detailed([misconfigured({ errors: names(total) })]), sentence(details));
+      }
+    });
+
+    it('truncates each entry at 90 characters with an ellipsis', () => {
+      const exact = 'x'.repeat(90);
+      const long = 'y'.repeat(91);
+      assert.deepEqual(misconfigurationDetail([misconfigured({ errors: [exact, long] })], localize), [
+        exact,
+        `${'y'.repeat(89)}…`
+      ]);
+    });
+
+    it('strips angle brackets from a GM-authored name', () => {
+      assert.deepEqual(
+        misconfigurationDetail([misconfigured({ errors: ['Group "<img src=x>" repeats.', '<>'] })], localize),
+        ['Group "img src=x" repeats.']
+      );
+    });
+
+    it('ignores non-array, non-object and empty entries', () => {
+      const reasons = [
+        misconfigured({ errors: 'nope', diagnostics: 'nope' }),
+        misconfigured({ errors: ['', 7, null, 'Kept.'] }),
+        misconfigured({ diagnostics: [null, 'text', 4, { code: '' }, { messageKey: '' }] }),
+        misconfigured('text'),
+        misconfigured(null),
+        { code: 'TASK_MISCONFIGURED' },
+        null
+      ];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), ['Kept.']);
+      assert.deepEqual(misconfigurationDetail(null, localize), []);
+    });
+
+    it('never shows the detail of a reason whose code is not TASK_MISCONFIGURED', () => {
+      const reasons = [{ code: 'TOOL_BLOCKED', data: { errors: ['Hidden.'], diagnostics: [{ code: 'X' }] } }];
+      assert.deepEqual(misconfigurationDetail(reasons, localize), []);
+      assert.equal(
+        detailed(reasons),
+        `${CANNOT}:${JSON.stringify({ reason: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools' })}`
+      );
+    });
+
+    it('leaves a TASK_MISCONFIGURED reason on the generic sentence by default', () => {
+      const reasons = [misconfigured({ errors: ['Rule.'] })];
+      assert.equal(
+        describeBlockedReasons(reasons, localize),
+        `${CANNOT}:${JSON.stringify({ reason: MESSAGE })}`
+      );
+    });
+
+    it('states only the generic sentence when data is null or absent', () => {
+      const generic = `${CANNOT}:${JSON.stringify({ reason: MESSAGE })}`;
+      assert.equal(detailed([misconfigured(null)]), generic);
+      assert.equal(detailed([{ code: 'TASK_MISCONFIGURED', message: MESSAGE }]), generic);
+    });
+  });
+
+  describe('logMisconfiguration', () => {
+    it('writes the full uncapped, unlocalized list with the task id', () => {
+      const calls = [];
+      const original = console.warn;
+      console.warn = (...args) => {
+        calls.push(args);
+      };
+      try {
+        const errors = ['A <b>.', 'B.', 'C.', 'C.', 'D.'];
+        logMisconfiguration([
+          { code: 'TASK_MISCONFIGURED', data: { taskId: 't1', errors } },
+          { code: 'TOOL_BLOCKED', data: { errors: ['skipped'] } }
+        ]);
+        assert.deepEqual(calls, [
+          ['Fabricate | Gathering task needs configuration:', { taskId: 't1', errors: ['A <b>.', 'B.', 'C.', 'D.'] }]
+        ]);
+      } finally {
+        console.warn = original;
+      }
+    });
+
+    it('writes a mapped diagnostic as its bare code, not its label key', () => {
+      const calls = [];
+      const original = console.warn;
+      console.warn = (...args) => {
+        calls.push(args);
+      };
+      try {
+        logMisconfiguration([
+          {
+            code: 'TASK_MISCONFIGURED',
+            data: { taskId: 't2', diagnostics: [{ code: 'MISSING_CHARACTER_MODIFIER', messageKey: null }] }
+          }
+        ]);
+        assert.deepEqual(calls, [
+          ['Fabricate | Gathering task needs configuration:', { taskId: 't2', errors: ['MISSING_CHARACTER_MODIFIER'] }]
+        ]);
+      } finally {
+        console.warn = original;
+      }
     });
   });
 });

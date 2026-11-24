@@ -194,6 +194,12 @@ A blocked Attempt stays a disabled primary with its visible label, in the pane's
 An Attempt in flight, the task inspector's and a blind environment's alike, is busy rather than disabled: the pressed button keeps focus, announces `aria-busy`, reads "Attempting…" and ignores a second press.
 Its reason is a visible warning notice directly under the header, "Can't attempt — {reason}", which the Attempt references by `aria-describedby`.
 A blind environment's header Attempt states only the generic reason, because its blockers may be derived from tasks the player cannot see.
+A GM's refused Attempt whose reason is `TASK_MISCONFIGURED` also names what needs fixing in its notification: the start-path `data.errors` strings, or the resolution-path diagnostics when no errors are present.
+The notification lists at most the first two distinct entries and states how many more there are.
+A player's notification, the task inspector's "Can't attempt" notice, and any reason whose `data` is absent state only the generic reason.
+The detail is presentation-only gating on the GM's own client, and the start-path rule strings stay in English.
+A resolution-path diagnostic reads as its own localized message when it carries one, as a plain-language sentence when its code is a known one, and as the bare code otherwise.
+A GM whose Attempt is refused with `recovery-required` is offered the retained-claim disposition prompt from the Gathering view after the refusal notice, as `data-models/spec.md` _Authority Ledger and Recovery Boundary_ requires.
 
 If `task.timeRequirement` is absent:
 
