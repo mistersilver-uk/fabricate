@@ -13,7 +13,7 @@ import {
 } from './journalRunAwardChoice.js';
 import { serializedOperationResult, terminalRun, validText } from './journalRunReply.js';
 import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
-import { applyGuardedRunMutation } from './runLifecycleState.js';
+import { applyGuardedRunMutation, commandAdmitsRun } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
 export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
@@ -597,7 +597,7 @@ export function createJournalRunCommandService({
     const run =
       request.action === 'start' ? null : await operation.getRun?.({ actor, runId: request.runId });
     if (request.action !== 'start' && !run) return failure('run-not-found');
-    if (run && run.lifecycleVersion !== 1) {
+    if (run && !commandAdmitsRun(run, request)) {
       return failure('unsupported-version');
     }
     const revision = currentRevision(run);

@@ -397,7 +397,7 @@ export function createJournalStore({ services } = {}) {
         actorId: listing?.selectedActorId ?? null,
         runId: run.id,
       });
-      if (result?.message) services?.notify?.(result.message);
+      notifyEach(services, [legacyCancelNotice(result, services)]);
       await load(true);
     } catch (err) {
       console.error('Fabricate | Error cancelling a crafting run:', err);
@@ -566,6 +566,12 @@ export function createJournalStore({ services } = {}) {
 
 function notifyEach(services, messages) {
   for (const message of messages) if (message) services?.notify?.(message);
+}
+
+/** A legacy cancel's one toast: its message, else a refusal's localized reason, never a Retry. */
+function legacyCancelNotice(result, services) {
+  const generic = result?.success === false ? services?.craftErrorMessage?.() : '';
+  return journalCommandRefusal(result, services?.localize, generic);
 }
 
 /** `kinds` with `kind` flipped in or out, the others untouched, in `RUN_KINDS` order. */

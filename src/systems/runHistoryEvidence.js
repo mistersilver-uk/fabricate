@@ -495,12 +495,15 @@ export function nativeStageRestorer(stage, snapshotKeys, persist) {
   };
 }
 
+/** Whether a record's settlement holds `pending` or `uncertain`: its native effects were invoked. */
+export function hasInvokedNativeEffects(run) {
+  return Object.values(run?.historySettlement ?? {}).some((state) =>
+    ['pending', 'uncertain'].includes(state)
+  );
+}
+
 export function assertNativeEffectsUninvoked(run) {
-  if (
-    Object.values(run?.historySettlement ?? {}).some((state) =>
-      ['pending', 'uncertain'].includes(state)
-    )
-  ) {
+  if (hasInvokedNativeEffects(run)) {
     throw unconfirmedHistoryError('This run has invoked effects and cannot be replayed');
   }
 }

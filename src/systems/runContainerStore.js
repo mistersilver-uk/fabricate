@@ -37,8 +37,8 @@ export class RunContainerManagerBase {
     this._flagKey = flagKey;
     this._settlementOwners = settlementOwners;
     this._cache = new Map(); // actorId -> container
-    // actorId -> the `{ activeKeys, historyIds }` last observed, so `_persist` removes only what
-    // THIS writer dropped, never another client's concurrent run (see runContainerCoherence).
+    // actorId -> the `{ activeKeys, historyIds }` and version-1 `revisions` last observed, so
+    // `_persist` removes only what THIS writer dropped and refuses a stale version-1 write.
     this._baseline = new Map();
   }
 
@@ -75,15 +75,16 @@ export class RunContainerManagerBase {
     const current = this._normalizeContainer(getFabricateFlag(actor, this._flagKey, null));
     const next = this._normalizeContainer(JSON.parse(JSON.stringify(container)));
     next.history = preserveSettledHistory(current.history, next.history);
-    const reconciled = reconcileAgainstDocument({
-      current,
-      next,
-      baseline: this._baseline.get(actor.id),
-      compareHistory: compareFinishedAtNewestFirst,
-      historyLimit: HISTORY_LIMIT,
-    });
-    for (const run of reconciled.history) delete reconciled.active[run.id];
+    // A stale-revision refusal also invalidates the cache, so the caller's retry reads the flag.
     try {
+      const reconciled = reconcileAgainstDocument({
+        current,
+        next,
+        baseline: this._baseline.get(actor.id),
+        compareHistory: compareFinishedAtNewestFirst,
+        historyLimit: HISTORY_LIMIT,
+      });
+      for (const run of reconciled.history) delete reconciled.active[run.id];
       await writeAcknowledgedRunContainer(
         actor,
         'fabricate',
@@ -91,13 +92,13 @@ export class RunContainerManagerBase {
         current,
         reconciled
       );
+      Object.assign(container, reconciled);
+      this._cache.set(actor.id, structuredClone(reconciled));
+      this._recordBaseline(actor.id, reconciled);
     } catch (error) {
       this.invalidateCache(actor.id);
       throw error;
     }
-    Object.assign(container, reconciled);
-    this._cache.set(actor.id, structuredClone(reconciled));
-    this._recordBaseline(actor.id, reconciled);
   }
 
   _recordBaseline(actorId, container) {

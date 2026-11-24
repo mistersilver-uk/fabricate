@@ -16,10 +16,10 @@ export class RunLifecycleError extends Error {
 
 /**
  * Run a guarded persistence call, returning its refusal instead of throwing it.
- * Every guard here runs in memory before the location persists, so a `RunLifecycleError`
- * escaping `mutate` provably wrote nothing; any other error may have half-applied and is
- * rethrown so the authority keeps its claim for reconciliation.
- * @param {Function} mutate Async call ending in `location.persist()`.
+ * Every guard here, and the persist's stale-revision refusal, runs before the flag write, so a
+ * `RunLifecycleError` escaping `mutate` provably wrote nothing; any other error may have
+ * half-applied and is rethrown so the authority keeps its claim for reconciliation.
+ * @param {Function} mutate Async call ending in its one `location.persist()`.
  * @returns {Promise<{run?: object|null, refused?: {code: string, message: string}}>}
  */
 export async function applyGuardedRunMutation(mutate) {
@@ -38,6 +38,16 @@ export async function applyGuardedRunMutation(mutate) {
 export function getRunLifecycleContract(run) {
   if (!hasOwn(run, 'lifecycleVersion')) return 'legacy';
   return run?.lifecycleVersion === RUN_LIFECYCLE_VERSION ? 'current' : 'unsupported';
+}
+
+/**
+ * Whether the command authority may act on `run` for `request`: any command on a current run, and
+ * on a legacy run only a crafting `cancel`, which keeps its legacy refund semantics.
+ */
+export function commandAdmitsRun(run, request) {
+  const contract = getRunLifecycleContract(run);
+  if (contract === 'current') return true;
+  return contract === 'legacy' && request?.runType === 'crafting' && request?.action === 'cancel';
 }
 
 /**
@@ -253,7 +263,8 @@ function normalizePauseState(value) {
   return { pausedAt, remainingSeconds: Math.max(0, remainingSeconds) };
 }
 
-function normalizeRevision(value) {
+/** A stored revision as a non-negative safe integer, else 0. */
+export function normalizeRevision(value) {
   const revision = Number(value);
   return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
 }

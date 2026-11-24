@@ -549,6 +549,69 @@ test('CraftingRunManager rejects a v1 update built from a stale manager cache', 
   assert.equal(secondManager.getActiveRun(actor, created.id).status, 'inProgress');
 });
 
+/** An actor whose `setFlag` calls are counted, for proving a refusal dispatched no write. */
+function countingActor(name) {
+  const actor = new FakeActor(name);
+  actor.id = name.toLowerCase().replaceAll(/\s+/g, '-');
+  actor.writes = 0;
+  const setFlag = actor.setFlag.bind(actor);
+  actor.setFlag = async (...args) => {
+    actor.writes += 1;
+    return setFlag(...args);
+  };
+  return actor;
+}
+
+test('CraftingRunManager refuses to archive a held v1 copy the stored run has advanced past', async () => {
+  setupGlobals(1000);
+  const actor = countingActor('Stale archiver');
+  const holder = new CraftingRunManager();
+  const held = await holder.createRun(actor, singleStepRecipe('held'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  await new CraftingRunManager().setCompletionMode(actor, held.id, 'worldTime', {
+    expectedRevision: 0,
+  });
+  actor.writes = 0;
+
+  await assert.rejects(
+    () => holder.completeRun(actor, held, 'succeeded'),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+  assert.equal(actor.writes, 0, 'the refusal dispatches no flag write');
+  const stored = new CraftingRunManager().getActiveRun(actor, held.id);
+  assert.equal(stored.completionMode, 'worldTime', 'the completion mode is preserved');
+  assert.equal(stored.runRevision, 1);
+});
+
+test('CraftingRunManager refuses to overlay a stale cached v1 run, then retries from the document', async () => {
+  setupGlobals(1000);
+  const actor = countingActor('Stale cache');
+  const stale = new CraftingRunManager();
+  const first = await stale.createRun(actor, singleStepRecipe('cached'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  await new CraftingRunManager().setCompletionMode(actor, first.id, 'worldTime', {
+    expectedRevision: 0,
+  });
+  const stored = structuredClone(actor._flags);
+  actor.writes = 0;
+
+  await assert.rejects(
+    () => stale.createRun(actor, singleStepRecipe('second'), [actor], 'user-1'),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+  assert.equal(actor.writes, 0, 'the refusal dispatches no flag write');
+  assert.deepEqual(actor._flags, stored, 'the flag is unchanged');
+
+  // The refusal invalidated the stale cache, so the retry reads the stored revision.
+  const second = await stale.createRun(actor, singleStepRecipe('second'), [actor], 'user-1');
+  const reread = new CraftingRunManager();
+  assert.equal(reread.getActiveRun(actor, first.id).runRevision, 1, 'no revision regressed');
+  assert.equal(reread.getActiveRun(actor, first.id).completionMode, 'worldTime');
+  assert.ok(reread.getActiveRun(actor, second.id), 'the retried run is stored');
+});
+
 test('CraftingRunManager preserves unsupported lifecycle records and refuses mutations without writes', async () => {
   setupGlobals(1000);
   const actor = new FakeActor('Future crafter');

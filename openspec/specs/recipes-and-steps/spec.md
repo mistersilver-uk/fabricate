@@ -209,7 +209,9 @@ Paused runs cannot advance manually or through world-time processing, but may be
 - Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
 It reverses a started-but-unresolved stage's consumption through the same shared reversal the legacy cancel uses, honouring the system's `features.refundOnPlayerCancel` flag and reporting the ACTUAL outcome rather than the policy intent.
 A stage START is not an attempt, so a cancelled run's started-but-unresolved stage records no attempted stage.
-Legacy consumption and refund behavior and salvage remain unchanged.
+Legacy consumption and refund behaviour and salvage remain unchanged, except that the active GM executes a legacy crafting cancel under the command authority.
+A legacy cancel therefore requires an active GM, honours `features.refundOnPlayerCancel` with no caller override, and restores only onto the crafting actor or the run's recorded component sources.
+Two cancels of one legacy crafting run restore its consumption at most once, because the authority refuses a cancel whose run is already archived.
 - A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
 It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
 - A matched version-1 alchemy start MUST carry a complete selection plan derived by the authority from the canonical submission: for every multi-option group, an option under which the submitted units fund the matched set when one exists, and an essence allocation scoped to the matched set's stage over the submitted carriers.

@@ -176,6 +176,7 @@ import {
   unconfirmedHistoryError,
   linkResultGroups,
   assertNativeEffectsUninvoked,
+  hasInvokedNativeEffects,
   nativeStageRestorer,
 } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
@@ -1241,6 +1242,8 @@ export class CraftingEngine {
     }
   }
 
+  /** Execute a cancel under the authority's claim, archiving the run `cancelled`; a legacy run
+   *  keeps its legacy refund semantics and never gains a revision. */
   async cancelVersionedRun({ actor, runId, expectedRevision, executionGrant, requestId }) {
     const trusted = await this._consumeVersionedGrant(executionGrant, {
       operation: 'cancel',
@@ -1253,19 +1256,20 @@ export class CraftingEngine {
     const runManager = this._craftingRunManager();
     runManager?.invalidateCache?.(actor?.id);
     const run = runManager?.getActiveRun?.(actor, runId) ?? null;
-    if (!run) return versionedFailure('There is no in-progress craft to cancel.');
-    if (getRunLifecycleContract(run) !== 'current') {
+    if (!run) return runNotFound();
+    const contract = getRunLifecycleContract(run);
+    if (contract === 'unsupported') {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
-    if (Number(expectedRevision) !== Number(run.runRevision)) {
+    // A legacy run holds no revision: the claim and this fresh read serialise its cancels.
+    if (contract !== 'legacy' && Number(expectedRevision) !== Number(run.runRevision)) {
       throw new CraftingLifecycleExecutionError(
         'The crafting run revision is stale',
         'STALE_RUN_REVISION'
       );
     }
-    if (run.executionJournal?.status === 'recoveryRequired') {
-      return versionedFailure('The crafting run requires recovery.');
-    }
+    const refusal = cancelRefusal(run, actor, runManager);
+    if (refusal) return refusal;
     // A started stage already spent its materials, so cancelling returns them through the
     // shared reversal; only a run that spent nothing reports nothing returned.
     const refundIntended = this._shouldRefundOnCancel(run);
@@ -4358,9 +4362,8 @@ export class CraftingEngine {
     };
     const steps = Array.isArray(run?.steps) ? run.steps : [];
     for (const step of steps) {
-      const prepared = step?.preparedConsumption;
-      // Only a consumed-but-unresolved step holds recoverable inputs.
-      if (!prepared || step.status === 'succeeded' || step.status === 'failed') continue;
+      if (!holdsRecoverableInputs(step)) continue;
+      const prepared = step.preparedConsumption;
       const outcome = await this._restoreConsumedIngredients(
         craftingActor,
         run?.craftingSystemId,
@@ -4405,13 +4408,10 @@ export class CraftingEngine {
     return { attempted, refundedGroups, status };
   }
 
-  /**
-   * Cancel a player's in-progress craft (issue 848). Owner-scoped, since the engine writes items
-   * with no GM relay. The run is archived `cancelled` with nothing produced; with
-   * `features.refundOnPlayerCancel` (default on, overridden by `options.refund`)
-   * {@link reverseRunConsumption} restores the START consumption, else the inputs are forfeit.
-   */
-  async cancelCraft(craftingActor, componentSourceActors, runId, options = {}) {
+  /** Cancel a player's in-progress craft: owner-scoped, and executed by the active GM through
+   *  {@link cancelVersionedRun}, on a legacy or a version 1 run, which honours
+   *  `features.refundOnPlayerCancel` (default on) and no caller override. */
+  async cancelCraft(craftingActor, componentSourceActors, runId) {
     // Owner scope, failing closed for a non-owner reaching the engine directly.
     if (craftingActor?.isOwner === false) {
       return { success: false, message: 'You must own this character to cancel its craft.' };
@@ -4430,51 +4430,18 @@ export class CraftingEngine {
     if (lifecycleContract === 'unsupported') {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
-    if (lifecycleContract === 'current') {
-      const requestCancel = this.versionedRunAuthority?.requestCancel;
-      if (typeof requestCancel !== 'function') return authorityUnavailableResult();
-      return requestCancel({
-        actor: craftingActor,
-        componentSourceActors,
-        runId,
-        expectedRevision: run.runRevision,
-      });
-    }
-
-    const refundIntended = this._shouldRefundOnCancel(run, options);
-    let restoredCount = 0;
-    let reversalOk = true;
-    let partialRefund = false;
-    try {
-      if (refundIntended) {
-        const reversal = await this.reverseRunConsumption(craftingActor, run);
-        restoredCount = reversal.restored.length;
-        reversalOk = reversal.ok;
-        // A partial reversal is reported distinctly from a total failure. Both operands are
-        // re-derived because `currencyRefund` is an object and would be truthy in boolean
-        // context; an unattempted refund recovered nothing.
-        const currencyRecovered = reversal.currencyRefund.refundedGroups > 0;
-        partialRefund = !reversal.ok && (reversal.restored.length > 0 || currencyRecovered);
-      }
-    } finally {
-      // Always archive, even after a failed reversal, so the run can never be re-cancelled.
-      await runManager.cancelRun(craftingActor, runId);
-    }
-
-    // Report the outcome, not the intent: `refunded` needs a complete reversal.
-    return {
-      success: true,
-      cancelled: true,
-      refunded: refundIntended && reversalOk,
-      partialRefund,
-      restoredCount,
-    };
+    const requestCancel = this.versionedRunAuthority?.requestCancel;
+    if (typeof requestCancel !== 'function') return authorityUnavailableResult();
+    return requestCancel({
+      actor: craftingActor,
+      componentSourceActors,
+      runId,
+      expectedRevision: run.runRevision ?? 0,
+    });
   }
 
-  /** Whether a player cancel refunds: `options.refund`, else `features.refundOnPlayerCancel`,
-   * defaulting on. */
-  _shouldRefundOnCancel(run, options = {}) {
-    if (typeof options.refund === 'boolean') return options.refund;
+  /** Whether a player cancel refunds: `features.refundOnPlayerCancel`, defaulting on. */
+  _shouldRefundOnCancel(run) {
     const system = game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(run?.craftingSystemId);
     return system?.features?.refundOnPlayerCancel !== false;
   }
@@ -6987,6 +6954,37 @@ export class CraftingEngine {
       },
     };
   }
+}
+
+/** A cancel's refusal before any reversal, returned so the authority releases its claim: a legacy
+ *  run already archived (reason-only, so the Journal localizes it) or with a settlement pending or
+ *  uncertain, a run requiring recovery, or a restore onto an actor outside the crafting actor and
+ *  the run's recorded sources, the set the sender's ownership was checked against. */
+function cancelRefusal(run, actor, runManager) {
+  if (getRunLifecycleContract(run) === 'legacy') {
+    if (runManager.getRunHistory(actor).some((entry) => entry?.id === run.id)) return runNotFound();
+    if ((run.steps ?? []).some(hasInvokedNativeEffects)) {
+      return versionedFailure('This craft has invoked effects and cannot be cancelled.');
+    }
+  }
+  if (run.executionJournal?.status === 'recoveryRequired') {
+    return versionedFailure('The crafting run requires recovery.');
+  }
+  const sources = Array.isArray(run.componentSourceActorUuids) ? run.componentSourceActorUuids : [];
+  const allowed = new Set([actor?.uuid, ...sources]);
+  const outside = (run.steps ?? [])
+    .filter(holdsRecoverableInputs)
+    .flatMap((step) => step.preparedConsumption.consumedSummary)
+    .some((entry) => entry?.actorUuid && !allowed.has(entry.actorUuid));
+  if (!outside) return null;
+  return versionedFailure('This craft names a source this character cannot restore to.');
+}
+
+const runNotFound = () => ({ success: false, reason: 'run-not-found' });
+
+/** Only a consumed-but-unresolved step holds recoverable inputs. */
+function holdsRecoverableInputs(step) {
+  return Boolean(step?.preparedConsumption) && !['succeeded', 'failed'].includes(step.status);
 }
 
 function snapshotRequirementSet(ingredientSet) {

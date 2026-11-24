@@ -641,6 +641,119 @@ describe('journal run command protocol', () => {
     }
   });
 
+  it('executes a legacy crafting cancel once under the claim and refuses its repeat (issue 900)', async () => {
+    const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
+    try {
+      let ids = 0;
+      Object.assign(globalThis, {
+        foundry: { utils: { randomID: () => `legacy-${++ids}` } },
+        game: { user: { id: 'gm', isGM: true }, time: { worldTime: 1000 }, fabricate: {} },
+      });
+      const runManager = new CraftingRunManager();
+      const engine = new CraftingEngine({ getRecipe: () => null }, runManager);
+      const operations = loadCraftingOperations()(
+        { craftingRunManager: runManager, craftingEngine: engine }, () => harness.service);
+      const harness = commandHarness({ currentUserId: 'gm', authority: replicatedAuthorityFixture().authority,
+        operations: { crafting: operations } });
+      installCraftingJournalRunAuthority({ engine, service: harness.service });
+      const { service, actor } = harness;
+      const flags = {};
+      const restored = [];
+      Object.assign(actor, { id: 'a', isOwner: true, items: [],
+        getFlag: (scope, key) => flags[scope]?.[key],
+        async setFlag(scope, key, value) {
+          flags[scope] ??= {};
+          flags[scope][key] = mergeHistoryFlag(flags[scope][key], value);
+          return this;
+        },
+        async createEmbeddedDocuments(_type, data) {
+          restored.push(...data);
+          return data.map((entry, index) => ({ ...entry, id: `restored-${index}` }));
+        } });
+      Object.assign(globalThis, { fromUuid: async (uuid) => (uuid === actor.uuid ? actor : null) });
+      const recipe = { id: 'recipe', craftingSystemId: 'system', getExecutionSteps: () => [{ id: 'step' }] };
+      const run = await runManager.createRun(actor, recipe, [actor], 'player');
+      await runManager.markStepPrepared(actor, run, 0, { selectedIngredientSetId: 'set', currencySpends: [],
+        consumedSummary: [{ itemUuid: 'Actor.a.Item.herb', actorUuid: actor.uuid, quantity: 2, name: 'Herb' }] });
+      const cancel = () => service.executeJournalRunCommand({ actorUuid: actor.uuid, runType: 'crafting',
+        runId: run.id, expectedRevision: 0, action: 'cancel', payload: {} });
+
+      const first = await cancel();
+      const second = await cancel();
+
+      assert.equal(first.success, true, JSON.stringify(first));
+      assert.equal(first.cancelled, true);
+      assert.equal(first.refunded, true);
+      assert.equal(second.success, false, JSON.stringify(second));
+      assert.equal(second.reason, 'run-not-found');
+      assert.equal(second.message, null, 'reason-only, so the Journal localizes it');
+      assert.deepEqual(restored.map((entry) => [entry.name, entry.system.quantity]), [['Herb', 2]],
+        'the consumption is restored once');
+      const archived = runManager.getRun(actor, run.id);
+      assert.equal(archived.status, 'cancelled');
+      assert.equal(Object.hasOwn(archived, 'lifecycleVersion'), false, 'the run stays legacy');
+    } finally {
+      Object.assign(globalThis, oldGlobals);
+    }
+  });
+
+  for (const { label, run, runType = 'crafting', action = 'cancel', expectedRevision = 0, reason } of [
+    { label: 'admits a legacy crafting cancel', run: { id: 'run-1' }, reason: null },
+    { label: 'refuses a legacy crafting execute', run: { id: 'run-1' }, action: 'execute',
+      reason: 'unsupported-version' },
+    { label: 'refuses a legacy gathering cancel', run: { id: 'run-1' }, runType: 'gathering',
+      reason: 'unsupported-version' },
+    { label: 'refuses an unsupported-version crafting cancel', run: { id: 'run-1', lifecycleVersion: 2 },
+      reason: 'unsupported-version' },
+    { label: 'refuses a legacy cancel at a revision it never had', run: { id: 'run-1' }, expectedRevision: 1,
+      reason: 'stale-run' },
+  ]) {
+    it(`${label} (issue 900)`, async () => {
+      const executed = [];
+      const record = (name) => async () => {
+        executed.push(name);
+        return { success: true };
+      };
+      const operation = { getRun: () => run, execute: record('execute'), cancel: record('cancel') };
+      const { service, actor } = commandHarness({ currentUserId: 'gm', operations: { [runType]: operation } });
+      const response = await service.executeJournalRunCommand({ actorUuid: actor.uuid, runType,
+        runId: run.id, expectedRevision, action, payload: {} });
+      assert.equal(response.reason ?? null, reason, JSON.stringify(response));
+      assert.deepEqual(executed, reason ? [] : [action], 'a refusal reaches no operation');
+    });
+  }
+
+  it('replays a resent version-1 cancel and refuses a fresh one at the old revision', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const executed = [];
+    const { service, actor } = commandHarness({
+      currentUserId: 'gm',
+      authority: replicatedAuthorityFixture().authority,
+      operations: {
+        crafting: {
+          getRun: () => run,
+          cancel: async ({ requestId }) => {
+            executed.push(requestId);
+            run.runRevision += 1;
+            return { success: true, cancelled: true, refunded: true, runRevision: run.runRevision };
+          },
+        },
+      },
+    });
+    const request = { kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, sessionId: 'player-tab', actorUuid: actor.uuid,
+      runType: 'crafting', runId: run.id, expectedRevision: 3, action: 'cancel', payload: {} };
+    const send = (requestId) => service.handleSocketMessage({ ...request, requestId }, 'gm');
+
+    const first = await send('cancel-once');
+    const resent = await send('cancel-once');
+    const fresh = await send('cancel-again');
+
+    assert.equal(first.response.success, true, JSON.stringify(first.response));
+    assert.deepEqual(resent.response, first.response, 'the ledger answers the recorded response');
+    assert.equal(fresh.response.reason, 'stale-run');
+    assert.deepEqual(executed, ['cancel-once'], 'nothing is reversed twice');
+  });
+
   async function assertAuthoritativeRouteSnapshot(clientSnapshot) {
     // Execute the actual composition-edge declarations without importing main's
     // Foundry boot side effects or maintaining a second copy of its callback.
