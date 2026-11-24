@@ -147,6 +147,8 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   // them. `gatheringRealmSettings` (`{ enabled }`) stays, and participation changes the realm
   // names, realm-gated task availability and realm tools a listing reads.
   gatheringRealmSettings: Object.freeze([LABELLING, COMPONENT_DEFINITIONS, ACCESS_AND_KNOWLEDGE]),
+  // Counter and action labels, their descriptions, and how an iterative step resolves.
+  iterative: Object.freeze([LABELLING, NARRATIVE, RESOLUTION_CONFIG]),
 });
 
 /** The domains of each top-level key a recipe's `toJSON()` emits, or omits at its default. */
@@ -185,6 +187,7 @@ export const RECIPE_FIELD_DOMAINS = Object.freeze({
   linkedRecipeItemUuid: Object.freeze([ACCESS_AND_KNOWLEDGE]),
   // Classified whole as gate configuration (see `NARRATIVE`).
   teaser: Object.freeze([ACCESS_AND_KNOWLEDGE]),
+  iterative: Object.freeze([RESOLUTION_CONFIG]),
 });
 
 /**

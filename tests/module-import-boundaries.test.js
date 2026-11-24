@@ -43,6 +43,7 @@ const NORMALIZE_SHARED = Object.freeze([
   'checkAdvantage',
   'checkEvaluation',
   'gatheringConditionOptions',
+  'iterativeLibrary',
 ]);
 
 /** Below these the walk or the model layer was truncated rather than measured. */

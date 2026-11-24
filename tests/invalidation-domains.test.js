@@ -108,6 +108,7 @@ const APPROVED_SYSTEM_FIELD_DOMAINS = {
   components: ['labelling', 'narrative', 'component-definitions'],
   tools: ['labelling', 'narrative', 'component-definitions', 'resolution-config'],
   gatheringRealmSettings: ['labelling', 'component-definitions', 'access-and-knowledge'],
+  iterative: ['labelling', 'narrative', 'resolution-config'],
 };
 const APPROVED_RECIPE_FIELD_DOMAINS = {
   id: [...ALL_INVALIDATION_DOMAINS],
@@ -141,12 +142,16 @@ const APPROVED_RECIPE_FIELD_DOMAINS = {
   recipeItemId: ['access-and-knowledge'],
   linkedRecipeItemUuid: ['access-and-knowledge'],
   teaser: ['access-and-knowledge'],
+  iterative: ['resolution-config'],
 };
 
 /** Every top-level key `_normalizeSystem` actually emits (issue 1363). */
 function producedSystemKeys() {
   const manager = new CraftingSystemManager(new RecipeManager({}));
-  return new Set(Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } })));
+  return new Set([
+    ...Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } })),
+    ...Object.keys(manager._normalizeSystem({ iterative: { counters: [], actions: [] } })),
+  ]);
 }
 
 /**
@@ -156,6 +161,7 @@ function producedSystemKeys() {
 function producedRecipeKeys() {
   return new Set([
     ...Object.keys(new Recipe({}).toJSON()),
+    ...Object.keys(new Recipe({ iterative: { counters: [{ counterId: 'heat' }] } }).toJSON()),
     ...Object.keys(RECIPE_OMITTED_WHEN_DEFAULT),
   ]);
 }

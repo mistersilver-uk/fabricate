@@ -3,9 +3,15 @@ import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { GENERAL_RECIPE_CATEGORY, normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
+import {
+  normalizeRecipeIterative,
+  producedWhenEntry,
+  stepIterativeEntry,
+} from './iterativeStepConfig.js';
 import { isEmptyArray, isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 import { Result } from './Result.js';
 
@@ -74,6 +80,7 @@ function serializeResultGroup(group) {
     name: group.name,
     ...(group.role === 'failure' && { role: 'failure' }),
     ...(checkOutcomeIds.length > 0 && { checkOutcomeIds }),
+    ...(group.producedWhen && { producedWhen: cloneJson(group.producedWhen) }),
     results: (group.results || []).map((result) => (result.toJSON ? result.toJSON() : result)),
   };
 }
@@ -113,6 +120,8 @@ export class Recipe {
 
     // Derived from the shape when absent; a reserved `role: 'failure'` group keeps it Simple.
     this.complex = typeof data.complex === 'boolean' ? data.complex : this._deriveComplex(data);
+    const iterative = normalizeRecipeIterative(data.iterative, { hasSteps: this.steps.length > 0 });
+    if (iterative) this.iterative = iterative;
 
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
@@ -462,6 +471,7 @@ export class Recipe {
         ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
         resultGroups: (step.resultGroups || []).map(serializeResultGroup),
         toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : [],
+        ...(step.iterative && { iterative: cloneJson(step.iterative) }),
       })),
       ingredientSets: this.ingredientSets.map((s) => s.toJSON()),
       resultGroups: this.resultGroups.map(serializeResultGroup),
@@ -475,6 +485,7 @@ export class Recipe {
       minSuccessOutcomeId: this.minSuccessOutcomeId,
       craftingModifier: this.craftingModifier,
       teaser: this.teaser,
+      ...(this.iterative && { iterative: cloneJson(this.iterative) }),
       metadata: this.metadata,
       importSource: this.importSource,
     });
@@ -556,6 +567,7 @@ export class Recipe {
         ...(group?.role === 'failure' && { role: 'failure' }),
         // The routed-check outcome tiers that produce this group.
         checkOutcomeIds: this._normalizeIdList(group?.checkOutcomeIds),
+        ...producedWhenEntry(group?.producedWhen),
         results: (group?.results || []).map((r) => (r instanceof Result ? r : Result.fromJSON(r))),
       }));
     }
@@ -614,6 +626,7 @@ export class Recipe {
           ? { ...step.outcomeRouting }
           : null,
       resultSelection: this._normalizeResultSelection(step.resultSelection),
+      ...stepIterativeEntry(step.iterative),
     };
   }
 
@@ -706,6 +719,7 @@ export class Recipe {
         timeRequirement: this.timeRequirement || null,
         outcomeRouting: this.outcomeRouting || null,
         resultSelection: this.resultSelection || null,
+        ...(this.iterative?.step && { iterative: this.iterative.step }),
       },
     ];
   }

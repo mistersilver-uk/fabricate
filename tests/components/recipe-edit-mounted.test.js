@@ -69,6 +69,8 @@ const RAW_MODULES = [
   // Recipe, Ingredient and IngredientSet all filter their payloads through the shared
   // omitted-when-default machinery (issue 1135).
   'src/models/reconstructibleDefaults.js',
+  'src/models/iterativeStepConfig.js',
+  'src/systems/iterative/counterRule.js',
   'src/models/IngredientSet.js',
   'src/models/ingredientAssignment.js',
   'src/models/ingredientEssenceBlock.js',

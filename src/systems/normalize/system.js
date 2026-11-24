@@ -16,6 +16,7 @@ import {
   normalizeSalvageCraftingCheck,
 } from './craftingCheck.js';
 import { looksLikeDocumentUuid, normalizeEssenceDefinitions } from './essences.js';
+import { iterativeLibraryEntry } from './iterativeLibrary.js';
 import { normalizeRecipeItemDefinitions } from './recipeItems.js';
 import { salvageNormalizationContext } from './salvage.js';
 import {
@@ -204,6 +205,8 @@ function systemLibraryFields(system, parts) {
     gatheringRealmSettings: normalizeGatheringRealmSettings(
       system.gatheringRealmSettings ?? system.gatheringRegionSettings
     ),
+    // Kept, inert, under every mode; absent unless authored.
+    ...iterativeLibraryEntry(system.iterative),
   };
 }
 
