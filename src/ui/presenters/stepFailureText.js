@@ -5,8 +5,8 @@
 import { iterableToArray, stringOrNull } from '../../systems/gatheringEngineInternals.js';
 
 export function stepFailureText(reason, localize) {
-  const text = stringOrNull(reason);
-  return text === 'iterativeFailure' ? localize('FABRICATE.Chat.IterativeFailure') : text;
+  const recorded = stringOrNull(reason);
+  return recorded === 'iterativeFailure' ? localize('FABRICATE.Chat.IterativeFailure') : recorded;
 }
 
 /** The first failed step's failure text, or `null`. */
