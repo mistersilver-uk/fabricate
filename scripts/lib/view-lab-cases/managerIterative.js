@@ -259,6 +259,7 @@ export const CASES = Object.freeze([
   editorCase({
     id: 'manager-iterative-action-edit',
     label: 'Manager — Iterative action editor, valid and ready',
+    steps: [{ selector: '[data-iterative-open-checks]', scroll: true }],
     expectSelector: '[data-iterative-check-facts][data-iterative-check-direction="over"]',
     expectCenterHit: '[data-iterative-open-checks]',
   }),
@@ -287,6 +288,7 @@ export const CASES = Object.freeze([
     id: 'manager-iterative-action-edit-check-missing',
     label: 'Manager — Iterative action editor, check not set up',
     state: 'noCheck',
+    steps: [{ selector: '[data-iterative-check-missing] [data-notice-action]', scroll: true }],
     expectSelector: '[data-iterative-check-missing] [data-notice-action]',
     expectCenterHit: '[data-iterative-check-missing] [data-notice-action]',
   }),
@@ -309,6 +311,7 @@ export const CASES = Object.freeze([
     id: 'manager-iterative-action-edit-no-effects',
     label: 'Manager — Iterative action editor, no effects',
     open: 'quench',
+    steps: [{ selector: '[data-iterative-add-effect]', scroll: true }],
     expectSelector: '[data-iterative-effects-empty]',
     expectCenterHit: '[data-iterative-add-effect]',
   }),

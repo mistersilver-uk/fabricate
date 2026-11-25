@@ -32,7 +32,7 @@ manager-environment-edit-placeholder
 manager-gathering-event-editor-normal
 manager-iterative-rail
 manager-iterative-actions
-manager-iterative-action-edit
+manager-iterative-action-new
 manager-world-parties-normal
 manager-world-downtime-test-companion-installed
 manager-world-travel-realms-normal
