@@ -456,6 +456,7 @@ export function iterativeCommandWorld({
     recipeManager: world.recipeManager,
     craftingSystemManager: world.systems,
     recipeVisibilityService: world.visibility,
+    getRecipeVisibilityService: () => world.visibility,
   };
   world.authority = replicatedAuthorityFixture().authority;
   world.service = createJournalCommandsForFabricate(world.fabricate, world.authority);

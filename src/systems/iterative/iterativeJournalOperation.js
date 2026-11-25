@@ -58,7 +58,13 @@ export function withIterativeOperations(operations, { fabricate, resolveSourceAc
       if (!componentSourceActors) return failure('source-actor-not-found');
       const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
       if (!engine) return failure('unsupported-operation');
-      const request = { actor, componentSourceActors, runId: run.id, expectedRevision };
+      const request = {
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        expectedRevision,
+        recipeVisibility: fabricate.getRecipeVisibilityService?.() ?? null,
+      };
       return takeIterativeAttempt(
         engine,
         {

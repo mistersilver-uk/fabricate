@@ -56,6 +56,20 @@ describe('a terminal success', () => {
     assert.equal(world.recipeUses, 1);
   });
 
+  it('records recipe use once through the visibility service the composition injects', async () => {
+    const world = await startedWorld({ steps: 1 });
+    const calls = [];
+    world.visibility.applyRecipeItemUseOnCraft = async (args) => {
+      calls.push(args);
+    };
+    globalThis.game.fabricate.getRecipeVisibilityService = () => null;
+    const replies = await takeAll(world, ['stoke', 'stoke', 'stoke', 'stoke']);
+    assert.equal(replies.at(-1).iterative.stepEnd.kind, 'success');
+    assert.equal(calls.length, 1, 'the injected applyRecipeItemUseOnCraft, exactly once');
+    assert.equal(calls[0].recipe.id, world.recipe.id);
+    assert.equal(calls[0].craftingActor, world.actor);
+  });
+
   it('routes otherwise identical successes to different groups through producedWhen', async () => {
     const plain = await startedWorld({ steps: 1 });
     await takeAll(plain, ['stoke', 'stoke', 'stoke', 'stoke']);

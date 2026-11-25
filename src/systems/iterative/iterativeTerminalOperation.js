@@ -137,16 +137,15 @@ function finalizeEffect(engine, state, { actor, runId, stepIndex, selectedSet, s
   };
 }
 
-function recordRecipeUseEffect({ actor, componentSourceActors, recipe }) {
-  const visibility = globalThis.game?.fabricate?.getRecipeVisibilityService?.();
-  if (!visibility) return [];
+function recordRecipeUseEffect({ actor, componentSourceActors, recipe, recipeVisibility }) {
+  if (!recipeVisibility) return [];
   return [
     {
       effectId: 'record-recipe-use',
       kind: 'recordRecipeUse',
       planned: { recipeId: recipe.id },
       apply: async () => {
-        await visibility.applyRecipeItemUseOnCraft({
+        await recipeVisibility.applyRecipeItemUseOnCraft({
           recipe,
           craftingActor: actor,
           componentSourceActors,
