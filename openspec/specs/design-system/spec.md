@@ -2752,6 +2752,10 @@ A column header MUST NOT appear sortable unless sorting it is meaningful.
 An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
 
 Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
+`DataTable` gains `hint` and `footer`, and a caller that passes neither renders the HTML it rendered before.
+`hint` is a second caption line, outside the table's accessible name, that describes the table through `aria-describedby`.
+`footer` draws inside the frame after the scroll container and, when the table pages, after the pager, so an adder and its notes sit under the rows.
+Both are painted from the component's own style block, as `:global` rules rooted at `fabricate-data-table`, so the root's class and the family in the module sheet do not move.
 The gathering task editor's drop rules are a table, paged, searchable, selectable, ranked under highest-ranked rewards and a drop target per row, and so are `IoTable`'s essence, tool and output groups in the crafting detail, which are bounded and carry no pager.
 The crafting detail's ingredient rail stays the requirement chooser's, and `OutcomeTierTable` is a ladder rather than a table, owned by `OutcomeLadder`.
 A table whose rows hold controls — the drop rules' chance sliders, count fields and rank rockers — keeps a taller row than the specimen's text rows, because its controls set the row's height.
