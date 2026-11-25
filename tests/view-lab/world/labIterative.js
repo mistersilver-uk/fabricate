@@ -91,9 +91,12 @@ export const LAB_ITERATIVE_STATES = Object.freeze({
   newer: (library) => ({ ...library, version: 2 }),
   // Counters to spend, and no action using them yet.
   noActions: (library) => ({ ...library, actions: [] }),
-  // An action costing a counter the library does not hold: one blocking issue.
+  // Nothing to fix, and no recipe to fault (see `RECIPELESS_STATES`): Validation reads ready.
+  ready: (library) => library,
+  // Actions costing counters the library does not hold or amounts it cannot read, and a counter
+  // whose minimum is above its maximum, so Validation lists both library groups.
   invalid: (library) => ({
-    ...library,
+    ...LAB_ITERATIVE_STATES.inverted(library),
     actions: [
       ...library.actions,
       baseAction('smelt', 'Smelt ore', {
@@ -145,6 +148,9 @@ export const LAB_ITERATIVE_STATES = Object.freeze({
     ],
   }),
 });
+
+/** The states whose world carries no recipe, whose own readiness the frame is not about. */
+const RECIPELESS_STATES = new Set(['ready']);
 
 const ROUTED_HIT = Object.freeze({
   type: 'fixed',
@@ -213,5 +219,5 @@ export function seedIterativeState(content, stateId) {
     gatheringRealmSettings: { enabled: false },
     iterative: library,
   });
-  content.recipes.push(...structuredClone(IRONWORKS_RECIPES));
+  if (!RECIPELESS_STATES.has(stateId)) content.recipes.push(...structuredClone(IRONWORKS_RECIPES));
 }

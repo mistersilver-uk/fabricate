@@ -49,6 +49,12 @@ const editorCase = ({ state, open = 'strike', steps = [], ...entry }) =>
     ...entry,
   });
 
+const VALIDATION_STEPS = ['System Overview', { selector: '#system-tab-validation' }];
+const OVERVIEW_SOURCES = [
+  ITERATIVE_SOURCES,
+  /^src\/ui\/svelte\/apps\/manager\/SystemOverviewView\.svelte$/,
+];
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-iterative-rail',
@@ -362,5 +368,36 @@ export const CASES = Object.freeze([
     label: 'Manager — Iterative action editor, at 880px',
     width: 880,
     expectSelector: '[data-iterative-editor] [data-iterative-section="identity"]',
+  }),
+  iterativeCase({
+    id: 'manager-system-edit-validation-iterative-ready',
+    label: 'Manager — System edit validation tab, iterative ready',
+    state: 'ready',
+    steps: VALIDATION_STEPS,
+    expectView: 'system-edit',
+    expectSelector: '[data-system-overview] [data-system-overview-empty]',
+    sourceMatches: OVERVIEW_SOURCES,
+  }),
+  iterativeCase({
+    id: 'manager-system-edit-validation-iterative',
+    label: 'Manager — System edit validation tab, iterative groups',
+    state: 'invalid',
+    steps: VALIDATION_STEPS,
+    expectView: 'system-edit',
+    // The counter group, directly before the action group: the order the tab promises.
+    expectSelector:
+      '[data-system-overview-group="counter"] + [data-system-overview-group="action"] [data-overview-link="action"]',
+    expectCenterHit:
+      '[data-overview-issue="iterativeUnknownCounter"] [data-overview-link="action"]',
+    sourceMatches: OVERVIEW_SOURCES,
+  }),
+  iterativeCase({
+    id: 'manager-iterative-checks-crafting',
+    label: 'Manager — Checks crafting, iterative',
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    // The mode callout the routed editor opens under, which names the iterative mode alone.
+    expectSelector: '[data-checks-mode-callout="crafting:iterative"]',
+    sourceMatches: [ITERATIVE_SOURCES, /^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
 ]);

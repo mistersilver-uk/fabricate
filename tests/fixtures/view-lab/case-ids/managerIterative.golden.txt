@@ -36,3 +36,6 @@ manager-iterative-action-edit-category-create
 manager-iterative-action-edit-discard-confirm
 manager-iterative-action-delete-in-use
 manager-iterative-action-edit-narrow
+manager-system-edit-validation-iterative-ready
+manager-system-edit-validation-iterative
+manager-iterative-checks-crafting
