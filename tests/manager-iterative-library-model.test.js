@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { isIterativeId } from '../src/systems/iterative/counterRule.js';
 import {
   actionUses,
   counterNameFault,
@@ -10,7 +11,6 @@ import {
   duplicateCounterIds,
   usageCounts,
 } from '../src/ui/svelte/apps/manager/iterative/iterativeLibraryModel.js';
-import { isIterativeId } from '../src/systems/iterative/counterRule.js';
 
 describe('deriveIterativeId', () => {
   it('derives a camelCase id from the label with a lower-case first character', () => {
@@ -62,7 +62,7 @@ describe('the Counter name rule', () => {
 
   it('refuses an empty name and a name another counter holds, ignoring case and space', () => {
     assert.equal(counterNameFault(counters, 'heat', ''), 'empty');
-    assert.equal(counterNameFault(counters, 'heat', '   '), 'empty');
+    assert.equal(counterNameFault(counters, 'heat', ' '.repeat(3)), 'empty');
     assert.equal(counterNameFault(counters, 'heat', ' iron '), 'duplicate');
     assert.equal(counterNameFault(counters, 'heat', 'IRON'), 'duplicate');
   });
@@ -81,7 +81,7 @@ describe('the Counter name rule', () => {
       { id: 'd', label: '' },
       { id: 'e', label: '  ' },
     ];
-    assert.deepEqual([...duplicateCounterIds(persisted)].sort(), ['a', 'b']);
+    assert.deepEqual([...duplicateCounterIds(persisted)].sort((a, b) => a.localeCompare(b)), ['a', 'b']);
     assert.deepEqual([...duplicateCounterIds(undefined)], []);
   });
 });

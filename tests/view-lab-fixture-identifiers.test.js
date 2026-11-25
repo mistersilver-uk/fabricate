@@ -24,6 +24,7 @@ import {
 } from './view-lab/world/labRunStates.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
 import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
+// ratchet-exempt(lint): this block was unordered before the line; it joins its sibling lab world imports
 import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
@@ -251,7 +252,7 @@ test('every query.iterative names a state the lab seeds', () => {
 
 test('the lab world holds no iterative system unless a frame asks for one', () => {
   const base = buildLabContent();
-  assert.ok(!base.systems.some((system) => system.id === LAB_SYSTEM_IDS.IRONWORKS));
+  assert.ok(base.systems.every((system) => system.id !== LAB_SYSTEM_IDS.IRONWORKS));
   for (const absent of [null, undefined, '', 'nonsense', 'toString', '__proto__']) {
     const content = structuredClone(base);
     seedIterativeState(content, absent);

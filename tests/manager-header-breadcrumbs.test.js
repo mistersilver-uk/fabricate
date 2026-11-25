@@ -49,9 +49,9 @@ function inputFor(route) {
     },
     ...handlers,
     ...route,
+    // The route model carries its one handler and the draft's name, as the shell passes it.
+    iterativeRoute: { backToActions: handlers.backToActions, ...route.iterativeRoute },
   };
-  // The iterative route model carries its one handler and the draft's name, as the shell passes it.
-  input.iterativeRoute = { backToActions: handlers.backToActions, ...route.iterativeRoute };
   return { input, calls };
 }
 

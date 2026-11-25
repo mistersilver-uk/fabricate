@@ -4,11 +4,13 @@
  */
 import assert from 'node:assert/strict';
 import { afterEach, before, it } from 'node:test';
+
 import { flushSync, unmount } from 'svelte';
 
+import { shippedString, useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
-import { shippedString, useShippedLocalization } from '../helpers/manager/managerLocalization.js';
+
 import {
   assertNoTitledIconButton,
   labCaseSelector,
@@ -63,9 +65,9 @@ const iterative = (library = LIBRARY, extra = {}) => ({
 
 const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
 const subitemIds = () =>
-  Array.from(target.querySelectorAll('#manager-crafting-submenu .manager-nav-subitem')).map(
-    (button) => button.id.replace('manager-crafting-nav-', '')
-  );
+  [
+    ...target.querySelector('#manager-crafting-submenu').querySelectorAll('.manager-nav-subitem'),
+  ].map((button) => button.id.replace('manager-crafting-nav-', ''));
 const countOf = (id) =>
   target.querySelector(`#manager-crafting-nav-${id} .manager-nav-count`)?.textContent.trim();
 const press = async (selector) => {
@@ -112,7 +114,7 @@ export function registerIterativeCases() {
     await openCrafting({});
     const ids = subitemIds();
     assert.ok(ids.includes('recipes'), 'the Crafting group renders');
-    assert.ok(!ids.includes('counters') && !ids.includes('actions'), ids.join());
+    assert.ok(!ids.includes('counters') && !ids.includes('actions'), ids.join(','));
   });
 
   it('lists Counters and Actions after Recipes with their own counts, outside the parent badge', async () => {
@@ -167,7 +169,7 @@ export function registerIterativeCases() {
     assert.equal(target.querySelector('[data-iterative-new-counter]').disabled, true);
     assert.ok(target.querySelector('[data-iterative-unsupported]'));
     await press('[data-iterative-new-counter]');
-    assert.ok(!calls.some(([name]) => name === 'updateSystem'));
+    assert.ok(calls.every(([name]) => !(name === 'updateSystem')));
   });
 
   it('disables New action, with its reason, while the system has no counters', async () => {
@@ -185,7 +187,7 @@ export function registerIterativeCases() {
     );
     await press('[data-iterative-new-action]');
     assert.equal(managerView(), 'iterative-actions');
-    assert.ok(!calls.some(([name]) => name === 'updateSystem'));
+    assert.ok(calls.every(([name]) => !(name === 'updateSystem')));
   });
 
   it('opens the action editor on a new draft with the recipe editor header shape', async () => {
@@ -222,14 +224,17 @@ export function registerIterativeCases() {
     await press('[data-iterative-action-back]');
     assert.ok(calls.some(([name]) => name === 'confirmDiscardDirtyIterativeActionDraft'));
     assert.equal(managerView(), 'iterative-actions');
-    assert.ok(!calls.some(([name]) => name === 'updateSystem'), 'discarding writes nothing');
+    assert.ok(
+      calls.every(([name]) => !(name === 'updateSystem')),
+      'discarding writes nothing'
+    );
   });
 
   it('saves a new draft under an id minted from its label, then offers Delete and Duplicate', async () => {
     const calls = await openIterativeRoute('Actions');
     await press('[data-iterative-new-action]');
     await press('[data-iterative-action-save]');
-    const [, , patch] = calls.find(([name]) => name === 'updateSystem');
+    const patch = calls.find(([name]) => name === 'updateSystem')[2];
     assert.deepEqual(
       patch.iterative.actions.map((action) => action.id),
       ['stoke', 'action']
@@ -240,7 +245,7 @@ export function registerIterativeCases() {
     assert.equal(countOf('actions'), '2');
     await press('[data-iterative-action-back]');
     assert.equal(managerView(), 'iterative-actions', 'a saved draft leaves with no prompt');
-    assert.ok(!calls.some(([name]) => name === 'confirmDiscardDirtyIterativeActionDraft'));
+    assert.ok(calls.every(([name]) => !(name === 'confirmDiscardDirtyIterativeActionDraft')));
   });
 
   it('returns to Actions when the action being edited is deleted', async () => {

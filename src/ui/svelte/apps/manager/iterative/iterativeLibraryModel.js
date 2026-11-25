@@ -3,8 +3,8 @@
  * the name rule a Counter keeps, and where a Counter or Crafting Action is used.
  */
 import { iterativeStepsOf } from '../../../../../models/iterativeStepConfig.js';
-import { analyzeIterativeExpression } from '../../../../../systems/iterative/expression.js';
 import { isIterativeId } from '../../../../../systems/iterative/counterRule.js';
+import { analyzeIterativeExpression } from '../../../../../systems/iterative/expression.js';
 import { arrayOrEmpty, isPlainObject, trimString } from '../../../../../utils/scalars.js';
 
 const ID_FALLBACKS = Object.freeze({

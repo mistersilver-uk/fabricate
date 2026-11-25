@@ -18,7 +18,7 @@ import {
 import { reorderListByIndex } from './adminStoreInternals.js';
 
 const COUNTER_FIELDS = Object.freeze(['description', 'limit', 'min', 'max']);
-const isUnset = (value) => value === null || value === undefined || value === '';
+const isUnset = (value) => [null, undefined, ''].includes(value);
 const indexOf = (list, id) => list.findIndex((entry) => entry.id === id);
 const idsOf = (list) => list.map((entry) => entry.id);
 
@@ -42,7 +42,8 @@ function patchedCounter(counters, counter, patch) {
     if (counterNameFault(counters, counter.id, patch.label)) return null;
     next.label = trimString(patch.label);
   }
-  for (const key of COUNTER_FIELDS.filter((field) => field in patch)) {
+  for (const key of COUNTER_FIELDS) {
+    if (!(key in patch)) continue;
     if (isUnset(patch[key])) delete next[key];
     else next[key] = patch[key];
   }
@@ -120,7 +121,7 @@ export function createIterativeLibrarySection({
   refresh,
   confirmDiscardDirty,
 }) {
-  const localized = (key, fallback, data) => services.localize?.(key, data) || fallback;
+  const localized = (key, fallback, data = {}) => services.localize?.(key, data) || fallback;
 
   /** The system id and a clone of its library, or `null` when no write may happen. */
   function writable() {

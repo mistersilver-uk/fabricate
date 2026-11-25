@@ -1,6 +1,7 @@
 /** The mounted contract for `CraftingSystemManagerRoot`. */
 import { after, describe } from 'node:test';
 
+import { registerIterativeCases } from './manager-iterative-mounted.js';
 import { disposeManagerSuite } from './manager-mounted-shared.js';
 import { registerRailCases } from './manager-rail-mounted.js';
 import { registerHeaderCases } from './manager-header-mounted.js';
@@ -16,7 +17,6 @@ import { registerWorldScopeCases } from './manager-world-scope-mounted.js';
 import { registerChecksCases } from './manager-checks-mounted.js';
 import { registerTagsCases } from './manager-tags-mounted.js';
 import { registerBulkCases } from './manager-bulk-mounted.js';
-import { registerIterativeCases } from './manager-iterative-mounted.js';
 
 describe('CraftingSystemManager mounted behavior', () => {
   registerRailCases();

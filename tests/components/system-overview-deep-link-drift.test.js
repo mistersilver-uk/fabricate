@@ -48,7 +48,9 @@ const ROOT_VIEW_TOKENS = new Set([
 // The deep links, built over spies so each `open` is observable without mounting the root.
 function buildLinks() {
   const opened = [];
-  const spy = (name) => (id) => opened.push([name, id]);
+  const spy = (name) => (id) => {
+    opened.push([name, id]);
+  };
   const factory = createOverviewDeepLinks({
     editRecipe: spy('recipe'),
     editEnvironment: spy('environment'),

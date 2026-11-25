@@ -370,7 +370,7 @@ test('Counters and Actions carry their own counts and stay out of the parent bad
 test('a system that is not iterative offers neither entry, with its redirect unchanged', () => {
   for (const resolutionMode of ['simple', 'alchemy', 'progressive', 'routedByCheck']) {
     const args = { ...ITERATIVE_ARGS, resolutionMode };
-    assert.ok(!ids(buildCraftingNavItems(args)).some((id) => id === 'counters' || id === 'actions'));
+    assert.ok(ids(buildCraftingNavItems(args)).every((id) => id !== 'counters' && id !== 'actions'));
     for (const view of ['iterative-counters', 'iterative-actions', 'iterative-action-edit']) {
       assert.equal(isCraftingViewAvailable(view, args), false, `${view} in ${resolutionMode}`);
     }

@@ -1,6 +1,7 @@
 /** The iterative library section: every write is one `updateSystem(id, { iterative })` and a refresh. */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+
 import { writable } from 'svelte/store';
 
 import { createIterativeLibrarySection } from '../../src/ui/svelte/stores/adminIterativeLibrarySection.js';
@@ -29,7 +30,11 @@ function harness({ iterative = LIBRARY, systemId = 'sys', fail = null } = {}) {
   const calls = { updates: [], refreshes: 0, notices: [], prompts: [] };
   const system = { id: 'sys', ...(iterative && { iterative: structuredClone(iterative) }) };
   const services = {
-    notify: { error: (message) => calls.notices.push(message) },
+    notify: {
+      error: (message) => {
+        calls.notices.push(message);
+      },
+    },
     getCraftingSystemManager: () => ({
       getSystem: (id) => (id === system.id ? system : null),
       updateSystem: async (id, patch) => {

@@ -13,8 +13,8 @@ import {
   seedTimeOfDayBar,
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
-import { seedIterativeState } from './labIterative.js';
 import { seedLabInteractables } from './labInteractables.js';
+import { seedIterativeState } from './labIterative.js';
 import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
 import { LAB_MACRO_UUIDS, registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
