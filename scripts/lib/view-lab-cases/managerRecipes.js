@@ -19,6 +19,8 @@ import { chooseSelectOption, choosePageSize, managerCase } from './caseFactories
 // The selection the inspector draws, and the draft whose refused save the notice reports.
 const RECIPE_ITEM_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/recipe-item\/recipeItemModel\.svelte\.js$/;
+/** A library row of the lab's authored Ironworks. */
+const ITERATIVE_ROW = (recipeId) => `.manager-recipe-row[data-recipe-id="${recipeId}"]`;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -54,6 +56,38 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
       BROWSER_LIST_STATE_MATCH,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipes-iterative',
+    label: 'Manager — Recipes iterative status',
+    // `beyond`: the smoke walk never builds an iterative system.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-ironworks', iterative: 'populated', iterativeRecipes: 'authoring' },
+    // Tempered Blade sorts last, below the fold.
+    steps: ['Crafting', { selector: ITERATIVE_ROW('iw-r-blade'), scroll: true }],
+    expectView: 'recipes',
+    // One pill per row: Ingot needs setup, Nail blocks, Blade is ready, and Hinge, which activation
+    // refuses, wears Incomplete and no Ready.
+    expectSelector:
+      `.fabricate-manager:has(${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="iterativeSetup"])` +
+      `:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="iterativeBlocking"])` +
+      `:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="incomplete"])` +
+      `:not(:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="iterativeReady"])) ` +
+      `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
+    expectCenterHit: [
+      `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
+      `${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="iterativeBlocking"]`,
+      `${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="iterativeSetup"]`,
+    ],
+    kinds: ['manager', 'recipes', 'iterative'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/recipeStatusPills\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/iterative\/iterative(?:RecipeIssues|HeaderCopy)\.js$/,
+      /^src\/ui\/svelte\/stores\/recipeIterativeStatus\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   }),
   managerCase({
