@@ -477,7 +477,19 @@ A row states each of its faults on its own line under its counter: a minimum abo
 Each faulted control is marked invalid and described by its line.
 A recipe with no Counter Instances offers to add every library counter, and says so when the library has none, and the adder states when every counter is already used.
 A Counter Instance naming no library counter is marked on its row and links to Counters.
-An iterative multi-step recipe is never presented as collapsed.
+Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error.
+A multi-step recipe's step hides or locks each Counter Instance for that step, and a Counter Instance the player never sees offers no per-step hide.
+A single-step recipe shows its hide and lock lists only while one is non-empty.
+Each step's Ends when holds success rules, which must all hold, and failure rules, any one of which is enough.
+The rules range over the recipe's Counter Instances, Session number and Previous action.
+A rule naming a counter that is not a Counter Instance is marked as not tracked.
+A step with no success rule says it can never finish, and a step with no failure rule says it can only end in success.
+Each multi-step recipe's step header shows that step's blocking count, or else its warning count, and nothing when it has none.
+A single-step recipe shows no step header count.
+Turning a single-step recipe multi-step makes its ingredient set, result sets and step configuration step 1's in the same edit.
+Collapsing to one step keeps step 1 whole as the single step, and removes the other steps with their result sets.
+A sole step offers no remove.
+With multi-step recipes turned off, an iterative multi-step recipe is never presented as collapsed, and its Steps card warns that it cannot be started.
 The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and its subline names the Iterative mode and a multi-step recipe's step count.
 The Preview tab is not offered.
 
