@@ -45,7 +45,7 @@
     size="inline"
     ariaLabel={opLabel}
     value={rule.op}
-    options={[{ value: rule.op, label: rule.op }]}
+    options={[{ value: rule.op, label: opLabel }]}
     onChange={change}
   />
 {/snippet}
