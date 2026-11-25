@@ -1997,11 +1997,6 @@
         "UnknownReactionDesc": "You haven't tried this combination. Brew to find out what it does.",
         "StillNeeded": "Still needed",
         "MissingRow": "{name} ×{need}"
-      },
-      "Manager": {
-        "SystemOverview": {
-          "IssueIterativeStartOutOfBounds": "A counter starts outside its minimum or maximum."
-        }
       }
     },
     "Settings": {
@@ -2871,7 +2866,8 @@
           "IssueIterativeInvalidExpression": "An amount or start formula cannot be read as an expression here.",
           "IssueIterativeExplodeUnbounded": "An exploding die in an expression can never stop.",
           "IssueIterativeExpressionBoundUnset": "An expression reads a counter minimum, maximum or target that is not set.",
-          "IssueIterativeCheckFactWithoutCheck": "An action with no check reads a check result in an effect."
+          "IssueIterativeCheckFactWithoutCheck": "An action with no check reads a check result in an effect.",
+          "IssueIterativeStartOutOfBounds": "A counter starts outside its minimum or maximum."
         },
         "Nav": {
           "ComponentRules": "Component Rules",

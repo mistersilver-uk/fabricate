@@ -35,6 +35,8 @@ export const ITERATIVE_ISSUE_KEYS = Object.freeze({
     'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeExpressionBoundUnset',
   iterativeCheckFactWithoutCheck:
     'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeCheckFactWithoutCheck',
+  iterativeStartOutOfBounds:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeStartOutOfBounds',
 });
 
 /** The Validation group of `issue`: its Counter or Crafting Action library entity, else its `kind`. */

@@ -9,10 +9,6 @@ import {
 } from '../../../../../systems/iterative/iterativeReadiness.js';
 import { arrayOrEmpty } from '../../../../../utils/scalars.js';
 
-/** The lang key the validation copy reads for `iterativeStartOutOfBounds` (`iterativeIssueCopy` joins it). */
-export const ITERATIVE_START_OUT_OF_BOUNDS_COPY_KEY =
-  'FABRICATE.App.Manager.SystemOverview.IssueIterativeStartOutOfBounds';
-
 /**
  * The recipe's own recipe-scoped issues, then the start blockers that are not recipe-scoped, which
  * count as recipe-wide because they refuse this recipe's start.
