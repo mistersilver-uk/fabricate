@@ -205,7 +205,7 @@ For systems in `alchemy` mode:
 ### Delete Counter
 
 1. Deleting a Counter requires GM confirmation through the Manager confirmation dialog.
-2. When Crafting Actions, or recipes through a Counter Instance, use the Counter, the confirmation names each use and states that each will need another Counter and that workpieces in progress are not affected.
+2. When Crafting Actions, or recipes through a Counter Instance, use the Counter, the confirmation names each use, a Crafting Action with whether it uses the Counter as a cost, an effect, both, or only in a rule, and states that each will need another Counter and that workpieces in progress are not affected.
    A Counter nothing uses is confirmed with no list.
 3. Deletion is WARNED, not BLOCKED.
    References are deliberately NOT rewritten, because an authored expression or rule is content an unrelated delete must not silently edit.
@@ -216,7 +216,7 @@ For systems in `alchemy` mode:
 ### Delete Crafting Action
 
 1. Deleting a Crafting Action requires GM confirmation through the Manager confirmation dialog.
-2. The confirmation names each recipe step that allows the Crafting Action by name, and each `previousAction` rule in any action's availability or effects, or in a recipe, that names it.
+2. The confirmation names each recipe step that allows the Crafting Action by name, and each `previousAction` rule in any other action's availability or effects, or in a recipe, that names it; a Crafting Action is never listed as its own use.
    A Crafting Action nothing names is confirmed with no list.
 3. Deletion is WARNED, not BLOCKED.
    References are deliberately NOT rewritten, because an authored rule or step allow-list is content an unrelated delete must not silently edit.
