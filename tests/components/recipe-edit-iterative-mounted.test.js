@@ -613,6 +613,10 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
       actionIds: ['stoke', 'strike', 'quench'],
     });
     assert.equal($('[data-iterative-step-actions-count]').textContent.trim(), '3 of 3 allowed');
+    assert.ok(
+      !$('[data-iterative-step-actions]').hasAttribute('aria-describedby'),
+      'an empty ariaDescribedBy is omitted, not emitted empty'
+    );
 
     await press($('[data-iterative-step-actions]'), 'the allowed-actions picker');
     assert.match(panelOption('quench').textContent, /changes nothing here/, 'Quench uses no Heat');
