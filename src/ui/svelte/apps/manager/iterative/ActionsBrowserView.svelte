@@ -182,15 +182,17 @@
     <FilterBar
       ariaLabel={text('FABRICATE.Admin.Manager.Iterative.ActionsFilters', 'Action filters')}
     >
-      <SearchField
-        value={String(ui.searchTerm ?? '')}
-        onChange={(next) => {
-          ui.searchTerm = next;
-          ui.pageIndex = 0;
-        }}
-        placeholder={text('FABRICATE.Admin.Manager.Iterative.ActionsSearch', 'Search actions')}
-        ariaLabel={text('FABRICATE.Admin.Manager.Iterative.ActionsSearch', 'Search actions')}
-      />
+      <div class="manager-iterative-search">
+        <SearchField
+          value={String(ui.searchTerm ?? '')}
+          onChange={(next) => {
+            ui.searchTerm = next;
+            ui.pageIndex = 0;
+          }}
+          placeholder={text('FABRICATE.Admin.Manager.Iterative.ActionsSearch', 'Search actions')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Iterative.ActionsSearch', 'Search actions')}
+        />
+      </div>
       {#each filters as filter (filter.key)}
         <Button
           pressed={ui[filter.key]}
@@ -327,8 +329,9 @@
     margin: var(--fab-space-3) var(--fab-space-3) 0;
   }
 
-  /* Scoped to the bar's row: the screen itself is a column, where a flex-basis of 220px would be a height. */
-  .manager-iterative-screen :global(.fabricate-filter-bar) > :global(.fabricate-search) {
+  /* The screen's own box sets the search's width, so no rule here names the published field. */
+  .manager-iterative-search {
+    display: flex;
     flex: 1 1 220px;
     max-width: 320px;
     min-width: 0;
