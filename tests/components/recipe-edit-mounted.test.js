@@ -164,6 +164,9 @@ const RAW_MODULES = [
   'src/utils/scalars.js',
   // The tag adder's exact component counts (issue 2430).
   'src/ui/model/vocabularyUsage.js',
+  // The editor's tab counts and modifier disposition, each a leaf beside its host (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/recipeModifierDisposition.js',
+  'src/ui/svelte/apps/manager/recipe/recipeTabCounts.js',
 ];
 
 // The new tab + section components the editor shell composes.

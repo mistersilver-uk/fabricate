@@ -13,11 +13,7 @@
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
-  import {
-    getEffectiveRecipeCategories,
-    getRecipeCategoryLabel,
-    normalizeRecipeCategory,
-  } from '../../../../utils/recipeCategories.js';
+  import { getEffectiveRecipeCategories } from '../../../../utils/recipeCategories.js';
   import {
     getComponentCategoryLabel,
     normalizeComponentCategory,
@@ -32,10 +28,7 @@
   import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
-  import {
-    createRecipeBrowserState,
-    recipeCheckSubtitleSuffix,
-  } from '../../../model/recipeBrowserModel.js';
+  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
@@ -142,6 +135,10 @@
   } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { createRecipeStepHandlers } from './recipe/recipeStepHandlers.js';
+  import {
+    recipeEditSubtitle as composeRecipeEditSubtitle,
+    resolutionModeLabel as modeLabelOf,
+  } from './recipe/recipeEditSubtitle.js';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import { isLearnedKnowledgeObservable } from '../../../../systems/learnedKnowledgeObservability.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
@@ -1920,18 +1917,14 @@
     return result;
   }
 
-  // The recipe editor's header subline: "<category> · <resolution mode>".
-  function recipeEditSubtitle() {
-    const category = getRecipeCategoryLabel(
-      normalizeRecipeCategory(recipeDraft?.category),
-      localize
-    );
-    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check from the same projected
-    // `checkSummary` the browser row's check pill reads, naming a Target as the pill does.
-    const suffix = recipeCheckSubtitleSuffix(selectedRecipe?.checkSummary || null, text);
-    return `${category} · ${mode}${suffix}`;
-  }
+  const recipeEditSubtitle = () =>
+    composeRecipeEditSubtitle({
+      recipe: recipeDraft,
+      mode: selectedSystem?.resolutionMode,
+      checkSummary: selectedRecipe?.checkSummary || null,
+      text,
+      localize,
+    });
 
   // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).
   function componentEditSubtitle() {
@@ -1949,21 +1942,7 @@
     );
   }
 
-  function resolutionModeLabel(mode) {
-    const labels = {
-      simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routedByIngredients: text(
-        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
-        'Routed by ingredients'
-      ),
-      routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
-      progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
-      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'),
-    };
-    return (
-      labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple')
-    );
-  }
+  const resolutionModeLabel = (mode) => modeLabelOf(mode, text);
 
   // The title bar's status line: no selection draws none.
   const titlebarModeLabel = $derived(

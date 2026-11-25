@@ -24,6 +24,7 @@
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeCraftingModifierField from './RecipeCraftingModifierField.svelte';
+  import { recipeModifierDisposition } from './recipeModifierDisposition.js';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import RecipeRoutingCard from './RecipeRoutingCard.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
@@ -32,6 +33,7 @@
     buildCategoryOptions,
     buildCheckTierOptions,
     buildMinSuccessTierOptions,
+    buildStepModeOptions,
   } from './recipeOverviewSelectOptions.js';
 
   let {
@@ -123,48 +125,19 @@
   const checkTierCaptionId = `${instanceId}-check-tier`;
   const minSuccessTierCaptionId = `${instanceId}-min-success-tier`;
 
-  // The callout copy for each inert cause: the same two causes the Checks card names, said from
-  // this tab's point of view — what the GM loses here, not what to fix there. Each sentence closes
-  // on the RECIPE's outcome, so it stays true however the surface below it is arranged.
-  const MODIFIER_INERT_COPY = {
-    noCheck: {
-      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoCheck',
-      fallback:
-        'This system resolves without a crafting check, so check modifiers change nothing for this recipe.',
-    },
-    noFormula: {
-      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoFormula',
-      fallback:
-        'The system’s crafting check has no roll formula yet, so check modifiers change nothing for this recipe.',
-    },
-  };
-
-  const modifierInert = $derived(MODIFIER_INERT_COPY[craftingModifierInertCause] || null);
-  const hasModifierCatalogue = $derived(craftingModifierOptions.length > 0);
-  // `bySubject` is the ONE rule that defers the selection to the recipe author, so it is the only
-  // rule under which this tab shows anything: a control the system will ignore is worse than no
-  // control. The comparison is against the CANONICAL token and the projection normalizes the
-  // legacy `byRecipe` on the way here, so an unmigrated world still renders the picker.
-  const modifierDeferredToRecipe = $derived(
-    hasModifierCatalogue && craftingModifierPolicy === 'bySubject'
+  const {
+    inert: modifierInert,
+    showInert: showModifierInert,
+    showControls: showModifierControls,
+  } = $derived(
+    recipeModifierDisposition({
+      options: craftingModifierOptions,
+      policy: craftingModifierPolicy,
+      inertCause: craftingModifierInertCause,
+    })
   );
-  // Two mutually exclusive dispositions under that rule, and the inert callout wins: the system
-  // asked this recipe to pick but rolls no check for the picks to reach.
-  const showModifierInert = $derived(modifierDeferredToRecipe && !!modifierInert);
-  const showModifierControls = $derived(modifierDeferredToRecipe && !modifierInert);
 
-  const STEP_MODE_OPTIONS = [
-    {
-      value: 'single',
-      icon: 'fas fa-square',
-      label: text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step'),
-    },
-    {
-      value: 'multi',
-      icon: 'fas fa-list-ol',
-      label: text('FABRICATE.Admin.Manager.Recipe.MultiStep', 'Multi-step'),
-    },
-  ];
+  const STEP_MODE_OPTIONS = buildStepModeOptions(text);
 
   // Reverting to single-step DISCARDS the per-step authoring, so the handler confirms
   // before staging it — never call these unless the mode actually changes.

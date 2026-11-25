@@ -27,6 +27,7 @@
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { resultsProjection, scopeWrites } from './recipe/recipeRoutingEdits.js';
   import { routedMinimum } from './recipe/recipeRoutingModel.js';
+  import { recipeTabCounts } from './recipe/recipeTabCounts.js';
   import {
     blocksEnable,
     countRecipeReadiness,
@@ -254,41 +255,16 @@
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
 
-  // Tab record counts (issue 643 §F1). Multi-step recipes sum each tab's count across every step;
-  // single-step recipes read the recipe-scope arrays.
-  function countIngredients(scope) {
-    const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
-    return sets.reduce((total, set) => {
-      const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups.length : 0;
-      const essences =
-        set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
-      return total + groups + essences;
-    }, 0);
-  }
-  function countResults(scope) {
-    const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-    return groups.reduce((total, group) => total + arrayOrEmpty(group?.results).length, 0);
-  }
-  const countTools = (scope) => arrayOrEmpty(scope?.toolIds).length;
-  function sumOverScopes(counter) {
-    if (isMultiStep) return steps.reduce((total, step) => total + counter(step), 0);
-    return counter(recipe || {});
-  }
-  const ingredientsCount = $derived(sumOverScopes(countIngredients));
-  const resultsCount = $derived(sumOverScopes(countResults));
-  // Tools also carries the recipe-level (global) tools in multi-step mode.
-  const toolsCount = $derived(
-    sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0)
-  );
+  const tabCounts = $derived(recipeTabCounts(recipe, steps));
   // While the recipe is OFF, an enable-blocking issue disables the toggle so the GM cannot trigger
   // the hard activation failure (issue 549); disabling stays free. NOT the activation gate
   // `canActivateRecipe` (issue 1018): the two are INCOMPARABLE in both directions, and DOMAIN.md
   // carries the ledger row.
   const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
-    ingredients: { vehicle: 'count', label: ingredientsCount },
-    results: { vehicle: 'count', label: resultsCount },
-    tools: { vehicle: 'count', label: toolsCount },
+    ingredients: { vehicle: 'count', label: tabCounts.ingredients },
+    results: { vehicle: 'count', label: tabCounts.results },
+    tools: { vehicle: 'count', label: tabCounts.tools },
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
       ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),
