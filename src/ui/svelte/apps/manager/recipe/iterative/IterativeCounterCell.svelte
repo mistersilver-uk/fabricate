@@ -85,6 +85,9 @@
   const startName = $derived(
     named('FABRICATE.Admin.Manager.Recipe.Iterative.StartName', '{counter} start')
   );
+  const targetLabels = $derived(
+    stepperLabels(named('FABRICATE.Admin.Manager.Recipe.Iterative.TargetName', '{counter} target'))
+  );
   const formulaInvalid = $derived(
     row.formulaFaults.length ? faultSentence(row.formulaFaults[0], text) : ''
   );
@@ -132,12 +135,15 @@
       data-iterative-counter-bound={field}>{row.bounds[field] ?? '—'}</Chip
     >
   {:else}
+    {@const labels = stepperLabels(boundName(field))}
     <Stepper
       value={instance[field] ?? null}
       allowUnset
       placeholder={row.defaults[field] === null ? '' : String(row.defaults[field])}
       {disabled}
-      {...stepperLabels(boundName(field))}
+      ariaLabel={labels.ariaLabel}
+      decrementLabel={labels.decrementLabel}
+      incrementLabel={labels.incrementLabel}
       inputProps={{ [`data-iterative-counter-${field}`]: row.key, ...marks(field) }}
       onChange={(next) => onChange(withField(field, next))}
     />
@@ -145,8 +151,8 @@
 {/snippet}
 
 {#if column === 'counter'}
-  <div class="manager-iterative-counter-name">
-    <span class="manager-iterative-counter-label" class:is-unknown={!row.known}>{row.label}</span>
+  <div class="manager-counter-instance-name">
+    <span class="manager-counter-instance-label" class:is-unknown={!row.known}>{row.label}</span>
     {#each row.faults as fault, index (index)}
       <FaultLine
         faults={[fault]}
@@ -206,9 +212,9 @@
     value={instance.target ?? null}
     allowUnset
     {disabled}
-    {...stepperLabels(
-      named('FABRICATE.Admin.Manager.Recipe.Iterative.TargetName', '{counter} target')
-    )}
+    ariaLabel={targetLabels.ariaLabel}
+    decrementLabel={targetLabels.decrementLabel}
+    incrementLabel={targetLabels.incrementLabel}
     inputProps={{ 'data-iterative-counter-target': row.key, ...marks('target') }}
     onChange={(next) => onChange(withField('target', next))}
   />
@@ -239,7 +245,7 @@
 {/if}
 
 <style>
-  .manager-iterative-counter-name {
+  .manager-counter-instance-name {
     display: grid;
     gap: var(--fab-space-1);
     justify-items: start;
@@ -247,7 +253,7 @@
   }
 
   /* As tall as the row's steppers, so the name centres on their line while faults stack under it. */
-  .manager-iterative-counter-label {
+  .manager-counter-instance-label {
     display: flex;
     align-items: center;
     min-height: 26px;
@@ -256,7 +262,7 @@
     overflow-wrap: anywhere;
   }
 
-  .manager-iterative-counter-label.is-unknown {
+  .manager-counter-instance-label.is-unknown {
     color: var(--fab-danger-text);
   }
 </style>

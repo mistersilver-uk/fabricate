@@ -150,7 +150,7 @@
 </script>
 
 {#snippet countersLink()}
-  <span class="manager-iterative-counters-note" id={noteId} data-iterative-counters-note>
+  <span class="manager-counter-instances-note" id={noteId} data-iterative-counters-note>
     <i class="fas fa-circle-info" aria-hidden="true"></i>{adderNote}
     <Button
       role="ghost"
@@ -192,7 +192,7 @@
     onChange={addCounter}
   />
   {#if unused.length === 0}{@render countersLink()}{/if}
-  <span class="manager-iterative-counters-optional"
+  <span class="manager-counter-instances-optional"
     >{say(
       'FABRICATE.Admin.Manager.Recipe.Iterative.CountersOptional',
       'Max and target are optional.'
@@ -214,7 +214,7 @@
   />
 {/snippet}
 
-<div class="manager-iterative-counters" bind:this={root} data-recipe-section="iterative-counters">
+<div class="manager-counter-instances" bind:this={root} data-recipe-section="iterative-counters">
   <DataTable
     heading={say('FABRICATE.Admin.Manager.Recipe.Iterative.CountersHeading', 'Counters')}
     hint={isMultiStep
@@ -237,15 +237,15 @@
 </div>
 
 <style>
-  .manager-iterative-counters :global(.fabricate-data-table-table) {
+  .manager-counter-instances :global(.fabricate-data-table-table) {
     min-width: 920px;
   }
 
-  .manager-iterative-counters :global(.fabricate-data-table-cell) {
+  .manager-counter-instances :global(.fabricate-data-table-cell) {
     vertical-align: top;
   }
 
-  .manager-iterative-counters-note {
+  .manager-counter-instances-note {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
@@ -254,7 +254,7 @@
     font-size: 11px;
   }
 
-  .manager-iterative-counters-optional {
+  .manager-counter-instances-optional {
     margin-inline-start: auto;
     color: var(--fab-text-subtle);
     font-size: 11px;
