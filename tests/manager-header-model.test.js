@@ -680,7 +680,8 @@ describe('headerModel', () => {
       subtitle: 'FABRICATE.Admin.Manager.Iterative.RecipesSubtitle',
       headingVariant: 'default',
     });
-    for (const view of Object.keys(ROUTES).filter((route) => route !== 'recipes')) {
+    for (const view of Object.keys(ROUTES)) {
+      if (view === 'recipes') continue;
       assert.deepEqual(
         answersOf(openModel(view, { selectedSystem: iterativeSystem }).model),
         answersOf(openModel(view).model),

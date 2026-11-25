@@ -13,20 +13,6 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/ui/model/recipeBrowserModel.js';
-import { Recipe } from '../../src/models/Recipe.js';
-import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
-import { normalizeIterativeLibrary } from '../../src/systems/normalize/iterativeLibrary.js';
-import {
-  iterativeRecipeIssues,
-  iterativeRecipeStatus,
-  iterativeStatusPill
-} from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
-import {
-  createIterativeStatusContext,
-  defineIterativeStatus
-} from '../../src/ui/svelte/stores/recipeIterativeStatus.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
-import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labIterative.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
@@ -43,8 +29,21 @@ import {
 import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
+import { normalizeIterativeLibrary } from '../../src/systems/normalize/iterativeLibrary.js';
+import {
+  iterativeRecipeIssues,
+  iterativeRecipeStatus,
+  iterativeStatusPill
+} from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
+import {
+  createIterativeStatusContext,
+  defineIterativeStatus
+} from '../../src/ui/svelte/stores/recipeIterativeStatus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { choosePageSize } from '../helpers/page-size-control.js';
+import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
+import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labIterative.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -723,7 +722,7 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
     ]);
   // What `iterativeRecipeStatus` answers is drawn as, written out by hand.
   const DRAWN = {
-    setup: (status) => ['iterativeSetup', 'warning', 'fas fa-flag', 'Needs iterative setup'],
+    setup: () => ['iterativeSetup', 'warning', 'fas fa-flag', 'Needs iterative setup'],
     blocking: (status) => [
       'iterativeBlocking',
       'danger',
@@ -740,17 +739,12 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
     seedIterativeRecipes(content, [], 'authoring');
     const persisted = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
     const system = { ...persisted, iterative: normalizeIterativeLibrary(persisted.iterative) };
-    // Recipe models, as the store projects them; `Result` names an unnamed result by Foundry's id.
-    const foundry = globalThis.foundry;
-    globalThis.foundry = { utils: { randomID: () => 'lab-result' } };
-    const recipes = content.recipes
-      .filter((entry) => entry.craftingSystemId === system.id)
-      .map((entry) => new Recipe(entry));
-    globalThis.foundry = foundry;
+    // The persisted entries: the oracle suite pins the same statuses over the Recipe models.
+    const recipes = content.recipes.filter((entry) => entry.craftingSystemId === system.id);
     const context = createIterativeStatusContext(system, recipes);
     const rows = recipes.map((recipe) => {
       // Hinge is the one recipe with no ingredient set anywhere, so activation refuses it.
-      const enableBlocked = recipe.ingredientSets.length === 0 && recipe.steps.length === 0;
+      const enableBlocked = !recipe.ingredientSets?.length && !recipe.steps?.length;
       const row = makeRecipe({ id: recipe.id, name: recipe.name, enableBlocked });
       defineIterativeStatus(row, recipe, context);
       return row;

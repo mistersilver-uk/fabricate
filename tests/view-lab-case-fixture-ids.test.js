@@ -28,13 +28,15 @@ function withIronworksRecipes() {
   seedIterativeRecipes(seeded, [], 'authoring');
   return seeded.recipes;
 }
+const SEEDED_RECIPE_IDS = ids(withIronworksRecipes());
 
 /** The fixture collection each id-bearing attribute addresses. */
 const COLLECTION_BY_ATTRIBUTE = Object.freeze({
   'data-environment-id': ids(content.environments),
-  'data-recipe-edit': ids(withIronworksRecipes()),
+  'data-recipe-edit': SEEDED_RECIPE_IDS,
   'data-recipe-select': ids(content.recipes),
-  'data-recipe-id': ids(content.recipes),
+  // The library rows a frame lists once it authors the Ironworks recipes too (issue 3010).
+  'data-recipe-id': SEEDED_RECIPE_IDS,
   'data-books-scrolls-edit': ids(content.recipeItems),
   'data-books-scrolls-select': ids(content.recipeItems),
   'data-component-id': ids(content.components),
