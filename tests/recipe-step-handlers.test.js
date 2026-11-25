@@ -162,6 +162,64 @@ describe('recipe step handler guards and confirms', () => {
   });
 });
 
+/** A confirm the test answers by hand, so an edit can land while it is open. */
+function deferredConfirm() {
+  const pending = [];
+  return {
+    confirm: () => new Promise((resolve) => pending.push(resolve)),
+    answer: (value) => pending.shift()(value),
+  };
+}
+
+describe('a confirming handler reads the draft after the confirm resolves', () => {
+  function deferredHarness(draft) {
+    const dialog = deferredConfirm();
+    const state = { draft, patches: [] };
+    const handlers = createRecipeStepHandlers({
+      draft: () => state.draft,
+      patch: (partial) => {
+        state.patches.push(partial);
+        state.draft = state.draft ? { ...state.draft, ...partial } : state.draft;
+      },
+      confirm: dialog.confirm,
+      text: (key, fallback) => fallback,
+      localize: (key) => key,
+    });
+    return { state, handlers, dialog };
+  }
+
+  it('deletes from the steps an edit left while the confirm was open', async () => {
+    const { state, handlers, dialog } = deferredHarness({
+      id: 'r1',
+      steps: [
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' },
+      ],
+    });
+    const deleting = handlers.handleDeleteStep('a');
+    handlers.handleUpdateStep('b', { name: 'B edited' });
+    dialog.answer(true);
+    assert.equal(await deleting, true);
+    assert.deepEqual(state.patches.at(-1), { steps: [{ id: 'b', name: 'B edited' }] });
+  });
+
+  it('writes nothing when the step or the draft went while the confirm was open', async () => {
+    const steps = [{ id: 'a' }, { id: 'b' }];
+    const gone = deferredHarness({ id: 'r1', steps });
+    const deleting = gone.handlers.handleDeleteStep('a');
+    gone.state.draft = { id: 'r1', steps: [{ id: 'b' }] };
+    gone.dialog.answer(true);
+    assert.equal(await deleting, false);
+
+    const closed = deferredHarness({ id: 'r1', steps });
+    const reverting = closed.handlers.handleRevertToSingleStep();
+    closed.state.draft = null;
+    closed.dialog.answer(true);
+    assert.equal(await reverting, false);
+    assert.deepEqual([...gone.state.patches, ...closed.state.patches], []);
+  });
+});
+
 describe('newStepId', () => {
   // The fallback runs first: this process holds no `foundry` until the second case installs one.
   it('falls back to a step- id without Foundry', () => {

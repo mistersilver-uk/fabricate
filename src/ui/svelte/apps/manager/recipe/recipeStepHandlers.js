@@ -2,6 +2,8 @@
  * The recipe editor's step handlers, over the root's in-flight recipe draft. `draft` is a thunk read
  * at each call, so a handler sees what the previous patch left; `patch(partial)` stages a change,
  * `confirm(options)` resolves truthy to proceed, and `text`/`localize` are the root's localizers.
+ * A confirming handler reads the draft again once `confirm` resolves, because `DialogV2` is not
+ * modal and the GM can edit while it is open.
  */
 
 /** A fresh step id, from Foundry's generator where it exists. */
@@ -72,7 +74,7 @@ export function createRecipeStepHandlers({ draft, patch, confirm, text, localize
     const recipe = draft();
     if (!recipe) return false;
     const confirmed = await confirm?.(revertPrompt(recipe, { text, localize }));
-    if (!confirmed) return false;
+    if (!confirmed || !draft()) return false;
     patch({ steps: [] });
     return true;
   }
@@ -112,11 +114,12 @@ export function createRecipeStepHandlers({ draft, patch, confirm, text, localize
   // Deleting a step removes the whole step (its ingredients, results, and tools).
   async function handleDeleteStep(stepId, context = 'overview') {
     if (!draft()) return false;
-    const steps = currentSteps();
-    const step = steps.find((entry) => entry?.id === stepId);
+    const step = currentSteps().find((entry) => entry?.id === stepId);
     if (!step) return false;
     const confirmed = await confirm?.(deletePrompt(step, context, { text, localize }));
-    if (!confirmed) return false;
+    if (!confirmed || !draft()) return false;
+    const steps = currentSteps();
+    if (!steps.some((entry) => entry?.id === stepId)) return false;
     patch({ steps: steps.filter((entry) => entry?.id !== stepId) });
     return true;
   }

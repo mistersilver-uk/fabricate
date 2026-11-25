@@ -281,9 +281,8 @@ export function registerRecipeStepsCases() {
       );
     });
 
-    // The shipped read-before-confirm: the delete computes its steps before the dialog, so an edit
-    // made while the dialog is open is not in what it writes. P6 replaces this with a read-after.
-    it('writes the steps it read before the confirm, dropping an edit made while it was open', async () => {
+    // `DialogV2` is not modal, so the delete reads the draft once the confirm resolves.
+    it('writes the steps it reads after the confirm, keeping an edit made while it was open', async () => {
       const calls = [];
       let release;
       const answer = new Promise((resolve) => {
@@ -299,7 +298,11 @@ export function registerRecipeStepsCases() {
       flushSync();
 
       const update = await save(calls);
-      assert.deepEqual(update[2].steps, [QUENCH], 'the pre-confirm copy of step sb is what lands');
+      assert.deepEqual(
+        update[2].steps,
+        [{ ...QUENCH, name: 'Edited meanwhile' }],
+        'the edit made while the dialog was open is what lands'
+      );
     });
   });
 }
