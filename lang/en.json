@@ -72,7 +72,11 @@
       },
       "StageBars": {
         "Unnamed": "Stage {index} of {count}",
-        "Position": "{percent}%, stage {index} of {count}"
+        "Position": "{percent}%, stage {index} of {count}",
+        "Failed": {
+          "One": "{percent}%, failed",
+          "Several": "{percent}%, stage {index} of {count}, failed"
+        }
       },
       "RuleRow": {
         "Remove": "Remove rule",

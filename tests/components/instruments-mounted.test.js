@@ -573,6 +573,36 @@ describe('StageBars (mounted)', () => {
     );
   });
 
+  it('paints a failed stage danger at any fill, ahead of the filled and current tones', async () => {
+    const root = await stages.mount({
+      stages: [
+        { name: 'A', value: 100, status: 'failed' },
+        { name: 'B', value: 40, status: 'failed' },
+        { name: 'C', value: 0, status: 'failed' },
+        { name: 'D', value: 100, status: 'done' },
+      ],
+      currentIndex: 1,
+      ariaLabel: 'Progress',
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-stage-bars-state]')].map((stage) => [
+        stage.dataset.stageBarsState,
+        stage.querySelector('.fab-fill-bar').dataset.fillBarTone,
+      ]),
+      [
+        ['danger', 'danger'],
+        ['danger', 'danger'],
+        ['danger', 'danger'],
+        ['success', 'success'],
+      ]
+    );
+    assert.equal(
+      root.querySelectorAll('[role="progressbar"]')[1].getAttribute('aria-current'),
+      'step',
+      'a failed current stage is still the current one'
+    );
+  });
+
   it('draws a bar for every stage whatever a stage carries, and marks no current one out of range', async () => {
     const duplicated = await stages.mount({
       stages: [
@@ -599,6 +629,138 @@ describe('StageBars (mounted)', () => {
       bars.map((bar) => bar.getAttribute('aria-current')),
       [null, null]
     );
+  });
+});
+
+const ticksOf = (root) => [...root.querySelectorAll('.fab-meter-mark')];
+const figuresOf = (root) => [...root.querySelectorAll('.fab-meter-figure')];
+
+describe('Meter marks (mounted)', () => {
+  /** A second mount in the same test, after the first is destroyed. */
+  async function remountMeter(props) {
+    meter.remount();
+    return meter.mount(props);
+  }
+
+  const RULES = [
+    { value: 40, label: 'Fine — Shape ≥ 40' },
+    { value: 60, label: 'Masterwork — Shape ≥ 60' },
+  ];
+
+  it('draws a tick over the track and a figure beneath for each mark, at its position', async () => {
+    const root = await meter.mount({ value: 50, max: 75, label: 'Shape', marks: RULES });
+    const node = root.querySelector('[role="meter"]');
+    const scale = node.querySelector('.fab-meter-scale');
+    assert.ok(scale.querySelector(':scope > .fab-fill-bar'), 'the track stands in the scale');
+    assert.deepEqual(
+      ticksOf(root).map((tick) => [tick.parentElement === scale, tick.style.left]),
+      [
+        [true, `${(40 / 75) * 100}%`],
+        [true, `${(60 / 75) * 100}%`],
+      ]
+    );
+    assert.deepEqual(
+      figuresOf(root).map((figure) => figure.textContent),
+      ['40', '60']
+    );
+    assert.equal(node.querySelector('.fab-meter-figures').getAttribute('aria-hidden'), 'true');
+  });
+
+  it('reaches a mark at or below the value, and states each mark by its label', async () => {
+    const root = await meter.mount({
+      value: 40,
+      max: 75,
+      label: 'Shape',
+      valueText: '40 of 75. Reached Fine — Shape ≥ 40',
+      marks: RULES,
+    });
+    assert.deepEqual(
+      ticksOf(root).map((tick) => [
+        tick.classList.contains('is-reached'),
+        tick.dataset.tooltipText,
+      ]),
+      [
+        [true, 'Fine — Shape ≥ 40'],
+        [false, 'Masterwork — Shape ≥ 60'],
+      ],
+      'a mark at the value is reached, and one above it is not'
+    );
+    assert.deepEqual(
+      figuresOf(root).map((figure) => figure.classList.contains('is-reached')),
+      [true, false]
+    );
+    assert.equal(
+      root.querySelector('[role="meter"]').getAttribute('aria-valuetext'),
+      '40 of 75. Reached Fine — Shape ≥ 40',
+      "the caller's reading states the reached mark as it was passed"
+    );
+  });
+
+  it("takes the caller's reached over the value when it is a boolean", async () => {
+    const root = await meter.mount({
+      value: 10,
+      max: 20,
+      label: 'Heat',
+      marks: [
+        { value: 5, label: 'a', reached: false },
+        { value: 15, label: 'b', reached: true },
+        { value: 18, label: 'c', reached: 'yes' },
+      ],
+    });
+    assert.deepEqual(
+      ticksOf(root).map((tick) => tick.classList.contains('is-reached')),
+      [false, true, false]
+    );
+  });
+
+  it('draws no mark outside 0 to max or with a value that is not a finite number', async () => {
+    const root = await meter.mount({
+      value: 3,
+      max: 10,
+      label: 'Finish',
+      marks: [
+        { value: -1, label: 'below' },
+        { value: 0, label: 'start' },
+        { value: 10, label: 'end' },
+        { value: 11, label: 'beyond' },
+        { value: NaN, label: 'nan' },
+        { value: Infinity, label: 'infinite' },
+        { value: '5', label: 'string' },
+        null,
+      ],
+    });
+    assert.deepEqual(
+      ticksOf(root).map((tick) => tick.dataset.tooltipText),
+      ['start', 'end']
+    );
+    const none = await remountMeter({ value: 0, max: 0, label: 'x', marks: [{ value: 0 }] });
+    assert.equal(ticksOf(none).length, 0, 'a max of zero draws no mark');
+  });
+
+  it('draws unsorted marks in value order on a scale of 1.25 times the top mark', async () => {
+    const root = await meter.mount({
+      value: 30,
+      max: 1.25 * 60,
+      label: 'Shape',
+      marks: [RULES[1], RULES[0]],
+    });
+    assert.deepEqual(
+      figuresOf(root).map((figure) => [figure.textContent, figure.style.left]),
+      [
+        ['40', `${(40 / 75) * 100}%`],
+        ['60', '80%'],
+      ]
+    );
+  });
+
+  it('draws an empty or absent list exactly as the meter drew before marks', async () => {
+    const props = { value: 7, max: 11, labelId: 'head-1', valueText: '7 / 11' };
+    const absent = (await meter.mount(props)).innerHTML;
+    const empty = (await remountMeter({ ...props, marks: [] })).innerHTML;
+    const invalid = (await remountMeter({ ...props, marks: [{ value: 12 }] })).innerHTML;
+    assert.equal(empty, absent);
+    assert.equal(invalid, absent, 'a list with no drawable mark draws none of the scale');
+    assert.ok(!meter.target.querySelector('.fab-meter-marked'));
   });
 });
 

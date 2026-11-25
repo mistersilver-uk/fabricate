@@ -379,6 +379,36 @@ describe('DataTable', () => {
     assert.deepEqual(found, JSON.parse(readFileSync(BASELINE_PATH, 'utf8')));
   });
 
+  it('forwards a compact pagerDensity to its pager, and reads any other as default', async () => {
+    const paged = (extra) =>
+      base({ rows: rowsOf(5), count: 12, perPage: 5, perPageOptions: [5, 10], ...extra });
+    const pagerOf = async (extra) => {
+      const root = await harness.mount(paged(extra));
+      const markup = root
+        .querySelector('.fabricate-pagination')
+        .outerHTML.replaceAll(/\bc\d+-/g, 'cN-');
+      harness.remount();
+      return markup;
+    };
+    const omitted = await pagerOf({});
+    assert.equal(await pagerOf({ pagerDensity: 'default' }), omitted);
+    assert.equal(
+      await pagerOf({ pagerDensity: 'dense' }),
+      omitted,
+      'an unknown value reads default'
+    );
+    assert.ok(!omitted.includes('data-pagination-compact'));
+    const root = await harness.mount(paged({ pagerDensity: 'compact' }));
+    assert.ok(root.querySelector('.fabricate-pagination[data-pagination-compact]'));
+    assert.ok(
+      root.querySelector('[data-pagination-size]').classList.contains('is-inline'),
+      "the page sizes take SegmentedControl's inline rung"
+    );
+    harness.remount();
+    const unpaged = await harness.mount(base({ pagerDensity: 'compact' }));
+    assert.ok(!unpaged.querySelector('.fabricate-pagination'), 'perPage 0 draws no pager');
+  });
+
   it('describes the table by its hint, outside the name the heading and count give it', async () => {
     const root = await harness.mount(base({ hint: 'Start values, bounds and targets.' }));
     const table = tableIn(root);

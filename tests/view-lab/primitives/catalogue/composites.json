@@ -1752,6 +1752,54 @@
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "progress — a failed stage, in danger",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunProgress.svelte",
+    "note": "A finished workpiece's record: the first stage done and the second failed, drawn in danger and read as failed through the shipped key.",
+    "props": {
+      "label": "Progress",
+      "current": 1,
+      "progress": 100,
+      "stages": [
+        {
+          "id": "rough",
+          "name": "Rough out the blade",
+          "status": "done"
+        },
+        {
+          "id": "edge",
+          "name": "Forge the edge",
+          "status": "failed"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "progress — a note beside the kicker",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunProgress.svelte",
+    "note": "The stage being worked, with the muted note the Workpiece view states its goal in.",
+    "props": {
+      "label": "Progress",
+      "current": 1,
+      "progress": 75,
+      "note": "Step 2: Shape 45 of 60",
+      "stages": [
+        {
+          "id": "rough",
+          "name": "Rough out the blade",
+          "status": "done"
+        },
+        {
+          "id": "edge",
+          "name": "Forge the edge"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
     "cap": "stage nav — a five-stage window over a longer run",
     "draws": ":scope > nav",
     "path": "src/ui/svelte/components/StageNav.svelte",

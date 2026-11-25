@@ -1235,6 +1235,33 @@ describe('run primitives mounted behavior', () => {
     expectGeometry('OutcomeLadder', '.fab-outcome-tier', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
   });
 
+  it('draws no primary for a null primary, with and without begin', async () => {
+    const actionsOf = (target) =>
+      [...target.querySelectorAll('[data-run-action]')].map((control) => control.dataset.runAction);
+    const bar = { run: { id: 'run-1' }, runLabel: 'Forge a Longsword', pause: null, primary: null };
+    assert.deepEqual(actionsOf(await runActionHarness.mount(bar)), ['cancel-arm']);
+    runActionHarness.remount();
+    const begin = { enabled: true, label: 'Start step 2', icon: 'fas fa-forward-step' };
+    const target = await runActionHarness.mount({ ...bar, begin });
+    assert.deepEqual(actionsOf(target), ['cancel-arm', 'begin']);
+    assert.equal(target.querySelectorAll('.is-primary').length, 1, 'begin is the one primary');
+    runActionHarness.remount();
+  });
+
+  it('draws neither pause nor resume for a null pause, whatever the run says, and keeps begin and completion', async () => {
+    const completion = { label: 'Complete', value: 'manual', options: [{ value: 'manual', label: 'By hand' }] };
+    const begin = { enabled: true, label: 'Start step 2' };
+    for (const run of [{ id: 'run-1', paused: true }, { id: 'run-1', pauseState: { reason: 'gm' } }, { id: 'run-1' }]) {
+      const target = await runActionHarness.mount({
+        run, runLabel: 'Forge a Longsword', pause: null, resume: { label: 'Resume' }, primary: null, begin, completion,
+      });
+      assert.ok(!target.querySelector('[data-run-action="pause"], [data-run-action="resume"]'), JSON.stringify(run));
+      assert.ok(target.querySelector('[data-run-completion]'), 'the completion switch stays');
+      assert.ok(target.querySelector('[data-run-action="begin"]'), 'begin stays');
+      runActionHarness.remount();
+    }
+  });
+
   it('draws every shipped ActionsPanel state as it drew before a null primary or pause', async () => {
     const bar = {
       run: { id: 'run-1' },

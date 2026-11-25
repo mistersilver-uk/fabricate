@@ -2,22 +2,31 @@
      heading over `StageBars`, which names its group by the kicker when one is drawn and by
      `ariaLabel` otherwise. An unnamed stage of several is labelled "Stage n of m", a named one reads
      "p%, stage n of m" as its bar's `valueText` with p the whole percent truncated, so an unfinished
-     stage never reads 100%, and a lone one takes the group's name. -->
+     stage never reads 100%, and a lone one takes the group's name. A stage whose `status` is `failed`
+     draws in danger and reads "p%, failed", or "p%, stage n of m, failed" when named among several.
+     `note` is a muted line beside the kicker that describes the group. -->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import Kicker from './Kicker.svelte';
   import StageBars from './StageBars.svelte';
+
+  const FAILED = Object.freeze({
+    one: 'FABRICATE.Common.StageBars.Failed.One',
+    several: 'FABRICATE.Common.StageBars.Failed.Several',
+  });
 
   let {
     stages = [],
     current = 0,
     progress = 0,
     blocker = '',
+    note = '',
     label = '',
     ariaLabel = '',
   } = $props();
 
   const kickerId = $props.id();
+  const noteId = `${kickerId}-note`;
 
   function stageProgress(stage, index) {
     if (stage?.status === 'done' || stage?.status === 'succeeded' || index < current) return 100;
@@ -27,24 +36,31 @@
 
   function barOf(stage, index) {
     const name = stage?.presentationSnapshot?.name || stage?.stepName || stage?.name || '';
-    const bar = { name, value: stageProgress(stage, index) };
-    if (stages.length === 1) return bar;
+    const bar = { name, value: stageProgress(stage, index), status: stage?.status };
+    const percent = Math.floor(bar.value);
+    const failed = stage?.status === 'failed';
+    const lone = failed ? { valueText: localize(FAILED.one, { percent }) } : {};
+    if (stages.length === 1) return { ...bar, ...lone };
     const position = { index: index + 1, count: stages.length };
-    if (!name) return { ...bar, label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
-    const reading = { percent: Math.floor(bar.value), ...position };
-    return { ...bar, valueText: localize('FABRICATE.Common.StageBars.Position', reading) };
+    const label = localize('FABRICATE.Common.StageBars.Unnamed', position);
+    if (!name) return { ...bar, label, ...lone };
+    const reading = { percent, ...position };
+    const key = failed ? FAILED.several : 'FABRICATE.Common.StageBars.Position';
+    return { ...bar, valueText: localize(key, reading) };
   }
 
   const bars = $derived(stages.map(barOf));
 </script>
 
 <div class="fab-run-progress" data-run-progress>
-  {#if label || blocker}
+  {#if label || blocker || note}
     <div class="fab-run-progress-heading">
       {#if label}<span class="fab-run-progress-label" id={kickerId}
           ><Kicker as="span">{label}</Kicker></span
         >{/if}
       {#if blocker}<span class="fab-run-progress-blocker" data-run-progress-blocker>{blocker}</span
+        >{/if}
+      {#if note}<span class="fab-run-progress-note" id={noteId} data-run-progress-note>{note}</span
         >{/if}
     </div>
   {/if}
@@ -54,6 +70,7 @@
     numbered={false}
     ariaLabel={label ? '' : ariaLabel}
     ariaLabelledBy={label ? kickerId : ''}
+    aria-describedby={note ? noteId : undefined}
   />
 </div>
 
@@ -77,6 +94,12 @@
   .fab-run-progress-blocker {
     min-width: 0;
     color: var(--fab-warning-text);
+    font-size: 10.5px;
+  }
+
+  .fab-run-progress-note {
+    min-width: 0;
+    color: var(--fab-text-muted);
     font-size: 10.5px;
   }
 </style>
