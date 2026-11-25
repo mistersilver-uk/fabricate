@@ -128,3 +128,20 @@ export function archiveRunTerms(run) {
   }
   delete run.termsSnapshot;
 }
+
+/**
+ * Writes an attempt's next state onto `run` in place: the step state, a `none` resolution snapshot
+ * promoted to `check` by a checked attempt, and a matured `waitingTime` run and step resumed.
+ */
+export function recordAttemptOnRun(run, stepIndex, state, { checked = false } = {}) {
+  const step = run.steps[stepIndex];
+  step.iterative = closedState(state);
+  if (checked && step.resolutionSnapshot?.kind === 'none') {
+    step.resolutionSnapshot = { ...step.resolutionSnapshot, kind: 'check' };
+  }
+  if (run.status === 'waitingTime') {
+    run.status = 'inProgress';
+    step.status = 'inProgress';
+  }
+  return run;
+}

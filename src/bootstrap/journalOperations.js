@@ -8,6 +8,7 @@ import { publicAdditionalDiceOffer } from '../systems/additionalDiceReach.js';
 import { publicAdvantageOffer } from '../systems/checkAdvantage.js';
 import { evaluatePreparedCraftingCheck, postCheckRollHandoff } from '../systems/checkRoll.js';
 import { EVENT_SCENE_SOCKET } from '../systems/eventSceneCoordinator.js';
+import { withIterativeOperations } from '../systems/iterative/iterativeJournalOperation.js';
 import { createFoundryJournalRunAuthority } from '../systems/journalRunAuthority.js';
 import {
   createGatheringJournalRunOperations,
@@ -321,11 +322,14 @@ function countPromptWording(prompt) {
 /** The check legs: what the GM describes to the initiator, and how a decision is graded. */
 function buildCheckOperations(fabricate, authorizeRollHandoff) {
   return {
-    describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
+    describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId, action }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
       const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
-      const describe = engine?.describeVersionedStageCheck;
+      const describe =
+        action === 'takeAction'
+          ? engine?.describeIterativeAttemptCheck
+          : engine?.describeVersionedStageCheck;
       if (typeof describe !== 'function') {
         return { required: false, blocked: 'unsupported-operation' };
       }
@@ -334,6 +338,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         componentSourceActors,
         runId: run.id,
         selectionPlan: payload.selectionPlan,
+        actionId: payload.actionId,
         preparationGrant,
         requestId,
       });
@@ -579,7 +584,13 @@ export function createJournalCommandsForFabricate(
     authority,
     operations: {
       crafting: withUnrollableCheckRefusal(
-        createCraftingJournalOperations(fabricate, () => service)
+        withIterativeOperations(
+          createCraftingJournalOperations(fabricate, () => service),
+          {
+            fabricate,
+            resolveSourceActors: resolveJournalSourceActors,
+          }
+        )
       ),
       gathering: withPromptActivity(
         withUnrollableCheckRefusal(

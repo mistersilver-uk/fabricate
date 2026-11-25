@@ -99,6 +99,7 @@ export async function describePreparedJournalCheck({ request, context, helpers, 
     payload: request.payload ?? {},
     preparationGrant,
     requestId: request.requestId,
+    action: request.action,
   });
   if (descriptor?.blocked) return { response: failure(descriptor.blocked, descriptor.detail) };
   if (descriptor?.required) {

@@ -248,6 +248,11 @@ The retained-claim prompt is worded for the claim and not for a run.
 Every surface that can mint a refusal reason keeps that vocabulary as its single home, including the module edges that report an absent command service, so the drift guard that re-derives the vocabulary can see every code a player may read.
 Native Reconciliation's `run-not-uncertain`, a run with no uncertain effect to close, joins that vocabulary.
 An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
+Every reason a `takeAction` can return is mapped to a localized sentence.
+Every reason an Iterative Attempt adds states that nothing was spent, except `check-mismatch`, which states that the workpiece is unchanged, and `roll-unavailable` keeps its shared sentence.
+A refused `takeAction` reply carries no `check` and no `rollHandoff`, so the player posts no roll for it, and it carries the resolver's `detail` verbatim, ids and numbers only.
+A secret check's GM-only roll, posted when the authority evaluates it, stands as the record of a roll that changed nothing.
+A replayed Iterative Attempt answers `iterative.replayed: true` with its recorded entry and changes nothing.
 
 #### A failed check is an outcome, not a refusal
 
@@ -259,6 +264,8 @@ The two are told apart by the `disposition` the stage's own outcome mints — `f
 A resolved failure MUST be reported in its own words, which state that the check failed and assert NOTHING about what the attempt consumed.
 The generic craft-failure text promises that nothing was consumed, and that promise is false whenever the recipe's `consumeIngredientsOnFail` or `breakToolsOnFail` policy spent something; the chat card is the surface that itemises it.
 It MUST NOT be recorded as a command error on the Journal run, whose own history already records the outcome.
+A committed Iterative Attempt answers `success: true` whether its check failed or its step ended, and its outcome is `iterative.attempt` and `iterative.stepEnd`.
+For `takeAction`, `success: false` is always a refusal, never carries a `disposition`, and posts no roll.
 The Alchemy workbench banner MUST give it a distinct non-success state rather than the no-reaction fizzle, because the bench did react.
 
 The player Crafting tab MUST refresh its listing after a resolved failure and record the outcome for the run summary, exactly as it does after a success.

@@ -1,4 +1,5 @@
 import { settleCardRolls } from './checkCardRolls.js';
+import { validTakeActionPayload } from './iterative/iterativeJournalOperation.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
   describePreparedJournalCheck,
@@ -43,6 +44,7 @@ function validRequest(request) {
   if (!MUTATING_ACTIONS.has(request?.action) && request?.action !== 'releaseCheck') return false;
   if (request.action !== 'start' && !validText(request?.runId)) return false;
   if (request.action === 'chooseAward' && !validAwardChoicePayload(request.payload)) return false;
+  if (request.action === 'takeAction' && !validTakeActionPayload(request.payload)) return false;
   return Number.isInteger(request?.expectedRevision) && request.expectedRevision >= 0;
 }
 
@@ -563,6 +565,8 @@ export function createJournalRunCommandService({
     }
     const operation = operations[request.runType];
     if (!operation) return failure('unsupported-operation');
+    const replay = await operation.answerReplay?.({ actor, request });
+    if (replay) return { replay };
     const run =
       request.action === 'start' ? null : await operation.getRun?.({ actor, runId: request.runId });
     if (request.action !== 'start' && !run) return failure('run-not-found');
@@ -657,7 +661,11 @@ export function createJournalRunCommandService({
         ...entitlement,
         payload: request.payload ?? {},
       });
-      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
+      trustedContext = {
+        operationId: request.requestId,
+        resolvedCheckResult: offered,
+        preparedActionId: privateEvaluation?.actionId,
+      };
     } else if (
       CHECKED_ACTIONS.has(request.action) &&
       typeof operation.describeCheck === 'function'
@@ -738,7 +746,7 @@ export function createJournalRunCommandService({
     const response = await authority.run(claimed, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
-      if (!context.success) return context;
+      if (!context.success) return context.replay ?? context;
       return executeOperation({ ...request, senderId }, context, helpers, spent);
     });
     return withSpentAdditionalDice(response, spent, request.expectedRevision);

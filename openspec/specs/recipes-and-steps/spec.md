@@ -252,6 +252,14 @@ Roll data — ability scores, proficiency and any other actor-derived value the 
 - A new iterative run is refused, with nothing spent, while its recipe has a critical iterative readiness issue, while a critical library issue names a counter or action in the subset its terms snapshot would carry, or while its system's iterative library version is unsupported.
 - A timed step arms its gate in the start commit, and the run and the step stay `waitingTime` until the first Iterative Attempt after maturity sets both to `inProgress`.
 - Iterative Attempts are refused until a timed step's gate matures, and world-time processing never executes an iterative step.
+- An Iterative Attempt is the `takeAction` journal command, executed by the active-GM command authority, and the public `Fabricate#takeCraftingAction` uses the same authority.
+- The authority answers a replayed Attempt id from the run's attempt log, active or archived, once none of the run's execution journals is uncommitted.
+  It then refuses a stale revision before any roll, re-reads the run under its claim, asserts the revision, checks Tool presence and preflight, prepares and rolls the routed check only for an action with `check: 'roll'`, resolves the Iterative Attempt, and persists.
+- A prepared check is keyed to its action, so a roll leg for another action refuses `check-mismatch`.
+- A non-terminal Iterative Attempt is one run write that advances `runRevision` by one.
+- A refused Iterative Attempt changes no counter, count, Tool or item.
+  A refusal found after the check is evaluated returns no `check` and no `rollHandoff`, so the player posts no roll, and a secret check's GM-only roll, which the authority posts at evaluation, still stands as the record of a roll that changed nothing.
+- Tools are checked for presence when the step starts and at every Iterative Attempt's preflight, and their check bonuses apply to every checked Iterative Attempt.
 
 ### Captured Execution Evidence
 

@@ -16,7 +16,22 @@ import { scriptedRollDie } from './scriptedRollDie.js';
 
 const gte = (counterId, value) => ({ source: 'counter', counterId, op: '>=', value });
 
-/** `heat` ends a step at 4; `fuel` is spent by `stoke`, which a `hammer` roll check also offers. */
+const plainAction = (id, extra = {}) => ({
+  id,
+  label: id,
+  categories: [],
+  usesSession: false,
+  availability: { combine: 'all', rules: [] },
+  costs: [],
+  check: 'none',
+  effects: [],
+  ...extra,
+});
+
+/**
+ * `heat` ends a step at 4 and an empty `fuel` fails it. `stoke` burns 1 fuel for 1 heat, `hammer`
+ * rolls the routed check for 1 heat on a hit, `rest` changes nothing and `heave` costs 5 fuel.
+ */
 export function forgeLibrary() {
   return {
     version: 1,
@@ -61,6 +76,10 @@ export function forgeLibrary() {
           },
         ],
       },
+      plainAction('rest'),
+      plainAction('heave', {
+        costs: [{ id: 'lift', counterId: 'fuel', amount: '5', needsEnough: true }],
+      }),
     ],
   };
 }

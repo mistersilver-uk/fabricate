@@ -114,6 +114,7 @@ import {
   readStoredStackQuantity,
   setStackQuantity,
 } from './itemStackQuantity.js';
+import { describeIterativeAttemptCheck } from './iterative/iterativeAttemptCheck.js';
 import { iterativeStartRefusal } from './iterative/iterativeCraftGate.js';
 import { prepareIterativeStepStart } from './iterative/iterativeStepStart.js';
 import { pairPlannedTools } from './plannedToolPairs.js';
@@ -367,6 +368,10 @@ export class CraftingEngine {
     // for why, and `_complicationWriter` for the ambient fallback.
     this.complicationDeliveryWriter = null;
     this.versionedRunAuthority = null;
+  }
+
+  describeIterativeAttemptCheck(args) {
+    return describeIterativeAttemptCheck(this, args);
   }
 
   installVersionedRunAuthority(authority = null) {

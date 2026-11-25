@@ -248,6 +248,42 @@ describe('journal run command protocol', () => {
         engineWithStationPresence, resolveRunRecipe);
   }
 
+  it('describes a takeAction through the iterative describe and keeps the roll redaction', async () => {
+    const calls = [];
+    const descriptor = {
+      required: true,
+      publicPrompt: { label: 'SECRET_RECIPE', allowAdvantage: true, offerSituationalBonus: true },
+      privateEvaluation: { recipeId: 'recipe', actionId: 'hammer' },
+    };
+    const engine = {
+      describeIterativeAttemptCheck: async (args) => {
+        calls.push(['iterative', args.actionId]);
+        return descriptor;
+      },
+      describeVersionedStageCheck: async () => {
+        calls.push(['stage']);
+        return descriptor;
+      },
+    };
+    const fabricate = {
+      craftingEngine: engine,
+      recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
+      recipeVisibilityService: { getVisibleRecipes: () => [] },
+    };
+    const operations = loadCraftingOperations()(fabricate, () => null);
+    const actor = { uuid: 'Actor.a', testUserPermission: () => true };
+    const described = await operations.describeCheck({
+      actor, run: { id: 'run-1' }, sender: { id: 'player', isGM: false },
+      payload: { actionId: 'hammer' }, action: 'takeAction',
+    });
+    await operations.describeCheck({
+      actor, run: { id: 'run-1' }, sender: { id: 'gm', isGM: true }, payload: {}, action: 'execute',
+    });
+    assert.deepEqual(calls, [['iterative', 'hammer'], ['stage']]);
+    assert.equal(described.publicPrompt.label, undefined, 'an unentitled sender reads no subject');
+    assert.equal(described.privateEvaluation.actionId, 'hammer');
+  });
+
   /** An engine whose stage methods record their receiver and the station its Tool consult sees. */
   function stationRecordingEngine() {
     const recipeManager = {

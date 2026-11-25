@@ -72,6 +72,8 @@ export async function cardOffer(checkResult, handoff, authorization) {
 
 /** Evidence and the handoff share one entitlement: an unentitled initiator receives neither. */
 export async function withEntitledFacts(response, { check, handoff }, authorization) {
+  // A refused Iterative Attempt changed nothing, so its evaluated roll is never posted.
+  if (authorization.request?.action === 'takeAction' && response?.success !== true) return response;
   if (!(handoff || check) || !(await initiatorEntitled(authorization))) return response;
   // A shown roll also names the routed tier its success went through (issue 1644).
   const outcomeId = check ? authorization.result?.checkResult?.data?.outcomeId : null;
