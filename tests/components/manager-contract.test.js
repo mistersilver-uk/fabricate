@@ -125,6 +125,7 @@ const BOOTSTRAP_MODULES = [
   'src/bootstrap/gatheringFacade.js',
   'src/bootstrap/gatheringRuntime.js',
   'src/bootstrap/hooks.js',
+  'src/bootstrap/iterativeRollDie.js',
   'src/bootstrap/journalFacade.js',
   'src/bootstrap/journalGatheringTools.js',
   'src/bootstrap/journalOperations.js',
