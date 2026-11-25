@@ -325,7 +325,7 @@ export function registerRecipeStepsCases() {
       await openEditor(calls, { iterative: { counters: COUNTERS, step } }, ITERATIVE);
       await press('[data-recipe-step-mode-option="multi"] input[type="radio"]');
 
-      const [, , payload] = await save(calls);
+      const payload = (await save(calls))[2];
       assert.deepEqual(payload.steps[0].iterative, step);
       assert.deepEqual(payload.iterative, { counters: COUNTERS }, 'no step is left on the recipe');
     });
@@ -343,7 +343,7 @@ export function registerRecipeStepsCases() {
       const [[, prompt]] = confirmCalls(calls);
       assert.equal(prompt.cancelLabel, `${KEY}.Iterative.KeepMultiStep`);
       assert.equal(prompt.confirmLabel, `${KEY}.Iterative.CollapseConfirm`);
-      const [, , payload] = await save(calls);
+      const payload = (await save(calls))[2];
       assert.deepEqual(payload.steps, []);
       assert.deepEqual(payload.iterative, { counters: COUNTERS, step: stepOf('heat') });
     });

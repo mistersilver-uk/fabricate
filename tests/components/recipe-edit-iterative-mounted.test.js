@@ -459,7 +459,9 @@ describe('the editor header, mounted', () => {
     recipeHeaderStatus: () => status,
     watchRuns: (view) => {
       watched.push(['watch', view]);
-      return () => watched.push(['stop', view]);
+      return () => {
+        watched.push(['stop', view]);
+      };
     },
   });
   const chip = () => $('[data-recipe-edit-heading] [data-recipe-edit-status]');
@@ -592,7 +594,9 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
     const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-hinge'), {
       saving: true,
     });
-    const modes = [...$(STEP_CARD).querySelectorAll('[data-iterative-step-actions-mode] input')];
+    const modes = [
+      ...$(STEP_CARD).querySelectorAll(':scope [data-iterative-step-actions-mode] input'),
+    ];
     assert.deepEqual(
       modes.map((radio) => radio.disabled),
       [true, true]

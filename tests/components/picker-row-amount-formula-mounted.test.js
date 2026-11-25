@@ -247,7 +247,7 @@ describe('PickerRowAmount formula mode', () => {
   it('draws no hint for a whitespace-only one', async () => {
     const { target } = await mountFormula(
       { kind: 'counter', quantityFormula: '40' },
-      { formula: formulaOf({ hint: '   ' }) }
+      { formula: formulaOf({ hint: ' '.repeat(3) }) }
     );
     assert.ok(!target.querySelector('.fab-picker-row-amount-hint'));
     assert.equal(describedBy(expression(target)).length, 1, 'the reading alone');
