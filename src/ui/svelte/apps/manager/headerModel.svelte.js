@@ -5,7 +5,7 @@
  * module's own `$derived.by` rather than captured once at construction.
  */
 import { interpolate } from './checks/checksCopy.js';
-import { iterativeHeaderCopy } from './iterative/iterativeHeaderCopy.js';
+import { iterativeHeaderCopy, iterativeHeadingVariant } from './iterative/iterativeHeaderCopy.js';
 import { PREMIUM_ICONS_AD_DISMISSED_KEY, isPremiumIconsAdVisible } from './premiumIconsAdModel.js';
 import { componentListSubtitle } from './scoped/componentScoped.js';
 
@@ -486,8 +486,8 @@ function headingVariantFor({
 }) {
   if (currentView === 'recipe-edit' && recipeDraft) return 'recipe-edit';
   if (currentView === 'component-edit' && componentForEdit) return 'component-edit';
-  if (currentView === 'iterative-action-edit' && iterativeRoute?.actionHeading)
-    return 'iterative-action-edit';
+  const iterativeVariant = iterativeHeadingVariant({ currentView, iterativeRoute });
+  if (iterativeVariant) return iterativeVariant;
   if (isWorldDowntimeRoute && downtimeHeaderArtwork) return 'downtime-artwork';
   if (worldEssenceEntryRecord) return 'world-essence-entry';
   if (currentView === 'essence-edit' && essenceRulesMode) return 'essence-edit-rules';

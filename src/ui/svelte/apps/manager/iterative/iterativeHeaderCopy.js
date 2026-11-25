@@ -72,3 +72,10 @@ export function iterativeHeaderCopy({ currentView, selectedSystem, text, iterati
     actionsLabel: actionsLabel(),
   };
 }
+
+/** The identity heading the page header draws on the Crafting Action editor once it holds an action, else `null`. */
+export function iterativeHeadingVariant({ currentView, iterativeRoute }) {
+  return currentView === 'iterative-action-edit' && iterativeRoute?.actionHeading
+    ? 'iterative-action-edit'
+    : null;
+}
