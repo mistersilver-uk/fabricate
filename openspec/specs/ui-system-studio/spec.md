@@ -1548,7 +1548,7 @@ Global edits fixed bounds, Per recipe edits default bounds a recipe may override
 - An empty name, or one that matches another Counter's name ignoring case and surrounding space, is shown as an error and is not written.
 - A row whose persisted name duplicates another Counter's shows a "Duplicate name" chip, and the first such row opens expanded, because one row is open at a time.
 - A minimum above a maximum is written, shown as an error on the row, and reported as a blocking readiness issue.
-- A new Counter's id is derived once, when it is created, from the label it has then: camelCase, falling back to `counter` (or `action`, `cost`, `effect` for those lists) when the label has no ASCII letter or digit, and given a numeric suffix until unique in its list.
+- A new Counter's id is derived once, when it is created, from the label it has then: camelCase, falling back to `counter` (or `action`, `cost`, `effect` for those lists) when the label has no ASCII letter or digit, prefixed with that word when it begins with a digit, and given a numeric suffix until unique in its list.
   It is never changed, so renaming a Counter rewrites no expression.
 - Reordering is keyboard-accessible, with the new position announced, through the shared list contract, and it is unavailable while a search is active.
 - The screen offers search with a shown-of-total count, an empty state with "New counter", and a separate state for a search that matches nothing.

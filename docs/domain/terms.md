@@ -682,6 +682,8 @@ A start is refused, with nothing spent, while the recipe has a critical iterativ
 Iterative data is kept, inert, in a system of any other mode.
 Its structural readiness runs only for an iterative system, and no iterative issue blocks the system or visibility, so a recipe stays listed and refuses a start.
 A recipe with no Counter Instance or a step with no success rule is in the derived "Needs iterative setup" tier, and no setup marker is persisted.
+For an iterative system the Crafting rail adds Counters and Actions entries after Recipes, and Checks › Crafting shows the **Routed by Check** editor with a callout that one check serves the whole system and each Crafting Action either rolls it or does not.
+The system's iterative issues are grouped under Counters and Actions in the Systems › Validation tab, and none of them blocks the system.
 
 Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`)
 
@@ -696,10 +698,14 @@ A counter with a missing, malformed or repeated id is dropped, the first one win
 A Counter is configuration, and a recipe gives it a start value through a Counter Instance.
 It is distinct from a Tool's usage counter, the per-item `flags.fabricate.toolUsage.timesUsed` that `limitedUses` breakage reads, and from a **Count Check**, which counts dice successes.
 Counter ids are local to their system, and a copy-mode import preserves them even when one equals a component id.
+The manager, not a normalizer, mints a Counter's id once, when the GM creates it: the label it has then in camelCase, `counter` when the label has no ASCII letter or digit, and a numeric suffix until it is unique.
+The id is never changed afterwards, so renaming a Counter rewrites no expression.
+The GM authors Counters on the Counters screen of the Crafting rail, which edits as it goes with no Save, refuses an empty or duplicate name and writes a minimum above a maximum as a blocking issue.
+Deleting one is WARNED, not BLOCKED: the confirmation names each use, no reference is rewritten, each becomes a blocking readiness issue, and its freed id satisfies any later Counter whose derived id equals it.
 
-Canonical mapping: `CraftingSystem.iterative.counters[]`, `COUNTER_LIMITS` and `normalizeIterativeLibrary` (`src/systems/normalize/iterativeLibrary.js`)
+Canonical mapping: `CraftingSystem.iterative.counters[]`, `COUNTER_LIMITS` and `normalizeIterativeLibrary` (`src/systems/normalize/iterativeLibrary.js`), `deriveIterativeId` (`src/ui/svelte/apps/manager/iterative/iterativeLibraryModel.js`), `createIterativeLibrarySection` (`src/ui/svelte/stores/adminIterativeLibrarySection.js`)
 
-Spec reference: openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/destructive-changes-and-migrations/spec.md
 
 ## Counter Instance
 
@@ -725,10 +731,17 @@ An effect changes one counter by `add`, `subtract` or `set` with an `amount`, un
 A step allows every action under `actions.mode: 'all'` and only the named ones under `'only'`, so `{ mode: 'only', actionIds: [] }` allows none.
 A cost or effect that does not parse is kept as authored and raises the blocking `iterativeInvalidEntry`, and is never dropped.
 The term is always written in full, because a bare "action" already names UI and run-control actions.
+The GM-facing screens shorten it to "action" inside the Actions screen and the Crafting Action editor, where the context removes the collision, and still say "Crafting Action" wherever it could be mistaken for a UI action.
+An action's and its cost's and effect's ids are minted once, at creation, by the same rule as a Counter's and are never rewritten.
+In the GM editor a "blocking" issue is a critical readiness issue only: the header pill, the notice and the browser chip count critical issues, a warning shows only as its field mark, and the browser's "Has issues" filter matches any issue.
+A blocking action still saves, and players cannot take it until it is fixed.
+Choosing No check clears every effect's outcome tiers, check success and check-value comparison from the staged edit, and discarding the edit restores them.
+An effect that still reads a check fact on an action with no check raises the warning `iterativeCheckFactWithoutCheck`.
+Deleting an action is WARNED, not BLOCKED, and follows the Counter delete rule: the confirmation names each recipe step that allows it and each `previousAction` rule that names it, never the action itself.
 
-Canonical mapping: `CraftingSystem.iterative.actions[]`, `ACTION_CHECKS`, `EFFECT_OPS`, `normalizeEffectWhen`, `iterativeEntryFault` and `actionEntryFaults` (`src/systems/normalize/iterativeLibrary.js`), `Step.iterative.actions` (`src/models/iterativeStepConfig.js`)
+Canonical mapping: `CraftingSystem.iterative.actions[]`, `ACTION_CHECKS`, `EFFECT_OPS`, `normalizeEffectWhen`, `iterativeEntryFault` and `actionEntryFaults` (`src/systems/normalize/iterativeLibrary.js`), `Step.iterative.actions` (`src/models/iterativeStepConfig.js`), `createIterativeActionDraft` (`src/ui/svelte/apps/manager/iterative/iterativeActionDraft.svelte.js`)
 
-Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-manager-shell/spec.md, openspec/specs/destructive-changes-and-migrations/spec.md
 
 ## Iterative Step State
 
@@ -817,6 +830,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 A Workpiece is a Crafting Run whose system is in `iterative` mode, and no record, field or enum is named for it.
 Player copy uses it, for instance in the unaffordable-cost refusal, and a mismatched check states that the workpiece is unchanged.
+GM copy uses it only in the Counters subtitle and in the delete confirmations, which say workpieces in progress are not affected.
 It is distinct from the alchemy **Workbench**, which holds submitted components rather than a run.
 
 Canonical mapping: no persisted name; the `IterativeCostUnaffordable`, `IterativeCheckMismatch`, `IterativeActionNotFound` and `IterativeNotReady` sentences (`FABRICATE.App.Journal.Reason.*` in `lang/en.json`)

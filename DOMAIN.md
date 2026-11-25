@@ -747,6 +747,7 @@ It persists but is not yet selectable, and its run starts through the versioned 
 #### Counter
 
 A system-defined numeric track in `CraftingSystem.iterative.counters[]` that Crafting Actions change and iterative rules read.
+The manager mints its id once, at creation.
 It is distinct from a Tool's usage counter (`flags.fabricate.toolUsage`), which counts uses toward breakage.
 
 [Notes](docs/domain/terms.md#counter)
