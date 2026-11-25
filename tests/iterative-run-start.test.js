@@ -132,6 +132,23 @@ describe('the start readiness gate', () => {
       Object.assign(world.system.iterative.counters[1], { min: 9, max: 1 });
       return 'iterativeBoundsInverted';
     },
+    'an inverted global counter only a reachable action names': (world) => {
+      world.system.iterative.counters.push({
+        id: 'spark',
+        label: 'Spark',
+        limit: 'global',
+        min: 9,
+        max: 1,
+      });
+      world.system.iterative.actions[0].effects.push({
+        id: 'kindle',
+        when: { combine: 'all' },
+        target: { kind: 'counter', counterId: 'spark' },
+        op: 'add',
+        amount: '1',
+      });
+      return 'iterativeBoundsInverted';
+    },
     'an unsupported library version': (world) => {
       world.system.iterative = { ...forgeLibrary(), version: 99 };
       return 'iterativeVersionUnsupported';

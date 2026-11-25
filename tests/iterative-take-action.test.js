@@ -571,6 +571,39 @@ describe('Fabricate#takeCraftingAction', () => {
     assert.equal(world.messages[0].rolls?.[0]?.total, 15);
   });
 
+  it('posts a default checked terminal attempt roll as its own self roll beside the card', async () => {
+    const { world, take } = await facadeWorld({ steps: 1 });
+    for (const actionId of ['stoke', 'stoke', 'stoke']) await take(actionId);
+    world.messages.length = 0;
+    const reply = await take('hammer');
+    assert.equal(reply.iterative.stepEnd.kind, 'success', JSON.stringify(reply));
+    assert.equal(world.messages.length, 2, 'the card and one roll message');
+    const [card] = world.messages.filter((message) =>
+      String(message.content ?? '').includes('fabricate-craft-chat')
+    );
+    assert.ok(card, 'the craft card posted');
+    assert.equal(card.rolls?.length ?? 0, 0, 'a self roll cannot ride the public card');
+    const rolls = world.messages.filter((message) => message !== card);
+    assert.equal(rolls.length, 1);
+    assert.equal(rolls[0].rollOptions?.rollMode, 'selfroll');
+    assert.equal(rolls[0].rolls[0].total, 15);
+  });
+
+  it('answers a retried attemptId from the log, charging once', async () => {
+    const { world, take } = await facadeWorld();
+    const fuel = () => world.stepState().counters.find((row) => row.counterId === 'fuel').value;
+    const expectedRevision = world.revision();
+    const first = await take('stoke', { attemptId: 'retry-1', expectedRevision });
+    assert.equal(first.success, true, JSON.stringify(first));
+    const spent = fuel();
+    const again = await take('stoke', { attemptId: 'retry-1', expectedRevision });
+    assert.equal(again.replayed, true, JSON.stringify(again));
+    assert.equal(again.attemptId, 'retry-1');
+    assert.equal(again.runRevision, expectedRevision + 1);
+    assert.equal(world.revision(), expectedRevision + 1);
+    assert.equal(fuel(), spent, 'the retry paid nothing');
+  });
+
   it('refuses a supplied attemptId without its revision, and an ill-formed one', async () => {
     const { world, take } = await facadeWorld();
     for (let n = 0; n < 30; n += 1)
