@@ -3,8 +3,12 @@
  * pure: it refuses with nothing spent, or returns the cost amounts the attempt will pay, so the
  * executor can run it before it prepares a check and the resolver can run it again.
  */
-import { producedWhenLineFault, STEP_ACTION_MODES } from '../../models/iterativeStepConfig.js';
-import { arrayOrEmpty } from '../../utils/scalars.js';
+import {
+  producedWhenLineFault,
+  STEP_ACTION_MODES,
+  stepIdListFault,
+} from '../../models/iterativeStepConfig.js';
+import { arrayOrEmpty, isPlainObject } from '../../utils/scalars.js';
 import {
   ACTION_CHECKS,
   actionEntryFaults,
@@ -73,7 +77,12 @@ function enumFault(action, step) {
   const enumsHold =
     ACTION_CHECKS.includes(action?.check) && RULE_COMBINES.includes(action?.availability?.combine);
   if (!enumsHold) return { entryId: action?.id ?? null, kind: 'action' };
-  return STEP_ACTION_MODES.includes(step.actions?.mode) ? null : { entryId: null, kind: 'step' };
+  const { actions } = step;
+  const stepHolds =
+    isPlainObject(actions) &&
+    STEP_ACTION_MODES.includes(actions.mode) &&
+    ![actions.actionIds, step.hiddenCounterIds, step.lockedCounterIds].some(stepIdListFault);
+  return stepHolds ? null : { entryId: null, kind: 'step' };
 }
 
 /** An `availability.rules`, `costs` or `effects` kept as authored because it is not a list. */
@@ -82,11 +91,15 @@ function listFault(action) {
   return lists.every(Array.isArray) ? null : { entryId: action?.id ?? null, kind: 'action' };
 }
 
-/** The first counter whose `limit` is outside its enum. */
-function limitFault(library) {
-  const bad = arrayOrEmpty(library?.counters).find(
-    (entry) => !COUNTER_LIMITS.includes(entry?.limit)
-  );
+/** The library's counters that one of its Counter Instances uses; the others never reach a run. */
+const usedCounters = (library) => {
+  const used = new Set(arrayOrEmpty(library?.instances).map((entry) => entry?.counterId));
+  return arrayOrEmpty(library?.counters).filter((entry) => used.has(entry?.id));
+};
+
+/** The first used counter whose `limit` is outside its enum. */
+export function limitFault(library) {
+  const bad = usedCounters(library).find((entry) => !COUNTER_LIMITS.includes(entry?.limit));
   return bad ? { entryId: bad.id ?? null, kind: 'counter' } : null;
 }
 
@@ -113,13 +126,13 @@ function ruleFault(action, step, library) {
   return null;
 }
 
-/** The first Counter Instance, or counter bound, whose number is `null`: a value that did not parse. */
+/** The first Counter Instance, or used counter bound, whose number is `null`: a value that did not parse. */
 export function nullNumberFault(library) {
   const nullInstance = arrayOrEmpty(library?.instances).find((entry) =>
     ['start', 'startFormula', 'min', 'max', 'target'].some((key) => entry?.[key] === null)
   );
   if (nullInstance) return { entryId: nullInstance.counterId, kind: 'instance' };
-  const nullCounter = arrayOrEmpty(library?.counters).find(
+  const nullCounter = usedCounters(library).find(
     (entry) => entry?.min === null || entry?.max === null
   );
   return nullCounter ? { entryId: nullCounter.id, kind: 'counter' } : null;
@@ -131,9 +144,10 @@ function stateFault(state, library) {
   const missing = arrayOrEmpty(library?.instances).find(({ counterId }) =>
     rows.every((row) => row?.counterId !== counterId)
   );
-  const bad = rows.find((row) => !Number.isFinite(row?.value));
-  if (bad || missing || !numbers.every(Number.isFinite)) {
-    return { entryId: bad?.counterId ?? missing?.counterId ?? null, kind: 'state' };
+  const unreadable = (row) => !Number.isFinite(row?.value);
+  if (rows.some(unreadable) || missing || !numbers.every(Number.isFinite)) {
+    const entryId = rows.find(unreadable)?.counterId ?? missing?.counterId ?? null;
+    return { entryId, kind: 'state' };
   }
   return null;
 }

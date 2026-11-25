@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
-import { deepFreeze, instance, library } from './helpers/iterativeAttemptFixtures.js';
+import { counter, deepFreeze, instance, library } from './helpers/iterativeAttemptFixtures.js';
 import { scriptedRollDie } from './helpers/scriptedRollDie.js';
 
 const reads = [];
@@ -22,9 +22,13 @@ const { resolveStartedWith } = await import('../src/systems/iterative/resolveAtt
 after(() => assert.deepEqual(reads, [], 'no start-value module reads a Foundry global'));
 
 /** Resolves on a deep-frozen library; `instances` replaces the default three. */
-function start({ instances, version, script = [], fill, rollData = {} } = {}) {
+function start({ instances, counters, version, script = [], fill, rollData = {} } = {}) {
   const held = deepFreeze(
-    library({ ...(instances && { instances }), ...(version && { version }) })
+    library({
+      ...(instances && { instances }),
+      ...(counters && { counters }),
+      ...(version && { version }),
+    })
   );
   const before = structuredClone(held);
   const die = scriptedRollDie(script, { fill });
@@ -133,6 +137,28 @@ describe('resolveStartedWith', () => {
         assert.equal(result.reason, 'invalid-entry', JSON.stringify(extra));
         assert.equal(result.detail.entryId, 'heat');
       }
+    });
+
+    it('a start that is not a finite number as invalid-entry on the instance', () => {
+      for (const bad of [NaN, Infinity, 'two']) {
+        const { result } = start({ instances: [instance('heat', { start: bad })] });
+        assert.equal(result.reason, 'invalid-entry', String(bad));
+        assert.deepEqual(result.detail, { entryId: 'heat', kind: 'instance' });
+      }
+    });
+
+    it('a limit outside its enum on a counter an instance uses, and only on that one', () => {
+      const spare = (extra) => [counter('heat', { limit: 'none' }), counter('spare', extra)];
+      const used = start({ counters: [counter('heat', { limit: 'sideways' })] }).result;
+      assert.equal(used.reason, 'invalid-entry');
+      assert.deepEqual(used.detail, { entryId: 'heat', kind: 'counter' });
+      const unused = start({
+        instances: [instance('heat')],
+        counters: spare({ limit: 'sideways' }),
+      });
+      assert.equal(unused.result.ok, true);
+      const nullBound = spare({ limit: 'global', min: null });
+      assert.equal(start({ instances: [instance('heat')], counters: nullBound }).result.ok, true);
     });
 
     it('an @counter, @sessionCount or @check read as an invalid expression', () => {

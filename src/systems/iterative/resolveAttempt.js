@@ -16,11 +16,12 @@ import {
   stateFacts,
 } from './attemptLibrary.js';
 import { evaluateCounterRule } from './counterRule.js';
-import { analyzeIterativeExpression, evaluateIterativeExpression } from './expression.js';
+import { analyzeIterativeExpression, evaluateIterativeExpression, sum } from './expression.js';
 import {
   applyActionAdjustment,
   expressionRefusal,
   ITERATIVE_ATTEMPT_REFUSALS,
+  limitFault,
   nullNumberFault,
   preflightAttempt,
   refuse,
@@ -49,8 +50,6 @@ export const ATTEMPT_PHASES = Object.freeze([
 ]);
 
 const REASON = ITERATIVE_ATTEMPT_REFUSALS;
-
-const sum = (values) => values.reduce((total, value) => total + value, 0);
 
 /** Per-counter deltas in first-touch order; a counter whose deltas cancel is left out. */
 function createLedger() {
@@ -302,7 +301,7 @@ export function resolveStartedWith({ library, rollData = {}, rollDie }) {
   if (Number(library?.version) > ITERATIVE_LIBRARY_VERSION) {
     return refuse(REASON.versionUnsupported, { libraryVersion: library.version });
   }
-  const invalid = nullNumberFault(library);
+  const invalid = nullNumberFault(library) ?? limitFault(library);
   if (invalid) return refuse(REASON.invalidEntry, invalid);
   const roots = expressionRoots(library, {
     counters: new Map(),

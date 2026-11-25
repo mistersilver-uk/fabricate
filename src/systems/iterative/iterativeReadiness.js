@@ -311,14 +311,17 @@ function recipeAllowsAction(recipe) {
 
 /**
  * The critical issues that refuse a new start of `recipe`: its own recipe-scoped ones, those on an
- * action one of its steps allows, and `iterativeVersionUnsupported`.
+ * action one of its steps allows, those on a counter its Counter Instances use, and
+ * `iterativeVersionUnsupported`.
  */
 export function iterativeStartBlockers(issues, recipe) {
   const allows = recipeAllowsAction(recipe);
+  const usesCounter = new Set(arrayOrEmpty(recipe?.iterative?.counters).map((e) => e?.counterId));
   return arrayOrEmpty(issues).filter((issue) => {
     if (issue?.severity !== 'critical') return false;
     if (issue.code === 'iterativeVersionUnsupported') return true;
     if (issue.entityKind === 'recipe') return issue.entityId === recipe?.id;
+    if (issue.entityKind === 'counter') return usesCounter.has(issue.entityId);
     return issue.entityKind === 'action' && allows(issue.entityId);
   });
 }

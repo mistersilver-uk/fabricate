@@ -4,7 +4,7 @@
  * a pure function over that data and never mutates it.
  */
 import { iterativeStepsOf } from '../../models/iterativeStepConfig.js';
-import { arrayOrEmpty } from '../../utils/scalars.js';
+import { arrayOrEmpty, isPlainObject } from '../../utils/scalars.js';
 import { ITERATIVE_LIBRARY_VERSION } from '../normalize/iterativeLibrary.js';
 
 const finiteOrNull = (value) =>
@@ -84,7 +84,11 @@ export function expressionRoots(library, { counters, sessionCount, checkValue })
 /** The facts a rule reads as the state stood: counter values, session count and the newest log action. */
 export function stateFacts(state) {
   return {
-    counters: new Map(arrayOrEmpty(state?.counters).map((row) => [row.counterId, row.value])),
+    counters: new Map(
+      arrayOrEmpty(state?.counters)
+        .filter(isPlainObject)
+        .map((row) => [row.counterId, row.value])
+    ),
     sessionCount: state?.sessionCount,
     previousActionId: arrayOrEmpty(state?.log).at(-1)?.actionId ?? null,
   };

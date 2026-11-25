@@ -136,6 +136,18 @@ const REFUSALS = [
   ['invalid-entry', { action: { availability: { combine: 'all', rules: 'always' } } }],
   ['invalid-entry', { state: { values: { heat: null } } }],
   ['invalid-entry', { state: { attemptCount: 'one' } }],
+  [
+    'invalid-entry',
+    { tweak: (i) => (i.state.counters = i.state.counters.filter((c) => c.counterId !== 'heat')) },
+  ],
+  ['invalid-entry', { tweak: (i) => (i.state.counters = [...i.state.counters, null]) }],
+  [
+    'invalid-entry',
+    { library: { step: step({ actions: { mode: 'only', actionIds: 'workshop' } }) } },
+  ],
+  ['invalid-entry', { library: { step: step({ hiddenCounterIds: 'heat' }) } }],
+  ['invalid-entry', { library: { step: step({ lockedCounterIds: 'heat' }) } }],
+  ['invalid-entry', { library: { step: step({ actions: 'all' }) } }],
   ['action-not-allowed', { library: { step: step({ actions: { mode: 'only', actionIds: [] } }) } }],
   ['unknown-counter', { action: { costs: [cost('c', 'ghost', '1')] } }],
   ['unknown-counter', { action: effectsOn(ghost) }],
@@ -188,6 +200,22 @@ describe('refusals', () => {
       assert.deepEqual(Object.keys(result).sort(byCodePoint), ['detail', 'ok', 'reason']);
     });
   }
+
+  it('names the state row a state is missing', () => {
+    const tweak = (i) =>
+      (i.state.counters = i.state.counters.filter((c) => c.counterId !== 'heat'));
+    assert.deepEqual(go({ tweak }).result.detail, { entryId: 'heat', kind: 'state' });
+  });
+
+  it('refuses a counter limit outside its enum only for a counter an instance uses', () => {
+    const counters = (limit) => [...library().counters, { id: 'spare', label: 'Spare', limit }];
+    assert.equal(go({ library: { counters: counters('sideways') } }).result.ok, true);
+    const used = { ...library().counters[1], limit: 'sideways' };
+    const held = [library().counters[0], used, library().counters[2]];
+    const { result } = go({ library: { counters: held } });
+    assert.equal(result.reason, 'invalid-entry');
+    assert.deepEqual(result.detail, { entryId: 'ember', kind: 'counter' });
+  });
 
   it('names the entry and the expression reason of an invalid expression', () => {
     const detailOf = (options) => go(options).result.detail;
