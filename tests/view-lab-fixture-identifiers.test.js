@@ -114,11 +114,13 @@ function ironworksRecipeIds() {
   seedIterativeRecipes(seeded, buildLabActors(seeded), 'authoring');
   return seeded.recipes.map((entry) => entry.id);
 }
+const IRONWORKS_RECIPE_IDS = ironworksRecipeIds();
 
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
-  'data-recipe-id': new Set(content.recipes.map((entry) => entry.id)),
+  // The library rows of a frame that seeds the Ironworks recipes too (issue 3010).
+  'data-recipe-id': new Set([...content.recipes.map((entry) => entry.id), ...IRONWORKS_RECIPE_IDS]),
   // The inventory inspector's cross-reference row hooks (issue 2321).
   'data-inventory-required-for': new Set(content.recipes.map((entry) => entry.id)),
   'data-inventory-contributor': new Set(content.components.map((entry) => entry.id)),
@@ -132,7 +134,7 @@ const IDENTITY_SOURCES = {
   // The ten below were the gap this file's own header describes and did not actually close.
   'data-recipe-edit': new Set([
     ...content.recipes.map((entry) => entry.id),
-    ...ironworksRecipeIds(),
+    ...IRONWORKS_RECIPE_IDS,
   ]),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
   // The recipe browser's bulk selection control (issue 1010) — the exact mirror of

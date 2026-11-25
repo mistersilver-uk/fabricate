@@ -24,6 +24,7 @@ import {
   activeChecksTab,
   isChecksRoute,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
+import { iterativeHeaderCopy } from '../src/ui/svelte/apps/manager/iterative/iterativeHeaderCopy.js';
 import {
   recipeEditSubtitle,
   resolutionModeLabel,
@@ -669,6 +670,39 @@ describe('headerModel', () => {
     assert.equal(lede({ rollsCheck: true, effectCount: 1 }), key('ActionSubtitleRollsOne'));
     assert.equal(lede({ rollsCheck: false, effectCount: 0 }), key('ActionSubtitleNoCheck'));
     assert.equal(lede({ rollsCheck: false, effectCount: 1 }), key('ActionSubtitleNoCheckOne'));
+  });
+
+  it('heads Recipes in an iterative system with the mode’s lede, and every other route as before', () => {
+    const iterativeSystem = { name: SYSTEM_NAME, resolutionMode: 'iterative' };
+    const { model } = openModel('recipes', { selectedSystem: iterativeSystem });
+    assert.deepEqual(answersOf(model), {
+      ...ROUTES.recipes,
+      subtitle: 'FABRICATE.Admin.Manager.Iterative.RecipesSubtitle',
+      headingVariant: 'default',
+    });
+    for (const view of Object.keys(ROUTES).filter((route) => route !== 'recipes')) {
+      assert.deepEqual(
+        answersOf(openModel(view, { selectedSystem: iterativeSystem }).model),
+        answersOf(openModel(view).model),
+        `${view} says the same in an iterative system`
+      );
+    }
+  });
+
+  it('words the iterative Recipes lede with the system’s name', () => {
+    const copy = (resolutionMode) =>
+      iterativeHeaderCopy({
+        currentView: 'recipes',
+        selectedSystem: { name: 'Ironworks', resolutionMode },
+        text: (key, fallback) => fallback,
+      });
+    assert.deepEqual(copy('iterative'), {
+      title: 'Recipes',
+      subtitle:
+        'Every recipe in Ironworks resolves as Iterative: each step is worked over sessions.',
+      actionsLabel: 'Recipe actions',
+    });
+    assert.equal(copy('routedByCheck'), null, 'another mode keeps the shipped copy');
   });
 
   it('opens the action editor heading when its draft appears, and closes it when it goes', () => {

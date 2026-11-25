@@ -3,7 +3,20 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Recipe } from '../../src/models/Recipe.js';
-import { buildRecipeList } from '../../src/ui/svelte/stores/adminRecipeRowProjection.js';
+import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
+import {
+  iterativeRecipeIssues,
+  iterativeRecipeStatus,
+} from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
+import {
+  DERIVED_RECIPE_PROJECTION_FIELDS,
+  buildRecipeList,
+  withoutDerivedRecipeProjectionFields,
+} from '../../src/ui/svelte/stores/adminRecipeRowProjection.js';
+import {
+  createIterativeStatusContext,
+  defineIterativeStatus,
+} from '../../src/ui/svelte/stores/recipeIterativeStatus.js';
 import {
   buildItemCards,
   hydrateItemCards,
@@ -868,6 +881,98 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     assert.equal(draft.structureKey, 'simple');
     assert.equal(draft.visibilitySummary, 'Restricted (2)');
     assert.equal(Array.isArray(draft.requirementsPreview), true);
+  });
+
+  // Issue 3010: the library's iterative status, one readiness evaluation per cohort.
+  describe('an iterative system’s rows carry their iterative status', () => {
+    const LIBRARY = Object.freeze({
+      version: 1,
+      counters: [{ id: 'heat', label: 'Heat', limit: 'none' }],
+      actions: [],
+    });
+    const heatRule = { source: 'counter', counterId: 'heat', op: '>=', value: 3 };
+    const configOf = (counterId) => ({
+      counters: [{ counterId, start: 0 }],
+      step: { actions: { mode: 'all', actionIds: [] }, success: [heatRule] },
+    });
+    // Ready, blocking (an unknown counter), then setup (no Counter Instances), in turn.
+    const CONFIGS = [configOf('heat'), configOf('rust'), null];
+    const statusCohort = (size) =>
+      Array.from({ length: size }, (_, index) => {
+        const iterative = CONFIGS[index % CONFIGS.length];
+        return makeRecipe({ id: `r-${index}`, ...(iterative && { iterative }) });
+      });
+    const iterativeSystem = () => makeSystem({ resolutionMode: 'iterative', iterative: LIBRARY });
+    const withStatus = (fields) =>
+      [...fields, 'iterativeStatus'].sort((a, b) => a.localeCompare(b));
+
+    it('adds `iterativeStatus` to every row of an iterative system and to no other', () => {
+      const { calls, manager } = makeCountingRecipeManager(statusCohort(3));
+      const rows = buildRecipeList(null, manager, iterativeSystem(), '').recipes;
+
+      assert.deepEqual(sortedKeys(rows[0]), withStatus([...RECIPE_ROW_FIELDS, 'iterative']));
+      assert.deepEqual(sortedKeys(rows[2]), withStatus(RECIPE_ROW_FIELDS));
+      const plain = buildRecipeList(null, manager, makeSystem(), '').recipes;
+      for (const row of plain) {
+        assert.equal(Object.keys(row).includes('iterativeStatus'), false, `${row.id} has no key`);
+      }
+      assert.equal(calls.toJSON, 0, 'listing the keys clones no row body');
+    });
+
+    it('answers each row’s status as the editor reads it, cloning no row body', () => {
+      const { calls, manager, recipes } = makeCountingRecipeManager(statusCohort(6));
+      const system = iterativeSystem();
+      const rows = buildRecipeList(null, manager, system, '').recipes;
+      const issues = evaluateIterativeReadiness(system, recipes);
+      const expected = recipes.map((recipe) =>
+        iterativeRecipeStatus(iterativeRecipeIssues(issues, recipe, system))
+      );
+
+      assert.deepEqual(
+        rows.map((row) => row.iterativeStatus),
+        expected
+      );
+      assert.deepEqual(
+        expected.slice(0, 3).map((status) => status.id),
+        ['ready', 'blocking', 'setup'],
+        'the cohort holds every status, so the agreement is not vacuous'
+      );
+      assert.equal(calls.toJSON, 0, 'the status reads the models, never a clone of one');
+    });
+
+    it('evaluates the cohort’s readiness once, on the first status a row reads', () => {
+      const roster = statusCohort(30);
+      let evaluations = 0;
+      const evaluate = (system, recipes) => {
+        evaluations += 1;
+        return evaluateIterativeReadiness(system, recipes);
+      };
+      const context = createIterativeStatusContext(iterativeSystem(), roster, { evaluate });
+      const rows = roster.map((recipe) => {
+        const row = { id: recipe.id };
+        defineIterativeStatus(row, recipe, context);
+        return row;
+      });
+
+      assert.equal(evaluations, 0, 'defining the field evaluates nothing');
+      for (const row of rows) void row.iterativeStatus;
+      for (const row of rows) void row.iterativeStatus;
+      assert.equal(evaluations, 1, 'thirty rows, read twice, share one evaluation');
+      assert.equal(createIterativeStatusContext(makeSystem(), roster, { evaluate }), null);
+      const bare = { id: 'r-0' };
+      defineIterativeStatus(bare, roster[0], null);
+      assert.deepEqual(Object.keys(bare), ['id'], 'no context, no key');
+    });
+
+    it('is a derived field, so a saved draft never posts it', () => {
+      const { manager } = makeCountingRecipeManager(statusCohort(1));
+      const [row] = buildRecipeList(null, manager, iterativeSystem(), '').recipes;
+      const draft = JSON.parse(JSON.stringify(row));
+
+      assert.deepEqual(draft.iterativeStatus, { id: 'ready' }, 'the draft does carry it');
+      assert.ok(DERIVED_RECIPE_PROJECTION_FIELDS.includes('iterativeStatus'));
+      assert.equal('iterativeStatus' in withoutDerivedRecipeProjectionFields(draft), false);
+    });
   });
 });
 

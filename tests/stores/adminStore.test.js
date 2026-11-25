@@ -2927,6 +2927,34 @@ describe('createAdminStore', () => {
       }
     });
 
+    // Issue 3010: an iterative system's row derives its library status, which is no recipe state.
+    it('updateRecipe strips the derived iterative status from a saved draft', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.resolutionMode = 'iterative';
+      sys.iterative = { version: 1, counters: [], actions: [] };
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Non-vacuity: the draft the editor seeds from the row does carry the status.
+      const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      const draft = JSON.parse(JSON.stringify(row));
+      assert.equal(draft.iterativeStatus?.id, 'setup', 'a recipe with no counters needs setup');
+
+      assert.equal(await store.updateRecipe('r1', { ...draft, name: 'Renamed' }), true);
+      assert.equal(updateArgs.updates.name, 'Renamed');
+      assert.equal('iterativeStatus' in updateArgs.updates, false, 'the status is never posted');
+    });
+
     it('updateRecipe strips the derived scalar in either membership order', async () => {
       // The leaked value tracked definition order, so a single-order assertion cannot distinguish
       // "stripped" from "happened to derive nothing".
