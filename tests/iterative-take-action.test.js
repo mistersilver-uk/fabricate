@@ -578,7 +578,7 @@ describe('Fabricate#takeCraftingAction', () => {
     const reply = await take('hammer');
     assert.equal(reply.iterative.stepEnd.kind, 'success', JSON.stringify(reply));
     assert.equal(world.messages.length, 2, 'the card and one roll message');
-    const [card] = world.messages.filter((message) =>
+    const card = world.messages.find((message) =>
       String(message.content ?? '').includes('fabricate-craft-chat')
     );
     assert.ok(card, 'the craft card posted');
