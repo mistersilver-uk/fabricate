@@ -6,10 +6,13 @@
 import { createJournalCommandsForFabricate } from '../../src/bootstrap/journalOperations.js';
 import { Recipe } from '../../src/models/Recipe.js';
 import { Tool } from '../../src/models/Tool.js';
+import { ActorPropertyCoinSpender } from '../../src/systems/CoinSpenders.js';
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 
+import { rewardableCrafter } from './companionRewardWorld.js';
+import { makeWorldCurrencyConfig } from './currency-spend-fixtures.js';
 import { replicatedAuthorityFixture } from './replicatedJournalAuthority.js';
 import { FakeActor } from './run-manager-fakes.js';
 import { scriptedRollDie } from './scriptedRollDie.js';
@@ -116,8 +119,14 @@ const oreSet = (id) => ({
   ],
 });
 
-/** A two-step forge recipe, or a one-step one, each step consuming one ore. */
-export function forgeRecipe({ steps = 2, timeRequirement = null, toolIds = [], fuel = 6 } = {}) {
+/** A two-step forge recipe, or a one-step one, each step consuming one ore; `rewards` join Plain. */
+export function forgeRecipe({
+  steps = 2,
+  timeRequirement = null,
+  toolIds = [],
+  fuel = 6,
+  rewards = [],
+} = {}) {
   const groups = (prefix) => [
     {
       id: `${prefix}-fine`,
@@ -129,7 +138,7 @@ export function forgeRecipe({ steps = 2, timeRequirement = null, toolIds = [], f
       id: `${prefix}-plain`,
       name: 'Plain',
       producedWhen: [{ end: 'success', rules: [] }],
-      results: [{ id: `${prefix}-plain-r`, componentId: 'blade', quantity: 1 }],
+      results: [{ id: `${prefix}-plain-r`, componentId: 'blade', quantity: 1 }, ...rewards],
     },
     {
       id: `${prefix}-slag`,
@@ -252,14 +261,14 @@ export function forgeActor({ ore = 3, tools = [] } = {}) {
   return actor;
 }
 
-function forgeSystem({ library, routed, toolBreakage, timeEnabled, tools }) {
+function forgeSystem({ library, routed, toolBreakage, timeEnabled, tools, currency }) {
   const registered = (id) => ({ id, name: id, registeredItemUuid: `Item.source-${id}` });
   return {
     id: 'forge',
     name: 'Forge',
     resolutionMode: 'iterative',
     features: { chatOutput: true, multiStepRecipes: true, craftingChecks: true },
-    requirements: { time: { enabled: timeEnabled } },
+    requirements: { time: { enabled: timeEnabled }, currency: { enabled: currency } },
     craftingCheck: { routed: structuredClone(routed), consumption: {} },
     components: [
       registered('ore'),
@@ -323,6 +332,7 @@ function installGlobals(world) {
       getResolutionModeService: () => world.modes,
       getRecipeVisibilityService: () => world.visibility,
       getCraftingRunManager: () => world.manager,
+      getCurrencyConfigStore: () => world.currencyConfigStore,
     },
   };
   const utils = {
@@ -396,7 +406,8 @@ function installRoll(world) {
 
 /**
  * Builds the world. `rolls` scripts the edge die every start formula and effect draws; a checked
- * action's routed check totals `world.nextTotal`.
+ * action's routed check totals `world.nextTotal`. `currency` enables currency rewards, credited
+ * through the real `actorProperty` writer to the actor's `system.currency` (1 gp to start).
  */
 export function iterativeCommandWorld({
   steps = 2,
@@ -410,9 +421,10 @@ export function iterativeCommandWorld({
   toolBreakage = null,
   fuel = 6,
   rolls = [],
+  currency = false,
 } = {}) {
   const toolIds = tools.map((componentId) => `tool-${componentId}`);
-  const system = forgeSystem({ library, routed, toolBreakage, timeEnabled, tools });
+  const system = forgeSystem({ library, routed, toolBreakage, timeEnabled, tools, currency });
   const world = {
     system,
     systems: { getSystem: (id) => (id === system.id ? system : null) },
@@ -422,7 +434,9 @@ export function iterativeCommandWorld({
     nextTotal: 15,
     die: scriptedRollDie(rolls, { fill: 1 }),
     recipeUses: 0,
+    currencyConfigStore: { get: () => makeWorldCurrencyConfig() },
   };
+  if (currency) rewardableCrafter(world.actor);
   world.modes = new ResolutionModeService(world.systems);
   world.visibility = {
     guardCraftStart: () => ({ craftable: true }),
@@ -443,10 +457,11 @@ export function iterativeCommandWorld({
     world.modes,
     null,
     null,
-    null,
+    new ActorPropertyCoinSpender(),
     {
       getCraftingSystem: (id) => world.systems.getSystem(id),
       resolveItemUuid: (uuid) => globalThis.fromUuid(uuid),
+      currencyConfigStore: world.currencyConfigStore,
       rollDie: world.die.rollDie,
     }
   );

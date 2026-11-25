@@ -70,6 +70,27 @@ describe('a terminal success', () => {
     assert.equal(calls[0].craftingActor, world.actor);
   });
 
+  it('credits the selected group currency reward once, and a replay credits nothing', async () => {
+    const fee = { id: 'fee', kind: 'currency', unit: 'gp', quantity: 2, label: 'Fee' };
+    const recipe = forgeRecipe({ steps: 1, rewards: [fee] });
+    const world = await startedWorld({ recipe, currency: true });
+    await takeAll(world, ['stoke', 'stoke', 'stoke']);
+    const ended = await world.take('stoke', { attemptId: 'paid' });
+    assert.equal(ended.iterative.stepEnd.resultGroupId, 's0-plain', JSON.stringify(ended));
+    const run = historyRun(world);
+    const rewards = run.executionJournal.effects.filter((effect) => effect.kind === 'awardRewards');
+    assert.equal(rewards.length, 1, 'one award-rewards effect');
+    assert.deepEqual(rewards[0].planned, ['fee'], 'planned over the selected group once');
+    assert.equal(rewards[0].receipt.currencyCredits.length, 1, 'one credit receipt');
+    assert.equal(world.actor._source.system.currency.gp, 3, 'credited 2 gp once');
+    const replay = await world.take('stoke', {
+      attemptId: 'paid',
+      expectedRevision: ended.runRevision,
+    });
+    assert.equal(replay.replayed, true);
+    assert.equal(world.actor._source.system.currency.gp, 3, 'the replay credited nothing');
+  });
+
   it('routes otherwise identical successes to different groups through producedWhen', async () => {
     const plain = await startedWorld({ steps: 1 });
     await takeAll(plain, ['stoke', 'stoke', 'stoke', 'stoke']);
