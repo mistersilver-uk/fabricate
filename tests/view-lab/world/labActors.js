@@ -453,6 +453,25 @@ export function seedLearnableBook(content, actors) {
 }
 
 /**
+ * Hands every actor one more stack, for a world that adds a component after the cast is built
+ * (issue 3011). Call it before {@link buildDocumentIndex}, which indexes the stacks.
+ *
+ * @param {object} content Output of `buildLabContent()`, holding the component.
+ * @param {object[]} actors Output of {@link buildLabActors}.
+ * @param {string} componentId The component the stack is an instance of.
+ * @param {number} quantity Stack size.
+ */
+export function stockComponent(content, actors, componentId, quantity) {
+  const component = content.components.find((entry) => entry.id === componentId);
+  for (const actor of actors) {
+    const item = ownedItem(componentId, component, quantity, actor.items.length);
+    item.parent = actor;
+    installDeleteSemantics(item, actor);
+    actor.items.push(item);
+  }
+}
+
+/**
  * Build the `fromUuid` index. This is not optional decoration.
  *
  * @param {object} content Output of `buildLabContent()`.

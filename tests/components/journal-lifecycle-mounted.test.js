@@ -34,6 +34,8 @@ import {
   seedJournalNoCheckFixture,
 } from '../view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
+import { seedIterativeState } from '../view-lab/world/labIterative.js';
+import { isIterativeState } from '../view-lab/world/labIterativeRuns.js';
 import {
   stockJournalPrototype,
   JOURNAL_PROTOTYPE_BINDINGS,
@@ -2170,13 +2172,32 @@ describe('Journal versioned lifecycle (mounted)', () => {
       // The history-data states need the seeded world for the same reason the prototype states
       // do: their records name a real mining task and real recipes, and a substitute would
       // resolve a different account's evidence under this state's name. So does the needs-tools
-      // state, which names the seeded world's `hb-task-icecap`.
+      // state, which names the seeded world's `hb-task-icecap`. The workbench's states read the
+      // `workpiece` Ironworks and throw in any other world.
+      const iterativeState = isIterativeState(state);
       const fixtureContent =
         Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) ||
         LAB_HISTORY_DATA_STATES.includes(state) ||
-        LAB_SEEDED_WORLD_STATES.includes(state)
+        LAB_SEEDED_WORLD_STATES.includes(state) ||
+        iterativeState
           ? buildLabContent({ journalCaseState: state })
           : null;
+      if (iterativeState) {
+        assert.throws(
+          () =>
+            buildLabRunStates({
+              actor: ACTOR,
+              userId: 'user-1',
+              recipes: RECIPES,
+              environments: ENVIRONMENTS,
+              tasks: TASKS,
+              journalCaseState: state,
+            }),
+          /iterative: 'workpiece'/,
+          `${state} needs the workpiece world`
+        );
+        seedIterativeState(fixtureContent, 'workpiece');
+      }
       const containers = buildLabRunStates({
         actor: ACTOR,
         userId: 'user-1',
