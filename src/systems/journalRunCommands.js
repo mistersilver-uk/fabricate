@@ -588,7 +588,7 @@ export function createJournalRunCommandService({
   }
 
   async function executeOperation(request, context, helpers, spent) {
-    const { actor, operation, run } = context;
+    const { actor, operation } = context;
     const binding = {
       operation:
         request.action === 'releaseCheck' ? releasedAction(request.payload) : request.action,
