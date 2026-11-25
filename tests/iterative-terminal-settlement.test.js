@@ -231,7 +231,7 @@ describe('Tools at an iterative step end', () => {
     world.nextTotal = 19;
     await world.take('hammer');
     assert.deepEqual(world.stepState().toolBreakOwed, { attempt: 2 });
-    world.nextTotal = 12;
+    world.nextTotal = 19;
     await world.take('hammer');
     assert.deepEqual(
       world.stepState().toolBreakOwed,
@@ -264,12 +264,9 @@ describe('Tools at an iterative step end', () => {
 });
 
 describe('cancelling an iterative run', () => {
-  it('restores only the current step inputs and trims and labels the step state', async () => {
-    const world = await startedWorld();
-    world.system.features.refundOnPlayerCancel = true;
-    await takeAll(world, ['stoke', 'rest']);
-    const ores = world.actor.items.filter((item) => item.componentId === 'ore').length;
-    const cancelled = await world.service.executeJournalRunCommand(
+  const oreCount = (world) => world.actor.items.filter((item) => item.name === 'ore').length;
+  const cancel = (world) =>
+    world.service.executeJournalRunCommand(
       {
         actorUuid: world.actor.uuid,
         runType: 'crafting',
@@ -280,15 +277,61 @@ describe('cancelling an iterative run', () => {
       },
       { interactive: false }
     );
+
+  it('restores the current step inputs and trims and labels the step state', async () => {
+    const world = iterativeCommandWorld();
+    world.system.features.refundOnPlayerCancel = true;
+    const before = oreCount(world);
+    assert.equal((await world.start()).success, true);
+    assert.equal(oreCount(world), before - 1, 'the start spent one ore');
+    await takeAll(world, ['stoke', 'rest']);
+    const cancelled = await cancel(world);
     assert.equal(cancelled.success, true, JSON.stringify(cancelled));
+    assert.equal(cancelled.refunded, true);
+    assert.equal(cancelled.restoredCount, 1);
+    assert.equal(oreCount(world), before);
     const run = historyRun(world);
     assert.equal(run.status, 'cancelled');
-    assert.ok(world.actor.created.length + world.actor.items.length >= ores, 'nothing lost');
     assert.equal(run.termsSnapshot, undefined);
     assert.equal(run.steps[0].iterative.log.length, 2);
     assert.deepEqual(
       run.steps[0].iterative.labels.actions.map((entry) => entry.id),
       ['stoke', 'hammer', 'rest', 'blast', 'heave']
     );
+  });
+
+  it('restores nothing when refundOnPlayerCancel is off', async () => {
+    const world = iterativeCommandWorld();
+    world.system.features.refundOnPlayerCancel = false;
+    const before = oreCount(world);
+    await world.start();
+    await takeAll(world, ['stoke', 'rest']);
+    const cancelled = await cancel(world);
+    assert.equal(cancelled.success, true, JSON.stringify(cancelled));
+    assert.equal(cancelled.refunded, false);
+    assert.equal(cancelled.restoredCount, 0);
+    assert.equal(oreCount(world), before - 1);
+    assert.equal(historyRun(world).status, 'cancelled');
+  });
+
+  it('restores only the current step, and a completed step award stands', async () => {
+    const world = iterativeCommandWorld();
+    world.system.features.refundOnPlayerCancel = true;
+    const before = oreCount(world);
+    await world.start();
+    const replies = await takeAll(world, ['stoke', 'stoke', 'stoke', 'stoke']);
+    assert.equal(replies.at(-1).iterative.stepEnd.kind, 'success');
+    assert.equal((await world.begin()).success, true);
+    assert.equal(oreCount(world), before - 2, 'each step spent one ore');
+    const cancelled = await cancel(world);
+    assert.equal(cancelled.success, true, JSON.stringify(cancelled));
+    assert.equal(cancelled.restoredCount, 1);
+    assert.equal(oreCount(world), before - 1, "only step 1's ore returns");
+    assert.deepEqual(awarded(world), ['blade', 'ore'], 'the award, then the refunded ore');
+    const blades = world.actor.items.filter((item) => item.name === 'blade');
+    assert.equal(blades.length, 1, "step 0's award stands");
+    const run = historyRun(world);
+    assert.equal(run.steps[0].status, 'succeeded');
+    assert.deepEqual(run.steps[1].iterative.log, [], 'step 1 started and took no attempt');
   });
 });
