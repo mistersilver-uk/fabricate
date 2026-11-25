@@ -415,6 +415,7 @@
           <RecipeOverviewTab
             {modeCallout}
             {recipe}
+            {iterative}
             {name}
             {description}
             {img}

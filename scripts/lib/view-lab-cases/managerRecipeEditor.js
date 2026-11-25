@@ -162,6 +162,50 @@ const STAGE_RESULT_GEOMETRY = Object.freeze({
   minInlineSize: { selector: `${STAGE_ROWS} .manager-recipe-option-name-field`, pixels: 180 },
 });
 
+/** The Ironworks recipe editor (issue 3010): every case seeds its recipes and claims the editor. */
+const ITERATIVE_RECIPE_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/iterative\//,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeOverviewTab\.svelte$/,
+]);
+const COUNTERS_CARD = '[data-recipe-section="iterative-counters"]';
+const COUNTER_ROW = (key) => `${COUNTERS_CARD} [data-iterative-counter-row="${key}"]`;
+/** A Fixed Start cell's controls, which hold one line. */
+const FIXED_START = `${COUNTERS_CARD} .fab-picker-row-amount-formula:not(:has([data-recipe-option-formula]))`;
+const FIXED_START_GEOMETRY = Object.freeze({
+  containerSelector: COUNTERS_CARD,
+  oneLineRows: FIXED_START,
+  alignedRight: `${COUNTERS_CARD} [data-iterative-counter-remove]`,
+});
+
+/** One Ironworks recipe Overview frame: `recipeId` open, scrolled to the Counters table. */
+function iterativeRecipeCase({
+  recipeId,
+  recipes = 'authoring',
+  width = 1280,
+  steps = [],
+  ...entry
+}) {
+  return managerCase({
+    // `beyond`: the smoke walk never builds an iterative system.
+    reaches: 'beyond',
+    smokeLabels: [],
+    position: { width, height: 900 },
+    query: { system: 'lab-ironworks', iterative: 'populated', iterativeRecipes: recipes },
+    steps: [
+      'Crafting',
+      { selector: `[data-recipe-edit="${recipeId}"]` },
+      { selector: '#recipe-tab-overview' },
+      { selector: COUNTERS_CARD, scroll: true },
+      ...steps,
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes', 'iterative'],
+    sourceMatches: ITERATIVE_RECIPE_SOURCES,
+    ...entry,
+  });
+}
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-normal',
@@ -2281,5 +2325,84 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
       // No `EmptyState.svelte` pattern: it is a broad signal, so the pattern could never be consulted.
     ],
+  }),
+  // Issue 3010: the Ironworks recipe Overview's Counters table, header chip, subline and callout.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative',
+    label: 'Manager — Recipe edit iterative counters',
+    recipeId: 'iw-r-blade',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-edit-status="ready"]):has([data-recipe-mode-callout="iterative"]) ' +
+      `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
+    expectCenterHit: [
+      `${COUNTER_ROW('heat')} [data-iterative-counter-visible]`,
+      `${COUNTER_ROW('heat')} [data-iterative-counter-remove]`,
+      '[data-recipe-edit-heading] [data-recipe-edit-status="ready"]',
+    ],
+    expectLayout: { containerSelector: COUNTERS_CARD, oneLineRows: FIXED_START },
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counters-empty',
+    label: 'Manager — Recipe edit iterative counters empty',
+    recipeId: 'iw-r-ingot',
+    expectSelector: `${COUNTERS_CARD} [data-iterative-counters-add-all]:not([disabled])`,
+    expectCenterHit: `${COUNTERS_CARD} [data-iterative-counters-add-all]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counters-no-library',
+    label: 'Manager — Recipe edit iterative counters, no library',
+    recipeId: 'iw-r-ingot',
+    recipes: 'noLibrary',
+    expectSelector: `${COUNTERS_CARD} [data-iterative-counters-add-all][disabled] ~ [data-iterative-counters-note] [data-iterative-counters-open]`,
+    expectCenterHit: `${COUNTERS_CARD} [data-iterative-counters-open]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counters-bounds',
+    label: 'Manager — Recipe edit iterative counters, bounds and formula',
+    recipeId: 'iw-r-hinge',
+    expectSelector:
+      `.fabricate-manager:has(${COUNTER_ROW('temper')} [data-iterative-counter-bound="max"] .fa-globe)` +
+      `:has(${COUNTER_ROW('slag')} [data-iterative-counter-bound="min"] .fa-infinity) ` +
+      `${COUNTER_ROW('slag')} [data-recipe-option-formula]`,
+    expectCenterHit: `${COUNTER_ROW('slag')} [data-recipe-option-formula]`,
+    expectLayout: FIXED_START_GEOMETRY,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counters-bad-bounds',
+    label: 'Manager — Recipe edit iterative counters, bad bounds',
+    recipeId: 'iw-r-rivet',
+    expectSelector:
+      `.fabricate-manager:has(${COUNTER_ROW('heat')} [data-issue-code="iterativeBoundsInverted"])` +
+      `:has(${COUNTER_ROW('temper')} [data-issue-code="iterativeStartOutOfBounds"]) ` +
+      `${COUNTER_ROW('slag')} [data-issue-code="iterativeInvalidNumber"]`,
+    expectCenterHit: `${COUNTER_ROW('heat')} [data-iterative-counter-min][aria-invalid="true"]`,
+    expectLayout: FIXED_START_GEOMETRY,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counters-all-used',
+    label: 'Manager — Recipe edit iterative counters, every counter used',
+    recipeId: 'iw-r-hinge',
+    steps: [{ selector: `${COUNTERS_CARD} [data-iterative-counters-note]`, scroll: true }],
+    expectSelector: `${COUNTERS_CARD}:has([data-iterative-counter-add][disabled]) [data-iterative-counters-note]`,
+    expectCenterHit: `${COUNTERS_CARD} [data-iterative-counters-open]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-counter-unknown',
+    label: 'Manager — Recipe edit iterative counter not in the library',
+    recipeId: 'iw-r-nail',
+    expectSelector: `${COUNTER_ROW('rust')} [data-issue-code="iterativeUnknownCounter"] ~ [data-iterative-counter-create]`,
+    expectCenterHit: [
+      `${COUNTER_ROW('rust')} [data-iterative-counter-create]`,
+      `${COUNTER_ROW('rust')} [data-iterative-counter-remove]`,
+    ],
+    expectLayout: FIXED_START_GEOMETRY,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-narrow',
+    label: 'Manager — Recipe edit iterative counters at 880px',
+    recipeId: 'iw-r-hinge',
+    width: 880,
+    expectSelector: `${COUNTERS_CARD} .fabricate-data-table-scroll [data-iterative-counter-row="heat"]`,
+    expectCenterHit: `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
   }),
 ]);

@@ -467,6 +467,20 @@ If multistep is disabled:
 
 - Show implicit single-step editors at the recipe level
 
+### Iterative Recipe Editor
+
+In an `iterative` system, Overview lists the recipe's Counter Instances in a table with Start, Min, Max, Target and Player sees, and each row can be removed.
+The table sits after the step-mode card, and its Counter Instances carry on across every step.
+Start is a fixed number, or a formula that rolls once when the first step starts, and switching back to a fixed number restores the kept start.
+Min and Max are editable only for a Per recipe counter, which shows the counter's defaults while unset, and a Global or No limit counter shows its system bound read-only.
+A row states each of its faults on its own line under its counter: a minimum above its maximum, a fixed start above the maximum or below the minimum, and a value that is not a number.
+Each faulted control is marked invalid and described by its line.
+A recipe with no Counter Instances offers to add every library counter, and says so when the library has none, and the adder states when every counter is already used.
+A Counter Instance naming no library counter is marked on its row and links to Counters.
+An iterative multi-step recipe is never presented as collapsed.
+The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and its subline names the Iterative mode and a multi-step recipe's step count.
+The Preview tab is not offered.
+
 ## Component Studio
 
 The GM component surfaces: the component browser and the component editor.

@@ -107,6 +107,14 @@ function modifierLibraryIds() {
   );
 }
 
+/** The Ironworks recipe ids a frame seeds through `query.iterativeRecipes`, which a step may open. */
+function ironworksRecipeIds() {
+  const seeded = buildLabContent();
+  seedIterativeState(seeded, 'populated');
+  seedIterativeRecipes(seeded, buildLabActors(seeded), 'authoring');
+  return seeded.recipes.map((entry) => entry.id);
+}
+
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
@@ -122,7 +130,10 @@ const IDENTITY_SOURCES = {
   'data-knowledge-actor': new Set(actors.map((entry) => entry.id)),
 
   // The ten below were the gap this file's own header describes and did not actually close.
-  'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
+  'data-recipe-edit': new Set([
+    ...content.recipes.map((entry) => entry.id),
+    ...ironworksRecipeIds(),
+  ]),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
   // The recipe browser's bulk selection control (issue 1010) — the exact mirror of
   // `data-component-select` above, and unguarded until now: the three
@@ -279,13 +290,16 @@ test('the lab world holds no iterative system unless a frame asks for one', () =
 
 test('every query.iterativeRecipes names a recipe state the lab seeds, beside an iterative one', () => {
   const unknown = [];
+  let named = 0;
   for (const viewCase of VIEW_LAB_CASES) {
     const state = viewCase.query?.iterativeRecipes;
     if (!state) continue;
+    named += 1;
     if (!Object.hasOwn(LAB_ITERATIVE_RECIPE_STATES, state))
       unknown.push(`${viewCase.id}: ${state}`);
     if (!viewCase.query.iterative) unknown.push(`${viewCase.id}: sets no iterative state`);
   }
+  assert.ok(named > 0, 'no case names an iterative recipe state, so this sweep proves nothing');
   assert.deepEqual(unknown, [], `these cases cannot seed their recipes: ${unknown.join(', ')}`);
 });
 

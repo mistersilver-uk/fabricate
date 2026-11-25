@@ -25,6 +25,7 @@
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeCraftingModifierField from './RecipeCraftingModifierField.svelte';
   import { recipeModifierDisposition } from './recipeModifierDisposition.js';
+  import IterativeOverview from './iterative/IterativeOverview.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import RecipeRoutingCard from './RecipeRoutingCard.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
@@ -34,6 +35,7 @@
     buildCheckTierOptions,
     buildMinSuccessTierOptions,
     buildStepModeOptions,
+    stepModeHintText,
   } from './recipeOverviewSelectOptions.js';
 
   let {
@@ -110,6 +112,8 @@
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {},
+    // The iterative route model in an iterative system, else `null`: the Counters card reads it.
+    iterative = null,
   } = $props();
 
   function text(key, fallback) {
@@ -138,6 +142,7 @@
   );
 
   const STEP_MODE_OPTIONS = buildStepModeOptions(text);
+  const stepModeHint = $derived(stepModeHintText(text, Boolean(iterative), isMultiStep));
 
   // Reverting to single-step DISCARDS the per-step authoring, so the handler confirms
   // before staging it — never call these unless the mode actually changes.
@@ -408,12 +413,7 @@
         <h3 class="manager-recipe-section-title">
           {text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
         </h3>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Recipe.StepModeHint',
-            'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.'
-          )}
-        </p>
+        <p class="manager-muted">{stepModeHint}</p>
       </div>
       <SegmentedControl
         options={STEP_MODE_OPTIONS}
@@ -424,6 +424,10 @@
         onChange={selectStepMode}
       />
     </section>
+  {/if}
+
+  {#if iterative}
+    <IterativeOverview {recipe} {iterative} {isMultiStep} disabled={saving} {onUpdateRecipe} />
   {/if}
 
   {#if collapsed}

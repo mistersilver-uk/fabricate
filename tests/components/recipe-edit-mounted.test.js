@@ -167,6 +167,15 @@ const RAW_MODULES = [
   // The editor's tab counts and modifier disposition, each a leaf beside its host (issue 3010).
   'src/ui/svelte/apps/manager/recipe/recipeModifierDisposition.js',
   'src/ui/svelte/apps/manager/recipe/recipeTabCounts.js',
+  // The iterative Counters table's rows and copy, and the judges they read (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/iterativeCounterRows.js',
+  'src/ui/svelte/apps/manager/recipe/iterative/counterInstanceCopy.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeFieldFaults.js',
+  'src/systems/iterative/attemptLibrary.js',
+  'src/systems/iterative/expression.js',
+  'src/systems/expressionReader.js',
+  'src/systems/normalize/iterativeLibrary.js',
+  'src/ui/svelte/components/stepperLabels.js',
 ];
 
 // The new tab + section components the editor shell composes.
@@ -258,6 +267,13 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
+  // The iterative Overview and its Counters table (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeOverview.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeCountersCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeCounterCell.svelte',
+  'src/ui/svelte/components/DataTable.svelte',
+  'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/apps/manager/iterative/FaultLine.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 ];
 

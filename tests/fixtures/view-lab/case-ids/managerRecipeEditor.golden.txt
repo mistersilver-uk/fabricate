@@ -92,3 +92,11 @@ manager-recipe-edit-access-inspector
 manager-access-recipe-selected
 manager-access-recipe-roster-paged
 manager-access-recipe-roster-no-match
+manager-recipe-edit-iterative
+manager-recipe-edit-iterative-counters-empty
+manager-recipe-edit-iterative-counters-no-library
+manager-recipe-edit-iterative-counters-bounds
+manager-recipe-edit-iterative-counters-bad-bounds
+manager-recipe-edit-iterative-counters-all-used
+manager-recipe-edit-iterative-counter-unknown
+manager-recipe-edit-iterative-narrow

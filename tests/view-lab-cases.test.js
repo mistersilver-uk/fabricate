@@ -831,6 +831,11 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-overview-routing-multistep',
   // The published stage bars (issue 2455): each group's bars on one line, each caption whole.
   'manager-published-stage-bars-specimen',
+  // The iterative Counters table (issue 3010): each Fixed Start on one line, the removes aligned.
+  'manager-recipe-edit-iterative',
+  'manager-recipe-edit-iterative-counters-bounds',
+  'manager-recipe-edit-iterative-counters-bad-bounds',
+  'manager-recipe-edit-iterative-counter-unknown',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
@@ -10173,6 +10178,17 @@ test('every recipe id the capture cases name exists in the lab world', async () 
   const content = buildLabContent();
   const recipeIds = new Set((content.recipes ?? []).map((recipe) => String(recipe?.id ?? '')));
   assert.ok(recipeIds.size > 0, 'the lab world holds recipes; the fixture read is broken');
+  // A case that seeds its recipe state reaches the Ironworks recipes that state authors as well.
+  const { seedIterativeRecipes, seedIterativeState } =
+    await import('./view-lab/world/labIterative.js');
+  const seededIdsOf = (viewCase) => {
+    const state = viewCase.query?.iterativeRecipes;
+    if (!state) return new Set();
+    const seeded = buildLabContent();
+    seedIterativeState(seeded, viewCase.query.iterative);
+    seedIterativeRecipes(seeded, [], state);
+    return new Set(seeded.recipes.map((recipe) => recipe.id));
+  };
 
   const IDENTITY_HOOK = /\[data-(?:recipe-id|recipe-edit|recipe-select|access-row)="([^"]+)"\]/g;
   const named = [];
@@ -10186,7 +10202,7 @@ test('every recipe id the capture cases name exists in the lab world', async () 
     ];
     for (const selector of selectors) {
       for (const [, id] of selector.matchAll(IDENTITY_HOOK)) {
-        named.push({ caseId: viewCase.id, id });
+        named.push({ caseId: viewCase.id, id, seeded: seededIdsOf(viewCase) });
       }
     }
   }
@@ -10196,9 +10212,9 @@ test('every recipe id the capture cases name exists in the lab world', async () 
   const distinct = new Set(named.map((entry) => entry.id)).size;
   assert.ok(distinct >= 20, `the scan found only ${distinct} distinct recipe ids; it is broken`);
 
-  for (const { caseId, id } of named) {
+  for (const { caseId, id, seeded } of named) {
     assert.ok(
-      recipeIds.has(id),
+      recipeIds.has(id) || seeded.has(id),
       `${caseId} names the recipe "${id}", which the lab world does not hold - the capture aborts ` +
         'on this step and the whole run publishes nothing'
     );

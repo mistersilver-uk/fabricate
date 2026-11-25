@@ -132,6 +132,7 @@ export function createIterativeRouteModel({
     saveAction: staged.save,
     editAction: staged.edit,
     openChecks: () => setView('checks'),
+    openCounters: () => setView('iterative-counters'),
     ...counterRoute.handlers,
     startNewAction: () =>
       setView('iterative-action-edit', () => staged.begin(section().newActionDraft())),
