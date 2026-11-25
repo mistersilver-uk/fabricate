@@ -28,8 +28,9 @@ export function createIterativeCounterRoute({ section, setView, services, text }
       setView('iterative-counters', () => {
         expandedId = id;
       }),
-    /** Adds a Counter, opens it and asks the screen to focus its Name. */
+    /** Clears the search so the new row shows, adds a Counter, opens it and asks for its Name's focus. */
     addCounter: async () => {
+      browse.searchTerm = '';
       const id = await section()?.addCounter();
       if (id) {
         expandedId = id;

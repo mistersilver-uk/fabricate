@@ -30,6 +30,15 @@ const MAX_WINDOW = 5000;
 /** The five-stop band ramp, worst to best, shared by the tier strip and the odds bars. */
 export const BAND_TONES = Object.freeze(['danger', 'warning', 'success', 'info', 'accent']);
 
+/** Each band tone as the `Chip` tone that paints it: `Chip` names success `positive`. */
+export const BAND_CHIP_TONES = Object.freeze({
+  danger: 'danger',
+  warning: 'warning',
+  success: 'positive',
+  info: 'info',
+  accent: 'accent',
+});
+
 /**
  * The tone for the band at `position` of `count`, worst first. A single band takes the MIDDLE
  * tone, and counts above five reuse one — the cost of a five-stop ramp.

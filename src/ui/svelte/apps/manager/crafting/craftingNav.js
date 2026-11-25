@@ -61,7 +61,9 @@ export function buildCraftingNavItems({
     },
   ];
 
-  // Counted on their own rows only: `parentBadge: false` keeps them out of the Crafting badge.
+  // Counted on their own rows only: `parentBadge: false` keeps them out of the Crafting badge. A
+  // `null` count, a library newer than this build, draws no count.
+  const libraryCount = (count) => (count === null ? undefined : (count ?? 0));
   if (resolutionMode === 'iterative') {
     items.push(
       {
@@ -70,7 +72,7 @@ export function buildCraftingNavItems({
         icon: 'fas fa-gauge-simple-high',
         labelKey: 'FABRICATE.Admin.Manager.Nav.Counters',
         labelFallback: 'Counters',
-        count: counterCount ?? 0,
+        count: libraryCount(counterCount),
         parentBadge: false,
       },
       {
@@ -79,7 +81,7 @@ export function buildCraftingNavItems({
         icon: 'fas fa-hand-back-fist',
         labelKey: 'FABRICATE.Admin.Manager.Nav.Actions',
         labelFallback: 'Actions',
-        count: actionCount ?? 0,
+        count: libraryCount(actionCount),
         parentBadge: false,
       }
     );

@@ -1,7 +1,7 @@
 /**
  * The Crafting Action the editor stages: a draft copy of one library action with its saved
- * baseline, its dirty flag, and the blocking issues Validation will report once it is saved. Every
- * input is a thunk read at call time, and the model owns no effect.
+ * baseline, its dirty flag, and the issues Validation will report once it is saved, of which only the
+ * critical ones block. Every input is a thunk read at call time, and the model owns no effect.
  */
 import { evaluateIterativeReadiness } from '../../../../../systems/iterative/iterativeReadiness.js';
 import { arrayOrEmpty } from '../../../../../utils/scalars.js';
@@ -50,13 +50,14 @@ export function createIterativeActionDraft({ selectedSystem, library, actions, s
     const entry = { ...snapshot(), id };
     return stagedIssues({ system, library: library(), actions: actions(), entry, id });
   });
+  const blocking = $derived(issues.filter((issue) => issue.severity === 'critical'));
   const heading = $derived(
     draft && {
       name: draft.label ?? '',
       icon: draft.icon || DEFAULT_ACTION_ICON,
       rollsCheck: draft.check === 'roll',
       effectCount: arrayOrEmpty(draft.effects).length,
-      issueCount: issues.length,
+      issueCount: blocking.length,
     }
   );
 
@@ -108,6 +109,9 @@ export function createIterativeActionDraft({ selectedSystem, library, actions, s
     },
     get issues() {
       return issues;
+    },
+    get blockingIssues() {
+      return blocking;
     },
     get heading() {
       return heading;

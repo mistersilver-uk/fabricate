@@ -136,7 +136,9 @@ const ROUTE_CRUMBS = Object.freeze({
     ),
     recordLeaf(
       input.iterativeRoute?.actionHeading?.name ||
-        input.text('FABRICATE.Admin.Manager.Iterative.ActionEditBreadcrumb', 'Edit action')
+        (input.iterativeRoute?.isNewAction
+          ? input.text('FABRICATE.Admin.Manager.Iterative.UnnamedAction', 'New action')
+          : input.text('FABRICATE.Admin.Manager.Iterative.ActionEditBreadcrumb', 'Edit action'))
     ),
   ],
   'recipe-item-edit': (input) => [

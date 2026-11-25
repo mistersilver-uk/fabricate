@@ -10,7 +10,7 @@ import { createActionsBrowserState } from '../../../../model/managerBrowserViewS
 import { createIterativeActionDraft } from './iterativeActionDraft.svelte.js';
 import { createIterativeCounterRoute } from './iterativeCounterRoute.svelte.js';
 import { confirmActionDelete } from './iterativeDeleteConfirm.js';
-import { actionBlockingCounts, actionUses } from './iterativeLibraryModel.js';
+import { actionIssueCounts, actionUses } from './iterativeLibraryModel.js';
 
 /** Read-only accessors for `reads`, each a thunk, so the model hands out live values. */
 const accessors = (reads) =>
@@ -52,6 +52,7 @@ const stagedReads = (staged) => ({
   isActionDirty: () => staged.isDirty,
   hasEditableAction: () => staged.hasEditable,
   actionIssues: () => staged.issues,
+  actionBlockingIssues: () => staged.blockingIssues,
   actionHeading: () => staged.heading,
 });
 
@@ -87,8 +88,10 @@ export function createIterativeRouteModel({
     viewState();
     return section()?.systemRecipes?.() ?? [];
   });
-  const blocking = $derived(
-    unsupported || !selectedSystem() ? new Map() : actionBlockingCounts(selectedSystem(), recipes)
+  const issueCounts = $derived(
+    unsupported || !selectedSystem()
+      ? { blocking: new Map(), all: new Map() }
+      : actionIssueCounts(selectedSystem(), recipes)
   );
   const staged = createIterativeActionDraft({
     selectedSystem,
@@ -141,12 +144,14 @@ export function createIterativeRouteModel({
       unsupported: () => unsupported,
       counters: () => counters,
       actions: () => actions,
-      counterCount: () => counters.length,
-      actionCount: () => actions.length,
+      // A library newer than this build lists nothing, so the rail draws no count for it.
+      counterCount: () => (unsupported ? null : counters.length),
+      actionCount: () => (unsupported ? null : actions.length),
       recipes: () => recipes,
       ...counterRoute.reads,
       actionsBrowse: () => actionsBrowse,
-      actionBlocking: () => blocking,
+      actionBlocking: () => issueCounts.blocking,
+      actionIssueTotals: () => issueCounts.all,
       routedCheck: () => selectedSystem()?.craftingCheck?.routed ?? null,
       ...stagedReads(staged),
     })

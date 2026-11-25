@@ -89,20 +89,25 @@ const actionRuleLists = (action) => [
   ...arrayOrEmpty(action?.effects).map((effect) => effect?.when?.rules),
 ];
 
-function actionUsesCounter(action, id) {
-  const costs = arrayOrEmpty(action?.costs);
-  const effects = arrayOrEmpty(action?.effects);
-  return (
-    costs.some((cost) => cost?.counterId === id || expressionReads(cost?.amount, 'cost', id)) ||
-    effects.some(
-      (effect) => effect?.target?.counterId === id || expressionReads(effect?.amount, 'effect', id)
-    ) ||
-    actionRuleLists(action).some((rules) => anyRule(rules, 'counterId', id))
+/** How `action` uses counter `id`: `'costEffect'`, `'cost'`, `'effect'` or `'rule'`, else `null`. */
+function counterUseKind(action, id) {
+  const cost = arrayOrEmpty(action?.costs).some(
+    (entry) => entry?.counterId === id || expressionReads(entry?.amount, 'cost', id)
   );
+  const effect = arrayOrEmpty(action?.effects).some(
+    (entry) => entry?.target?.counterId === id || expressionReads(entry?.amount, 'effect', id)
+  );
+  if (cost && effect) return 'costEffect';
+  if (cost || effect) return cost ? 'cost' : 'effect';
+  return actionRuleLists(action).some((rules) => anyRule(rules, 'counterId', id)) ? 'rule' : null;
 }
 
 const actionUsesAction = (action, id) =>
   actionRuleLists(action).some((rules) => anyRule(rules, 'previousAction', id));
+
+/** `'rule'` when another action holds a `previousAction` rule naming `id`; an action is never its own use. */
+const actionUseKind = (action, id) =>
+  action?.id !== id && actionUsesAction(action, id) ? 'rule' : null;
 
 /** Each step of `recipe` as `{ recipeId, recipeName, stepIndex, stepName, view }`. */
 function stepsOf(recipe) {
@@ -140,7 +145,7 @@ function stepUsesAction(step, id) {
 
 const publicStep = ({ view, ...step }) => step;
 
-function usesOf({ actions, recipes, actionNames, stepNames, instances = false, id }) {
+function usesOf({ actions, recipes, useKind, stepNames, instances = false, id }) {
   const steps = arrayOrEmpty(recipes).flatMap((recipe) => {
     const whole =
       instances && arrayOrEmpty(recipe?.iterative?.counters).some((e) => e?.counterId === id);
@@ -148,23 +153,24 @@ function usesOf({ actions, recipes, actionNames, stepNames, instances = false, i
       .filter((step) => whole || stepNames(step, id))
       .map(publicStep);
   });
-  const named = arrayOrEmpty(actions)
-    .filter((action) => actionNames(action, id))
-    .map((action) => ({ id: action.id, label: trimString(action.label) || action.id }));
+  const named = arrayOrEmpty(actions).flatMap((action) => {
+    const kind = useKind(action, id);
+    return kind ? [{ id: action.id, label: trimString(action.label) || action.id, kind }] : [];
+  });
   return { actions: named, steps };
 }
 
 /**
  * Where counter `id` is used: the Crafting Actions that name it in a cost, an effect target, a rule
- * or an expression, and the recipe steps that name it. A recipe holding a Counter Instance of it
- * counts every one of its steps, because the counter is live in each.
- * @returns {{ actions: {id: string, label: string}[], steps: object[] }}
+ * or an expression, each with how it uses it, and the recipe steps that name it. A recipe holding a
+ * Counter Instance of it counts every one of its steps, because the counter is live in each.
+ * @returns {{ actions: {id: string, label: string, kind: string}[], steps: object[] }}
  */
 export function counterUses(library, recipes, id) {
   return usesOf({
     actions: library?.actions,
     recipes,
-    actionNames: actionUsesCounter,
+    useKind: counterUseKind,
     stepNames: stepUsesCounter,
     instances: true,
     id,
@@ -173,14 +179,14 @@ export function counterUses(library, recipes, id) {
 
 /**
  * Where Crafting Action `id` is used: the steps whose allow-list or rules name it, and the actions
- * whose availability or effects hold a `previousAction` rule naming it.
- * @returns {{ actions: {id: string, label: string}[], steps: object[] }}
+ * other than itself whose availability or effects hold a `previousAction` rule naming it.
+ * @returns {{ actions: {id: string, label: string, kind: 'rule'}[], steps: object[] }}
  */
 export function actionUses(library, recipes, id) {
   return usesOf({
     actions: library?.actions,
     recipes,
-    actionNames: actionUsesAction,
+    useKind: actionUseKind,
     stepNames: stepUsesAction,
     id,
   });
@@ -189,12 +195,18 @@ export function actionUses(library, recipes, id) {
 /** `{ actions, steps }` counts of one {@link counterUses} or {@link actionUses} answer. */
 export const usageCounts = (uses) => ({ actions: uses.actions.length, steps: uses.steps.length });
 
-/** Each Crafting Action's blocking issue count as Validation reports it: a `Map` of id to count. */
-export function actionBlockingCounts(system, recipes) {
-  const counts = new Map();
+const bump = (counts, id) => counts.set(id, (counts.get(id) ?? 0) + 1);
+
+/**
+ * Each Crafting Action's issue counts as Validation reports them, as `Map`s of id to count: `all`
+ * holds every issue and `blocking` only the critical ones, because a warning never stops a player.
+ */
+export function actionIssueCounts(system, recipes) {
+  const counts = { blocking: new Map(), all: new Map() };
   for (const issue of evaluateIterativeReadiness(system, arrayOrEmpty(recipes))) {
     if (issue.entityKind !== 'action') continue;
-    counts.set(issue.entityId, (counts.get(issue.entityId) ?? 0) + 1);
+    bump(counts.all, issue.entityId);
+    if (issue.severity === 'critical') bump(counts.blocking, issue.entityId);
   }
   return counts;
 }

@@ -37,13 +37,16 @@ export const whenFootnote = (combine, text) =>
         'All of these must hold. Leave it empty to apply every session.'
       );
 
-/** How many conditions an effect's `when` carries, counting the check ones only while `rolls`. */
-export function conditionCount(when, rolls) {
+/**
+ * How many conditions an effect's `when` carries, check facts included whether or not the action
+ * rolls, so an imported effect that reads a check under No check is not summarised as "every session".
+ */
+export function conditionCount(when) {
   const check =
     (arrayOrEmpty(when?.checkOutcomeIds).length > 0 ? 1 : 0) +
     (typeof when?.success === 'boolean' ? 1 : 0) +
     (when?.value == null ? 0 : 1);
-  return (rolls ? check : 0) + arrayOrEmpty(when?.rules).length;
+  return check + arrayOrEmpty(when?.rules).length;
 }
 
 function whenSummary(count, text) {
@@ -57,7 +60,7 @@ function whenSummary(count, text) {
 }
 
 /** "Increment Heat by 2 · every session", the line under an effect's name. */
-export function effectSummary(effect, { counterLabel, rolls }, text) {
+export function effectSummary(effect, { counterLabel }, text) {
   const data = { counter: counterLabel, amount: effect.amount ?? '' };
   const lines = {
     subtract: text(
@@ -71,5 +74,5 @@ export function effectSummary(effect, { counterLabel, rolls }, text) {
     ),
   };
   const line = interpolate(lines[effect.op] ?? lines.add, data);
-  return `${line} · ${whenSummary(conditionCount(effect.when, rolls), text)}`;
+  return `${line} · ${whenSummary(conditionCount(effect.when), text)}`;
 }

@@ -3,6 +3,7 @@
  * Counter or Crafting Action library issue) maps to the view it opens and the open helper that
  * selects the record there. A group with no entry, a `system` blocker among them, has no link.
  */
+import { overviewIssueGroup } from './iterative/iterativeIssueCopy.js';
 
 /**
  * @param {object} open The root's open helpers, each taking the record id.
@@ -36,7 +37,7 @@ export function createOverviewDeepLinks({
 
   function selectIssue(issue) {
     if (!issue) return;
-    const group = issue.kind === 'system' ? issue.entityKind : issue.kind;
+    const group = overviewIssueGroup(issue);
     const target = Object.hasOwn(links, group) ? links[group] : null;
     const id = target?.targetId(issue);
     if (id) target.open(id);
