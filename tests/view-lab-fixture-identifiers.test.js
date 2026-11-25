@@ -24,6 +24,7 @@ import {
 } from './view-lab/world/labRunStates.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
 import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
+import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
@@ -232,6 +233,57 @@ test('every query.checkPreviewState names a state the lab seeds', () => {
     [],
     `these cases name no seeded check state:\n  ${unknown.join('\n  ')}`
   );
+});
+
+test('every query.iterative names a state the lab seeds', () => {
+  // An unknown state seeds nothing, so the case would photograph a system the lab does not hold.
+  const unknown = [];
+  let named = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    const state = viewCase.query?.iterative;
+    if (!state) continue;
+    named += 1;
+    if (!Object.hasOwn(LAB_ITERATIVE_STATES, state)) unknown.push(`${viewCase.id}: ${state}`);
+  }
+  assert.ok(named > 0, 'no case names an iterative state, so this sweep proves nothing');
+  assert.deepEqual(unknown, [], `these cases name no seeded state: ${unknown.join(', ')}`);
+});
+
+test('the lab world holds no iterative system unless a frame asks for one', () => {
+  const base = buildLabContent();
+  assert.ok(!base.systems.some((system) => system.id === LAB_SYSTEM_IDS.IRONWORKS));
+  for (const absent of [null, undefined, '', 'nonsense', 'toString', '__proto__']) {
+    const content = structuredClone(base);
+    seedIterativeState(content, absent);
+    assert.deepEqual(content, base, `${String(absent)} must leave the world as it was`);
+  }
+  for (const state of Object.keys(LAB_ITERATIVE_STATES)) {
+    const content = structuredClone(base);
+    seedIterativeState(content, state);
+    assert.deepEqual(content.systems.slice(0, base.systems.length), base.systems, state);
+    assert.deepEqual(content.recipes.slice(0, base.recipes.length), base.recipes, state);
+    const [ironworks, ...rest] = content.systems.slice(base.systems.length);
+    assert.equal(rest.length, 0, `${state} adds exactly one system`);
+    assert.equal(ironworks.id, LAB_SYSTEM_IDS.IRONWORKS);
+    assert.equal(ironworks.resolutionMode, 'iterative');
+    assert.notEqual(ironworks.name, 'Karrun Forgecraft', 'the lab names its systems apart');
+  }
+});
+
+test('every iterative case asserts a selector of its own', () => {
+  const selectors = new Map();
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!viewCase.query?.iterative) continue;
+    assert.equal(typeof viewCase.expectSelector, 'string', `${viewCase.id} asserts no selector`);
+    assert.ok(viewCase.expectView, `${viewCase.id} asserts no view`);
+    selectors.set(viewCase.expectSelector, [
+      ...(selectors.get(viewCase.expectSelector) ?? []),
+      viewCase.id,
+    ]);
+  }
+  const shared = [...selectors].filter(([, ids]) => ids.length > 1);
+  assert.deepEqual(shared, [], 'these iterative cases share one expectSelector');
+  assert.ok(selectors.size > 0, 'no iterative case exists, so this proves nothing');
 });
 
 test('every fixture id a selector names exists in the lab world', () => {

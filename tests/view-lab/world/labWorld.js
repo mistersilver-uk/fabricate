@@ -13,6 +13,7 @@ import {
   seedTimeOfDayBar,
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
+import { seedIterativeState } from './labIterative.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
 import { LAB_MACRO_UUIDS, registerLabMacros } from './labMacros.js';
@@ -1042,6 +1043,8 @@ export function labLocalizer(shippedLocalize, longTravelLabels) {
  *   issue 2514's `failure-policy-never`.
  * @param {string|null} [options.subjectModifierPicks] `suppressed` authors a custom pick on the
  *   herbalism salvage component and gathering task, `missing` one naming a deleted modifier. See {@link seedSubjectModifierPicks}.
+ * @param {string|null} [options.iterative] Adds the Ironworks system in this state. See
+ *   {@link seedIterativeState}.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
@@ -1069,6 +1072,7 @@ export async function buildLabWorld({
   checkOverride = null,
   journalCaseState = null,
   checkPreviewState = null,
+  iterative = null,
   resultRowState = null,
   subjectModifierPicks = null,
   learnableBook = false,
@@ -1087,6 +1091,7 @@ export async function buildLabWorld({
     seedJournalNoCheckFixture(content);
   }
   if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
+  seedIterativeState(content, iterative);
   seedGatheringTaskMode(content, gatheringTaskMode);
   seedResultRowState(content, resultRowState);
   seedSubjectModifierPicks(content, subjectModifierPicks);

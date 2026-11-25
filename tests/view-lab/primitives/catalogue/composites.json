@@ -1062,6 +1062,31 @@
     "note": "Wired as `GatheringModifierEditor` wires a condition modifier, with its sheet class for the positive tone. The value field is that editor's own snippet markup, so the rule carries no steps; a follow-up renders it through `Stepper`."
   },
   {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "one condition the caller combines (All)",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "fixture": "RuleRowPredicate",
+    "props": {
+      "value": {
+        "source": "counter",
+        "counterId": "heat",
+        "op": ">=",
+        "value": 3
+      },
+      "class": "manager-iterative-rule-row"
+    },
+    "data": {
+      "icon": "fas fa-bolt",
+      "title": "When",
+      "removeLabel": "Remove rule",
+      "sourceLabel": "Heat",
+      "opLabel": ">=",
+      "valueLabel": "Value"
+    },
+    "note": "Wired as `CounterRuleList` wires a counter predicate: the rule carries no sentence of its own, because the caller combines its siblings with All or Any and states that once above the list; its source, comparison and value are the field chain, drawn through `Select` and `Stepper`."
+  },
+  {
     "spec": "<SortableList>",
     "cap": "expanded — the row opens to its editing body",
     "draws": ":scope > div",

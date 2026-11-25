@@ -29,6 +29,7 @@ import { CASES as managerChecksCases } from './view-lab-cases/managerChecks.js';
 import { CASES as managerComponentsCases } from './view-lab-cases/managerComponents.js';
 import { CASES as managerEssencesCases } from './view-lab-cases/managerEssences.js';
 import { CASES as managerGatheringCases } from './view-lab-cases/managerGathering.js';
+import { CASES as managerIterativeCases } from './view-lab-cases/managerIterative.js';
 import { CASES as managerKnowledgeCases } from './view-lab-cases/managerKnowledge.js';
 import { CASES as managerRecipeEditorCases } from './view-lab-cases/managerRecipeEditor.js';
 import { CASES as managerRecipesCases } from './view-lab-cases/managerRecipes.js';
@@ -135,6 +136,7 @@ export const VIEW_LAB_CASE_FILES = Object.freeze([
   caseFile('managerChecks', managerChecksCases),
   caseFile('managerEssences', managerEssencesCases),
   caseFile('managerGathering', managerGatheringCases),
+  caseFile('managerIterative', managerIterativeCases),
   caseFile('managerWorldPartiesAndDowntime', managerWorldPartiesAndDowntimeCases),
   caseFile('managerWorldTravel', managerWorldTravelCases),
   caseFile('managerSystemTools', managerSystemToolsCases),
