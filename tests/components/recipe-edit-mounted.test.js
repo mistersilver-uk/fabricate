@@ -180,6 +180,9 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/iterative/iterativeStepConfig.js',
   'src/ui/svelte/apps/manager/iterative/iterativeLibraryModel.js',
   'src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js',
+  // The iterative Validation rows' mapper and their words (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/iterativeRecipeReadiness.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeIssueCopy.js',
   'src/ui/svelte/apps/manager/iterative/iterativeEffectCopy.js',
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
   'src/systems/iterative/iterativeReadiness.js',
@@ -297,6 +300,7 @@ const RECIPE_COMPILED = [
   // The iterative Results tab's sets and their Produced when lines (issue 3010).
   'src/ui/svelte/apps/manager/recipe/iterative/IterativeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/iterative/ProducedWhenLines.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeMidRunBanner.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 ];
 

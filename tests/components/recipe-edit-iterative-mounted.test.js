@@ -12,12 +12,21 @@ import { SvelteMap } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 
 import { Recipe } from '../../src/models/Recipe.js';
+import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
 import { normalizeIterativeLibrary } from '../../src/systems/normalize/iterativeLibrary.js';
-import { iterativeStepTally } from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
+import {
+  iterativeRecipeStatus,
+  iterativeStepTally,
+} from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
 import { iterativeStatusChip } from '../../src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js';
+import {
+  evaluateRecipeReadiness,
+  recipeValidationRowStates,
+} from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createRecipeStepHandlers } from '../../src/ui/svelte/apps/manager/recipe/recipeStepHandlers.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices } from '../helpers/adminStoreServices.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import { setInputValue } from '../helpers/manager/managerQueries.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
@@ -69,16 +78,22 @@ async function recipeReads(world) {
   });
 }
 
-/** Mounts the editor on `draft`, applying each patch as the shell's `patchRecipeDraft` does. */
-async function mountEditor(world, draft, extra = {}) {
+/**
+ * Mounts the editor on `draft`, applying each patch as the shell's `patchRecipeDraft` does;
+ * `runs` is what the stubbed `activeRunCount` answers.
+ */
+async function mountEditor(world, draft, { runs = 0, ...extra } = {}) {
   const live = new SvelteMap([['recipe', draft]]);
   const calls = { patches: [], routed: 0 };
+  const reads = await recipeReads(world);
   const iterative = {
     counters: world.system.iterative.counters,
     actions: world.system.iterative.actions,
     library: world.system.iterative,
     systemName: world.system.name,
-    recipeIssues: (await recipeReads(world)).recipeIssues,
+    recipeIssues: reads.recipeIssues,
+    recipeReadinessInput: reads.recipeReadinessInput,
+    activeRunCount: (recipeId) => (recipeId === draft.id ? runs : 0),
     openCounters: () => {
       calls.routed += 1;
     },
@@ -760,5 +775,176 @@ describe('iterative recipe Results', () => {
     assert.equal(group.getAttribute('aria-invalid'), 'true');
     assert.equal(group.getAttribute('aria-describedby'), mark.id);
     assert.equal(group.getAttribute('aria-label'), 'Success or failure');
+  });
+});
+
+describe('iterative recipe Validation', () => {
+  const badges = () =>
+    [
+      ...target.querySelectorAll(
+        ':scope [data-recipe-tab-button="validation"] .manager-editor-tab-badge'
+      ),
+    ].map((node) => node.textContent.trim());
+  const enableSwitch = () => $('[data-recipe-field="enabled"]');
+  const openValidation = () => press($('#recipe-tab-validation'), 'Validation');
+
+  it('blocks Enable for a recipe-scoped critical issue, and frees an enabled recipe', async () => {
+    const world = ironworks();
+    const draft = { ...(await draftOf(world, 'iw-r-nail')), enabled: false };
+    await mountEditor(world, draft);
+    assert.equal(enableSwitch().disabled, true, 'Bent Nail cannot be enabled');
+    unmount(mounted);
+    target.remove();
+
+    await mountEditor(world, { ...draft, enabled: true });
+    assert.equal(enableSwitch().disabled, false, 'an enabled recipe can still be disabled');
+  });
+
+  it('counts a library start blocker on the badge and leaves Enable free', async () => {
+    const world = ironworks();
+    const draft = { ...(await draftOf(world, 'iw-r-blade')), enabled: false };
+    await mountEditor(world, draft);
+    assert.deepEqual(badges(), []);
+    unmount(mounted);
+    target.remove();
+
+    world.system.iterative.counters = world.system.iterative.counters.map((counter) =>
+      counter.id === 'heat' ? { ...counter, limit: 'global', min: 9, max: 2 } : counter
+    );
+    await mountEditor(world, draft);
+    assert.deepEqual(badges(), ['1'], 'the badge rises by one');
+    assert.equal(enableSwitch().disabled, false, 'and Enable stays free');
+    await openValidation();
+    const row = $('[data-issue="iterativeBoundsInverted:counter:heat"]');
+    assert.match(row.querySelector('.manager-recipe-val-title').textContent, /^Heat: /);
+    assert.ok(row.classList.contains('is-block'), 'a block row, though Enable is free');
+  });
+
+  it('lands each row’s View on the control its issue names', async () => {
+    const world = ironworks();
+    const cases = [
+      ['iw-r-ingot', 'iterativeNoCounters:recipe', '[data-iterative-counters-add-all]'],
+      ['iw-r-nail', 'iterativeUnknownAction:recipe', '[data-iterative-step-actions]'],
+      [
+        'iw-r-rivet',
+        'iterativeBoundsInverted:recipe',
+        '[data-recipe-section="iterative-counters"]',
+      ],
+      [
+        'iw-r-sword',
+        'iterativeNoSuccessRule:1',
+        '[data-recipe-step-id="iw-sword-etch"] [data-iterative-step-end="success"]',
+      ],
+    ];
+    for (const [id, issueId, control] of cases) {
+      await mountWithHandlers(world, await draftOf(world, id));
+      await openValidation();
+      await press($(`[data-issue="${issueId}"] [data-recipe-issue-view]`), `${issueId}'s View`);
+      await settle();
+      assert.ok(document.activeElement === $(control), `${issueId} focuses ${control}`);
+      unmount(mounted);
+      target.remove();
+      mounted = null;
+    }
+  });
+
+  it('agrees with the status, the tallies and Systems › Validation on every lab recipe', async () => {
+    const world = ironworks();
+    const reads = await recipeReads(world);
+    const byCode = (codes) => [...codes].sort(byCodePoint);
+    for (const recipe of world.recipes) {
+      const draft = await draftOf(world, recipe.id);
+      const issues = reads.recipeIssues(draft);
+      const readiness = evaluateRecipeReadiness(draft, {
+        iterative: reads.recipeReadinessInput(draft),
+      });
+      const iterativeRows = recipeValidationRowStates(readiness).filter(
+        (row) => row.issue?.iterativeCode
+      );
+      const blockRows = iterativeRows.filter((row) => row.status === 'block').length;
+      const status = iterativeRecipeStatus(issues);
+      if (status.id === 'blocking') assert.equal(blockRows, status.count, recipe.id);
+      assert.equal(blockRows, issues.filter((entry) => entry.severity === 'critical').length);
+      const tallied = (draft.steps ?? []).map((_step, index) => iterativeStepTally(issues, index));
+      const wide = issues.filter((entry) => entry.stepIndex == null || draft.steps?.length === 0);
+      const sum = (key) => tallied.reduce((total, tally) => total + tally[key], 0);
+      assert.equal(
+        sum('blocking') + wide.filter((entry) => entry.severity === 'critical').length,
+        issues.filter((entry) => entry.severity === 'critical').length,
+        `${recipe.id} blocking`
+      );
+      assert.equal(
+        sum('warnings') + wide.filter((entry) => entry.severity === 'warning').length,
+        issues.filter((entry) => entry.severity === 'warning').length,
+        `${recipe.id} warnings`
+      );
+      const system = evaluateIterativeReadiness(world.system, [draft])
+        .filter((entry) => entry.kind === 'recipe')
+        .map((entry) => entry.code);
+      const editor = readiness.issues
+        .filter((entry) => entry.iterativeCode && !entry.entityName)
+        .map((entry) => entry.iterativeCode);
+      assert.deepEqual(byCode(editor), byCode(system), `${recipe.id} codes`);
+    }
+  });
+
+  it('keeps the Validation codes equal to the pill after a Save and a reopen', async () => {
+    const world = ironworks();
+    const replace = async (id, updates) => {
+      const at = world.recipes.findIndex((entry) => entry.id === id);
+      world.recipes[at] = Recipe.fromJSON({ ...world.recipes[at].toJSON(), ...updates, id });
+    };
+    const store = createAdminStore(
+      createServices(world.system, world.recipes, [], { updateRecipe: replace })
+    );
+    await store.selectSystem(world.system.id);
+    const rowOf = (id) => get(store.viewState).recipes.find((entry) => entry.id === id);
+    const { live } = await mountEditor(world, JSON.parse(JSON.stringify(rowOf('iw-r-blade'))));
+    await press($('[data-iterative-counter-remove="heat"]'), 'remove Heat');
+    assert.equal(await store.updateRecipe('iw-r-blade', live.get('recipe')), true);
+    unmount(mounted);
+    target.remove();
+
+    const reopened = JSON.parse(JSON.stringify(rowOf('iw-r-blade')));
+    const reads = await recipeReads(world);
+    const status = iterativeRecipeStatus(reads.recipeIssues(reopened));
+    await mountEditor(world, reopened);
+    await openValidation();
+    const codes = [...target.querySelectorAll('[data-issue]')].map((row) => row.dataset.issue);
+    assert.deepEqual(status, { id: 'setup' });
+    assert.ok(codes.includes('iterativeNoCounters:recipe'), 'Validation states what the pill does');
+  });
+});
+
+describe('the mid-run banner', () => {
+  const banner = () => $('[data-iterative-mid-run]');
+
+  it('states the count on every tab but Validation, singular for one', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-blade'), { runs: 2 });
+    for (const tab of ['overview', 'ingredients', 'results', 'tools']) {
+      await press($(`#recipe-tab-${tab}`), tab);
+      assert.ok(Boolean(banner()), `${tab} states it`);
+      assert.ok(Boolean(banner().closest('.manager-editor-notice-position')), 'in the inset');
+    }
+    assert.equal(banner().dataset.iterativeMidRun, '2');
+    assert.match(banner().textContent, /2 workpieces of Tempered Blade are in progress\./);
+    assert.match(
+      banner().textContent,
+      /They keep the counters, rules and routes they started with\./
+    );
+    await press($('#recipe-tab-validation'), 'Validation');
+    assert.ok(!banner(), 'Validation does not');
+    unmount(mounted);
+    target.remove();
+
+    await mountEditor(world, await draftOf(world, 'iw-r-blade'), { runs: 1 });
+    assert.match(banner().textContent, /1 workpiece of Tempered Blade is in progress\./);
+    unmount(mounted);
+    target.remove();
+
+    await mountEditor(world, await draftOf(world, 'iw-r-blade'));
+    assert.ok(!banner(), 'nothing at zero');
+    assert.ok(!$('.manager-editor-notice-position'), 'and no empty inset');
   });
 });

@@ -373,6 +373,13 @@ export const CASES = Object.freeze([
     query: { dialog: 'open' },
     expectSelector: '.application.dialog [data-iterative-delete-uses="action"]',
   }),
+  // Issue 3010: the in-progress note, over two Tempered Blade workpieces that can take Strike.
+  editorCase({
+    id: 'manager-iterative-action-edit-in-progress',
+    label: 'Manager — Iterative action editor, workpieces in progress',
+    query: { iterativeRecipes: 'midRun' },
+    expectSelector: '[data-iterative-editor] > [data-iterative-in-progress="2"]:first-child',
+  }),
   editorCase({
     id: 'manager-iterative-action-edit-narrow',
     label: 'Manager — Iterative action editor, at 880px',

@@ -35,6 +35,7 @@ manager-iterative-action-edit-icon-picker
 manager-iterative-action-edit-category-create
 manager-iterative-action-edit-discard-confirm
 manager-iterative-action-delete-in-use
+manager-iterative-action-edit-in-progress
 manager-iterative-action-edit-narrow
 manager-system-edit-validation-iterative-ready
 manager-system-edit-validation-iterative

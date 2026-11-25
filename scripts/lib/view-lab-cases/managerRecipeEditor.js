@@ -187,6 +187,13 @@ const ITERATIVE_RESULTS_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultsTab\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
 ]);
+/** An iterative recipe's Validation tab claims the tab and the readiness it reads. */
+const ITERATIVE_VALIDATION_SOURCES = Object.freeze([
+  ...ITERATIVE_RECIPE_SOURCES,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeValidationTab\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeReadiness\.js$/,
+]);
+const VALIDATION_STEPS_GROUP = '[data-recipe-tab="validation"] [data-validation-group="steps"]';
 const RESULTS_TAB = '[data-recipe-tab="results"]';
 const RESULT_SET_ROW = (id) => `${RESULTS_TAB} [data-iterative-result-set="${id}"]`;
 const OPEN_RESULTS = { selector: '#recipe-tab-results' };
@@ -2621,5 +2628,34 @@ export const CASES = Object.freeze([
       oneLineRows: `${RESULT_SET_ROW('g1')} > .fabricate-sortable-list-line`,
     },
     sourceMatches: ITERATIVE_RESULTS_SOURCES,
+  }),
+  // Issue 3010: an iterative recipe's Validation, and the mid-run banner.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-validation',
+    label: 'Manager — Recipe edit iterative validation, blocking',
+    recipeId: 'iw-r-nail',
+    steps: [{ selector: '#recipe-tab-validation' }, SCROLL_TO(VALIDATION_STEPS_GROUP)],
+    expectSelector:
+      `${VALIDATION_STEPS_GROUP}:has([data-check="iterativeCounters"][data-satisfied="false"]) ` +
+      '[data-check="iterativeStep:single"][data-satisfied="false"] [data-recipe-issue-view]',
+    expectCenterHit: `${VALIDATION_STEPS_GROUP} [data-check="iterativeStep:single"] [data-recipe-issue-view]`,
+    sourceMatches: ITERATIVE_VALIDATION_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-validation-ready',
+    label: 'Manager — Recipe edit iterative validation, ready',
+    recipeId: 'iw-r-blade',
+    steps: [{ selector: '#recipe-tab-validation' }, SCROLL_TO(VALIDATION_STEPS_GROUP)],
+    expectSelector:
+      `${VALIDATION_STEPS_GROUP}:has([data-check="iterativeCounters"][data-satisfied="true"]) ` +
+      '[data-check="iterativeStep:single"][data-satisfied="true"]',
+    sourceMatches: ITERATIVE_VALIDATION_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-mid-run',
+    label: 'Manager — Recipe edit iterative, workpieces in progress',
+    recipeId: 'iw-r-blade',
+    recipes: 'midRun',
+    expectSelector: '.manager-editor-notice-position [data-iterative-mid-run="2"]',
   }),
 ]);

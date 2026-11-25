@@ -354,6 +354,7 @@ function authoring(content) {
 /** Two Blade workpieces in progress, kept on the last lab actor so the Journal's own actor is untouched. */
 function installMidRunWorkpieces(content, actors) {
   const actor = actors.at(-1);
+  if (!actor) return;
   const system = ironworksOf(content);
   const blade = content.recipes.find((entry) => entry.id === 'iw-r-blade');
   const strike = system.iterative.actions.find((entry) => entry.id === 'strike');
@@ -363,6 +364,8 @@ function installMidRunWorkpieces(content, actors) {
     userId: 'user-lab-player',
     craftingSystemId: system.id,
     recipeId: blade.id,
+    // A current run, as an iterative start writes it; startup prunes a legacy instantaneous one.
+    lifecycleVersion: 1,
     status: 'inProgress',
     startedAt: 1_209_600 - 7200,
     updatedAt: 1_209_600 - 3600,

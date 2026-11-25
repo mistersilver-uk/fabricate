@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shippedString } from '../helpers/manager/managerLocalization.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
 import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
@@ -32,7 +33,11 @@ const harness = createMountedComponentHarness({
     'src/utils/rollFormulaRollability.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
     'src/utils/recipeActivationMessages.js',
-    'src/utils/scalars.js'
+    'src/utils/scalars.js',
+    // The iterative rows' mapper, their words and their step numbers (issue 3010).
+    'src/ui/svelte/apps/manager/recipe/iterative/iterativeRecipeReadiness.js',
+    'src/ui/svelte/apps/manager/iterative/iterativeIssueCopy.js',
+    'src/utils/fillPlaceholders.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -502,6 +507,131 @@ describe('RecipeValidationTab (mounted)', () => {
     await flushRender();
     assert.deepEqual(rowActionArgs(calls), [['results', 'result-group-g-fail']]);
     harness.remount();
+  });
+
+  // ── AN ITERATIVE RECIPE (issue 3010) ──────────────────────────────────────────────────────
+  describe('an iterative recipe', () => {
+    let original;
+    before(() => {
+      original = globalThis.game.i18n.localize;
+      globalThis.game.i18n.localize = shippedString;
+    });
+    after(() => {
+      globalThis.game.i18n.localize = original;
+    });
+
+    const sword = {
+      name: 'Etched Sword',
+      enabled: true,
+      steps: [
+        { id: 'heat', name: 'Heat the blank', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1' }] },
+        { id: 'etch', name: 'Etch the fuller', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'g2' }] }
+      ]
+    };
+    const steps = [
+      { index: 0, id: 'heat', name: 'Heat the blank' },
+      { index: 1, id: 'etch', name: 'Etch the fuller' }
+    ];
+    const issue = (code, stepIndex, severity = 'critical') => ({
+      kind: 'recipe', entityKind: 'recipe', entityId: 'r', entityName: 'Etched Sword', code, stepIndex, severity
+    });
+    const groupIds = (target) =>
+      [...target.querySelectorAll('[data-validation-group]')].map((group) => group.dataset.validationGroup);
+    const rowOf = (target, issueId) => target.querySelector(`[data-issue="${issueId}"]`);
+
+    it('opens with Steps, prefixes each row with its step or library entry, and passes the rest', async () => {
+      const target = await harness.mount({
+        recipe: sword,
+        iterativeReadiness: {
+          steps,
+          issues: [
+            issue('iterativeNoSuccessRule', 1),
+            issue('iterativeSuccessLineOnFailureGroup', 0, 'warning'),
+            {
+              kind: 'system', entityKind: 'counter', entityId: 'heat', entityName: 'Heat',
+              code: 'iterativeInvalidNumber', severity: 'critical'
+            }
+          ]
+        }
+      });
+      assert.deepEqual(groupIds(target), ['steps', 'ingredients', 'results', 'requirements']);
+      const stepsGroup = target.querySelector('[data-validation-group="steps"]');
+      assert.match(stepsGroup.querySelector('.manager-recipe-val-group-label').textContent, /Steps/);
+      assert.ok(stepsGroup.querySelector('.fa-list-ol'));
+
+      const counters = target.querySelector('[data-check="iterativeCounters"]');
+      assert.equal(counters.querySelector('.manager-recipe-val-title').textContent, 'Counters are set up');
+      assert.ok(counters.classList.contains('is-pass'));
+      assert.equal(
+        target.querySelector(':scope [data-check="iterativeStep:0"] .manager-recipe-val-title')
+          .textContent,
+        'Step 1, Heat the blank: counters, end rules and routes resolve'
+      );
+
+      const noRule = rowOf(target, 'iterativeNoSuccessRule:1');
+      assert.equal(noRule.dataset.check, 'iterativeStep:1', 'its step check claims it');
+      assert.equal(
+        noRule.querySelector('.manager-recipe-val-detail').textContent,
+        'Etch the fuller: A step has no success rule yet, so it needs iterative setup.'
+      );
+      const library = rowOf(target, 'iterativeInvalidNumber:counter:heat');
+      assert.ok(stepsGroup.contains(library), 'an Overview issue no check claims joins Steps');
+      assert.equal(
+        library.querySelector('.manager-recipe-val-title').textContent,
+        'Heat: A counter start, start formula, bound or target cannot be read.'
+      );
+      assert.ok(library.classList.contains('is-block'));
+      const onFailure = rowOf(target, 'iterativeSuccessLineOnFailureGroup:0');
+      assert.equal(onFailure.dataset.check, 'iterativeStep:0', 'the step check holds its warning');
+      assert.ok(onFailure.classList.contains('is-warn'));
+
+      assert.equal(target.querySelector('[data-recipe-count-blocking]').textContent.match(/\d+/)[0], '2');
+      assert.equal(target.querySelector('[data-recipe-count-warnings]').textContent.match(/\d+/)[0], '1');
+      harness.remount();
+    });
+
+    it('hands each row its route and the control it names', async () => {
+      const calls = [];
+      const target = await harness.mount({
+        recipe: sword,
+        iterativeReadiness: {
+          steps,
+          issues: [issue('iterativeNoCounters', null), issue('iterativeNoSuccessRule', 1), issue('iterativeUnknownAction', 0), issue('iterativeFinalStepProducesNothing', 1, 'warning')]
+        },
+        onSelectIssue: (...args) => {
+          calls.push(args);
+        }
+      });
+      for (const id of ['iterativeNoCounters:recipe', 'iterativeNoSuccessRule:1', 'iterativeUnknownAction:0', 'iterativeFinalStepProducesNothing:1']) {
+        rowOf(target, id).querySelector('[data-recipe-issue-view]').click();
+      }
+      await flushRender();
+      assert.deepEqual(calls.map((call) => call.slice(0, 2)), [
+        ['overview', 'iterative-counters-add'],
+        ['overview', 'iterative-step-1-success'],
+        ['overview', 'iterative-step-0-actions'],
+        ['results', '']
+      ]);
+      harness.remount();
+    });
+
+    it('reads a ready single-step recipe as pass rows with nothing blocking', async () => {
+      const target = await harness.mount({
+        recipe: { name: 'Tempered Blade', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'rg' }] },
+        iterativeReadiness: { steps: [], issues: [] }
+      });
+      const rows = [...target.querySelectorAll(':scope [data-validation-group="steps"] [data-check]')];
+      assert.deepEqual(
+        rows.map((row) => [row.dataset.check, row.querySelector('.manager-recipe-val-title').textContent]),
+        [
+          ['iterativeCounters', 'Counters are set up'],
+          ['iterativeStep:single', 'The step’s counters, end rules and routes resolve']
+        ]
+      );
+      assert.ok(rows.every((row) => row.classList.contains('is-pass')));
+      assert.equal(target.querySelector('[data-recipe-validation-summary]').dataset.recipeValidationSummary, 'clear');
+      harness.remount();
+    });
   });
 });
 
