@@ -27,6 +27,7 @@ import {
 } from '../utils/routedOutcomeKeywords.js';
 import { trimString as trimmed } from '../utils/scalars.js';
 
+import { evaluateIterativeReadiness } from './iterative/iterativeReadiness.js';
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -466,6 +467,8 @@ export function evaluateSystemValidation(system, { recipes, environments, compon
     ...collectEnvironmentIssues(environments),
     ...collectSalvageIssues(system, components),
     ...collectSystemBlockers(system, recipes, components),
+    // Never `blocks: 'system'` or `'visibility'`, so `computeSystemVisibility` does not read it.
+    ...evaluateIterativeReadiness(system, recipes),
   ];
 
   const counts = {

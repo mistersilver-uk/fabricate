@@ -24,7 +24,7 @@ CraftingSystem = {
 
   // System-level invariant for all recipes in this crafting system.
   // Mode semantics and validation are defined in resolution-modes/spec.md.
-  resolutionMode: "simple" | "routedByIngredients" | "routedByCheck" | "progressive" | "alchemy",
+  resolutionMode: "simple" | "routedByIngredients" | "routedByCheck" | "progressive" | "alchemy" | "iterative",
 
   // Tool-breakage authority for the whole system.
   // "toolSpecific" (default): each Tool's own breakage.mode decides whether it
@@ -440,7 +440,30 @@ CraftingSystem = {
   // Foundry Scene Region (RegionDocument / Region Behaviour), which a realm maps to
   // many-to-one through sceneMappings[].sceneRegionUuid.
   gatheringRealmSettings?: GatheringRealmSettings, // { enabled } only; default false. The realm library, reveal mode and modifier visibility are world scope — see TravelConfig
+
+  // The iterative library (requirement 37). Absent unless authored, and kept, inert, under
+  // every other mode.
+  iterative?: {
+    version: 1,
+    counters: [{ id, label, description?, limit: "none" | "perRecipe" | "global", min?, max? }],
+    actions: [{
+      id, label, description?, icon?, categories: string[], usesSession: boolean,
+      availability: { combine: "all" | "any", rules: CounterRule[] },
+      costs: [{ id, counterId, amount: string, needsEnough: boolean }],
+      check: "roll" | "none",
+      effects: [{ id, name?, description?, when: EffectWhen,
+                  target: { kind: "counter", counterId }, op: "add" | "subtract" | "set", amount: string }],
+    }],
+  },
 }
+
+CounterRule =
+  | { source: "counter", counterId, op: ">=" | "<=" | ">" | "<" | "=", value: number }
+  | { source: "sessionCount", op, value: number }
+  | { source: "previousAction", actionIds: string[] }
+
+EffectWhen = { combine: "all" | "any", checkOutcomeIds?: string[], success?: boolean,
+               value?: { op, value: number }, rules?: CounterRule[] }
 ```
 
 ### Check evaluation record
@@ -498,7 +521,8 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
    6d.
    Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
    Deleting a referenced item tag strips it from the `tags` of every component carrying it.
-7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
+7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, `"alchemy"`, or `"iterative"`.
+   `"iterative"` is accepted on read and write, and it is selectable only per `resolution-modes` § Iterative Mode Availability.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`checkMode: "none"`, `learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
@@ -758,6 +782,39 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
     Reading it is not authority, and neither is a shed: nothing is removed from any of the eight keys while this requirement holds.
     The world corpus is nevertheless part of each key's VALID ID BASIS — see `## Scoped Entity Definitions` requirement 16 — so a reference is pruned only when BOTH halves can vouch for the id set, and a world setting that has never been written vouches for nothing.
 
+37. `CraftingSystem.iterative`, when present, is `{ version, counters, actions }`, rebuilt with a fixed key set at every level, and any key the normalizer does not know is dropped.
+    - A counter is `{ id, label, description?, limit, min?, max? }`.
+    - An action is `{ id, label, description?, icon?, categories, usesSession, availability, costs, check, effects }`.
+    - A cost is `{ id, counterId, amount, needsEnough }`.
+    - An effect is `{ id, name?, description?, when, target: { kind: 'counter', counterId }, op: 'add' | 'subtract' | 'set', amount }`.
+    - `label` is a trimmed string (default `''`).
+    - `description`, `icon` and `name` are trimmed strings emitted only when non-empty, and `categories` holds unique trimmed strings.
+    - `amount` is a trimmed string, and a finite number becomes its string.
+    - An absent, `null` or non-object `iterative` normalizes to absent, so a system that never authored it persists no `iterative` key.
+    - `version` is written as the build's `ITERATIVE_LIBRARY_VERSION` (`1`), and an absent `version` reads as `1`.
+    - A block whose `version` is above the build's is kept verbatim and reported `iterativeVersionUnsupported`.
+    - Every counter, action, cost and effect id matches `^[a-z][A-Za-z0-9]*$`, is unique within its list, and is never minted or rewritten by a normalizer.
+    - `usesSession` defaults to `true`, `check` (`'roll' | 'none'`) to `'none'`, `availability` to `{ combine: 'all', rules: [] }`, and a cost's `needsEnough` to `true`.
+    - `limit` (`'none' | 'perRecipe' | 'global'`) defaults to `'none'`.
+    - A counter's `min` and `max` are absent unless authored, and are kept under every limit.
+      They are read only under `perRecipe`, as defaults a Counter Instance overrides, and under `global`, as fixed bounds.
+    - A counter or action with a missing, malformed or repeated id is dropped (the first wins), because every reference to it then reports as unknown.
+    - A cost, effect or `CounterRule` that does not parse is kept as authored, with only its record's known keys, and is never dropped.
+      Not parsing means a missing, malformed or repeated id, a missing or malformed reference id, an unknown `source`, `op` or `target.kind`, an empty or malformed `previousAction.actionIds`, a non-finite `value`, or an `amount` that is neither a string nor a finite number.
+    - A `CounterRule` that does not parse raises `iterativeInvalidRule`, and any other entry that does not parse raises `iterativeInvalidEntry`.
+      Both are blocking.
+    - An absent or `null` enum value takes its default.
+      A present value outside the enum (`check`, `limit`, `combine`) is kept as authored and raises `iterativeInvalidEntry`, never falling back to the default.
+    - A `CounterRule` is `{ source: 'counter', counterId, op, value }`, `{ source: 'sessionCount', op, value }` or `{ source: 'previousAction', actionIds }`, where `op` is one of `>=`, `<=`, `>`, `<`, `=` and `value` is finite.
+    - `EffectWhen` is `{ combine, checkOutcomeIds?, success?, value?: { op, value }, rules? }`, with `combine` (`'all' | 'any'`) defaulting to `'all'`.
+      `checkOutcomeIds` and `rules` are emitted only when non-empty, `success` only as a boolean, and `value` only as `{ op, value }`.
+      A present `success` that is not a boolean, a present `checkOutcomeIds` or `rules` that is not an array, or a `checkOutcomeIds` entry that is not a non-empty string makes the `when` not parse, so its effect is kept as authored and never narrowed.
+    - A present `availability` that is not an object, or a present `availability.rules`, `costs` or `effects` that is not an array, is kept as authored and raises `iterativeInvalidEntry`, so a malformed restriction never widens to none.
+    - Inside an iterative record every non-optional key is emitted at its default, as a deliberate exception to Recipe requirement 18, because the record is absent unless authored and its readers are new.
+      Optional keys are omitted when absent.
+    - No normalizer prunes a cross-record reference, so a dangling id survives and is a readiness issue.
+    - Iterative data is kept, inert, in a system of any other mode.
+
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
 
@@ -825,6 +882,8 @@ Requirements:
 4. The report computation is pure — no Foundry runtime globals, store reads, or
    I/O — so it is unit-testable and reusable from both the synchronous visibility
    hot-path and the GM overview view.
+5. An `iterative` system adds the iterative readiness codes (`resolution-modes` § Iterative Validation), as `kind: 'recipe'` or `kind: 'system'`, none carrying `blocks: 'system'` or `blocks: 'visibility'`.
+   Each iterative issue also carries `entityKind: 'recipe' | 'counter' | 'action' | 'system'`, naming the record its `entityId` identifies, because counter ids and action ids are unique only within their own list.
 
 ## CurrencyConfig
 
@@ -1662,6 +1721,20 @@ Recipe = {
   // (requirement 18) — the never-prune guard is the RECONSTRUCTED null, which absence
   // rebuilds, not the presence of the key on the wire.
   importSource: { systemId: string, importedAt: number } | null,
+
+  // Iterative configuration (requirement 19). Absent unless authored.
+  iterative?: {
+    counters: [{ counterId, start: number, startFormula?: string, min?, max?, target?, visible: boolean }],
+    step?: StepIterative, // a recipe with no explicit steps only
+  },
+}
+
+StepIterative = {
+  actions: { mode: "all" | "only", actionIds: string[] },
+  hiddenCounterIds: string[],
+  lockedCounterIds: string[],
+  success: CounterRule[], // AND
+  failure: CounterRule[], // OR
 }
 ```
 
@@ -1760,6 +1833,23 @@ Recipe = {
     The rule reaches the NESTED rows as well as the top-level ones (issue 1135).
     A result group emits `checkOutcomeIds` only when it names at least one routed outcome tier, at recipe level and step level alike, through the one serializer both emitters share; `_normalizeResultGroups` rebuilds `[]` from absence and the only two arbiters that read it — `ResolutionModeService`'s routed-group filters — treat an omitted key and `[]` identically.
     The nested ingredient rows are recorded under § IngredientSet, § IngredientGroup and § Ingredient, whose omissions are far larger than the recipe's own: on the corpus this rule was measured against, everything removable is 36.89% of a simple serialized corpus and 58.79% of a rich one, and the whole `ingredientSets` subtree is 54.66% / 93.68% of it.
+
+19. `Recipe.iterative`, when present, is `{ counters: CounterInstance[], step?: StepIterative }`.
+    - A Counter Instance is `{ counterId, start, startFormula?, min?, max?, target?, visible }`, unique by `counterId`, with `start` defaulting to `0` and `visible` to `true`.
+    - A Counter Instance with a missing, malformed or repeated `counterId` is dropped (the first wins).
+    - When present, `startFormula` replaces `start`, which is kept so switching back to a fixed start restores it.
+      An empty `startFormula` normalizes to absent, and a present one that is neither a string nor a finite number, a persisted `null` included, normalizes to `null`, which is a blocking readiness issue.
+    - A Counter Instance's `min` and `max` override the counter's only under `perRecipe`, and are kept but unread under `none` and `global`.
+    - A present non-finite `start`, `min`, `max` or `target` normalizes to `null` and is a blocking readiness issue, and an absent optional number stays absent.
+      A blank string is not a number.
+    - `Recipe.iterative.step` configures a recipe with no explicit steps and is dropped on one with explicit steps.
+    - A write that gives a recipe its first explicit step moves `Recipe.iterative.step` to that step's `Step.iterative` in the same write, and the reverse when the last explicit step is removed, because the normalizer drops it.
+    - `getExecutionSteps()` gives the implicit step that configuration, and plain-JSON readers use `iterativeStepsOf`.
+    - `iterativeStepsOf` answers one `{ stepIndex, iterative, resultGroups }` per execution step, the implicit step included, where `resultGroups` holds each group's `id`, `role` and `producedWhen`, and an implicit step's groups are the recipe-level groups.
+    - `toJSON()` emits `iterative` and each step's `iterative` as deep clones, so `termsSnapshot.recipe` carries them.
+    - An out-of-enum `actions.mode`, and a `producedWhen` line that does not parse, are kept as authored and raise `iterativeInvalidEntry`.
+      A `producedWhen` line does not parse when it is not an object, its `end` is not `success` or `failure`, or a present `rules` is not an array.
+    - The record follows CraftingSystem requirement 37's rules for unknown keys, defaults, ids and `CounterRule`.
 
 ### Validation Guidance
 
@@ -1922,6 +2012,8 @@ Step = {
     months?: number,
     years?: number,
   },
+
+  iterative?: StepIterative, // Recipe § Properties; absent unless authored
 }
 ```
 
@@ -1930,6 +2022,9 @@ Step = {
 1. `timeRequirement` is a duration declaration, not an absolute timestamp.
 2. If present, at least one of `minutes`, `hours`, `days`, `months`, `years` must be a positive number.
 3. Runtime execution normalises duration fields to a world-time target timestamp for gate evaluation.
+4. `Step.iterative`, when present, is `{ actions: { mode: 'all' | 'only', actionIds }, hiddenCounterIds, lockedCounterIds, success, failure }` with every key emitted at its default.
+   `{ mode: 'only', actionIds: [] }` allows no action.
+   A present `actions` that is not an object, and a present `actionIds`, `hiddenCounterIds` or `lockedCounterIds` that is not an array of ids, is kept as authored, never narrowed to a looser list, and blocks its recipe with `iterativeInvalidEntry`.
 
 ## IngredientSet
 
@@ -3159,15 +3254,21 @@ ResultGroup = {
   // the editor adds it empty and removes it through "Award results on a failed check",
   // and never synthesizes it. No other mode or checkMode selects it by role, and a
   // mode change into `progressive` drops it. Preserved verbatim by normalization so a
-  // settings-only mode flip round-trips it.
+  // settings-only mode flip round-trips it. In iterative mode the reserved failure group
+  // is selected only by its `producedWhen`, never by its role.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
   // alchemy tiered). Empty for non-tiered groups, and OMITTED from the serialized
   // payload when empty (issue 1135; see Recipe requirement 18).
   checkOutcomeIds?: string[],
+  // Iterative routing: the lines are OR'd, each line's rules are AND'd, and an empty
+  // `rules` always matches. Recipe and step groups only.
+  producedWhen?: [{ end: "success" | "failure", rules: CounterRule[] }],
   results: Result[],
 }
 ```
+
+`producedWhen` is normalized on recipe and step result groups only, never on salvage or gathering groups, and is emitted only when it holds a line (Recipe requirement 18).
 
 `ResultGroup.name` reserved/duplicate integrity now applies at the service layer for the routed modes AND alchemy `tiered` only (`ResolutionModeService._validateRoutedGroupNames`); with `resultSelection.provider` retired, the model no longer validates alchemy names via `Recipe._validateRoutedResultSelection`, and `Recipe._deriveComplex` never governs alchemy authoring (the editor forces a single ingredient set).
 

@@ -84,3 +84,19 @@ export function modeChangeConfirmContent(summary, toMode, localize) {
   }
   return blocks.map((block) => `<p>${block}</p>`).join('');
 }
+
+/** The `confirmDialog` options for a mode change to `toMode`, its content from `summary`. */
+export function modeChangeConfirmOptions(summary, toMode, localize) {
+  return {
+    title:
+      localize?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
+      'Change Resolution Mode?',
+    content: modeChangeConfirmContent(summary, toMode, localize),
+    yes: {
+      label:
+        localize?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeConfirm') || 'Change mode',
+      callback: () => true,
+    },
+    no: { callback: () => false },
+  };
+}

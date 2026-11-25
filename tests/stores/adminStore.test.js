@@ -1445,6 +1445,47 @@ describe('createAdminStore', () => {
       assert.equal(updateCalled, false);
     });
 
+    /** A store over `systems`, counting every confirm and every system write. */
+    async function modeChangeHarness(systems = null) {
+      const calls = { confirm: 0, update: 0 };
+      const services = createMockServices({
+        ...(systems && { systems }),
+        confirmDialog: async () => {
+          calls.confirm += 1;
+          return true;
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          calls.update += 1;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      return { store, calls };
+    }
+
+    it('setResolutionMode refuses iterative and an unknown token before the confirm, writing nothing', async () => {
+      for (const mode of ['iterative', 'bogus']) {
+        const { store, calls } = await modeChangeHarness(null);
+        assert.equal(await store.setResolutionMode(mode), false, mode);
+        assert.deepEqual(calls, { confirm: 0, update: 0 }, mode);
+      }
+      const { store, calls } = await modeChangeHarness(null);
+      assert.equal(await store.setResolutionMode('routed'), true, 'a legacy alias still confirms');
+      assert.deepEqual(calls, { confirm: 1, update: 1 });
+    });
+
+    it('setResolutionMode re-selecting the current iterative mode is still a no-op that succeeds', async () => {
+      const systems = [makeSystem({ id: 'sys1', name: 'Forge', resolutionMode: 'iterative' })];
+      const { store, calls } = await modeChangeHarness(systems);
+      assert.equal(await store.setResolutionMode('iterative'), true);
+      assert.deepEqual(calls, { confirm: 0, update: 0 });
+    });
+
     /** The confirm `content` a mode change to `mode` shows, over `recipes` and English copy. */
     async function resolutionModeConfirmContent(mode, recipes) {
       let content = null;

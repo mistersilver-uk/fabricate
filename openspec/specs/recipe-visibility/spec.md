@@ -175,6 +175,11 @@ The gate is evaluated against `game.user?.isGM`.
 The system-blocker decision is computed at most once per listing call (cached per
 system), not rebuilt per entity, because listing is a synchronous per-render read.
 
+Iterative readiness issues are recipe-scoped and never carry `blocks: 'system'` or `blocks: 'visibility'`, so the recipe stays listed and an active workpiece is never redacted.
+That includes "Needs iterative setup", `iterativeMultiStepOff`, `iterativeInvalidRule` and `iterativeInvalidEntry`.
+The library-wide `iterativeVersionUnsupported` and `iterativeCheckUnavailable` are deliberately not `blocks: 'system'` either: recipes stay listed and refuse a start, so an active workpiece is never redacted.
+`computeSystemVisibility` does not read the iterative readiness codes.
+
 ### Listing Algorithm
 
 Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentSourceActors`:
@@ -242,6 +247,7 @@ Reject when the recipe's `access` grant does not admit the viewer — the viewer
 6. If the mode is `item` or `knowledge`, re-run knowledge access evaluation.
 Reject if knowledge access is denied.
 7. Reject execution when any guard fails.
+8. In an `iterative` system, a recipe with a critical iterative readiness issue refuses a new start, and until Iterative Attempts ship every iterative start refuses (`resolution-modes` § Iterative Mode Availability).
 
 ## Alchemy Visibility and Learning
 

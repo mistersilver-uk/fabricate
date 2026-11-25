@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { summarizeModeChange } from '../../src/systems/migrateRecipeForModeChange.js';
-import { modeChangeConfirmContent } from '../../src/ui/svelte/stores/modeChangeConfirm.js';
+import {
+  modeChangeConfirmContent,
+  modeChangeConfirmOptions,
+} from '../../src/ui/svelte/stores/modeChangeConfirm.js';
 
 const EMPTY = { migrated: 0, deleted: [], droppedIngredientSets: [], droppedFailureSets: [] };
 const summary = (overrides) => ({ ...EMPTY, ...overrides });
@@ -167,5 +170,27 @@ describe('modeChangeConfirmContent', () => {
       ],
       'the deleted Recipe A contributes no dropped ingredient sets'
     );
+  });
+});
+
+describe('modeChangeConfirmOptions', () => {
+  it('builds the dialog options the store confirms with, localized when a key resolves', () => {
+    const options = modeChangeConfirmOptions(summary({ migrated: 2 }), 'simple', echo);
+    assert.equal(options.title, 'FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle');
+    assert.equal(
+      options.content,
+      modeChangeConfirmContent(summary({ migrated: 2 }), 'simple', echo)
+    );
+    assert.equal(options.yes.label, 'FABRICATE.Admin.SystemSettings.ResolutionModeChangeConfirm');
+    assert.equal(options.yes.callback(), true);
+    assert.equal(options.no.callback(), false);
+    assert.deepEqual(Object.keys(options), ['title', 'content', 'yes', 'no']);
+  });
+
+  it('falls back to English when localize answers nothing', () => {
+    const options = modeChangeConfirmOptions(summary({ migrated: 1 }), 'simple', english);
+    assert.equal(options.title, 'Change Resolution Mode?');
+    assert.equal(options.yes.label, 'Change mode');
+    assert.equal(options.content, '<p>1 recipe(s) will be migrated to simple.</p>');
   });
 });
