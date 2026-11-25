@@ -479,6 +479,7 @@
           <RecipeResultsTab
             {modeCallout}
             recipe={resultsRecipe}
+            {iterative}
             {alchemySimple}
             {simpleFailureSlot}
             isMultiStep={collapsed ? false : isMultiStep}

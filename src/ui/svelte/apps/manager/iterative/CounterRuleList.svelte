@@ -12,7 +12,7 @@
   | `counterSources` | `{ id, label }[]` | `[]` | the counter sources, a PROP: a caller narrows it, so it is never read from the store |
   | `actions` | `{ id, label }[]` | `[]` | the actions a Previous action rule may name |
   | `combineControl` | boolean | `true` | `false` hides the All/Any control, for a caller whose `combine` is set elsewhere |
-  | `sourceScope` | `'library'` \| `'step'` | `'library'` | `'step'` words a rule whose counter is not among `counterSources` as "{Counter} isn't tracked in this step."; the rule still renders, with its stored id, and keeps its remove control |
+  | `sourceScope` | `'library'` \| `'step'` | `'library'` | `'step'` words a rule whose counter is not among `counterSources` as "{Counter} isn't tracked in this step." and its source as "{Counter} (not tracked)"; the rule still renders, with its stored id, and keeps its remove control |
   | `counterNames` | `{ id, label }[]` | `[]` | names a rule's counter that `counterSources` lacks, else its stored id is shown |
   | `joiner` | `'and'` \| `'or'` | unset | with `combineControl={false}`, the localized word drawn above every rule after the first, as the prototype joins success rules with "and" and failure rules with "or" |
   | `adderLabel` | string | the "Rule" copy | overrides the adder button's label; C6 passes "Condition" |
@@ -115,7 +115,16 @@
     if (missing) {
       options.push({
         value: sourceKey(rule),
-        label: counterLabel(rule.counterId),
+        label:
+          sourceScope === 'step'
+            ? interpolate(
+                text(
+                  'FABRICATE.Admin.Manager.Iterative.RuleCounterUntrackedOption',
+                  '{counter} (not tracked)'
+                ),
+                { counter: counterLabel(rule.counterId) }
+              )
+            : counterLabel(rule.counterId),
         hint: counterWord,
       });
     }
