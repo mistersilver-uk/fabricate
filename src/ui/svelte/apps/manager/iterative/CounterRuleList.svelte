@@ -3,7 +3,7 @@
 <!--
   The list of `CounterRule`s a Crafting Action's availability, an effect's workpiece rules and, in
   C6, a recipe step's rules share: one inline `RuleRow` per rule, and the dashed "Rule" adder. It is
-  the only place `RuleRow` is used, and the only way `RuleSentence` is reached.
+  the one `RuleRow` wrapper for `CounterRule`s, so a caller never builds a rule row itself.
 
   Props (the contract C6 imports):
   | prop | values | default | contract |

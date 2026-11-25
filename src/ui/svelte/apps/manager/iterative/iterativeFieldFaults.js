@@ -1,9 +1,10 @@
 /**
- * The marks the Crafting Action editor draws beside a field, one `{ code, reason? }` each, where
- * `code` is the readiness code Validation reports for it. Nothing here re-judges: C2's fault
- * helpers and C3's expression analysis do, so a mark and the readiness issue cannot disagree on
- * what parses. `faultSentence(fault, text)` is the one copy for every mark, and `expressionFaults`
- * takes any C3 profile, `start` included, so recipe authoring reuses both unchanged.
+ * The marks the Crafting Action editor draws beside a field, one `{ code, reason?, field? }` each,
+ * where `code` is the readiness code Validation reports for it and `field` names the field a mark
+ * is drawn under when it belongs to no single row. Nothing here re-judges: C2's fault helpers and
+ * C3's expression analysis do, so a mark and the readiness issue cannot disagree on what parses.
+ * `faultSentence(fault, text)` is the one copy for every mark, and `expressionFaults` takes any C3
+ * profile, `start` included, so recipe authoring reuses both unchanged.
  */
 import { namesCheckFact } from '../../../../../systems/iterative/attemptLibrary.js';
 import { counterRuleFault, entryFaults } from '../../../../../systems/iterative/counterRule.js';

@@ -1,6 +1,7 @@
 /**
  * The GM's view of the iterative library, as pure functions: the id a new entry is minted with,
- * the name rule a Counter keeps, and where a Counter or Crafting Action is used.
+ * the name rule a Counter keeps, where a Counter or Crafting Action is used, and each Crafting
+ * Action's issue counts as Validation reports them.
  */
 import { iterativeStepsOf } from '../../../../../models/iterativeStepConfig.js';
 import { isIterativeId } from '../../../../../systems/iterative/counterRule.js';
