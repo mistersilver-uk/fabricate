@@ -1269,6 +1269,8 @@ export class GatheringRichStateService {
    * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which commit this
    *   is. A timed run commits at start and at maturity, so `onStart` depletes at `waitingStart`
    *   and `onSuccess` at `timedMaturity`; an `immediate` attempt commits once.
+   * @param {{stamina?: object|null}|null} [args.startCommit] A later commit of a run passes what its
+   *   start commit recorded: that start spent the stamina, so this commit spends none and keeps it.
    */
   async commitAcceptedAttempt({
     actor,
@@ -1279,6 +1281,7 @@ export class GatheringRichStateService {
     viewer = null,
     interactableRef = null,
     phase = 'immediate',
+    startCommit = null,
   } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
@@ -1293,7 +1296,6 @@ export class GatheringRichStateService {
     };
 
     const systemId = system?.id || environment?.craftingSystemId;
-    const staminaEnabled = this.staminaEnabled(systemId);
     const nodesEnabled = this.nodesEnabled(systemId);
 
     const source = this.nodeService._resolveNodeSource({ environment, task, interactableRef });
@@ -1323,17 +1325,15 @@ export class GatheringRichStateService {
       };
     }
 
-    if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
-      await this.staminaService.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
-      // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
-      if (this.staminaService.getActorStamina(actor, systemId).max != null) {
-        const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
-        if (cost > 0) {
-          await this.staminaService.adjustActorStamina(actor, { systemId, delta: -cost });
-          evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
-        }
-      }
-    }
+    evidence.stamina = await this.staminaService.spendForCommit({
+      actor,
+      systemId,
+      system,
+      environment,
+      task,
+      startCommit,
+      resolveCost: () => this._effectiveStaminaCost({ actor, system, environment, task, viewer }),
+    });
 
     this._callHook('fabricate.gathering.richAttemptCommitted', {
       actor,

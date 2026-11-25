@@ -42,6 +42,7 @@ Each can be on or off on its own:
 
 Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them).
 A task with no stamina cost is never gated by stamina.
+An attempt spends its stamina cost once, when it starts: a timed or ready attempt is not charged again when it finishes.
 Resource-node enforcement applies per task only where you author a node pool on that task.
 Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles.
 The toggles only decide whether each limitation is _active_ for the system.

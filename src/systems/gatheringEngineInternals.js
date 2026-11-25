@@ -182,3 +182,13 @@ export {
   stringOrEmpty,
   stringOrNull,
 } from '../utils/scalars.js';
+
+/** What a run's start commit recorded, or null for no run: a versioned run's applied economy
+ * receipt; a legacy waiting run recorded none, so its `stamina` stays undefined. */
+export function runStartCommit(run) {
+  if (!run) return null;
+  const start = iterableToArray(run.executionJournal?.effects).find(
+    (effect) => effect?.kind === 'commitGatheringEconomy' && effect.phase === 'applied'
+  );
+  return start ? { stamina: plainObjectOrNull(start.receipt)?.stamina ?? null } : {};
+}
