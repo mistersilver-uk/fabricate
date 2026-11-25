@@ -82,8 +82,8 @@ export function createExpressionReader(
   }
   function parseCall(spec) {
     const args = [parseExpression()];
-    while (consume(',')) args.push(parseExpression());
-    if (!consume(')') || args.length < spec.minArgs || args.length > spec.maxArgs) throw 'invalid';
+    while (args.length < spec.maxArgs && consume(',')) args.push(parseExpression());
+    if (!consume(')') || args.length < spec.minArgs) throw 'invalid';
     return spec.apply(...args);
   }
   function parsePrimary() {

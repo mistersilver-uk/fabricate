@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PATH_TOKEN as REEXPORTED_PATH_TOKEN } from '../src/systems/checkEvaluation.js';
+import {
+  PATH_TOKEN as REEXPORTED_PATH_TOKEN,
+  resolveDeterministicExpression,
+} from '../src/systems/checkEvaluation.js';
 import {
   createExpressionReader,
   DEFAULT_FUNCTIONS,
@@ -48,6 +51,21 @@ test('the default functions take one argument and a name outside its arity is in
   for (const source of ['floor(1,2)', 'floor()', 'floor', 'floor + 1', 'floorx(1)', 'Floor(1)']) {
     assert.equal(read(source), 'invalid', source);
   }
+});
+
+test('an extra argument is refused as invalid before it is read, in both path modes', () => {
+  for (const pathMode of [undefined, 'foundry']) {
+    const options = { pathMode };
+    const missing = resolveDeterministicExpression('floor(1, @missing)', {}, options);
+    assert.deepEqual(missing, { ok: false, reason: 'invalid' }, String(pathMode));
+    const text = resolveDeterministicExpression('round(1, @s)', { s: 'abc' }, options);
+    assert.deepEqual(text, { ok: false, reason: 'invalid' }, String(pathMode));
+  }
+});
+
+test('an injected function with an unbounded maxArgs still reads every argument', () => {
+  assert.equal(read('min(1, 2, 3)', { functions: { min } }), 1);
+  assert.equal(read('min(4, 2, 3)', { functions: { min } }), 2);
 });
 
 test('a default reader refuses abs, min, max and dice terms', () => {
