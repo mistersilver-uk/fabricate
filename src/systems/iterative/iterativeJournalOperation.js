@@ -8,13 +8,11 @@ import { engineWithStationPresence } from '../stationPresence.js';
 
 import { takeIterativeAttempt } from './IterativeAttemptExecutor.js';
 import { findAttemptEntry } from './iterativeStepState.js';
+import { settleIterativeTerminal } from './iterativeTerminalOperation.js';
 
 export const ATTEMPT_ID_MAX_LENGTH = 64;
 
 const failure = (reason, extra = {}) => ({ success: false, reason, ...extra });
-
-/** Until terminal settlement lands, a step-ending attempt is refused with nothing written. */
-const settleIterativeTerminal = () => failure('unsupported-operation');
 
 const validAttemptId = (value) =>
   typeof value === 'string' && value.length > 0 && value.length <= ATTEMPT_ID_MAX_LENGTH;

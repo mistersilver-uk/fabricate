@@ -2095,6 +2095,7 @@
       "Results": "Created",
       "Roll": "Roll",
       "FailureReason": "Reason",
+      "IterativeFailure": "A failure condition for this step was met.",
       "ConsumedOnFailure": "Consumed on Failure",
       "ProducedOnFailure": "Produced on Failure",
       "GatherSuccess": "Gathering Successful",

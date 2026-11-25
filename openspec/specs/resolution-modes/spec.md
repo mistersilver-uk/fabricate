@@ -1186,6 +1186,11 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - An empty rule list always holds, and nothing is selected when no line matches.
 - A group with no `producedWhen` is never selected, and the failure group is selected only by its `producedWhen`, never by its role.
 - A counter rule reads a counter value, the session count or the previous action, and a rule that does not parse, or names a counter with no value, holds nothing.
+- The selected group settles exactly once, through one execution journal whose effects run in this order: `record-attempt`, `apply-tools`, the versioned award effects (`award-results`, `award-rewards`) over the selected group only, `finalize-iterative-step`, `record-recipe-use` on a success, and `post-chat`.
+- No complication fires, because component complications are progressive-only.
+- A terminal success advances the run to its next step, unstarted, or completes it `succeeded`, and records recipe use.
+- A terminal failure ends the step and the run `failed`, keeps their inputs consumed, awards only a matching failure group, and never advances.
+- A checked terminal attempt's craft card carries its check roll, so the roll posts once.
 
 ### Iterative Validation
 

@@ -544,6 +544,7 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
+    `breakToolsOnFail` is inert in `iterative` mode, where Tools are used at every iterative step end, success or failure.
     Before 1.35.0 a failed alchemy check ignored this field and always broke tools; the 1.35.0 migration stamps `true` onto every existing alchemy system with no explicit value so that behaviour does not change (`destructive-changes-and-migrations/spec.md` § Alchemy Break-Tools-on-Fail Default), and `ui-system-studio/spec.md` § The On-failure section documents the Checks Studio switch that now reads and writes it for alchemy.
 14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
     A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
@@ -3790,6 +3791,8 @@ CraftingRunStepState = {
    An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
    A main Roll that throws after a spend refuses with `data.targetRefusal: 'roll-failed'`, the error in its message and `data.boughtDice`, never a failed check.
 6. `failureReason` is required when `status` is `failed`.
+   An iterative step's terminal failure sets `failureReason: 'iterativeFailure'`, a stable code, unlike the free text other modes write, and every display localizes it and never prints it raw.
+   An iterative step carries no `lastCheckResult`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
 8. `preparedConsumption.essenceEnabled` records each contributing essence's `enabled` state as it stood at START, and the FINISH phase evaluates the essence behaviour gate from it rather than from the live definitions.
@@ -3872,6 +3875,7 @@ Versioned stage arming captures `presentationSnapshot` from the authoritative ex
 For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+An iterative step records `{ kind, mode: 'iterative' }` derived from its Iterative Attempts, not from the active-check derivation: `none` at start and `check` from its first checked Iterative Attempt, kept through finalization without `product` or `direction`.
 Only an executed, permitted versioned `kind: "check"` stage may additionally retain a validated `product` and `direction` (`over` or `under`); both history allowlists require an executed versioned boundary and snapshot values that agree with the check result's, beside a finite raw total in that result, and drop both when they disagree.
 No-check, ingredient-routed, fizzle, legacy and gathering d100 snapshots gain no evaluation metadata.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.

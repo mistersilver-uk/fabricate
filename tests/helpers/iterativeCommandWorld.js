@@ -30,7 +30,8 @@ const plainAction = (id, extra = {}) => ({
 
 /**
  * `heat` ends a step at 4 and an empty `fuel` fails it. `stoke` burns 1 fuel for 1 heat, `hammer`
- * rolls the routed check for 1 heat on a hit, `rest` changes nothing and `heave` costs 5 fuel.
+ * rolls the routed check for 1 heat on a hit, `rest` changes nothing, `blast` adds 3 heat and
+ * `heave` costs 5 fuel.
  */
 export function forgeLibrary() {
   return {
@@ -77,6 +78,17 @@ export function forgeLibrary() {
         ],
       },
       plainAction('rest'),
+      plainAction('blast', {
+        effects: [
+          {
+            id: 'flare',
+            when: { combine: 'all' },
+            target: { kind: 'counter', counterId: 'heat' },
+            op: 'add',
+            amount: '3',
+          },
+        ],
+      }),
       plainAction('heave', {
         costs: [{ id: 'lift', counterId: 'fuel', amount: '5', needsEnough: true }],
       }),
@@ -193,6 +205,12 @@ class OreItem {
     return this.flags?.[namespace]?.[key];
   }
 
+  async setFlag(namespace, key, value) {
+    this.flags[namespace] ??= {};
+    this.flags[namespace][key] = structuredClone(value);
+    return this;
+  }
+
   async delete() {
     this.parent.items = this.parent.items.filter((entry) => entry !== this);
     return this;
@@ -224,6 +242,7 @@ export function forgeActor({ ore = 3, tools = [] } = {}) {
       const item = new OreItem(actor, `made-${actor.created.length}-${index}`, 'made');
       Object.assign(item, { name: entry.name, flags: structuredClone(entry.flags ?? {}) });
       item.system = { ...item.system, ...structuredClone(entry.system ?? {}) };
+      item._source = { system: structuredClone(item.system) };
       return item;
     });
     actor.items.push(...made);

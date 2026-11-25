@@ -260,6 +260,11 @@ Roll data — ability scores, proficiency and any other actor-derived value the 
 - A refused Iterative Attempt changes no counter, count, Tool or item.
   A refusal found after the check is evaluated returns no `check` and no `rollHandoff`, so the player posts no roll, and a secret check's GM-only roll, which the authority posts at evaluation, still stands as the record of a roll that changed nothing.
 - Tools are checked for presence when the step starts and at every Iterative Attempt's preflight, and their check bonuses apply to every checked Iterative Attempt.
+- A terminal Iterative Attempt records the attempt, uses Tools, awards the selected result group at most once, completes the step, and advances or ends the run, all through one execution journal.
+- After a terminal success, the run advances to its next step, unstarted, or completes `succeeded`.
+- After a terminal failure, the step and run end `failed`, the step's inputs stay consumed, only a matching failure group is awarded, and the run never advances.
+- Tools are used and broken once per step, at its end, whether it succeeded or failed.
+- Under `checkDriven`, a `checkBreakage` trigger on any checked Iterative Attempt latches `toolBreakOwed`, which breaks the Tools at the step's end.
 
 ### Captured Execution Evidence
 
