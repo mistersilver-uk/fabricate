@@ -1530,3 +1530,21 @@ Player-facing event copy is framed as a neutral encounter (a travelling merchant
 - Event-outcome copy uses event terminology (for example "If an event occurs, your gather still succeeds." / "…the gather fails.") rather than risk/hazard terminology.
 - Copy that legitimately describes the danger axis (for example "Danger tags let environments opt in…") is retained.
   The d100 result-group validation copy still reserves the failure aliases (including the former miss/`hazard` terms) as forbidden result-group names — this is the failure-keyword concept, not the Gathering Event concept.
+
+## Counters Screen
+
+The Counters screen lists the system's Counters as an ordered, expandable list whose order is the persisted order.
+Each row shows its name, its limit, and its usage across Crafting Actions and recipe steps, or "Not used yet".
+An expanded row edits the name, a GM-only description, and the Limits choice of No limit, Per recipe or Global.
+Global edits fixed bounds, Per recipe edits default bounds a recipe may override, and No limit hides the bounds without discarding them.
+
+- Edits apply as they are made, and the screen has no Save.
+- An empty name, or one that matches another Counter's name ignoring case and surrounding space, is shown as an error and is not written.
+- A row whose persisted name duplicates another Counter's shows a "Duplicate name" chip and opens expanded.
+- A minimum above a maximum is written, shown as an error on the row, and reported as a blocking readiness issue.
+- A new Counter's id is derived once, when it is created, from the label it has then: camelCase, falling back to `counter` (or `action`, `cost`, `effect` for those lists) when the label has no ASCII letter or digit, and given a numeric suffix until unique in its list.
+  It is never changed, so renaming a Counter rewrites no expression.
+- Reordering is keyboard-accessible, with the new position announced, through the shared list contract, and it is unavailable while a search is active.
+- The screen offers search with a shown-of-total count, an empty state with "New counter", and a separate state for a search that matches nothing.
+- Deleting a Counter confirms through the Manager confirmation dialog and announces "{name} deleted." through the list's live region.
+- The screen is read-only, behind a blocking notice, when the system's iterative settings were made by a newer version of Fabricate.

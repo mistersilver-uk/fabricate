@@ -12,6 +12,8 @@
   | `text` | the shell's localizer | — | `(key, fallback)` |
 -->
 <script>
+  import CountersView from './CountersView.svelte';
+
   let { route, currentView = '', text = () => '' } = $props();
 
   const LABELS = {
@@ -28,4 +30,25 @@
   data-iterative-route
   data-iterative-view={currentView}
   data-iterative-unsupported={route.unsupported ? '' : undefined}
-></main>
+>
+  {#if currentView === 'iterative-counters'}
+    <CountersView
+      counters={route.counters}
+      actions={route.actions}
+      recipes={route.recipes}
+      systemName={route.systemName}
+      selectedSystemId={route.systemId}
+      unsupported={route.unsupported}
+      expandedId={route.expandedCounterId}
+      focusNameId={route.focusNameId}
+      browserState={route.countersBrowse}
+      {text}
+      onAdd={route.addCounter}
+      onUpdate={route.updateCounter}
+      onReorder={route.reorderCounters}
+      onDelete={route.deleteCounter}
+      onExpand={route.expandCounter}
+      onNameFocused={route.clearNameFocus}
+    />
+  {/if}
+</main>

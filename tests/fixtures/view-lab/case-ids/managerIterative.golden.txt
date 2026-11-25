@@ -1,1 +1,13 @@
 manager-iterative-rail
+manager-iterative-counters
+manager-iterative-counters-searched
+manager-iterative-counter-limit-none
+manager-iterative-counter-limit-per-recipe
+manager-iterative-counter-limit-global
+manager-iterative-counters-empty
+manager-iterative-counter-duplicate-name
+manager-iterative-counter-bounds-inverted
+manager-iterative-counter-delete-in-use
+manager-iterative-counters-filtered-empty
+manager-iterative-counters-narrow
+manager-iterative-library-unsupported

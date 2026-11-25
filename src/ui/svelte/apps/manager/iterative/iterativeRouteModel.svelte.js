@@ -5,8 +5,10 @@
  */
 import { iterativeLibraryVersionUnsupported } from '../../../../../systems/normalize/iterativeLibrary.js';
 import { arrayOrEmpty } from '../../../../../utils/scalars.js';
+import { createActionsBrowserState } from '../../../../model/managerBrowserViewState.js';
 
 import { createIterativeActionDraft } from './iterativeActionDraft.svelte.js';
+import { createIterativeCounterRoute } from './iterativeCounterRoute.svelte.js';
 
 /** Read-only accessors for `reads`, each a thunk, so the model hands out live values. */
 const accessors = (reads) =>
@@ -51,9 +53,11 @@ export function createIterativeRouteModel({
   services,
   text,
 }) {
-  let expandedCounterId = $state('');
+  // The browser's search, filters and page outlive the editor round trip and are never persisted.
+  const actionsBrowse = $state(createActionsBrowserState());
 
   const section = () => store()?.iterative;
+  const counterRoute = createIterativeCounterRoute({ section, setView, services, text });
   const library = $derived(selectedSystem()?.iterative ?? null);
   const unsupported = $derived(iterativeLibraryVersionUnsupported(library));
   const counters = $derived(unsupported ? [] : arrayOrEmpty(library?.counters));
@@ -101,18 +105,7 @@ export function createIterativeRouteModel({
     duplicateAction,
     deleteAction,
     saveAction: staged.save,
-    expandCounter: (id) => {
-      expandedCounterId = id;
-    },
-    openCounter: (id) =>
-      setView('iterative-counters', () => {
-        expandedCounterId = id;
-      }),
-    addCounter: async () => {
-      const id = await section()?.addCounter();
-      if (id) expandedCounterId = id;
-      return id;
-    },
+    ...counterRoute.handlers,
     startNewAction: () =>
       setView('iterative-action-edit', () => staged.begin(section().newActionDraft())),
     backToActions: () => setView('iterative-actions'),
@@ -122,13 +115,16 @@ export function createIterativeRouteModel({
     methods,
     accessors({
       library: () => library,
+      systemId: () => selectedSystem()?.id ?? '',
+      systemName: () => selectedSystem()?.name ?? '',
       unsupported: () => unsupported,
       counters: () => counters,
       actions: () => actions,
       counterCount: () => counters.length,
       actionCount: () => actions.length,
       recipes: () => recipes,
-      expandedCounterId: () => expandedCounterId,
+      ...counterRoute.reads,
+      actionsBrowse: () => actionsBrowse,
       actionDraft: () => staged.draft,
       actionSaving: () => staged.saving,
       isNewAction: () => staged.isNew,
