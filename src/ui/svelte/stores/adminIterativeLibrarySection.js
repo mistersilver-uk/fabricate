@@ -109,6 +109,44 @@ const blankAction = () => ({
 });
 
 /**
+ * The memo of active iterative runs, read by the editors' in-progress notes. It walks nothing
+ * until an editor route watches it, and publishes only a list that differs from the last.
+ */
+function createActiveRunsMemo(services) {
+  const activeRuns = writableStore([]);
+  let watching = false;
+  let runsRefreshQueued = false;
+  let runsKey = '[]';
+  const keyOf = (runs) =>
+    JSON.stringify(runs.map((run) => [run?.recipeId, run?.craftingSystemId, run?.actionIds]));
+  function recomputeActiveRuns() {
+    const runs = arrayOrEmpty(services.getActiveIterativeRuns?.());
+    const key = keyOf(runs);
+    if (key === runsKey) return;
+    runsKey = key;
+    activeRuns.set(runs);
+  }
+
+  return {
+    activeIterativeRuns: { subscribe: activeRuns.subscribe },
+    /** Starts or stops keeping the memo; turning it on recomputes once. */
+    watchActiveRuns(on) {
+      watching = on === true;
+      if (watching) recomputeActiveRuns();
+    },
+    /** Recomputes the memo through one coalescing microtask while watched, and does nothing otherwise. */
+    scheduleActiveRunsRefresh() {
+      if (!watching || runsRefreshQueued) return;
+      runsRefreshQueued = true;
+      queueMicrotask(() => {
+        runsRefreshQueued = false;
+        if (watching) recomputeActiveRuns();
+      });
+    },
+  };
+}
+
+/**
  * @param {object} deps
  * @param {object} deps.services The manager services: the system manager, `localize`, `notify`.
  * @param {object} deps.selectedSystemId The selected system's id store.
@@ -156,46 +194,12 @@ export function createIterativeLibrarySection({
     return systemId ? (recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []) : [];
   };
 
-  // The memo of active iterative runs, read by the editors' in-progress notes. It walks nothing
-  // until an editor route watches it, and publishes only a list that differs from the last.
-  const activeRuns = writableStore([]);
-  let watching = false;
-  let runsRefreshQueued = false;
-  let runsKey = '[]';
-  const keyOf = (runs) =>
-    JSON.stringify(runs.map((run) => [run?.recipeId, run?.craftingSystemId, run?.actionIds]));
-  function recomputeActiveRuns() {
-    const runs = arrayOrEmpty(services.getActiveIterativeRuns?.());
-    const key = keyOf(runs);
-    if (key === runsKey) return;
-    runsKey = key;
-    activeRuns.set(runs);
-  }
-
-  /** Starts or stops keeping the memo; turning it on recomputes once. */
-  function watchActiveRuns(on) {
-    watching = on === true;
-    if (watching) recomputeActiveRuns();
-  }
-
-  /** Recomputes the memo through one coalescing microtask while watched, and does nothing otherwise. */
-  function scheduleActiveRunsRefresh() {
-    if (!watching || runsRefreshQueued) return;
-    runsRefreshQueued = true;
-    queueMicrotask(() => {
-      runsRefreshQueued = false;
-      if (watching) recomputeActiveRuns();
-    });
-  }
-
   const copyLabel = (label) =>
     localized('FABRICATE.Admin.Manager.Iterative.CopyLabel', `${label} copy`, { label });
 
   return {
     systemRecipes,
-    activeIterativeRuns: { subscribe: activeRuns.subscribe },
-    watchActiveRuns,
-    scheduleActiveRunsRefresh,
+    ...createActiveRunsMemo(services),
     /** Adds a Counter under a placeholder name, so its id comes from that name; answers its id. */
     addCounter: () =>
       commit((library) =>

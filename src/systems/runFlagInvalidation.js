@@ -50,10 +50,7 @@ export function runContainersChanged(changes, hasProperty = hasByPath) {
   ).map(({ manager }) => manager);
 }
 
-/**
- * `true` when an `updateActor` diff touches a world actor's crafting runs. A compendium actor or a
- * synthetic token actor also fires `updateActor`, but crafting runs begin only on world actors.
- */
+/** Whether an `updateActor` diff touches crafting runs, which begin on world actors only. */
 export function worldCraftingRunsChanged(actor, changes) {
   if (actor?.pack || actor?.isToken === true) return false;
   return runContainersChanged(changes).includes('crafting');
