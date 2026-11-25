@@ -59,6 +59,9 @@
     ...rest
   } = $props();
 
+  // The iterative editors state the active runs, so the store's memo is watched while one is open.
+  $effect(() => iterativeRoute?.watchRuns?.(currentView));
+
   const crumbs = $derived(
     headerBreadcrumbs({
       ...rest,

@@ -9,7 +9,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { writable } from 'svelte/store';
 
 import { flushSync } from '../node_modules/svelte/src/index-client.js';
-import { effect_root } from '../node_modules/svelte/src/internal/client/index.js';
+import { effect_root, user_effect } from '../node_modules/svelte/src/internal/client/index.js';
 import { activeIterativeRuns } from '../src/systems/runTerms.js';
 import { createIterativeLibrarySection } from '../src/ui/svelte/stores/adminIterativeLibrarySection.js';
 
@@ -212,58 +212,68 @@ describe('the route model counts', () => {
         },
       },
     };
-    let model;
-    const stop = effect_root(() => {
-      model = createIterativeRouteModel({
-        store: () => store,
-        selectedSystem: () => ({ id: 'iron', resolutionMode: 'iterative' }),
-        currentView: () => live.get('view'),
-        viewState: () => null,
-        setView: () => {},
-        services: () => ({}),
-        text: (key, fallback) => fallback,
-      });
+    // Built outside any component effect, as the action editor's suite builds it.
+    const model = createIterativeRouteModel({
+      store: () => store,
+      selectedSystem: () => ({ id: 'iron', resolutionMode: 'iterative' }),
+      currentView: () => live.get('view'),
+      viewState: () => null,
+      setView: () => {},
+      services: () => ({}),
+      text: (key, fallback) => fallback,
     });
-    flushSync();
-    return { model, live, watched, memo, stop };
+    return { model, live, watched, memo };
   }
 
   it('counts the selected system only, and each recipe and action on its own', () => {
-    const { model, stop } = open();
+    const { model } = open();
     assert.equal(model.activeRunCount('blade'), 2);
     assert.equal(model.activeRunCount('nail'), 1);
     assert.equal(model.activeRunCount('ghost'), 0);
     assert.equal(model.actionActiveRunCount('strike'), 2);
     assert.equal(model.actionActiveRunCount('stoke'), 1);
-    stop();
   });
 
   it('reads the snapshot action ids, so an action the library no longer holds still counts', () => {
-    const { model, stop } = open('iterative-action-edit');
+    const { model } = open('iterative-action-edit');
     assert.equal(model.actionActiveRunCount('strike'), 2);
-    stop();
   });
 
-  it('answers 0 off the editor routes, and watches the memo only on them', () => {
-    const { model, live, watched, stop } = open('iterative-actions');
+  it('answers 0 off the editor routes', () => {
+    const { model, live } = open('iterative-actions');
     assert.equal(model.activeRunCount('blade'), 0);
     assert.equal(model.actionActiveRunCount('strike'), 0);
     live.set('view', 'recipe-edit');
     flushSync();
     assert.equal(model.activeRunCount('blade'), 2);
+  });
+
+  it('is built outside a component without an error, and leaves the watch off', () => {
+    const { watched } = open();
+    flushSync();
+    assert.deepEqual(watched, []);
+  });
+
+  it('watches the memo only on an editor route, and stops with the effect that asked', () => {
+    const { model, live, watched } = open('iterative-actions');
+    const stop = effect_root(() => {
+      user_effect(() => model.watchRuns(live.get('view')));
+    });
+    flushSync();
+    live.set('view', 'recipe-edit');
+    flushSync();
     live.set('view', 'iterative-actions');
     flushSync();
-    assert.deepEqual(watched, [false, true, false]);
     stop();
+    assert.deepEqual(watched, [false, false, true, false, false, false]);
   });
 
   it('republishes a count when the memo changes', () => {
-    const { model, memo, stop } = open();
+    const { model, memo } = open();
     assert.equal(model.activeRunCount('nail'), 1);
     memo.set([]);
     flushSync();
     assert.equal(model.activeRunCount('nail'), 0);
-    stop();
   });
 });
 
