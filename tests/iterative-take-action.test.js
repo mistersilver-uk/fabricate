@@ -163,6 +163,7 @@ describe('a non-terminal Iterative Attempt', () => {
       { actionId: 'rest', attemptId: 'x'.repeat(65) },
       { actionId: 'rest' },
       { attemptId: 'no-action' },
+      { actionId: 'rest', attemptId: 5 },
     ]) {
       const reply = await unchangedBy(world, () =>
         world.service.handleRequest(request(world, 'takeAction', payload), 'gm')
@@ -174,6 +175,36 @@ describe('a non-terminal Iterative Attempt', () => {
       'gm'
     );
     assert.equal(longest.success, true, JSON.stringify(longest));
+  });
+
+  it('refuses a takeAction for any run type but crafting before any describe', async () => {
+    const world = await startedWorld();
+    const reply = await unchangedBy(world, () =>
+      world.service.handleRequest(
+        request(
+          world,
+          'takeAction',
+          { actionId: 'hammer', attemptId: 'gather' },
+          {
+            runType: 'gathering',
+          }
+        ),
+        'gm'
+      )
+    );
+    assert.equal(reply.reason, 'invalid-command');
+    assert.deepEqual(world.messages, []);
+  });
+
+  it('checks the actor owner before it answers a replay', async () => {
+    const world = await startedWorld();
+    const sent = request(world, 'takeAction', { actionId: 'stoke', attemptId: 'mine' });
+    assert.equal((await world.service.handleRequest(sent, 'player')).success, true);
+    const reply = await unchangedBy(world, () =>
+      world.service.handleRequest({ ...sent, requestId: 'observer-replay' }, 'observer')
+    );
+    assert.equal(reply.reason, 'owner-required');
+    assert.equal(Object.hasOwn(reply, 'iterative'), false);
   });
 });
 
@@ -296,6 +327,30 @@ describe('a checked Iterative Attempt', () => {
       }
     );
     assert.deepEqual(sent[0].payload, { prepareToken: 'token', releases: 'takeAction' });
+  });
+
+  it('binds a prepare token to its operation, for a settle and for a release', async () => {
+    const world = await startedWorld();
+    const leg = (extra = {}) =>
+      request(world, 'takeAction', { actionId: 'hammer', attemptId: 'bound', ...extra });
+    const described = await world.service.handleRequest(leg(), 'gm');
+    const { prepareToken } = described;
+    const execute = await unchangedBy(world, () =>
+      world.service.handleRequest(
+        request(world, 'execute', { prepareToken, rollDecision: {} }),
+        'gm'
+      )
+    );
+    assert.equal(execute.reason, 'prepare-token-invalid', JSON.stringify(execute));
+    assert.deepEqual(world.messages, [], 'an execute leg rolls nothing on a takeAction token');
+    const wrongRelease = await world.service.handleRequest(
+      request(world, 'releaseCheck', { prepareToken, releases: 'execute' }),
+      'gm'
+    );
+    assert.equal(wrongRelease.reason, 'prepare-token-invalid');
+    const rolled = await world.service.handleRequest(leg({ prepareToken, rollDecision: {} }), 'gm');
+    assert.equal(rolled.success, true, JSON.stringify(rolled));
+    assert.equal(rolled.iterative.attempt.actionId, 'hammer');
   });
 
   it('refuses stale-run when another manager moves the run at persist, posting no roll', async () => {

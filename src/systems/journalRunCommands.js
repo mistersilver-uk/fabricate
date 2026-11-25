@@ -1,5 +1,5 @@
 import { settleCardRolls } from './checkCardRolls.js';
-import { validTakeActionPayload } from './iterative/iterativeJournalOperation.js';
+import { validTakeActionRequest } from './iterative/iterativeJournalOperation.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
   describePreparedJournalCheck,
@@ -44,7 +44,7 @@ function validRequest(request) {
   if (!MUTATING_ACTIONS.has(request?.action) && request?.action !== 'releaseCheck') return false;
   if (request.action !== 'start' && !validText(request?.runId)) return false;
   if (request.action === 'chooseAward' && !validAwardChoicePayload(request.payload)) return false;
-  if (request.action === 'takeAction' && !validTakeActionPayload(request.payload)) return false;
+  if (request.action === 'takeAction' && !validTakeActionRequest(request)) return false;
   return Number.isInteger(request?.expectedRevision) && request.expectedRevision >= 0;
 }
 

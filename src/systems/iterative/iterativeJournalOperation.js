@@ -26,6 +26,10 @@ export function validTakeActionPayload(payload) {
   );
 }
 
+/** A `takeAction` is a crafting command whose payload is well-formed. */
+export const validTakeActionRequest = (request) =>
+  request?.runType === 'crafting' && validTakeActionPayload(request.payload);
+
 /** Whether `sender` sees the run's recipe, so its checks were not secret (`evaluateCheck`). */
 async function senderSeesRecipe(fabricate, resolveSourceActors, { actor, run, sender }) {
   if (sender?.isGM === true) return true;
