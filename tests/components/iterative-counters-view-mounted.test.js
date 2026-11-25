@@ -199,7 +199,7 @@ describe('the Counters screen (issue 3009)', () => {
     const error = target.querySelector('[data-iterative-name-error="duplicate"]');
     assert.ok(Boolean(error), 'the duplicate-name sentence is shown');
     assert.equal(input.getAttribute('aria-invalid'), 'true');
-    assert.equal(input.getAttribute('aria-describedby'), error.id);
+    assert.equal(input.getAttribute('aria-describedby'), error.querySelector('[id]').id);
     assert.ok(error.textContent.includes('Ironworks') && error.textContent.includes('iron'));
     await type(input, '');
     assert.ok(Boolean(target.querySelector('[data-iterative-name-error="empty"]')));
@@ -289,10 +289,12 @@ describe('the Counters screen (issue 3009)', () => {
     const [min] = boundsOf('iron');
     await type(min, '20', { commit: false });
     assert.equal(calls.updates[0][1].iterative.counters[0].min, 20);
-    assert.equal(
-      target.querySelector('[data-iterative-bounds-error]').textContent.trim(),
-      'Min 20 is above max 9.'
-    );
+    const error = target.querySelector('[data-iterative-bounds-error]');
+    assert.equal(error.textContent.trim(), 'Min 20 is above max 9.');
+    for (const stepper of boundsOf('iron')) {
+      assert.equal(stepper.getAttribute('aria-invalid'), 'true');
+      assert.equal(stepper.getAttribute('aria-describedby'), error.querySelector('[id]').id);
+    }
   });
 
   it('draws the grip and rocker, and a rocker move writes the order and announces it', async () => {
@@ -360,8 +362,12 @@ describe('the Counters screen (issue 3009)', () => {
     assert.equal(title, 'Delete Heat?');
     assert.ok(content.includes('Heat is used in 2 places:'), content);
     assert.ok(
-      content.includes('<li>Stoke &lt;b&gt;hot&lt;/b&gt;</li>'),
-      'the action name is escaped'
+      content.includes('<li>Stoke &lt;b&gt;hot&lt;/b&gt; · cost</li>'),
+      'the action name is escaped, with how it uses the counter'
+    );
+    assert.deepEqual(
+      [calls.dialogs[0].yes.label, calls.dialogs[0].no.label],
+      ['Delete counter', 'Cancel']
     );
     assert.ok(content.includes('<li>Shield &amp; Rim › Frame</li>'), 'the step is named');
     assert.ok(!content.includes('<b>hot</b>'));
@@ -381,9 +387,50 @@ describe('the Counters screen (issue 3009)', () => {
       ['iron', 'heat']
     );
     assert.ok(
-      target.querySelector('[data-sortable-list-status]').textContent.includes('Slag deleted.'),
-      'announced through the list’s live region'
+      target
+        .querySelector('[data-iterative-counters-status]')
+        .textContent.includes('Slag deleted.'),
+      'announced through the screen’s live region'
     );
+    assert.ok(
+      document.activeElement === rowOf('heat').querySelector('[data-sortable-disclosure]'),
+      'the last row hands focus to the row before it'
+    );
+  });
+
+  it('hands focus to the next row after a delete', async () => {
+    await mountView();
+    rowOf('iron').querySelector('[data-iterative-counter-delete]').click();
+    await settle();
+    assert.ok(document.activeElement === rowOf('heat').querySelector('[data-sortable-disclosure]'));
+  });
+
+  it('announces deleting the last counter, and hands focus to the empty state’s adder', async () => {
+    await mountView({
+      iterative: { version: 1, counters: [counter('slag', 'Slag')], actions: [] },
+    });
+    rowOf('slag').querySelector('[data-iterative-counter-delete]').click();
+    await settle();
+    assert.ok(!target.querySelector('[data-iterative-counter-list]'), 'the list is gone');
+    assert.ok(
+      target
+        .querySelector('[data-iterative-counters-status]')
+        .textContent.includes('Slag deleted.'),
+      'the announcement outlives the list'
+    );
+    assert.ok(document.activeElement === target.querySelector('[data-iterative-add-counter]'));
+  });
+
+  it('localizes the explainer’s example when there are no counters', async () => {
+    harness = makeHarness({ iterative: { version: 1, counters: [], actions: [] } });
+    target = document.createElement('div');
+    target.className = 'fabricate-manager';
+    document.body.appendChild(target);
+    const text = (key, fallback) =>
+      key === 'FABRICATE.Admin.Manager.Iterative.ExplainerExample' ? 'Hitze' : fallback;
+    mounted = mount(View, { target, props: { ...harness.props, text } });
+    await settle();
+    assert.ok(target.querySelector('[data-iterative-explainer]').textContent.includes('Hitze'));
   });
 
   it('renders a library newer than this build as a blocking Notice with no list', async () => {

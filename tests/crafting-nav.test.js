@@ -41,22 +41,38 @@ test('CRAFTING_VIEWS lists every crafting-group view', () => {
 });
 
 test('global mode shows only Recipes and Settings', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'global', recipeCount: 3, recipeItemCount: 5 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'global',
+    recipeCount: 3,
+    recipeItemCount: 5,
+  });
   assert.deepEqual(ids(items), ['recipes', 'settings']);
 });
 
 test('restricted mode inserts Access after Recipes, no Books & Scrolls', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'restricted', recipeCount: 3, recipeItemCount: 5 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'restricted',
+    recipeCount: 3,
+    recipeItemCount: 5,
+  });
   assert.deepEqual(ids(items), ['recipes', 'access', 'settings']);
 });
 
 test('item mode shows Books & Scrolls but not Access', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'item', recipeCount: 3, recipeItemCount: 5 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'item',
+    recipeCount: 3,
+    recipeItemCount: 5,
+  });
   assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'knowledge', 'settings']);
 });
 
 test('knowledge mode shows Books & Scrolls but not Access', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'knowledge', recipeCount: 3, recipeItemCount: 5 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'knowledge',
+    recipeCount: 3,
+    recipeItemCount: 5,
+  });
   assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'knowledge', 'settings']);
 });
 
@@ -224,7 +240,11 @@ test('the Knowledge entry carries no count badge and the brain icon', () => {
 });
 
 test('Recipes and Books & Scrolls carry counts; Access and Settings do not', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'knowledge', recipeCount: 12, recipeItemCount: 4 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'knowledge',
+    recipeCount: 12,
+    recipeItemCount: 4,
+  });
   const recipes = items.find((item) => item.id === 'recipes');
   const books = items.find((item) => item.id === 'books-scrolls');
   const settings = items.find((item) => item.id === 'settings');
@@ -242,7 +262,11 @@ test('Access has no count and defaults counts to 0 when omitted', () => {
 });
 
 test('every nav item carries id, view, icon, labelKey and labelFallback', () => {
-  const items = buildCraftingNavItems({ visibilityMode: 'restricted', recipeCount: 1, recipeItemCount: 1 });
+  const items = buildCraftingNavItems({
+    visibilityMode: 'restricted',
+    recipeCount: 1,
+    recipeItemCount: 1,
+  });
   for (const item of items) {
     assert.equal(typeof item.id, 'string');
     assert.equal(typeof item.view, 'string');
@@ -258,7 +282,10 @@ test('the icons match the design brief', () => {
   assert.equal(byId.recipes, 'fas fa-scroll');
   assert.equal(byId.access, 'fas fa-user-lock');
   assert.equal(byId.settings, 'fas fa-sliders');
-  assert.equal(buildCraftingNavItems({ visibilityMode: 'item' }).find((i) => i.id === 'books-scrolls').icon, 'fas fa-book');
+  assert.equal(
+    buildCraftingNavItems({ visibilityMode: 'item' }).find((i) => i.id === 'books-scrolls').icon,
+    'fas fa-book'
+  );
 });
 
 test('activeCraftingTab collapses editor views onto their parent tab', () => {
@@ -347,16 +374,14 @@ test('an iterative system lists Counters and Actions directly after Recipes', ()
 test('Counters and Actions carry their own counts and stay out of the parent badge', () => {
   const items = buildCraftingNavItems(ITERATIVE_ARGS);
   const [counters, actions] = ['counters', 'actions'].map((id) => items.find((i) => i.id === id));
-  assert.deepEqual([counters.view, counters.count, counters.icon], [
-    'iterative-counters',
-    3,
-    'fas fa-gauge-simple-high',
-  ]);
-  assert.deepEqual([actions.view, actions.count, actions.icon], [
-    'iterative-actions',
-    5,
-    'fas fa-hand-back-fist',
-  ]);
+  assert.deepEqual(
+    [counters.view, counters.count, counters.icon],
+    ['iterative-counters', 3, 'fas fa-gauge-simple-high']
+  );
+  assert.deepEqual(
+    [actions.view, actions.count, actions.icon],
+    ['iterative-actions', 5, 'fas fa-hand-back-fist']
+  );
   assert.equal(counters.parentBadge, false);
   assert.equal(actions.parentBadge, false);
   // The root's `craftingNavCount` skips `parentBadge === false`, so only Recipes counts here.
@@ -367,18 +392,35 @@ test('Counters and Actions carry their own counts and stay out of the parent bad
   assert.equal(parentBadge, 4);
 });
 
+test('a library newer than this build draws Counters and Actions with no count', () => {
+  const items = buildCraftingNavItems({ ...ITERATIVE_ARGS, counterCount: null, actionCount: null });
+  for (const id of ['counters', 'actions']) {
+    assert.equal(items.find((item) => item.id === id).count, undefined, id);
+  }
+  const unset = buildCraftingNavItems({ ...ITERATIVE_ARGS, counterCount: undefined });
+  assert.equal(unset.find((item) => item.id === 'counters').count, 0, 'an unset count reads 0');
+});
+
 test('a system that is not iterative offers neither entry, with its redirect unchanged', () => {
   for (const resolutionMode of ['simple', 'alchemy', 'progressive', 'routedByCheck']) {
     const args = { ...ITERATIVE_ARGS, resolutionMode };
-    assert.ok(ids(buildCraftingNavItems(args)).every((id) => id !== 'counters' && id !== 'actions'));
+    assert.ok(
+      ids(buildCraftingNavItems(args)).every((id) => id !== 'counters' && id !== 'actions')
+    );
     for (const view of ['iterative-counters', 'iterative-actions', 'iterative-action-edit']) {
       assert.equal(isCraftingViewAvailable(view, args), false, `${view} in ${resolutionMode}`);
     }
   }
   // The redirect precedence is the visibility trio and then Recipes, whatever the mode.
   assert.equal(resolveCraftingRedirect(ITERATIVE_ARGS), 'recipes');
-  assert.equal(resolveCraftingRedirect({ ...ITERATIVE_ARGS, visibilityMode: 'restricted' }), 'access');
-  assert.equal(resolveCraftingRedirect({ visibilityMode: 'item', resolutionMode: 'simple' }), 'books-scrolls');
+  assert.equal(
+    resolveCraftingRedirect({ ...ITERATIVE_ARGS, visibilityMode: 'restricted' }),
+    'access'
+  );
+  assert.equal(
+    resolveCraftingRedirect({ visibilityMode: 'item', resolutionMode: 'simple' }),
+    'books-scrolls'
+  );
 });
 
 test('every iterative route is a crafting route and the action editor highlights Actions', () => {

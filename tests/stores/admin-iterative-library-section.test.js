@@ -221,7 +221,10 @@ describe('the iterative library section: Crafting Actions', () => {
 
 describe('the iterative library section: refusals', () => {
   it('writes nothing while the library was made by a newer version', async () => {
-    const { section, calls } = harness({ iterative: { version: 2, counters: [], actions: [] } });
+    // Every call has a real target, so only the version guard can refuse it.
+    const { section, calls } = harness({
+      iterative: { version: 2, counters: LIBRARY.counters, actions: LIBRARY.actions },
+    });
     assert.equal(await section.addCounter(), false);
     assert.equal(await section.updateCounter('iron', { label: 'x' }), false);
     assert.equal(await section.reorderCounters(0, 1), false);

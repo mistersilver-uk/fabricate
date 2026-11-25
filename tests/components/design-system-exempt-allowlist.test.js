@@ -167,8 +167,9 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte': 1 },
   ],
   [
-    "a composition of the app's field-mark text with the iterative editor's readiness codes, " +
-      'shared by its cards rather than offered as a vocabulary member',
+    "a composition of the app's field-mark text with the iterative library's readiness codes, " +
+      "shared by the action editor's cards and the counter rows rather than offered as a " +
+      'vocabulary member',
     { 'src/ui/svelte/apps/manager/iterative/FaultLine.svelte': 1 },
   ],
   [

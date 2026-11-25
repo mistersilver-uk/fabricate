@@ -166,3 +166,13 @@ test('every localization key the callout can ask for exists in lang/en.json', ()
     }
   }
 });
+
+test('iterative states its check per action, never Optional beside a slot with no off state', () => {
+  const iterative = describeCheckMode({ activity: 'crafting', mode: 'iterative' });
+  const check = iterative.facts.find((entry) => entry.id === 'check').value;
+  assert.equal(check.fallback, 'Per action', 'the slot is always on; each action rolls it or not');
+  assert.equal(
+    check.key.split('.').reduce((node, part) => node?.[part], LANG),
+    check.fallback
+  );
+});

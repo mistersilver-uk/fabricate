@@ -201,8 +201,7 @@ export const CASES = Object.freeze([
     state: 'empty',
     steps: ACTIONS_STEPS,
     expectView: 'iterative-actions',
-    expectSelector:
-      '[data-iterative-actions-empty="no-counters"] [data-iterative-empty-new-action]',
+    expectSelector: '[data-iterative-actions-empty="no-counters"]',
   }),
   iterativeCase({
     id: 'manager-iterative-actions-empty-with-counters',
@@ -275,6 +274,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Iterative action editor, unknown counter',
     state: 'invalid',
     open: 'smelt',
+    steps: [{ selector: '[data-iterative-cost] [data-issue-code]', scroll: true }],
     expectSelector: '[data-iterative-cost] [data-issue-code="iterativeUnknownCounter"]',
   }),
   editorCase({
@@ -282,6 +282,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Iterative action editor, malformed expression',
     state: 'invalid',
     open: 'refine',
+    steps: [{ selector: '[data-iterative-cost] [data-issue-code]', scroll: true }],
     expectSelector: '[data-iterative-cost] [data-issue-code="iterativeInvalidExpression"]',
   }),
   editorCase({
@@ -297,13 +298,14 @@ export const CASES = Object.freeze([
     label: 'Manager — Iterative action editor, no check, check fact warned',
     state: 'noCheck',
     open: 'stoke',
-    steps: [openEffect('warm')],
+    steps: [openEffect('warm'), { selector: '[data-iterative-effect-no-check]', scroll: true }],
     expectSelector: '[data-iterative-effect-no-check]',
   }),
   editorCase({
     id: 'manager-iterative-action-edit-check-count-under',
     label: 'Manager — Iterative action editor, check counts, under',
     state: 'countUnder',
+    steps: [{ selector: '[data-iterative-check-facts]', scroll: true }],
     expectSelector:
       '[data-iterative-check-facts][data-iterative-check-product="count"][data-iterative-check-direction="under"]',
   }),
@@ -318,16 +320,21 @@ export const CASES = Object.freeze([
   editorCase({
     id: 'manager-iterative-action-edit-effect-expanded',
     label: 'Manager — Iterative action editor, effect with a workpiece rule',
-    steps: [openEffect('shape')],
+    steps: [
+      openEffect('shape'),
+      { selector: '[data-iterative-effect="shape"] [data-iterative-effect-rules]', scroll: true },
+    ],
     expectSelector:
       '[data-iterative-effect="shape"] .fabricate-sortable-list-body:not([hidden]) [data-iterative-effect-rules] [data-counter-rule]',
-    expectCenterHit: '[data-iterative-effect="shape"] [data-sortable-remove]',
+    expectCenterHit:
+      '[data-iterative-effect="shape"] [data-iterative-effect-rules] [data-rule-row-remove]',
   }),
   editorCase({
     id: 'manager-iterative-action-edit-effect-fault',
     label: 'Manager — Iterative action editor, collapsed effect with a fault',
     state: 'invalid',
     open: 'refine',
+    steps: [{ selector: '[data-iterative-effect="burn"] [data-issue-code]', scroll: true }],
     expectSelector: '[data-iterative-effect="burn"] [data-issue-code="iterativeUnknownCounter"]',
   }),
   editorCase({

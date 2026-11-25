@@ -6,28 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
-import {
-  buildLabActors,
-  buildDocumentIndex,
-  seedLearnableBook,
-} from './view-lab/world/labActors.js';
-import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
-import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
-import {
-  LAB_JOURNAL_CASE_STATE_RUN_IDS,
-  buildLabRunStates,
-  createLabJournalCaseController,
-  installLabRunStates,
-} from './view-lab/world/labRunStates.js';
-import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
-import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
-// ratchet-exempt(lint): this block was unordered before the line; it joins its sibling lab world imports
-import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
 import { Recipe } from '../src/models/Recipe.js';
-import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
@@ -41,6 +21,26 @@ import {
   createJournalRunCommandService,
   JOURNAL_RUN_SOCKET_KIND,
 } from '../src/systems/journalRunCommands.js';
+import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
+import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
+
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
+import {
+  buildLabActors,
+  buildDocumentIndex,
+  seedLearnableBook,
+} from './view-lab/world/labActors.js';
+import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
+import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
+import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
+import {
+  LAB_JOURNAL_CASE_STATE_RUN_IDS,
+  buildLabRunStates,
+  createLabJournalCaseController,
+  installLabRunStates,
+} from './view-lab/world/labRunStates.js';
 
 const content = buildLabContent();
 const actors = buildLabActors(content);

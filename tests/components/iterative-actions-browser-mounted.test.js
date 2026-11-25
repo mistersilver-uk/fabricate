@@ -189,16 +189,12 @@ describe('the Actions browser (issue 3009)', () => {
     assert.deepEqual(calls.opened, ['quench']);
   });
 
-  it('disables New action, with its reason, and says counters come first when there are none', async () => {
+  it('says counters come first, and offers no button, when there are none', async () => {
     mountView({ actions: [], counters: [] });
     const empty = target.querySelector('[data-iterative-actions-empty="no-counters"]');
     assert.ok(Boolean(empty));
     assert.ok(empty.textContent.includes('this system has none. Add counters first.'));
-    const button = target.querySelector('[data-iterative-empty-new-action]');
-    assert.equal(button.disabled, true);
-    assert.ok(button.outerHTML.includes('Add counters first.'), 'the reason rides the button');
-    button.click();
-    assert.equal(calls.created, 0);
+    assert.ok(!empty.querySelector('button'), 'nothing to press until a counter exists');
     assert.ok(
       !target.querySelector('[data-iterative-footer-new-action]'),
       'no footer over an empty library'
@@ -226,7 +222,7 @@ describe('the Actions browser (issue 3009)', () => {
   });
 
   it('narrows by Rolls check, No check and Has issues, each a pressed toggle', async () => {
-    mountView({ blocking: new Map([['quench', 2]]) });
+    mountView({ blocking: new Map([['quench', 2]]), issues: new Map([['quench', 2]]) });
     await press('rollsCheck');
     assert.equal(filter('rollsCheck').getAttribute('aria-pressed'), 'true');
     assert.deepEqual(rowIds(), ['strike']);
@@ -241,7 +237,7 @@ describe('the Actions browser (issue 3009)', () => {
     );
   });
 
-  it('combines the toggles with the category and search, and Clear filters resets them', async () => {
+  it('combines the toggles with the category, and Clear filters resets them', async () => {
     mountView();
     await press('noCheck');
     chooseSelectOption(target, '[data-iterative-category]', 'Forging');
@@ -262,6 +258,30 @@ describe('the Actions browser (issue 3009)', () => {
     chooseSelectOption(target, '[data-iterative-category]', '__none');
     await settle();
     assert.deepEqual(rowIds(), ['polish']);
+  });
+
+  it('lists an action with only warnings under Has issues, with no blocking chip or danger row', async () => {
+    mountView({ blocking: new Map(), issues: new Map([['stoke', 1]]) });
+    await press('hasIssues');
+    assert.deepEqual(rowIds(), ['stoke']);
+    const row = target.querySelector('[data-iterative-action="stoke"]');
+    assert.ok(!row.querySelector('[data-iterative-blocking-chip]'), 'a warning is not blocking');
+    assert.ok(!row.hasAttribute('data-iterative-action-blocking'));
+  });
+
+  it('searches the label and description, and counts what it shows', async () => {
+    mountView();
+    const search = target.querySelector(':scope .fabricate-search input');
+    search.value = 'fire';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.deepEqual(rowIds(), ['stoke'], 'the description "Feed the fire." matches');
+    assert.equal(
+      target.querySelector('[data-iterative-actions-count]').textContent.trim(),
+      '1 of 4'
+    );
+    await press('noCheck');
+    assert.deepEqual(rowIds(), ['stoke'], 'the search combines with a toggle');
   });
 
   it('draws the blocking chip with its count on an action Validation reports on', async () => {
@@ -290,6 +310,9 @@ describe('the Actions browser (issue 3009)', () => {
     target.querySelector('[data-pagination-next]').click();
     await settle();
     assert.deepEqual(rowIds(), ['a11', 'a12', 'a13']);
+    await press('noCheck');
+    assert.deepEqual(rowIds().slice(0, 2), ['a1', 'a2'], 'a filter restores the first page');
+    await press('noCheck');
     target.querySelector('[data-pagination-size-option="25"]').click();
     await settle();
     assert.equal(rowIds().length, 13);

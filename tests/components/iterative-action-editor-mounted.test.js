@@ -10,7 +10,10 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { writable } from 'svelte/store';
 
-import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
+import {
+  evaluateIterativeReadiness,
+  ITERATIVE_READINESS_CODES,
+} from '../../src/systems/iterative/iterativeReadiness.js';
 import { iterativeLibraryEntry } from '../../src/systems/normalize/iterativeLibrary.js';
 import { createIterativeLibrarySection } from '../../src/ui/svelte/stores/adminIterativeLibrarySection.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
@@ -53,6 +56,12 @@ const LIBRARY = Object.freeze({
       ],
     }),
     action('quench', 'Quench', { categories: ['Fire'], usesSession: false }),
+    action('chain', 'Chain <i>x</i>', {
+      availability: {
+        combine: 'all',
+        rules: [{ source: 'previousAction', actionIds: ['strike'] }],
+      },
+    }),
   ],
 });
 const HIT = {
@@ -275,15 +284,49 @@ describe('the Crafting Action editor (issue 3009)', () => {
         [code],
         'the draft raises exactly the code under test'
       );
-      assert.equal(route.actionHeading.issueCount, expected.length, 'the header pill');
-      assert.equal(
-        $('[data-iterative-blocking-notice]').dataset.issueCount,
-        String(expected.length)
-      );
+      const blocking = expected.filter((issue) => issue.severity === 'critical');
+      assert.equal(route.actionHeading.issueCount, blocking.length, 'the pill counts the critical');
+      const notice = $('[data-iterative-blocking-notice]');
+      if (blocking.length === 0) assert.ok(!notice, 'a warning draws no blocking Notice');
+      else assert.equal(notice.dataset.issueCount, String(blocking.length));
       assert.deepEqual([...new Set(marks())], [code], 'every mark carries the one code');
+      const warning = expected[0].severity === 'warning';
+      assert.equal($(`[data-issue-code="${code}"]`).classList.contains('is-warning'), warning);
       assert.equal(calls.updates.length, 0, 'editing without saving writes nothing');
     });
   }
+
+  it('covers every action-scoped readiness code, so a new one fails here', () => {
+    const recipeOrSystem = [
+      'iterativeNoCounters',
+      'iterativeNoSuccessRule',
+      'iterativeInvalidNumber',
+      'iterativeBoundsInverted',
+      'iterativeCheckUnavailable',
+      'iterativeMultiStepOff',
+      'iterativeSuccessLineOnFailureGroup',
+      'iterativeFinalStepProducesNothing',
+      'iterativeVersionUnsupported',
+      'iterativeExpressionBoundUnset',
+    ];
+    assert.deepEqual(
+      new Set([...Object.keys(CODES), ...recipeOrSystem]),
+      new Set(ITERATIVE_READINESS_CODES)
+    );
+  });
+
+  it('reads Ready, with no blocking Notice, for a no-check action whose effect reads the check', async () => {
+    const library = structuredClone(LIBRARY);
+    library.actions[1].effects = [effect('glow', { amount: '@check.value' })];
+    const { route } = await openEditor('quench', { library });
+    assert.equal(route.actionHeading.issueCount, 0, 'Ready');
+    assert.ok(!$('[data-iterative-blocking-notice]'));
+    await press('[data-iterative-effect="glow"] [data-sortable-disclosure]');
+    const mark = $(
+      '[data-iterative-effect="glow"] [data-issue-code="iterativeCheckFactWithoutCheck"]'
+    );
+    assert.ok(mark.classList.contains('is-warning'), 'the mark is a warning');
+  });
 
   it('counts an issue once however many fields carry its mark, so the pill is not the mark count', async () => {
     const { route } = await openEditor('strike');
@@ -319,6 +362,10 @@ describe('the Crafting Action editor (issue 3009)', () => {
     await type('[data-iterative-amount="cost"]', '1d6');
     const mark = $('[data-iterative-cost] [data-issue-code="iterativeInvalidExpression"]');
     assert.ok(mark.textContent.includes('Dice cannot be rolled in this field'));
+    assert.ok(
+      !$('[data-iterative-cost]').textContent.includes('Resolves each attempt'),
+      'an amount that does not parse draws no reading'
+    );
     const tokens = $$(
       '[data-iterative-cost] .fab-expr-token, [data-iterative-cost] [role="group"] button'
     ).map((token) => token.textContent.trim());
@@ -338,6 +385,10 @@ describe('the Crafting Action editor (issue 3009)', () => {
     );
     await press('[data-iterative-add-cost]');
     assert.equal(route.actionDraft.costs[1].id, 'cost2');
+    assert.ok(
+      document.activeElement === $('[data-iterative-cost="cost2"] [data-iterative-amount="cost"]'),
+      'adding focuses the new amount'
+    );
     await press('[data-iterative-cost="cost"] [data-iterative-cost-needs-enough]');
     assert.equal(route.actionDraft.costs[0].needsEnough, false);
     chooseSelectOption(
@@ -347,10 +398,81 @@ describe('the Crafting Action editor (issue 3009)', () => {
     );
     await settle();
     assert.equal(route.actionDraft.costs[1].counterId, 'temper');
+    assert.equal(
+      $('[data-iterative-cost-remove="cost2"]').getAttribute('aria-label'),
+      'Remove Temper cost',
+      'each remove names its counter'
+    );
     await press('[data-iterative-cost-remove="cost"]');
     assert.deepEqual(
       route.actionDraft.costs.map((cost) => cost.id),
       ['cost2']
+    );
+    assert.ok(
+      document.activeElement === $('[data-iterative-add-cost]'),
+      'removing hands focus to the adder'
+    );
+  });
+
+  it('names each switch in full and ties the session note to its toggle', async () => {
+    await openEditor('strike');
+    const session = $('[data-iterative-uses-session]');
+    assert.ok(session.classList.contains('has-name'), 'a snippet name is drawn uncapped');
+    assert.ok(!session.hasAttribute('aria-label'), 'its text names it');
+    assert.equal(session.textContent.trim(), 'Uses a session');
+    const note = $('[data-iterative-session-note]');
+    assert.equal(session.getAttribute('aria-describedby'), note.id);
+    assert.ok(note.id.length > 0);
+    const needs = $('[data-iterative-cost-needs-enough]');
+    assert.ok(needs.classList.contains('has-name'));
+    assert.equal(needs.textContent.trim(), 'Needs enough');
+  });
+
+  it('describes a marked control by its mark, and names an effect by its place', async () => {
+    const { route } = await openEditor('strike');
+    route.editAction((d) => {
+      d.costs[0].counterId = 'ore';
+      d.effects[0].target.counterId = 'ore';
+      d.availability.rules = [{ source: 'counter', counterId: 'ore', op: '>=', value: 1 }];
+    });
+    await settle();
+    const describedMark = (selector) => {
+      const id = $(selector).getAttribute('aria-describedby') ?? '';
+      return target.querySelector(`[id="${id.split(' ', 1)[0]}"]`)?.dataset.issueCode;
+    };
+    assert.equal(
+      describedMark('[data-iterative-cost] [data-iterative-cost-counter]'),
+      'iterativeUnknownCounter'
+    );
+    assert.equal(
+      describedMark('[data-iterative-availability] [data-counter-rule-source]'),
+      'iterativeUnknownCounter'
+    );
+    await press('[data-iterative-effect="shape"] [data-sortable-disclosure]');
+    const effectCounter = $('[data-iterative-effect="shape"] [data-iterative-effect-counter]');
+    assert.equal(effectCounter.getAttribute('aria-invalid'), 'true');
+    assert.equal(
+      describedMark('[data-iterative-effect="shape"] [data-iterative-effect-counter]'),
+      'iterativeUnknownCounter'
+    );
+    assert.equal(
+      $('[data-iterative-effect-name="shape"]').getAttribute('aria-label'),
+      'Effect 1 name'
+    );
+  });
+
+  it('removes an availability rule and hands focus to the adder, naming each remove by its source', async () => {
+    await openEditor('strike');
+    await press('[data-iterative-availability] [data-rule-row-preset="rule"]');
+    const remove = $(
+      '[data-iterative-availability] [data-counter-rule="0"] [data-rule-row-remove]'
+    );
+    assert.equal(remove.getAttribute('aria-label'), 'Remove Heat rule');
+    await press('[data-iterative-availability] [data-counter-rule="0"] [data-rule-row-remove]');
+    assert.ok(
+      document.activeElement ===
+        $('[data-iterative-availability] [data-counter-rules-add] [data-rule-row-preset]'),
+      'focus lands on the adder'
     );
   });
 
@@ -434,6 +556,12 @@ describe('the Crafting Action editor (issue 3009)', () => {
   it('warns, with the same way to Checks, when the routed check has no usable roll', async () => {
     const { calls } = await openEditor('strike', { routed: { ...HIT, rollFormula: '' } });
     assert.ok(!$('[data-iterative-check-facts]'), 'the facts give way to the warning');
+    assert.ok(!$('[data-iterative-check-note]'), 'the note gives way too');
+    assert.equal(
+      $$('[data-iterative-open-checks], [data-notice-action]').length,
+      1,
+      'one Open Checks'
+    );
     const warning = $('[data-iterative-check-missing]');
     assert.equal(warning.dataset.noticeTone, 'warning');
     assert.ok(warning.textContent.includes('Ironworks has no crafting check set up'));
@@ -442,34 +570,66 @@ describe('the Crafting Action editor (issue 3009)', () => {
     assert.equal(calls.views.at(-1), 'checks');
   });
 
-  it('hides tier, success and compare under No check, keeps the workpiece rules, and warns on a check fact', async () => {
-    const { route } = await openEditor('strike');
+  it('hides tier, success and compare under No check and keeps the workpiece rules', async () => {
+    await openEditor('strike');
     await press('[data-iterative-effect="shape"] [data-sortable-disclosure]');
     assert.ok(
       Boolean($('[data-iterative-effect-tier="hit"]')),
       'a rolling action offers its tiers'
     );
-    await press('[data-iterative-effect="shape"] [data-iterative-effect-success="yes"]');
-    route.editAction((d) => {
-      d.check = 'none';
-    });
-    await settle();
+    await press('[data-iterative-check-option="none"]');
     assert.ok(!$('[data-iterative-effect-tier="hit"]'));
     assert.ok(!$('[data-iterative-effect-success]'));
     assert.ok(!$('[data-iterative-effect-compare-add]'));
     assert.ok(Boolean($('[data-iterative-effect-rules]')), 'workpiece rules stay');
     assert.ok(Boolean($('[data-iterative-no-check]')));
-    const warning = $(
-      '[data-iterative-effect="shape"] [data-issue-code="iterativeCheckFactWithoutCheck"]'
-    );
-    assert.ok(Boolean(warning));
-    assert.ok(warning.classList.contains('is-warning'));
+  });
+
+  it('clears the check conditions when the action switches to No check, and Discard restores them', async () => {
+    const library = structuredClone(LIBRARY);
+    library.actions[0].effects[0].when = {
+      combine: 'all',
+      checkOutcomeIds: ['hit'],
+      success: true,
+      value: { op: '>=', value: 4 },
+      rules: [{ source: 'sessionCount', op: '>=', value: 1 }],
+    };
+    const { route, calls } = await openEditor('strike', { library });
+    await press('[data-iterative-check-option="none"]');
+    assert.deepEqual(route.actionDraft.effects[0].when, {
+      combine: 'all',
+      rules: [{ source: 'sessionCount', op: '>=', value: 1 }],
+    });
+    assert.ok(!$('[data-issue-code="iterativeCheckFactWithoutCheck"]'), 'nothing hidden is left');
+    assert.ok($('[data-iterative-effect="shape"]').textContent.includes('when 1 condition holds'));
+    assert.equal(calls.updates.length, 0, 'the switch is staged');
+    assert.equal(await route.exitGuard.finish('discard'), true);
+    route.openAction('strike');
+    await settle();
+    assert.equal(route.actionDraft.effects[0].when.success, true, 'Discard restores them');
+  });
+
+  it('summarises an imported No check effect that still reads the check by its conditions', async () => {
+    const library = structuredClone(LIBRARY);
+    library.actions[1].effects = [effect('glow', { when: { combine: 'all', success: true } })];
+    await openEditor('quench', { library });
+    const row = $('[data-iterative-effect="glow"]');
+    assert.ok(row.textContent.includes('when 1 condition holds'), 'never "every session"');
+    assert.ok(row.querySelector('[data-issue-code="iterativeCheckFactWithoutCheck"].is-warning'));
   });
 
   it('applies tiers, success and a value compare, and follows All or Any with its sentence', async () => {
     const { route } = await openEditor('strike');
     await press('[data-iterative-effect="shape"] [data-sortable-disclosure]');
     assert.ok($('[data-iterative-effect-footnote]').textContent.includes('All of these must hold'));
+    assert.ok(
+      Boolean(
+        $('[data-iterative-effect-footnote]').compareDocumentPosition(
+          $('[data-iterative-effect-rules]')
+        ) & Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the footnote sits above the workpiece rules'
+    );
     $('[data-iterative-effect-tier="hit"]').click();
     await settle();
     assert.deepEqual(route.actionDraft.effects[0].when.checkOutcomeIds, ['hit']);
@@ -611,8 +771,16 @@ describe('the Crafting Action editor (issue 3009)', () => {
     assert.equal(dialog.title, 'Delete Strike?');
     assert.ok(dialog.content.includes('data-iterative-delete-uses="action"'));
     assert.ok(dialog.content.includes('<li>Blade › Forge</li>'));
-    assert.ok(dialog.content.includes('Workpieces in progress are not affected.'));
-    assert.equal(calls.updates.at(-1)[1].iterative.actions.length, 1);
+    assert.ok(
+      dialog.content.includes('<li>Chain &lt;i&gt;x&lt;/i&gt; · rule</li>'),
+      'a previous-action rule is listed, escaped'
+    );
+    assert.ok(dialog.content.includes('Workpieces in progress aren’t affected.'));
+    assert.deepEqual([dialog.yes.label, dialog.no.label], ['Delete action', 'Cancel']);
+    assert.deepEqual(
+      calls.updates.at(-1)[1].iterative.actions.map((held) => held.id),
+      ['quench', 'chain']
+    );
     assert.equal(route.hasEditableAction, false, 'a deleted action leaves the editor');
   });
 
@@ -632,6 +800,13 @@ describe('the Crafting Action editor (issue 3009)', () => {
     assert.ok(
       ctx.live.get('system').iterative.actions.some((held) => held.id === 'strikeTwiceCopy')
     );
+  });
+
+  it('opens no editor for an action id the library does not hold', () => {
+    const { route, calls } = makeRoute();
+    route.openAction('ghost');
+    assert.deepEqual(calls.views, [], 'no route is entered');
+    assert.equal(route.actionDraft, null);
   });
 
   it('mints an id from the label when a new draft is first saved', async () => {
@@ -734,6 +909,21 @@ describe('the Crafting Action editor (issue 3009)', () => {
           .textContent.includes('heat'),
         'the stored id is drawn as the source'
       );
+    });
+
+    it('writes a rule that is not an object back as it was when another rule is edited', () => {
+      const changes = [];
+      mountList({
+        rules: ['junk', RULES[1]],
+        onChange: (next) => {
+          changes.push(next);
+        },
+      });
+      chooseSelectOption(host, '[data-counter-rule="1"] [data-counter-rule-op]', '>=');
+      flushSync();
+      assert.equal(changes.length, 1);
+      assert.equal(changes[0].rules[0], 'junk', 'the authored rule is untouched');
+      assert.equal(changes[0].rules[1].op, '>=');
     });
 
     it('takes its counters from its caller, so a narrowed list marks a counter it no longer offers', () => {

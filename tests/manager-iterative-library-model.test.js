@@ -20,7 +20,7 @@ import {
   ruleFault,
 } from '../src/ui/svelte/apps/manager/iterative/iterativeFieldFaults.js';
 import {
-  actionBlockingCounts,
+  actionIssueCounts,
   actionUses,
   counterNameFault,
   counterUses,
@@ -192,6 +192,17 @@ describe('counterUses', () => {
     assert.deepEqual(counterUses(LIBRARY, [], 'idle').actions, []);
   });
 
+  it('says how each action uses the counter: cost, effect, both, or only a rule', () => {
+    const kinds = (library, id) => counterUses(library, [], id).actions.map((a) => a.kind);
+    assert.deepEqual(kinds(LIBRARY, 'ember'), ['costEffect'], 'a cost and an effect amount');
+    assert.deepEqual(kinds(LIBRARY, 'heat'), ['effect']);
+    const library = structuredClone(LIBRARY);
+    library.actions[0].effects = [];
+    assert.deepEqual(kinds(library, 'ember'), ['cost']);
+    library.actions[0].costs = [];
+    assert.deepEqual(kinds(library, 'ember'), ['rule'], 'only its availability rule names it');
+  });
+
   it('counts every step of a recipe with an instance, and a step that names it in a rule', () => {
     const ember = counterUses(LIBRARY, RECIPES, 'ember');
     assert.deepEqual(
@@ -227,6 +238,16 @@ describe('actionUses', () => {
       ['stoke']
     );
     assert.deepEqual(actionUses(LIBRARY, [], 'stoke').actions, []);
+    assert.equal(actionUses(LIBRARY, [], 'inspect').actions[0].kind, 'rule');
+  });
+
+  it('never lists an action as its own use', () => {
+    const library = structuredClone(LIBRARY);
+    library.actions[1].availability.rules = [previous('inspect')];
+    assert.deepEqual(
+      actionUses(library, [], 'inspect').actions.map((a) => a.id),
+      ['stoke']
+    );
   });
 
   it('names the steps whose allow-list or rules name it', () => {
@@ -253,7 +274,7 @@ describe('actionUses', () => {
   });
 });
 
-describe('actionBlockingCounts', () => {
+describe('actionIssueCounts', () => {
   const system = {
     resolutionMode: 'iterative',
     craftingCheck: {},
@@ -270,6 +291,22 @@ describe('actionBlockingCounts', () => {
           effects: [],
         },
         {
+          id: 'reads',
+          label: 'Reads the check',
+          availability: { combine: 'all', rules: [] },
+          costs: [],
+          check: 'none',
+          effects: [
+            {
+              id: 'e',
+              when: { combine: 'all', success: true },
+              target: { kind: 'counter', counterId: 'heat' },
+              op: 'add',
+              amount: '1',
+            },
+          ],
+        },
+        {
           id: 'lost',
           label: 'Lost',
           availability: { combine: 'all', rules: [] },
@@ -282,14 +319,23 @@ describe('actionBlockingCounts', () => {
   };
 
   it('counts the issues Validation reports on each action, and none for a clean one', () => {
-    const counts = actionBlockingCounts(system, []);
-    assert.equal(counts.get('lost'), 1);
-    assert.ok(!counts.has('ok'));
+    const { blocking, all } = actionIssueCounts(system, []);
+    assert.equal(blocking.get('lost'), 1);
+    assert.equal(all.get('lost'), 1);
+    assert.ok(!blocking.has('ok') && !all.has('ok'));
+  });
+
+  it('counts a warning as an issue but never as blocking', () => {
+    const { blocking, all } = actionIssueCounts(system, []);
+    assert.equal(all.get('reads'), 1, 'the check-fact warning is an issue');
+    assert.ok(!blocking.has('reads'), 'players can still take it');
   });
 
   it('reports nothing for a system that is not iterative or has no library', () => {
-    assert.equal(actionBlockingCounts({ ...system, resolutionMode: 'simple' }, []).size, 0);
-    assert.equal(actionBlockingCounts(null, undefined).size, 0);
+    const simple = actionIssueCounts({ ...system, resolutionMode: 'simple' }, []);
+    assert.equal(simple.blocking.size + simple.all.size, 0);
+    const none = actionIssueCounts(null, undefined);
+    assert.equal(none.blocking.size + none.all.size, 0);
   });
 });
 

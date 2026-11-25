@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, before, it } from 'node:test';
 
-import { flushSync, unmount } from 'svelte';
+import { flushSync, tick, unmount } from 'svelte';
 
 import { shippedString, useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
@@ -24,6 +24,7 @@ import {
 let Component;
 let mounted;
 let target;
+let store;
 
 const queries = createManagerQueries(() => target);
 const { craftingParent, craftingSubitem, managerTitle, switchScopeSystemTo } = queries;
@@ -34,7 +35,9 @@ const { mountManager } = createManagerMounts({
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (next) => {
+    store = next;
+  },
 });
 
 const counter = (id, label) => ({ id, label, limit: 'none' });
@@ -159,6 +162,94 @@ export function registerIterativeCases() {
       ['heat', 'ember', 'newCounter']
     );
     assert.equal(countOf('counters'), '3');
+    const row = target.querySelector('[data-iterative-counter="newCounter"]');
+    assert.equal(row.querySelector('.fabricate-sortable-list-body').hidden, false, 'it opens');
+    assert.ok(
+      document.activeElement === target.querySelector('[data-iterative-counter-name="newCounter"]'),
+      'its Name has focus'
+    );
+  });
+
+  it('clears a search that would hide the counter New counter adds', async () => {
+    await openIterativeRoute('Counters');
+    const search = target.querySelector(':scope [data-iterative-counters] .fabricate-search input');
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    await press('[data-iterative-new-counter]');
+    assert.equal(search.value, '');
+    assert.ok(target.querySelector('[data-iterative-counter="newCounter"]'), 'the new row shows');
+  });
+
+  it('deletes a counter only when the GM confirms, listing its uses', async () => {
+    const answers = [false, true];
+    const dialogs = [];
+    const calls = await openIterativeRoute('Counters', iterative(), {
+      confirmDialog: async (config) => {
+        dialogs.push(config);
+        return answers.shift();
+      },
+    });
+    const writes = () => calls.filter(([name]) => name === 'updateSystem');
+    await press('[data-iterative-counter="heat"] [data-iterative-counter-delete]');
+    assert.equal(dialogs.length, 1, 'the GM is asked');
+    assert.equal(writes().length, 0, 'Cancel keeps the counter');
+    assert.equal(countOf('counters'), '2');
+    await press('[data-iterative-counter="heat"] [data-iterative-counter-delete]');
+    assert.equal(writes().length, 1);
+    assert.deepEqual(
+      writes()[0][2].iterative.counters.map((entry) => entry.id),
+      ['ember']
+    );
+    assert.equal(countOf('counters'), '1');
+    assert.ok(
+      target.querySelector('[data-iterative-counters-status]').textContent.includes('Heat deleted.')
+    );
+  });
+
+  it('opens Counters with the counter a Validation issue names', async () => {
+    const issue = {
+      kind: 'system',
+      entityKind: 'counter',
+      entityId: 'ember',
+      entityName: 'Ember',
+      severity: 'critical',
+      blocks: 'enable',
+      code: 'iterativeBoundsInverted',
+      message: 'Min is above max.',
+    };
+    mountManager([], {
+      ...iterative(),
+      systemValidation: {
+        issues: [issue],
+        counts: { critical: 1, warning: 0, info: 0, blockers: 0 },
+        blocksSystem: false,
+      },
+    });
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await settle();
+    target.querySelector('[data-system-tab="validation"]').click();
+    await settle();
+    await press('[data-overview-link="counter"]');
+    assert.equal(managerView(), 'iterative-counters');
+    const row = target.querySelector('[data-iterative-counter="ember"]');
+    assert.equal(row.querySelector('.fabricate-sortable-list-body').hidden, false, 'Ember is open');
+    assert.equal(
+      target.querySelector(':scope [data-iterative-counter="heat"] .fabricate-sortable-list-body')
+        .hidden,
+      true
+    );
+  });
+
+  it('shows the routed crafting check editor for an iterative system', async () => {
+    mountManager([], iterative());
+    queries.navButton('Checks').click();
+    await tick();
+    flushSync();
+    const panel = target.querySelector('[data-checks-panel="crafting"]');
+    assert.ok(Boolean(panel), 'the crafting check panel renders');
+    assert.ok(Boolean(panel.querySelector('[data-crafting-check-editor]')), 'the routed editor');
+    assert.ok(!panel.querySelector('[data-simple-check-editor]'), 'not the simple editor');
   });
 
   it('refuses every write while the library was made by a newer version', async () => {
@@ -218,6 +309,23 @@ export function registerIterativeCases() {
     assert.equal(managerView(), 'iterative-action-edit', 'Keep editing stays on the editor');
   });
 
+  it('saves a dirty draft when the GM answers Save to the discard prompt', async () => {
+    const calls = await openIterativeRoute(
+      'Actions',
+      iterative(LIBRARY, { confirmDiscardIterativeActionResult: 'save' })
+    );
+    await press('[data-iterative-new-action]');
+    await press('[data-iterative-action-back]');
+    const writes = calls.filter(([name]) => name === 'updateSystem');
+    assert.equal(writes.length, 1, 'Save writes the draft once');
+    assert.deepEqual(
+      writes[0][2].iterative.actions.map((action) => action.id),
+      ['stoke', 'action']
+    );
+    assert.equal(managerView(), 'iterative-actions');
+    assert.equal(countOf('actions'), '2');
+  });
+
   it('leaves a dirty draft behind when the GM discards it', async () => {
     const calls = await openIterativeRoute('Actions');
     await press('[data-iterative-new-action]');
@@ -272,6 +380,69 @@ export function registerIterativeCases() {
       subitemIds().filter((id) => id === 'counters' || id === 'actions'),
       []
     );
+  });
+
+  it('discards a dirty action draft without a prompt when a republish makes the system not iterative', async () => {
+    const calls = await openIterativeRoute('Actions');
+    await press('[data-iterative-new-action]');
+    const label = target.querySelector('[data-iterative-action-label]');
+    label.value = 'Quench';
+    label.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.ok(target.querySelector('[data-iterative-action-dirty]'), 'the draft is dirty');
+    // Another client switches this system's mode, so the store republishes it.
+    store.viewState.update((state) => ({
+      ...state,
+      selectedSystem: { ...state.selectedSystem, resolutionMode: 'simple' },
+    }));
+    await settle();
+    assert.ok(!managerView().startsWith('iterative'), `still on ${managerView()}`);
+    assert.ok(calls.every(([name]) => name !== 'confirmDiscardDirtyIterativeActionDraft'));
+    assert.ok(calls.every(([name]) => name !== 'updateSystem'));
+  });
+
+  it('redirects an action editor whose action leaves the library to Actions', async () => {
+    await openIterativeRoute('Actions');
+    await press('[data-iterative-action="stoke"] .fabricate-list-row-open');
+    assert.equal(managerView(), 'iterative-action-edit');
+    await store.iterative.deleteAction('stoke');
+    await settle();
+    assert.equal(managerView(), 'iterative-actions');
+  });
+
+  it('draws the pill as Validation counts it: blocking for critical issues, Ready for a warning', async () => {
+    const reads = {
+      id: 'reads',
+      label: 'Reads',
+      categories: [],
+      usesSession: true,
+      availability: { combine: 'all', rules: [] },
+      costs: [{ id: 'spend', counterId: 'gone', amount: '1', needsEnough: true }],
+      check: 'none',
+      effects: [],
+    };
+    const library = { ...LIBRARY, actions: [...LIBRARY.actions, reads] };
+    await openIterativeRoute('Actions', iterative(library));
+    await press('[data-iterative-action="reads"] .fabricate-list-row-open');
+    const pill = () => target.querySelector('[data-iterative-action-pill]');
+    assert.equal(pill().dataset.iterativeActionPill, 'blocking');
+    assert.equal(pill().textContent.trim(), '1 blocking', 'an unknown counter blocks');
+    const cost = target.querySelector('[data-iterative-amount="cost"]');
+    cost.value = '2 +';
+    cost.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(pill().textContent.trim(), '2 blocking', 'a broken amount adds one');
+    await press('[data-iterative-cost-remove="spend"]');
+    await press('[data-iterative-add-effect]');
+    const amount = target.querySelector(
+      ':scope [data-iterative-effect] [data-iterative-amount="effect"]'
+    );
+    amount.value = '@check.value';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.ok(target.querySelector('[data-issue-code="iterativeCheckFactWithoutCheck"]'));
+    assert.equal(pill().dataset.iterativeActionPill, 'ready', 'a warning reads Ready');
+    assert.ok(!target.querySelector('[data-iterative-blocking-notice]'));
   });
 
   it('mounts the editor for an existing action and judges the pill against the unsaved edit', async () => {
