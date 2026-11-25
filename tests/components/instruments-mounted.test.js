@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -598,5 +599,57 @@ describe('StageBars (mounted)', () => {
       bars.map((bar) => bar.getAttribute('aria-current')),
       [null, null]
     );
+  });
+});
+
+const INSTRUMENTS_BASELINE = resolve(import.meta.dirname, '../fixtures/instrumentsBaseline.json');
+/** The props each shipped caller passes, kept as the markup it drew before `marks` and `status`. */
+const INSTRUMENT_CALLERS = {
+  meter: [
+    meter,
+    {
+      value: 2,
+      max: 4,
+      segments: [{ tone: 'neutral', color: 'var(--fab-tag-aqua)' }],
+      valueText: '2 of 4',
+      labelId: 'essence-0',
+    },
+  ],
+  stamina: [
+    meter,
+    { value: 60, segments: [{ tone: 'accent' }], label: 'Stamina', valueText: '6/10' },
+  ],
+  stages: [
+    stages,
+    {
+      stages: [
+        { name: 'Gather', value: 100, valueText: '100%, stage 1 of 3' },
+        { label: 'Stage 2 of 3', value: 40 },
+        { name: 'Temper', value: 0, weight: 2, title: 'Smelt: 3 of 5 days' },
+      ],
+      currentIndex: 1,
+      numbered: false,
+      ariaLabelledBy: 'kicker-1',
+    },
+  ],
+  forms: [
+    stages,
+    {
+      stages: [{ name: 'Smelt', value: 60, shares: [{ weight: 1, tone: 'ember' }, { weight: 2 }] }],
+      gap: 'tight',
+      track: 'thin',
+      ariaLabel: 'Forging progress',
+    },
+  ],
+};
+
+describe('instrument callers (mounted)', () => {
+  it('draws every shipped caller as it drew before marks and status', async () => {
+    const found = {};
+    for (const [caller, [harness, props]] of Object.entries(INSTRUMENT_CALLERS)) {
+      found[caller] = normalizedMarkup(await harness.mount(props));
+      harness.remount();
+    }
+    assertMatchesBaseline(INSTRUMENTS_BASELINE, found);
   });
 });

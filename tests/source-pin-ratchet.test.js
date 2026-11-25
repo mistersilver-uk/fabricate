@@ -95,6 +95,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/logicalStylesheet.js': 'corpus',
   'tests/helpers/manager/managerCompile.js': 'fixture',
   'tests/helpers/manager/managerLocalization.js': 'fixture',
+  'tests/helpers/markupBaseline.js': 'fixture',
   'tests/helpers/mergeBaseRatchet.js': 'corpus',
   'tests/helpers/optionCardsMarkup.js': 'ast',
   'tests/helpers/parsedSource.js': 'ast',

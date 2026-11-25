@@ -10,6 +10,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -125,5 +126,30 @@ describe('RunProgress (mounted)', () => {
     const [bar] = barsOf(root);
     assert.equal(bar.getAttribute('aria-label'), 'Run progress');
     assert.ok(!bar.hasAttribute('aria-labelledby'), 'exactly one naming route');
+  });
+});
+
+const RUN_PROGRESS_BASELINE = resolve(import.meta.dirname, '../fixtures/runProgressBaseline.json');
+/** The props `RunCard` and `RunDetail` pass, kept as the markup they drew before `status` and `note`. */
+const RUN_PROGRESS_CALLERS = {
+  card: { stages: [{}], current: 0, progress: 35, ariaLabel: 'Progress' },
+  detail: {
+    stages: [{ name: 'Gather', status: 'done' }, { stepName: 'Refine' }, {}],
+    current: 1,
+    progress: 40,
+    blocker: 'Waiting for materials',
+    label: 'Progress',
+  },
+  gate: { stages: [{}], current: 0, progress: 70, label: 'Progress' },
+};
+
+describe('RunProgress callers (mounted)', () => {
+  it('draws every shipped caller as it drew before status and note', async () => {
+    const found = {};
+    for (const [caller, props] of Object.entries(RUN_PROGRESS_CALLERS)) {
+      found[caller] = normalizedMarkup(await harness.mount(props));
+      harness.remount();
+    }
+    assertMatchesBaseline(RUN_PROGRESS_BASELINE, found);
   });
 });

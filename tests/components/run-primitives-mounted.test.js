@@ -8,11 +8,13 @@ import { createRawSnippet } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, PAGINATION_COMPILED_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
+const RUN_ACTION_BAR_BASELINE = resolve(import.meta.dirname, '../fixtures/runActionBarBaseline.json');
 
 function createHarness(name, dependencies = [], rawModules = []) {
   return createMountedComponentHarness({
@@ -1231,5 +1233,31 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-outcome-yield]').length, 1, 'empty tier never gains a result');
     assert.equal(target.querySelector('.fab-outcome-yield-quantity').textContent, '×4');
     expectGeometry('OutcomeLadder', '.fab-outcome-tier', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
+  });
+
+  it('draws every shipped ActionsPanel state as it drew before a null primary or pause', async () => {
+    const bar = {
+      run: { id: 'run-1' },
+      runLabel: 'Forge Iron Rivets',
+      cancel: { ariaLabel: 'Cancel craft', title: 'Cancel craft', prompt: 'Cancel this run?', confirmLabel: 'Cancel run', keepLabel: 'Keep it' },
+      pause: { enabled: true, label: 'Pause', reason: '' },
+      resume: { disabled: false, label: 'Resume', title: '' },
+      primary: { enabled: true, busy: false, label: 'Roll check', busyLabel: 'Working…', icon: 'fas fa-dice-d20', reason: '' },
+      begin: null,
+    };
+    const states = {
+      ready: bar,
+      busy: { ...bar, primary: { ...bar.primary, busy: true } },
+      begin: { ...bar, begin: { enabled: true, label: 'Begin step', busyLabel: 'Working…', icon: 'fas fa-play', prompt: 'Begin now?', reason: '' } },
+      paused: { ...bar, run: { id: 'run-1', pauseState: { reason: 'gm' } } },
+      waiting: { ...bar, pause: { enabled: false, label: 'Pause', reason: 'Nothing counts down' }, completion: { label: 'Complete', value: 'manual', options: [{ value: 'manual', label: 'By hand' }] } },
+      armed: { ...bar, armed: true },
+    };
+    const found = {};
+    for (const [state, props] of Object.entries(states)) {
+      found[state] = normalizedMarkup(await runActionHarness.mount(props));
+      runActionHarness.remount();
+    }
+    assertMatchesBaseline(RUN_ACTION_BAR_BASELINE, found);
   });
 });
