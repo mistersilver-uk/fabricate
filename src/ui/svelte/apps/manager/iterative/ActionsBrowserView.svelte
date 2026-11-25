@@ -327,7 +327,8 @@
     margin: var(--fab-space-3) var(--fab-space-3) 0;
   }
 
-  .manager-iterative-screen :global(.fabricate-search) {
+  /* Scoped to the bar's row: the screen itself is a column, where a flex-basis of 220px would be a height. */
+  .manager-iterative-screen :global(.fabricate-filter-bar) > :global(.fabricate-search) {
     flex: 1 1 220px;
     max-width: 320px;
     min-width: 0;
