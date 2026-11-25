@@ -1147,7 +1147,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - A `previousAction` rule reads the newest log entry before the attempt in preflight, costs and effects, and the current action from the terminal check on.
   An empty log matches no `previousAction` rule.
 - Preflight refuses, with nothing spent and in this order, an unsupported version, an ended step, an invalid entry, a disallowed action, an unknown counter, an unavailable action, an invalid cost amount and an unaffordable cost.
-  An entry is invalid when `counterRuleFault` or `iterativeEntryFault` faults it, or when a bound, target, start or state value is `null`, so the resolver and readiness agree on what is kept as authored.
+  An entry is invalid when `counterRuleFault`, `iterativeEntryFault`, `producedWhenLineFault` or `stepIdListFault` faults it, when an action, the step or a counter it uses holds a value outside its enum or a list kept as authored, or when a bound, target, start or state value is `null` or missing.
 - Preflight evaluates every cost amount before any check is prepared, and a negative amount refuses as an invalid expression.
   Each `needsEnough` cost refuses on its own when its counter holds less than its amount, so two costs on one counter are each checked alone.
   A locked counter ignores every cost and effect aimed at it.
