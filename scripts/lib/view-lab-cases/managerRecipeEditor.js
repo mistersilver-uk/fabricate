@@ -2431,6 +2431,8 @@ export const CASES = Object.freeze([
     width: 880,
     expectSelector: `${COUNTERS_CARD} .fabricate-data-table-scroll [data-iterative-counter-row="heat"]`,
     expectCenterHit: `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
+    // The table scrolls inside its frame, so the frame stays inside the card at 880px.
+    expectContained: [{ container: COUNTERS_CARD, target: '.fabricate-data-table-scroll' }],
   }),
   // Issue 3010: a single step's Working the recipe card.
   iterativeRecipeCase({

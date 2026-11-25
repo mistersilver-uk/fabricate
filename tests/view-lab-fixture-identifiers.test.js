@@ -116,11 +116,16 @@ function ironworksRecipeIds() {
 }
 const IRONWORKS_RECIPE_IDS = ironworksRecipeIds();
 
+/** The ids only a frame that seeds `query.iterativeRecipes` holds, so only such a case may name them. */
+const SEEDED_IRONWORKS_SOURCES = Object.freeze({
+  'data-recipe-id': new Set(IRONWORKS_RECIPE_IDS),
+  'data-recipe-edit': new Set(IRONWORKS_RECIPE_IDS),
+});
+
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
-  // The library rows of a frame that seeds the Ironworks recipes too (issue 3010).
-  'data-recipe-id': new Set([...content.recipes.map((entry) => entry.id), ...IRONWORKS_RECIPE_IDS]),
+  'data-recipe-id': new Set(content.recipes.map((entry) => entry.id)),
   // The inventory inspector's cross-reference row hooks (issue 2321).
   'data-inventory-required-for': new Set(content.recipes.map((entry) => entry.id)),
   'data-inventory-contributor': new Set(content.components.map((entry) => entry.id)),
@@ -132,10 +137,7 @@ const IDENTITY_SOURCES = {
   'data-knowledge-actor': new Set(actors.map((entry) => entry.id)),
 
   // The ten below were the gap this file's own header describes and did not actually close.
-  'data-recipe-edit': new Set([
-    ...content.recipes.map((entry) => entry.id),
-    ...IRONWORKS_RECIPE_IDS,
-  ]),
+  'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
   // The recipe browser's bulk selection control (issue 1010) — the exact mirror of
   // `data-component-select` above, and unguarded until now: the three
@@ -206,14 +208,17 @@ function attributePairs(selector) {
 
 /**
  * The identifier pins in a selector that `IDENTITY_SOURCES` recognises, each marked with whether
- * its value exists in the lab world.
+ * its value exists in the lab world `viewCase` opens, which holds the Ironworks recipes only when
+ * the case seeds them (issue 3010).
  */
-function identifierPins(selector) {
+function identifierPins(selector, viewCase) {
+  const seeded = Boolean(viewCase?.query?.iterativeRecipes);
   const pins = [];
   for (const { name, value } of attributePairs(selector)) {
     const source = IDENTITY_SOURCES[name];
     if (!source || value === '') continue;
-    pins.push({ name, value, known: source.has(value) });
+    const known = source.has(value) || (seeded && SEEDED_IRONWORKS_SOURCES[name]?.has(value));
+    pins.push({ name, value, known: Boolean(known) });
   }
   return pins;
 }
@@ -431,7 +436,7 @@ test('every fixture id a selector names exists in the lab world', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step !== 'object') continue;
-      for (const pin of identifierPins(step.selector)) {
+      for (const pin of identifierPins(step.selector, viewCase)) {
         if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
       }
     }
@@ -450,7 +455,7 @@ test('every fixture id an expectSelector names exists in the lab world', () => {
   let recognized = 0;
   for (const viewCase of VIEW_LAB_CASES) {
     if (typeof viewCase.expectSelector !== 'string') continue;
-    for (const pin of identifierPins(viewCase.expectSelector)) {
+    for (const pin of identifierPins(viewCase.expectSelector, viewCase)) {
       recognized++;
       if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
     }
