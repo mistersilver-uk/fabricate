@@ -1548,3 +1548,16 @@ Global edits fixed bounds, Per recipe edits default bounds a recipe may override
 - The screen offers search with a shown-of-total count, an empty state with "New counter", and a separate state for a search that matches nothing.
 - Deleting a Counter confirms through the Manager confirmation dialog and announces "{name} deleted." through the list's live region.
 - The screen is read-only, behind a blocking notice, when the system's iterative settings were made by a newer version of Fabricate.
+
+## Actions Screen
+
+The Actions screen lists the system's Crafting Actions as rows or as cards, with search, the filter toggles "Rolls check", "No check" and "Has issues", and a category filter.
+Each entry shows its icon, label, description, Counter costs, whether it rolls the crafting check, its effect count, and a blocking count when it has blocking issues.
+Opening an entry opens the Crafting Action editor.
+
+- The toggles combine, so "Rolls check" with "No check" matches nothing and the screen offers Clear filters.
+- The list is paged, with a page size of 10, 25 or 50, and a "New action" button follows the list or the grid.
+- Search, filters, page, page size and arrangement outlive a trip to the editor and are never persisted.
+- "New action" is disabled, with its reason stated, while the system has no Counters, and the empty state says Counters come before any Crafting Action.
+- With Counters and no Crafting Actions, the empty state says what an action holds and "New action" is enabled.
+- The screen is read-only, behind a blocking notice, when the system's iterative settings were made by a newer version of Fabricate.

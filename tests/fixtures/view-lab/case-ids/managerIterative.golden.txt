@@ -11,3 +11,12 @@ manager-iterative-counter-delete-in-use
 manager-iterative-counters-filtered-empty
 manager-iterative-counters-narrow
 manager-iterative-library-unsupported
+manager-iterative-actions
+manager-iterative-actions-grid
+manager-iterative-actions-empty
+manager-iterative-actions-empty-with-counters
+manager-iterative-actions-filtered
+manager-iterative-actions-filtered-empty
+manager-iterative-actions-has-issues
+manager-iterative-actions-paged
+manager-iterative-actions-narrow

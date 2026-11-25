@@ -1096,6 +1096,17 @@
       ]
     },
     {
+      "path": "src/ui/svelte/components/ViewToggle.svelte",
+      "library": "<ViewToggle>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "manager-only",
+      "why": [
+        "The list and grid switch, `SegmentedControl`'s icon-only form over the closed list and grid pair, its two radios named by required, already-localized labels and the group by its `ariaLabel`.",
+        "Two independent callers, `src/ui/svelte/apps/manager/EssenceBrowserView.svelte` and `src/ui/svelte/apps/manager/iterative/ActionsBrowserView.svelte`, clear the two-importer membership bar, and both are manager browse screens, so it is manager-only."
+      ]
+    },
+    {
       "path": "src/ui/svelte/components/Typeahead.svelte",
       "library": "<Typeahead>",
       "status": "shipped",
@@ -1309,16 +1320,6 @@
       "why": [
         "The cross-reference list: a read-only list named by its own kicker, each row ListRow's dense row or its selectable dense form, with a caller-formatted detail at the trailing edge.",
         "ONE importer, `src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte`, is below the two-importer membership bar."
-      ]
-    },
-    {
-      "path": "src/ui/svelte/components/ViewToggle.svelte",
-      "library": "<ViewToggle>",
-      "evidence": "broad",
-      "callers": ["src/ui/svelte/apps/manager/EssenceBrowserView.svelte"],
-      "why": [
-        "The list and grid switch, `SegmentedControl`'s icon-only form over the closed list and grid pair, its two radios named by required, already-localized labels and the group by its `ariaLabel`.",
-        "ONE importer, `src/ui/svelte/apps/manager/EssenceBrowserView.svelte`, is below the two-importer membership bar."
       ]
     },
     {

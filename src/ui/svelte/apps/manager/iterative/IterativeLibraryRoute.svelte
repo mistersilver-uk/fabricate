@@ -12,6 +12,7 @@
   | `text` | the shell's localizer | — | `(key, fallback)` |
 -->
 <script>
+  import ActionsBrowserView from './ActionsBrowserView.svelte';
   import CountersView from './CountersView.svelte';
 
   let { route, currentView = '', text = () => '' } = $props();
@@ -49,6 +50,18 @@
       onDelete={route.deleteCounter}
       onExpand={route.expandCounter}
       onNameFocused={route.clearNameFocus}
+    />
+  {:else if currentView === 'iterative-actions'}
+    <ActionsBrowserView
+      actions={route.actions}
+      counters={route.counters}
+      blocking={route.actionBlocking}
+      selectedSystemId={route.systemId}
+      unsupported={route.unsupported}
+      browserState={route.actionsBrowse}
+      {text}
+      onOpen={route.openAction}
+      onNew={route.startNewAction}
     />
   {/if}
 </main>

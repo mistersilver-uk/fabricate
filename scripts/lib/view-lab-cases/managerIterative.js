@@ -3,12 +3,14 @@
  * editor, on the lab's `lab-ironworks` system (issue 3009).
  */
 
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 /** The one claim every case in this file makes: the whole `iterative/` directory. */
 const ITERATIVE_SOURCES = /^src\/ui\/svelte\/apps\/manager\/iterative\//;
 
 const COUNTERS_STEPS = ['Crafting', { selector: '#manager-crafting-nav-counters' }];
+const ACTIONS_STEPS = ['Crafting', { selector: '#manager-crafting-nav-actions' }];
+const FILTER = (key) => ({ selector: `[data-iterative-filter="${key}"]` });
 
 /** One iterative frame: `Ironworks` in `state`, reached through the rail, claimed by the directory. */
 function iterativeCase({ state = 'populated', width = 1280, ...entry }) {
@@ -153,5 +155,82 @@ export const CASES = Object.freeze([
     steps: COUNTERS_STEPS,
     expectView: 'iterative-counters',
     expectSelector: '[data-iterative-unsupported-notice]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions',
+    label: 'Manager — Iterative Actions list',
+    steps: ACTIONS_STEPS,
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-arrangement="list"] [data-iterative-action="stoke"]',
+    expectCenterHit: '[data-iterative-action="strike"] .fabricate-list-row-open',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-grid',
+    label: 'Manager — Iterative Actions grid',
+    steps: [...ACTIONS_STEPS, { selector: '[data-iterative-view-option="grid"]' }],
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-arrangement="grid"] [data-iterative-action="stoke"]',
+    expectCenterHit: '[data-iterative-action="strike"] .fabricate-list-row-open',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-empty',
+    label: 'Manager — Iterative Actions empty, no counters',
+    state: 'empty',
+    steps: ACTIONS_STEPS,
+    expectView: 'iterative-actions',
+    expectSelector:
+      '[data-iterative-actions-empty="no-counters"] [data-iterative-empty-new-action]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-empty-with-counters',
+    label: 'Manager — Iterative Actions empty, with counters',
+    state: 'noActions',
+    steps: ACTIONS_STEPS,
+    expectView: 'iterative-actions',
+    expectSelector:
+      '[data-iterative-actions-empty="no-actions"] [data-iterative-empty-new-action]:enabled',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-filtered',
+    label: 'Manager — Iterative Actions filtered by check and category',
+    steps: [
+      ...ACTIONS_STEPS,
+      FILTER('rollsCheck'),
+      ...chooseSelectOption('[data-iterative-category]', 'Forging'),
+    ],
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-action-list] > [data-iterative-action="strike"]:only-child',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-filtered-empty',
+    label: 'Manager — Iterative Actions filtered to nothing',
+    // Rolls the check and does not: no action is both, so the filters leave nothing.
+    steps: [...ACTIONS_STEPS, FILTER('rollsCheck'), FILTER('noCheck')],
+    expectView: 'iterative-actions',
+    expectSelector: '[data-clear-filters="actions"]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-has-issues',
+    label: 'Manager — Iterative Actions with a blocking issue',
+    state: 'invalid',
+    steps: ACTIONS_STEPS,
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-action="smelt"] [data-iterative-blocking-chip]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-paged',
+    label: 'Manager — Iterative Actions, second page',
+    state: 'paged',
+    steps: [...ACTIONS_STEPS, { selector: '[data-iterative-actions] [data-pagination-next]' }],
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-action-list] > [data-iterative-action="drill10"]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-actions-narrow',
+    label: 'Manager — Iterative Actions at 880px',
+    width: 880,
+    steps: ACTIONS_STEPS,
+    expectView: 'iterative-actions',
+    expectSelector: '[data-iterative-action-list] > [data-iterative-action="quench"]',
   }),
 ]);

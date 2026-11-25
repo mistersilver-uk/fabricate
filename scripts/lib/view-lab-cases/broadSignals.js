@@ -110,10 +110,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-typeahead-free-text',
     'manager-published-typeahead-open-on-empty',
   ]),
-  // The list and grid switch (issue 2412): the essence browser in each arrangement.
+  // The list and grid switch (issue 2412): the essence browser in each arrangement, and the Crafting
+  // Action browser in each (issue 3009).
   'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([
     'manager-essences-normal',
     'manager-essences-grid',
+    'manager-iterative-actions',
+    'manager-iterative-actions-grid',
   ]),
   // The cross-reference list (issue 2321): the inventory inspector, a tool's Required for and an
   // essence's Contributing.

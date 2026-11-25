@@ -9,6 +9,7 @@ import { createActionsBrowserState } from '../../../../model/managerBrowserViewS
 
 import { createIterativeActionDraft } from './iterativeActionDraft.svelte.js';
 import { createIterativeCounterRoute } from './iterativeCounterRoute.svelte.js';
+import { actionBlockingCounts } from './iterativeLibraryModel.js';
 
 /** Read-only accessors for `reads`, each a thunk, so the model hands out live values. */
 const accessors = (reads) =>
@@ -66,6 +67,9 @@ export function createIterativeRouteModel({
     viewState();
     return section()?.systemRecipes?.() ?? [];
   });
+  const blocking = $derived(
+    unsupported || !selectedSystem() ? new Map() : actionBlockingCounts(selectedSystem(), recipes)
+  );
   const staged = createIterativeActionDraft({
     selectedSystem,
     library: () => (unsupported ? null : library),
@@ -125,6 +129,7 @@ export function createIterativeRouteModel({
       recipes: () => recipes,
       ...counterRoute.reads,
       actionsBrowse: () => actionsBrowse,
+      actionBlocking: () => blocking,
       actionDraft: () => staged.draft,
       actionSaving: () => staged.saving,
       isNewAction: () => staged.isNew,

@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): a composition of the Notice member with the iterative library's two fixed sentences, shared by the Counters and Actions screens rather than offered as a vocabulary member -->
 <!--
   The blocking Notice every iterative screen shows when the library was made by a newer build of
   Fabricate: the screens read nothing from it and write nothing to it.

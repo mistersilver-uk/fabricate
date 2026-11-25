@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 
 import { isIterativeId } from '../src/systems/iterative/counterRule.js';
 import {
+  actionBlockingCounts,
   actionUses,
   counterNameFault,
   counterUses,
@@ -81,7 +82,10 @@ describe('the Counter name rule', () => {
       { id: 'd', label: '' },
       { id: 'e', label: '  ' },
     ];
-    assert.deepEqual([...duplicateCounterIds(persisted)].sort((a, b) => a.localeCompare(b)), ['a', 'b']);
+    assert.deepEqual(
+      [...duplicateCounterIds(persisted)].sort((a, b) => a.localeCompare(b)),
+      ['a', 'b']
+    );
     assert.deepEqual([...duplicateCounterIds(undefined)], []);
   });
 });
@@ -230,5 +234,45 @@ describe('actionUses', () => {
       ),
       false
     );
+  });
+});
+
+describe('actionBlockingCounts', () => {
+  const system = {
+    resolutionMode: 'iterative',
+    craftingCheck: {},
+    iterative: {
+      version: 1,
+      counters: [{ id: 'heat', label: 'Heat', limit: 'none' }],
+      actions: [
+        {
+          id: 'ok',
+          label: 'Fine',
+          availability: { combine: 'all', rules: [] },
+          costs: [{ id: 'c', counterId: 'heat', amount: '1', needsEnough: true }],
+          check: 'none',
+          effects: [],
+        },
+        {
+          id: 'lost',
+          label: 'Lost',
+          availability: { combine: 'all', rules: [] },
+          costs: [{ id: 'c', counterId: 'gone', amount: '1', needsEnough: true }],
+          check: 'none',
+          effects: [],
+        },
+      ],
+    },
+  };
+
+  it('counts the issues Validation reports on each action, and none for a clean one', () => {
+    const counts = actionBlockingCounts(system, []);
+    assert.equal(counts.get('lost'), 1);
+    assert.ok(!counts.has('ok'));
+  });
+
+  it('reports nothing for a system that is not iterative or has no library', () => {
+    assert.equal(actionBlockingCounts({ ...system, resolutionMode: 'simple' }, []).size, 0);
+    assert.equal(actionBlockingCounts(null, undefined).size, 0);
   });
 });

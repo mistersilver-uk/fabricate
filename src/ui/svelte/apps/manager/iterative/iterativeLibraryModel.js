@@ -5,6 +5,7 @@
 import { iterativeStepsOf } from '../../../../../models/iterativeStepConfig.js';
 import { isIterativeId } from '../../../../../systems/iterative/counterRule.js';
 import { analyzeIterativeExpression } from '../../../../../systems/iterative/expression.js';
+import { evaluateIterativeReadiness } from '../../../../../systems/iterative/iterativeReadiness.js';
 import { arrayOrEmpty, isPlainObject, trimString } from '../../../../../utils/scalars.js';
 
 const ID_FALLBACKS = Object.freeze({
@@ -187,3 +188,13 @@ export function actionUses(library, recipes, id) {
 
 /** `{ actions, steps }` counts of one {@link counterUses} or {@link actionUses} answer. */
 export const usageCounts = (uses) => ({ actions: uses.actions.length, steps: uses.steps.length });
+
+/** Each Crafting Action's blocking issue count as Validation reports it: a `Map` of id to count. */
+export function actionBlockingCounts(system, recipes) {
+  const counts = new Map();
+  for (const issue of evaluateIterativeReadiness(system, arrayOrEmpty(recipes))) {
+    if (issue.entityKind !== 'action') continue;
+    counts.set(issue.entityId, (counts.get(issue.entityId) ?? 0) + 1);
+  }
+  return counts;
+}

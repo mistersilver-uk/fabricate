@@ -151,13 +151,16 @@
       />
       {#if hasBounds}
         {#each [{ key: 'min', word: minWord }, { key: 'max', word: maxWord }] as bound (bound.key)}
+          {@const names = stepperLabels(`${counter.label} ${bound.word}`)}
           <div class="manager-iterative-counter-bound">
             <span class="manager-iterative-counter-bound-word">{bound.word}</span>
             <Stepper
               allowUnset
               value={counter[bound.key] ?? null}
               placeholder="—"
-              {...stepperLabels(`${counter.label} ${bound.word}`)}
+              ariaLabel={names.ariaLabel}
+              decrementLabel={names.decrementLabel}
+              incrementLabel={names.incrementLabel}
               inputProps={{ 'data-iterative-counter-bound': bound.key }}
               onChange={(next) => onUpdate({ [bound.key]: next })}
             />

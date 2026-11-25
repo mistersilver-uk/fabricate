@@ -209,8 +209,7 @@ It holds no state of its own: the list around it owns the current arrangement, a
 Its glyphs are fixed, `fa-list` for list and `fa-table-cells-large` for grid, so every list's switch reads alike; a caller supplies the words, never the glyphs.
 Each option renders a glyph alone, so each takes its accessible name from a required, already-localized label prop, `listLabel` and `gridLabel`, and the group takes its own from a required `ariaLabel`.
 A caller's per-option hook rides `optionDataAttr` onto each option's clickable label, never onto its hidden radio.
-The essence browser's presentation control is its first caller.
-With one importer, `ViewToggle` is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+The essence browser and the Crafting Action browser are its callers, so `ViewToggle` is a member of the primitive set.
 
 #### Scenario: A GM switches the essence library to its grid
 

@@ -161,6 +161,17 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/PlayerDetailHeader.svelte': 1 },
   ],
   [
+    "a composition of the Pagination member with the callers' own entry and empty-state " +
+      'snippets, shared by the essence and Crafting Action browsers rather than offered as a ' +
+      'vocabulary member',
+    { 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte': 1 },
+  ],
+  [
+    "a composition of the Notice member with the iterative library's two fixed sentences, " +
+      'shared by the Counters and Actions screens rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/manager/iterative/UnsupportedLibraryNotice.svelte': 1 },
+  ],
+  [
     'a composition of the Medallion member and two text runs, shared by the crafting ' +
       "detail's two award lists rather than offered as a vocabulary member",
     { 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte': 1 },
