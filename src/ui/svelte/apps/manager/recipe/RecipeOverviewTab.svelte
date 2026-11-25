@@ -114,6 +114,9 @@
     onDeleteStep = () => {},
     // The iterative route model in an iterative system, else `null`: the Counters card reads it.
     iterative = null,
+    // An iterative recipe's sole step offers no delete; the Steps card's warning links to settings.
+    soleStepLocked = false,
+    onOpenCraftingSettings = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -464,6 +467,12 @@
     <RecipeStepsCard
       steps={recipe?.steps || []}
       {timeRequirementsEnabled}
+      {recipe}
+      {iterative}
+      {multiStepEnabled}
+      removable={!soleStepLocked || (recipe?.steps?.length ?? 0) > 1}
+      disabled={saving}
+      {onOpenCraftingSettings}
       {onAddStep}
       {onReorderSteps}
       {onUpdateStep}

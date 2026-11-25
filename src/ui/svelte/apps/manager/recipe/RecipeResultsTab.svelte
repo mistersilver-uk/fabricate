@@ -61,6 +61,8 @@
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {},
+    // An iterative recipe's sole step offers no delete: Collapse is the way back to one step.
+    soleStepLocked = false,
     // GM policy: may a player reorder this recipe's progressive stages? Default true.
     onToggleAllowPlayerResultReorder = () => {},
   } = $props();
@@ -203,7 +205,12 @@
         )}
       </p>
     {:else}
-      <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
+      <RecipeStepAccordion
+        {steps}
+        alwaysOpen
+        {onDeleteStep}
+        removable={!soleStepLocked || steps.length > 1}
+      >
         {#snippet body(step, index)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}

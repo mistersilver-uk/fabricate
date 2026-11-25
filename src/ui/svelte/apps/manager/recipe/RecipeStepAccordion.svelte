@@ -13,7 +13,9 @@
   expands it, because a whole-row toggle would nest the row's own grip, rocker and delete in a
   button. Results and Tools pass `alwaysOpen`, because a single-expand accordion on a tab whose
   whole subject is the body showed nothing by default. With `onUpdateStep` the row's time chip
-  becomes an editable duration trigger; otherwise it stays a read-only chip.
+  becomes an editable duration trigger; otherwise it stays a read-only chip. `removable={false}`
+  draws no delete, and an optional `rowMeta(step, index)` snippet draws between the step's copy and
+  its time control, outside `.manager-recipe-steps-requirements`, whose chips are control height.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -32,6 +34,8 @@
     onReorderSteps = () => {},
     onDeleteStep = () => {},
     onUpdateStep = null,
+    removable = true,
+    rowMeta = undefined,
     body,
     footer,
   } = $props();
@@ -59,7 +63,7 @@
   items={steps}
   itemLabel={stepLabel}
   numbered
-  removable
+  {removable}
   {reorderable}
   {alwaysOpen}
   expandable={!alwaysOpen}
@@ -85,6 +89,9 @@
           )}</span
       >
     </span>
+    {#if rowMeta}
+      <span class="manager-recipe-step-meta">{@render rowMeta(step, index)}</span>
+    {/if}
     <div class="manager-recipe-steps-requirements">
       {#if onUpdateStep && timeRequirementsEnabled}
         <RecipeDurationEditor
@@ -107,3 +114,11 @@
     </div>
   {/snippet}
 </SortableList>
+
+<style>
+  .manager-recipe-step-meta {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+</style>

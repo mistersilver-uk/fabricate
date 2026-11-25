@@ -42,6 +42,8 @@
     onAddIngredientSetTool = () => {},
     onRemoveIngredientSetTool = () => {},
     onDeleteStep = () => {},
+    // An iterative recipe's sole step offers no delete: Collapse is the way back to one step.
+    soleStepLocked = false,
   } = $props();
 
   function text(key, fallback) {
@@ -194,7 +196,12 @@
       <span>{text('FABRICATE.Admin.Manager.Recipe.PlusPerStep', 'Plus, per step')}</span>
     </div>
 
-    <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
+    <RecipeStepAccordion
+      {steps}
+      alwaysOpen
+      {onDeleteStep}
+      removable={!soleStepLocked || steps.length > 1}
+    >
       {#snippet body(step)}
         <RecipeToolsSection
           idPrefix={`step-${step.id}-`}

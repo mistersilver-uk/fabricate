@@ -147,6 +147,7 @@
   // They are preserved and restored on re-enable, and meanwhile the editor presents the recipe as
   // single-step over the FINAL step's results. Never under `iterative`, which keeps its steps.
   const collapsed = $derived(!multiStepEnabled && steps.length > 1 && !iterative);
+  const soleStepLocked = $derived(Boolean(iterative));
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
   // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
@@ -452,6 +453,8 @@
             {onReorderSteps}
             {onUpdateStep}
             onDeleteStep={deleteStepFrom('overview')}
+            {soleStepLocked}
+            {onOpenCraftingSettings}
           />
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
@@ -470,6 +473,7 @@
             {routingProvider}
             onUpdateIngredientSets={writes.sets}
             onDeleteStep={deleteStepFrom('ingredients')}
+            {soleStepLocked}
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
@@ -498,6 +502,7 @@
             onAssignIngredientSet={writes.assignSet}
             onUpdateResultGroups={writes.groups}
             onDeleteStep={deleteStepFrom('results')}
+            {soleStepLocked}
             onToggleAllowPlayerResultReorder={toggleAllowPlayerResultReorder}
           />
         {:else if activeTab === 'tools'}
@@ -517,6 +522,7 @@
             onAddIngredientSetTool={addIngredientSetTool}
             onRemoveIngredientSetTool={removeIngredientSetTool}
             onDeleteStep={deleteStepFrom('tools')}
+            {soleStepLocked}
           />
         {:else if activeTab === 'access'}
           <RecipeAccessTab {accessPlayers} {accessCharacters} {onOpenAccess} />

@@ -49,6 +49,8 @@
     routingProvider = null,
     onUpdateIngredientSets = () => {},
     onDeleteStep = () => {},
+    // An iterative recipe's sole step offers no delete: Collapse is the way back to one step.
+    soleStepLocked = false,
   } = $props();
 
   function text(key, fallback) {
@@ -128,7 +130,7 @@
         )}
       </p>
     {:else}
-      <RecipeStepAccordion {steps} {onDeleteStep}>
+      <RecipeStepAccordion {steps} {onDeleteStep} removable={!soleStepLocked || steps.length > 1}>
         {#snippet body(step)}
           <RecipeIngredientsSection
             idPrefix={`step-${step.id}-`}
