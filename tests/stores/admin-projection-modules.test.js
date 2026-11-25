@@ -958,6 +958,7 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
       for (const row of rows) void row.iterativeStatus;
       for (const row of rows) void row.iterativeStatus;
       assert.equal(evaluations, 1, 'thirty rows, read twice, share one evaluation');
+      assert.equal(rows[0].iterativeStatus, rows[0].iterativeStatus, 'each row keeps its status');
       assert.equal(createIterativeStatusContext(makeSystem(), roster, { evaluate }), null);
       const bare = { id: 'r-0' };
       defineIterativeStatus(bare, roster[0], null);

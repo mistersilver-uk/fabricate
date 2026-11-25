@@ -230,6 +230,18 @@ describe('a confirming handler reads the draft after the confirm resolves', () =
     assert.deepEqual([...gone.state.patches, ...closed.state.patches], []);
   });
 
+  it('writes no collapse when the draft went while the confirm was open, under iterative', async () => {
+    const { state, handlers, dialog } = deferredHarness(
+      { id: 'r1', iterative: { counters: [] }, steps: [FORGE, QUENCH] },
+      true
+    );
+    const collapsing = handlers.handleRevertToSingleStep();
+    state.draft = null;
+    dialog.answer(true);
+    assert.equal(await collapsing, false);
+    assert.deepEqual(state.patches, []);
+  });
+
   it('collapses the step 1 an edit left while the confirm was open, under iterative', async () => {
     const { state, handlers, dialog } = deferredHarness(
       { id: 'r1', iterative: { counters: [] }, steps: [FORGE, QUENCH] },
