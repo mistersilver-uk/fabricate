@@ -1561,3 +1561,23 @@ Opening an entry opens the Crafting Action editor.
 - "New action" is disabled, with its reason stated, while the system has no Counters, and the empty state says Counters come before any Crafting Action.
 - With Counters and no Crafting Actions, the empty state says what an action holds and "New action" is enabled.
 - The screen is read-only, behind a blocking notice, when the system's iterative settings were made by a newer version of Fabricate.
+
+## Action Editor
+
+The Crafting Action editor edits a staged copy of one Crafting Action, saved by "Save action".
+Leaving it with unsaved edits runs the Manager confirm-discard route-exit guard.
+Its header shows `Ready` or the Crafting Action's blocking count, from the same readiness evaluation the Validation tab reports, computed against the unsaved edit.
+
+- A Crafting Action with blocking issues still saves, and the editor states that players cannot take it until those issues are fixed, marking each affected field.
+- Identity edits the icon, the label, a player-facing description, and categories, chosen from the categories the system's Crafting Actions already use or created in place.
+- Creating a category refuses an exact case-insensitive duplicate and suggests a near match.
+- "How it is taken" edits whether the Crafting Action is taken as a Crafting Session (the default) or as a free action, and its availability rules, combined as All or Any.
+- Costs edit an amount expression, the Counter it is paid from, and "Needs enough", and an amount may not roll dice or read the check.
+- Check chooses between rolling the system's routed crafting check and no check.
+- While the Crafting Action rolls, Check shows the routed check read-only with a link to Checks, and warns when that check has no usable roll.
+- Effects apply top to bottom in a reorderable list.
+- Each effect edits its name, its description, when it applies, and the Counter it increments, decrements or sets by an amount expression.
+- When it applies covers the outcome tiers, check success or failure, a check-value comparison and workpiece rules, all combined by the effect's All or Any.
+- An effect that reads a check fact on a Crafting Action with no check is shown as a warning.
+- "Duplicate" copies the Crafting Action under a new id, and "Delete" removes it after confirmation.
+- The editor is read-only when the system's iterative settings were made by a newer version of Fabricate.
