@@ -18,6 +18,7 @@ const REACHABLE = [
   ['crafting', 'routedByIngredients', ''],
   ['crafting', 'routedByCheck', ''],
   ['crafting', 'progressive', ''],
+  ['crafting', 'iterative', ''],
   // No `['crafting', 'alchemy', 'none']`.
   ['crafting', 'alchemy', 'simple'],
   ['crafting', 'alchemy', 'tiered'],

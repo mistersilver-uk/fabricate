@@ -140,6 +140,15 @@ const BASE_MODES = {
     ],
     facts: ['check:required', 'outcomes:ordered', 'results:spent'],
   },
+  'crafting:iterative': {
+    icon: 'fas fa-dice-d20',
+    title: ['Iterative', 'Iterative'],
+    body: [
+      'IterativeBody',
+      'One check for the whole system. Each action either rolls it or doesn’t.',
+    ],
+    facts: ['check:optional', 'outcomes:tiers', 'results:counters'],
+  },
   'gathering:d100': {
     icon: 'fas fa-percent',
     title: ['GatheringD100', 'd100 roll'],
@@ -186,6 +195,7 @@ const FACT_VALUES = Object.freeze({
   'results:spent': ['ResultsSpent', 'Spent down the list'],
   'results:successFailure': ['ResultsSuccessFailure', 'Success or failure set'],
   'results:perDrop': ['ResultsPerDrop', 'Rolled per drop'],
+  'results:counters': ['ResultsCounters', 'Moves counters'],
 });
 
 /** Every key this module can describe, for the exhaustiveness gate. */

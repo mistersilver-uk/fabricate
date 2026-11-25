@@ -83,6 +83,7 @@
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { usesRoutedCheck } from '../../../../../systems/checkRouting.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -216,12 +217,11 @@
   const consumeComponentOnFail = $derived(salvageConsumption?.consumeComponentOnFail !== false);
   const salvageBreakToolsOnFail = $derived(salvageConsumption?.breakToolsOnFail === true);
 
-  // Only `routedByCheck` uses the tier-routing editor, and alchemy has a dedicated FIRST
-  // branch, so `craftingAlchemy` wins before these two can match — but they still INCLUDE the
-  // alchemy cases, so `validationSections` picks the right draft. Do not tighten them.
+  // `usesRoutedCheck` modes use the tier-routing editor. Alchemy wins first, yet these two
+  // INCLUDE its cases so `validationSections` picks the right draft: do not tighten them.
   const craftingAlchemy = $derived(resolutionMode === 'alchemy');
   const craftingRouted = $derived(
-    resolutionMode === 'routedByCheck' || (craftingAlchemy && alchemyCheckMode === 'tiered')
+    usesRoutedCheck(resolutionMode) || (craftingAlchemy && alchemyCheckMode === 'tiered')
   );
   const craftingSimple = $derived(
     resolutionMode === 'simple' ||

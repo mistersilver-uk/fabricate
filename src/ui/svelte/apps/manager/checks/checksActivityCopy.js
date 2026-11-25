@@ -89,6 +89,7 @@ const SUBSYSTEM_MODE_LABELS = Object.freeze({
     routedByCheck: ['FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'],
     progressive: ['FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'],
     alchemy: ['FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'],
+    iterative: ['FABRICATE.Admin.SystemSettings.ResolutionIterative', 'Iterative'],
   },
   // Alchemy's row names the ALCHEMY CHECK MODE, the choice deciding what alchemy rolls.
   alchemy: {

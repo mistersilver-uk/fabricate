@@ -85,7 +85,7 @@ function anchoredSurfaces(target) {
 const ALL_SHOWN = { dcSource: true, difficulty: true, tiers: true, previewAgainst: true };
 const ALL_WITHHELD = { dcSource: false, difficulty: false, tiers: false, previewAgainst: false };
 
-describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () => {
+describe('the anchor gate is exactly a routed-check mode AND fixed (issues 1096, 3009)', () => {
   it('withholds all three anchored surfaces on routedByCheck + fixed', async () => {
     const target = await render({ type: 'fixed', resolutionMode: 'routedByCheck' });
     assert.deepEqual(
@@ -104,6 +104,16 @@ describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () =
     );
   });
 
+  it('withholds all three anchored surfaces on iterative + fixed, which rolls the same routed check', async () => {
+    const target = await render({ type: 'fixed', resolutionMode: 'iterative' });
+    assert.deepEqual(anchoredSurfaces(target), ALL_WITHHELD);
+  });
+
+  it('shows all three on iterative + relative', async () => {
+    const target = await render({ type: 'relative', resolutionMode: 'iterative' });
+    assert.deepEqual(anchoredSurfaces(target), ALL_SHOWN);
+  });
+
   it('does not WIDEN to any fixed check: a fixed salvage check keeps its anchor', async () => {
     // Salvage and gathering reuse this editor with no system resolution mode at all.
     for (const resolutionMode of [null, undefined, 'routedByIngredients', 'simple']) {
@@ -118,7 +128,7 @@ describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () =
   });
 
   it('does not NARROW to the check type alone: relative under any mode shows all three', async () => {
-    for (const resolutionMode of [null, 'routedByCheck', 'simple']) {
+    for (const resolutionMode of [null, 'routedByCheck', 'iterative', 'simple']) {
       harness.remount();
       const target = await render({ type: 'relative', resolutionMode });
       assert.deepEqual(anchoredSurfaces(target), ALL_SHOWN);
