@@ -21,7 +21,6 @@ import {
 } from '../../../systems/CraftingSystemExporter.js';
 import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
 import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
-import { modeChangeRefusal } from '../../../systems/resolutionModeAvailability.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../model/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
@@ -68,7 +67,6 @@ import {
   normalizeNullableSuccesses,
 } from '../../../systems/normalize/checkEvaluation.js';
 import { Tool } from '../../../models/Tool.js';
-import { summarizeModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
@@ -127,11 +125,12 @@ import {
   emptyWorldCurrencyState,
 } from './adminCurrencySection.js';
 import { createKnowledgeSection } from './adminKnowledgeSection.js';
+import { createCraftingSettingsActions } from './adminCraftingSettingsActions.js';
+import { createIterativeLibrarySection } from './adminIterativeLibrarySection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
-import { modeChangeConfirmOptions } from './modeChangeConfirm.js';
 import { createWorldScopeActions } from './worldScopeActions.js';
 import {
   buildWorldScopeState as _buildWorldScopeState,
