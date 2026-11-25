@@ -8,6 +8,7 @@
   | --- | --- | --- | --- |
   | `config` | a normalized `StepIterative` | — | from `stepConfigOf` |
   | `options` | `SetPicker` options | `[]` | the library actions, from `actionOptions` |
+  | `address` | `'single'` or a step index | `'single'` | the picker's `iterative-step-<address>-actions` Validation target |
   | `disabled` | boolean | `false` | every control off |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
@@ -25,6 +26,7 @@
   let {
     config,
     options = [],
+    address = 'single',
     disabled = false,
     text = (_key, fallback) => fallback,
     onChange = () => {},
@@ -119,6 +121,7 @@
       addLabel={text('FABRICATE.Admin.Manager.Iterative.RuleActionsAdd', 'Choose actions')}
       addProps={{
         'data-iterative-step-actions': '',
+        'data-validation-target': `iterative-step-${address}-actions`,
         disabled,
         ...(none && { 'aria-invalid': 'true' }),
       }}

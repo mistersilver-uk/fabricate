@@ -3446,7 +3446,11 @@
             "AnyValue": "Any value",
             "RemoveProducedWhen": "Remove this condition",
             "AddProducedWhen": "When",
-            "NeverProduced": "Never produced. Add when it should be."
+            "NeverProduced": "Never produced. Add when it should be.",
+            "MidRunTitle": "{count} workpieces of {recipe} are in progress.",
+            "MidRunTitleOne": "1 workpiece of {recipe} is in progress.",
+            "MidRunText": "They keep the counters, rules and routes they started with. Your changes apply to workpieces started after you save.",
+            "MidRunTextOne": "It keeps the counters, rules and routes it started with. Your changes apply to workpieces started after you save."
           },
           "AmountFixed": "Fixed",
           "AmountRolled": "Rolled",
@@ -3648,6 +3652,11 @@
             "GroupResults": "Results",
             "GroupResolution": "Resolution",
             "GroupRequirements": "Requirements",
+            "GroupSteps": "Steps",
+            "CheckIterativeCounters": "Counters are set up",
+            "CheckIterativeSingleStep": "The step’s counters, end rules and routes resolve",
+            "CheckIterativeStep": "Step {n}, {name}: counters, end rules and routes resolve",
+            "CheckIterativeStepUnnamed": "Step {n}: counters, end rules and routes resolve",
             "Severity": {
               "critical": "Critical",
               "warning": "Warning",
@@ -8666,6 +8675,8 @@
           "AddRule": "Rule",
           "RuleCounterUntracked": "{counter} isn't tracked in this step.",
           "RuleCounterUntrackedOption": "{counter} (not tracked)",
+          "ActionInProgress": "{count} workpieces in progress can use {name}. They keep the version of this action they started with; your changes apply to workpieces started after you save.",
+          "ActionInProgressOne": "1 workpiece in progress can use {name}. It keeps the version of this action it started with; your changes apply to workpieces started after you save.",
           "JoinerAnd": "and",
           "JoinerOr": "or",
           "RuleTitle": "When",

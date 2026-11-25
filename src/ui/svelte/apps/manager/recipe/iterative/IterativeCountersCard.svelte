@@ -171,6 +171,7 @@
     disabled={disabled || library.length === 0}
     aria-describedby={library.length === 0 ? noteId : undefined}
     data-iterative-counters-add-all
+    data-validation-target="iterative-counters-add"
     onclick={addAll}>{addAllLabel}</Button
   >
   {#if library.length === 0}{@render countersLink()}{/if}
@@ -214,7 +215,15 @@
   />
 {/snippet}
 
-<div class="manager-counter-instances" bind:this={root} data-recipe-section="iterative-counters">
+<!-- `tabindex="-1"`: a Counter Instance issue's Validation row focuses the table it is in. -->
+<div
+  class="manager-counter-instances"
+  bind:this={root}
+  tabindex="-1"
+  data-keyboard-focus="true"
+  data-recipe-section="iterative-counters"
+  data-validation-target="iterative-counters"
+>
   <DataTable
     heading={say('FABRICATE.Admin.Manager.Recipe.Iterative.CountersHeading', 'Counters')}
     hint={isMultiStep

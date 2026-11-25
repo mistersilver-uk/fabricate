@@ -10,11 +10,15 @@
   than introducing a second one that could disagree; the category map below is display metadata
   only. The MARKUP is `EditorValidationSurface`'s, and every `data-*` hook this tab shipped is
   preserved through `hookAttrs`, `countAttrs`, `viewDataAttr` and each row's own `dataAttrs`.
+  With `iterativeReadiness` the Steps group comes first, holding the iterative checks and the
+  iterative issues on Overview, each worded as the system Validation tab words its code.
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
+  import { fill } from '../../../../../utils/fillPlaceholders.js';
+  import { iterativeIssueSentence } from '../iterative/iterativeIssueCopy.js';
   import {
     countRecipeReadiness,
     evaluateRecipeReadiness,
@@ -32,6 +36,8 @@
     systemRecipes = [],
     // A progressive system awards every stage in order, so a set may hold no choice group.
     progressive = false,
+    // The iterative route model's `recipeReadinessInput`, in an iterative system only.
+    iterativeReadiness = null,
     onSelectIssue = () => {},
   } = $props();
 
@@ -49,6 +55,7 @@
       alchemy,
       signatureConflicts,
       progressive,
+      iterative: iterativeReadiness,
     })
   );
 
@@ -168,18 +175,55 @@
   };
 
   const GROUP_ORDER = [
+    ['steps', 'GroupSteps', 'Steps', 'fas fa-list-ol'],
     ['ingredients', 'GroupIngredients', 'Ingredients', 'fas fa-flask'],
     ['results', 'GroupResults', 'Results', 'fas fa-box-open'],
     ['resolution', 'GroupResolution', 'Resolution', 'fas fa-dice-d20'],
     ['requirements', 'GroupRequirements', 'Requirements', 'fas fa-clipboard-check'],
   ];
 
+  /** An iterative check's words: Counters are set up, else its step's. */
+  function iterativeCheckLabel(id) {
+    if (id === 'iterativeCounters') {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.Validation.CheckIterativeCounters',
+        'Counters are set up'
+      );
+    }
+    if (id === 'iterativeStep:single') {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.Validation.CheckIterativeSingleStep',
+        'The step’s counters, end rules and routes resolve'
+      );
+    }
+    const index = Number(id.slice('iterativeStep:'.length));
+    const name = String(recipe?.steps?.[index]?.name ?? '').trim();
+    const sentence = name
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.Validation.CheckIterativeStep',
+          'Step {n}, {name}: counters, end rules and routes resolve'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Recipe.Validation.CheckIterativeStepUnnamed',
+          'Step {n}: counters, end rules and routes resolve'
+        );
+    return fill(sentence, { n: index + 1, name });
+  }
+
+  const isIterativeCheck = (id) => id === 'iterativeCounters' || id.startsWith('iterativeStep:');
+
   function checkLabel(id) {
+    if (isIterativeCheck(id)) return iterativeCheckLabel(id);
     const meta = CHECK_LABELS[id] || [id, id];
     return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
 
   function issueTitle(issue) {
+    if (issue.iterativeCode) {
+      const sentence = iterativeIssueSentence({ code: issue.iterativeCode }, text);
+      const prefix = issue.stepName || issue.entityName;
+      return prefix ? `${prefix}: ${sentence}` : sentence;
+    }
     // A coded issue carries the activation message the save path raises for the same fault.
     if (issue.code) {
       return localizeActivationIssue(
@@ -217,6 +261,14 @@
     overview: 'requirements',
   };
 
+  /** The group a row joins: an iterative check, or an iterative issue on Overview, joins Steps. */
+  function rowCategory(checkId, issue) {
+    if (checkId)
+      return isIterativeCheck(checkId) ? 'steps' : CHECK_CATEGORY[checkId] || 'requirements';
+    if (issue?.iterativeCode && issue.target === 'overview') return 'steps';
+    return ISSUE_TARGET_GROUP[issue?.target] || 'requirements';
+  }
+
   // ONE ROW PER CHECK, borrowing the owning issue when the check fails, then one row per issue no
   // check claimed. The pairing and the STATUS come from {@link recipeValidationRowStates} and
   // this maps them onto copy, taking the status verbatim so the tab strip's badge cannot report
@@ -224,9 +276,7 @@
   const rows = $derived(
     recipeValidationRowStates(readiness).map(({ checkId, issue, status }) => ({
       id: checkId,
-      category: checkId
-        ? CHECK_CATEGORY[checkId] || 'requirements'
-        : ISSUE_TARGET_GROUP[issue?.target] || 'requirements',
+      category: rowCategory(checkId, issue),
       status,
       title: checkId ? checkLabel(checkId) : issueTitle(issue),
       detail: checkId && issue ? issueTitle(issue) : '',

@@ -13,7 +13,7 @@
   | `instances` | `Recipe.iterative.counters` | `[]` | the Counter Instances the step can name |
   | `iterative` | the iterative route model | — | reads `library`, `counters` and `actions` |
   | `multi` | boolean | `false` | a multi-step recipe always shows its Counters in this step |
-  | `stepNumber` | integer | `1` | the 1-based step the per-counter names say |
+  | `stepNumber` | integer | `1` | the 1-based step the per-counter names say, and with `multi` its Validation address |
   | `disabled` | boolean | `false` | every control off |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
@@ -85,10 +85,12 @@
     },
   ];
   const say = ([key, fallback]) => text(key, fallback);
+  // The `iterative-step-<index|single>-*` addresses `iterativeRecipeReadiness.js` gives its issues.
+  const address = $derived(multi ? String(stepNumber - 1) : 'single');
 </script>
 
 <div class="manager-iterative-step-config" data-iterative-step-config>
-  <IterativeStepActions {config} {options} {disabled} {text} {onChange} />
+  <IterativeStepActions {config} {options} {address} {disabled} {text} {onChange} />
 
   {#if showCounters}
     <IterativeStepCounters {config} {sources} {stepNumber} {disabled} {text} {onChange} />
@@ -105,7 +107,15 @@
       </p>
     </div>
     {#each ENDS as end (end.key)}
-      <div class="manager-iterative-step-end" data-iterative-step-end={end.key}>
+      <div
+        class="manager-iterative-step-end"
+        data-iterative-step-end={end.key}
+        tabindex="-1"
+        data-keyboard-focus="true"
+        data-validation-target={end.key === 'success'
+          ? `iterative-step-${address}-success`
+          : undefined}
+      >
         <div class="manager-iterative-step-end-head">
           <i class={`${end.icon} is-${end.key}`} aria-hidden="true"></i>
           <Kicker as="span">{say(end.title)}</Kicker>

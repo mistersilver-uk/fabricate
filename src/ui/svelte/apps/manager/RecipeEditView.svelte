@@ -25,6 +25,7 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
+  import IterativeMidRunBanner from './recipe/iterative/IterativeMidRunBanner.svelte';
   import { resultsProjection, scopeWrites } from './recipe/recipeRoutingEdits.js';
   import { routedMinimum } from './recipe/recipeRoutingModel.js';
   import { recipeTabCounts } from './recipe/recipeTabCounts.js';
@@ -237,8 +238,13 @@
 
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
+  // The recipe's workpieces in progress, stated on every tab but Validation.
+  const runCount = $derived(
+    iterative && activeTab !== 'validation' ? iterative.activeRunCount(recipe?.id) : 0
+  );
 
   // Validation badges, read straight off the draft, which is the single source of truth.
+  const iterativeReadiness = $derived(iterative ? iterative.recipeReadinessInput(recipe) : null);
   const readiness = $derived(
     evaluateRecipeReadiness(
       { ...(recipe || {}) },
@@ -250,6 +256,7 @@
         alchemy,
         signatureConflicts,
         progressive,
+        iterative: iterativeReadiness,
       }
     )
   );
@@ -386,17 +393,22 @@
 
       <!-- The blocking notice's page position, outside the scroller so a failed save stays in view
            on every tab, inset as the panel insets its cards. -->
-      {#if saveFailed}
-        <div class="manager-editor-notice-position" data-notice-position="page">
-          <Notice
-            blocking
-            tone="danger"
-            title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
-            detail={text(
-              'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
-              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
-            )}
-          />
+      {#if saveFailed || runCount > 0}
+        <div class="manager-editor-notice-position fab-stack" data-notice-position="page">
+          {#if saveFailed}
+            <Notice
+              blocking
+              tone="danger"
+              title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
+              detail={text(
+                'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
+                'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+              )}
+            />
+          {/if}
+          {#if runCount > 0}
+            <IterativeMidRunBanner count={runCount} recipeName={name} {text} />
+          {/if}
         </div>
       {/if}
 
@@ -544,6 +556,7 @@
             {alchemy}
             {signatureConflicts}
             {progressive}
+            {iterativeReadiness}
             systemRecipes={recipeOptions}
             onSelectIssue={selectIssue}
           />
