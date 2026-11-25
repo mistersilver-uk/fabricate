@@ -95,6 +95,7 @@ A section's notices sort blocking issues first, then warnings, as the Validation
 A notice's Review action focuses the control the issue names, and otherwise focuses the section, as a Validation row's View does.
 No readiness issue renders as a `Callout`; the mode description on The roll stays a `Callout`, because it documents the mode rather than reporting this check's state.
 That mode callout (`CheckModeCallout`) sits in the section's heading block, after the pane heading and below the section's notices.
+In an `iterative` system Checks › Crafting renders the routed check editor over `craftingCheck.routed`, chosen by the one `usesRoutedCheck` helper that `routedByCheck` shares, and its callout states that one check serves the whole system and each Crafting Action either rolls it or does not.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
@@ -643,7 +644,8 @@ The tab also carries danger and warning badges in the tab bar reflecting the ope
 
 Issues are grouped by their `kind` —
 `system` (system blockers), `recipe`, `environment`, `task`, `event`, and `salvage` —
-with the `system` blockers surfaced first.
+except that a `system` issue whose `entityKind` is `counter` or `action` is grouped as `Counters` or `Actions`.
+The order is system blockers, Counters, Actions, then the rest, so the system blockers surface first.
 Each issue renders one row carrying a severity chip
 (`.manager-chip.is-danger` for `critical`, `.manager-chip.is-warning` for `warning`, `.manager-chip.is-neutral` for `info`),
 the offending entity's name, and the issue message.
@@ -652,7 +654,10 @@ Every non-`system` row deep-links to the editor that owns the entity,
 reusing the manager's existing selection helpers
 (recipe issues open the recipe editor, environment/task/event issues open the environment editor,
 and salvage issues open the component editor).
-The `system` kind is the overview itself and carries no deep-link button.
+A Counters row links to "Open counter", the Counters screen with that counter expanded, and an Actions row links to "Open action", that Crafting Action's editor.
+The `system` kind is the overview itself and carries no deep-link button, so a `system` issue with no counter or action entity, including a library newer than this build, stays under the system blockers with no link.
+No iterative issue sets `blocksSystem`.
+Each iterative readiness code renders its own localized sentence from one exported code-to-key map shared with the recipe issues of the same codes, and falls back to the issue's own `message`.
 When there are no issues, the Validation tab shows an empty "ready to use" state.
 
 When the report's `blocksSystem` is true,
