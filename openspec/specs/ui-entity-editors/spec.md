@@ -493,6 +493,10 @@ With multi-step recipes turned off, an iterative multi-step recipe is never pres
 In an iterative system, Results lists each scope's result sets in a reorderable list, checked top to bottom, and marks the failure set.
 Each set states its Produced when lines, each a Success or Failure end with rules that all hold.
 A set with no line says it is never produced, and a scope with no set says it produces nothing.
+The Validation tab groups the recipe's counter and step checks under Steps, first, with one row per step, which passes when the step has no issue.
+The Validation tab names each addressed issue's step and lists the library issues that refuse the recipe's start, using the copy the system Validation tab uses.
+A library issue counts as blocking on the Validation tab but does not block enabling the recipe.
+While active workpieces of the recipe exist in the system, every tab except Validation states how many there are, and that they keep the terms they started with.
 The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and its subline names the Iterative mode and a multi-step recipe's step count.
 The Preview tab is not offered.
 

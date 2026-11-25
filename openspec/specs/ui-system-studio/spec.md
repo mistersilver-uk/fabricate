@@ -1589,4 +1589,5 @@ The count and the blocking notice count only critical issues, so a Crafting Acti
 - When it applies covers the outcome tiers, check success or failure, a check-value comparison and workpiece rules, all combined by the effect's All or Any.
 - An effect that reads a check fact on a Crafting Action with no check is shown as a warning.
 - "Duplicate" copies the Crafting Action under a new id, and "Delete" removes it after confirmation.
+- While active workpieces of the system can use the saved Crafting Action, the editor states how many there are, and that they keep the version they started with.
 - The editor shows only a blocking notice and no card when the system's iterative settings were made by a newer version of Fabricate.
