@@ -9,7 +9,7 @@
   | `config` | a normalized `StepIterative` | — | from `stepConfigOf` |
   | `options` | `SetPicker` options | `[]` | the library actions, from `actionOptions` |
   | `address` | `'single'` or a step index | `'single'` | the picker's `iterative-step-<address>-actions` Validation target |
-  | `disabled` | boolean | `false` | every control off |
+  | `disabled` | boolean | `false` | the All / Only segments off; `SetPicker` takes no `disabled`, so the picker stays live |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
   Callbacks:
@@ -45,10 +45,12 @@
     {
       value: 'all',
       label: text('FABRICATE.Admin.Manager.Recipe.Iterative.ActionsAll', 'All actions'),
+      disabled,
     },
     {
       value: 'only',
       label: text('FABRICATE.Admin.Manager.Recipe.Iterative.ActionsOnly', 'Only these'),
+      disabled,
     },
   ]);
   const countText = $derived(
@@ -122,7 +124,6 @@
       addProps={{
         'data-iterative-step-actions': '',
         'data-validation-target': `iterative-step-${address}-actions`,
-        disabled,
         ...(none && { 'aria-invalid': 'true' }),
       }}
       ariaDescribedBy={none ? faultId : ''}

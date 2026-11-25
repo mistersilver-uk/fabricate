@@ -10,7 +10,7 @@
   | `recipe` | the staged draft | `null` | |
   | `iterative` | the iterative route model | — | the selected system's library and routes |
   | `isMultiStep` | boolean | `false` | whether the recipe has explicit steps |
-  | `disabled` | boolean | `false` | every control off while saving |
+  | `disabled` | boolean | `false` | while saving: every Counters control, and the step card's as `IterativeStepConfig` states |
 
   Callbacks:
   - `onUpdateRecipe(patch)` — a staged draft patch.

@@ -11,7 +11,7 @@
   | `amount` | `{ min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's and its two buttons' names, the two segment words, and the toggle's and the expression's names. |
   | `name` | string | `''` | The subject's name, or the kind word while unnamed: the stepper is `Quantity for {name}`, the toggle `Amount for {name}` and the expression `Rolled amount for {name}`. |
   | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` or `currency` result has a formula, so every other kind ignores it. |
-  | `formula` | `{ resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint? }` \| `null` | `null` | Supersedes `rollable`: the Fixed \| Formula toggle draws for every kind. An absent `amount.min` or `amount.max` is unbounded and the stepper shows a stored number verbatim, 0 included. `resolve`, `unresolvedLabel`, `tokens` and `tokensLabel` go to the expression field; `placeholder` may truncate at its 102px, so `hint` carries the full example, drawn as muted text under the Formula input and only there, and described after the reading. |
+  | `formula` | `{ resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint? }` \| `null` | `null` | Supersedes `rollable`: the Fixed \| Formula toggle draws for every kind. An absent `amount.min` or `amount.max` is unbounded and the stepper shows a stored number verbatim, 0 included, and a `null` amount as "—", unset. `resolve`, `unresolvedLabel`, `tokens` and `tokensLabel` go to the expression field; `placeholder` may truncate at its 102px, so `hint` carries the full example, drawn as muted text under the Formula input and only there, and described after the reading. |
   | `readonly` / `disabled` | booleans | `false` | The static read-only amount, a rolled one as its expression; and every control off. |
   | `invalid` | string | `''` | A message: sets `aria-invalid` on the amount control and describes it with the message. |
 
@@ -127,6 +127,8 @@
     value={shown}
     min={amount.min ?? (formula ? null : 1)}
     max={amount.max ?? (formula ? null : 9999)}
+    allowUnset={Boolean(formula)}
+    placeholder={formula ? '—' : ''}
     {disabled}
     ariaLabel={stepperName}
     decrementLabel={amount.decrementLabel ||
@@ -257,7 +259,7 @@
   .fab-picker-row-amount-formula {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--fab-space-1) var(--fab-space-2);
     min-width: 0;
   }

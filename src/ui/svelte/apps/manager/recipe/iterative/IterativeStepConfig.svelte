@@ -14,14 +14,15 @@
   | `iterative` | the iterative route model | — | reads `library`, `counters` and `actions` |
   | `multi` | boolean | `false` | a multi-step recipe always shows its Counters in this step |
   | `stepNumber` | integer | `1` | the 1-based step the per-counter names say, and with `multi` its Validation address |
-  | `disabled` | boolean | `false` | every control off |
+  | `disabled` | boolean | `false` | the All / Only segments and the hide and lock checkboxes off; the allowed-action picker and Ends when stay live, because `SetPicker` and `RuleRow` take no `disabled` |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
   Callbacks:
   - `onChange(config)` — the whole next config, which the caller writes to its step.
 
   Invariants:
-  - A single step shows Counters in this step only while its hide or lock list is non-empty.
+  - A single step shows Counters in this step once its hide or lock list is non-empty, and keeps it
+    for the mount, so clearing the last box does not unmount the box that has focus.
 -->
 <script>
   import Kicker from '../../../../components/Kicker.svelte';
@@ -53,10 +54,12 @@
     )
   );
   const ruleActions = $derived(options.map(({ id, label }) => ({ id, label })));
-  const showCounters = $derived(
-    sources.length > 0 &&
-      (multi || config.hiddenCounterIds.length > 0 || config.lockedCounterIds.length > 0)
-  );
+  // Latched for the mount: a plain variable, so the latch itself is never a reactive write.
+  let shown = false;
+  const showCounters = $derived.by(() => {
+    shown ||= config.hiddenCounterIds.length > 0 || config.lockedCounterIds.length > 0;
+    return sources.length > 0 && (multi || shown);
+  });
 
   const ENDS = [
     {

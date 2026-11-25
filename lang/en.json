@@ -3444,7 +3444,7 @@
             "ProducedWhenEnd": "Success or failure",
             "ProducedWhenRules": "Conditions",
             "AnyValue": "Any value",
-            "RemoveProducedWhen": "Remove this condition",
+            "RemoveProducedWhen": "Remove Produced when line {n}",
             "AddProducedWhen": "When",
             "NeverProduced": "Never produced. Add when it should be.",
             "MidRunTitle": "{count} workpieces of {recipe} are in progress.",

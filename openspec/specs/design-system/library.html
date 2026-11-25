@@ -8480,7 +8480,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>toggle</b> the Fixed | Rolled <code>SegmentedControl</code> at its 30px <code>inline</code> rung</li>
           <li><b>unit</b> 10/500 <code>--fab-text-subtle</code>, right of the stepper</li>
           <li><b>invalid</b> its reason on a line of its own</li>
-          <li><b>formula</b> one wrapping root; the hint and the invalid message each on a line under the controls</li>
+          <li><b>formula</b> one wrapping root, its controls aligned to their top edge; the hint and the invalid message each on a line under the controls</li>
           <li><b>gap</b> the host row&rsquo;s 8 between parts: the slot renders a fragment and owns no wrapper</li>
         </ul>
       </div>
@@ -8492,7 +8492,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>amount</b> {min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel}</li>
           <li><b>name</b> — the subject&rsquo;s name in each control&rsquo;s accessible name</li>
           <li><b>rollable</b> — the Fixed | Rolled toggle on a component or currency row</li>
-          <li><b>formula</b> — {resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint?}, superseding <b>rollable</b>: the Fixed | Formula toggle for every kind, an absent min or max unbounded, and the hint under the Formula input</li>
+          <li><b>formula</b> — {resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint?}, superseding <b>rollable</b>: the Fixed | Formula toggle for every kind, an absent min or max unbounded, a <code>null</code> amount unset as &ldquo;&mdash;&rdquo;, and the hint under the Formula input</li>
           <li><b>readonly · disabled</b></li>
           <li><b>invalid</b> — the message that marks the amount invalid</li>
           <li><b>onChange</b>(patch) — <code>{quantity}</code> or <code>{quantityFormula}</code></li>

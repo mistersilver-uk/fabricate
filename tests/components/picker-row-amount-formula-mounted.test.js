@@ -177,6 +177,16 @@ describe('PickerRowAmount formula mode', () => {
     assert.deepEqual(patches, [{ quantity: -12_345 }, { quantity: 999_999 }]);
   });
 
+  it('draws a null amount unset as "—", and writes null when the field is cleared', async () => {
+    const { target } = await mountFormula({ kind: 'counter', quantity: null });
+    assert.equal(stepperInput(target).value, '', 'not 0');
+    assert.equal(stepperInput(target).getAttribute('placeholder'), '—');
+    harness.remount();
+    const held = await mountFormula({ kind: 'counter', quantity: 4 });
+    await type(stepperInput(held.target), '');
+    assert.deepEqual(held.patches, [{ quantity: null }]);
+  });
+
   it('keeps a caller bound under formula', async () => {
     const { target } = await mountFormula(
       { kind: 'counter', quantity: 3 },
@@ -231,6 +241,15 @@ describe('PickerRowAmount formula mode', () => {
     assert.ok(!target.querySelector('.fab-picker-row-amount-hint'));
     assert.ok(!target.querySelector('[role="group"]'), 'no tokens');
     assert.equal(expression(target).getAttribute('placeholder'), '1d4+1');
+    assert.equal(describedBy(expression(target)).length, 1, 'the reading alone');
+  });
+
+  it('draws no hint for a whitespace-only one', async () => {
+    const { target } = await mountFormula(
+      { kind: 'counter', quantityFormula: '40' },
+      { formula: formulaOf({ hint: '   ' }) }
+    );
+    assert.ok(!target.querySelector('.fab-picker-row-amount-hint'));
     assert.equal(describedBy(expression(target)).length, 1, 'the reading alone');
   });
 

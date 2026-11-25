@@ -90,11 +90,15 @@
 
   const instanceOf = (counterId) => ({ counterId, start: 0, visible: true });
 
+  /** The added row is found by its counter, because a Formula row above it draws no Start stepper. */
   function addCounter(counterId) {
     if (!counterId || disabled) return;
-    const added = nth('data-iterative-counter-start', instances.length);
     write([...instances, instanceOf(counterId)]);
-    focusAfter(added);
+    const row = `[data-iterative-counter-row="${counterId}"]`;
+    focusAfter(
+      first(`data-iterative-counter-start="${counterId}"`),
+      (scope) => scope?.querySelector(`${row} input:not([disabled])`) ?? null
+    );
   }
 
   function addAll() {

@@ -307,6 +307,21 @@ describe('iterative recipe Overview: the Counters table', () => {
     );
   });
 
+  it('focuses the added counter’s Start past a Formula row above it', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.counters[0].startFormula = '2 + 1d4';
+    await mountEditor(world, draft);
+    assert.ok(!$('[data-iterative-counter-start="heat"]'), 'Heat draws no Start stepper');
+    chooseSelectOption(target, '[data-iterative-counter-add]', 'temper');
+    await settle();
+    await settle();
+    assert.ok(
+      document.activeElement === $('[data-iterative-counter-start="temper"]'),
+      'focus moved there'
+    );
+  });
+
   it('marks a counter missing from the library and routes Create counter', async () => {
     const world = ironworks();
     const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-nail'));
@@ -486,6 +501,21 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
     assert.ok(!$('[data-iterative-step-actions]'), 'All draws no picker');
   });
 
+  it('turns the action mode and the lock off while saving', async () => {
+    const world = ironworks();
+    const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-hinge'), {
+      saving: true,
+    });
+    const modes = [...$(STEP_CARD).querySelectorAll('[data-iterative-step-actions-mode] input')];
+    assert.deepEqual(
+      modes.map((radio) => radio.disabled),
+      [true, true]
+    );
+    assert.equal($('[data-iterative-step-lock="temper"]').disabled, true);
+    await press(modes[0], 'All actions');
+    assert.equal(calls.patches.length, 0, 'a disabled segment writes nothing');
+  });
+
   it('seeds every library action on Only, writes the picker on Apply only, and marks idle ones', async () => {
     const world = ironworks();
     const draft = await draftOf(world, 'iw-r-blade');
@@ -564,13 +594,23 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
     assert.match(fault('failure'), /^Slag isn.t tracked in this step\.$/);
   });
 
-  it('shows a single step’s lock while a list is non-empty, and hides it once cleared', async () => {
+  it('shows a single step’s lock while a list is non-empty, and keeps it and its focus once cleared', async () => {
     const world = ironworks();
     const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-hinge'));
     assert.ok(Boolean($(`${STEP_CARD} [data-iterative-step-part="counters"]`)), 'Temper is locked');
-    await press($('[data-iterative-step-lock="temper"]'), 'the Temper lock');
+    const lock = $('[data-iterative-step-lock="temper"]');
+    lock.focus();
+    await press(lock, 'the Temper lock');
     assert.deepEqual(lastStep(calls).lockedCounterIds, []);
-    assert.ok(!$(`${STEP_CARD} [data-iterative-step-part="counters"]`), 'nothing left to show');
+    assert.ok(Boolean($(`${STEP_CARD} [data-iterative-step-part="counters"]`)), 'still shown');
+    assert.ok(document.activeElement === $('[data-iterative-step-lock="temper"]'), 'focus stays');
+    assert.equal($('[data-iterative-step-lock="temper"]').checked, false);
+  });
+
+  it('shows no Counters in this step on a single step whose lists start empty', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-blade'));
+    assert.ok(!$(`${STEP_CARD} [data-iterative-step-part="counters"]`), 'nothing to show');
   });
 });
 
@@ -743,7 +783,10 @@ describe('iterative recipe Results', () => {
       { source: 'counter', counterId: 'heat', op: '>=', value: 0 },
     ]);
 
-    await press(lines().querySelector('[data-produced-when-remove="0"]'), 'the line remove');
+    // The line's remove names the whole line, which may hold several conditions.
+    const remove = lines().querySelector('[data-produced-when-remove="0"]');
+    assert.equal(remove.getAttribute('aria-label'), 'Remove Produced when line 1');
+    await press(remove, 'the line remove');
     assert.equal(calls.patches.length, 4);
     assert.equal('producedWhen' in groupsOf(calls)[0], false, 'no line leaves no key');
     assert.equal(groupsOf(calls)[0].id, 'rg', 'the set keeps its id');

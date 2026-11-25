@@ -26,6 +26,7 @@
   import Kicker from '../../../../components/Kicker.svelte';
   import SegmentedControl from '../../../../components/SegmentedControl.svelte';
   import { producedWhenLineFault } from '../../../../../../models/iterativeStepConfig.js';
+  import { fill } from '../../../../../../utils/fillPlaceholders.js';
   import { arrayOrEmpty, isPlainObject } from '../../../../../../utils/scalars.js';
   import CounterRuleList from '../../iterative/CounterRuleList.svelte';
   import FaultLine from '../../iterative/FaultLine.svelte';
@@ -113,9 +114,12 @@
         role="ghost-danger"
         icon="fas fa-xmark"
         size="24"
-        ariaLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.Iterative.RemoveProducedWhen',
-          'Remove this condition'
+        ariaLabel={fill(
+          text(
+            'FABRICATE.Admin.Manager.Recipe.Iterative.RemoveProducedWhen',
+            'Remove Produced when line {n}'
+          ),
+          { n: index + 1 }
         )}
         data-produced-when-remove={index}
         onclick={() => removeAt(index)}
