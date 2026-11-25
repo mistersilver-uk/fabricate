@@ -67,6 +67,8 @@ async function seedForge(page, crafterId) {
       const created = await csm.getSystem(system.id);
       await csm.updateSystem(system.id, {
         resolutionMode: 'iterative',
+        // the player must see the recipe for its check to be public, so the facade posts the player's own roll
+        visibilityMode: 'global',
         features: { ...created.features, chatOutput: true, multiStepRecipes: false },
         craftingCheck: {
           ...created.craftingCheck,
