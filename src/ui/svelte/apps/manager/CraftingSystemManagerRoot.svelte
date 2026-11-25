@@ -2695,17 +2695,11 @@
     return true;
   }
 
-  const {
-    handleEnterMultiStep,
-    handleRevertToSingleStep,
-    handleAddStep,
-    handleReorderSteps,
-    handleUpdateStep,
-    handleDeleteStep,
-  } = createRecipeStepHandlers({
+  const stepHandlers = createRecipeStepHandlers({
     draft: () => recipeDraft,
     patch: patchRecipeDraft,
     confirm: (options) => store.confirmRecipeAction?.(options),
+    iterative: () => selectedSystem?.resolutionMode === 'iterative',
     text,
     localize,
   });
@@ -4728,16 +4722,16 @@
         onOpenAccess={openRecipeAccess}
         onOpenBooksScrolls={() => openCraftingSection('books-scrolls')}
         multiStepEnabled={recipeMultiStepEnabled}
-        onEnterMultiStep={handleEnterMultiStep}
-        onRevertToSingleStep={handleRevertToSingleStep}
+        onEnterMultiStep={stepHandlers.handleEnterMultiStep}
+        onRevertToSingleStep={stepHandlers.handleRevertToSingleStep}
         onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onToggleLocked={handleToggleRecipeLocked}
-        onAddStep={handleAddStep}
-        onReorderSteps={handleReorderSteps}
-        onUpdateStep={handleUpdateStep}
-        onDeleteStep={handleDeleteStep}
+        onAddStep={stepHandlers.handleAddStep}
+        onReorderSteps={stepHandlers.handleReorderSteps}
+        onUpdateStep={stepHandlers.handleUpdateStep}
+        onDeleteStep={stepHandlers.handleDeleteStep}
       />
     {:else if currentView === 'crafting-settings' && selectedSystem}
       <CraftingSettingsView
