@@ -1193,6 +1193,8 @@ const MODE_TABLE = [
   { mode: 'routedByIngredients', slot: 'simple', requiresCheck: false },
   { mode: 'routedByCheck', slot: 'routed', requiresCheck: true },
   { mode: 'progressive', slot: 'progressive', requiresCheck: true },
+  // An iterative step rolls the routed check only for an action with `check: 'roll'`.
+  { mode: 'iterative', slot: 'routed', requiresCheck: false },
 ];
 
 const CHECK_SLOTS = {

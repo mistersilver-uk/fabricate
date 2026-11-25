@@ -3848,6 +3848,7 @@ CounterTotal = { counterId: string, total: number }
 ```
 
 1. `CraftingRunStepState.iterative` is present only on a started step of an iterative run, and it is rebuilt with exactly this key set on every write.
+   A started iterative step also carries `preparedConsumption`, timed or not.
 2. `counters` holds one row per Counter Instance, in instance order.
    A later step starts with the previous step's final values verbatim, and `attemptCount` and `sessionCount` start at 0 on every step.
 3. `startedWith` holds one row per Counter Instance.

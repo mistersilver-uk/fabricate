@@ -70,30 +70,6 @@ const PATHS = {
     const probe = world(mode, { steps: [TIMED_STEP] });
     return { probe, result: await probe.craft() };
   },
-  'versioned start refusal': async (mode) => {
-    const probe = world(mode);
-    const result = probe.engine._versionedRunStartRefusal({
-      viewer: { id: 'user-probe' },
-      actor: probe.craftingActor,
-      sourceActors: [probe.sourceActor],
-      recipe: probe.recipe,
-      trusted: null,
-      runManager: probe.engine._craftingRunManager(),
-    });
-    return { probe, result };
-  },
-  'versioned start': async (mode) => {
-    const probe = world(mode);
-    const result = await versionedEngine(probe).startVersionedRun({
-      viewer: { id: 'user-probe' },
-      actor: probe.craftingActor,
-      sourceActors: [probe.sourceActor],
-      recipeId: probe.recipe.id,
-      executionGrant: 'grant',
-      requestId: 'request-start',
-    });
-    return { probe, result };
-  },
   'fresh versioned stage preparation': async (mode) => {
     const probe = world(mode);
     return { probe, result: await stagePreparation(probe, false) };
@@ -121,6 +97,52 @@ describe('every craft path refuses an iterative recipe, and only an iterative on
     it(`${path} does not refuse a simple recipe`, async () => {
       const { result } = await run('simple');
       assert.ok(!messageOf(result).includes(ITERATIVE_CRAFT_REFUSAL), messageOf(result));
+    });
+  }
+});
+
+/** The versioned starts, which run for an iterative recipe once its iterative setup is ready. */
+const START_PATHS = {
+  'versioned start refusal': async (mode) => {
+    const probe = world(mode);
+    const result = probe.engine._versionedRunStartRefusal({
+      viewer: { id: 'user-probe' },
+      actor: probe.craftingActor,
+      sourceActors: [probe.sourceActor],
+      recipe: probe.recipe,
+      trusted: null,
+      runManager: probe.engine._craftingRunManager(),
+    });
+    return { probe, result };
+  },
+  'versioned start': async (mode) => {
+    const probe = world(mode);
+    const result = await versionedEngine(probe).startVersionedRun({
+      viewer: { id: 'user-probe' },
+      actor: probe.craftingActor,
+      sourceActors: [probe.sourceActor],
+      recipeId: probe.recipe.id,
+      executionGrant: 'grant',
+      requestId: 'request-start',
+    });
+    return { probe, result };
+  },
+};
+
+describe('a versioned start passes the craft gate and meets the readiness gate instead', () => {
+  for (const [path, run] of Object.entries(START_PATHS)) {
+    it(`${path} refuses an unready iterative recipe with nothing spent`, async () => {
+      const { probe, result } = await run('iterative');
+      assert.ok(!messageOf(result).includes(ITERATIVE_CRAFT_REFUSAL), messageOf(result));
+      assert.equal(result.reason, 'iterative-not-ready');
+      assert.equal(result.detail.code, 'iterativeNoCounters');
+      assertNothingSpent(probe);
+    });
+
+    it(`${path} does not refuse a simple recipe`, async () => {
+      const { result } = await run('simple');
+      assert.ok(!messageOf(result).includes(ITERATIVE_CRAFT_REFUSAL), messageOf(result));
+      assert.notEqual(result?.reason, 'iterative-not-ready');
     });
   }
 });

@@ -68,5 +68,8 @@ export function serializedOperationResult(result, { secret = false, runId = '' }
     }),
     createdResultUuids:
       source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
+    // A refusal's ids-and-numbers `detail`, and an Iterative Attempt's outcome, pass verbatim.
+    ...(Object.hasOwn(source, 'detail') && { detail: source.detail }),
+    ...(Object.hasOwn(source, 'iterative') && { iterative: source.iterative }),
   };
 }

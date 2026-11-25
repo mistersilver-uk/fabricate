@@ -177,6 +177,9 @@ Every reader of "has this stage started" — the begin operation, the roll-readi
 - Once a stage has started its selection is authoritative: a caller-supplied selection plan is IGNORED rather than refused, so a redundant resend can never fail a craft the player already committed to.
 A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
 - A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.
+- An iterative stage always has a separate start, timed or not, so neither the one-act rule below nor an automatic world-time start applies to it.
+`Fabricate.craft` and `/craft` start an iterative run and return it, and each Iterative Attempt is a separate `takeCraftingAction`.
+A manual or world-time execute of an iterative step is refused with nothing spent.
 - A stage with no honoured time requirement has no waiting window, so beginning and resolving it remain one act that still consumes as part of that act.
 This governs a LATER stage of a multi-step run, which is reached only by resolving the stage before it.
 Run start is different: it CREATES a run, so the first stage commits at run start whether or not it has an honoured time requirement.
@@ -209,6 +212,8 @@ Paused runs cannot advance manually or through world-time processing, but may be
 - Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
 It reverses a started-but-unresolved stage's consumption through the same shared reversal the legacy cancel uses, honouring the system's `features.refundOnPlayerCancel` flag and reporting the ACTUAL outcome rather than the policy intent.
 A stage START is not an attempt, so a cancelled run's started-but-unresolved stage records no attempted stage.
+An Iterative Attempt is neither a stage start nor a stage resolution.
+Versioned cancellation of an iterative run reverses only the current step's started inputs, per `features.refundOnPlayerCancel`, and never refunds counter state.
 Legacy consumption and refund behaviour and salvage remain unchanged, except that the active GM executes a legacy crafting cancel under the command authority.
 A legacy cancel therefore requires an active GM, honours `features.refundOnPlayerCancel` with no caller override, and restores only onto the crafting actor or the run's recorded component sources.
 Two cancels of one legacy crafting run restore its consumption at most once, because the authority refuses a cancel whose run is already archived.
@@ -236,6 +241,17 @@ Roll data — ability scores, proficiency and any other actor-derived value the 
 3. A run begun before this field existed persists no `termsSnapshot`.
    Resolution for such a run MUST fall back to resolving the live recipe by id, exactly as it did before this requirement, so a run already active when this feature ships is unaffected.
 4. The snapshot MUST be removed from the run record when the run completes, before the record is archived to history, so a completed run's history entry never carries `termsSnapshot` and the accepted-terms exception applies only to a run that is still active.
+5. An Iterative Attempt resolves its actions, Counter Instances and step configuration from the terms snapshot, and reads actor roll data live.
+
+### Iterative Step Lifecycle
+
+- Every iterative step has an explicit start, even an untimed one.
+  Run start starts the first step, and the begin operation starts each later step.
+- Starting an iterative step consumes its inputs once through the shared stage-start commit, arms its gate when it has an honoured time requirement, and writes its Iterative Step State in that commit.
+- Counter Instance start formulas resolve against live actor roll data before anything is consumed, and a formula that cannot resolve refuses the start with nothing spent.
+- A new iterative run is refused, with nothing spent, while its recipe has a critical iterative readiness issue, while a critical library issue names a counter or action in the subset its terms snapshot would carry, or while its system's iterative library version is unsupported.
+- A timed step arms its gate in the start commit, and the run and the step stay `waitingTime` until the first Iterative Attempt after maturity sets both to `inProgress`.
+- Iterative Attempts are refused until a timed step's gate matures, and world-time processing never executes an iterative step.
 
 ### Captured Execution Evidence
 

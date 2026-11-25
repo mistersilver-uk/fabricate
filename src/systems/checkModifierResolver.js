@@ -122,6 +122,7 @@ const CRAFTING_CHECK_SLOTS = new Map([
   ['routedByIngredients', 'simple'],
   ['routedByCheck', 'routed'],
   ['progressive', 'progressive'],
+  ['iterative', 'routed'],
 ]);
 
 /** Alchemy selects its slot from the SYSTEM-level `alchemy.checkMode`; `none` has no check. */

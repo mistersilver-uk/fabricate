@@ -23,6 +23,7 @@ import { hasActiveCheck } from '../salvageCheckUsability.js';
 
 import { counterRuleFault } from './counterRule.js';
 import { libraryExpressionCodes, recipeExpressionCodes } from './expressionReadiness.js';
+import { iterativeTermsSubset } from './iterativeTerms.js';
 
 /** Headless English per code; the manager localizes by `code`. */
 export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
@@ -311,17 +312,20 @@ function recipeAllowsAction(recipe) {
 
 /**
  * The critical issues that refuse a new start of `recipe`: its own recipe-scoped ones, those on an
- * action one of its steps allows, those on a counter its Counter Instances use, and
- * `iterativeVersionUnsupported`.
+ * action one of its steps allows or on a counter its Counter Instances use or the terms subset
+ * of `system` carries, and `iterativeVersionUnsupported`.
  */
-export function iterativeStartBlockers(issues, recipe) {
+export function iterativeStartBlockers(issues, recipe, system = null) {
   const allows = recipeAllowsAction(recipe);
-  const usesCounter = new Set(arrayOrEmpty(recipe?.iterative?.counters).map((e) => e?.counterId));
+  const carried = new Set([
+    ...arrayOrEmpty(recipe?.iterative?.counters).map((entry) => entry?.counterId),
+    ...iterativeTermsSubset(recipe, system?.iterative).counters.map((counter) => counter.id),
+  ]);
   return arrayOrEmpty(issues).filter((issue) => {
     if (issue?.severity !== 'critical') return false;
     if (issue.code === 'iterativeVersionUnsupported') return true;
     if (issue.entityKind === 'recipe') return issue.entityId === recipe?.id;
-    if (issue.entityKind === 'counter') return usesCounter.has(issue.entityId);
+    if (issue.entityKind === 'counter') return carried.has(issue.entityId);
     return issue.entityKind === 'action' && allows(issue.entityId);
   });
 }

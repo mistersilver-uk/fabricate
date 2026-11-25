@@ -116,11 +116,11 @@ export function resultGroupRefusals(groups, options = {}) {
 /**
  * A stage's own `resultGroupRefusals` against the world as it is now, as its preparation's refusal,
  * or `null`: a GM change since run start refuses before the stage consumes or awards (issue 1773).
- * An iterative recipe refuses first.
+ * An iterative recipe refuses first, unless `refusals.iterativeStart` marks a step start.
  */
 export function stageResultRefusal({ actor, recipe, step }, modeService, refusals = {}) {
   const mode = modeService?.getMode?.(recipe);
-  const iterative = iterativeCraftRefusal(mode);
+  const iterative = iterativeCraftRefusal(mode, { start: refusals.iterativeStart === true });
   if (iterative) return { valid: false, message: `Invalid recipe: ${iterative}` };
   const progressive = mode === 'progressive';
   const context = { actor, recipe, progressive, ...refusals };
@@ -132,14 +132,14 @@ export function stageResultRefusal({ actor, recipe, step }, modeService, refusal
 
 /**
  * The iterative refusal, then `recipe.validate({ Roll })`, then `resultGroupRefusals` over every result group the recipe and
- * its steps author, against `actor`; `refusals` carries its `refuseRewards` and
- * `refusePlayerChoices`. A progressive award drops every formula (`ResolutionModeService`), so the
+ * its steps author, against `actor`; `refusals` carries its `refuseRewards`,
+ * `refusePlayerChoices` and `iterativeStart`. A progressive award drops every formula (`ResolutionModeService`), so the
  * amount refusals skip it there; `refuseRewards` still refuses any currency, knowledge or group.
  */
 export function validateCraft(recipe, actor, modeService, refusals = {}) {
   const modes = modeService ?? globalThis.game?.fabricate?.getResolutionModeService?.();
   const mode = modes?.getMode?.(recipe);
-  const iterative = iterativeCraftRefusal(mode);
+  const iterative = iterativeCraftRefusal(mode, { start: refusals.iterativeStart === true });
   if (iterative) return { valid: false, errors: [iterative] };
   const Roll = diceEngine();
   const progressive = mode === 'progressive';

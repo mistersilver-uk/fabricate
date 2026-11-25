@@ -314,6 +314,8 @@ An executed, permitted versioned crafting check additionally records the product
 Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
 2. On crafting and salvage, `kind` is `check` when the canonical active-check derivation reported the check required or usable at execution, `ingredients` for `routedByIngredients` routing, and `none` only for a confirmed no-check resolution.
 A `simple` stage on a system with crafting checks disabled resolves to `none`, as do a no-check salvage and an alchemy fizzle.
+An iterative step records `{ kind, mode: 'iterative' }` derived from its Iterative Attempts, not from the active-check derivation.
+It is `none` at start and becomes `check` at its first checked Iterative Attempt, and finalization keeps the step's own snapshot, never retaining `product` or `direction`, because the step carries no `lastCheckResult`.
 Native gathering derives `kind` from the task's own mode instead: Direct records `none`, and every rolled mode — d100, routed and legacy progressive — records `check`.
 Reading gathering history back therefore uses `mode`, not `kind`, to choose the terminal composition.
 A recorded `d100` check-result provider, or a recorded outcome tier, overrides the captured mode, because the stored result shape is the stronger evidence of what actually resolved.
@@ -1104,8 +1106,9 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - The admin store refuses, before its confirm and writing nothing, a change to a known mode outside the selectable set, or to a token that is neither a mode nor a legacy alias.
   A legacy alias keeps today's path, and re-selecting the current mode is still a no-op that succeeds.
 - Fixtures and tests may write the mode directly through `createSystem` or `updateSystem`, which are not gated.
-- Until Iterative Attempts ship, every existing craft path refuses a recipe in an `iterative` system before it creates a run, consumes, spends, rolls or awards.
-  That covers the legacy `craft`, the versioned start, and every fresh or started versioned stage preparation, each refusing with `Iterative crafting is not available in this version of Fabricate.`
+- The versioned run start and the step start run for a recipe in an `iterative` system.
+- The legacy `craft`, the versioned execute, the stage check description and the immediate-execute probe still refuse it before any run, consumption, spend, roll or award, each with `Iterative crafting is not available in this version of Fabricate.`
+  A versioned start therefore never answers `canExecuteImmediately: true` for an iterative recipe, and each Iterative Attempt is its own `takeAction` command.
 - `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
 
 ### Iterative Expression Grammar and Field Profiles
@@ -1171,6 +1174,12 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - Start values resolve once, in Counter Instance order, each clamped to its effective bounds.
   Each is recorded with its formula value, one dice total per term and whether it was clamped, and a plain start records no formula value and no dice.
 
+### Iterative Check Slot
+
+- An iterative system rolls `craftingCheck.routed`, and its `checkBreakage` is the routed slot's.
+- `success` and `outcomeId` come from the matched tier, and a total that matches no tier gives `success: false` and `outcomeId: null`.
+- `minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read.
+
 ### Iterative Terminal Routing
 
 - At a terminal outcome, the step's result groups are read in order, and the first with a `producedWhen` line for that outcome whose rules all hold is selected.
@@ -1215,8 +1224,9 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - A library warning has no `blocks`, and the other new codes follow their kind's severity and blocking above.
 - `iterativeNoCounters` and `iterativeNoSuccessRule` form the derived "Needs iterative setup" tier (`needsIterativeSetup`), and no setup marker is persisted.
 - Each code carries headless English from `ITERATIVE_READINESS_MESSAGES`, so no `message` equals its code.
-- A recipe with a critical recipe-scoped issue, or that allows an action with a critical library issue, or in a system reporting `iterativeVersionUnsupported`, refuses a new start.
-  `iterativeStartBlockers(issues, recipe)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
+- A new iterative run is refused, with nothing spent, while its recipe has a critical iterative readiness issue, while a critical library issue names a counter or action in the subset its terms snapshot would carry, or while its system's iterative library version is unsupported.
+  `iterativeStartBlockers(issues, recipe, system)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
+  The refusal is `{ success: false, reason: 'iterative-not-ready', detail: { code, message } }` from the first blocker, with no top-level `message`, so the localized reason sentence shows.
 
 ## Testing Requirements
 

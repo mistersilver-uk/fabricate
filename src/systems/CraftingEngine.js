@@ -114,6 +114,8 @@ import {
   readStoredStackQuantity,
   setStackQuantity,
 } from './itemStackQuantity.js';
+import { iterativeStartRefusal } from './iterative/iterativeCraftGate.js';
+import { prepareIterativeStepStart } from './iterative/iterativeStepStart.js';
 import { pairPlannedTools } from './plannedToolPairs.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
@@ -345,6 +347,8 @@ export class CraftingEngine {
       // The world currency configuration (issue 1278); when absent the affordance resolver
       // falls back to the `game.fabricate` global.
       currencyConfigStore = null,
+      // `rollDie(faces)`, the edge die an Iterative Attempt's effect dice and start formulas draw.
+      rollDie = null,
     } = {}
   ) {
     this.recipeManager = recipeManager;
@@ -358,6 +362,7 @@ export class CraftingEngine {
     this.getPlayerResultOrder = getPlayerResultOrder;
     this.getCraftingSystem = getCraftingSystem;
     this.resolveItemUuid = resolveItemUuid;
+    this.rollDie = rollDie;
     // Declared here, installed post-construction (issue 1286). See `installComplicationDelivery`
     // for why, and `_complicationWriter` for the ambient fallback.
     this.complicationDeliveryWriter = null;
@@ -751,7 +756,7 @@ export class CraftingEngine {
     }
     if (!opened.success) {
       await runManager.discardRun(actor, run.id);
-      return versionedFailure(opened.message);
+      return opened.reason ? opened : versionedFailure(opened.message);
     }
     current = opened.run;
     const canExecuteImmediately = await this._canExecuteVersionedStageImmediately({
@@ -844,24 +849,33 @@ export class CraftingEngine {
         return versionedFailure('Crafting is unavailable.');
       }
     }
-    const validation = validateCraft(recipe, actor, this.resolutionModeService, this._refusals());
-    if (validation.valid) return null;
-    return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
+    const refusals = { ...this._refusals(), iterativeStart: true };
+    const validation = validateCraft(recipe, actor, this.resolutionModeService, refusals);
+    if (!validation.valid) {
+      return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
+    }
+    return iterativeStartRefusal(this._getRecipeSystem(recipe), recipe);
   }
 
   /** For the first stage, run start is stage start, so the choice locks and the materials are
    * spent here, for every first stage including an untimed one (issue 1648); the gate is armed
    * from the effective duration. */
   async _startFirstVersionedStage({ sourceActors, run, recipe, step, ...commit }) {
-    const seconds = this._craftingRunManager().durationToSeconds(step.timeRequirement);
     return this._commitVersionedStageStart({
       ...commit,
       componentSourceActors: sourceActors,
       run,
       recipe,
       step,
-      requiredSeconds: this._timeRequirementsEnabled(recipe) ? seconds : 0,
+      requiredSeconds: this._stageStartSeconds(recipe, step),
+      iterativeStart: true,
     });
+  }
+
+  /** The gate a stage start arms: its duration, unless the system ignores time requirements. */
+  _stageStartSeconds(recipe, step) {
+    const seconds = this._craftingRunManager().durationToSeconds(step.timeRequirement);
+    return this._timeRequirementsEnabled(recipe) ? seconds : 0;
   }
 
   /** Begin the current versioned stage: lock its choice, spend its materials and start its clock,
@@ -932,10 +946,12 @@ export class CraftingEngine {
         viewer: game.users?.get?.(run.userId) ?? (viewer?.id === run.userId ? viewer : null),
         sourceActors: componentSourceActors,
       }),
-      requiredSeconds: runManager.durationToSeconds(step.timeRequirement),
+      requiredSeconds: this._stageStartSeconds(recipe, step),
       trusted,
       requestId,
+      iterativeStart: true,
     });
+    if (committed.reason) return committed;
     if (!committed.success) return versionedFailure(committed.message, committed.blocker);
     return {
       ...versionedTransitionResult(committed.run, { success: true, disposition: 'started' }),
@@ -1369,7 +1385,7 @@ export class CraftingEngine {
       this.resolutionModeService?.getMode?.(recipe) ?? system?.resolutionMode ?? 'simple';
     const check = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
     let kind = 'none';
-    if (check.requiresCheck || check.checkUsable) kind = 'check';
+    if (mode !== 'iterative' && (check.requiresCheck || check.checkUsable)) kind = 'check';
     else if (mode === 'routedByIngredients') kind = 'ingredients';
     const implicit = step.id === 'implicit-step' && !recipe.steps?.length;
     return craftingStepHistoryEvidence({
@@ -1425,6 +1441,7 @@ export class CraftingEngine {
   /** Whether the stage has a start of its own: a zero-duration stage has no waiting window, so
    * beginning and resolving it stay one act. */
   _versionedStageNeedsStart(recipe, step) {
+    if (this._getRecipeSystem(recipe)?.resolutionMode === 'iterative') return true;
     const seconds = this._craftingRunManager()?.durationToSeconds?.(step?.timeRequirement) ?? 0;
     return seconds > 0 && this._timeRequirementsEnabled(recipe);
   }
@@ -1528,9 +1545,10 @@ export class CraftingEngine {
 
   /** An unstarted stage's preparation, refused while an earlier stage's claimable choice is owed
    *  or by its own result pre-flight. */
-  async _prepareFreshVersionedStage(stage) {
+  async _prepareFreshVersionedStage(stage, { iterativeStart = false } = {}) {
     if (this._awardChoices().blocks(stage.run, stage.actor)) return AWARD_CHOICE_PENDING;
-    const refused = stageResultRefusal(stage, this.resolutionModeService, this._refusals());
+    const refusals = { ...this._refusals(), iterativeStart };
+    const refused = stageResultRefusal(stage, this.resolutionModeService, refusals);
     return refused ?? this._prepareVersionedStage(stage);
   }
 
@@ -1549,16 +1567,16 @@ export class CraftingEngine {
     requiredSeconds,
     trusted,
     requestId,
+    iterativeStart = false,
   }) {
-    const prepared = await this._prepareFreshVersionedStage({
-      run,
-      actor,
-      componentSourceActors,
-      recipe,
-      step,
-      selectedSet,
-      selectionPlan,
-    });
+    const iterative = iterativeStart
+      ? prepareIterativeStepStart({ run, stepIndex, actor, rollDie: this.rollDie })
+      : null;
+    if (iterative?.refusal) return iterative.refusal;
+    const prepared = await this._prepareFreshVersionedStage(
+      { run, actor, componentSourceActors, recipe, step, selectedSet, selectionPlan },
+      { iterativeStart }
+    );
     if (!prepared.valid) return { ...prepared, success: false };
     const executor = new CraftingLifecycleExecutor({
       runManager: this._craftingRunManager(),
@@ -1583,6 +1601,7 @@ export class CraftingEngine {
           selectionPlan,
           historySnapshots,
           requiredSeconds,
+          iterativeState: iterative?.state,
         }),
     });
     return { success: true, run: execution.run };
@@ -1600,6 +1619,7 @@ export class CraftingEngine {
     selectionPlan,
     historySnapshots,
     requiredSeconds,
+    iterativeState,
   }) {
     const state = {
       consumedItems: [],
@@ -1647,6 +1667,7 @@ export class CraftingEngine {
       planned: { runId: run.id, stepIndex, requiredSeconds },
       apply: async ({ trusted: effectTrusted }) => {
         const current = this._freshVersionedRun(actor, run.id);
+        if (iterativeState) current.steps[stepIndex].iterative = iterativeState;
         const started = await this._craftingRunManager().markStepStarted(
           actor,
           current,
@@ -5692,7 +5713,8 @@ export class CraftingEngine {
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const mode = resolutionService?.getMode?.(recipe) || system?.resolutionMode || 'simple';
     const check = system?.craftingCheck || {};
-    if (mode === 'routedByCheck') return check.routed?.checkBreakage ?? null;
+    if (mode === 'routedByCheck' || mode === 'iterative')
+      return check.routed?.checkBreakage ?? null;
     if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
     if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'tiered') {
       return check.routed?.checkBreakage ?? null;
