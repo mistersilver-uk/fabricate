@@ -10,6 +10,7 @@ const STEP_CODES = new Set([
   'iterativeSuccessLineOnFailureGroup',
   'iterativeInvalidEntry',
   'iterativeUnknownAction',
+  'iterativeNoAllowedActions',
   'iterativeUnknownCounter',
   'iterativeInvalidRule',
   'iterativeFinalStepProducesNothing',
@@ -29,6 +30,9 @@ const RESULTS_CODES = new Set([
   'iterativeFinalStepProducesNothing',
 ]);
 
+/** The step codes whose control is the step's allowed-actions picker. */
+const ACTION_CODES = new Set(['iterativeUnknownAction', 'iterativeNoAllowedActions']);
+
 const COUNTERS_CHECK = 'iterativeCounters';
 const stepCheckId = (address) => `iterativeStep:${address}`;
 
@@ -47,7 +51,7 @@ function focusTargetOf(code, owner) {
   const address = owner?.startsWith('iterativeStep:') ? owner.slice('iterativeStep:'.length) : '';
   if (!address) return '';
   if (code === 'iterativeNoSuccessRule') return `iterative-step-${address}-success`;
-  return code === 'iterativeUnknownAction' ? `iterative-step-${address}-actions` : '';
+  return ACTION_CODES.has(code) ? `iterative-step-${address}-actions` : '';
 }
 
 function mappedIssue(issue, owner, steps) {

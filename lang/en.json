@@ -2853,6 +2853,7 @@
           "IssueIterativeNoSuccessRule": "A step has no success rule yet, so it needs iterative setup.",
           "IssueIterativeUnknownCounter": "A counter reference names a counter that does not exist.",
           "IssueIterativeUnknownAction": "An action reference names a crafting action that does not exist.",
+          "IssueIterativeNoAllowedActions": "A step allows no actions, so it can't be worked.",
           "IssueIterativeInvalidNumber": "A counter start, start formula, bound or target cannot be read.",
           "IssueIterativeBoundsInverted": "A counter minimum is above its maximum.",
           "IssueIterativeInvalidRule": "A counter rule cannot be read.",

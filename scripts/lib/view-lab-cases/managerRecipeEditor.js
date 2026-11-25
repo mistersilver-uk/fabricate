@@ -2464,7 +2464,10 @@ export const CASES = Object.freeze([
       { selector: '[data-set-picker-apply]' },
       SCROLL_TO(`${STEP_CARD} [data-iterative-step-part="actions"]`),
     ],
-    expectSelector: `${STEP_CARD} [data-iterative-step-actions][aria-invalid="true"]`,
+    // The empty list is a blocking issue, so the header chip reads "1 blocking".
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-edit-status="blocking"]) ' +
+      `${STEP_CARD} [data-iterative-step-actions][aria-invalid="true"]`,
     expectCenterHit: `${STEP_CARD} [data-iterative-step-actions]`,
   }),
   iterativeRecipeCase({

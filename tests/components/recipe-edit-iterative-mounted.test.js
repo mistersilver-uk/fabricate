@@ -518,6 +518,11 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
     const add = $('[data-iterative-step-actions]');
     assert.equal(add.getAttribute('aria-invalid'), 'true');
     assert.equal(add.getAttribute('aria-describedby'), line.id);
+    const issues = (await recipeReads(world)).recipeIssues(draft);
+    assert.deepEqual(
+      issues.map((issue) => [issue.code, issue.severity, issue.blocks]),
+      [['iterativeNoAllowedActions', 'critical', 'enable']]
+    );
   });
 
   it('states both empty rule lists, writes a Condition, and draws no step chip', async () => {

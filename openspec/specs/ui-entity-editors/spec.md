@@ -473,6 +473,7 @@ If multistep is disabled:
 ### Iterative Recipe Editor
 
 In an `iterative` system, Overview lists the recipe's Counter Instances in a table with Start, Min, Max, Target and Player sees, and each row can be removed.
+Removing a row also removes its counter from every step's hide and lock lists, once no other row names it.
 The table sits after the step-mode card, and its Counter Instances carry on across every step.
 Start is a fixed number, or a formula that rolls once when the first step starts, and switching back to a fixed number restores the kept start.
 Min and Max are editable only for a Per recipe counter, which shows the counter's defaults while unset, and a Global or No limit counter shows its system bound read-only.
@@ -480,7 +481,7 @@ A row states each of its faults on its own line under its counter: a minimum abo
 Each faulted control is marked invalid and described by its line.
 A recipe with no Counter Instances offers to add every library counter, and says so when the library has none, and the adder states when every counter is already used.
 A Counter Instance naming no library counter is marked on its row and links to Counters.
-Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error.
+Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error and blocks enabling the recipe.
 A multi-step recipe's step hides or locks each Counter Instance for that step, and a Counter Instance the player never sees offers no per-step hide.
 A single-step recipe shows its hide and lock lists only while one is non-empty.
 Each step's Ends when holds success rules, which must all hold, and failure rules, any one of which is enough.

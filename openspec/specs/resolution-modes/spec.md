@@ -1204,6 +1204,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeNoSuccessRule`: a step has no success rule, so it never succeeds vacuously.
   - `iterativeUnknownCounter`: a Counter Instance names no library counter, or a hidden or locked id or a rule names no Counter Instance.
   - `iterativeUnknownAction`: an allowed or `previousAction` id names no library action.
+  - `iterativeNoAllowedActions`: a step's `actions.mode` is `only` and its `actionIds` is empty, so the step can't be worked.
   - `iterativeInvalidNumber`: a `null` start, `startFormula`, bound or target.
   - `iterativeBoundsInverted`: a `perRecipe` Counter Instance's effective `min` is above its effective `max`.
   - `iterativeStartOutOfBounds`: a Counter Instance's fixed `start` lies outside its effective minimum or maximum, as Effective Bounds defines them: the instance's bound over the counter's under `perRecipe`, the counter's bound only under `global`, and never under `none`.
@@ -1217,7 +1218,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeFinalStepProducesNothing`: no final-step group has an `end: 'success'` line.
 - Each recipe-scoped issue carries `stepId` and `stepIndex`: the id and zero-based position in `recipe.steps` of the explicit step whose configuration or result groups raise it.
   Both are `null` on a recipe with no explicit steps and on a recipe-wide issue.
-  - The step-scoped codes are `iterativeNoSuccessRule`, `iterativeSuccessLineOnFailureGroup`, and a step's `iterativeInvalidEntry`, `iterativeUnknownAction`, `iterativeUnknownCounter` and `iterativeInvalidRule`.
+  - The step-scoped codes are `iterativeNoSuccessRule`, `iterativeSuccessLineOnFailureGroup`, and a step's `iterativeInvalidEntry`, `iterativeUnknownAction`, `iterativeNoAllowedActions`, `iterativeUnknownCounter` and `iterativeInvalidRule`.
     `iterativeFinalStepProducesNothing` is addressed to the final step.
   - `iterativeNoCounters`, `iterativeMultiStepOff`, `iterativeCheckUnavailable`, a Counter Instance's codes and the expression codes are recipe-wide.
   - A recipe raises one issue per code and step address, in first-raised order, with every step's configuration codes before any `producedWhen` code.

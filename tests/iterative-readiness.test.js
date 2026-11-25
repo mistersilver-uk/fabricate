@@ -134,6 +134,9 @@ const FIRES = {
   iterativeUnknownAction: ({ recipe }) => {
     step(recipe).actions.actionIds = ['quench'];
   },
+  iterativeNoAllowedActions: ({ recipe }) => {
+    step(recipe).actions = { mode: 'only', actionIds: [] };
+  },
   iterativeInvalidNumber: ({ recipe }) => {
     recipe.iterative.counters[0].start = 'warm';
   },
@@ -624,6 +627,31 @@ describe('step address (D-1)', () => {
       ['iterativeInvalidEntry']
     );
     assert.ok(issues.every((issue) => !('stepId' in issue) && !('stepIndex' in issue)));
+  });
+});
+
+describe('iterativeNoAllowedActions', () => {
+  const codesWith = (actions) =>
+    codesAfter(({ recipe }) => {
+      step(recipe).actions = actions;
+    });
+
+  it('is raised for an empty Only list alone, and not under All or for a list that does not parse', () => {
+    assert.deepEqual(codesWith({ mode: 'only', actionIds: [] }), ['iterativeNoAllowedActions']);
+    assert.deepEqual(codesWith({ mode: 'all', actionIds: [] }), []);
+    assert.deepEqual(codesWith({ mode: 'only', actionIds: 'stoke' }), ['iterativeInvalidEntry']);
+  });
+
+  it('is critical, blocks enabling and is addressed to the step that raises it', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.steps[1].iterative.actions = { mode: 'only', actionIds: [] };
+    });
+    assert.deepEqual(addressesOf(recipe), ['iterativeNoAllowedActions@1:s-2']);
+    const [raised] = evaluateIterativeReadiness(system(), [new Recipe(recipe)]);
+    assert.deepEqual(
+      [raised.severity, raised.blocks, raised.message],
+      ['critical', 'enable', "A step allows no actions, so it can't be worked."]
+    );
   });
 });
 

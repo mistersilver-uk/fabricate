@@ -306,6 +306,7 @@ describe('the Crafting Action editor (issue 3009)', () => {
       'iterativeInvalidNumber',
       'iterativeBoundsInverted',
       'iterativeStartOutOfBounds',
+      'iterativeNoAllowedActions',
       'iterativeCheckUnavailable',
       'iterativeMultiStepOff',
       'iterativeSuccessLineOnFailureGroup',

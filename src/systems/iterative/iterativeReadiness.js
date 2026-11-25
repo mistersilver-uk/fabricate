@@ -32,6 +32,7 @@ export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
   iterativeNoSuccessRule: 'A step has no success rule yet, so it needs iterative setup.',
   iterativeUnknownCounter: 'A counter reference names a counter that does not exist.',
   iterativeUnknownAction: 'An action reference names a crafting action that does not exist.',
+  iterativeNoAllowedActions: "A step allows no actions, so it can't be worked.",
   iterativeInvalidNumber: 'A counter start, start formula, bound or target cannot be read.',
   iterativeBoundsInverted: 'A counter minimum is above its maximum.',
   iterativeStartOutOfBounds: 'A counter starts outside its minimum or maximum.',
@@ -222,6 +223,18 @@ function stepEntriesHold(config) {
   );
 }
 
+/** A step's action-list codes: an id naming no library action, and an Only list naming none. */
+function stepActionCodes(actions, references) {
+  const ids = actions?.actionIds;
+  const none = actions?.mode === 'only' && Array.isArray(ids) && ids.length === 0;
+  return [
+    ...(arrayOrEmpty(ids).some((id) => !references.actionIds.has(id))
+      ? ['iterativeUnknownAction']
+      : []),
+    ...(none ? ['iterativeNoAllowedActions'] : []),
+  ];
+}
+
 function stepConfigCodes(config, references, context) {
   if (!config) return ['iterativeNoSuccessRule'];
   const named = [
@@ -232,9 +245,7 @@ function stepConfigCodes(config, references, context) {
   return [
     ...(arrayOrEmpty(config.success).length === 0 ? ['iterativeNoSuccessRule'] : []),
     ...(stepEntriesHold(config) ? [] : ['iterativeInvalidEntry']),
-    ...(arrayOrEmpty(config.actions?.actionIds).some((id) => !references.actionIds.has(id))
-      ? ['iterativeUnknownAction']
-      : []),
+    ...stepActionCodes(config.actions, references),
     ...(named.some((id) => !references.counterIds.has(id)) ? ['iterativeUnknownCounter'] : []),
     ...ruleCodes([...arrayOrEmpty(config.success), ...arrayOrEmpty(config.failure)], references),
     ...(rolls && !context.routedCheckActive ? ['iterativeCheckUnavailable'] : []),

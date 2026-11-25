@@ -1247,6 +1247,24 @@ describe('iterative recipe readiness (issue 3010)', () => {
     assert.ok(issues.every((entry) => !('stepName' in entry)), 'no step is addressed');
   });
 
+  it('lands an empty Only list on its step’s actions picker, on a multi-step or a single step', () => {
+    const issueOf = (readiness) =>
+      readiness.issues.find((entry) => entry.iterativeCode === 'iterativeNoAllowedActions');
+    const multi = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([recipeIssue('iterativeNoAllowedActions', 1)]),
+    });
+    assert.deepEqual(check(multi.checks, 'iterativeStep:1').owners, ['iterativeNoAllowedActions:1']);
+    assert.equal(issueOf(multi).focusTarget, 'iterative-step-1-actions');
+    assert.equal(issueOf(multi).blocks, 'enable');
+    const single = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([recipeIssue('iterativeNoAllowedActions', null)], []),
+    });
+    assert.deepEqual(check(single.checks, 'iterativeStep:single').owners, [
+      'iterativeNoAllowedActions:recipe',
+    ]);
+    assert.equal(issueOf(single).focusTarget, 'iterative-step-single-actions');
+  });
+
   it('lets a step check claim its first issue, leaving the rest as their own rows', () => {
     const readiness = evaluateRecipeReadiness(RECIPE, {
       iterative: iterativeOf([
