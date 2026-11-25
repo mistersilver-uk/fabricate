@@ -1997,6 +1997,11 @@
         "UnknownReactionDesc": "You haven't tried this combination. Brew to find out what it does.",
         "StillNeeded": "Still needed",
         "MissingRow": "{name} ×{need}"
+      },
+      "Manager": {
+        "SystemOverview": {
+          "IssueIterativeStartOutOfBounds": "A counter starts outside its minimum or maximum."
+        }
       }
     },
     "Settings": {

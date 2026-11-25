@@ -14,7 +14,7 @@ import {
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
-import { seedIterativeState } from './labIterative.js';
+import { seedIterativeRecipes, seedIterativeState } from './labIterative.js';
 import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
 import { LAB_MACRO_UUIDS, registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
@@ -1045,6 +1045,8 @@ export function labLocalizer(shippedLocalize, longTravelLabels) {
  *   herbalism salvage component and gathering task, `missing` one naming a deleted modifier. See {@link seedSubjectModifierPicks}.
  * @param {string|null} [options.iterative] Adds the Ironworks system in this state. See
  *   {@link seedIterativeState}.
+ * @param {string|null} [options.iterativeRecipes] Authors the Ironworks recipes in this state, on
+ *   top of `iterative`. See {@link seedIterativeRecipes}.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
@@ -1073,6 +1075,7 @@ export async function buildLabWorld({
   journalCaseState = null,
   checkPreviewState = null,
   iterative = null,
+  iterativeRecipes = null,
   resultRowState = null,
   subjectModifierPicks = null,
   learnableBook = false,
@@ -1108,6 +1111,7 @@ export async function buildLabWorld({
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
+  seedIterativeRecipes(content, actors, iterativeRecipes);
   if (['reward-craft', 'reward-group'].includes(resultRowState)) seedRewardCraftLearned(actors);
   seedCheckPreviewState(content, actors, checkPreviewState);
   if (learnableBook) seedLearnableBook(content, actors);

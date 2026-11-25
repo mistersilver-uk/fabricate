@@ -24,6 +24,7 @@ import {
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   buildLabActors,
@@ -33,7 +34,12 @@ import {
 import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
-import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
+import {
+  LAB_ITERATIVE_RECIPE_STATES,
+  LAB_ITERATIVE_STATES,
+  seedIterativeRecipes,
+  seedIterativeState,
+} from './view-lab/world/labIterative.js';
 import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
@@ -268,6 +274,66 @@ test('the lab world holds no iterative system unless a frame asks for one', () =
     assert.equal(ironworks.id, LAB_SYSTEM_IDS.IRONWORKS);
     assert.equal(ironworks.resolutionMode, 'iterative');
     assert.notEqual(ironworks.name, 'Karrun Forgecraft', 'the lab names its systems apart');
+  }
+});
+
+test('every query.iterativeRecipes names a recipe state the lab seeds, beside an iterative one', () => {
+  const unknown = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    const state = viewCase.query?.iterativeRecipes;
+    if (!state) continue;
+    if (!Object.hasOwn(LAB_ITERATIVE_RECIPE_STATES, state))
+      unknown.push(`${viewCase.id}: ${state}`);
+    if (!viewCase.query.iterative) unknown.push(`${viewCase.id}: sets no iterative state`);
+  }
+  assert.deepEqual(unknown, [], `these cases cannot seed their recipes: ${unknown.join(', ')}`);
+});
+
+test('the iterative recipe states leave every other world as it was', () => {
+  const base = buildLabContent();
+  const seeded = () => {
+    const content = structuredClone(base);
+    seedIterativeState(content, 'populated');
+    return content;
+  };
+  const without = seeded();
+  for (const absent of [null, undefined, '', 'nonsense', 'toString', '__proto__']) {
+    const content = seeded();
+    seedIterativeRecipes(content, [], absent);
+    assert.deepEqual(content, without, `${String(absent)} must leave the world as it was`);
+  }
+  const bare = structuredClone(base);
+  seedIterativeRecipes(bare, [], 'authoring');
+  assert.deepEqual(bare, base, 'a world with no Ironworks has nothing to author');
+});
+
+test('each iterative recipe state authors the Ironworks recipes once, by id', () => {
+  const expectedIds = [
+    'iw-r-blade',
+    'iw-r-hinge',
+    'iw-r-ingot',
+    'iw-r-nail',
+    'iw-r-rivet',
+    'iw-r-sword',
+  ];
+  for (const state of Object.keys(LAB_ITERATIVE_RECIPE_STATES)) {
+    const content = buildLabContent();
+    seedIterativeState(content, 'populated');
+    const actors = buildLabActors(content);
+    seedIterativeRecipes(content, actors, state);
+    const ids = content.recipes
+      .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.IRONWORKS)
+      .map((entry) => entry.id);
+    assert.deepEqual([...ids].sort(byCodePoint), expectedIds, state);
+    assert.equal(new Set(content.recipes.map((entry) => entry.id)).size, content.recipes.length);
+    const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
+    const held = new Set(system.components.map((entry) => entry.id));
+    assert.deepEqual([...held].sort(byCodePoint), ['iw-iron-bar', 'iw-steel-blade'], state);
+    for (const entry of held) {
+      assert.equal(content.components.filter((c) => c.id === entry).length, 1, `${state} ${entry}`);
+    }
+    assert.equal(system.features.multiStepRecipes, state !== 'multiStepOff', state);
+    assert.equal(system.iterative.counters.length === 0, state === 'noLibrary', state);
   }
 });
 
