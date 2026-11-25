@@ -76,10 +76,10 @@ export const CASES = Object.freeze([
       `:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="incomplete"])` +
       `:not(:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="iterativeReady"])) ` +
       `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
+    // A pill is read-only text inside the row's own button, which owns the pointer over it.
     expectCenterHit: [
-      `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
-      `${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="iterativeBlocking"]`,
-      `${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="iterativeSetup"]`,
+      `${ITERATIVE_ROW('iw-r-blade')} .manager-recipe-identity:has([data-recipe-status="iterativeReady"])`,
+      `${ITERATIVE_ROW('iw-r-ingot')} .manager-recipe-identity:has([data-recipe-status="iterativeSetup"])`,
     ],
     kinds: ['manager', 'recipes', 'iterative'],
     sourceMatches: [
