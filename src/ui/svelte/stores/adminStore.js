@@ -6664,6 +6664,7 @@ export function createAdminStore(services) {
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
     knowledge.deactivate();
+    iterative.watchActiveRuns(false);
     // The graph index retains the whole recipe corpus's component sets (issue 1082); a closed
     // manager must not keep them alive alongside the knowledge snapshot.
     graphIndexCache = null;

@@ -12,7 +12,9 @@ import { flushSync } from '../node_modules/svelte/src/index-client.js';
 import { effect_root, user_effect } from '../node_modules/svelte/src/internal/client/index.js';
 import { activeIterativeRuns } from '../src/systems/runTerms.js';
 import { createIterativeLibrarySection } from '../src/ui/svelte/stores/adminIterativeLibrarySection.js';
+import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 
+import { createServices } from './helpers/adminStoreServices.js';
 import { createSvelteModuleCompiler } from './helpers/compile-svelte-module.js';
 import { withProductionApplication } from './helpers/extension-composition-harness.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
@@ -85,6 +87,18 @@ describe('activeIterativeRuns', () => {
     assert.deepEqual(activeIterativeRuns({}, [arden]), []);
   });
 
+  it('skips a run with no recipe, reads a missing system as empty, and keeps only string action ids', () => {
+    const snapshot = { iterative: { actions: [{ id: 'a' }, { id: 5 }, null, {}] } };
+    const manager = managerOf(
+      new Map([
+        [arden, [run('', 'iron', snapshot), { recipeId: 'blade', termsSnapshot: snapshot }]],
+      ])
+    );
+    assert.deepEqual(activeIterativeRuns(manager, [arden]), [
+      { recipeId: 'blade', craftingSystemId: '', actionIds: ['a'] },
+    ]);
+  });
+
   it('reads only getActiveRuns, so history is never walked', () => {
     const manager = managerOf(new Map([[arden, [run('a', 'iron', snapshotWith('strike'))]]]));
     assert.equal(activeIterativeRuns(manager, [arden]).length, 1);
@@ -124,9 +138,11 @@ describe('the section memo', () => {
     let current;
     section.activeIterativeRuns.subscribe((value) => {
       current = value;
+      calls.published = (calls.published ?? -1) + 1;
     });
     return { section, calls, read: () => current, setRuns: (next) => (runs = next) };
   }
+  const BLADE = { recipeId: 'blade', craftingSystemId: 'iron', actionIds: ['strike'] };
   const tick = () => new Promise((resolve) => queueMicrotask(resolve));
 
   it('is empty, and walks nothing, until it is watched', async () => {
@@ -153,6 +169,61 @@ describe('the section memo', () => {
     await tick();
     await tick();
     assert.equal(calls.walks, 2, 'one on entry and one for the two schedules');
+  });
+
+  it('refreshes again after a tick, so a later run diff is read', async () => {
+    const { section, calls, read, setRuns } = memo();
+    section.watchActiveRuns(true);
+    section.scheduleActiveRunsRefresh();
+    await tick();
+    setRuns([BLADE]);
+    section.scheduleActiveRunsRefresh();
+    await tick();
+    assert.equal(calls.walks, 3, 'entry, then one walk per tick');
+    assert.deepEqual(read(), [BLADE]);
+  });
+
+  it('drops a refresh queued before the watch stopped', async () => {
+    const { section, calls } = memo();
+    section.watchActiveRuns(true);
+    section.scheduleActiveRunsRefresh();
+    section.watchActiveRuns(false);
+    await tick();
+    assert.equal(calls.walks, 1, 'only the entry walk');
+  });
+
+  it('publishes a list only when it differs from the last', async () => {
+    const { section, calls, setRuns } = memo();
+    setRuns([BLADE]);
+    section.watchActiveRuns(true);
+    assert.equal(calls.published, 1);
+    setRuns([{ ...BLADE, actionIds: ['strike'] }]);
+    section.scheduleActiveRunsRefresh();
+    await tick();
+    assert.equal(calls.walks, 2);
+    assert.equal(calls.published, 1, 'an equal list notifies no subscriber');
+    setRuns([{ ...BLADE, actionIds: ['strike', 'stoke'] }]);
+    section.scheduleActiveRunsRefresh();
+    await tick();
+    assert.equal(calls.published, 2, 'a changed action list does');
+  });
+
+  it('stops with the admin store, so a late refresh walks nothing', async () => {
+    let walks = 0;
+    const store = createAdminStore(
+      createServices({ id: 'iron', name: 'Iron', resolutionMode: 'iterative' }, [], [], {
+        getActiveIterativeRuns: () => {
+          walks += 1;
+          return [];
+        },
+      })
+    );
+    store.iterative.watchActiveRuns(true);
+    const before = walks;
+    store.destroy();
+    store.iterative.scheduleActiveRunsRefresh();
+    await tick();
+    assert.equal(walks, before, 'nothing after destroy');
   });
 
   it('does nothing once watching is turned off', async () => {
@@ -307,6 +378,11 @@ describe('the actor hooks that republish the memo', () => {
     onUpdate({}, { flags: { fabricate: { gatheringRuns: {} } } });
     onUpdate({}, { name: 'Renamed' });
     assert.deepEqual(drained(), [], 'an HP tick, a gathering run or a rename');
+    onUpdate({ pack: 'world.heroes' }, CRAFTING_DIFF);
+    onUpdate({ isToken: true }, CRAFTING_DIFF);
+    assert.deepEqual(drained(), [], 'a compendium or synthetic token actor the walk never sees');
+    onCreate({ pack: 'world.heroes' });
+    assert.deepEqual(drained(), ['runs'], 'a create or delete still schedules');
   });
 
   it('tolerates a store with no iterative section', async () => {

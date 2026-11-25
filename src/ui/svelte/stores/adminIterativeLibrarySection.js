@@ -157,12 +157,20 @@ export function createIterativeLibrarySection({
   };
 
   // The memo of active iterative runs, read by the editors' in-progress notes. It walks nothing
-  // until an editor route watches it, then recomputes on entry, on a refresh and on a run diff.
+  // until an editor route watches it, and publishes only a list that differs from the last.
   const activeRuns = writableStore([]);
   let watching = false;
   let runsRefreshQueued = false;
-  const recomputeActiveRuns = () =>
-    activeRuns.set(arrayOrEmpty(services.getActiveIterativeRuns?.()));
+  let runsKey = '[]';
+  const keyOf = (runs) =>
+    JSON.stringify(runs.map((run) => [run?.recipeId, run?.craftingSystemId, run?.actionIds]));
+  function recomputeActiveRuns() {
+    const runs = arrayOrEmpty(services.getActiveIterativeRuns?.());
+    const key = keyOf(runs);
+    if (key === runsKey) return;
+    runsKey = key;
+    activeRuns.set(runs);
+  }
 
   /** Starts or stops keeping the memo; turning it on recomputes once. */
   function watchActiveRuns(on) {
