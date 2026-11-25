@@ -17,10 +17,10 @@ function withoutStep(iterative, fallback) {
 
 function entered(draft, nextSteps) {
   if (!isPlainObject(draft.iterative)) return { steps: nextSteps, ...carried(draft) };
-  const { step } = draft.iterative;
+  const { step, ...recipeIterative } = draft.iterative;
   const [first, ...others] = nextSteps;
   const steps = step == null ? nextSteps : [{ ...first, iterative: step }, ...others];
-  return { steps, iterative: withoutStep(draft.iterative) };
+  return { steps, iterative: recipeIterative };
 }
 
 function collapsed(draft, first) {

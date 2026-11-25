@@ -173,7 +173,10 @@ describe('recipe step handler guards and confirms', () => {
 function deferredConfirm() {
   const pending = [];
   return {
-    confirm: () => new Promise((resolve) => pending.push(resolve)),
+    confirm: () =>
+      new Promise((resolve) => {
+        pending.push(resolve);
+      }),
     answer: (value) => pending.shift()(value),
   };
 }

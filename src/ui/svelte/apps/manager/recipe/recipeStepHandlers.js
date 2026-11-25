@@ -31,8 +31,6 @@ function revertPrompt(recipe, { text, localize }) {
   };
 }
 
-const ITERATIVE_KEY = 'FABRICATE.Admin.Manager.Recipe.Iterative';
-
 const stepName = (step, index, text) =>
   String(step?.name || '').trim() ||
   `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`;
@@ -40,14 +38,17 @@ const stepName = (step, index, text) =>
 /** Collapse keeps step 1 whole and removes the others with their result sets. */
 function collapsePrompt(steps, { text, localize }) {
   const others = steps.slice(1).map((step, index) => stepName(step, index + 1, text));
-  const content = others.length === 1 ? 'CollapseContentOne' : 'CollapseContent';
+  const content =
+    others.length === 1
+      ? 'FABRICATE.Admin.Manager.Recipe.Iterative.CollapseContentOne'
+      : 'FABRICATE.Admin.Manager.Recipe.Iterative.CollapseContent';
   return {
     title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
-    content: localize(`${ITERATIVE_KEY}.${content}`, {
+    content: localize(content, {
       first: stepName(steps[0], 0, text),
       others: others.join(', '),
     }),
-    confirmLabel: localize(`${ITERATIVE_KEY}.CollapseConfirm`),
+    confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.Iterative.CollapseConfirm'),
   };
 }
 
@@ -58,7 +59,9 @@ function deletePrompt(step, context, { text, localize, iterative = false }) {
   const also = localize(
     DELETE_ALSO_KEYS[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll'
   );
-  const alsoDeleted = iterative ? `${also}${localize(`${ITERATIVE_KEY}.DeleteStepAlso`)}` : also;
+  const alsoDeleted = iterative
+    ? `${also}${localize('FABRICATE.Admin.Manager.Recipe.Iterative.DeleteStepAlso')}`
+    : also;
   return {
     title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
     content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
@@ -66,14 +69,57 @@ function deletePrompt(step, context, { text, localize, iterative = false }) {
   };
 }
 
-export function createRecipeStepHandlers({
-  draft,
-  patch,
-  confirm,
-  iterative = () => false,
-  text,
-  localize,
-}) {
+/** Revert or Collapse, and delete: the handlers that confirm, each reading the draft once it resolves. */
+function confirmingHandlers(seams, { currentSteps, patchSteps }) {
+  const { draft, patch, confirm, iterative, text, localize } = seams;
+
+  // Collapse keeps step 1 whole, so a sole step loses nothing and is collapsed without asking.
+  async function collapseToOneStep() {
+    const steps = currentSteps();
+    if (steps.length > 1 && !(await confirm?.(collapsePrompt(steps, { text, localize })))) {
+      return false;
+    }
+    if (!draft()) return false;
+    patchSteps([]);
+    return true;
+  }
+
+  // Reverting multi-step → single-step discards the per-step authoring, so warn
+  // before staging the empty steps array (engine falls back to top-level fields).
+  async function handleRevertToSingleStep() {
+    const recipe = draft();
+    if (!recipe) return false;
+    if (iterative()) return collapseToOneStep();
+    const confirmed = await confirm?.(revertPrompt(recipe, { text, localize }));
+    if (!confirmed || !draft()) return false;
+    patch({ steps: [] });
+    return true;
+  }
+
+  // Deleting a step removes the whole step (its ingredients, results, and tools). An iterative
+  // recipe's sole step is never deleted: Collapse is the way back to one step.
+  const deletable = (steps, stepId) =>
+    steps.some((entry) => entry?.id === stepId) && !(iterative() && steps.length <= 1);
+
+  async function handleDeleteStep(stepId, context = 'overview') {
+    if (!draft()) return false;
+    const step = currentSteps().find((entry) => entry?.id === stepId);
+    if (!step || !deletable(currentSteps(), stepId)) return false;
+    const prompt = deletePrompt(step, context, { text, localize, iterative: iterative() });
+    const confirmed = await confirm?.(prompt);
+    if (!confirmed || !draft()) return false;
+    const steps = currentSteps();
+    if (!deletable(steps, stepId)) return false;
+    patchSteps(steps.filter((entry) => entry?.id !== stepId));
+    return true;
+  }
+
+  return { handleRevertToSingleStep, handleDeleteStep };
+}
+
+export function createRecipeStepHandlers({ iterative = () => false, ...rest }) {
+  const seams = { ...rest, iterative };
+  const { draft, patch, text } = seams;
   function currentSteps() {
     const recipe = draft();
     return Array.isArray(recipe?.steps) ? [...recipe.steps] : [];
@@ -99,29 +145,6 @@ export function createRecipeStepHandlers({
       toolIds: recipe.toolIds || [],
     };
     patchSteps([seeded]);
-    return true;
-  }
-
-  // Reverting multi-step → single-step discards the per-step authoring, so warn
-  // before staging the empty steps array (engine falls back to top-level fields).
-  async function handleRevertToSingleStep() {
-    const recipe = draft();
-    if (!recipe) return false;
-    if (iterative()) return collapseToOneStep();
-    const confirmed = await confirm?.(revertPrompt(recipe, { text, localize }));
-    if (!confirmed || !draft()) return false;
-    patch({ steps: [] });
-    return true;
-  }
-
-  // Collapse keeps step 1 whole, so a sole step loses nothing and is collapsed without asking.
-  async function collapseToOneStep() {
-    const steps = currentSteps();
-    if (steps.length > 1 && !(await confirm?.(collapsePrompt(steps, { text, localize })))) {
-      return false;
-    }
-    if (!draft()) return false;
-    patchSteps([]);
     return true;
   }
 
@@ -157,30 +180,11 @@ export function createRecipeStepHandlers({
     return true;
   }
 
-  // Deleting a step removes the whole step (its ingredients, results, and tools). An iterative
-  // recipe's sole step is never deleted: Collapse is the way back to one step.
-  const deletable = (steps, stepId) =>
-    steps.some((entry) => entry?.id === stepId) && !(iterative() && steps.length <= 1);
-
-  async function handleDeleteStep(stepId, context = 'overview') {
-    if (!draft()) return false;
-    const step = currentSteps().find((entry) => entry?.id === stepId);
-    if (!step || !deletable(currentSteps(), stepId)) return false;
-    const prompt = deletePrompt(step, context, { text, localize, iterative: iterative() });
-    const confirmed = await confirm?.(prompt);
-    if (!confirmed || !draft()) return false;
-    const steps = currentSteps();
-    if (!deletable(steps, stepId)) return false;
-    patchSteps(steps.filter((entry) => entry?.id !== stepId));
-    return true;
-  }
-
   return {
     handleEnterMultiStep,
-    handleRevertToSingleStep,
     handleAddStep,
     handleReorderSteps,
     handleUpdateStep,
-    handleDeleteStep,
+    ...confirmingHandlers(seams, { currentSteps, patchSteps }),
   };
 }
