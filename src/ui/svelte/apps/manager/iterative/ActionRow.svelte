@@ -78,7 +78,7 @@
 
 {#snippet meta()}
   <span class="manager-iterative-action-costs" data-iterative-action-costs>
-    <Kicker as="span" size="8">
+    <Kicker as="span">
       {text('FABRICATE.Admin.Manager.Iterative.CostsLabel', 'Costs')}
     </Kicker>
     {#each costs as cost, index (index)}
