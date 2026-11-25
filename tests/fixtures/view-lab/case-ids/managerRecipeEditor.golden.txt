@@ -112,3 +112,7 @@ manager-recipe-edit-iterative-enter-multistep
 manager-recipe-edit-iterative-collapse-confirm
 manager-recipe-edit-iterative-multistep-off
 manager-recipe-edit-iterative-steps-multi-narrow
+manager-recipe-edit-iterative-results
+manager-recipe-edit-iterative-results-never
+manager-recipe-edit-iterative-results-empty
+manager-recipe-edit-iterative-results-narrow

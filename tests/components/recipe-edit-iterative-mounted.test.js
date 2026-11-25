@@ -644,3 +644,121 @@ describe('step headers outside iterative', () => {
     assert.ok(!$('[data-iterative-step-config]'));
   });
 });
+
+describe('iterative recipe Results', () => {
+  const setRow = (id) => $(`[data-iterative-result-set="${id}"]`);
+  const groupsOf = (calls) => calls.patches.at(-1).resultGroups;
+  const stepGroupsOf = (calls, index = 0) => calls.patches.at(-1).steps[index].resultGroups;
+
+  it('reads the iterative intro, and writes a When line’s end, rule and remove once each', async () => {
+    const world = ironworks();
+    const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-hinge'));
+    await press($('#recipe-tab-results'), 'Results');
+    assert.match(
+      $('[data-recipe-tab="results"] .manager-recipe-tab-intro').textContent,
+      /What the work produces\. Result sets are checked top to bottom/
+    );
+    const lines = () => setRow('rg').querySelector('[data-produced-when]');
+    assert.equal(
+      lines().querySelector('.manager-iterative-fault').textContent.trim(),
+      'Never produced. Add when it should be.'
+    );
+
+    await press(lines().querySelector('[data-produced-when-add]'), 'When');
+    assert.equal(calls.patches.length, 1);
+    assert.deepEqual(groupsOf(calls)[0].producedWhen, [{ end: 'success', rules: [] }]);
+    assert.equal(
+      lines().querySelector('[data-counter-rules-empty]').textContent.trim(),
+      'Any value'
+    );
+
+    await press(
+      lines().querySelector(':scope [data-produced-when-end="failure"] input'),
+      'Failure'
+    );
+    assert.equal(calls.patches.length, 2);
+    assert.deepEqual(groupsOf(calls)[0].producedWhen, [{ end: 'failure', rules: [] }]);
+
+    await press(lines().querySelector('[data-rule-row-preset]'), 'Condition');
+    assert.equal(calls.patches.length, 3);
+    assert.deepEqual(groupsOf(calls)[0].producedWhen[0].rules, [
+      { source: 'counter', counterId: 'heat', op: '>=', value: 0 },
+    ]);
+
+    await press(lines().querySelector('[data-produced-when-remove="0"]'), 'the line remove');
+    assert.equal(calls.patches.length, 4);
+    assert.equal('producedWhen' in groupsOf(calls)[0], false, 'no line leaves no key');
+    assert.equal(groupsOf(calls)[0].id, 'rg', 'the set keeps its id');
+    assert.ok(document.activeElement === lines().querySelector('[data-produced-when-add]'));
+  });
+
+  it('marks only the failure set, and moves a set with the rocker in its step', async () => {
+    const world = ironworks();
+    const { calls } = await mountWithHandlers(world, await draftOf(world, 'iw-r-sword'));
+    await press($('#recipe-tab-results'), 'Results');
+    assert.match(
+      $('[data-recipe-tab="results"] .manager-recipe-tab-intro').textContent,
+      /What each step produces\./
+    );
+    assert.equal(
+      setRow('g1-fail').querySelector('[data-iterative-failure-set]').textContent,
+      'Failure set'
+    );
+    assert.ok(!setRow('g1').querySelector('[data-iterative-failure-set]'));
+    assert.equal(
+      setRow('g1-fail').closest('[aria-label="Result sets"]').getAttribute('role'),
+      'list'
+    );
+
+    await press(setRow('g1').querySelector('[data-sortable-move="down"]'), 'Move down');
+    assert.deepEqual(
+      stepGroupsOf(calls).map((group) => group.id),
+      ['g1-fail', 'g1']
+    );
+    assert.equal(stepGroupsOf(calls)[0].role, 'failure', 'the failure set moves like any other');
+  });
+
+  it('states a scope with no set, and hands focus to the adder after a remove', async () => {
+    const world = ironworks();
+    const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-blade'));
+    await press($('#recipe-tab-results'), 'Results');
+    await press(setRow('rg').querySelector('[data-sortable-remove]'), 'remove the set');
+    assert.deepEqual(groupsOf(calls), []);
+    assert.equal(
+      $('[data-iterative-results-empty]').textContent.trim(),
+      'No result sets. This step produces nothing.'
+    );
+    assert.ok(
+      document.activeElement === $('[data-iterative-results] [data-recipe-add="result-set"]')
+    );
+
+    await press($('[data-recipe-add="result-set"]'), 'Add result set');
+    assert.equal(groupsOf(calls).length, 1);
+    assert.ok(Boolean(groupsOf(calls)[0].id), 'a new set carries an id');
+  });
+
+  it('names an untracked rule and marks a line that does not parse', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.resultGroups[0].producedWhen = [
+      { end: 'success', rules: [{ source: 'counter', counterId: 'temper', op: '>=', value: 2 }] },
+      { end: 'sideways', rules: [] },
+    ];
+    await mountEditor(world, draft);
+    await press($('#recipe-tab-results'), 'Results');
+    const line = (index) => $(`[data-produced-when-line="${index}"]`);
+    assert.match(
+      line(0).querySelector('[data-counter-rule-source]').textContent,
+      /Temper \(not tracked\)/
+    );
+    assert.equal(
+      line(0).querySelector('[data-issue-code="iterativeUnknownCounter"]').textContent.trim(),
+      "Temper isn't tracked in this step."
+    );
+    const group = line(1).querySelector('[role="radiogroup"]');
+    const mark = line(1).querySelector('[data-issue-code="iterativeInvalidEntry"]');
+    assert.equal(group.getAttribute('aria-invalid'), 'true');
+    assert.equal(group.getAttribute('aria-describedby'), mark.id);
+    assert.equal(group.getAttribute('aria-label'), 'Success or failure');
+  });
+});

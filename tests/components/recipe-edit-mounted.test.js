@@ -294,6 +294,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/SetPicker.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // The iterative Results tab's sets and their Produced when lines (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeResultsSection.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/ProducedWhenLines.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 ];
 

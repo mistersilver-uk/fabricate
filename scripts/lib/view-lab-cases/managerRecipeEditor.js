@@ -181,6 +181,15 @@ const ITERATIVE_STEPS_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/RecipeStepsCard\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeStepAccordion\.svelte$/,
 ]);
+/** An iterative recipe's Results tab claims the tab and its result card too. */
+const ITERATIVE_RESULTS_SOURCES = Object.freeze([
+  ...ITERATIVE_RECIPE_SOURCES,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultsTab\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
+]);
+const RESULTS_TAB = '[data-recipe-tab="results"]';
+const RESULT_SET_ROW = (id) => `${RESULTS_TAB} [data-iterative-result-set="${id}"]`;
+const OPEN_RESULTS = { selector: '#recipe-tab-results' };
 /** A Fixed Start cell's controls, which hold one line. */
 const FIXED_START = `${COUNTERS_CARD} .fab-picker-row-amount-formula:not(:has([data-recipe-option-formula]))`;
 const FIXED_START_GEOMETRY = Object.freeze({
@@ -2559,5 +2568,58 @@ export const CASES = Object.freeze([
       oneLineRows: `${STEPS_CARD} .fabricate-sortable-list-line, ${STEPS_CARD} .fabricate-sortable-list-content`,
     },
     sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  // Issue 3010: an iterative recipe's Results, each set's Produced when lines.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-results',
+    label: 'Manager — Recipe edit iterative results, produced when and the failure set',
+    recipeId: 'iw-r-sword',
+    steps: [OPEN_RESULTS, SCROLL_TO(`${RESULT_SET_ROW('g1-fail')} [data-produced-when-line="0"]`)],
+    expectSelector:
+      `${RESULTS_TAB}:has([data-iterative-result-set="g1"] [data-produced-when-line="0"]) ` +
+      `[data-iterative-result-set="g1-fail"] [data-iterative-failure-set]`,
+    expectCenterHit: [
+      `${RESULT_SET_ROW('g1-fail')} [data-sortable-move="up"]`,
+      `${RESULT_SET_ROW('g1-fail')} [data-sortable-grip]`,
+      `${RESULT_SET_ROW('g1-fail')} [data-sortable-remove]`,
+      `${RESULT_SET_ROW('g1-fail')} [data-produced-when-end="failure"]`,
+      `${RESULT_SET_ROW('g1-fail')} [data-produced-when-remove="0"]`,
+    ],
+    sourceMatches: ITERATIVE_RESULTS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-results-never',
+    label: 'Manager — Recipe edit iterative results, a set never produced',
+    recipeId: 'iw-r-hinge',
+    steps: [OPEN_RESULTS, SCROLL_TO(`${RESULT_SET_ROW('rg')} [data-produced-when-add]`)],
+    expectSelector: `${RESULT_SET_ROW('rg')} [data-produced-when]:not(:has([data-produced-when-line])) .manager-iterative-fault.is-warning`,
+    expectCenterHit: `${RESULT_SET_ROW('rg')} [data-produced-when-add]`,
+    sourceMatches: ITERATIVE_RESULTS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-results-empty',
+    label: 'Manager — Recipe edit iterative results, no result sets',
+    recipeId: 'iw-r-blade',
+    steps: [OPEN_RESULTS, CLICK(`${RESULT_SET_ROW('rg')} [data-sortable-remove]`)],
+    expectSelector: `${RESULTS_TAB}:not(:has([data-iterative-result-set])) [data-iterative-results-empty]`,
+    expectCenterHit: `${RESULTS_TAB} [data-recipe-add="result-set"]`,
+    sourceMatches: ITERATIVE_RESULTS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-results-narrow',
+    label: 'Manager — Recipe edit iterative results at 880px',
+    recipeId: 'iw-r-sword',
+    width: 880,
+    steps: [OPEN_RESULTS, SCROLL_TO(`${RESULT_SET_ROW('g1')} [data-produced-when-line="0"]`)],
+    expectSelector: `${RESULT_SET_ROW('g1')} [data-produced-when-line="0"] [data-counter-rules-empty]`,
+    expectCenterHit: [
+      `${RESULT_SET_ROW('g1')} [data-produced-when-end="success"]`,
+      `${RESULT_SET_ROW('g1')} [data-produced-when-remove="0"]`,
+    ],
+    expectLayout: {
+      containerSelector: RESULT_SET_ROW('g1'),
+      oneLineRows: `${RESULT_SET_ROW('g1')} > .fabricate-sortable-list-line`,
+    },
+    sourceMatches: ITERATIVE_RESULTS_SOURCES,
   }),
 ]);
