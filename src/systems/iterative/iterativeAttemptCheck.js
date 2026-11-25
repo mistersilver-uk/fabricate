@@ -37,7 +37,7 @@ function currentStep(engine, run) {
 
 /**
  * Inspects an attempt of `actionId` on `run` for `actor`: a `{ refusal }` with nothing spent, or
- * the recipe, step, state, terms library, action, roll data and started-stage preparation.
+ * the recipe, step, state, terms library, action, roll data, started-stage preparation and Tools.
  */
 export async function inspectIterativeAttempt(
   engine,
@@ -56,7 +56,8 @@ export async function inspectIterativeAttempt(
   const rollData = actorRollData(actor);
   const preflight = preflightAttempt({ state, action, library, rollData });
   if (!preflight.ok) return failure(preflight.reason, preflight.detail);
-  return { ...current, library, action, rollData, prepared };
+  const tools = prepared.toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
+  return { ...current, library, action, rollData, prepared, tools };
 }
 
 /** The resolver's check summary from the routed result the authority evaluated. */
@@ -109,7 +110,7 @@ export async function describeIterativeAttemptCheck(
     return { required: false, blocked: reason, detail: { detail } };
   }
   if (inspected.action.check !== 'roll') return { required: false };
-  const { recipe, step, stepIndex, selectedSet, prepared } = inspected;
+  const { recipe, step, stepIndex, selectedSet, tools } = inspected;
   const descriptor = await describeVersionedCheck(engine, {
     actor,
     componentSourceActors,
@@ -117,7 +118,7 @@ export async function describeIterativeAttemptCheck(
     step,
     stepIndex,
     selectedSet,
-    prepareTools: async () => prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
+    prepareTools: async () => tools,
   });
   return { ...descriptor, privateEvaluation: { ...descriptor.privateEvaluation, actionId } };
 }

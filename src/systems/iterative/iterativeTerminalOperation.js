@@ -16,7 +16,7 @@ import { ITERATIVE_LANE } from './IterativeAttemptExecutor.js';
 import { recordAttemptOnRun } from './iterativeStepState.js';
 
 /** The settlement's working state, seeded from what the step spent when it started. */
-function settlementState(prepared) {
+function settlementState(prepared, toolPairs) {
   const started = prepared.startedConsumption ?? {};
   return {
     consumedItems: started.consumedItems ?? [],
@@ -26,7 +26,7 @@ function settlementState(prepared) {
     resultItems: [],
     resultRecords: [],
     resolutionMeta: null,
-    toolPairs: [...prepared.toolValidation.tools], // ratchet-exempt(world-scope): not-a-system
+    toolPairs: [...toolPairs],
   };
 }
 
@@ -56,9 +56,11 @@ function applyToolsEffect(engine, state, { prepared, next }) {
     planned: prepared.plan.toolItemUuids,
     apply: async () => {
       const authority = effectiveToolBreakageAuthority(engine._getRecipeSystem(recipe));
-      const tools = prepared.toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       const forceBreak = next.toolBreakOwed !== null;
-      state.usedTools = await engine._applyToolBreakage(recipe, tools, { forceBreak, authority });
+      state.usedTools = await engine._applyToolBreakage(recipe, state.toolPairs, {
+        forceBreak,
+        authority,
+      });
       return { tools: cloneJson(state.usedTools) };
     },
   };
@@ -182,11 +184,11 @@ function postChatEffect(engine, state, { actor, recipe, success, checkResult }) 
 
 function terminalOperation(engine, request) {
   const { actor, runId, inspected, next, checked, trusted } = request;
-  const { recipe, stepIndex, prepared } = inspected;
+  const { recipe, stepIndex, prepared, tools } = inspected;
   const { terminal } = next;
   const success = terminal.kind === 'success';
   const checkResult = checked ? trusted.resolvedCheckResult : null;
-  const state = settlementState(prepared);
+  const state = settlementState(prepared, tools);
   const facts = { ...request, ...inspected, success, terminal, checkResult };
   const effects = [
     recordAttemptEffect(engine, { ...request, stepIndex }),
