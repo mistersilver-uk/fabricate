@@ -425,6 +425,92 @@ describe('iterative recipe header status', () => {
   });
 });
 
+describe('the editor header, mounted', () => {
+  const HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
+  const headerOf = (headingVariant) => ({
+    headingVariant,
+    title: 'Recipe',
+    subtitle: 'Forging · Iterative',
+    kicker: '',
+    actionsLabel: 'Recipe actions',
+    actionsFamily: '',
+  });
+
+  /** Mounts the real header over `iterativeRoute`; `watched` records each watch and teardown. */
+  async function mountHeader({ variant = 'recipe-edit', draft, iterativeRoute }) {
+    const Header = await managerComponent(HEADER);
+    target = document.createElement('div');
+    target.className = 'fabricate-manager';
+    document.body.appendChild(target);
+    mounted = mount(Header, {
+      target,
+      props: {
+        header: headerOf(variant),
+        currentView: variant,
+        text: (_key, fallback) => fallback,
+        recipeDraft: draft,
+        componentForEdit: { img: '', name: 'Iron Bar' },
+        iterativeRoute,
+      },
+    });
+    await settle();
+  }
+  const routeOf = (status, watched = []) => ({
+    recipeHeaderStatus: () => status,
+    watchRuns: (view) => {
+      watched.push(['watch', view]);
+      return () => watched.push(['stop', view]);
+    },
+  });
+  const chip = () => $('[data-recipe-edit-heading] [data-recipe-edit-status]');
+
+  it('draws the status beside the title, at the header rung', async () => {
+    await mountHeader({ draft: { name: 'Blade' }, iterativeRoute: routeOf({ id: 'ready' }) });
+    assert.equal(chip().dataset.recipeEditStatus, 'ready');
+    assert.equal(chip().textContent.trim(), 'Ready');
+    assert.ok(chip().matches('.is-header.is-positive'), chip().className);
+  });
+
+  it('draws no chip outside iterative, and the row’s pill while Ready is withheld', async () => {
+    await mountHeader({ draft: { name: 'Blade' }, iterativeRoute: routeOf(null) });
+    assert.ok(!$('[data-recipe-edit-status]'), 'no chip outside iterative');
+    unmount(mounted);
+    target.remove();
+    const draft = { name: 'Hinge', enabled: true, enableBlocked: true };
+    await mountHeader({ draft, iterativeRoute: routeOf({ id: 'withheld' }) });
+    assert.equal(chip().dataset.recipeEditStatus, 'incomplete');
+    assert.equal(chip().textContent.trim(), 'Incomplete');
+  });
+
+  it('draws no recipe chip on the component editor', async () => {
+    await mountHeader({ variant: 'component-edit', iterativeRoute: routeOf({ id: 'ready' }) });
+    assert.ok(Boolean($('[data-component-edit-heading]')), 'the component heading');
+    assert.ok(!$('[data-recipe-edit-status]'), 'no chip');
+  });
+
+  it('watches the runs for its view, and stops the watch when it unmounts', async () => {
+    const watched = [];
+    await mountHeader({ draft: { name: 'Blade' }, iterativeRoute: routeOf(null, watched) });
+    assert.deepEqual(watched, [['watch', 'recipe-edit']]);
+    unmount(mounted);
+    mounted = null;
+    assert.deepEqual(watched, [
+      ['watch', 'recipe-edit'],
+      ['stop', 'recipe-edit'],
+    ]);
+  });
+
+  it('reads "1 blocking" over the real reads for a step that allows no actions', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.step.actions = { mode: 'only', actionIds: [] };
+    const reads = await recipeReads(world);
+    await mountHeader({ draft, iterativeRoute: { ...reads, watchRuns: () => {} } });
+    assert.equal(chip().dataset.recipeEditStatus, 'blocking');
+    assert.equal(chip().textContent.trim(), '1 blocking');
+  });
+});
+
 describe('iterative recipe Save through the real store', () => {
   it('keeps the step a Save never touched, because the row projects `iterative`', async () => {
     const world = ironworks();
