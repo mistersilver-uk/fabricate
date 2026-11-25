@@ -52,6 +52,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-essences-mounted.js': 'fixture',
   'tests/components/manager-gathering-mounted.js': 'fixture',
   'tests/components/manager-header-mounted.js': 'fixture',
+  'tests/components/manager-iterative-mounted.js': 'fixture',
   'tests/components/manager-layout-browsers.js': 'legacy-scan',
   'tests/components/manager-layout-downtime-fixtures.js': 'legacy-scan',
   'tests/components/manager-layout-gathering-fixtures.js': 'legacy-scan',

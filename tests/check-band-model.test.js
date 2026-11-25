@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  BAND_CHIP_TONES,
+  BAND_TONES,
   bandToneFor,
   bandsAreEditable,
   buildCountBands,
@@ -27,13 +29,20 @@ import {
   targetValueStatus,
 } from '../src/ui/svelte/apps/manager/checks/checkTargetStatus.js';
 
+import { CHIP_TONES } from './helpers/chipTone.js';
+
 const fallback = (_key, text) => text;
 const NAMES = { success: 'Success', failure: 'Failure' };
 const UNDER_FIXED = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
 const attribute = (direction, adjustmentKind = 'add', baseAdjustment = null) => ({
   product: 'sum',
   direction,
-  target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind, baseAdjustment },
+  target: {
+    source: 'attribute',
+    expression: '@skills.craft.value',
+    adjustmentKind,
+    baseAdjustment,
+  },
 });
 const LADDER = [
   { id: 'extreme', name: 'Extreme', success: true, dc: 0, adjustment: 0.2 },
@@ -44,6 +53,13 @@ const LADDER = [
 
 const summary = (bands) =>
   bands.map((band) => `${band.name}: ${describeBandRange(band, fallback)}`).join('; ');
+
+describe('BAND_CHIP_TONES', () => {
+  it('maps every band tone to a tone Chip paints, so a ramp rename cannot fall back silently', () => {
+    assert.deepEqual(new Set(Object.keys(BAND_CHIP_TONES)), new Set(BAND_TONES));
+    for (const tone of BAND_TONES) assert.ok(CHIP_TONES.has(BAND_CHIP_TONES[tone]), tone);
+  });
+});
 
 describe('bandsAreEditable', () => {
   it('keeps handles only for summed roll-over against a fixed DC', () => {
@@ -60,20 +76,42 @@ describe('bandsAreEditable', () => {
 
 describe('buildPassFailBands', () => {
   it('ends an inclusive under success at the target and a strict one a step below', () => {
-    const meet = buildPassFailBands({ evaluation: UNDER_FIXED, comparison: 'meet', target: 12, names: NAMES });
+    const meet = buildPassFailBands({
+      evaluation: UNDER_FIXED,
+      comparison: 'meet',
+      target: 12,
+      names: NAMES,
+    });
     assert.equal(summary(meet), 'Success: 12 or under; Failure: 13 or over');
-    const exceed = buildPassFailBands({ evaluation: UNDER_FIXED, comparison: 'exceed', target: 12, names: NAMES });
+    const exceed = buildPassFailBands({
+      evaluation: UNDER_FIXED,
+      comparison: 'exceed',
+      target: 12,
+      names: NAMES,
+    });
     assert.equal(summary(exceed), 'Success: 11 or under; Failure: 12 or over');
   });
 
   it('puts an over success at the high end', () => {
-    const bands = buildPassFailBands({ evaluation: attribute('over'), comparison: 'meet', target: 14, names: NAMES });
+    const bands = buildPassFailBands({
+      evaluation: attribute('over'),
+      comparison: 'meet',
+      target: 14,
+      names: NAMES,
+    });
     assert.equal(summary(bands), 'Failure: 13 or under; Success: 14 or over');
     assert.ok(bands[0].from < bands[1].from, 'value order');
   });
 
   it('widens a supplied reachable range to show the target', () => {
-    const bands = buildPassFailBands({ evaluation: UNDER_FIXED, comparison: 'meet', target: 12, min: 3, max: 18, names: NAMES });
+    const bands = buildPassFailBands({
+      evaluation: UNDER_FIXED,
+      comparison: 'meet',
+      target: 12,
+      min: 3,
+      max: 18,
+      names: NAMES,
+    });
     assert.deepEqual([bands[0].from, bands.at(-1).to], [3, 18]);
   });
 });
@@ -87,7 +125,10 @@ describe('buildRoutedBands', () => {
       type: 'relative',
       outcomes: LADDER,
     });
-    assert.equal(summary(bands), 'Extreme: 11 or under; Hard: 12–27; Regular: 28–55; Otherwise: 56 or over');
+    assert.equal(
+      summary(bands),
+      'Extreme: 11 or under; Hard: 12–27; Regular: 28–55; Otherwise: 56 or over'
+    );
     assert.deepEqual(
       bands.map((band) => band.index),
       [0, 1, 2, 3],
@@ -103,7 +144,10 @@ describe('buildRoutedBands', () => {
       type: 'relative',
       outcomes: LADDER,
     });
-    assert.equal(summary(bands), 'Extreme: 10 or under; Hard: 11–26; Regular: 27–54; Otherwise: 55 or over');
+    assert.equal(
+      summary(bands),
+      'Extreme: 10 or under; Hard: 11–26; Regular: 27–54; Otherwise: 55 or over'
+    );
   });
 
   it('floors a multiplied threshold', () => {
@@ -144,14 +188,23 @@ describe('buildRoutedBands', () => {
       ],
     });
     assert.equal(summary(bands), 'A: 5 or under; B: 6 or over');
-    assert.deepEqual(bands.map((band) => band.index), [1, 0]);
+    assert.deepEqual(
+      bands.map((band) => band.index),
+      [1, 0]
+    );
   });
 
   it('adds a roll-under modifier total after the multiply, as the runtime routes it', () => {
     const idrin = { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } };
     const evaluation = attribute('under', 'multiply');
     const previewed = previewBandTarget(
-      { evaluation, anchor: 0, tier: { name: 'Standard', adjustment: 1 }, character: idrin, modifiers: 6 },
+      {
+        evaluation,
+        anchor: 0,
+        tier: { name: 'Standard', adjustment: 1 },
+        character: idrin,
+        modifiers: 6,
+      },
       fallback
     );
     assert.deepEqual([previewed.anchor, previewed.delta, previewed.target], [55, 6, 61]);
@@ -225,11 +278,17 @@ describe('resolvePreviewTarget', () => {
       target: 27,
       value: 55,
     });
-    assert.equal(resolvePreviewTarget({ evaluation, anchor: 0, adjustment: 0.2, character }).target, 11);
+    assert.equal(
+      resolvePreviewTarget({ evaluation, anchor: 0, adjustment: 0.2, character }).target,
+      11
+    );
   });
 
   it('resolves an actor-free literal without a character', () => {
-    const evaluation = { ...attribute('under', 'add', -2), target: { source: 'attribute', expression: '14', baseAdjustment: -2 } };
+    const evaluation = {
+      ...attribute('under', 'add', -2),
+      target: { source: 'attribute', expression: '14', baseAdjustment: -2 },
+    };
     assert.equal(resolvePreviewTarget({ evaluation, anchor: 0 }).target, 12);
   });
 });
@@ -237,18 +296,30 @@ describe('resolvePreviewTarget', () => {
 describe('the read-only strip copy', () => {
   it('states the target and where success sits, in the plain comparison word', () => {
     assert.equal(
-      describeBandScale({ direction: 'under', comparison: 'exceed', target: 12, cmp: 'under' }, fallback),
+      describeBandScale(
+        { direction: 'under', comparison: 'exceed', target: 12, cmp: 'under' },
+        fallback
+      ),
       'Target 12. Success sits at the low end: a total under 12 succeeds.'
     );
     assert.equal(
       describeBandScale(
-        { direction: 'under', comparison: 'meet', target: 27, source: 'Idrin 55, Hard ×½', cmp: 'at or under' },
+        {
+          direction: 'under',
+          comparison: 'meet',
+          target: 27,
+          source: 'Idrin 55, Hard ×½',
+          cmp: 'at or under',
+        },
         fallback
       ),
       'Target 27 (Idrin 55, Hard ×½). Success sits at the low end: a total at or under 27 succeeds.'
     );
     assert.equal(
-      describeBandScale({ direction: 'over', comparison: 'meet', target: 14, source: 'Idrin 14' }, fallback),
+      describeBandScale(
+        { direction: 'over', comparison: 'meet', target: 14, source: 'Idrin 14' },
+        fallback
+      ),
       'Target 14 (Idrin 14). Success sits at the high end: a total of 14 or more succeeds.'
     );
     assert.equal(
@@ -258,7 +329,10 @@ describe('the read-only strip copy', () => {
   });
 
   it('names the missing actor or value instead of charting a zero', () => {
-    assert.match(describeBandsUnavailable({ state: 'needs-actor' }, {}, fallback), /Choose a character/);
+    assert.match(
+      describeBandsUnavailable({ state: 'needs-actor' }, {}, fallback),
+      /Choose a character/
+    );
     assert.equal(
       describeBandsUnavailable(
         { state: 'unresolved', reason: 'unresolved-path' },
@@ -301,7 +375,11 @@ describe('the read-only strip copy', () => {
     ];
     for (const [reason, character, sentence] of cases) {
       assert.equal(
-        describeBandsUnavailable({ state: 'unresolved', reason }, { character, expression: '' }, fallback),
+        describeBandsUnavailable(
+          { state: 'unresolved', reason },
+          { character, expression: '' },
+          fallback
+        ),
         sentence,
         reason
       );
@@ -318,7 +396,10 @@ describe('the read-only strip copy', () => {
       [dice, null, /rolls dice/],
     ]) {
       const state = resolvePreviewTarget({ evaluation, anchor: 12, character });
-      assert.match(describeBandsUnavailable(state, { character, expression: '' }, fallback), pattern);
+      assert.match(
+        describeBandsUnavailable(state, { character, expression: '' }, fallback),
+        pattern
+      );
     }
   });
 });
@@ -333,8 +414,10 @@ describe('previewBandTarget', () => {
       'Idrin @skills.craft.value 55, base −5'
     );
     assert.equal(
-      previewBandTarget({ evaluation, anchor: 0, tier: { name: 'Hard', adjustment: -2 }, character: idrin }, fallback)
-        .source,
+      previewBandTarget(
+        { evaluation, anchor: 0, tier: { name: 'Hard', adjustment: -2 }, character: idrin },
+        fallback
+      ).source,
       'Idrin @skills.craft.value 55, Hard −2'
     );
   });
@@ -347,7 +430,12 @@ describe('previewBandTarget', () => {
     assert.equal(under.target, 56);
     assert.equal(under.source, 'Idrin @skills.craft.value 55, modifiers +1');
     const fixedUnder = previewBandTarget(
-      { evaluation: { product: 'sum', direction: 'under' }, anchor: 10, character: idrin, modifiers: 1 },
+      {
+        evaluation: { product: 'sum', direction: 'under' },
+        anchor: 10,
+        character: idrin,
+        modifiers: 1,
+      },
       fallback
     );
     assert.deepEqual([fixedUnder.target, fixedUnder.source], [11, 'includes modifiers +1']);
@@ -382,7 +470,11 @@ describe('targetValueStatus', () => {
     assert.equal(targetValueStatus('@skills.craft.value', null, fallback).tone, 'muted');
     assert.equal(targetValueStatus('@skills.craft.value - 2', idrin, fallback), null);
     assert.equal(targetValueStatus('14', idrin, fallback), null);
-    assert.equal(targetValueStatus('14', null, fallback).tone, 'muted', 'no actor still asks for one');
+    assert.equal(
+      targetValueStatus('14', null, fallback).tone,
+      'muted',
+      'no actor still asks for one'
+    );
   });
 
   it('names only the missing paths, and states any other refusal as the runtime does', () => {
@@ -507,15 +599,34 @@ describe('count bands (issue 2006)', () => {
       { id: 'good', name: 'Good', success: true, start: 2, end: 6 },
     ];
     const names = COUNT_NAMES;
-    const fixed = buildCountBands({ evaluation: counting(), type: 'fixed', outcomes: ranges, names });
+    const fixed = buildCountBands({
+      evaluation: counting(),
+      type: 'fixed',
+      outcomes: ranges,
+      names,
+    });
     assert.equal(countSummary(fixed), 'Botch: below 0; Bad: 0–1; Good: 2–6');
-    const shifted = ranges.map((range) => ({ ...range, start: range.start + 1, end: range.end + 1 }));
-    const noBotch = buildCountBands({ evaluation: counting(), type: 'fixed', outcomes: shifted, names });
+    const shifted = ranges.map((range) => ({
+      ...range,
+      start: range.start + 1,
+      end: range.end + 1,
+    }));
+    const noBotch = buildCountBands({
+      evaluation: counting(),
+      type: 'fixed',
+      outcomes: shifted,
+      names,
+    });
     assert.equal(countSummary(noBotch), 'Bad: 1–2; Good: 3–7');
   });
 
   it('draws nothing for a routed check with no tiers', () => {
-    const bands = buildCountBands({ evaluation: counting(), required: 2, outcomes: [], names: COUNT_NAMES });
+    const bands = buildCountBands({
+      evaluation: counting(),
+      required: 2,
+      outcomes: [],
+      names: COUNT_NAMES,
+    });
     assert.deepEqual(bands, []);
   });
 
@@ -551,7 +662,14 @@ describe('count bands (issue 2006)', () => {
       normalizeCheckEvaluation({
         product: 'count',
         direction: 'over',
-        pool: { die: 6, base: '0', threshold: '5', required: 1, modifierDestination, zeroPoolFails: true },
+        pool: {
+          die: 6,
+          base: '0',
+          threshold: '5',
+          required: 1,
+          modifierDestination,
+          zeroPoolFails: true,
+        },
       });
     const pool = at('pool');
     assert.equal(

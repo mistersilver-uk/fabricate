@@ -30,6 +30,7 @@ test('each activity names its records and itself in its own words', () => {
 
 test('an authored mode reads its picker words, and an unmapped one reads as itself', () => {
   assert.equal(subsystemModeLabel('crafting', 'routedByIngredients', text), 'Routed by ingredients');
+  assert.equal(subsystemModeLabel('crafting', 'iterative', text), 'Iterative');
   assert.equal(subsystemModeLabel('alchemy', 'none', text), 'No check');
   assert.equal(subsystemModeLabel('gathering', 'd100', text), 'd100 roll');
   assert.equal(subsystemModeLabel('salvage', 'future', text), 'future');

@@ -398,6 +398,11 @@ export function classifyCheckTotal({
   };
 }
 
+/** The crafting modes that roll the routed check and so draw its tier-routing editor. */
+export function usesRoutedCheck(resolutionMode) {
+  return resolutionMode === 'routedByCheck' || resolutionMode === 'iterative';
+}
+
 /** A routed check's tier ids, worst first, by the one ranking {@link classifyCheckTotal} uses. */
 export function routedOutcomeOrder({ type, dc, evaluation, relativeOutcomes, fixedOutcomes }) {
   const routing = routingOf({

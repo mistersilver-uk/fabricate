@@ -110,10 +110,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-typeahead-free-text',
     'manager-published-typeahead-open-on-empty',
   ]),
-  // The list and grid switch (issue 2412): the essence browser in each arrangement.
+  // The list and grid switch (issue 2412): the essence browser in each arrangement, and the Crafting
+  // Action browser in each (issue 3009).
   'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([
     'manager-essences-normal',
     'manager-essences-grid',
+    'manager-iterative-actions',
+    'manager-iterative-actions-grid',
   ]),
   // The cross-reference list (issue 2321): the inventory inspector, a tool's Required for and an
   // essence's Contributing.
@@ -153,11 +156,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-count-botch-odds',
     'manager-published-leaves-specimen',
   ]),
-  // The rule row (issue 1782): an opened trigger, a counting check's presets, an attached drop modifier.
+  // The rule row (issue 1782): an opened trigger, a counting check's presets, an attached drop modifier,
+  // and a Crafting Action effect's workpiece rule (issue 3009).
   'src/ui/svelte/components/RuleRow.svelte': Object.freeze([
     'manager-checks-crafting-tier-step',
     'manager-checks-v3-count-triggers',
     'manager-gathering-task-drop-condition-modifier-attached',
+    'manager-iterative-action-edit-effect-expanded',
   ]),
   // Its sentence: an opened trigger's lead and quotation, and a counting check's net successes.
   'src/ui/svelte/components/RuleSentence.svelte': Object.freeze([

@@ -1,7 +1,7 @@
 /**
  * The manager page header's breadcrumb trail, one route family per test (issue 1777). The
  * localizer answers with the key, so a crumb wearing its sibling's key is visible here; the
- * rendered copy is pinned by the 38-state census in `tests/components/manager-header-mounted.js`.
+ * rendered copy is pinned by the 41-state census in `tests/components/manager-header-mounted.js`.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -25,6 +25,7 @@ const HANDLERS = Object.freeze([
   'backToEnvironmentsBrowse',
   'backToGatheringTaskLibrary',
   'backToGatheringEventLibrary',
+  'backToActions',
 ]);
 
 function inputFor(route) {
@@ -48,6 +49,8 @@ function inputFor(route) {
     },
     ...handlers,
     ...route,
+    // The route model carries its one handler and the draft's name, as the shell passes it.
+    iterativeRoute: { backToActions: handlers.backToActions, ...route.iterativeRoute },
   };
   return { input, calls };
 }
@@ -74,6 +77,29 @@ const GATHERING = [`${M}.Nav.Environments`, {}, ['backToEnvironmentsBrowse']];
 const WORLD = [`${M}.World.Breadcrumb`, { 'data-breadcrumb-world': '' }, ['openWorldParties']];
 
 describe('headerBreadcrumbs', () => {
+  it('draws the iterative library screens under the Crafting group, and the editor under Actions', () => {
+    for (const [view, key] of [
+      ['iterative-counters', 'Nav.Counters'],
+      ['iterative-actions', 'Nav.Actions'],
+    ]) {
+      assert.deepEqual(
+        trail({ currentView: view }),
+        [ROOT, SYSTEM_CRUMB, CRAFTING, [`${M}.${key}`, {}, null]],
+        view
+      );
+    }
+    const editor = (name) =>
+      trail({ currentView: 'iterative-action-edit', iterativeRoute: { actionHeading: { name } } });
+    assert.deepEqual(editor('Stoke'), [
+      ROOT,
+      SYSTEM_CRUMB,
+      CRAFTING,
+      [`${M}.Nav.Actions`, {}, ['backToActions']],
+      ['Stoke', { title: 'Stoke' }, null],
+    ]);
+    assert.equal(editor('')[4][0], `${M}.Iterative.ActionEditBreadcrumb`);
+  });
+
   it('roots every system route at the library, and names the system below it', () => {
     assert.deepEqual(trail({ currentView: 'systems' }), [ROOT]);
     assert.deepEqual(trail({ currentView: 'recipes', selectedSystem: null }), [

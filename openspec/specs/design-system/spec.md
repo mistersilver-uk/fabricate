@@ -209,8 +209,7 @@ It holds no state of its own: the list around it owns the current arrangement, a
 Its glyphs are fixed, `fa-list` for list and `fa-table-cells-large` for grid, so every list's switch reads alike; a caller supplies the words, never the glyphs.
 Each option renders a glyph alone, so each takes its accessible name from a required, already-localized label prop, `listLabel` and `gridLabel`, and the group takes its own from a required `ariaLabel`.
 A caller's per-option hook rides `optionDataAttr` onto each option's clickable label, never onto its hidden radio.
-The essence browser's presentation control is its first caller.
-With one importer, `ViewToggle` is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+The essence browser and the Crafting Action browser are its callers, so `ViewToggle` is a member of the primitive set.
 
 #### Scenario: A GM switches the essence library to its grid
 
@@ -1741,7 +1740,7 @@ A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
 `StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
 `RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and `<RunProgress>` keeps its own entry in the run-surface block, `shipped` since its kicker adopted `Kicker`.
-A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a gathering condition modifier's condition and drop-chance change.
+A `RuleRow` edits one condition→effect rule, or one condition the caller combines (All/Any): a Check Breakage trigger, a gathering condition modifier's condition and drop-chance change, or an iterative counter predicate.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.

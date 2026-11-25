@@ -9,6 +9,7 @@ scripts/lib/view-lab-cases/managerComponents.js
 scripts/lib/view-lab-cases/managerChecks.js
 scripts/lib/view-lab-cases/managerEssences.js
 scripts/lib/view-lab-cases/managerGathering.js
+scripts/lib/view-lab-cases/managerIterative.js
 scripts/lib/view-lab-cases/managerWorldPartiesAndDowntime.js
 scripts/lib/view-lab-cases/managerWorldTravel.js
 scripts/lib/view-lab-cases/managerSystemTools.js

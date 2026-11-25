@@ -103,6 +103,22 @@ export function createRecipeAccessBrowserState() {
   };
 }
 
+/** The iterative Counters screen's search, held by the route model rather than the lifted registry. */
+export function createCountersBrowserState() {
+  return browseState();
+}
+
+/** The iterative Actions browser: search, the three filters, category, page and arrangement. */
+export function createActionsBrowserState() {
+  return browseState({
+    rollsCheck: false,
+    noCheck: false,
+    hasIssues: false,
+    category: '',
+    viewMode: 'list',
+  });
+}
+
 /** Every lifted browser view-state the manager root owns, in one object. */
 export function createManagerBrowserViewStates() {
   return {

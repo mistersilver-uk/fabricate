@@ -18,11 +18,13 @@
   import Chip from '../../components/Chip.svelte';
   import Button from '../../components/Button.svelte';
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
+  import IterativeHeaderActions from './iterative/IterativeHeaderActions.svelte';
 
   let {
     text = () => '',
     currentView = '',
     isChecksRoute = false,
+    iterativeRoute = null,
     createRecipe = () => {},
     selectedSystemId = '',
     recipeEditDirty = false,
@@ -205,4 +207,6 @@
     saveLabel={essenceEditSaveLabel()}
     onBack={cancelEssenceEdit}
   />
+{:else if currentView === 'iterative-counters' || currentView === 'iterative-actions' || currentView === 'iterative-action-edit'}
+  <IterativeHeaderActions route={iterativeRoute} {currentView} {text} />
 {/if}

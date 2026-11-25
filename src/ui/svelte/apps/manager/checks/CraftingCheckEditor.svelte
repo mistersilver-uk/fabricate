@@ -19,7 +19,7 @@
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
-  import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
+  import { routedOutcomeOrder, usesRoutedCheck } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import Button from '../../../components/Button.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
@@ -97,7 +97,7 @@
   // resolution mode and their fixed checks keep a DC — and `routedByCheck` alone is not either, a
   // relative routed check being DEFINED by its DC.
   // `tests/components/crafting-check-anchor-gate.test.js` pins all four corners.
-  const bandsAreAbsolute = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
+  const bandsAreAbsolute = $derived(usesRoutedCheck(resolutionMode) && type === 'fixed');
   // Outcome options for the `CheckTriggers` outcomeTier condition, from the ACTIVE list.
   const breakageOutcomeOptions = $derived(
     outcomes.map((outcome) => ({ id: outcome.id, name: outcome.name }))

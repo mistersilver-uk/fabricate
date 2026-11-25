@@ -2,7 +2,8 @@
  * Which header-action branch every manager route selects, and which family owns it (issue 1720).
  *
  * `LADDER` is transcribed from the shell's own 26-branch chain as it stood before the extraction,
- * plus the world Component catalogue's empty arm (issue 2220), so it is an oracle rather than a
+ * plus the world Component catalogue's empty arm (issue 2220) and the iterative library's one
+ * branch (issue 3009), so it is an oracle rather than a
  * re-reading of the source it checks. The observed answer is
  * evaluated out of the shipped markup, so moving a branch into another file, dropping one, or
  * changing a predicate is visible here even though the rendered DOM of any one route is not.
@@ -81,6 +82,10 @@ const LADDER = Object.freeze(
     ['isChecksRoute', 'crafting'],
     ["currentView === 'essences'", 'crafting'],
     ["currentView === 'essence-edit'", 'crafting'],
+    [
+      "currentView === 'iterative-counters' || currentView === 'iterative-actions' || currentView === 'iterative-action-edit'",
+      'crafting',
+    ],
     ["currentView === 'environments' && displayedGatheringTab === 'tasks'", 'gathering'],
     ["currentView === 'environments' && displayedGatheringTab === 'encounters'", 'gathering'],
     ["currentView === 'world'", 'world'],
@@ -299,7 +304,7 @@ describe('the manager page header routes every view to one action family', () =>
   }
 
   it('NON-VACUITY: the oracle, the route set and the shipped chain are all real', () => {
-    assert.equal(LADDER.length, 27, 'the pre-extraction chain is 26 branches, plus one');
+    assert.equal(LADDER.length, 28, 'the pre-extraction chain is 26 branches, plus two');
     assert.ok(routeTokens().length >= 33, `the scan found only ${routeTokens().length} routes`);
     assert.ok(
       chainStarting(ACTIONS_FILE, LADDER[0].id).length >= 10,

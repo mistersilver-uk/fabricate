@@ -1816,7 +1816,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <b>Name:</b> it shows its accessible name as a plain-text tooltip under the pointer and keyboard focus alike, no call site writes a native <code>title</code>, and the three information-bearing hints pass <code>tooltip</code>.
       The bare &times; above is <code>role="ghost"</code> at the 24 rung &mdash; the ghost&rsquo;s transparent, borderless paint at the rung&rsquo;s 24px box, the journal history&rsquo;s dismiss &mdash; and the <b>icon 24</b> unit draws the same rung neutral and bordered.
       A labelled control is a <code>Button</code>, not an IconButton: the essence row&rsquo;s &ldquo;Edit rules&rdquo; is drawn by <code>Button</code> with its trailing arrow as a child, so no IconButton call site renders a visible label.
-      What it also enforces is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 39 importers, 69 render sites &middot; <b>icon-button-source-contract.test.js</b> &middot; <b>ui-visual-style/spec.md</b></span></div>
+      What it also enforces is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 42 importers, 72 render sites &middot; <b>icon-button-source-contract.test.js</b> &middot; <b>ui-visual-style/spec.md</b></span></div>
     <div class="delta ok"><b>Both button families are now rooted at a class the primitive emits, and each declares its own focus ring.</b>
       <code>Button</code> emits <code>fabricate-button</code> and <code>IconButton</code> emits <code>fabricate-icon-button</code>, each as the FIRST literal of its own <code>classes</code> array, and every rule in the two families is a COMPOUND on that root at the specificity an application-rooted rule would have &mdash; one class for one class.
       81 of <code>Button</code>&rsquo;s 109 sheet selectors and 16 of IconButton&rsquo;s 22 are rooted there; the rest name a caller&rsquo;s own container in their ancestor chain &mdash; or, for one per-view override each, an application root qualified by an attribute &mdash; and are exempt.
@@ -5043,7 +5043,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>InfoStrip API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>components/InfoStrip.svelte</code>&rsquo;s <code>$props()</code>: the crafting check card and the gathering detail&rsquo;s stamina pool are its two importers.</li>
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>components/InfoStrip.svelte</code>&rsquo;s <code>$props()</code>: the crafting check card, the gathering detail&rsquo;s stamina pool and the Crafting Action editor&rsquo;s Check card are its three importers.</li>
           <li><b>Props:</b> <b>label</b> the optional kicker at the head of the strip, already localized &middot; <b>badge</b> <code>{label, tone}</code>, a read-only state beside it drawn through the chip primitive in its own tone, which is how the worked example says the check is required &middot; <b>facts</b> <code>[{icon, label?, value, props}]</code>, an ordered list, each a decorative glyph, an optional body-type label, a caller-formatted mono value, and <code>props</code> spread on the fact for its hook and its <code>title</code>.
             Caller-formatted is the contract: a strip is where a GM checks a figure, so the figure arrives already stated and no arithmetic happens here.
             There is no <code>tone</code>: the strip is never tinted, so a state is its badge&rsquo;s, and a fault is a danger notice after the strip.</li>
@@ -5178,7 +5178,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Card API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 37 importing files: 36 components render 86 tags, 17 of them <code>flush</code>, and the published-component module imports it.
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 42 importing files: 41 components render 91 tags, 17 of them <code>flush</code>, and the published-component module imports it.
             It was extracted from 80 hand-written card sections across 20 components, and draws both card units above: radius 11, padding <code>--fab-space-4</code>, a 1px <code>--fab-border</code> edge on <code>--fab-bg-2</code>.</li>
           <li><b>flush</b> boolean, default <code>false</code> &mdash; padding 0, for a card whose head and body inset themselves, the second unit above.
             It emits <code>is-flush</code> and is unpublished: the published card takes <code>children</code>, <code>tone</code> and the head below, never <code>flush</code>.</li>
@@ -6041,10 +6041,10 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <h5>ViewToggle API</h5>
       <ul>
         <li class="k-hint"><b>SHIPPED</b> &mdash; shipped as <code>components/ViewToggle.svelte</code> and read here from its <code>$props()</code>, to the switcher drawn above, which is the essence browser&rsquo;s list and grid switcher at its icon-only form.
-          With that one importer, <code>EssenceBrowserView.svelte</code>, it is recorded as a non-member on the <code>LogList</code>, <code>StageNav</code> and <code>XrefList</code> precedent.</li>
+          Its callers are <code>EssenceBrowserView.svelte</code> and the Crafting Action browser, <code>ActionsBrowserView.svelte</code>, so it is a member of the primitive set.</li>
         <li><b>Props:</b> <code>view</code> <code>list</code> | <code>grid</code>, a CLOSED set of two, because a third arrangement is a different screen rather than a third button, and anything other than <code>grid</code> reads as <code>list</code> &middot; <b>listLabel</b> and <b>gridLabel</b>, both required, since each control renders a glyph and nothing else.
           It IS <code>&lt;SegmentedControl iconOnly&gt;</code>, composed rather than restated: the two glyph controls are its <code>options</code> and those two labels are the options&rsquo; own, <code>view</code> is its <code>value</code>, and the group label is its <code>ariaLabel</code>.
-          <code>EssenceBrowserView.svelte</code> renders it.
+          <code>EssenceBrowserView.svelte</code> and <code>ActionsBrowserView.svelte</code> render it.
           <b>optionDataAttr</b> names the per-option hook, written on each option&rsquo;s clickable label and never on its radio.</li>
         <li><b>Geometry:</b> segments are 32.4px wide in Foundry, where Font Awesome draws its glyph in a 1.25em box.</li>
         <li><b>Passthrough:</b> <b>class</b> plus a rest spread on the root, written after the class and before the fixed track props, so a caller cannot override them &mdash; the spread carries the <code>data-*</code> hook a harness or a capture step selects on, so the attribute is genuinely absent when unset.</li>
@@ -6902,7 +6902,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <b>Svelte API:</b> <code>children</code> (a snippet), <code>ariaLabel</code> (REQUIRED-shaped and gated in source — an unnamed <code>&lt;section&gt;</code> is not a landmark), <code>class</code> (an EXTRA class, appended) and a rest spread carrying every <code>data-*</code> hook and the three browsers’ <code>tabindex="-1"</code> focus target.
       <b>No variant prop:</b> the bar has one treatment.
       The scrolling caps and the scoped list frame&rsquo;s <code>flex: 0 0 auto</code> are layout only, so the bar&rsquo;s paint is one rule, and the data props above are recorded declined.
-      <b>The row <code>&lt;div&gt;</code> stays at the call site</b>, because <code>BulkSelectionToolbar</code> renders <code>&lt;div class="{rowClass} is-selection"&gt;</code> in its own template: that is how “the selection bar replaces the filter bar in place” is built.<span class="cite"><b>FilterBar.svelte</b> — 14 callers · <b>SearchField.svelte</b> · <b>ui-visual-style/spec.md</b></span></div>
+      <b>The row <code>&lt;div&gt;</code> stays at the call site</b>, because <code>BulkSelectionToolbar</code> renders <code>&lt;div class="{rowClass} is-selection"&gt;</code> in its own template: that is how “the selection bar replaces the filter bar in place” is built.<span class="cite"><b>FilterBar.svelte</b> — 16 callers · <b>SearchField.svelte</b> · <b>ui-visual-style/spec.md</b></span></div>
     <div class="delta ok"><b>The page size is a segmented control, and the pager draws this specimen.</b>
       The default bar is padded <code>--fab-space-3</code> on <code>--fab-bg-1</code> on every route and caller, <code>box-sizing: border-box</code>, 10.5px muted type with an 11.5px/600 page label, and square corners, because the design-system spec requires a square footer.
       The compact bar stays a transparent rail row and keeps its 9.5px type.
@@ -6915,7 +6915,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       Every host insets the box by <code>--fab-space-3</code>: the sheet does so for the manager&rsquo;s main pane, a gathering panel and the scoped list column (at the top only where the bar opens its host or follows the recipe notice slot), and the Tools content column (its own 20px padding), the interactables column and the Vocabulary card add nothing because they pad their own content.
       The specimen&rsquo;s inner controls are drawn at the ruled 38px search and 34px toolbar select, and its off-scale lengths realise at the nearest scale token: the 9px gap is <code>--fab-space-2</code>, and the 10px padding, equidistant from <code>--fab-space-2</code> and <code>--fab-space-3</code>, stays at the shipped <code>--fab-space-3</code>.
       The bar&rsquo;s box sits on the pane&rsquo;s own fill, so on a <code>--fab-bg-2</code> pane it reads as a recessed well.
-      The search field does not sit on the scoped rows&rsquo; 12px gutter, because the box does and the search sits a further 13px inside it.<span class="cite"><b>FilterBar.svelte</b> &middot; <b>fabricate-list-primitives.css</b> &middot; <b>14 importers</b></span></div>
+      The search field does not sit on the scoped rows&rsquo; 12px gutter, because the box does and the search sits a further 13px inside it.<span class="cite"><b>FilterBar.svelte</b> &middot; <b>fabricate-list-primitives.css</b> &middot; <b>16 importers</b></span></div>
     <div class="delta ok"><b>The pager is now rooted at its own class, with a button-only ring, and the player apps were audited property by property.</b>
       <code>Pagination</code> writes <code>fabricate-pagination</code> inline on its root <code>&lt;section&gt;</code> &mdash; inline rather than composed, because this component builds no class list &mdash; and its seven owned selectors are compounds and descendants of that root instead of <code>.fabricate-manager</code>.
       <b>Ring:</b> <code>.fabricate-pagination button:focus</code> stripping core&rsquo;s outline and glow, then <code>.fabricate-pagination button:focus-visible</code> repainting the accent ring &mdash; buttons ONLY, both halves.
@@ -8593,7 +8593,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <h4>&lt;RuleRow&gt; &lt;RuleSentence&gt;</h4>
       <span class="st st-shipped">RuleRow &middot; shipped</span>
       <span class="st st-shipped">RuleSentence &middot; shipped</span>
-      <p class="why">The condition editor behind triggers, gates and modifiers.
+      <p class="why">The condition editor behind triggers, gates, modifiers and counter predicates.
         The sentence is not decoration — it is how a GM checks they built what they meant.</p>
     </div>
     <div class="stage col">
@@ -8662,6 +8662,18 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <button class="k-btn icon" style="width:34px;height:34px;min-height:34px;border-radius:9px;color:var(--fab-danger-text);border-color:var(--fab-danger-border)" aria-label="Delete modifier"><svg class="i"><use href="#i-trash"/></svg></button>
         </div>
         <span class="k-hint">A gathering condition modifier: the condition heads it, its drop-chance change is the value, and nothing is disclosed.</span>
+        </div>
+      <div class="unit">
+        <span class="cap">one condition the caller combines (All)</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <svg class="i" style="width:24px"><use href="#i-bolt"/></svg>
+          <span class="grow" style="font-weight:600">When</span>
+          <div class="k-field inline" style="min-width:96px">Heat<svg class="i chev"><use href="#i-cd"/></svg></div>
+          <div class="k-field inline" style="min-width:56px">&ge;<svg class="i chev"><use href="#i-cd"/></svg></div>
+          <input type="number" aria-label="Value" value="3" readonly style="width:56px;height:28px;border:1px solid var(--fab-border);border-radius:6px;background:var(--fab-bg-2);color:var(--fab-text);font-variant-numeric:tabular-nums">
+          <button class="k-btn icon" style="width:34px;height:34px;min-height:34px;border-radius:9px;color:var(--fab-danger-text);border-color:var(--fab-danger-border)" aria-label="Remove rule"><svg class="i"><use href="#i-trash"/></svg></button>
+        </div>
+        <span class="k-hint">An iterative counter predicate: one condition on one line, with its source, comparison and value as the field chain. The caller combines its siblings with All or Any and states that once above the list, so the rule carries no sentence.</span>
         </div>
     </div>
     <div class="notes">

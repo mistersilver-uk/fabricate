@@ -126,6 +126,21 @@ const ROUTE_CRUMBS = Object.freeze({
   access: craftingScreen('FABRICATE.Admin.Manager.Nav.Access', 'Access'),
   'books-scrolls': craftingScreen('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls'),
   knowledge: craftingScreen('FABRICATE.Admin.Manager.Nav.Knowledge', 'Knowledge'),
+  'iterative-counters': craftingScreen('FABRICATE.Admin.Manager.Nav.Counters', 'Counters'),
+  'iterative-actions': craftingScreen('FABRICATE.Admin.Manager.Nav.Actions', 'Actions'),
+  'iterative-action-edit': (input) => [
+    crafting(input),
+    link(
+      input.text('FABRICATE.Admin.Manager.Nav.Actions', 'Actions'),
+      input.iterativeRoute?.backToActions
+    ),
+    recordLeaf(
+      input.iterativeRoute?.actionHeading?.name ||
+        (input.iterativeRoute?.isNewAction
+          ? input.text('FABRICATE.Admin.Manager.Iterative.UnnamedAction', 'New action')
+          : input.text('FABRICATE.Admin.Manager.Iterative.ActionEditBreadcrumb', 'Edit action'))
+    ),
+  ],
   'recipe-item-edit': (input) => [
     crafting(input),
     link(

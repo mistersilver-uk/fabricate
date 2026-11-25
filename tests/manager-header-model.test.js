@@ -42,6 +42,7 @@ const SYSTEM_ACTIONS = 'FABRICATE.Admin.Manager.SystemActions';
 const COMPONENT_ACTIONS = 'FABRICATE.Admin.Manager.Component.Actions';
 const ESSENCE_ACTIONS = 'FABRICATE.Admin.Manager.Essence.Actions';
 const ENVIRONMENT_ACTIONS = 'FABRICATE.Admin.Manager.Environment.Actions';
+const ITERATIVE_ACTIONS = 'FABRICATE.Admin.Manager.Iterative.HeaderActions';
 
 /** The sentinels the fixture injects for the four answers that never reach the localizer. */
 const SYSTEM_NAME = 'Alchemy';
@@ -325,9 +326,30 @@ const ROUTES = Object.freeze({
     actionsLabel: 'FABRICATE.Admin.Manager.Checks.Actions',
     actionsFamily: 'crafting',
   },
+  'iterative-counters': {
+    kicker: '',
+    title: 'FABRICATE.Admin.Manager.Iterative.CountersTitle',
+    subtitle: 'FABRICATE.Admin.Manager.Iterative.CountersSubtitle',
+    actionsLabel: ITERATIVE_ACTIONS,
+    actionsFamily: 'crafting',
+  },
+  'iterative-actions': {
+    kicker: '',
+    title: 'FABRICATE.Admin.Manager.Iterative.ActionsTitle',
+    subtitle: 'FABRICATE.Admin.Manager.Iterative.ActionsSubtitle',
+    actionsLabel: ITERATIVE_ACTIONS,
+    actionsFamily: 'crafting',
+  },
+  'iterative-action-edit': {
+    kicker: '',
+    title: 'FABRICATE.Admin.Manager.Iterative.ActionEditTitle',
+    subtitle: 'FABRICATE.Admin.Manager.Iterative.ActionSubtitleNoCheck',
+    actionsLabel: ITERATIVE_ACTIONS,
+    actionsFamily: 'crafting',
+  },
 });
 
-/** The eight identity headings, each against the one record or draft that selects it. */
+/** The nine identity headings, each against the one record or draft that selects it. */
 const HEADING_VARIANTS = [
   ['recipe-edit', { recipeDraft: { name: 'Elixir' } }, 'recipe-edit'],
   ['component-edit', { componentForEdit: { name: 'Vial' } }, 'component-edit'],
@@ -336,6 +358,12 @@ const HEADING_VARIANTS = [
   ['essence-edit', { essenceRulesMode: true }, 'essence-edit-rules'],
   ['world-component-entry', { worldComponentEntryRecord: { id: 'vial' } }, 'world-component-entry'],
   ['world-tool-entry', { worldToolEntryRecord: { id: 'pick' } }, 'world-tool-entry'],
+  [
+    'iterative-action-edit',
+    { iterativeRoute: { actionHeading: { name: 'Stoke', effectCount: 0 } } },
+    'iterative-action-edit',
+  ],
+  ['iterative-action-edit', {}, 'default'],
   ['recipes', {}, 'default'],
   ['tool-edit', {}, 'none'],
 ];
@@ -368,6 +396,7 @@ describe('headerModel', () => {
         gatheringTabPageHint: '',
         worldRulesPageTitle: WORLD_RULES_TITLE,
         recipeDraft: null,
+        iterativeRoute: null,
         componentForEdit: null,
         componentSalvageModeLabel: 'Manual',
         showEssenceSourceUi: false,
@@ -419,6 +448,7 @@ describe('headerModel', () => {
         format: () => (key) => key,
         gatheringTabPageHint: read('gatheringTabPageHint'),
         gatheringTabPageTitle: read('gatheringTabPageTitle'),
+        iterativeRoute: read('iterativeRoute'),
         playerCharacterUuids: read('playerCharacterUuids'),
         premiumInstalled: read('premiumInstalled'),
         recipeDraft: read('recipeDraft'),
@@ -594,6 +624,27 @@ describe('headerModel', () => {
     inputs.set('recipeDraft', null);
     flushSync();
     assert.equal(model.headingVariant, 'default', 'and closes again when the draft is dropped');
+  });
+
+  it('words the action editor lede by whether the action rolls and how many effects it has', () => {
+    const lede = (actionHeading) =>
+      openModel('iterative-action-edit', { iterativeRoute: { actionHeading } }).model.subtitle;
+    const key = (name) => `FABRICATE.Admin.Manager.Iterative.${name}`;
+    assert.equal(lede({ rollsCheck: true, effectCount: 3 }), key('ActionSubtitleRolls'));
+    assert.equal(lede({ rollsCheck: true, effectCount: 1 }), key('ActionSubtitleRollsOne'));
+    assert.equal(lede({ rollsCheck: false, effectCount: 0 }), key('ActionSubtitleNoCheck'));
+    assert.equal(lede({ rollsCheck: false, effectCount: 1 }), key('ActionSubtitleNoCheckOne'));
+  });
+
+  it('opens the action editor heading when its draft appears, and closes it when it goes', () => {
+    const { model, inputs } = openModel('iterative-action-edit');
+    assert.equal(model.headingVariant, 'default');
+    inputs.set('iterativeRoute', { actionHeading: { name: 'Stoke' } });
+    flushSync();
+    assert.equal(model.headingVariant, 'iterative-action-edit');
+    inputs.set('iterativeRoute', { actionHeading: null });
+    flushSync();
+    assert.equal(model.headingVariant, 'default');
   });
 
   it('shows the Premium advert live, and once dismissed hides it for every route', () => {

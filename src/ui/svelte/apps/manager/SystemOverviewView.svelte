@@ -13,6 +13,7 @@
   import Chip from '../../components/Chip.svelte';
   import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import { iterativeIssueSentence, overviewIssueGroup } from './iterative/iterativeIssueCopy.js';
 
   let {
     // `{ issues, counts, blocksSystem }` from `evaluateSystemValidation`.
@@ -29,11 +30,22 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Stable kind order so the system blockers surface first, then per-entity gaps.
-  const KIND_ORDER = ['system', 'recipe', 'environment', 'task', 'event', 'salvage'];
+  // Stable group order so the system blockers surface first, then the library, then per-entity gaps.
+  const KIND_ORDER = [
+    'system',
+    'counter',
+    'action',
+    'recipe',
+    'environment',
+    'task',
+    'event',
+    'salvage',
+  ];
 
   const KIND_LABELS = {
     system: ['GroupSystem', 'System blockers'],
+    counter: ['GroupCounter', 'Counters'],
+    action: ['GroupAction', 'Actions'],
     recipe: ['GroupRecipe', 'Recipes'],
     environment: ['GroupEnvironment', 'Gathering environments'],
     task: ['GroupTask', 'Gathering tasks'],
@@ -44,6 +56,8 @@
   // Per-kind deep-link button labels. The `system` kind is the overview itself,
   // so it carries no deep-link button.
   const KIND_LINK_LABELS = {
+    counter: ['LinkCounter', 'Open counter'],
+    action: ['LinkAction', 'Open action'],
     recipe: ['LinkRecipe', 'Open recipe'],
     environment: ['LinkEnvironment', 'Open environment'],
     task: ['LinkTask', 'Open gathering task'],
@@ -187,7 +201,7 @@
   const groups = $derived(
     KIND_ORDER.map((kind) => ({
       kind,
-      issues: issues.filter((issue) => issue.kind === kind),
+      issues: issues.filter((issue) => overviewIssueGroup(issue) === kind),
     })).filter((group) => group.issues.length > 0)
   );
 
@@ -203,6 +217,8 @@
   }
 
   function issueMessage(issue) {
+    const iterative = iterativeIssueSentence(issue, text);
+    if (iterative) return iterative;
     const meta = ISSUE_LABELS[issue.code] || [issue.code, issue.message || issue.code];
     return text(`FABRICATE.Admin.Manager.SystemOverview.${meta[0]}`, meta[1]);
   }
@@ -224,8 +240,9 @@
   const ENVIRONMENT_KINDS = new Set(['environment', 'task', 'event']);
 
   function canDeepLink(issue) {
-    if (issue.kind === 'system' || !KIND_LINK_LABELS[issue.kind]) return false;
-    if (ENVIRONMENT_KINDS.has(issue.kind)) return Boolean(issue.environmentId);
+    const group = overviewIssueGroup(issue);
+    if (!KIND_LINK_LABELS[group]) return false;
+    if (ENVIRONMENT_KINDS.has(group)) return Boolean(issue.environmentId);
     return Boolean(issue.entityId);
   }
 </script>
@@ -329,10 +346,10 @@
                 <Button
                   role="ghost"
                   class="manager-system-overview-link"
-                  data-overview-link={issue.kind}
+                  data-overview-link={overviewIssueGroup(issue)}
                   onclick={() => onSelectIssue(issue)}
                 >
-                  {kindLinkLabel(issue.kind)}
+                  {kindLinkLabel(overviewIssueGroup(issue))}
                 </Button>
               {/if}
             </li>

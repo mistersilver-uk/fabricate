@@ -202,6 +202,28 @@ For systems in `alchemy` mode:
    This is how the mode-change disable path and clause 2's "blocks saves globally until resolved" reconcile — the mode switch is the one save permitted to land a collision (a mode switch cannot be refused wholesale), after which the global block resumes.
 6. Non-`alchemy` system updates are not signature-validated.
 
+### Delete Counter
+
+1. Deleting a Counter requires GM confirmation through the Manager confirmation dialog.
+2. When Crafting Actions, or recipes through a Counter Instance, use the Counter, the confirmation names each use, a Crafting Action with whether it uses the Counter as a cost, an effect, both, or only in a rule, and states that each will need another Counter and that workpieces in progress are not affected.
+   A Counter nothing uses is confirmed with no list.
+3. Deletion is WARNED, not BLOCKED.
+   References are deliberately NOT rewritten, because an authored expression or rule is content an unrelated delete must not silently edit.
+   Each remaining reference becomes a blocking iterative readiness issue on its action or recipe, never `blocks: 'system'`.
+4. Active workpieces keep working from their accepted terms.
+5. The accepted consequence is recorded rather than discovered later: the id is freed, so a Counter created later whose derived id equals it satisfies every reference that still names it.
+
+### Delete Crafting Action
+
+1. Deleting a Crafting Action requires GM confirmation through the Manager confirmation dialog.
+2. The confirmation names each recipe step that allows the Crafting Action by name, and each `previousAction` rule in any other action's availability or effects, or in a recipe, that names it; a Crafting Action is never listed as its own use.
+   A Crafting Action nothing names is confirmed with no list.
+3. Deletion is WARNED, not BLOCKED.
+   References are deliberately NOT rewritten, because an authored rule or step allow-list is content an unrelated delete must not silently edit.
+   Each remaining reference becomes a blocking iterative readiness issue on its action or recipe, never `blocks: 'system'`.
+4. Active workpieces are unaffected.
+5. The accepted consequence is recorded rather than discovered later: the id is freed, so a Crafting Action created later whose derived id equals it satisfies every reference that still names it.
+
 ## Clean-up Rules
 
 ### Runs Clean-up

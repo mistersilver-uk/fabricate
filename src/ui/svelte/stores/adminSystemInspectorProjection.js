@@ -378,6 +378,7 @@ function _toolBreakageAuthoritySource(worldToolBreakage, systemToolBreakage) {
  * tool corpus the `tools` projection unions against, and `null` — the default — means there is
  * no world half, which the read seam answers by handing back the in-system array itself.
  */
+// ratchet-exempt(file-size): the one allowlist key the iterative library needs; the literal is the projection's whole contract
 export function buildSelectedSystemViewData(
   selectedSystem,
   managedItemOptions,
@@ -408,6 +409,7 @@ export function buildSelectedSystemViewData(
     description: selectedSystem.description,
     enabled: selectedSystem.enabled !== false,
     resolutionMode: selectedSystem.resolutionMode || 'simple',
+    ...(selectedSystem.iterative && { iterative: selectedSystem.iterative }),
     visibilityMode,
     craftingEffect: craftingEffect(visibilityMode),
 

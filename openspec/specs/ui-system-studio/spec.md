@@ -95,6 +95,8 @@ A section's notices sort blocking issues first, then warnings, as the Validation
 A notice's Review action focuses the control the issue names, and otherwise focuses the section, as a Validation row's View does.
 No readiness issue renders as a `Callout`; the mode description on The roll stays a `Callout`, because it documents the mode rather than reporting this check's state.
 That mode callout (`CheckModeCallout`) sits in the section's heading block, after the pane heading and below the section's notices.
+In an `iterative` system Checks › Crafting renders the routed check's five sections over `craftingCheck.routed` with the routed check editor, chosen by the one `usesRoutedCheck` helper that `routedByCheck` shares, and its callout states that one check serves the whole system and each Crafting Action either rolls it or does not.
+The check is required only when an allowed Crafting Action rolls it, and a missing roll is reported as `iterativeCheckUnavailable`.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
@@ -643,7 +645,8 @@ The tab also carries danger and warning badges in the tab bar reflecting the ope
 
 Issues are grouped by their `kind` —
 `system` (system blockers), `recipe`, `environment`, `task`, `event`, and `salvage` —
-with the `system` blockers surfaced first.
+except that a `system` issue whose `entityKind` is `counter` or `action` is grouped as `Counters` or `Actions`.
+The order is system blockers, Counters, Actions, then the rest, so the system blockers surface first.
 Each issue renders one row carrying a severity chip
 (`.manager-chip.is-danger` for `critical`, `.manager-chip.is-warning` for `warning`, `.manager-chip.is-neutral` for `info`),
 the offending entity's name, and the issue message.
@@ -652,7 +655,10 @@ Every non-`system` row deep-links to the editor that owns the entity,
 reusing the manager's existing selection helpers
 (recipe issues open the recipe editor, environment/task/event issues open the environment editor,
 and salvage issues open the component editor).
-The `system` kind is the overview itself and carries no deep-link button.
+A Counters row links to "Open counter", the Counters screen with that counter expanded, and an Actions row links to "Open action", that Crafting Action's editor.
+The `system` kind is the overview itself and carries no deep-link button, so a `system` issue with no counter or action entity, including a library newer than this build, stays under the system blockers with no link.
+No iterative issue sets `blocksSystem`.
+Each iterative readiness code renders its own localized sentence from one exported code-to-key map shared with the recipe issues of the same codes, and falls back to the issue's own `message`.
 When there are no issues, the Validation tab shows an empty "ready to use" state.
 
 When the report's `blocksSystem` is true,
@@ -1530,3 +1536,57 @@ Player-facing event copy is framed as a neutral encounter (a travelling merchant
 - Event-outcome copy uses event terminology (for example "If an event occurs, your gather still succeeds." / "…the gather fails.") rather than risk/hazard terminology.
 - Copy that legitimately describes the danger axis (for example "Danger tags let environments opt in…") is retained.
   The d100 result-group validation copy still reserves the failure aliases (including the former miss/`hazard` terms) as forbidden result-group names — this is the failure-keyword concept, not the Gathering Event concept.
+
+## Counters Screen
+
+The Counters screen lists the system's Counters as an ordered, expandable list whose order is the persisted order.
+Each row shows its name, its limit, and its usage across Crafting Actions and recipe steps, or "Not used yet".
+An expanded row edits the name, a GM-only description, and the Limits choice of No limit, Per recipe or Global.
+Global edits fixed bounds, Per recipe edits default bounds a recipe may override, and No limit hides the bounds without discarding them.
+
+- Edits apply as they are made, and the screen has no Save.
+- An empty name, or one that matches another Counter's name ignoring case and surrounding space, is shown as an error and is not written.
+- A row whose persisted name duplicates another Counter's shows a "Duplicate name" chip, and the first such row opens expanded, because one row is open at a time.
+- A minimum above a maximum is written, shown as an error on the row, and reported as a blocking readiness issue.
+- A new Counter's id is derived once, when it is created, from the label it has then: camelCase, falling back to `counter` (or `action`, `cost`, `effect` for those lists) when the label has no ASCII letter or digit, prefixed with that word when it begins with a digit, and given a numeric suffix until unique in its list.
+  It is never changed, so renaming a Counter rewrites no expression.
+- Reordering is keyboard-accessible, with the new position announced, through the shared list contract, and it is unavailable while a search is active.
+- The screen offers search with a shown-of-total count, an empty state with "New counter", and a separate state for a search that matches nothing.
+- Deleting a Counter confirms through the Manager confirmation dialog, announces "{name} deleted." through the screen's own live region, which outlives the list when the last Counter goes, and moves focus to the next row, the previous one, or the adder.
+- The screen shows only a blocking notice and lists nothing, and the rail shows no Counters or Actions count, when the system's iterative settings were made by a newer version of Fabricate.
+
+## Actions Screen
+
+The Actions screen lists the system's Crafting Actions as rows or as cards, with search, the filter toggles "Rolls check", "No check" and "Has issues", and a category filter.
+Each entry shows its icon, label, description, Counter costs, whether it rolls the crafting check, its effect count, and a blocking count when it has blocking issues.
+The blocking count counts only critical readiness issues, while "Has issues" matches an entry with any readiness issue, a warning included.
+Opening an entry opens the Crafting Action editor.
+
+- The toggles combine, so "Rolls check" with "No check" matches nothing and the screen offers Clear filters.
+- The list is paged, with a page size of 10, 25 or 50, and a "New action" button follows the list or the grid.
+- Search, filters, page, page size and arrangement outlive a trip to the editor and are never persisted.
+- "New action" is disabled, with its reason stated, while the system has no Counters, and the empty state says Counters come before any Crafting Action and offers no button.
+- With Counters and no Crafting Actions, the empty state says what an action holds and "New action" is enabled.
+- The screen shows only a blocking notice and lists nothing when the system's iterative settings were made by a newer version of Fabricate.
+
+## Action Editor
+
+The Crafting Action editor edits a staged copy of one Crafting Action, saved by "Save action".
+Leaving it with unsaved edits runs the Manager confirm-discard route-exit guard.
+Its header shows `Ready` or the Crafting Action's blocking count, from the same readiness evaluation the Validation tab reports, computed against the unsaved edit.
+The count and the blocking notice count only critical issues, so a Crafting Action with only warnings reads `Ready` and each warning is drawn only as its field mark.
+
+- A Crafting Action with blocking issues still saves, and the editor states that players cannot take it until those issues are fixed, marking each affected field.
+- Identity edits the icon, the label, a player-facing description, and categories, chosen from the categories the system's Crafting Actions already use or created in place.
+- Creating a category refuses an exact case-insensitive duplicate and suggests a near match.
+- "How it is taken" edits whether the Crafting Action is taken as a Crafting Session (the default) or as a free action, and its availability rules, combined as All or Any.
+- Costs edit an amount expression, the Counter it is paid from, and "Needs enough", and an amount may not roll dice or read the check.
+- Check chooses between rolling the system's routed crafting check and no check.
+  Choosing no check clears every effect's outcome tiers, check success and check-value comparison in the unsaved edit, which discarding it restores.
+- While the Crafting Action rolls, Check shows the routed check read-only with a link to Checks, and warns when that check has no usable roll.
+- Effects apply top to bottom in a reorderable list.
+- Each effect edits its name, its description, when it applies, and the Counter it increments, decrements or sets by an amount expression.
+- When it applies covers the outcome tiers, check success or failure, a check-value comparison and workpiece rules, all combined by the effect's All or Any.
+- An effect that reads a check fact on a Crafting Action with no check is shown as a warning.
+- "Duplicate" copies the Crafting Action under a new id, and "Delete" removes it after confirmation.
+- The editor shows only a blocking notice and no card when the system's iterative settings were made by a newer version of Fabricate.

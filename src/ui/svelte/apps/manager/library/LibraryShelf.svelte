@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(design-system): a composition of the Pagination member with the callers' own entry and empty-state snippets, shared by the essence and Crafting Action browsers rather than offered as a vocabulary member -->
 <!--
   The paginated tail every studio browser ends with, written once: an empty state when the library is
   empty, a DIFFERENT one when filters excluded everything, otherwise a `<ul role="list">` of entries
@@ -8,6 +9,9 @@
   attribute are props because the smoke walk, the View Lab cases and `managerLayoutGuards` navigate
   by studio selectors. The GRID template stays the studio's: column width is a content judgement a
   210px essence minimum and a recipe card do not share.
+
+  An optional `footer` snippet is drawn after the list, or the filtered-empty state, inside the scroll
+  section; the essence browser passes none, and a library with no entries at all draws none.
 -->
 <script>
   import Pagination from '../../../components/Pagination.svelte';
@@ -33,6 +37,7 @@
     entry = undefined,
     empty = undefined,
     emptyFiltered = undefined,
+    footer = undefined,
   } = $props();
 
   const isGrid = $derived(viewMode === 'grid');
@@ -57,6 +62,7 @@
       {/each}
     </ul>
   {/if}
+  {#if footer && !isEmpty}{@render footer()}{/if}
 </section>
 
 <!-- UNCONDITIONAL: `Pagination` already decides whether there is anything to page, so a gate here

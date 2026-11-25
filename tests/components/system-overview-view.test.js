@@ -12,7 +12,10 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-system-overview-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/apps/manager/iterative/iterativeIssueCopy.js'
+  ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
@@ -254,6 +257,82 @@ describe('SystemOverviewView (mounted)', () => {
     assert.ok(
       row.querySelector('[data-overview-link]') === null,
       'no deep-link button without an environmentId'
+    );
+    harness.remount();
+  });
+
+  // The iterative library's issues are tagged `system` and listed by their `entityKind`.
+  const libraryIssue = (entityKind, entityId, code) => ({
+    kind: 'system',
+    entityKind,
+    entityId,
+    entityName: entityId ?? 'Ironworks',
+    severity: 'critical',
+    code,
+    message: `headless ${code}`,
+    nav: { view: 'system-overview' }
+  });
+  const iterativeReport = {
+    issues: [
+      { ...populatedReport.issues[1], code: 'iterativeNoCounters', entityKind: 'recipe' },
+      libraryIssue('action', 'smelt', 'iterativeUnknownCounter'),
+      libraryIssue('counter', 'temper', 'iterativeBoundsInverted'),
+      libraryIssue('system', null, 'iterativeVersionUnsupported'),
+      libraryIssue('counter', null, 'iterativeInvalidEntry')
+    ],
+    counts: { critical: 5, warning: 0, info: 0, blockers: 0 },
+    blocksSystem: false
+  };
+
+  it('lists the library groups after the system blockers and before the recipes', async () => {
+    const target = await harness.mount({ report: iterativeReport });
+    const order = [...target.querySelectorAll('[data-system-overview-group]')].map((group) =>
+      group.getAttribute('data-system-overview-group')
+    );
+    assert.deepEqual(order, ['system', 'counter', 'action', 'recipe']);
+    const system = target.querySelector('[data-system-overview-group="system"]');
+    assert.ok(
+      system.querySelector('[data-overview-issue="iterativeVersionUnsupported"]'),
+      'a library issue with no counter or action entity stays under the system blockers'
+    );
+    assert.ok(system.querySelector('[data-overview-link]') === null, 'and carries no link');
+    harness.remount();
+  });
+
+  it('falls back to the message the issue carries for an iterative code with no localization', async () => {
+    const target = await harness.mount({ report: iterativeReport });
+    const row = target.querySelector('[data-overview-issue="iterativeBoundsInverted"]');
+    assert.match(row.textContent, /headless iterativeBoundsInverted/);
+    harness.remount();
+  });
+
+  it('links a counter row to Open counter and an action row to Open action', async () => {
+    const selected = [];
+    const target = await harness.mount({
+      report: iterativeReport,
+      onSelectIssue: (issue) => {
+        selected.push(issue);
+      }
+    });
+    const linkOf = (code) =>
+      target.querySelector(`[data-overview-issue="${code}"]`).querySelector('[data-overview-link]');
+    const counterLink = linkOf('iterativeBoundsInverted');
+    const actionLink = linkOf('iterativeUnknownCounter');
+    assert.equal(counterLink.getAttribute('data-overview-link'), 'counter');
+    assert.equal(actionLink.getAttribute('data-overview-link'), 'action');
+    assert.match(counterLink.textContent, /Open counter/);
+    assert.match(actionLink.textContent, /Open action/);
+    counterLink.click();
+    actionLink.click();
+    await flushRender();
+    assert.deepEqual(
+      selected.map((issue) => [issue.entityKind, issue.entityId]),
+      [['counter', 'temper'], ['action', 'smelt']]
+    );
+    assert.equal(
+      target.querySelector('[data-overview-issue="iterativeInvalidEntry"]').querySelectorAll('[data-overview-link]').length,
+      0,
+      'a counter issue with no entity id has no link'
     );
     harness.remount();
   });

@@ -643,6 +643,7 @@ export const COMPONENT_SERVICE_KEYS = Object.freeze([
   'getWorldItemOptions',
   'resolveToolSource',
   'getWorldTimeComponents',
+  'confirmDialog',
 ]);
 
 /**

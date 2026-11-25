@@ -26,6 +26,8 @@ export const LAB_SYSTEM_IDS = Object.freeze({
   // on: Jewellery's is deliberately off so its collapsed-editor frame keeps its subject, so the
   // legal empty non-terminal step (issue 1907) has nowhere else to be photographed.
   GLASSWORK: 'lab-glasswork',
+  // The one `iterative` system, seeded only when a frame names an `iterative` state (see labIterative.js).
+  IRONWORKS: 'lab-ironworks',
 });
 
 /** One component definition plus the world item it originates from. */

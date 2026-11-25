@@ -133,6 +133,8 @@ function readParams() {
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
     checkPreviewState: params.get('checkPreviewState') ?? null,
+    // Adds the `iterative` Ironworks system to the lab world in this state (issue 3009).
+    iterative: params.get('iterative') ?? null,
     // Brenna holds a knowledge book she can learn whole, for the Read & learn header action.
     learnableBook: params.get('learnableBook') === '1',
     journalCaseState: params.get('journalCaseState') ?? null,
@@ -1143,6 +1145,7 @@ async function boot() {
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
+        iterative: params.iterative,
         learnableBook: params.learnableBook,
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,

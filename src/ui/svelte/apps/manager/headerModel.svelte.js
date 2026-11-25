@@ -5,6 +5,7 @@
  * module's own `$derived.by` rather than captured once at construction.
  */
 import { interpolate } from './checks/checksCopy.js';
+import { iterativeHeaderCopy, iterativeHeadingVariant } from './iterative/iterativeHeaderCopy.js';
 import { PREMIUM_ICONS_AD_DISMISSED_KEY, isPremiumIconsAdVisible } from './premiumIconsAdModel.js';
 import { componentListSubtitle } from './scoped/componentScoped.js';
 
@@ -89,6 +90,9 @@ const CRAFTING_ACTION_VIEWS = [
   'tags',
   'essences',
   'essence-edit',
+  'iterative-counters',
+  'iterative-actions',
+  'iterative-action-edit',
 ];
 
 /** The same, for the gathering family; they also share one action-group name. */
@@ -474,6 +478,7 @@ function headingVariantFor({
   downtimeHeaderArtwork,
   essenceRulesMode,
   isWorldDowntimeRoute,
+  iterativeRoute,
   recipeDraft,
   worldComponentEntryRecord,
   worldEssenceEntryRecord,
@@ -481,6 +486,8 @@ function headingVariantFor({
 }) {
   if (currentView === 'recipe-edit' && recipeDraft) return 'recipe-edit';
   if (currentView === 'component-edit' && componentForEdit) return 'component-edit';
+  const iterativeVariant = iterativeHeadingVariant({ currentView, iterativeRoute });
+  if (iterativeVariant) return iterativeVariant;
   if (isWorldDowntimeRoute && downtimeHeaderArtwork) return 'downtime-artwork';
   if (worldEssenceEntryRecord) return 'world-essence-entry';
   if (currentView === 'essence-edit' && essenceRulesMode) return 'essence-edit-rules';
@@ -553,10 +560,13 @@ export function createHeaderModel({ route, state } = {}) {
     }
   }
 
+  const iterativeCopy = $derived.by(() => iterativeHeaderCopy(inputs()));
   const kicker = $derived.by(() => viewKicker(inputs()));
-  const title = $derived.by(() => viewTitle(inputs()));
-  const subtitle = $derived.by(() => viewSubtitle(inputs()));
-  const actionsLabel = $derived.by(() => headerActionsLabel(inputs()));
+  const title = $derived.by(() => iterativeCopy?.title ?? viewTitle(inputs()));
+  const subtitle = $derived.by(() => iterativeCopy?.subtitle ?? viewSubtitle(inputs()));
+  const actionsLabel = $derived.by(
+    () => iterativeCopy?.actionsLabel ?? headerActionsLabel(inputs())
+  );
   const headingVariant = $derived.by(() => headingVariantFor(inputs()));
   const actionsFamily = $derived.by(() => actionsFamilyFor({ ...inputs(), premiumIconsAdVisible }));
 
