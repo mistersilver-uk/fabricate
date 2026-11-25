@@ -3,7 +3,7 @@
  * `system.iterative` and sends it through `updateSystem`, so the normalizer remains the one judge of
  * its shape, then refreshes. A library newer than this build is never written.
  */
-import { get } from 'svelte/store';
+import { get, writable as writableStore } from 'svelte/store';
 
 import {
   ITERATIVE_LIBRARY_VERSION,
@@ -156,11 +156,38 @@ export function createIterativeLibrarySection({
     return systemId ? (recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []) : [];
   };
 
+  // The memo of active iterative runs, read by the editors' in-progress notes. It walks nothing
+  // until an editor route watches it, then recomputes on entry, on a refresh and on a run diff.
+  const activeRuns = writableStore([]);
+  let watching = false;
+  let runsRefreshQueued = false;
+  const recomputeActiveRuns = () =>
+    activeRuns.set(arrayOrEmpty(services.getActiveIterativeRuns?.()));
+
+  /** Starts or stops keeping the memo; turning it on recomputes once. */
+  function watchActiveRuns(on) {
+    watching = on === true;
+    if (watching) recomputeActiveRuns();
+  }
+
+  /** Recomputes the memo through one coalescing microtask while watched, and does nothing otherwise. */
+  function scheduleActiveRunsRefresh() {
+    if (!watching || runsRefreshQueued) return;
+    runsRefreshQueued = true;
+    queueMicrotask(() => {
+      runsRefreshQueued = false;
+      if (watching) recomputeActiveRuns();
+    });
+  }
+
   const copyLabel = (label) =>
     localized('FABRICATE.Admin.Manager.Iterative.CopyLabel', `${label} copy`, { label });
 
   return {
     systemRecipes,
+    activeIterativeRuns: { subscribe: activeRuns.subscribe },
+    watchActiveRuns,
+    scheduleActiveRunsRefresh,
     /** Adds a Counter under a placeholder name, so its id comes from that name; answers its id. */
     addCounter: () =>
       commit((library) =>

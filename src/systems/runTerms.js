@@ -5,7 +5,7 @@
  * the live corpus; roll data still comes from the live actor when the check rolls.
  */
 import { Recipe } from '../models/Recipe.js';
-import { cloneJson } from '../utils/scalars.js';
+import { arrayOrEmpty, cloneJson, isPlainObject } from '../utils/scalars.js';
 
 import { iterativeTermsEntry } from './iterative/iterativeTerms.js';
 
@@ -46,4 +46,27 @@ export function activeRunRecipeIds(runManager, actors) {
     }
   }
   return ids;
+}
+
+/**
+ * Every active run of these actors that carries an iterative `termsSnapshot`, as
+ * `{ recipeId, craftingSystemId, actionIds }` with the action ids the snapshot holds. It walks world
+ * actors only, because that is where crafting runs begin, and reads through `getActiveRuns` alone.
+ */
+export function activeIterativeRuns(runManager, actors) {
+  const runs = [];
+  for (const actor of actors ?? []) {
+    for (const run of runManager?.getActiveRuns?.(actor) ?? []) {
+      const snapshot = run?.termsSnapshot?.iterative;
+      if (!isPlainObject(snapshot) || !run.recipeId) continue;
+      runs.push({
+        recipeId: String(run.recipeId),
+        craftingSystemId: String(run.craftingSystemId ?? ''),
+        actionIds: arrayOrEmpty(snapshot.actions)
+          .map((action) => action?.id)
+          .filter((id) => typeof id === 'string'),
+      });
+    }
+  }
+  return runs;
 }

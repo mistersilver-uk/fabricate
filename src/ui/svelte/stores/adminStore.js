@@ -2707,9 +2707,8 @@ export function createAdminStore(services) {
       featureCount: Object.values(s.features || {}).filter((value) => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
-      // Whether this system participates in the world currency (issue 1278). A flat boolean because this
-      // list is an allowlist carrying no `requirements`: a consumer reaching for
-      // `requirements.currency.enabled` reads undefined and silently counts zero.
+      // Whether this system participates in the world currency (issue 1278): a flat boolean, because this
+      // allowlist carries no `requirements` and `requirements.currency.enabled` reads undefined.
       currencyEnabled: s?.requirements?.currency?.enabled === true,
       // Whether this system authors its own tool break mode, and what it authored (issue 1373).
       toolBreakage: {
@@ -2941,6 +2940,7 @@ export function createAdminStore(services) {
       ...buildCharacterLibrariesState(),
       ...worldScopeState,
     }));
+    iterative.scheduleActiveRunsRefresh();
   }
 
   // The three world-scope entity corpora (issue 1362), read straight from their stores on every

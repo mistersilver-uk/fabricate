@@ -16,6 +16,7 @@ import {
 } from './svelte/util/importFolderGroups.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
 import { buildKnowledgeSnapshot, recipeItemCaps } from '../systems/knowledgeSnapshot.js';
+import { runContainersChanged } from '../systems/runFlagInvalidation.js';
 import { managerExtensions } from './managerExtensions.js';
 // The title bar's companion signal reports the MODULE, so it reads BOTH registries (issue
 // 1198). This is a second subscription to the player registry from a different application,
@@ -638,8 +639,10 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     // write, and republishing to make it visible would re-derive the whole manager on the
     // same cadence. The store rebuilds on the next read that needs it.
     const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();
+    const reprojectRuns = () => this._adminStore?.iterative?.scheduleActiveRunsRefresh?.();
     const reprojectOnActorCrud = () => {
       reproject();
+      reprojectRuns();
       markLearnerIndexStale();
       reprojectKnowledge();
     };
@@ -649,6 +652,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // the index stale as well as re-projecting the access rosters.
       if ('ownership' in diff) markLearnerIndexStale();
       if ('ownership' in diff || 'name' in diff || 'img' in diff) reproject();
+      if (runContainersChanged(diff).includes('crafting')) reprojectRuns();
       // Learned recipes, usage counts and learn counts all live under `flags`.
       if ('flags' in diff) {
         markLearnerIndexStale();
