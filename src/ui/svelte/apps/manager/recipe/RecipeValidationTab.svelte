@@ -220,7 +220,10 @@
 
   function issueTitle(issue) {
     if (issue.iterativeCode) {
-      const sentence = iterativeIssueSentence({ code: issue.iterativeCode }, text);
+      const sentence = iterativeIssueSentence(
+        { code: issue.iterativeCode, message: issue.message },
+        text
+      );
       const prefix = issue.stepName || issue.entityName;
       return prefix ? `${prefix}: ${sentence}` : sentence;
     }

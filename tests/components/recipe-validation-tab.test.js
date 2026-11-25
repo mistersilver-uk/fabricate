@@ -590,6 +590,24 @@ describe('RecipeValidationTab (mounted)', () => {
       harness.remount();
     });
 
+    it('falls back to the issue’s own message, never its code, when its key is missing', async () => {
+      globalThis.game.i18n.localize = (key) => key;
+      try {
+        const message = 'A step has no success rule yet, so it needs iterative setup.';
+        const target = await harness.mount({
+          recipe: sword,
+          iterativeReadiness: { steps, issues: [{ ...issue('iterativeNoSuccessRule', 1), message }] }
+        });
+        assert.equal(
+          rowOf(target, 'iterativeNoSuccessRule:1').querySelector('.manager-recipe-val-detail').textContent,
+          `Etch the fuller: ${message}`
+        );
+      } finally {
+        globalThis.game.i18n.localize = shippedString;
+        harness.remount();
+      }
+    });
+
     it('hands each row its route and the control it names', async () => {
       const calls = [];
       const target = await harness.mount({

@@ -59,11 +59,13 @@ function mappedIssue(issue, owner, steps) {
   const step =
     issue.stepIndex == null ? null : steps.find((entry) => entry.index === issue.stepIndex);
   const focusTarget = focusTargetOf(issue.code, owner);
+  // `message` is the headless sentence the Validation title falls back to when a key is missing.
   return {
     id: library
       ? `${issue.code}:${issue.entityKind}:${issue.entityId ?? ''}`
       : `${issue.code}:${issue.stepIndex ?? 'recipe'}`,
     iterativeCode: issue.code,
+    ...(issue.message && { message: issue.message }),
     severity: issue.severity,
     ...(!library && issue.severity === 'critical' && { blocks: 'enable' }),
     target: RESULTS_CODES.has(issue.code) ? 'results' : 'overview',

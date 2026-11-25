@@ -483,7 +483,7 @@ A recipe with no Counter Instances offers to add every library counter, and says
 A Counter Instance naming no library counter is marked on its row and links to Counters.
 Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error and blocks enabling the recipe.
 A multi-step recipe's step hides or locks each Counter Instance for that step, and a Counter Instance the player never sees offers no per-step hide.
-A single-step recipe shows its hide and lock lists only while one is non-empty.
+A single-step recipe shows its hide and lock lists once one is non-empty, and keeps them shown while the editor stays open, so clearing the last one keeps its focus.
 Each step's Ends when holds success rules, which must all hold, and failure rules, any one of which is enough.
 The rules range over the recipe's Counter Instances, Session number and Previous action.
 A rule naming a counter that is not a Counter Instance is marked as not tracked.
