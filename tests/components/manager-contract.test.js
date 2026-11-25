@@ -482,6 +482,12 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   defineStructureContract(
+    'forwards the confirm seam the manager root hands its iterative Counter delete',
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['confirmDialog'] }
+  );
+
+  defineStructureContract(
     'forwards the world clock components into prepared Svelte props',
     { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
     { spellsExactly: ['getWorldTimeComponents'] }
