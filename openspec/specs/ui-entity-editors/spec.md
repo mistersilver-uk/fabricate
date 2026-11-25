@@ -490,6 +490,9 @@ Turning a single-step recipe multi-step makes its ingredient set, result sets an
 Collapsing to one step keeps step 1 whole as the single step, and removes the other steps with their result sets.
 A sole step offers no remove.
 With multi-step recipes turned off, an iterative multi-step recipe is never presented as collapsed, and its Steps card warns that it cannot be started.
+In an iterative system, Results lists each scope's result sets in a reorderable list, checked top to bottom, and marks the failure set.
+Each set states its Produced when lines, each a Success or Failure end with rules that all hold.
+A set with no line says it is never produced, and a scope with no set says it produces nothing.
 The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and its subline names the Iterative mode and a multi-step recipe's step count.
 The Preview tab is not offered.
 
