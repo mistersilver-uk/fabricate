@@ -122,6 +122,8 @@
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {},
+    // The iterative route model in an iterative system, else `null`: Overview reads its library.
+    iterative = null,
   } = $props();
 
   // Current single-step requirement scopes default to empty arrays so an unconfigured recipe still
@@ -143,8 +145,8 @@
 
   // COLLAPSED chain (issue 710): a recipe still carrying authored steps while multi-step is OFF.
   // They are preserved and restored on re-enable, and meanwhile the editor presents the recipe as
-  // single-step over the FINAL step's results.
-  const collapsed = $derived(!multiStepEnabled && steps.length > 1);
+  // single-step over the FINAL step's results. Never under `iterative`, which keeps its steps.
+  const collapsed = $derived(!multiStepEnabled && steps.length > 1 && !iterative);
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
   // The recipe view the Results tab edits while collapsed. Writes route back to the final step.

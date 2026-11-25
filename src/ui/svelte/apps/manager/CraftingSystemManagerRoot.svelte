@@ -466,9 +466,9 @@
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   // Complex recipes need a resolution mode that allows multiple ingredient/result
-  // sets; simple/progressive systems craft exactly one set into one result.
+  // sets; simple, progressive and iterative systems author exactly one set into one result.
   const recipeMultiSetAllowed = $derived(
-    !['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple')
+    !['simple', 'progressive', 'iterative'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const essenceOptions = $derived(canShowEssences ? selectedSystem?.essenceDefinitions || [] : []);
@@ -4679,6 +4679,7 @@
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
         recipe={recipeDraft}
+        iterative={selectedSystem?.resolutionMode === 'iterative' ? iterativeRoute : null}
         canAddSet={recipeCanAddSet}
         alchemySimple={recipeAlchemySimple}
         simpleFailureSlot={recipeSimpleWithCheck}

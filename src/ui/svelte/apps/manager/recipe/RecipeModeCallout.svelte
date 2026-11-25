@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `mode` | a `resolutionModeOptions` value | `'simple'` | An unknown mode reads as the first option. |
+  | `mode` | a `resolutionModeOptions` value, or `'iterative'` | `'simple'` | An unknown mode reads as the first option. |
   | `text` | the host's localizer | — | `(key, fallback)`; this component authors no lookup of its own. |
 
   Callbacks:
@@ -18,12 +18,17 @@
 <script>
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
-  import { resolutionModeOptions } from '../resolutionModeOptions.js';
+  import {
+    iterativeResolutionModeOption,
+    resolutionModeOptions,
+  } from '../resolutionModeOptions.js';
 
   let { mode = 'simple', text, onOpenCraftingSettings = () => {} } = $props();
 
   const option = $derived(
-    resolutionModeOptions.find((entry) => entry.value === mode) || resolutionModeOptions[0]
+    [...resolutionModeOptions, iterativeResolutionModeOption].find(
+      (entry) => entry.value === mode
+    ) || resolutionModeOptions[0]
   );
   const kicker = $derived(
     text('FABRICATE.Admin.Manager.Recipe.ModeCallout.Kicker', 'System resolution mode')

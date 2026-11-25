@@ -3334,6 +3334,12 @@
           "NoMatches": "No matches",
           "QuantityDecrement": "Decrease quantity",
           "QuantityIncrement": "Increase quantity",
+          "Iterative": {
+            "SublineSteps": "{count} steps, each worked over sessions",
+            "StatusSetup": "Needs iterative setup",
+            "StatusBlocking": "{count} blocking",
+            "StatusReady": "Ready"
+          },
           "AmountFixed": "Fixed",
           "AmountRolled": "Rolled",
           "AmountFormula": "Formula",
@@ -8904,6 +8910,7 @@
         "ResolutionProgressive": "Progressive",
         "ResolutionAlchemy": "Alchemy",
         "ResolutionIterative": "Iterative",
+        "ResolutionIterativeDesc": "Crafters work a piece over many sessions, choosing an action each session. Counters you define decide when it is finished and how well.",
         "ResolutionModeHelpTitle": "What each mode does",
         "ResolutionSimpleDesc": "One ingredient set and one result set, with an optional pass/fail check.",
         "ResolutionRoutedDesc": "Multiple ingredient sets and result sets; exactly one result is selected per craft, routed by the crafting check outcome or by the ingredients used.",

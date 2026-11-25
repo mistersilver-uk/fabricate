@@ -204,6 +204,7 @@ function makeRecipe(overrides = {}) {
       toolIds: recipe.toolIds,
       visibility: recipe.visibility,
       access: { characterIds: ['char-1'], playerIds: ['p-1', 'p-2'] },
+      ...(recipe.iterative && { iterative: recipe.iterative }),
     }),
   };
 }
@@ -698,6 +699,40 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
 
     for (const row of rows.slice(0, 25)) void row.enableBlocked;
     assert.equal(calls.canActivateRecipe, 25, 'and one activation check per row read');
+  });
+
+  const ITERATIVE = Object.freeze({
+    counters: [{ counterId: 'heat', start: 0, visible: true }],
+    step: { actions: { mode: 'all', actionIds: [] }, success: [] },
+  });
+  const iterativeCohort = (size) =>
+    makeCohort(size).map((recipe, index) =>
+      index % 2 === 0 ? makeRecipe({ id: recipe.id, iterative: ITERATIVE }) : recipe
+    );
+
+  it('adds `iterative` to an iterative row alone, and only as a detail field', () => {
+    const { calls, manager } = makeCountingRecipeManager(iterativeCohort(4));
+    const rows = buildRecipeList(null, manager, makeSystem(), '').recipes;
+
+    assert.deepEqual(sortedKeys(rows[1]), RECIPE_ROW_FIELDS, 'a non-iterative row keeps its keys');
+    assert.deepEqual(
+      sortedKeys(rows[0]),
+      [...RECIPE_ROW_FIELDS, 'iterative'].sort((a, b) => a.localeCompare(b))
+    );
+    assert.equal(calls.toJSON, 0, 'listing the keys clones no row body');
+    assert.deepEqual(rows[0].iterative, ITERATIVE, 'the draft carries the instances and the step');
+    assert.equal(calls.toJSON, 1, 'reading it is one detail clone');
+    assert.equal(JSON.parse(JSON.stringify(rows[1])).iterative, undefined);
+  });
+
+  it('projects an iterative cohort with no toJSON until a detail field is read', () => {
+    const { calls, manager } = makeCountingRecipeManager(iterativeCohort(50));
+    const rows = buildRecipeList(null, manager, makeSystem(), '').recipes;
+
+    assert.equal(rows.length, 50);
+    assert.equal(calls.toJSON, 0, 'no iterative row is cloned to build the cohort');
+    void rows[0].steps;
+    assert.equal(calls.toJSON, 1);
   });
 
   it('memoizes each tier per row, so a second read costs nothing', () => {

@@ -27,6 +27,7 @@
   import ManagerHeaderActions from './ManagerHeaderActions.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
   import { headerBreadcrumbs } from './headerBreadcrumbs.js';
+  import { iterativeStatusChip } from './iterative/iterativeStatusCopy.js';
 
   let {
     header,
@@ -61,6 +62,13 @@
 
   // The iterative editors state the active runs, so the store's memo is watched while one is open.
   $effect(() => iterativeRoute?.watchRuns?.(currentView));
+
+  // An iterative recipe's status, by the rule its library row follows; `null` outside iterative.
+  const recipeStatus = $derived(
+    header.headingVariant === 'recipe-edit'
+      ? iterativeStatusChip(iterativeRoute?.recipeHeaderStatus?.(recipeDraft) ?? null, text)
+      : null
+  );
 
   const crumbs = $derived(
     headerBreadcrumbs({
@@ -105,6 +113,14 @@
             </h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
           </div>
+          {#if recipeStatus}
+            <Chip
+              density="header"
+              tone={recipeStatus.tone}
+              icon={recipeStatus.icon}
+              data-recipe-edit-status={recipeStatus.id}>{recipeStatus.label}</Chip
+            >
+          {/if}
         </div>
       {:else if header.headingVariant === 'component-edit'}
         <!-- The component editor's identity header, which must match the recipe editor's

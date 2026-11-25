@@ -436,6 +436,7 @@ function _buildRecipeRowDetail(recipe, executionSteps, summary, context) {
     requirementsPreview: display.requirementsPreview,
     ingredients: new Array(summary.ingredientCount),
     tools: new Array(display.toolCount),
+    iterative: raw.iterative,
   };
 }
 
@@ -597,7 +598,11 @@ function _createRecipeRow(recipe, context) {
   _defineLazyFields(row, ['enableBlocked'], () => ({
     enableBlocked: _isRecipeEnableBlocked(context.recipeManager, recipe),
   }));
-  _defineLazyFields(row, RECIPE_DETAIL_FIELDS, () =>
+  // An iterative recipe's draft carries its Counter Instances and `Recipe.iterative.step`.
+  const detailFields = recipe.iterative
+    ? [...RECIPE_DETAIL_FIELDS, 'iterative']
+    : RECIPE_DETAIL_FIELDS;
+  _defineLazyFields(row, detailFields, () =>
     _buildRecipeRowDetail(recipe, executionSteps, { isSimple, ...counts }, context)
   );
   return row;
