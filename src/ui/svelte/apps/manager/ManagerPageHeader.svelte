@@ -109,13 +109,6 @@
   ]);
 </script>
 
-<!-- An iterative editor's status, beside its title at the header rung; `hook` names it per editor. -->
-{#snippet statusChip(status, hook)}
-  <Chip density="header" tone={status.tone} icon={status.icon} {...{ [hook]: status.id }}
-    >{status.label}</Chip
-  >
-{/snippet}
-
 {#if !isToolStudioRoute}
   <!-- The trail row, then two blocks, always: the heading and the trailing actions. -->
   <PageHeader class="manager-header" breadcrumbs={crumbs} kicker={header.kicker}>
@@ -131,7 +124,14 @@
             </h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
           </div>
-          {#if recipeStatus}{@render statusChip(recipeStatus, 'data-recipe-edit-status')}{/if}
+          {#if recipeStatus}
+            <Chip
+              density="header"
+              tone={recipeStatus.tone}
+              icon={recipeStatus.icon}
+              data-recipe-edit-status={recipeStatus.id}>{recipeStatus.label}</Chip
+            >
+          {/if}
         </div>
       {:else if header.headingVariant === 'component-edit'}
         <!-- The component editor's identity header, which must match the recipe editor's
@@ -157,7 +157,15 @@
             </h1>
             <p class="manager-subtitle" data-iterative-action-subline>{header.subtitle}</p>
           </div>
-          {#if actionStatus}{@render statusChip(actionStatus, 'data-iterative-action-pill')}{/if}
+          <!-- The recipe editor's chip, in the same slot and at the same rung. -->
+          {#if actionStatus}
+            <Chip
+              density="header"
+              tone={actionStatus.tone}
+              icon={actionStatus.icon}
+              data-iterative-action-pill={actionStatus.id}>{actionStatus.label}</Chip
+            >
+          {/if}
         </div>
       {:else if header.headingVariant === 'downtime-artwork'}
         <!-- A companion's drill-down identity, drawn in core's header from the recipe editor's
