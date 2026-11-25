@@ -108,8 +108,15 @@ export function buildEngine({
   isPrimaryGM = () => true,
   toolBreakage = null,
   stageJournal,
+  richStateOptions = {},
+  richStateMethods = [],
 }) {
-  const rich = new GatheringRichStateService({ environmentStore: store, rollD100, nowWorldTime });
+  const rich = new GatheringRichStateService({
+    environmentStore: store,
+    rollD100,
+    nowWorldTime,
+    ...richStateOptions,
+  });
   const engine = new GatheringEngine({
     environmentStore: store,
     runManager,
@@ -123,6 +130,7 @@ export function buildEngine({
         'commitAcceptedAttempt',
         'revealTask',
         'listRevealedTaskIds',
+        ...richStateMethods,
       ].map((name) => [name, rich[name].bind(rich)])
     ),
     getSystems: () => [system],
@@ -198,6 +206,10 @@ export async function runRealGatheringAttempt({
   beforeStart = null,
   isPrimaryGM = () => true,
   toolBreakage = null,
+  // Real rich-state seams (settings, hooks, evaluator) and extra bound methods, e.g. the stamina
+  // economy and its `evaluateStart` gate.
+  richStateOptions = {},
+  richStateMethods = [],
 } = {}) {
   const { GatheringRunManager } = await import('../../src/systems/GatheringRunManager.js');
   const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
@@ -268,6 +280,8 @@ export async function runRealGatheringAttempt({
       isPrimaryGM,
       toolBreakage,
       stageJournal,
+      richStateOptions,
+      richStateMethods,
     });
     engine.installVersionedRunAuthority({
       consumeExecutionGrant: async (_grant, context) => ({

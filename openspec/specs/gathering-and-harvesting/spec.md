@@ -1237,6 +1237,8 @@ Existing gathering systems without either toggle behave as no-limit.
 12. When stamina is enabled, a gathering task may define a stamina cost.
 13. A start attempt is blocked if the selected actor lacks the required stamina and no GM override is used.
 14. Stamina spend occurs only after start guards pass.
+An accepted gathering attempt spends its stamina cost exactly once, at its start commit.
+A later commit of the same run, at maturity or at terminal resolution, spends none, and the run keeps the start commit's stamina evidence.
 15. Stamina spend, refund, and rollback semantics must be explicit in implementation design before production code changes.
 16. A crafting system lets the GM choose whether stamina regenerates over time, regenerates from explicit rest/provider events, is manual-only, or uses a hybrid of manual and automatic regeneration.
 17. Manual-only stamina means stamina changes only through explicit GM adjustment, approved API calls, or provider events configured by the GM.

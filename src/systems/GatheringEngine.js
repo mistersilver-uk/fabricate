@@ -71,6 +71,7 @@ import {
   normalizeStringList,
   plainObjectOrNull,
   redactRichEvidence,
+  runStartCommit,
   sameActor,
   sameActorUuid,
   stringOrEmpty,
@@ -3328,6 +3329,8 @@ export class GatheringEngine {
   /**
    * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] A timed run
    *   commits at start and maturity; the rich state consumes the node once per run.
+   * @param {object|null} [args.activeRun] The run this terminal commit settles; its start commit
+   *   already spent the stamina. Absent for a start or a single-commit attempt.
    */
   async _commitRichAttempt({
     actor,
@@ -3338,6 +3341,7 @@ export class GatheringEngine {
     viewer = null,
     interactableRef = null,
     phase = 'immediate',
+    activeRun = null,
   }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
     return this.richState.commitAcceptedAttempt({
@@ -3349,6 +3353,7 @@ export class GatheringEngine {
       viewer,
       interactableRef,
       phase,
+      startCommit: runStartCommit(activeRun),
     });
   }
 
@@ -3448,7 +3453,6 @@ export class GatheringEngine {
       checkResult,
       plan,
       activeRun,
-      interactableRef,
       phase,
       initiatedBy,
       opaqueBlind,
@@ -3458,16 +3462,7 @@ export class GatheringEngine {
     const safeTools = opaqueBlind ? [] : (plan.usedTools ?? []);
     const effects = [
       versionedEffect('economy', 'commitGatheringEconomy', { phase }, async () => {
-        state.richEvidence = await this._commitRichAttempt({
-          actor,
-          system,
-          environment,
-          task,
-          outcome,
-          viewer,
-          interactableRef,
-          phase,
-        });
+        state.richEvidence = await this._commitRichAttempt(context);
         return opaqueBlind ? { applied: true } : (cloneJson(state.richEvidence) ?? null);
       }),
       versionedEffect('results', 'createGatheredResults', safeResults, async () => {
