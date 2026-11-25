@@ -2,7 +2,8 @@
  * The recipe editor's step handlers as the root runs them: add, reorder, update, delete, enter
  * multi-step and revert to single-step, each driven from the rendered control and read back from the
  * `updateRecipe` payload Save commits (issue 3010, P4). A non-iterative recipe, `confirmRecipeAction`
- * stubbed for both outcomes.
+ * stubbed for both outcomes; then an iterative system, whose step config moves with the steps and
+ * whose editor offers no multi-set adder.
  */
 import assert from 'node:assert/strict';
 import { afterEach, before, describe, it } from 'node:test';
@@ -303,6 +304,63 @@ export function registerRecipeStepsCases() {
         [{ ...QUENCH, name: 'Edited meanwhile' }],
         'the edit made while the dialog was open is what lands'
       );
+    });
+  });
+
+  // The root's `iterative` flag (`resolutionMode === 'iterative'`) is what moves the step config.
+  describe('recipe step handlers on the root mount, iterative', () => {
+    const ITERATIVE = { alchemyResolutionMode: 'iterative' };
+    const stepOf = (counterId) => ({
+      actions: { mode: 'all', actionIds: [] },
+      hiddenCounterIds: [],
+      lockedCounterIds: [counterId],
+      success: [{ source: 'counter', counterId, op: '>=', value: 3 }],
+      failure: [],
+    });
+    const COUNTERS = [{ counterId: 'heat', start: 0, visible: true }];
+
+    it('enters multi-step by moving Recipe.iterative.step onto step 1', async () => {
+      const calls = [];
+      const step = stepOf('heat');
+      await openEditor(calls, { iterative: { counters: COUNTERS, step } }, ITERATIVE);
+      await press('[data-recipe-step-mode-option="multi"] input[type="radio"]');
+
+      const [, , payload] = await save(calls);
+      assert.deepEqual(payload.steps[0].iterative, step);
+      assert.deepEqual(payload.iterative, { counters: COUNTERS }, 'no step is left on the recipe');
+    });
+
+    it('collapses to step 1 whole, asking with the keep-multi-step cancel', async () => {
+      showFormatData();
+      const calls = [];
+      const steps = [
+        { ...FORGE, iterative: stepOf('heat') },
+        { ...QUENCH, iterative: stepOf('temper') },
+      ];
+      await openEditor(calls, { iterative: { counters: COUNTERS }, steps }, ITERATIVE);
+      await press('[data-recipe-step-mode-option="single"] input[type="radio"]');
+
+      const [[, prompt]] = confirmCalls(calls);
+      assert.equal(prompt.cancelLabel, `${KEY}.Iterative.KeepMultiStep`);
+      assert.equal(prompt.confirmLabel, `${KEY}.Iterative.CollapseConfirm`);
+      const [, , payload] = await save(calls);
+      assert.deepEqual(payload.steps, []);
+      assert.deepEqual(payload.iterative, { counters: COUNTERS, step: stepOf('heat') });
+    });
+
+    it('offers no ingredient-set adder under iterative, where routedByCheck offers it', async () => {
+      const adder = () => target.querySelector('[data-recipe-add="ingredient-set"]');
+      for (const [mode, offered] of [
+        ['iterative', false],
+        ['routedByCheck', true],
+      ]) {
+        await openEditor([], {}, { alchemyResolutionMode: mode });
+        await press('#recipe-tab-ingredients');
+        assert.equal(Boolean(adder()), offered, `${mode}: the Add ingredient set adder`);
+        unmount(mounted);
+        mounted = null;
+        target.remove();
+      }
     });
   });
 }
