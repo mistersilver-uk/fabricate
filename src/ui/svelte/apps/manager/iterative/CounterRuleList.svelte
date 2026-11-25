@@ -24,9 +24,14 @@
   - A rule's source is one `Select`: each counter (sub-line "counter"), Session number, then
     Previous action. A counter or Session number then takes an op and a value; Previous action takes
     a `SetPicker` of actions and has no "is not", because the rule carries only `actionIds`.
-  - A rule that does not parse, or names a counter or action the lists lack, draws its mark.
+  - A rule that does not parse, or names a counter or action the lists lack, draws its mark, which
+    describes its source.
+  - Every edit starts from `rules` as passed, so a rule that is not an object is written back as it
+    was, and removing a rule hands focus to the adder.
 -->
 <script>
+  import { tick } from 'svelte';
+
   import Select from '../../../components/Select.svelte';
   import RuleRow from '../../../components/RuleRow.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
@@ -56,6 +61,9 @@
     onChange = () => {},
     ...rest
   } = $props();
+
+  const uid = $props.id();
+  let root = $state(null);
 
   const GLYPHS = {
     counter: 'fas fa-gauge-simple-high',
@@ -144,12 +152,25 @@
 
   const emit = (nextRules, nextCombine = combine) =>
     onChange({ rules: nextRules, combine: nextCombine });
-  const replaceAt = (index, next) =>
-    emit(
-      next === null
-        ? list.filter((_, at) => at !== index)
-        : list.map((r, at) => (at === index ? next : r))
-    );
+  async function replaceAt(index, next) {
+    const held = arrayOrEmpty(rules);
+    if (next !== null) {
+      emit(held.map((rule, at) => (at === index ? next : rule)));
+      return;
+    }
+    emit(held.filter((_, at) => at !== index));
+    await tick();
+    root?.querySelector('[data-counter-rules-add] [data-rule-row-preset]')?.focus();
+  }
+
+  function sourceName(rule) {
+    if (rule.source === 'sessionCount')
+      return text('FABRICATE.Admin.Manager.Iterative.SourceSession', 'Session number');
+    if (rule.source === 'previousAction')
+      return text('FABRICATE.Admin.Manager.Iterative.SourcePreviousAction', 'Previous action');
+    const held = counterSources.find((counter) => counter.id === rule.counterId);
+    return held?.label ?? String(rule.counterId ?? '');
+  }
 
   const presets = $derived([
     {
@@ -160,28 +181,35 @@
     },
   ]);
 
-  const schema = $derived({
-    head: (rule) => ({
-      glyph: GLYPHS[rule.source] ?? 'fas fa-sliders',
-      title: text('FABRICATE.Admin.Manager.Iterative.RuleTitle', 'When'),
-    }),
+  const head = (rule) => ({
+    glyph: GLYPHS[rule.source] ?? 'fas fa-sliders',
+    title: text('FABRICATE.Admin.Manager.Iterative.RuleTitle', 'When'),
+  });
+  /** One rule's schema, its `source` step a snippet that knows the row's mark id. */
+  const schemaFor = (rule, source) => ({
+    head,
     steps: [
-      { key: 'source', render: sourceStep },
+      { key: 'source', render: source },
       { key: 'predicate', render: predicateStep },
     ],
     labels: {
-      remove: text('FABRICATE.Admin.Manager.Iterative.RemoveRule', 'Remove rule'),
+      remove: interpolate(
+        text('FABRICATE.Admin.Manager.Iterative.RemoveRule', 'Remove {source} rule'),
+        { source: sourceName(rule) }
+      ),
     },
   });
+  const faultIdOf = (index) => `${uid}-rule-${index}-fault`;
 </script>
 
-{#snippet sourceStep(rule, change)}
+{#snippet sourceStep(rule, change, describedBy = '')}
   <Select
     size="inline"
     ariaLabel={text('FABRICATE.Admin.Manager.Iterative.RuleSourceLabel', 'Rule source')}
     value={sourceKey(rule)}
     options={sourceOptions(rule)}
     invalid={Boolean(ruleFault(rule, context))}
+    ariaDescribedBy={describedBy}
     triggerProps={{ 'data-counter-rule-source': '' }}
     onChange={(key) => change(ruleFromSource(rule, key))}
   />
@@ -222,14 +250,14 @@
   {/if}
 {/snippet}
 
-<div class="manager-iterative-rules" data-counter-rules {...rest}>
+<div class="manager-iterative-rules" bind:this={root} data-counter-rules {...rest}>
   {#if combineControl && list.length > 1}
     <SegmentedControl
       options={combineOptions}
       value={combine}
       ariaLabel={text('FABRICATE.Admin.Manager.Iterative.CombineLabel', 'Rules combine')}
       optionDataAttr="data-counter-rules-combine"
-      onChange={(next) => emit(list, next)}
+      onChange={(next) => emit(arrayOrEmpty(rules), next)}
     />
   {/if}
   {#if list.length === 0 && emptyText}
@@ -239,6 +267,9 @@
     <div class="manager-iterative-rules-list" role="list" aria-label={ariaLabel || undefined}>
       {#each list as rule, index (index)}
         {@const fault = ruleFault(rule, context)}
+        {#snippet describedSource(value, change)}
+          {@render sourceStep(value, change, showFaults && fault ? faultIdOf(index) : '')}
+        {/snippet}
         <div class="manager-iterative-rules-item" role="listitem">
           {#if joinerWord && index > 0}
             <span class="manager-iterative-rules-joiner" data-counter-rules-joiner={joiner}
@@ -246,13 +277,14 @@
             >
           {/if}
           <RuleRow
-            {schema}
+            schema={schemaFor(rule, describedSource)}
             value={rule}
             data-counter-rule={index}
             onChange={(next) => replaceAt(index, next)}
           />
           <FaultLine
             faults={showFaults && fault ? [fault] : []}
+            id={faultIdOf(index)}
             sentence={(held) => untrackedSentence(rule, held)}
             {text}
           />
@@ -265,7 +297,7 @@
     value={null}
     {presets}
     data-counter-rules-add
-    onChange={(next) => emit([...list, next])}
+    onChange={(next) => emit([...arrayOrEmpty(rules), next])}
   />
 </div>
 

@@ -8,7 +8,8 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `actions` / `counters` | the library's lists | `[]` | rows, and the Counters their costs name |
-  | `blocking` | `Map` of action id to blocking count | empty | drawn as a chip and read by Has issues |
+  | `blocking` | `Map` of action id to blocking count | empty | the critical issues, drawn as a chip and a danger row |
+  | `issues` | `Map` of action id to issue count | empty | every issue, warnings included, read by Has issues |
   | `selectedSystemId` | string | `''` | a change of system resets the filters |
   | `unsupported` | boolean | `false` | a library newer than this build: a blocking Notice, no list |
   | `browserState` | the shell's lifted browse state | `null` | falls back to a local one |
@@ -17,7 +18,8 @@
   Invariants:
   - Search, filters, page, page size and arrangement live on the lifted state, so they survive the
     editor round trip, and are never persisted.
-  - `New action` is disabled, with its reason, while the system has no Counters.
+  - `New action` is disabled, with its reason, while the system has no Counters, and the empty
+    state of a system with no Counters offers no button, as there is nothing to act on here.
 -->
 <script>
   import Button from '../../../components/Button.svelte';
@@ -48,6 +50,7 @@
     actions = [],
     counters = [],
     blocking = new Map(),
+    issues = new Map(),
     selectedSystemId = '',
     unsupported = false,
     browserState = $bindable(null),
@@ -86,12 +89,12 @@
   );
 
   function matches(action) {
-    const issues = blocking.get(action.id) ?? 0;
+    const issueCount = issues.get(action.id) ?? 0;
     const haystack = `${action.label} ${action.description ?? ''}`.toLowerCase();
     if (needle && !haystack.includes(needle)) return false;
     if (ui.rollsCheck && action.check !== 'roll') return false;
     if (ui.noCheck && action.check === 'roll') return false;
-    if (ui.hasIssues && issues === 0) return false;
+    if (ui.hasIssues && issueCount === 0) return false;
     if (category === NO_CATEGORY) return (action.categories ?? []).length === 0;
     return !category || (action.categories ?? []).includes(category);
   }
@@ -252,16 +255,16 @@
           hint={emptyHint}
           data-iterative-actions-empty={hasCounters ? 'no-actions' : 'no-counters'}
         >
-          <Button
-            role="primary"
-            icon="fas fa-plus"
-            data-iterative-empty-new-action
-            disabled={!hasCounters}
-            tooltip={hasCounters ? '' : noCountersReason}
-            onclick={onNew}
-          >
-            {text('FABRICATE.Admin.Manager.Iterative.NewAction', 'New action')}
-          </Button>
+          {#if hasCounters}
+            <Button
+              role="primary"
+              icon="fas fa-plus"
+              data-iterative-empty-new-action
+              onclick={onNew}
+            >
+              {text('FABRICATE.Admin.Manager.Iterative.NewAction', 'New action')}
+            </Button>
+          {/if}
         </EmptyState>
       {/snippet}
       {#snippet emptyFiltered()}
@@ -290,14 +293,14 @@
       {#snippet footer()}
         <Button
           role="dashed"
+          icon="fas fa-plus"
           class="manager-iterative-new-action"
           data-iterative-footer-new-action
           disabled={!hasCounters}
           tooltip={hasCounters ? '' : noCountersReason}
           onclick={onNew}
         >
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Iterative.NewAction', 'New action')}</span>
+          {text('FABRICATE.Admin.Manager.Iterative.AddAction', 'Action')}
         </Button>
       {/snippet}
     </LibraryShelf>
@@ -306,16 +309,6 @@
 
 <style>
   /* The browser's own three rows: the filter bar, the scrolling shelf, then the pager. */
-  .manager-iterative-screen {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    min-width: 0;
-    min-height: 0;
-    padding: var(--fab-space-4);
-    overflow-y: auto;
-  }
-
   .manager-iterative-screen.is-browser {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;

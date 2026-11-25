@@ -8,13 +8,14 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `route` | the `iterativeRouteModel` instance | — | the staged `actionDraft`, `actionIssues`, the library lists, `routedCheck`, `editAction` and `openChecks` |
+  | `route` | the `iterativeRouteModel` instance | — | the staged `actionDraft`, `actionBlockingIssues`, the library lists, `routedCheck`, `editAction` and `openChecks` |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
   Invariants:
   - A library newer than this build draws its Notice and no card.
   - The blocking Notice, the header pill and every mark come from `evaluateIterativeReadiness` and
-    `iterativeFieldFaults.js` over the same unsaved draft, so they agree with Validation after a Save.
+    `iterativeFieldFaults.js` over the same unsaved draft, so they agree with Validation after a Save;
+    the Notice and the pill count only critical issues, and a warning draws only its mark.
   - C6 mounts its in-progress `Callout` as this root's first child, above the blocking Notice and
     the Identity card; nothing is reserved there until it does.
 -->
@@ -43,7 +44,7 @@
     tierIds: new Set(tiers.map((tier) => tier.id)),
   });
   const faults = $derived(draft ? actionLevelFaults(draft) : []);
-  const issueCount = $derived(route.actionIssues.length);
+  const issueCount = $derived(route.actionBlockingIssues.length);
   const name = $derived(
     draft?.label?.trim() || text('FABRICATE.Admin.Manager.Iterative.UnnamedAction', 'New action')
   );
@@ -53,11 +54,11 @@
       issueCount === 1
         ? text(
             'FABRICATE.Admin.Manager.Iterative.BlockingOne',
-            '1 blocking issue. Players cannot take {name} until it is fixed; it is marked below. The action still saves.'
+            '1 blocking issue. Players can’t take {name} until it is fixed; it is marked below. The action still saves.'
           )
         : text(
             'FABRICATE.Admin.Manager.Iterative.Blocking',
-            '{count} blocking issues. Players cannot take {name} until they are fixed; each is marked below. The action still saves.'
+            '{count} blocking issues. Players can’t take {name} until they are fixed; each is marked below. The action still saves.'
           ),
       { count: issueCount, name }
     )
@@ -104,20 +105,25 @@
 </div>
 
 <style>
-  .manager-iterative-screen {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    min-width: 0;
-    min-height: 0;
-    padding: var(--fab-space-4);
-    overflow-y: auto;
-  }
-
   .manager-iterative-editor :global(.manager-iterative-card-body) {
     display: grid;
     gap: var(--fab-space-3);
     min-width: 0;
+  }
+
+  /* The connective words ("from", "by") sit on the 30px control rung, not centred on a field's token row. */
+  .manager-iterative-editor :global(.manager-iterative-word) {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    min-height: 30px;
+    color: var(--fab-text-secondary);
+    font-size: 0.72rem;
+  }
+
+  /* A segmented control in a card's grid keeps its own width rather than stretching an empty track. */
+  .manager-iterative-editor :global(.manager-iterative-start) {
+    justify-self: start;
   }
 
   .manager-iterative-editor :global(.manager-iterative-note),

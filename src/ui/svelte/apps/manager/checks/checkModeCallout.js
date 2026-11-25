@@ -43,6 +43,8 @@ function fact(id, value) {
 const REQUIRED = ['StateRequired', 'Required'];
 const OPTIONAL = ['StateOptional', 'Optional'];
 const FIXED_D100 = ['StateFixedD100', 'Fixed d100'];
+// Iterative: the routed slot has no off state, yet a Crafting Action may roll no check.
+const PER_ACTION = ['StatePerAction', 'Per action'];
 
 /**
  * Every mode, keyed `<activity>:<mode>`. `crafting:alchemy` is keyed by the ALCHEMY CHECK MODE,
@@ -147,7 +149,7 @@ const BASE_MODES = {
       'IterativeBody',
       'One check for the whole system. Each action either rolls it or doesn’t.',
     ],
-    facts: ['check:optional', 'outcomes:tiers', 'results:counters'],
+    facts: ['check:perAction', 'outcomes:tiers', 'results:counters'],
   },
   'gathering:d100': {
     icon: 'fas fa-percent',
@@ -185,6 +187,7 @@ const FACT_VALUES = Object.freeze({
   'check:required': REQUIRED,
   'check:optional': OPTIONAL,
   'check:fixedD100': FIXED_D100,
+  'check:perAction': PER_ACTION,
   'outcomes:tiers': ['OutcomesTiers', '{count} tiers'],
   'outcomes:passFail': ['OutcomesPassFail', 'Pass or fail'],
   'outcomes:ordered': ['OutcomesOrdered', 'An ordered list'],

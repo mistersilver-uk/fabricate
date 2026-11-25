@@ -9,10 +9,11 @@ import { interpolate } from '../checks/checksCopy.js';
 import { counterUseLines } from './iterativeCounterCopy.js';
 import { usageCounts } from './iterativeLibraryModel.js';
 
-const DELETE = ['FABRICATE.Admin.Manager.Delete', 'Delete'];
+const CANCEL = ['FABRICATE.Admin.Manager.Cancel', 'Cancel'];
 
 const COUNTER_COPY = (text) => ({
   kind: 'counter',
+  confirm: text('FABRICATE.Admin.Manager.Iterative.DeleteCounterConfirm', 'Delete counter'),
   title: text('FABRICATE.Admin.Manager.Iterative.DeleteCounterTitle', 'Delete {name}?'),
   unused: text(
     'FABRICATE.Admin.Manager.Iterative.DeleteCounterUnused',
@@ -28,12 +29,13 @@ const COUNTER_COPY = (text) => ({
   ),
   consequence: text(
     'FABRICATE.Admin.Manager.Iterative.DeleteCounterConsequence',
-    'Each will need another counter. Workpieces in progress are not affected.'
+    'Each of these will need another counter. Workpieces in progress aren’t affected.'
   ),
 });
 
 const ACTION_COPY = (text) => ({
   kind: 'action',
+  confirm: text('FABRICATE.Admin.Manager.Iterative.DeleteActionConfirm', 'Delete action'),
   title: text('FABRICATE.Admin.Manager.Iterative.DeleteActionTitle', 'Delete {name}?'),
   unused: text(
     'FABRICATE.Admin.Manager.Iterative.DeleteActionUnused',
@@ -49,7 +51,7 @@ const ACTION_COPY = (text) => ({
   ),
   consequence: text(
     'FABRICATE.Admin.Manager.Iterative.DeleteActionConsequence',
-    'Each will need another action. Workpieces in progress are not affected.'
+    'Each of these will need another action. Workpieces in progress aren’t affected.'
   ),
 });
 
@@ -70,8 +72,8 @@ async function confirmDelete({ confirmDialog, text, entry, uses, copyOf }) {
   const confirmed = await confirmDialog?.({
     title: interpolate(copy.title, { name }),
     content: confirmBody({ name, uses, text, copy }),
-    yes: { label: text(...DELETE), callback: () => true },
-    no: { callback: () => false },
+    yes: { label: copy.confirm, callback: () => true },
+    no: { label: text(...CANCEL), callback: () => false },
   });
   return confirmed === true;
 }

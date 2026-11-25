@@ -60,9 +60,19 @@ export function counterUsageText(uses, text) {
     : text('FABRICATE.Admin.Manager.Iterative.UsageNone', 'Not used yet');
 }
 
-/** One use as a line: an action's label, or a step as "Recipe › Step". */
+const useKinds = (text) => ({
+  cost: text('FABRICATE.Admin.Manager.Iterative.UseCost', '{name} · cost'),
+  effect: text('FABRICATE.Admin.Manager.Iterative.UseEffect', '{name} · effect'),
+  costEffect: text('FABRICATE.Admin.Manager.Iterative.UseCostEffect', '{name} · cost and effect'),
+  rule: text('FABRICATE.Admin.Manager.Iterative.UseRule', '{name} · rule'),
+});
+
+/** One use as a line: an action as "Hammer · cost and effect", or a step as "Recipe › Step". */
 export function counterUseLines(uses, text) {
-  const actions = uses.actions.map((action) => action.label);
+  const kinds = useKinds(text);
+  const actions = uses.actions.map((action) =>
+    kinds[action.kind] ? interpolate(kinds[action.kind], { name: action.label }) : action.label
+  );
   const steps = uses.steps.map((step) =>
     interpolate(text('FABRICATE.Admin.Manager.Iterative.UseStep', '{recipe} › {step}'), {
       recipe: step.recipeName,

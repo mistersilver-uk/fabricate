@@ -184,7 +184,7 @@ export function createIterativeLibrarySection({
     confirmDiscardDirtyActionDraft: () =>
       confirmDiscardDirty(
         'FABRICATE.Admin.Manager.Iterative.DiscardDirtyContent',
-        'The current action has unsaved changes. Discard them and continue?'
+        'The current action has unsaved changes. Save them and continue, or discard them?'
       ),
   };
 }

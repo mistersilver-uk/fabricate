@@ -13,10 +13,12 @@
   | `edit(change)` | function | no-op | runs `change(draft)`, the only way this card writes |
 
   Invariants:
-  - "Uses a session" is a staged `aria-pressed` toggle, because the editor applies on Save.
+  - "Uses a session" is a staged `aria-pressed` toggle, because the editor applies on Save, named by a
+    snippet so its name is never capped, and described by the session note beside it.
 -->
 <script>
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { arrayOrEmpty } from '../../../../../utils/scalars.js';
 
@@ -32,6 +34,8 @@
     edit = () => {},
   } = $props();
 
+  const uid = $props.id();
+  const noteId = `${uid}-session-note`;
   const usesSession = $derived(draft.usesSession !== false);
   const marks = $derived(faults.filter((fault) => fault.field === 'availability'));
   const sessionNote = $derived(
@@ -50,6 +54,11 @@
   }
 </script>
 
+{#snippet usesSessionName()}{text(
+    'FABRICATE.Admin.Manager.Iterative.UsesSession',
+    'Uses a session'
+  )}{/snippet}
+
 <InspectorCard data-iterative-section="taken">
   {#snippet title()}{text(
       'FABRICATE.Admin.Manager.Iterative.SectionTaken',
@@ -63,19 +72,19 @@
     <div class="manager-iterative-toggle-line">
       <StatusToggle
         on={usesSession}
-        label={text('FABRICATE.Admin.Manager.Iterative.UsesSession', 'Uses a session')}
-        ariaLabel={text('FABRICATE.Admin.Manager.Iterative.UsesSession', 'Uses a session')}
+        label={usesSessionName}
+        aria-describedby={noteId}
         data-iterative-uses-session
         onclick={() =>
           edit((action) => {
             action.usesSession = !usesSession;
           })}
       />
-      <span class="manager-iterative-note" data-iterative-session-note>{sessionNote}</span>
+      <span class="manager-iterative-note" id={noteId} data-iterative-session-note
+        >{sessionNote}</span
+      >
     </div>
-    <div class="manager-iterative-rules-heading">
-      {text('FABRICATE.Admin.Manager.Iterative.CounterRulesHeading', 'Counters')}
-    </div>
+    <Kicker>{text('FABRICATE.Admin.Manager.Iterative.CounterRulesHeading', 'Counters')}</Kicker>
     <CounterRuleList
       rules={arrayOrEmpty(draft.availability?.rules)}
       combine={draft.availability?.combine ?? 'all'}
@@ -100,11 +109,5 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-3);
-  }
-
-  .manager-iterative-rules-heading {
-    color: var(--fab-text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
   }
 </style>

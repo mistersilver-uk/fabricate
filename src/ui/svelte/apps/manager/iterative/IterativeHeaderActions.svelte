@@ -85,6 +85,7 @@
       route.actionSaving ||
       route.unsupported}
     tooltip={route.isActionDirty && !route.isNewAction ? dirtyReason : ''}
+    description={route.isActionDirty && !route.isNewAction ? dirtyReason : ''}
     onclick={route.duplicateAction}
   >
     {text('FABRICATE.Admin.Manager.Iterative.Duplicate', 'Duplicate')}

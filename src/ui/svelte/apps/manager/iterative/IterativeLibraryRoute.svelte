@@ -57,6 +57,7 @@
       actions={route.actions}
       counters={route.counters}
       blocking={route.actionBlocking}
+      issues={route.actionIssueTotals}
       selectedSystemId={route.systemId}
       unsupported={route.unsupported}
       browserState={route.actionsBrowse}
@@ -68,3 +69,16 @@
     <ActionEditorView {route} {text} />
   {/if}
 </main>
+
+<style>
+  /* Every screen's one scrolling column; the Actions browser lays out its own rows over it. */
+  main > :global(.manager-iterative-screen) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--fab-space-4);
+    overflow-y: auto;
+  }
+</style>

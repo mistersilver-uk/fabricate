@@ -25,6 +25,7 @@
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { interpolate } from '../checks/checksCopy.js';
 
+  import FaultLine from './FaultLine.svelte';
   import { counterBoundsError } from './iterativeCounterCopy.js';
   import { counterNameFault } from './iterativeLibraryModel.js';
 
@@ -41,6 +42,7 @@
   const fault = $derived(counterNameFault(counters, counter.id, typed ?? counter.label));
   const shownName = $derived(typed ?? counter.label);
   const nameId = $derived(`iterative-counter-name-note-${counter.id}`);
+  const boundsId = $derived(`iterative-counter-bounds-note-${counter.id}`);
   const limit = $derived(counter.limit ?? 'none');
   const boundsError = $derived(counterBoundsError(counter, text));
   const isGlobal = $derived(limit === 'global');
@@ -114,13 +116,9 @@
     />
   </Field>
   {#if fault}
-    <p
-      class="manager-iterative-counter-note is-danger"
-      id={nameId}
-      data-iterative-name-error={fault}
-    >
-      {faultText}
-    </p>
+    <div data-iterative-name-error={fault}>
+      <FaultLine faults={[{ message: faultText }]} id={nameId} {text} />
+    </div>
   {/if}
 
   <Field as="label">
@@ -161,7 +159,11 @@
               ariaLabel={names.ariaLabel}
               decrementLabel={names.decrementLabel}
               incrementLabel={names.incrementLabel}
-              inputProps={{ 'data-iterative-counter-bound': bound.key }}
+              inputProps={{
+                'data-iterative-counter-bound': bound.key,
+                'aria-invalid': boundsError ? 'true' : undefined,
+                'aria-describedby': boundsError ? boundsId : undefined,
+              }}
               onChange={(next) => onUpdate({ [bound.key]: next })}
             />
             {#if isPerRecipe && typeof counter[bound.key] === 'number'}
@@ -182,9 +184,9 @@
       {/if}
     </div>
     {#if boundsError}
-      <p class="manager-iterative-counter-note is-danger" data-iterative-bounds-error>
-        {boundsError}
-      </p>
+      <div data-iterative-bounds-error>
+        <FaultLine faults={[{ message: boundsError }]} id={boundsId} {text} />
+      </div>
     {/if}
     <p class="manager-iterative-counter-note">{limitHint}</p>
   </Field>
@@ -222,9 +224,5 @@
     font-size: 0.66rem;
     line-height: 1.5;
     text-wrap: pretty;
-  }
-
-  .manager-iterative-counter-note.is-danger {
-    color: var(--fab-danger-text);
   }
 </style>

@@ -17,7 +17,8 @@
   | `edit(change)` | function | no-op | runs `change(draft)`, the only way this card writes |
 
   Invariants:
-  - Removing an effect hands focus to the adder, because the removed row's controls are gone.
+  - Removing an effect hands focus to the adder, because the removed row's controls are gone, and
+    adding one focuses its name.
 -->
 <script>
   import { tick } from 'svelte';
@@ -76,7 +77,12 @@
       change(action.effects[effects.indexOf(effect)]);
     });
 
-  function addEffect() {
+  const nameLabel = (effect) =>
+    interpolate(text('FABRICATE.Admin.Manager.Iterative.EffectNameLabel', 'Effect {number} name'), {
+      number: effects.indexOf(effect) + 1,
+    });
+
+  async function addEffect() {
     const id = deriveIterativeId(
       '',
       'effect',
@@ -95,6 +101,8 @@
       ];
     });
     openId = id;
+    await tick();
+    section?.querySelector(`[data-iterative-effect-name="${id}"]`)?.focus();
   }
 
   async function removeEffect(effect) {
@@ -161,7 +169,7 @@
             <input
               type="text"
               data-iterative-effect-name={effect.id}
-              aria-label={nameOf(effect)}
+              aria-label={nameLabel(effect)}
               placeholder={nameOf(effect)}
               value={effect.name ?? ''}
               oninput={(event) =>
@@ -173,9 +181,9 @@
           </Field>
           <span
             class="manager-iterative-effect-summary"
-            title={effectSummary(effect, { counterLabel: counterLabel(effect), rolls }, text)}
+            title={effectSummary(effect, { counterLabel: counterLabel(effect) }, text)}
           >
-            {effectSummary(effect, { counterLabel: counterLabel(effect), rolls }, text)}
+            {effectSummary(effect, { counterLabel: counterLabel(effect) }, text)}
           </span>
           {#if openId !== effect.id}
             <FaultLine faults={faultsOf(effect)} {text} />

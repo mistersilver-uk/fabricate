@@ -17,7 +17,8 @@
 
   Invariants:
   - The reading calls `evaluateIterativeExpression` with no state and no dice, so only a constant
-    resolves; anything else reads "Resolves each attempt".
+    resolves; anything else that parses reads "Resolves each attempt", and one that does not parse
+    draws no reading, only its mark.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -51,6 +52,7 @@
     ...counters.map((counter) => `@counter.${counter.id}`),
   ]);
   const blocking = $derived(faults.some((fault) => !isWarningFault(fault)));
+  const unparsed = $derived(faults.some((fault) => fault.code === 'iterativeInvalidExpression'));
 
   function resolve(expression) {
     const outcome = evaluateIterativeExpression(expression, {
@@ -73,7 +75,7 @@
       {value}
       {tokens}
       tokensLabel={text('FABRICATE.Admin.Manager.Iterative.AmountTokens', 'Insert a value')}
-      {resolve}
+      resolve={unparsed ? undefined : resolve}
       unresolvedLabel={text(
         'FABRICATE.Admin.Manager.Iterative.AmountUnresolved',
         'Resolves each attempt'
@@ -85,8 +87,10 @@
 </div>
 
 <style>
+  /* Capped, so a long amount does not push its counter and toggle off the line. */
   .manager-iterative-amount {
     display: grid;
+    flex: 0 1 18rem;
     gap: var(--fab-space-1);
     min-width: 0;
   }

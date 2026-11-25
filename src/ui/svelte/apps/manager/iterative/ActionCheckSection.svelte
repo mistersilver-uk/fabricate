@@ -16,8 +16,10 @@
 
   Invariants:
   - The routed slot has no off state: an action without a check is the No check choice.
-  - A routed check with no usable roll replaces the facts with a warning Notice carrying the same
-    way to Checks.
+  - A routed check with no usable roll replaces the note and the facts with a warning Notice
+    carrying the one way to Checks.
+  - Choosing No check clears every effect's check conditions in the staged draft, because no check
+    fact can hold without a roll; Discard restores them.
 -->
 <script>
   import Button from '../../../components/Button.svelte';
@@ -28,6 +30,7 @@
   import Notice from '../../../components/Notice.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { hasActiveCheck } from '../../../../../systems/salvageCheckUsability.js';
+  import { arrayOrEmpty, isPlainObject } from '../../../../../utils/scalars.js';
   import { interpolate } from '../checks/checksCopy.js';
   import { routedCheckFacts } from '../recipe/routedCheckFacts.js';
 
@@ -65,29 +68,50 @@
     },
     {
       icon: 'fas fa-plus',
-      label: text('FABRICATE.Admin.Manager.Iterative.CheckFactResult', 'Result'),
+      label: text('FABRICATE.Admin.Manager.Checks.Count.ProductTitle', 'What the roll produces'),
       value:
         facts.evaluation.product === 'count'
-          ? text('FABRICATE.Admin.Manager.Iterative.CheckFactCount', 'Count')
-          : text('FABRICATE.Admin.Manager.Iterative.CheckFactSum', 'Sum'),
+          ? text('FABRICATE.Admin.Manager.Checks.Count.ProductCount', 'Count successes')
+          : text('FABRICATE.Admin.Manager.Checks.Count.ProductSum', 'Add the dice'),
       props: { 'data-iterative-check-fact': 'product' },
     },
     {
       icon: 'fas fa-arrows-up-down',
-      label: text('FABRICATE.Admin.Manager.Iterative.CheckFactDirection', 'Wins'),
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionTitle',
+        'Which way is better'
+      ),
       value:
         facts.evaluation.direction === 'under'
-          ? text('FABRICATE.Admin.Manager.Iterative.CheckFactUnder', 'Under')
-          : text('FABRICATE.Admin.Manager.Iterative.CheckFactOver', 'Over'),
+          ? text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionUnder', 'Lower is better')
+          : text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionOver', 'Higher is better'),
       props: { 'data-iterative-check-fact': 'direction' },
     },
     {
       icon: 'fas fa-layer-group',
       label: text('FABRICATE.Admin.Manager.Iterative.CheckFactOutcomes', 'Outcomes'),
-      value: String(facts.tiers.length),
+      value:
+        facts.tiers.length === 1
+          ? text('FABRICATE.Admin.Manager.Iterative.CheckFactTiersOne', '1 outcome tier')
+          : interpolate(
+              text('FABRICATE.Admin.Manager.Iterative.CheckFactTiers', '{count} outcome tiers'),
+              { count: facts.tiers.length }
+            ),
       props: { 'data-iterative-check-fact': 'outcomes' },
     },
   ]);
+
+  const CHECK_FACTS = ['checkOutcomeIds', 'success', 'value'];
+
+  function setCheck(next) {
+    edit((action) => {
+      action.check = next;
+      if (next !== 'none') return;
+      for (const effect of arrayOrEmpty(action.effects)) {
+        if (isPlainObject(effect?.when)) for (const key of CHECK_FACTS) delete effect.when[key];
+      }
+    });
+  }
 
   const openChecksLabel = $derived(
     text('FABRICATE.Admin.Manager.Iterative.OpenChecks', 'Open Checks')
@@ -109,16 +133,14 @@
       )}
     </p>
     <SegmentedControl
+      class="manager-iterative-start"
       {options}
       value={draft.check}
       ariaLabel={text('FABRICATE.Admin.Manager.Iterative.SectionCheck', 'Check')}
       optionDataAttr="data-iterative-check-option"
-      onChange={(next) =>
-        edit((action) => {
-          action.check = next;
-        })}
+      onChange={setCheck}
     />
-    {#if rolls}
+    {#if rolls && usable}
       <Callout
         tone="info"
         text={text(
@@ -138,32 +160,30 @@
           </Button>
         {/snippet}
       </Callout>
-      {#if usable}
-        <InfoStrip
-          label={text('FABRICATE.Admin.Manager.Iterative.CheckStripLabel', 'Crafting check')}
-          facts={strip}
-          data-iterative-check-facts
-          data-iterative-check-product={facts.evaluation.product}
-          data-iterative-check-direction={facts.evaluation.direction}
-        />
-      {:else}
-        <Notice
-          tone="warning"
-          title={interpolate(
-            text(
-              'FABRICATE.Admin.Manager.Iterative.CheckMissing',
-              '{system} has no crafting check set up, so this action cannot be taken.'
-            ),
-            { system: systemName }
-          )}
-          detail={text(
-            'FABRICATE.Admin.Manager.Iterative.CheckMissingDetail',
-            'Set one up in Checks or choose No check.'
-          )}
-          action={{ label: openChecksLabel, onClick: onOpenChecks }}
-          data-iterative-check-missing
-        />
-      {/if}
+      <InfoStrip
+        label={text('FABRICATE.Admin.Manager.Iterative.CheckStripLabel', 'Crafting check')}
+        facts={strip}
+        data-iterative-check-facts
+        data-iterative-check-product={facts.evaluation.product}
+        data-iterative-check-direction={facts.evaluation.direction}
+      />
+    {:else if rolls}
+      <Notice
+        tone="warning"
+        title={interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Iterative.CheckMissing',
+            '{system} has no crafting check set up, so this action can’t be taken.'
+          ),
+          { system: systemName }
+        )}
+        detail={text(
+          'FABRICATE.Admin.Manager.Iterative.CheckMissingDetail',
+          'Set one up in Checks or choose No check.'
+        )}
+        action={{ label: openChecksLabel, onClick: onOpenChecks }}
+        data-iterative-check-missing
+      />
     {:else if draft.check === 'none'}
       <p class="manager-iterative-note" data-iterative-no-check>
         {text(

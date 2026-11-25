@@ -19,6 +19,8 @@
   Invariants:
   - With a search term the list is not reorderable, because filtered indexes are not the persisted order.
   - A persisted duplicate name opens its row, and the row cannot be collapsed while it holds.
+  - A delete is announced through the screen's own live region, which outlives the list when the
+    last row goes, and hands focus to the next row, the previous one, or the adder.
 -->
 <script>
   import { tick } from 'svelte';
@@ -85,7 +87,9 @@
   const usage = $derived(
     new Map(counters.map((counter) => [counter.id, counterUses({ actions }, recipes, counter.id)]))
   );
-  const explainerExample = $derived(counters[0]?.label || 'Heat');
+  const explainerExample = $derived(
+    counters[0]?.label || text('FABRICATE.Admin.Manager.Iterative.ExplainerExample', 'Heat')
+  );
 
   const countText = $derived(
     interpolate(text('FABRICATE.Admin.Manager.Iterative.CountersCount', '{shown} of {total}'), {
@@ -94,17 +98,25 @@
     })
   );
 
+  /** Focuses the row now at `index`, else the one before it, else the adder. */
+  function focusAfterDelete(index) {
+    const rows = [...(screen?.querySelectorAll('[data-iterative-counter]') ?? [])];
+    const row = rows[index] ?? rows[index - 1];
+    const next = row?.querySelector('[data-sortable-disclosure]');
+    (next ?? screen?.querySelector('[data-iterative-add-counter]'))?.focus();
+  }
+
   async function remove(counter) {
+    const index = visible.indexOf(counter);
     const deleted = await onDelete(counter, usage.get(counter.id));
     if (!deleted) return;
+    announcement = '';
+    await tick();
     announcement = interpolate(
       text('FABRICATE.Admin.Manager.Iterative.CounterDeleted', '{name} deleted.'),
-      {
-        name: counter.label,
-      }
+      { name: counter.label }
     );
-    await tick();
-    announcement = '';
+    focusAfterDelete(index);
   }
 
   $effect(() => {
@@ -197,7 +209,6 @@
         onToggle={onExpand}
         onReorder={(from, to) => onReorder(from, to)}
         onRemove={remove}
-        {announcement}
         data-iterative-counter-list
         rowData={(counter) => ({ 'data-iterative-counter': counter.id })}
         removeData={(counter) => ({ 'data-iterative-counter-delete': counter.id })}
@@ -229,28 +240,24 @@
         {/snippet}
         {#snippet footer()}
           <li class="manager-iterative-counter-add">
-            <Button role="dashed" fullWidth data-iterative-add-counter onclick={onAdd}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Iterative.AddCounter', 'Add counter')}</span>
+            <Button
+              role="dashed"
+              fullWidth
+              icon="fas fa-plus"
+              data-iterative-add-counter
+              onclick={onAdd}
+            >
+              {text('FABRICATE.Admin.Manager.Iterative.AddCounter', 'Add counter')}
             </Button>
           </li>
         {/snippet}
       </SortableList>
     {/if}
   {/if}
+  <p class="visually-hidden" aria-live="polite" data-iterative-counters-status>{announcement}</p>
 </div>
 
 <style>
-  .manager-iterative-screen {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    min-width: 0;
-    min-height: 0;
-    padding: var(--fab-space-4);
-    overflow-y: auto;
-  }
-
   .manager-iterative-counter-label {
     flex: 1 1 auto;
     min-width: 0;

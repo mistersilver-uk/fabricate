@@ -24,13 +24,14 @@
   import Chip from '../../../components/Chip.svelte';
   import Field from '../../../components/Field.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Select from '../../../components/Select.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { arrayOrEmpty } from '../../../../../utils/scalars.js';
-  import { bandToneFor } from '../checks/checkBandModel.js';
+  import { BAND_CHIP_TONES, bandToneFor } from '../checks/checkBandModel.js';
 
   import ActionExpressionField from './ActionExpressionField.svelte';
   import CounterRuleList from './CounterRuleList.svelte';
@@ -50,13 +51,8 @@
     change = () => {},
   } = $props();
 
-  const CHIP_TONES = {
-    danger: 'danger',
-    warning: 'warning',
-    success: 'positive',
-    info: 'info',
-    accent: 'accent',
-  };
+  const uid = $props.id();
+  const lineFaultId = `${uid}-line-fault`;
 
   const when = $derived(effect.when ?? {});
   const combine = $derived(when.combine ?? 'all');
@@ -66,6 +62,12 @@
   );
   const compare = $derived(when.value ?? null);
   const counterIds = $derived(new Set(counters.map((counter) => counter.id)));
+  const lineFaults = $derived(
+    open ? faults.filter((fault) => !isAmountFault(fault) && fault.field !== 'rule') : []
+  );
+  const targetMissing = $derived(
+    typeof effect.target?.counterId === 'string' && !counterIds.has(effect.target.counterId)
+  );
 
   const combineOptions = $derived([
     { value: 'all', label: text('FABRICATE.Admin.Manager.Iterative.CombineAll', 'All must hold') },
@@ -126,10 +128,9 @@
   </Field>
 
   <div class="manager-iterative-when" data-iterative-effect-when>
-    <div class="manager-iterative-subheading">
-      {text('FABRICATE.Admin.Manager.Iterative.AppliesWhen', 'Applies when')}
-    </div>
+    <Kicker>{text('FABRICATE.Admin.Manager.Iterative.AppliesWhen', 'Applies when')}</Kicker>
     <SegmentedControl
+      class="manager-iterative-start"
       options={combineOptions}
       value={combine}
       ariaLabel={text('FABRICATE.Admin.Manager.Iterative.AppliesWhen', 'Applies when')}
@@ -149,7 +150,7 @@
             onChange={(on) => toggleTier(tier.id, on)}
           >
             {#snippet label()}
-              <Chip tone={CHIP_TONES[bandToneFor(position, tiers.length)] ?? 'neutral'}
+              <Chip tone={BAND_CHIP_TONES[bandToneFor(position, tiers.length)] ?? 'neutral'}
                 >{tier.name}</Chip
               >
             {/snippet}
@@ -230,6 +231,9 @@
         )}
       </p>
     {/if}
+    <p class="manager-iterative-note" data-iterative-effect-footnote>
+      {whenFootnote(combine, text)}
+    </p>
     <div class="manager-iterative-subheading">
       {text('FABRICATE.Admin.Manager.Iterative.WorkpieceRules', 'Workpiece rules')}
     </div>
@@ -245,15 +249,10 @@
       data-iterative-effect-rules
       onChange={({ rules }) => setWhen('rules', rules)}
     />
-    <p class="manager-iterative-note" data-iterative-effect-footnote>
-      {whenFootnote(combine, text)}
-    </p>
   </div>
 
   <div class="manager-iterative-effect-line" data-iterative-effect-line>
-    <div class="manager-iterative-subheading">
-      {text('FABRICATE.Admin.Manager.Iterative.EffectHeading', 'Effect')}
-    </div>
+    <Kicker>{text('FABRICATE.Admin.Manager.Iterative.EffectHeading', 'Effect')}</Kicker>
     <div class="manager-iterative-when-line">
       <SegmentedControl
         options={effectOpOptions(text)}
@@ -273,6 +272,8 @@
         )}
         value={effect.target?.counterId ?? null}
         options={counterOptions}
+        invalid={targetMissing}
+        ariaDescribedBy={targetMissing && lineFaults.length > 0 ? lineFaultId : ''}
         triggerProps={{ 'data-iterative-effect-counter': '' }}
         onChange={(next) =>
           change((entry) => {
@@ -298,10 +299,7 @@
           })}
       />
     </div>
-    {#if open}<FaultLine
-        faults={faults.filter((fault) => !isAmountFault(fault) && fault.field !== 'rule')}
-        {text}
-      />{/if}
+    <FaultLine faults={lineFaults} id={lineFaultId} {text} />
   </div>
 </div>
 
@@ -330,12 +328,6 @@
     color: var(--fab-text-secondary);
     font-size: 0.72rem;
     font-weight: 600;
-  }
-
-  .manager-iterative-word {
-    align-self: center;
-    color: var(--fab-text-secondary);
-    font-size: 0.72rem;
   }
 
   .manager-iterative-optional {

@@ -51,10 +51,6 @@
 </script>
 
 <InspectorCard data-iterative-section="identity">
-  {#snippet title()}{text(
-      'FABRICATE.Admin.Manager.Iterative.SectionIdentity',
-      'Identity'
-    )}{/snippet}
   <div class="manager-iterative-card-body">
     <div class="manager-iterative-identity-line">
       <Field as="div" data-iterative-action-icon="">
