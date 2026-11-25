@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+
 import { forgeRecipe, iterativeCommandWorld } from './helpers/iterativeCommandWorld.js';
 
 async function startedWorld(options = {}) {
@@ -148,6 +150,18 @@ describe('a terminal failure', () => {
     const [card] = cards(world);
     assert.match(card.content, /FABRICATE\.Chat\.IterativeFailure/);
     assert.doesNotMatch(card.content, /: iterativeFailure/);
+    const journal = new RunJournalBuilder({
+      recipeManager: world.recipeManager,
+      getSystem: (id) => world.systems.getSystem(id),
+      craftingRunManager: world.manager,
+      localize: (key) => key,
+    });
+    const [entry] = journal.buildListing({
+      actor: world.actor,
+      viewer: globalThis.game.user,
+    }).history;
+    assert.equal(entry.failureReason, 'FABRICATE.Chat.IterativeFailure');
+    assert.doesNotMatch(JSON.stringify(entry), /"iterativeFailure"/, 'the Journal never prints it');
   });
 
   it('refuses against a planned award-choice journal and keeps the authority available', async () => {
