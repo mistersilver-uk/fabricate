@@ -4,6 +4,9 @@
  */
 import { get, writable } from 'svelte/store';
 
+import { iterativeLibraryEntry } from '../../../src/systems/normalize/iterativeLibrary.js';
+import { createIterativeLibrarySection } from '../../../src/ui/svelte/stores/adminIterativeLibrarySection.js';
+
 /**
  * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its own id
  * in `requests` when a view asks for it (issue 1081).
@@ -111,6 +114,38 @@ function projectedWorldRealms(realms) {
     parties: [],
     ...realm,
   }));
+}
+
+/**
+ * The store's `iterative` member, built from the real section over a one-system manager, so each
+ * write is normalized and republished as the store does. `updateSystem` calls are recorded.
+ */
+function createIterativeFake({ calls, options, viewState, library }) {
+  let held = library ?? null;
+  const services = {
+    getCraftingSystemManager: () => ({
+      getSystem: () => ({ id: 'alchemy', iterative: held }),
+      updateSystem: async (id, patch) => {
+        calls.push(['updateSystem', id, patch]);
+        held = iterativeLibraryEntry(patch.iterative).iterative ?? null;
+        viewState.update((state) => ({
+          ...state,
+          selectedSystem: { ...state.selectedSystem, iterative: held },
+        }));
+      },
+    }),
+    getRecipeManager: () => ({ getRecipes: () => options.iterativeRecipes ?? [] }),
+  };
+  const section = createIterativeLibrarySection({
+    services,
+    selectedSystemId: writable('alchemy'),
+    refresh: async () => {},
+    confirmDiscardDirty: () => {
+      calls.push(['confirmDiscardDirtyIterativeActionDraft']);
+      return options.confirmDiscardIterativeActionResult ?? 'discard';
+    },
+  });
+  return section;
 }
 
 function createStore(calls = [], options = {}) {
@@ -1136,6 +1171,12 @@ function createStore(calls = [], options = {}) {
       calls.push(['deleteRecipeItemDefinition', recipeItemId]);
       return options.deleteRecipeItemDefinitionResult ?? true;
     },
+    iterative: createIterativeFake({
+      calls,
+      options,
+      viewState,
+      library: selectedSystem?.iterative,
+    }),
     confirmDiscardDirtyRecipeItemDraft: () => {
       calls.push(['confirmDiscardDirtyRecipeItemDraft']);
       return options.confirmDiscardRecipeItemResult ?? 'discard';

@@ -16,6 +16,7 @@ import { registerWorldScopeCases } from './manager-world-scope-mounted.js';
 import { registerChecksCases } from './manager-checks-mounted.js';
 import { registerTagsCases } from './manager-tags-mounted.js';
 import { registerBulkCases } from './manager-bulk-mounted.js';
+import { registerIterativeCases } from './manager-iterative-mounted.js';
 
 describe('CraftingSystemManager mounted behavior', () => {
   registerRailCases();
@@ -32,6 +33,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   registerChecksCases();
   registerTagsCases();
   registerBulkCases();
+  registerIterativeCases();
 
   // Registered last so it runs after every module's own `afterEach`, and once.
   after(disposeManagerSuite);

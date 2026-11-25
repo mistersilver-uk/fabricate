@@ -111,6 +111,7 @@
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
     isCraftingViewAvailable,
+    isIterativeView,
     resolveCraftingRedirect,
   } from './crafting/craftingNav.js';
   import {
@@ -120,6 +121,10 @@
   } from './checks/checksNav.js';
   import { createChecksRouteModel } from './checks/checksRouteModel.svelte.js';
   import { createGatheringRouteModel } from './gatheringRouteModel.svelte.js';
+  import IterativeLibraryRoute from './iterative/IterativeLibraryRoute.svelte';
+  import { createIterativeRouteModel } from './iterative/iterativeRouteModel.svelte.js';
+  import { inspectorLabel } from './inspectorLabel.js';
+  import { createOverviewDeepLinks } from './systemOverviewDeepLinks.js';
   import { createGatheringDraftHandlers } from './gatheringDraftHandlers.svelte.js';
   import { createGatheringModifierHandlers } from './gatheringModifierHandlers.svelte.js';
   import {
@@ -415,6 +420,15 @@
     // per render.
     components: () => store?.componentsForSystem?.(selectedSystemId) ?? [],
     gatheringTasks: () => $viewState.gatheringConfig?.systems?.[selectedSystemId]?.tasks ?? [],
+  });
+  const iterativeRoute = createIterativeRouteModel({
+    store: () => store,
+    selectedSystem: () => selectedSystem,
+    currentView: () => currentView,
+    viewState: () => $viewState,
+    setView,
+    services: () => services,
+    text,
   });
   // The gathering workspace's tab, selections, drafts and library (issue 1721).
   const gathering = createGatheringRouteModel({
@@ -1326,6 +1340,12 @@
       predicate: (view) => isChecksView(view),
     },
     {
+      id: 'iterative',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view^="iterative"] .manager-body',
+      predicate: (view) => isIterativeView(view),
+    },
+    {
       id: 'component-edit',
       layoutClass: 'full-width-2-track',
       selector: '.fabricate-manager[data-manager-view="component-edit"] .manager-body',
@@ -1574,12 +1594,16 @@
     resolutionMode: craftingResolutionMode,
     recipeCount,
     recipeItemCount,
+    counterCount: iterativeRoute.counterCount,
+    actionCount: iterativeRoute.actionCount,
   });
   const craftingNavItems = $derived(buildCraftingNavItems(craftingNavArgs));
   // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books & Scrolls where
   // that surface applies), mirroring the gathering group's total.
   const craftingNavCount = $derived(
-    craftingNavItems.reduce((sum, item) => sum + (item.count || 0), 0)
+    craftingNavItems
+      .filter((item) => item.parentBadge !== false)
+      .reduce((sum, item) => sum + (item.count || 0), 0)
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
@@ -1982,6 +2006,8 @@
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
+    if (view === 'iterative-action-edit' && !iterativeRoute.hasEditableAction)
+      return 'iterative-actions';
     if (
       (view === 'environments' ||
         view === 'environment-edit' ||
@@ -2044,6 +2070,7 @@
       format: () => format,
       gatheringTabPageHint: () => gathering.gatheringTabPageHint,
       gatheringTabPageTitle: () => gathering.gatheringTabPageTitle,
+      iterativeRoute: () => iterativeRoute,
       playerCharacterUuids: () => playerCharacterUuids,
       premiumInstalled: () => premiumInstalled,
       recipeDraft: () => recipeDraft,
@@ -2078,44 +2105,15 @@
     return result;
   }
 
-  function inspectorLabel() {
-    if (currentView === 'recipe-edit')
-      return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
-    if (currentView === 'component-edit')
-      return text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item');
-    if (currentView === 'access')
-      return text('FABRICATE.Admin.Manager.Access.Inspector', 'Grant access inspector');
-    if (currentView === 'books-scrolls')
-      return text(
-        'FABRICATE.Admin.Manager.BooksScrolls.Inspector',
-        'Selected recipe item inspector'
-      );
-    if (currentView === 'recipes')
-      return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
-    if (currentView === 'components')
-      return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
-    if (currentView === 'essences' || currentView === 'essence-edit')
-      return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && gathering.displayedGatheringTab === 'tasks')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
-        'Selected gathering task inspector'
-      );
-    if (isWorldRoute)
-      return text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party');
-    if (isWorldTravelRoute)
-      return worldTravelTab === 'map'
-        ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
-        : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm');
-    if (currentView === 'tools')
-      return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
-    if (currentView === 'environments')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Inspector',
-        'Selected environment inspector'
-      );
-    return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
-  }
+  const inspectorLabelNow = () =>
+    inspectorLabel({
+      currentView,
+      displayedGatheringTab: gathering.displayedGatheringTab,
+      isWorldRoute,
+      isWorldTravelRoute,
+      text,
+      worldTravelTab,
+    });
 
   // The gathering finishers also run on the clean path: both answers clear the draft and move on.
   const finishGatheringTaskExit = async (action, nextView) => {
@@ -2293,6 +2291,7 @@
         return false;
       },
     },
+    'iterative-action-edit': iterativeRoute.exitGuard,
     // The Checks Studio's route-exit prompt (issue 1096); its route is a family of tabs.
     checks: {
       active: () => isChecksRoute,
@@ -2402,7 +2401,7 @@
     notifyWarn(localize('FABRICATE.Admin.Manager.Tools.SaveBlockedInvalid'));
   }
 
-  function setView(view) {
+  function setView(view, onEnter) {
     if (
       (view === 'recipes' ||
         view === 'components' ||
@@ -2427,6 +2426,7 @@
       return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
+      onEnter?.();
       activeView = view;
       if (view === 'tools') store?.cancelToolsDraft?.();
     });
@@ -2454,6 +2454,7 @@
     'component-edit': 'components',
     'essence-edit': 'essences',
     'tool-edit': 'tools',
+    'iterative-action-edit': 'iterative-actions',
   };
 
   function browserViewForScopeChange(view) {
@@ -2534,44 +2535,13 @@
     });
   }
 
-  // Maps a system-validation issue `kind` to the manager's deep-link selection helper + the view it
-  // routes to.
-  const OVERVIEW_DEEP_LINKS = {
-    recipe: {
-      view: 'recipe-edit',
-      targetId: (issue) => issue.entityId,
-      open: (id) => editRecipe(id),
-    },
-    environment: {
-      view: 'environment-edit',
-      targetId: (issue) => issue.environmentId,
-      open: (id) => drafts.editEnvironment(id),
-    },
-    task: {
-      view: 'environment-edit',
-      targetId: (issue) => issue.environmentId,
-      open: (id) => drafts.editEnvironment(id),
-    },
-    event: {
-      view: 'environment-edit',
-      targetId: (issue) => issue.environmentId,
-      open: (id) => drafts.editEnvironment(id),
-    },
-    salvage: {
-      view: 'component-edit',
-      targetId: (issue) => issue.entityId,
-      open: (id) => editComponent(id),
-    },
-  };
-
-  function selectOverviewIssue(issue) {
-    if (!issue) return;
-    const target = OVERVIEW_DEEP_LINKS[issue.kind];
-    if (!target) return;
-    const id = target.targetId(issue);
-    if (!id) return;
-    target.open(id);
-  }
+  const overviewLinks = createOverviewDeepLinks({
+    editRecipe: (id) => editRecipe(id),
+    editEnvironment: (id) => drafts.editEnvironment(id),
+    editComponent: (id) => editComponent(id),
+    openCounter: iterativeRoute.openCounter,
+    openAction: iterativeRoute.openAction,
+  });
 
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
@@ -3986,6 +3956,7 @@
     {essenceEditTint}
     {essenceEditName}
     {essenceEditSubline}
+    {iterativeRoute}
     worldComponentEntryImage={worldScope.worldComponentEntryImage}
     worldComponentEntryName={worldScope.worldComponentEntryName}
     worldComponentEntrySubtitle={worldScope.componentEntry.subline}
@@ -4480,6 +4451,8 @@
           />
         </section>
       </main>
+    {:else if isIterativeView(currentView) && selectedSystem}
+      <IterativeLibraryRoute route={iterativeRoute} {currentView} {text} />
     {:else if isChecksRoute && selectedSystem}
       <main
         class="manager-main manager-environment-edit-main"
@@ -4957,7 +4930,7 @@
             validationReport={systemValidationReport}
             requestedTab={requestedSystemTab}
             requestedTabNonce={requestedSystemTabNonce}
-            onSelectIssue={(issue) => selectOverviewIssue(issue)}
+            onSelectIssue={overviewLinks.selectIssue}
             onShowSystemOverview={showSystemOverview}
             onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
             onDetailsChange={(name, description) => {
@@ -5023,7 +4996,7 @@
          subset alone: `tool-edit` and `knowledge` suppress the aside AND keep three
          tracks, so a full-width-only test would put their inspector back. -->
     {#if !fullWidthLayout}
-      <aside class="manager-inspector" aria-label={inspectorLabel()}>
+      <aside class="manager-inspector" aria-label={inspectorLabelNow()}>
         <!-- `world-travel` belongs in this list even though it renders its own `manager-main`:
              the travel inspector is a BRANCH of the chain nested inside here, so leaving the
              route out makes that branch unreachable and the aside falls through to nothing.

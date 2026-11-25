@@ -145,6 +145,8 @@ export const NON_TOKEN_PREDICATES = Object.freeze({
   // A FAMILY, not a token: `checks` became four child routes plus a retained redirect (issue
   // 1096), which is why the stylesheet matches it by prefix and this predicate delegates.
   checks: '(view) => isChecksView(view)',
+  // A FAMILY too: the Counters, Actions and action editor routes share the `iterative` prefix.
+  iterative: '(view) => isIterativeView(view)',
   // ROUTE + SUBSTATE: World owns the whole content column only on its Parties tab, so the
   // stylesheet matches a compound of two attributes and this predicate reads both.
   'world-parties': "(view, context) => view === 'world' && context.travelTab === 'parties'",

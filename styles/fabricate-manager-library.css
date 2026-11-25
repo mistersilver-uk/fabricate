@@ -2850,6 +2850,7 @@
 /* The three Rules & Resources routes join this list in issue 1311. `world-currency` belonged here and always did: its aside has been suppressed in the root since issue 1278, but the column was never released, so the page has been rendering against the ~300px dead strip the comment above warns about — the Checks regression, arriving from the other direction a second time. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view^="checks"] .manager-body,
+.fabricate-manager[data-manager-view^="iterative"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
@@ -2872,6 +2873,7 @@
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view^="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view^="iterative"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,

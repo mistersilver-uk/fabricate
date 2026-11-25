@@ -15,6 +15,9 @@ export const CRAFTING_VIEWS = Object.freeze([
   'recipe-item-edit',
   'knowledge',
   'crafting-settings',
+  'iterative-counters',
+  'iterative-actions',
+  'iterative-action-edit',
 ]);
 
 /** The mode-conditional views in rail order, which is also the redirect's precedence order. */
@@ -29,7 +32,13 @@ const TAB_BY_VIEW = {
   'recipe-item-edit': 'books-scrolls',
   knowledge: 'knowledge',
   'crafting-settings': 'settings',
+  'iterative-counters': 'counters',
+  'iterative-actions': 'actions',
+  'iterative-action-edit': 'actions',
 };
+
+/** The three views of the iterative library, which share one full-width route family. */
+export const isIterativeView = (view) => typeof view === 'string' && view.startsWith('iterative');
 
 /** The visible sub-tabs in rail order; an unknown `visibilityMode` resolves via `craftingEffect`. */
 export function buildCraftingNavItems({
@@ -37,6 +46,8 @@ export function buildCraftingNavItems({
   resolutionMode,
   recipeCount,
   recipeItemCount,
+  counterCount,
+  actionCount,
 } = {}) {
   const effect = craftingEffect(visibilityMode);
   const items = [
@@ -49,6 +60,30 @@ export function buildCraftingNavItems({
       count: recipeCount ?? 0,
     },
   ];
+
+  // Counted on their own rows only: `parentBadge: false` keeps them out of the Crafting badge.
+  if (resolutionMode === 'iterative') {
+    items.push(
+      {
+        id: 'counters',
+        view: 'iterative-counters',
+        icon: 'fas fa-gauge-simple-high',
+        labelKey: 'FABRICATE.Admin.Manager.Nav.Counters',
+        labelFallback: 'Counters',
+        count: counterCount ?? 0,
+        parentBadge: false,
+      },
+      {
+        id: 'actions',
+        view: 'iterative-actions',
+        icon: 'fas fa-hand-back-fist',
+        labelKey: 'FABRICATE.Admin.Manager.Nav.Actions',
+        labelFallback: 'Actions',
+        count: actionCount ?? 0,
+        parentBadge: false,
+      }
+    );
+  }
 
   if (effect.showAccess) {
     items.push({

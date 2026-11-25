@@ -150,6 +150,7 @@
 
   .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
   .fabricate-manager[data-manager-view^="checks"] .manager-body,
+  .fabricate-manager[data-manager-view^="iterative"] .manager-body,
   .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
   .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,

@@ -22,6 +22,7 @@ const CASCADE = [
   'essence-edit',
   'recipe-edit',
   'recipe-item-edit',
+  'iterative-action-edit',
   'component-edit',
   'gathering-task-edit',
   'gathering-event-edit',
@@ -58,7 +59,7 @@ function inertRow(guard, calls) {
   };
 }
 
-/** The thirteen inert rows, with the named ones replaced by what a case is about. */
+/** The fourteen inert rows, with the named ones replaced by what a case is about. */
 function contextOf(overrides = {}, calls = []) {
   const context = {};
   for (const guard of ROUTE_EXIT_GUARDS) {
@@ -90,7 +91,7 @@ async function microtaskDepthOf(result) {
 }
 
 describe('the route-exit guard table', () => {
-  it('carries the thirteen guarded routes in the cascade order', () => {
+  it('carries the fourteen guarded routes in the cascade order', () => {
     const rows = buildRouteExitGuards(contextOf());
     assert.deepEqual(
       rows.map((row) => row.view),
@@ -116,7 +117,7 @@ describe('the route-exit guard table', () => {
 
   it('answers a raw `true` for a skipped row, never a promise, row by row', () => {
     // Row by row because an all-skipped whole table is unconstructible: the skip shapes answer to
-    // different destinations, and no one `(nextView, nextRouteId)` pair waives all ten at once.
+    // different destinations, and no one `(nextView, nextRouteId)` pair waives all eleven at once.
     const calls = [];
     const overrides = {};
     for (const { view, skip } of ROUTE_EXIT_GUARDS) {
@@ -124,7 +125,7 @@ describe('the route-exit guard table', () => {
         overrides[view] = prompting({ subject: () => 'subject-1', family: () => true });
     }
     const rows = buildRouteExitGuards(contextOf(overrides, calls)).filter((row) => row.skip);
-    assert.equal(rows.length, 10, 'every skip shape waives a re-entry that keeps its subject');
+    assert.equal(rows.length, 11, 'every skip shape waives a re-entry that keeps its subject');
     for (const row of rows) {
       const answer = runRouteExitGuard(row, row.view, 'subject-1');
       assert.strictEqual(answer, true, `${row.view} waives its own re-entry`);
@@ -185,8 +186,8 @@ describe('the three skip shapes', () => {
     assert.equal(rowFor(unheld, 'essence-edit').skip('essence-edit', ''), false);
   });
 
-  it('waives a same-view navigation on the view token alone for the four rows that must', () => {
-    assert.equal(sameViewRows.length, 4);
+  it('waives a same-view navigation on the view token alone for the five rows that must', () => {
+    assert.equal(sameViewRows.length, 5);
     const rows = buildRouteExitGuards(contextOf());
     for (const { view } of sameViewRows) {
       const { skip } = rowFor(rows, view);
@@ -250,18 +251,19 @@ describe('the prompt each row raises', () => {
       );
       seen.push([guard.view, guard.missing]);
     }
-    assert.equal(seen.length, 13);
+    assert.equal(seen.length, 14);
     assert.deepEqual(
       seen.filter(([, missing]) => missing === false).map(([view]) => view),
       [
         'essence-edit',
         'recipe-edit',
         'recipe-item-edit',
+        'iterative-action-edit',
         'component-edit',
         'gathering-task-edit',
         'gathering-event-edit',
       ],
-      'six rows block on a missing helper and the other seven do not'
+      'seven rows block on a missing helper and the other seven do not'
     );
     assert.deepEqual(
       seen.filter(([, missing]) => missing === 'cancel').map(([view]) => view),

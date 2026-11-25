@@ -16,6 +16,7 @@ import {
   activeCraftingTab,
   isCraftingRoute,
   isCraftingViewAvailable,
+  isIterativeView,
   resolveCraftingRedirect,
 } from '../src/ui/svelte/apps/manager/crafting/craftingNav.js';
 import { craftingEffect } from '../src/ui/svelte/apps/manager/crafting/craftingVisibility.js';
@@ -33,6 +34,9 @@ test('CRAFTING_VIEWS lists every crafting-group view', () => {
     'recipe-item-edit',
     'knowledge',
     'crafting-settings',
+    'iterative-counters',
+    'iterative-actions',
+    'iterative-action-edit',
   ]);
 });
 
@@ -313,4 +317,80 @@ test('the manager root reads one craftingNavArgs for both the rail and the route
     rootSource,
     /isCraftingView\(view\) && !isCraftingViewAvailable\(view, craftingNavArgs\)\s*\)?\s*return resolveCraftingRedirect\(craftingNavArgs\);/
   );
+});
+
+const ITERATIVE_ARGS = Object.freeze({
+  visibilityMode: 'global',
+  resolutionMode: 'iterative',
+  recipeCount: 4,
+  counterCount: 3,
+  actionCount: 5,
+});
+
+test('an iterative system lists Counters and Actions directly after Recipes', () => {
+  assert.deepEqual(ids(buildCraftingNavItems(ITERATIVE_ARGS)), [
+    'recipes',
+    'counters',
+    'actions',
+    'settings',
+  ]);
+  assert.deepEqual(ids(buildCraftingNavItems({ ...ITERATIVE_ARGS, visibilityMode: 'knowledge' })), [
+    'recipes',
+    'counters',
+    'actions',
+    'books-scrolls',
+    'knowledge',
+    'settings',
+  ]);
+});
+
+test('Counters and Actions carry their own counts and stay out of the parent badge', () => {
+  const items = buildCraftingNavItems(ITERATIVE_ARGS);
+  const [counters, actions] = ['counters', 'actions'].map((id) => items.find((i) => i.id === id));
+  assert.deepEqual([counters.view, counters.count, counters.icon], [
+    'iterative-counters',
+    3,
+    'fas fa-gauge-simple-high',
+  ]);
+  assert.deepEqual([actions.view, actions.count, actions.icon], [
+    'iterative-actions',
+    5,
+    'fas fa-hand-back-fist',
+  ]);
+  assert.equal(counters.parentBadge, false);
+  assert.equal(actions.parentBadge, false);
+  // The root's `craftingNavCount` skips `parentBadge === false`, so only Recipes counts here.
+  const parentBadge = items.reduce(
+    (sum, item) => sum + (item.parentBadge === false ? 0 : item.count || 0),
+    0
+  );
+  assert.equal(parentBadge, 4);
+});
+
+test('a system that is not iterative offers neither entry, with its redirect unchanged', () => {
+  for (const resolutionMode of ['simple', 'alchemy', 'progressive', 'routedByCheck']) {
+    const args = { ...ITERATIVE_ARGS, resolutionMode };
+    assert.ok(!ids(buildCraftingNavItems(args)).some((id) => id === 'counters' || id === 'actions'));
+    for (const view of ['iterative-counters', 'iterative-actions', 'iterative-action-edit']) {
+      assert.equal(isCraftingViewAvailable(view, args), false, `${view} in ${resolutionMode}`);
+    }
+  }
+  // The redirect precedence is the visibility trio and then Recipes, whatever the mode.
+  assert.equal(resolveCraftingRedirect(ITERATIVE_ARGS), 'recipes');
+  assert.equal(resolveCraftingRedirect({ ...ITERATIVE_ARGS, visibilityMode: 'restricted' }), 'access');
+  assert.equal(resolveCraftingRedirect({ visibilityMode: 'item', resolutionMode: 'simple' }), 'books-scrolls');
+});
+
+test('every iterative route is a crafting route and the action editor highlights Actions', () => {
+  for (const view of ['iterative-counters', 'iterative-actions', 'iterative-action-edit']) {
+    assert.equal(isCraftingRoute(view), true, view);
+    assert.equal(isIterativeView(view), true, view);
+    assert.equal(isCraftingViewAvailable(view, ITERATIVE_ARGS), true, view);
+  }
+  assert.equal(activeCraftingTab('iterative-counters'), 'counters');
+  assert.equal(activeCraftingTab('iterative-actions'), 'actions');
+  assert.equal(activeCraftingTab('iterative-action-edit'), 'actions');
+  for (const view of ['recipes', 'checks-crafting', 'system-edit', '', undefined, null]) {
+    assert.equal(isIterativeView(view), false, String(view));
+  }
 });

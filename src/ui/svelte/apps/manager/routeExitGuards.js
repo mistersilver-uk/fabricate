@@ -17,6 +17,7 @@ export const ROUTE_EXIT_GUARDS = Object.freeze(
     { view: 'essence-edit', skip: 'subject', missing: false, finish: 'own' },
     { view: 'recipe-edit', skip: 'same-view', missing: false, finish: 'own' },
     { view: 'recipe-item-edit', skip: 'same-view', missing: false, finish: 'own' },
+    { view: 'iterative-action-edit', skip: 'same-view', missing: false, finish: 'own' },
     // Issue 676: the component editor waives no navigation, not even a same-view one.
     { view: 'component-edit', skip: 'none', missing: false, finish: 'own' },
     { view: 'gathering-task-edit', skip: 'none', missing: false, finish: 'own' },

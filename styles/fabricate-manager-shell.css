@@ -584,6 +584,7 @@
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
 .fabricate-manager[data-manager-view^="checks"] .manager-main,
+.fabricate-manager[data-manager-view^="iterative"] .manager-main,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
 .fabricate-manager[data-manager-view="system-edit"] .manager-main {

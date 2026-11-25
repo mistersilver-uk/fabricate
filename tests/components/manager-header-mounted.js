@@ -308,6 +308,29 @@ const TASK_INVALID = () => ({
 
 const hook = (selector, why) => assert.ok(Boolean(target.querySelector(selector)), why);
 
+const ITERATIVE_SYSTEM = Object.freeze({
+  systemCraftingModes: {
+    alchemy: {
+      resolutionMode: 'iterative',
+      visibilityMode: 'global',
+      iterative: {
+        version: 1,
+        counters: [{ id: 'heat', label: 'Heat', limit: 'none' }],
+        actions: [],
+      },
+    },
+  },
+});
+
+/** Mount an iterative system and open one of its Crafting entries. */
+async function openIterativeRoute(entry) {
+  mountManager([], ITERATIVE_SYSTEM);
+  craftingParent().click();
+  await settleHeader();
+  craftingSubitem(entry).click();
+  await settleHeader();
+}
+
 /** The heading is what distinguishes the states one route reaches through its own tab strip. */
 const titled = (expected, why) =>
   assert.equal(target.querySelector('.manager-title').textContent.trim(), expected, why);
@@ -709,6 +732,29 @@ const CENSUS_STATES = {
     },
     prove: () =>
       assert.ok(!target.querySelector('.manager-header-actions'), 'the dismissed group rendered'),
+  },
+  'Crafting > Counters, an iterative system whose header creates a counter': {
+    view: 'iterative-counters',
+    open: async () => {
+      await openIterativeRoute('Counters');
+    },
+    prove: () => hook('[data-iterative-new-counter]', 'the New counter action did not render'),
+  },
+  'Crafting > Actions, an iterative system whose header creates an action': {
+    view: 'iterative-actions',
+    open: async () => {
+      await openIterativeRoute('Actions');
+    },
+    prove: () => hook('[data-iterative-new-action]', 'the New action action did not render'),
+  },
+  'the Crafting Action editor, a new draft with the unsaved chip and a ready pill': {
+    view: 'iterative-action-edit',
+    open: async () => {
+      await openIterativeRoute('Actions');
+      target.querySelector('[data-iterative-new-action]').click();
+      await settleHeader();
+    },
+    prove: () => hook('[data-iterative-action-pill="ready"]', 'the readiness pill did not render'),
   },
 };
 
@@ -1997,6 +2043,103 @@ const HEADER_CENSUS = Object.freeze({
       "- 3 span | Create",
       "+ 2 h1 class=\"manager-title\" | Component catalogue",
       "+ 2 p class=\"manager-subtitle\" | One component per source item — identity only. Crafting behaviour lives in each system's own component rules.",
+    ],
+    "Crafting > Counters, an iterative system whose header creates a counter": [
+      "- 2 button aria-current=\"page\" data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Alchemy",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 span aria-current=\"page\" | Counters",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\" role=\"group\"",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button is-primary is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "+ 2 h1 class=\"manager-title\" | Counters",
+      "+ 2 p class=\"manager-subtitle\" | The numbers every Alchemy workpiece can track. Recipes choose which ones they use.",
+      "+ 1 div aria-label=\"Counter and action actions\" class=\"manager-header-actions\" role=\"group\"",
+      "+ 2 button class=\"fabricate-button is-primary is-size-38\" data-iterative-new-counter=\"true\" data-keyboard-focus=\"true\" type=\"button\" | New counter",
+      "- 3 span | Create",
+    ],
+    "Crafting > Actions, an iterative system whose header creates an action": [
+      "- 2 button aria-current=\"page\" data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Alchemy",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 span aria-current=\"page\" | Actions",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\" role=\"group\"",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button is-primary is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "+ 2 h1 class=\"manager-title\" | Actions",
+      "+ 2 p class=\"manager-subtitle\" | The choices players make at the workbench. Every action is offered in every Alchemy session, subject to its prerequisites.",
+      "+ 1 div aria-label=\"Counter and action actions\" class=\"manager-header-actions\" role=\"group\"",
+      "+ 2 button class=\"fabricate-button is-primary is-size-38\" data-iterative-new-action=\"true\" data-keyboard-focus=\"true\" type=\"button\" | New action",
+      "- 3 span | Create",
+    ],
+    "the Crafting Action editor, a new draft with the unsaved chip and a ready pill": [
+      "- 2 button aria-current=\"page\" data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting Systems",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Alchemy",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Crafting",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Actions",
+      "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 2 span aria-current=\"page\" title=\"Edit action\" | Edit action",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\" role=\"group\"",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button is-primary is-size-38\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 2 div class=\"manager-recipe-edit-heading\" data-iterative-action-heading=\"\"",
+      "+ 3 span class=\"fab-medallion svelte-1jh7cl8\" data-medallion=\"glyph\" style=\"width: 38px; height: 38px; --fab-medallion-glyph: 15px;\"",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-hand-back-fist svelte-1jh7cl8\"",
+      "+ 3 div class=\"manager-recipe-edit-heading-copy\"",
+      "+ 4 h1 class=\"manager-title\" title=\"\" | New action",
+      "+ 4 p class=\"manager-subtitle\" data-iterative-action-subline=\"\" | Action in Alchemy · no check · 0 effects",
+      "+ 2 div class=\"manager-environment-header-pills\" data-iterative-action-status=\"\"",
+      "+ 3 span class=\"manager-chip is-active svelte-13kzmru\" data-iterative-action-pill=\"ready\" | Ready",
+      "+ 1 div aria-label=\"Counter and action actions\" class=\"manager-header-actions\" role=\"group\"",
+      "+ 2 span class=\"manager-chip is-warning is-truncated is-header svelte-13kzmru\" data-iterative-action-dirty=\"true\"",
+      "+ 3 span class=\"manager-chip-label svelte-1vupdsz\" | Unsaved",
+      "+ 2 button class=\"fabricate-button is-ghost is-size-38\" data-iterative-action-back=\"true\" data-keyboard-focus=\"true\" type=\"button\" | Back to actions",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",
+      "+ 2 button class=\"fabricate-button is-ghost is-size-38\" data-iterative-action-duplicate=\"true\" data-keyboard-focus=\"true\" disabled=\"\" type=\"button\" | Duplicate",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-copy\"",
+      "+ 2 button class=\"fabricate-button is-primary is-size-38\" data-iterative-action-save=\"true\" data-keyboard-focus=\"true\" type=\"button\" | Save action",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
     ],
   },
   /* header-census:end */

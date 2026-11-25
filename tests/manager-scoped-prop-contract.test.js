@@ -164,6 +164,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './headerModel.svelte.js',
   // Added by issue 1721: the import report and the folder-aware component drop are their own unit.
   './importFlowModel.svelte.js',
+  // Added by issue 3009: the inspector aside's accessible name is its own unit, and the iterative
+  // library's route and its model are the Counters, Actions and action-editor routes.
+  './inspectorLabel.js',
+  './iterative/IterativeLibraryRoute.svelte',
+  './iterative/iterativeRouteModel.svelte.js',
   './navRailModel.svelte.js',
   // Added by issue 1721: the Books & Scrolls selection and recipe-item draft are their own unit.
   './recipe-item/recipeItemModel.svelte.js',
@@ -188,6 +193,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/essenceScoped.js',
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4).
   './scoped/scopedEntryRoutes.js',
+  // Added by issue 3009: the overview deep links are their own unit.
+  './systemOverviewDeepLinks.js',
   './tools/ToolBrowserInspector.svelte',
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',

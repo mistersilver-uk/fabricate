@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The manager's page header, drawn by `PageHeader`: the breadcrumb trail `headerBreadcrumbs.js`
-  derives, the eyebrow, one of eight identity headings and the trailing action group, plus the
+  derives, the eyebrow, one of nine identity headings and the trailing action group, plus the
   Tool library's own second header (issues 1720 and 1777).
 
   Props:
@@ -18,7 +18,7 @@
   Invariants:
   - Two `<header>` elements under no wrapper, so the shell's own children are unchanged — pinned
     by the DOM census in `tests/components/manager-header-mounted.js`.
-  - The identity heading is keyed on `header.headingVariant` alone; the order the eight variants
+  - The identity heading is keyed on `header.headingVariant` alone; the order the nine variants
     are tested in is stated once, in `headerModel.svelte.js`.
 -->
 <script>
@@ -55,6 +55,7 @@
     worldToolEntryName = '',
     worldToolEntrySubtitle = '',
     environmentDraftForDisplay = null,
+    iterativeRoute = null,
     ...rest
   } = $props();
 
@@ -70,6 +71,7 @@
       recipeDraft,
       componentForEdit,
       essenceEditName,
+      iterativeRoute,
     })
   );
 
@@ -111,6 +113,19 @@
               {componentForEdit.name || header.title}
             </h1>
             <p class="manager-subtitle" data-component-edit-subline>{header.subtitle}</p>
+          </div>
+        </div>
+      {:else if header.headingVariant === 'iterative-action-edit'}
+        <!-- The Crafting Action editor's identity header, from the same block: the action's
+             glyph, its name and the "Action in <system> · ..." lede. -->
+        <div class="manager-recipe-edit-heading" data-iterative-action-heading>
+          <Medallion icon={iterativeRoute.actionHeading.icon} size={38} glyph={15} />
+          <div class="manager-recipe-edit-heading-copy">
+            <h1 class="manager-title" title={iterativeRoute.actionHeading.name}>
+              {iterativeRoute.actionHeading.name ||
+                text('FABRICATE.Admin.Manager.Iterative.UnnamedAction', 'New action')}
+            </h1>
+            <p class="manager-subtitle" data-iterative-action-subline>{header.subtitle}</p>
           </div>
         </div>
       {:else if header.headingVariant === 'downtime-artwork'}
@@ -208,6 +223,22 @@
         <h1 class="manager-title">{header.title}</h1>
         <p class="manager-subtitle">{header.subtitle}</p>
       {/if}
+      {#if header.headingVariant === 'iterative-action-edit'}
+        <div class="manager-environment-header-pills" data-iterative-action-status>
+          {#if iterativeRoute.actionHeading.issueCount === 0}
+            <Chip tone="active" data-iterative-action-pill="ready">
+              {text('FABRICATE.Admin.Manager.Iterative.StatusReady', 'Ready')}
+            </Chip>
+          {:else}
+            <Chip tone="danger" data-iterative-action-pill="blocking">
+              {text('FABRICATE.Admin.Manager.Iterative.StatusBlocking', '{count} blocking').replace(
+                '{count}',
+                String(iterativeRoute.actionHeading.issueCount)
+              )}
+            </Chip>
+          {/if}
+        </div>
+      {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-chips>
           <Chip
@@ -235,7 +266,7 @@
       {/if}
     {/snippet}
     {#snippet actions()}
-      <ManagerHeaderActions {header} {text} {currentView} {...rest} />
+      <ManagerHeaderActions {header} {text} {currentView} {iterativeRoute} {...rest} />
     {/snippet}
   </PageHeader>
 {/if}
