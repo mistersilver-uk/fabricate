@@ -123,7 +123,8 @@ export function normalizeCounterRuleList(raw) {
   return arrayOrEmpty(raw).map(normalizeCounterRule);
 }
 
-const COMPARISONS = Object.freeze({
+/** The comparison each rule `op` applies, `(actual, value) => boolean`. */
+export const COMPARISONS = Object.freeze({
   '>=': (actual, value) => actual >= value,
   '<=': (actual, value) => actual <= value,
   '>': (actual, value) => actual > value,

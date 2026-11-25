@@ -6,6 +6,8 @@
  */
 import { createExpressionReader, DEFAULT_FUNCTIONS, readFoundryPath } from '../expressionReader.js';
 
+import { COMPARISONS } from './counterRule.js';
+
 /** Dice results one term may hold, base dice and explosions together. */
 const MAX_TERM_RESULTS = 1000;
 
@@ -50,15 +52,7 @@ const REASONS = Object.freeze([
   'roll-unavailable',
 ]);
 
-const COMPARISONS = Object.freeze({
-  '=': (face, threshold) => face === threshold,
-  '>=': (face, threshold) => face >= threshold,
-  '>': (face, threshold) => face > threshold,
-  '<=': (face, threshold) => face <= threshold,
-  '<': (face, threshold) => face < threshold,
-});
-
-const sum = (values) => values.reduce((total, value) => total + value, 0);
+export const sum = (values) => values.reduce((total, value) => total + value, 0);
 
 /** One face from the injected die, or `'roll-unavailable'` for a throw or a value off the die. */
 function drawFace(rollDie, faces) {
