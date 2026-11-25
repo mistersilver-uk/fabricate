@@ -6,6 +6,7 @@
 
 import { runPhaseEAlchemyAndJournal } from './phase-e-alchemy-journal.mjs';
 import { runPhaseEInventoryGatheringAndCrafting } from './phase-e-inventory-gathering-crafting.mjs';
+import { runIterativeAttempts } from './phase-e-iterative-attempts.mjs';
 
 export default {
   id: 'phase-e',
@@ -33,6 +34,7 @@ export default {
       try {
         const { appShell } = await runPhaseEInventoryGatheringAndCrafting(ctx);
         await runPhaseEAlchemyAndJournal(ctx, { appShell });
+        await runIterativeAttempts(ctx);
         results.steps.push({ step: 'craft-item-phase', passed: true });
         process.stdout.write('Phase E complete.\n');
       } catch (error) {

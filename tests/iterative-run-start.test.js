@@ -88,6 +88,27 @@ describe('an iterative run start', () => {
     assert.deepEqual(world.manager.listDueVersionedRuns(1000 + 7200), []);
   });
 
+  it('answers the public craft with the started run and sends no execute', async () => {
+    const { executePublicCraft } = await import('../src/systems/journalRunCommands.js');
+    const world = iterativeCommandWorld();
+    const sent = [];
+    const started = await executePublicCraft({
+      engine: world.engine,
+      runManager: world.manager,
+      actor: world.actor,
+      sourceActors: [world.actor],
+      recipe: world.recipe,
+      ingredientSetId: world.recipe.getExecutionSteps()[0].ingredientSets[0].id,
+      executeCommand: async (command) => {
+        sent.push(command);
+      },
+    });
+    assert.equal(started.success, true, JSON.stringify(started));
+    assert.equal(started.canExecuteImmediately, false);
+    assert.deepEqual(sent, []);
+    assert.equal(world.manager.getActiveRuns(world.actor).length, 1);
+  });
+
   it('gives an untimed single-step recipe an explicit start', async () => {
     const world = iterativeCommandWorld({ steps: 1 });
     const step = world.recipe.getExecutionSteps()[0];

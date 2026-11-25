@@ -6,7 +6,7 @@
 import { isGatheringActorSelectableByUser } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { resolveAdvanceSources } from '../systems/advanceCraftingSources.js';
-import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
+import { postCheckRollHandoff, resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
 import { executePublicBrew } from '../systems/publicAlchemyBrew.js';
 import { resolveRunRecipe } from '../systems/runTerms.js';
@@ -433,6 +433,56 @@ export const craftingFacade = {
       interactive,
       presentTools,
     });
+  },
+
+  /**
+   * One Iterative Attempt through the active-GM authority, owner-scoped as `cancelCraftingRun` is.
+   * A retry resends the same `attemptId` with its original `expectedRevision`, which a supplied id
+   * requires, and is answered from the run's log without paying twice. With `interactive: false`
+   * this call posts a checked non-terminal attempt's roll itself.
+   */
+  async takeCraftingAction({
+    actorId,
+    runId,
+    actionId,
+    expectedRevision,
+    attemptId,
+    interactive = false,
+    presentTools = null,
+  } = {}) {
+    this._requireReady();
+    const actor = game.actors?.get(actorId);
+    const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
+    if (resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync }).blocked) {
+      return {
+        success: false,
+        message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner'),
+      };
+    }
+    const supplied = attemptId !== undefined;
+    if (!run && !supplied) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NoRun') };
+    }
+    const validId = typeof attemptId === 'string' && attemptId.length > 0 && attemptId.length <= 64;
+    if (supplied && (!validId || !Number.isInteger(expectedRevision))) {
+      return { success: false, reason: 'invalid-command' };
+    }
+    const id = supplied ? attemptId : foundry.utils.randomID();
+    const reply = await this.executeJournalRunCommand(
+      {
+        action: 'takeAction',
+        runType: 'crafting',
+        actorUuid: actor.uuid,
+        runId,
+        expectedRevision: Number.isInteger(expectedRevision)
+          ? expectedRevision
+          : (run.runRevision ?? 0),
+        payload: { actionId, attemptId: id, ...(presentTools && { presentTools }) },
+      },
+      { interactive }
+    );
+    if (!interactive && reply?.rollHandoff) await postCheckRollHandoff(reply.rollHandoff);
+    return { ...reply, attemptId: id };
   },
 
   /** `advanceCraftingRun`'s ownership guard (issue 848): the refund writes to the source actors. */

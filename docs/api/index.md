@@ -190,6 +190,16 @@ Hooks.once('fabricate.ready', async () => {
   `presentTools` is the same optional station payload described for `hydrateCraftingRecipe`, and a borrowed station Tool is never worn down or used up.
   It applies to this call only: the active GM checks it against each command the craft sends and never stores it on the run, so a later step needs the station again.
   Exact craft-time validation is always authoritative, independent of what either listing phase reported.
+- `takeCraftingAction({ actorId, runId, actionId, expectedRevision, attemptId, interactive, presentTools })` takes one Iterative Attempt on an iterative run through the active-GM authority.
+  It is owner-scoped like `cancelCraftingRun`: it resolves `game.actors.get(actorId)`, so only world actors can be addressed and a synthetic token actor cannot, and a viewer who does not own the actor and every component source gets the "needs owner" message.
+  When the actor has no active run with that id and no `attemptId` was supplied, it answers the "no run" message before anything is sent.
+  It sends `{ action: 'takeAction', runType: 'crafting', actorUuid, runId, expectedRevision, payload: { actionId, attemptId, presentTools? } }` through `executeJournalRunCommand`.
+  `attemptId` defaults to a new id, and a supplied one must be a non-empty string of at most 64 characters.
+  `expectedRevision` defaults to the run's `runRevision` as this client reads it, and only when `attemptId` is also defaulted, so a supplied `attemptId` without `expectedRevision` refuses `invalid-command`.
+  The answer returns `attemptId`.
+  A retry resends the same `attemptId` with its original `expectedRevision`, gets back the recorded attempt with `iterative.replayed: true`, and never pays twice.
+  A committed attempt answers `success: true` with `iterative: { attempt, stepEnd, replayed }`, even when its step ended in failure, and `success: false` is always a refusal that spent nothing.
+  `interactive` defaults to `false`, and then the call itself posts the check roll of a checked attempt whose roll no craft card carried.
 
 ### Gathering Runtime Facade
 

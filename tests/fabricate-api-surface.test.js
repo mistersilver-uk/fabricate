@@ -74,6 +74,7 @@ const PUBLIC_MEMBERS = Object.freeze([
   member('listGatheringForActor', 0),
   member('startGatheringAttempt', 0),
   member('getGatheringDropBreakdown', 0),
+  member('takeCraftingAction', 0),
   ...published('macroApiKeys', 'deleteRecipe', 'craft'),
   ...published(
     'apiKeys',

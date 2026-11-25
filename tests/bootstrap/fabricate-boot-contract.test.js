@@ -638,7 +638,7 @@ test('the boot contract golden is not vacuous', () => {
   assert.equal(golden.hookEventsAfterReady.length, 29);
   assert.equal(golden.socketListenerCount, 1);
   assert.equal(golden.instanceProperties.length, 47);
-  assert.equal(golden.prototypeProperties.length, 140);
+  assert.equal(golden.prototypeProperties.length, 141);
   assert.equal(golden.gatheringKeys.length, 17);
   assert.equal(golden.deprecationWarnings.length, 10);
   assert.equal(new Set(golden.deprecationWarnings).size, 10);

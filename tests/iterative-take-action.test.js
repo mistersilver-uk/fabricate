@@ -416,3 +416,81 @@ describe('two command services over one ledger', () => {
     assert.deepEqual(consumed, ['a']);
   });
 });
+
+describe('Fabricate#takeCraftingAction', () => {
+  /** The crafting facade bound to the world, as the composition root binds it. */
+  async function facadeWorld(options = {}) {
+    const { craftingFacade } = await import('../src/bootstrap/craftingFacade.js');
+    const world = await startedWorld(options);
+    globalThis.game.actors = Object.assign([world.actor], {
+      get: (id) => (id === world.actor.id ? world.actor : undefined),
+    });
+    const facade = Object.assign(Object.create(craftingFacade), {
+      _requireReady() {},
+      craftingRunManager: world.manager,
+      executeJournalRunCommand: (command, commandOptions) =>
+        world.service.executeJournalRunCommand(command, commandOptions),
+    });
+    const take = (actionId, extra = {}) =>
+      facade.takeCraftingAction({
+        actorId: world.actor.id,
+        runId: world.runId,
+        actionId,
+        ...extra,
+      });
+    return { world, facade, take };
+  }
+
+  it('posts a checked non-terminal attempt roll itself, exactly once', async () => {
+    const { world, take } = await facadeWorld();
+    const reply = await take('hammer');
+    assert.equal(reply.success, true, JSON.stringify(reply));
+    assert.equal(typeof reply.attemptId, 'string');
+    assert.equal(world.messages.length, 1);
+    assert.equal(world.messages[0].rolls[0].total, 15, 'the check roll');
+  });
+
+  it('lets the craft card of a public checked terminal attempt claim its roll', async () => {
+    const { world, take } = await facadeWorld({ steps: 1 });
+    for (const actionId of ['stoke', 'stoke', 'stoke']) await take(actionId);
+    world.messages.length = 0;
+    const leg = (extra) =>
+      request(world, 'takeAction', { actionId: 'hammer', attemptId: 'public', ...extra });
+    const described = await world.service.handleRequest(leg({}), 'gm');
+    const reply = await world.service.handleRequest(
+      leg({ prepareToken: described.prepareToken, rollDecision: { rollMode: 'publicroll' } }),
+      'gm'
+    );
+    assert.equal(reply.iterative.stepEnd.kind, 'success', JSON.stringify(reply));
+    assert.equal(Object.hasOwn(reply, 'rollHandoff'), false, 'the card claimed the roll');
+    assert.equal(world.messages.length, 1, 'one card and no second roll message');
+    assert.ok(String(world.messages[0].content).includes('fabricate-craft-chat'));
+    assert.equal(world.messages[0].rolls?.[0]?.total, 15);
+  });
+
+  it('refuses a supplied attemptId without its revision, and an ill-formed one', async () => {
+    const { world, take } = await facadeWorld();
+    for (let n = 0; n < 30; n += 1)
+      await take('rest', { attemptId: `facade-${n}`, expectedRevision: world.revision() });
+    const before = world.flag();
+    assert.equal((await take('rest', { attemptId: 'facade-0' })).reason, 'invalid-command');
+    assert.equal(
+      (await take('rest', { attemptId: '', expectedRevision: 1 })).reason,
+      'invalid-command'
+    );
+    assert.deepEqual(world.flag(), before);
+  });
+
+  it('answers a non-owner with the NeedsOwner message and a missing run with NoRun', async () => {
+    const { world, facade, take } = await facadeWorld();
+    globalThis.game.user = { id: 'observer', isGM: false };
+    assert.equal((await take('rest')).message, 'FABRICATE.App.Journal.Actions.NeedsOwner');
+    globalThis.game.user = { id: 'gm', isGM: true };
+    const missing = await facade.takeCraftingAction({
+      actorId: world.actor.id,
+      runId: 'gone',
+      actionId: 'rest',
+    });
+    assert.equal(missing.message, 'FABRICATE.App.Journal.Actions.NoRun');
+  });
+});
