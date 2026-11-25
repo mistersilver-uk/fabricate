@@ -65,6 +65,8 @@ const RECIPE_RAW_MODULES = [
   // The row's labelled pills, and the iterative pill rule the model reads with its closure (#3010).
   'src/ui/svelte/apps/manager/recipes/recipeStatusPills.js',
   'src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js',
+  // ... and the one status table both editors' headers read too.
+  'src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js',
   'src/systems/iterative/iterativeReadiness.js',
   'src/systems/iterative/counterRule.js',
   'src/systems/iterative/attemptLibrary.js',

@@ -3387,8 +3387,6 @@
             "AddCounter": "+ Counter",
             "AddCounterLabel": "Add a counter to this step",
             "StatusSetup": "Needs iterative setup",
-            "StatusBlocking": "{count} blocking",
-            "StatusReady": "Ready",
             "CollapseContent": "<p>Single step keeps step 1, {first}, and removes {others} with their result sets.</p>",
             "CollapseContentOne": "<p>Single step keeps step 1, {first}, and removes {others} with its result sets.</p>",
             "CollapseConfirm": "Collapse to one step",

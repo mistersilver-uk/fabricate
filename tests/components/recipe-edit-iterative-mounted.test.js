@@ -18,12 +18,12 @@ import {
   iterativeRecipeStatus,
   iterativeStepTally,
 } from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
-import { iterativeStatusChip } from '../../src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js';
 import {
   evaluateRecipeReadiness,
   recipeValidationRowStates,
 } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createRecipeStepHandlers } from '../../src/ui/svelte/apps/manager/recipe/recipeStepHandlers.js';
+import { recipeHeaderChip } from '../../src/ui/svelte/apps/manager/recipes/recipeStatusPills.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices } from '../helpers/adminStoreServices.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
@@ -377,7 +377,7 @@ describe('iterative recipe Overview: the Counters table', () => {
 });
 
 describe('iterative recipe header status', () => {
-  it('reads Ready, Needs iterative setup, N blocking, or nothing while Ready is withheld', async () => {
+  it('reads Ready, Needs iterative setup, N blocking, or the row’s pill while Ready is withheld', async () => {
     const world = ironworks();
     const { createIterativeRecipeReads } = await managerModule(RECIPE_READS);
     const reads = createIterativeRecipeReads({
@@ -385,11 +385,10 @@ describe('iterative recipe header status', () => {
       selectedSystem: () => world.system,
       currentView: () => 'recipe-edit',
     });
-    const chipOf = async (id, enableBlocked = false) =>
-      iterativeStatusChip(
-        reads.recipeHeaderStatus({ ...(await draftOf(world, id)), enableBlocked }),
-        (_k, f) => f
-      );
+    const chipOf = async (id, enableBlocked = false, enabled = true) => {
+      const draft = { ...(await draftOf(world, id)), enableBlocked, enabled };
+      return recipeHeaderChip(reads.recipeHeaderStatus(draft), draft, (_k, f) => f);
+    };
     assert.deepEqual(await chipOf('iw-r-blade'), {
       id: 'ready',
       label: 'Ready',
@@ -399,11 +398,15 @@ describe('iterative recipe header status', () => {
     assert.equal((await chipOf('iw-r-ingot')).label, 'Needs iterative setup');
     assert.equal((await chipOf('iw-r-rivet')).label, '3 blocking');
     assert.equal((await chipOf('iw-r-hinge')).label, 'Ready');
-    assert.equal(
-      await chipOf('iw-r-hinge', true),
-      null,
-      'Hinge has no ingredient set, so while enabling is blocked Ready is withheld'
-    );
+    // Hinge has no ingredient set, so while enabling is blocked Ready is withheld, and the header
+    // draws the row's own pill.
+    assert.deepEqual(await chipOf('iw-r-hinge', true), {
+      id: 'incomplete',
+      label: 'Incomplete',
+      tone: 'warning',
+      icon: 'fas fa-pen-ruler',
+    });
+    assert.equal((await chipOf('iw-r-hinge', true, false)).label, "Can't enable");
   });
 });
 

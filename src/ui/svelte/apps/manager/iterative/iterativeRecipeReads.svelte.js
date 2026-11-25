@@ -57,12 +57,13 @@ export function createIterativeRecipeReads({ section, selectedSystem, currentVie
       systemRuns().filter((run) => run.actionIds.includes(actionId)).length,
     recipeIssues,
     recipeReadinessInput: (recipe) => iterativeReadinessInput(recipeIssues(recipe), recipe),
+    /** The header's status: `null` outside iterative, and `{ id: 'withheld' }` while Ready is withheld. */
     recipeHeaderStatus: (draft) =>
       draft && iterativeSystem
-        ? iterativeStatusPill(
+        ? (iterativeStatusPill(
             iterativeRecipeStatus(recipeIssues(draft)),
             draft.enableBlocked === true
-          )
+          ) ?? { id: 'withheld' })
         : null,
   };
 }

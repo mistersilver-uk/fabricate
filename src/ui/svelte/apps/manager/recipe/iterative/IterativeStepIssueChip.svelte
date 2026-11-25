@@ -23,8 +23,8 @@
   /** Each tone's `[key, fallback]` copy, with a singular form for a count of one. */
   const COPY = {
     danger: {
-      label: ['FABRICATE.Admin.Manager.Recipe.Iterative.StatusBlocking', '{count} blocking'],
-      labelOne: ['FABRICATE.Admin.Manager.Recipe.Iterative.StatusBlocking', '{count} blocking'],
+      label: ['FABRICATE.Admin.Manager.Iterative.StatusBlocking', '{count} blocking'],
+      labelOne: ['FABRICATE.Admin.Manager.Iterative.StatusBlocking', '{count} blocking'],
       name: [
         'FABRICATE.Admin.Manager.Recipe.Iterative.StepBlockingName',
         '{step}: {count} blocking issues',

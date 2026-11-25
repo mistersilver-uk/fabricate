@@ -1574,6 +1574,7 @@ Opening an entry opens the Crafting Action editor.
 The Crafting Action editor edits a staged copy of one Crafting Action, saved by "Save action".
 Leaving it with unsaved edits runs the Manager confirm-discard route-exit guard.
 Its header shows `Ready` or the Crafting Action's blocking count, from the same readiness evaluation the Validation tab reports, computed against the unsaved edit.
+That status is drawn as the recipe editor draws its own, beside the title at the header rung, from the one status table both editors and the Recipes library row read.
 The count and the blocking notice count only critical issues, so a Crafting Action with only warnings reads `Ready` and each warning is drawn only as its field mark.
 
 - A Crafting Action with blocking issues still saves, and the editor states that players cannot take it until those issues are fixed, marking each affected field.

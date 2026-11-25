@@ -501,7 +501,7 @@ The Validation tab groups the recipe's counter and step checks under Steps, firs
 The Validation tab names each addressed issue's step and lists the library issues that refuse the recipe's start, using the copy the system Validation tab uses.
 A library issue counts as blocking on the Validation tab but does not block enabling the recipe.
 While active workpieces of the recipe exist in the system, every tab except Validation states how many there are, and that they keep the terms they started with.
-The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and its subline names the Iterative mode and a multi-step recipe's step count.
+The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and while Ready is withheld it shows the row's own "Incomplete" or "Can't enable"; its subline names the Iterative mode and a multi-step recipe's step count.
 The Preview tab is not offered.
 
 ## Component Studio
