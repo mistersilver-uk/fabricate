@@ -4,7 +4,7 @@
  * them so a row and Validation agree. A fault names the readiness `code` and the `control` it marks.
  */
 import { effectiveBounds } from '../../../../../../systems/iterative/attemptLibrary.js';
-import { arrayOrEmpty } from '../../../../../../utils/scalars.js';
+import { arrayOrEmpty, isPlainObject } from '../../../../../../utils/scalars.js';
 import { expressionFaults } from '../../iterative/iterativeFieldFaults.js';
 
 /** The four numbers an instance holds, in the order their faults are stated. */
@@ -73,4 +73,39 @@ export function counterInstanceRows(instances, counters) {
 export function unusedCounters(instances, counters) {
   const used = new Set(arrayOrEmpty(instances).map((instance) => instance?.counterId));
   return arrayOrEmpty(counters).filter((counter) => !used.has(counter.id));
+}
+
+const STEP_COUNTER_LISTS = Object.freeze(['hiddenCounterIds', 'lockedCounterIds']);
+
+/** `config` with `counterId` dropped from its hide and lock lists; a list that does not parse is kept. */
+function withoutCounter(config, counterId) {
+  const next = { ...config };
+  for (const key of STEP_COUNTER_LISTS) {
+    if (Array.isArray(next[key])) next[key] = next[key].filter((id) => id !== counterId);
+  }
+  return next;
+}
+
+/**
+ * The one patch that removes the Counter Instance at `index`. Once no instance names its counter,
+ * its id also leaves the hide and lock lists of `Recipe.iterative.step` and of every
+ * `Step.iterative`, which no row could clear; a rule naming it stays and reads as not tracked.
+ */
+export function counterRemovalPatch(recipe, index) {
+  const iterative = recipe?.iterative ?? { counters: [] };
+  const held = arrayOrEmpty(iterative.counters);
+  const counters = held.filter((_, at) => at !== index);
+  const removed = held[index]?.counterId;
+  const patch = { iterative: { ...iterative, counters } };
+  if (removed === undefined || counters.some((entry) => entry?.counterId === removed)) return patch;
+  if (isPlainObject(iterative.step)) patch.iterative.step = withoutCounter(iterative.step, removed);
+  const steps = arrayOrEmpty(recipe?.steps);
+  if (steps.some((step) => isPlainObject(step?.iterative))) {
+    patch.steps = steps.map((step) =>
+      isPlainObject(step?.iterative)
+        ? { ...step, iterative: withoutCounter(step.iterative, removed) }
+        : step
+    );
+  }
+  return patch;
 }

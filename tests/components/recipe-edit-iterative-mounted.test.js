@@ -333,6 +333,41 @@ describe('iterative recipe Overview: the Counters table', () => {
     assert.ok(document.activeElement === $('[data-iterative-counter-add]'), 'focus moved there');
   });
 
+  it('prunes a removed counter from every step’s hide and lock lists in the one write', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-sword');
+    // No rule names Heat, so only the lists could leave an unknown counter behind.
+    const temperRule = { source: 'counter', counterId: 'temper', op: '>=', value: 2 };
+    draft.steps[0].iterative.success = [temperRule];
+    draft.steps[1].iterative.success = [temperRule];
+    draft.steps[1].iterative.hiddenCounterIds = ['heat'];
+    const { calls, live } = await mountWithHandlers(world, draft);
+    await press(
+      stepRow('iw-sword-heat').querySelector('[data-iterative-step-lock="heat"]'),
+      'lock Heat'
+    );
+    assert.deepEqual(live.get('recipe').steps[0].iterative.lockedCounterIds, ['temper', 'heat']);
+
+    const before = calls.patches.length;
+    await press($('[data-iterative-counter-remove="heat"]'), 'remove Heat');
+    assert.equal(calls.patches.length, before + 1, 'one write');
+    const [patch] = calls.patches.slice(before);
+    assert.deepEqual(
+      patch.iterative.counters.map((entry) => entry.counterId),
+      ['temper', 'slag']
+    );
+    const lists = patch.steps.map(({ iterative }) => [
+      iterative.hiddenCounterIds,
+      iterative.lockedCounterIds,
+    ]);
+    assert.deepEqual(lists, [
+      [['slag'], ['temper']],
+      [[], []],
+    ]);
+    const codes = (await recipeReads(world)).recipeIssues(live.get('recipe')).map((i) => i.code);
+    assert.ok(!codes.includes('iterativeUnknownCounter'), codes.join(', '));
+  });
+
   it('never presents an iterative multi-step recipe as collapsed', async () => {
     const world = ironworks('multiStepOff');
     await mountEditor(world, await draftOf(world, 'iw-r-sword'));

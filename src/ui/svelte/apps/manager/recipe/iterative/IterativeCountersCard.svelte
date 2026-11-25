@@ -2,7 +2,8 @@
 <!--
   The recipe Overview's Counters table: one row per Counter Instance, an adder for the library
   counters the recipe does not use yet, and an empty state that adds every library counter. Every
-  write is `onUpdateRecipe({ iterative: { ...recipe.iterative, counters } })`.
+  write is `onUpdateRecipe({ iterative: { ...recipe.iterative, counters } })`; a remove also
+  prunes the counter from each step's hide and lock lists in that one patch (`counterRemovalPatch`).
 
   Props:
   | prop | values | default | contract |
@@ -26,7 +27,11 @@
   import { fill } from '../../../../../../utils/fillPlaceholders.js';
   import { arrayOrEmpty } from '../../../../../../utils/scalars.js';
   import IterativeCounterCell from './IterativeCounterCell.svelte';
-  import { counterInstanceRows, unusedCounters } from './iterativeCounterRows.js';
+  import {
+    counterInstanceRows,
+    counterRemovalPatch,
+    unusedCounters,
+  } from './iterativeCounterRows.js';
 
   let {
     recipe = null,
@@ -99,7 +104,7 @@
   }
 
   function remove(index) {
-    write(instances.filter((_, at) => at !== index));
+    onUpdateRecipe(counterRemovalPatch(recipe, index));
     focusAfter(
       nth('data-iterative-counter-remove', index),
       first('data-iterative-counter-add'),
