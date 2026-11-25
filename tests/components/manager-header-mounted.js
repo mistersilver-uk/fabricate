@@ -2108,7 +2108,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
       "+ 2 button data-keyboard-focus=\"true\" type=\"button\" | Actions",
       "+ 2 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
-      "+ 2 span aria-current=\"page\" title=\"Edit action\" | Edit action",
+      "+ 2 span aria-current=\"page\" title=\"New action\" | New action",
       "- 2 div class=\"manager-page-kicker\"",
       "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
       "- 2 h1 class=\"manager-title\" | Crafting systems",
