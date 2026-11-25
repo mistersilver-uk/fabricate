@@ -885,6 +885,7 @@ Requirements:
    hot-path and the GM overview view.
 5. An `iterative` system adds the iterative readiness codes (`resolution-modes` § Iterative Validation), as `kind: 'recipe'` or `kind: 'system'`, none carrying `blocks: 'system'` or `blocks: 'visibility'`.
    Each iterative issue also carries `entityKind: 'recipe' | 'counter' | 'action' | 'system'`, naming the record its `entityId` identifies, because counter ids and action ids are unique only within their own list.
+   A recipe-scoped iterative issue also carries `stepId` and `stepIndex` (`resolution-modes` § Iterative Validation), and no other issue carries either key.
 
 ## CurrencyConfig
 

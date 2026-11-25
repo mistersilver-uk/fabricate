@@ -531,6 +531,7 @@ describe('through evaluateSystemValidation', () => {
 
   it('gives each issue the full shape and English that is not its code', () => {
     for (const issue of issues) {
+      const address = issue.kind === 'recipe' ? ['stepId', 'stepIndex'] : [];
       assert.deepEqual(
         Object.keys(issue).sort((a, b) => a.localeCompare(b)),
         [
@@ -543,6 +544,7 @@ describe('through evaluateSystemValidation', () => {
           'message',
           'nav',
           'severity',
+          ...address,
         ]
       );
       assert.ok(['recipe', 'counter', 'action'].includes(issue.entityKind), issue.code);

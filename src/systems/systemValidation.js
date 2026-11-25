@@ -9,10 +9,12 @@
  *
  * @typedef {'recipe'|'environment'|'task'|'event'|'salvage'|'system'} IssueKind
  * @typedef {{ kind: IssueKind, entityId: string|null, environmentId?: string|null,
- *   entityName: string, severity: 'critical'|'warning'|'info',
+ *   stepId?: string|null, stepIndex?: number|null, entityName: string,
+ *   severity: 'critical'|'warning'|'info',
  *   blocks: 'enable'|'visibility'|'system'|undefined, code: string, message: string,
  *   nav: { view: string, tab?: string } }} SystemValidationIssue `environmentId` names the owning
  *   environment of an environment, task or event issue, the environment editor's deep-link target.
+ *   `stepId` and `stepIndex` address the explicit step a recipe-scoped iterative issue belongs to.
  * @typedef {{ issues: SystemValidationIssue[], blocksSystem: boolean,
  *   counts: { critical: number, warning: number, info: number, blockers: number } }}
  *   SystemValidationReport

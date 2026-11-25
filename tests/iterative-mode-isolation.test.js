@@ -75,6 +75,7 @@ describe('the system report carries every iterative issue in full', () => {
 
   it('gives each issue the full shape and English that is not its code', () => {
     for (const issue of issues) {
+      const address = issue.kind === 'recipe' ? ['stepId', 'stepIndex'] : [];
       assert.deepEqual(
         Object.keys(issue).sort((a, b) => a.localeCompare(b)),
         [
@@ -87,6 +88,7 @@ describe('the system report carries every iterative issue in full', () => {
           'message',
           'nav',
           'severity',
+          ...address,
         ],
         issue.code
       );

@@ -21,6 +21,7 @@ import {
 } from '../normalize/iterativeLibrary.js';
 import { hasActiveCheck } from '../salvageCheckUsability.js';
 
+import { effectiveBounds } from './attemptLibrary.js';
 import { counterRuleFault } from './counterRule.js';
 import { libraryExpressionCodes, recipeExpressionCodes } from './expressionReadiness.js';
 import { iterativeTermsSubset } from './iterativeTerms.js';
@@ -33,6 +34,7 @@ export const ITERATIVE_READINESS_MESSAGES = Object.freeze({
   iterativeUnknownAction: 'An action reference names a crafting action that does not exist.',
   iterativeInvalidNumber: 'A counter start, start formula, bound or target cannot be read.',
   iterativeBoundsInverted: 'A counter minimum is above its maximum.',
+  iterativeStartOutOfBounds: 'A counter starts outside its minimum or maximum.',
   iterativeInvalidRule: 'A counter rule cannot be read.',
   iterativeInvalidEntry: 'An iterative setting cannot be read.',
   iterativeCheckUnavailable:
@@ -136,6 +138,12 @@ function actionCodes(action, context) {
 /** One issue per code, in first-raised order. */
 const uniqueCodes = (codes) => [...new Set(codes)];
 
+/** One entry per code and step index, in first-raised order. */
+function uniqueEntries(entries) {
+  const seen = new Map(entries.map((entry) => [`${entry.code}@${entry.stepIndex}`, entry]));
+  return [...seen.values()];
+}
+
 /** `entityKind` is `'counter'`, `'action'`, or `'system'` for the library as a whole. */
 function libraryIssue(system, record, code, entityKind) {
   return {
@@ -167,6 +175,20 @@ function libraryIssues(system, context) {
   ];
 }
 
+/** A fixed `start` outside the bounds the runtime clamp holds it to; inverted bounds are judged apart. */
+function startOutOfBounds(instance, context) {
+  const { start, startFormula } = instance;
+  if (startFormula !== undefined || typeof start !== 'number' || !Number.isFinite(start)) {
+    return false;
+  }
+  const { min, max } = effectiveBounds(instance.counterId, {
+    counters: context.library.counters,
+    instances: [instance],
+  });
+  if (min !== null && max !== null && min > max) return false;
+  return (min !== null && start < min) || (max !== null && start > max);
+}
+
 function instanceCodes(instance, context) {
   const counter = context.countersById.get(instance.counterId);
   const perRecipe = counter?.limit === 'perRecipe';
@@ -178,6 +200,7 @@ function instanceCodes(instance, context) {
       ? ['iterativeInvalidNumber']
       : []),
     ...(perRecipe && boundsInverted(min, max) ? ['iterativeBoundsInverted'] : []),
+    ...(startOutOfBounds(instance, context) ? ['iterativeStartOutOfBounds'] : []),
   ];
 }
 
@@ -232,6 +255,10 @@ function producedWhenCodes(group, references) {
 const producesOnSuccess = (groups) =>
   groups.some((group) => arrayOrEmpty(group.producedWhen).some((line) => line?.end === 'success'));
 
+/**
+ * The `{ code, stepIndex }` entries a recipe raises: a step's own faults carry its position in
+ * `recipe.steps`, and recipe-wide ones, or any on a recipe with no explicit steps, carry `null`.
+ */
 function recipeCodes(recipe, system, context) {
   const instances = arrayOrEmpty(recipe?.iterative?.counters);
   const references = {
@@ -240,24 +267,46 @@ function recipeCodes(recipe, system, context) {
   };
   const views = iterativeStepsOf(recipe);
   const multiStep = arrayOrEmpty(recipe?.steps).length > 0;
+  const entries = (codes, stepIndex = null) => codes.map((code) => ({ code, stepIndex }));
+  const addressOf = (view) => (multiStep ? view.stepIndex : null);
+  const finalView = views.at(-1);
   return [
-    ...(instances.length === 0 ? ['iterativeNoCounters'] : []),
-    ...instances.flatMap((instance) => instanceCodes(instance, context)),
-    ...views.flatMap((view) => stepConfigCodes(view.iterative, references, context)),
-    ...views.flatMap((view) => view.resultGroups.flatMap((g) => producedWhenCodes(g, references))),
-    ...(multiStep && system?.features?.multiStepRecipes !== true ? ['iterativeMultiStepOff'] : []),
-    ...(producesOnSuccess(views.at(-1).resultGroups) ? [] : ['iterativeFinalStepProducesNothing']),
-    ...recipeExpressionCodes({
-      library: context.library,
-      instances,
-      actions: views.flatMap((view) => allowedActions(view.iterative, context)),
-    }),
+    ...entries(instances.length === 0 ? ['iterativeNoCounters'] : []),
+    ...instances.flatMap((instance) => entries(instanceCodes(instance, context))),
+    ...views.flatMap((view) =>
+      stepConfigCodes(view.iterative, references, context).map((code) => ({
+        code,
+        stepIndex: code === 'iterativeCheckUnavailable' ? null : addressOf(view),
+      }))
+    ),
+    ...views.flatMap((view) =>
+      entries(
+        view.resultGroups.flatMap((g) => producedWhenCodes(g, references)),
+        addressOf(view)
+      )
+    ),
+    ...entries(
+      multiStep && system?.features?.multiStepRecipes !== true ? ['iterativeMultiStepOff'] : []
+    ),
+    ...entries(
+      producesOnSuccess(finalView.resultGroups) ? [] : ['iterativeFinalStepProducesNothing'],
+      addressOf(finalView)
+    ),
+    ...entries(
+      recipeExpressionCodes({
+        library: context.library,
+        instances,
+        actions: views.flatMap((view) => allowedActions(view.iterative, context)),
+      })
+    ),
   ];
 }
 
-function recipeIssue(recipe, code) {
+function recipeIssue(recipe, { code, stepIndex }) {
   const severity = WARNING_CODES.has(code) ? 'warning' : 'critical';
   return {
+    stepId: stepIndex === null ? null : (recipe?.steps?.[stepIndex]?.id ?? null),
+    stepIndex,
     kind: 'recipe',
     entityKind: 'recipe',
     entityId: recipe?.id ?? null,
@@ -297,7 +346,7 @@ export function evaluateIterativeReadiness(system, recipes) {
   return [
     ...libraryIssues(system, context),
     ...arrayOrEmpty(recipes).flatMap((recipe) =>
-      uniqueCodes(recipeCodes(recipe, system, context)).map((code) => recipeIssue(recipe, code))
+      uniqueEntries(recipeCodes(recipe, system, context)).map((entry) => recipeIssue(recipe, entry))
     ),
   ];
 }
