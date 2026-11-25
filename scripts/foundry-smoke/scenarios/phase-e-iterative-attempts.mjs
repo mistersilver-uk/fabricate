@@ -174,22 +174,30 @@ async function joinAs(page, userLabel) {
   return { context, clientPage, errors: () => [...sinks.consoleErrors] };
 }
 
-/** One `takeCraftingAction` from `clientPage`, answering the reply's facts. */
+/**
+ * One `takeCraftingAction` from `clientPage`, answering the reply's facts and the chat messages
+ * it added: `posted`, and the last message's roll count and whether this client's user wrote it.
+ */
 async function takeFrom(clientPage, { crafterId, runId, actionId }) {
   return await clientPage.evaluate(
     async ({ crafterId, runId, actionId }) => {
+      const before = game.messages.size;
       const reply = await game.fabricate.takeCraftingAction({
         actorId: crafterId,
         runId,
         actionId,
         interactive: false,
       });
+      const last = game.messages.contents.at(-1);
       return {
         success: reply?.success ?? null,
         reason: reply?.reason ?? null,
         message: reply?.message ?? null,
         attempt: reply?.iterative?.attempt?.attempt ?? null,
-        checked: reply?.iterative?.attempt?.check !== null,
+        checked: (reply?.iterative?.attempt?.check ?? null) !== null,
+        posted: game.messages.size - before,
+        lastRolls: last?.rolls?.length ?? 0,
+        lastByMe: last?.author?.id === game.user.id,
         needsOwner: game.i18n.localize('FABRICATE.App.Journal.Actions.NeedsOwner'),
       };
     },
@@ -247,6 +255,8 @@ async function proveObserverRefused(ctx, staged) {
     if (reply.success !== false || reply.message !== reply.needsOwner) {
       throw new Error(`the observer was answered ${JSON.stringify(reply)}`);
     }
+    const errors = observer.errors();
+    if (errors.length > 0) throw new Error(`the observer client logged: ${errors.join(' | ')}`);
     const after = await readCounters(ctx.page, {
       ...staged,
       crafterId: ctx.shared.cleanup.crafterId,
@@ -257,6 +267,15 @@ async function proveObserverRefused(ctx, staged) {
   } finally {
     await observer.context.close().catch(() => {});
   }
+}
+
+/** A checked attempt's roll is posted once, by the player; an unchecked one posts nothing. */
+function assertPosted(actionId, reply) {
+  const posted =
+    actionId === 'hammer'
+      ? reply.posted === 1 && reply.lastRolls === 1 && reply.lastByMe
+      : reply.posted === 0;
+  if (!posted) throw new Error(`${actionId} posted ${JSON.stringify(reply)}`);
 }
 
 async function provePlayerAttempts(ctx, staged) {
@@ -272,6 +291,7 @@ async function provePlayerAttempts(ctx, staged) {
         `the ${actionId} attempt never answered`
       );
       if (reply.success !== true) throw new Error(`${actionId} refused: ${reply.reason}`);
+      assertPosted(actionId, reply);
       replies.push(reply);
     }
     if (!replies[1].checked) throw new Error('the hammer attempt carried no check');
