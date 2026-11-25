@@ -201,6 +201,12 @@ describe('the reserved roots', () => {
     assert.equal(refusal('@ability', { rollData }), 'dice');
     assert.equal(refusal('@missing', { rollData }), 'unresolved-path');
     assert.equal(refusal('@blank', { rollData }), 'unresolved-path');
+    const throwing = {
+      get boom() {
+        throw new Error('unreadable');
+      },
+    };
+    assert.equal(refusal('@boom', { rollData: throwing }), 'invalid');
   });
 
   it('are matched by one token that carries no match state', () => {
@@ -244,9 +250,9 @@ describe('dice', () => {
     const rows = [
       ['1d6x4', [4, 4, 1], 9],
       ['1d6x>=5', [5, 6, 3], 14],
-      ['1d6x>4', [5, 6, 3], 14],
+      ['2d6x>4', [4, 5, 3], 12],
       ['1d6x<=2', [1, 2, 5], 8],
-      ['1d6x<3', [1, 2, 4], 7],
+      ['2d6x<3', [3, 2, 4], 9],
       ['1d6x>=5 + 1', [4], 5],
     ];
     for (const [text, script, total] of rows) {
@@ -262,6 +268,7 @@ describe('dice', () => {
     assert.equal(evaluated('2d20kh', { script: [4, 9] }), 9);
     assert.equal(evaluated('2d20kl1', { script: [4, 9] }), 4);
     assert.equal(evaluated('2d6kh5', { script: [3, 4] }), 7);
+    assert.equal(evaluated('3d6kh4', { script: [1, 2, 3] }), 6);
   });
 
   it('keeps from every result of an exploding term', () => {
@@ -309,10 +316,10 @@ describe('dice', () => {
 
 describe('analyzeIterativeExpression', () => {
   it('flags an explosion that cannot stop', () => {
-    for (const text of ['1d1x', '1d6x>=1', '1d6x<=6', '1d6x<7', '1d6x>0', '2d1x5']) {
+    for (const text of ['1d1x', '1d6x>=1', '1d6x<=6', '1d6x<7', '1d6x>0', '2d1x5', '1d2x<=2']) {
       assert.equal(analyzeIterativeExpression(text, 'effect').explodeUnbounded, true, text);
     }
-    for (const text of ['1d6x', '1d6x>=2', '1d6x6', '1d6x<=5', '1d6x>5', '1d6']) {
+    for (const text of ['1d6x', '1d6x>=2', '1d6x6', '1d6x<=5', '1d6x>5', '1d6', '1d2x']) {
       assert.equal(analyzeIterativeExpression(text, 'effect').explodeUnbounded, false, text);
     }
   });
@@ -346,6 +353,8 @@ describe('analyzeIterativeExpression', () => {
       explodeUnbounded: false,
     });
     assert.equal(analyzeIterativeExpression('2', 'cost').roots.check, false);
+    const twice = analyzeIterativeExpression('@counter.heat + @counter.heat', 'effect');
+    assert.deepEqual(twice.roots.counter, ['heat']);
   });
 });
 
