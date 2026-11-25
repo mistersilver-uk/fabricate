@@ -8401,6 +8401,37 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         </div>
         <span class="k-hint">Rolled swaps the stepper for the expression at the same 102&times;28, so the toggle moves nothing else in the row; switching back to Fixed keeps what was typed.</span>
         </div>
+      <div class="unit">
+        <span class="cap">formula &mdash; Fixed at 0, unbounded</span>
+        <div style="display:flex;align-items:center;gap:8px;align-self:flex-start">
+          <div class="k-seg inline" role="radiogroup" aria-label="Amount for Heat" style="flex:none">
+            <button class="sel">Fixed</button>
+            <button class="">Formula</button>
+          </div>
+          <div class="k-step">
+            <button><svg class="i"><use href="#i-minus"/></svg></button>
+            <input id="spec-pra-4" aria-label="Quantity for Heat" value="0" readonly>
+            <button><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+        </div>
+        <span class="k-hint">Under <code>formula</code> the toggle draws for every kind, and a stored 0 shows as 0: an absent min or max is unbounded, so the stepper never clamps the number it holds.</span>
+      </div>
+      <div class="unit">
+        <span class="cap">formula &mdash; the expression, its reading and its hint</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;align-self:flex-start;width:fit-content">
+          <div class="k-seg inline" role="radiogroup" aria-label="Amount for Heat" style="flex:none">
+            <button class="">Fixed</button>
+            <button class="sel">Formula</button>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-start;align-self:flex-start;gap:4px;padding-top:1px">
+            <input id="spec-pra-5" aria-label="Rolled amount for Heat" value="40 + 2" readonly style="box-sizing:border-box;width:102px;height:28px;padding:0 8px;border:1px solid var(--fab-border);border-radius:7px;background:var(--fab-surface-soft);color:var(--fab-text);font-family:var(--fab-font-mono);font-size:11.5px;font-weight:500">
+            <span class="k-badge info k-mono" style="font-weight:500;line-height:1;border:1px solid var(--fab-info-border)">= 42</span>
+          </div>
+          <span style="flex:0 0 100%;contain:inline-size;margin-inline-end:-8px;font-size:.66rem;color:var(--fab-text-muted)">A number, dice, or character data such as @abilities.con.mod. Dice roll once, when the step starts.</span>
+        </div>
+        <span class="k-hint">The expression keeps the 102&times;28 and its placeholder may truncate, so the hint carries the full example: muted text under the input, drawn only under Formula and read after the reading.
+          An invalid message wraps on the line under the controls, whatever the host.</span>
+      </div>
     </div>
     <div class="notes">
       <div>
@@ -8411,6 +8442,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>toggle</b> the Fixed | Rolled <code>SegmentedControl</code> at its 30px <code>inline</code> rung</li>
           <li><b>unit</b> 10/500 <code>--fab-text-subtle</code>, right of the stepper</li>
           <li><b>invalid</b> its reason on a line of its own</li>
+          <li><b>formula</b> one wrapping root; the hint and the invalid message each on a line under the controls</li>
           <li><b>gap</b> the host row&rsquo;s 8 between parts: the slot renders a fragment and owns no wrapper</li>
         </ul>
       </div>
@@ -8422,6 +8454,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>amount</b> {min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel}</li>
           <li><b>name</b> — the subject&rsquo;s name in each control&rsquo;s accessible name</li>
           <li><b>rollable</b> — the Fixed | Rolled toggle on a component or currency row</li>
+          <li><b>formula</b> — {resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint?}, superseding <b>rollable</b>: the Fixed | Formula toggle for every kind, an absent min or max unbounded, and the hint under the Formula input</li>
           <li><b>readonly · disabled</b></li>
           <li><b>invalid</b> — the message that marks the amount invalid</li>
           <li><b>onChange</b>(patch) — <code>{quantity}</code> or <code>{quantityFormula}</code></li>

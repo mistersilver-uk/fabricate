@@ -3340,6 +3340,7 @@
           "QuantityIncrement": "Increase quantity",
           "AmountFixed": "Fixed",
           "AmountRolled": "Rolled",
+          "AmountFormula": "Formula",
           "AmountFor": "Amount for {name}",
           "QuantityFor": "Quantity for {name}",
           "KindFor": "Kind of {name}",

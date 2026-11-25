@@ -1,7 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The amount slot of a `PickerRow`: a stepper, or behind a Fixed | Rolled toggle a roll expression.
-  It renders a fragment into the row's trailing controls and owns no wrapper element.
+  It renders a fragment into the row's trailing controls and owns no wrapper element, except under
+  `formula`, which draws one flex-wrapping root so its notes sit under the controls on any host.
 
   Props:
   | prop | values | default | contract |
@@ -10,6 +11,7 @@
   | `amount` | `{ min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's and its two buttons' names, the two segment words, and the toggle's and the expression's names. |
   | `name` | string | `''` | The subject's name, or the kind word while unnamed: the stepper is `Quantity for {name}`, the toggle `Amount for {name}` and the expression `Rolled amount for {name}`. |
   | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` or `currency` result has a formula, so every other kind ignores it. |
+  | `formula` | `{ resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint? }` \| `null` | `null` | Supersedes `rollable`: the Fixed \| Formula toggle draws for every kind. An absent `amount.min` or `amount.max` is unbounded and the stepper shows a stored number verbatim, 0 included. `resolve`, `unresolvedLabel`, `tokens` and `tokensLabel` go to the expression field; `placeholder` may truncate at its 102px, so `hint` carries the full example, drawn as muted text under the Formula input and only there, and described after the reading. |
   | `readonly` / `disabled` | booleans | `false` | The static read-only amount, a rolled one as its expression; and every control off. |
   | `invalid` | string | `''` | A message: sets `aria-invalid` on the amount control and describes it with the message. |
 
@@ -18,7 +20,7 @@
     the expression; Fixed sends `undefined`, which the adapters turn into an absent key.
 
   Invariants:
-  - Rolled never writes `quantity`, and opening Rolled with nothing typed writes nothing.
+  - Rolled never writes `quantity`, and opening Rolled with nothing typed writes nothing; the same holds for Formula.
   - The typed expression is kept here across Rolled → Fixed → Rolled, so switching back restores it.
   - That Fixed | Rolled state is per component instance, so a `rollable` caller keys its rows by
     stable entry identity.
@@ -40,6 +42,7 @@
   amountSeq += 1;
   const instance = amountSeq;
   const errorId = `fabricate-picker-row-amount-error-${instance}`;
+  const hintId = `fabricate-picker-row-amount-hint-${instance}`;
 
   // Essence and currency count on `match.amount`, so their marker differs from the quantity's.
   const AMOUNT_HOOKS = {
@@ -52,15 +55,17 @@
     amount = {},
     name = '',
     rollable = false,
+    formula = null,
     readonly = false,
     disabled = false,
     invalid = '',
     onChange = () => {},
   } = $props();
 
-  const shown = $derived(shownAmount(value?.quantity));
+  const verbatim = $derived(typeof value?.quantity === 'number' ? value.quantity : null);
+  const shown = $derived(formula ? verbatim : shownAmount(value?.quantity));
   const togglable = $derived(
-    rollable && ['component', 'currency'].includes(value?.kind) && !readonly
+    formula ? !readonly : rollable && ['component', 'currency'].includes(value?.kind) && !readonly
   );
   const stored = $derived(typeof value?.quantityFormula === 'string' ? value.quantityFormula : '');
 
@@ -93,6 +98,16 @@
   const stepperName = $derived(
     amount.ariaLabel || named('FABRICATE.Admin.Manager.Recipe.QuantityFor', 'Quantity for {name}')
   );
+  const hint = $derived(typeof formula?.hint === 'string' ? formula.hint.trim() : '');
+  const hintShown = $derived(rolled && hint !== '');
+  const formulaDescription = $derived(
+    [hintShown ? hintId : '', invalid ? errorId : ''].filter(Boolean).join(' ') || undefined
+  );
+  const secondWord = $derived(
+    formula
+      ? text('FABRICATE.Admin.Manager.Recipe.AmountFormula', 'Formula')
+      : text('FABRICATE.Admin.Manager.Recipe.AmountRolled', 'Rolled')
+  );
   const modes = $derived([
     {
       value: 'fixed',
@@ -101,7 +116,7 @@
     },
     {
       value: 'rolled',
-      label: amount.rolledLabel || text('FABRICATE.Admin.Manager.Recipe.AmountRolled', 'Rolled'),
+      label: amount.rolledLabel || secondWord,
       disabled,
     },
   ]);
@@ -110,8 +125,8 @@
 {#snippet stepper()}
   <Stepper
     value={shown}
-    min={amount.min ?? 1}
-    max={amount.max ?? 9999}
+    min={amount.min ?? (formula ? null : 1)}
+    max={amount.max ?? (formula ? null : 9999)}
     {disabled}
     ariaLabel={stepperName}
     decrementLabel={amount.decrementLabel ||
@@ -149,6 +164,55 @@
     data-recipe-currency-amount
     data-recipe-currency-readonly-amount>{stored || shown}</span
   >
+{:else if formula}
+  <div class="fab-picker-row-amount-formula">
+    <SegmentedControl
+      options={modes}
+      value={rolled ? 'rolled' : 'fixed'}
+      density="inline"
+      groupName={`picker-row-amount-${instance}`}
+      ariaLabel={amount.modeAriaLabel ||
+        named('FABRICATE.Admin.Manager.Recipe.AmountFor', 'Amount for {name}')}
+      optionDataAttr="data-recipe-option-amount-mode"
+      onChange={setMode}
+    />
+    {#if rolled}
+      <div class="fab-picker-row-amount-field">
+        <RollDataExpressionInput
+          value={stored}
+          placeholder={formula.placeholder ?? '1d4+1'}
+          resolve={formula.resolve}
+          unresolvedLabel={formula.unresolvedLabel}
+          tokens={formula.tokens}
+          tokensLabel={formula.tokensLabel}
+          {disabled}
+          data-recipe-option-formula=""
+          aria-label={amount.formulaAriaLabel ||
+            named('FABRICATE.Admin.Manager.Recipe.RolledAmountFor', 'Rolled amount for {name}')}
+          aria-invalid={invalid ? 'true' : undefined}
+          aria-describedby={formulaDescription}
+          onChange={writeFormula}
+        />
+      </div>
+    {:else}
+      {@render stepper()}
+    {/if}
+    {#if amount.unit}
+      <span class="manager-recipe-option-unit" title={amount.unit} data-recipe-option-unit
+        >{amount.unit}</span
+      >
+    {/if}
+    {#if hintShown}
+      <span id={hintId} class="fab-picker-row-amount-note fab-picker-row-amount-hint">{hint}</span>
+    {/if}
+    {#if invalid}
+      <span
+        id={errorId}
+        class="manager-recipe-option-invalid fab-picker-row-amount-note"
+        data-recipe-option-invalid>{invalid}</span
+      >
+    {/if}
+  </div>
 {:else if togglable}
   <SegmentedControl
     options={modes}
@@ -186,3 +250,37 @@
 {:else}
   {@render stepper()}
 {/if}
+
+<style>
+  /* Notes hang on lines under the controls, on any host: `contain: inline-size` gives them no
+     intrinsic width, and the negative end margin cancels the gap they would add to the row. */
+  .fab-picker-row-amount-formula {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-1) var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .fab-picker-row-amount-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--fab-space-1);
+    min-width: 0;
+    padding-block-start: 1px;
+    align-self: flex-start;
+  }
+
+  .fab-picker-row-amount-note {
+    order: 1;
+    flex: 0 0 100%;
+    margin-inline-end: calc(-1 * var(--fab-space-2));
+    contain: inline-size;
+    font-size: 0.66rem;
+  }
+
+  .fab-picker-row-amount-hint {
+    color: var(--fab-text-muted);
+  }
+</style>
