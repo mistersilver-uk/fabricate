@@ -270,7 +270,11 @@ function authoringRecipes() {
           { counterId: 'temper', start: 0 },
           { counterId: 'slag', start: 0, startFormula: '2 + 1d4' },
         ],
-        step: { actions: onlyActions('stoke', 'strike'), success: [heatAtLeast(7)] },
+        step: {
+          actions: onlyActions('stoke', 'strike'),
+          lockedCounterIds: ['temper'],
+          success: [heatAtLeast(7)],
+        },
       },
     }),
     forge('iw-r-rivet', 'Cracked Rivet', {
@@ -290,7 +294,7 @@ function authoringRecipes() {
         counters: [
           { counterId: 'heat', start: 0 },
           { counterId: 'temper', start: 0 },
-          { counterId: 'slag', start: 0 },
+          { counterId: 'slag', start: 0, visible: false },
         ],
       },
       steps: [

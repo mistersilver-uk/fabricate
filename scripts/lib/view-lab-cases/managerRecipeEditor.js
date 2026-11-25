@@ -170,6 +170,17 @@ const ITERATIVE_RECIPE_SOURCES = Object.freeze([
 ]);
 const COUNTERS_CARD = '[data-recipe-section="iterative-counters"]';
 const COUNTER_ROW = (key) => `${COUNTERS_CARD} [data-iterative-counter-row="${key}"]`;
+const STEP_CARD = '[data-recipe-section="iterative-step"]';
+const STEPS_CARD = '[data-recipe-section="steps"]';
+const STEP_ROW = (id) => `${STEPS_CARD} [data-recipe-step-id="${id}"]`;
+const STEP_END = (end) => `[data-iterative-step-end="${end}"]`;
+const ACTION_OPTION = (id) => `.fabricate-set-picker-popover [data-popover-option="${id}"]`;
+/** A multi-step iterative recipe also claims the Steps card and the step list it draws. */
+const ITERATIVE_STEPS_SOURCES = Object.freeze([
+  ...ITERATIVE_RECIPE_SOURCES,
+  /^src\/ui\/svelte\/apps\/manager\/RecipeStepsCard\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeStepAccordion\.svelte$/,
+]);
 /** A Fixed Start cell's controls, which hold one line. */
 const FIXED_START = `${COUNTERS_CARD} .fab-picker-row-amount-formula:not(:has([data-recipe-option-formula]))`;
 const FIXED_START_GEOMETRY = Object.freeze({
@@ -2404,5 +2415,149 @@ export const CASES = Object.freeze([
     width: 880,
     expectSelector: `${COUNTERS_CARD} .fabricate-data-table-scroll [data-iterative-counter-row="heat"]`,
     expectCenterHit: `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
+  }),
+  // Issue 3010: a single step's Working the recipe card.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-step-all',
+    label: 'Manager — Recipe edit iterative step, all actions',
+    recipeId: 'iw-r-blade',
+    steps: [
+      SCROLL_TO(STEP_CARD),
+      { selector: `${STEP_CARD} [data-iterative-step-actions-mode="all"]` },
+    ],
+    expectSelector: `${STEP_CARD}:not(:has([data-iterative-step-actions])) [data-iterative-step-actions-count]`,
+    expectCenterHit: `${STEP_CARD} [data-iterative-step-actions-mode="only"]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-step-only',
+    label: 'Manager — Recipe edit iterative step, only these actions',
+    recipeId: 'iw-r-blade',
+    steps: [SCROLL_TO(STEP_CARD), { selector: `${STEP_CARD} [data-iterative-step-actions]` }],
+    // The panel is portaled to the manager root, over the editor's scroller.
+    expectSelector: `${ACTION_OPTION('quench')} .fabricate-set-picker-option-meta`,
+    expectCenterHit: [ACTION_OPTION('quench'), '[data-set-picker-apply]'],
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-step-none',
+    label: 'Manager — Recipe edit iterative step, no actions allowed',
+    recipeId: 'iw-r-blade',
+    steps: [
+      SCROLL_TO(STEP_CARD),
+      { selector: `${STEP_CARD} [data-iterative-step-actions]` },
+      { selector: ACTION_OPTION('strike') },
+      { selector: '[data-set-picker-apply]' },
+      SCROLL_TO(`${STEP_CARD} [data-iterative-step-part="actions"]`),
+    ],
+    expectSelector: `${STEP_CARD} [data-iterative-step-actions][aria-invalid="true"]`,
+    expectCenterHit: `${STEP_CARD} [data-iterative-step-actions]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-no-success-rule',
+    label: 'Manager — Recipe edit iterative step, no success rule',
+    recipeId: 'iw-r-blade',
+    steps: [
+      SCROLL_TO(STEP_CARD),
+      { selector: `${STEP_END('success')} [data-rule-row-remove]` },
+      SCROLL_TO(`${STEP_CARD} [data-iterative-step-part="ends"]`),
+    ],
+    expectSelector:
+      `${STEP_CARD}:has(${STEP_END('failure')} [data-counter-rules-empty]):not(:has([data-recipe-step-issues])) ` +
+      `${STEP_END('success')} [data-counter-rules-empty]`,
+    expectCenterHit: `${STEP_END('success')} [data-rule-row-preset]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-rule-untracked',
+    label: 'Manager — Recipe edit iterative step, rule on an untracked counter',
+    recipeId: 'iw-r-blade',
+    steps: [
+      { selector: `${COUNTER_ROW('heat')} [data-iterative-counter-remove]` },
+      SCROLL_TO(`${STEP_CARD} [data-iterative-step-part="ends"]`),
+    ],
+    expectSelector: `${STEP_END('success')} [data-counter-rule] [data-counter-rule-source][aria-invalid="true"]`,
+    expectCenterHit: `${STEP_END('success')} [data-rule-row-remove]`,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-single-locked',
+    label: 'Manager — Recipe edit iterative step, a single step with a lock',
+    recipeId: 'iw-r-hinge',
+    steps: [SCROLL_TO(`${STEP_CARD} [data-iterative-step-part="counters"]`)],
+    expectSelector: `${STEP_CARD} [data-iterative-step-counter="temper"] [data-iterative-step-lock="temper"]:checked`,
+  }),
+  // Issue 3010: a multi-step recipe's Steps card.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-multistep',
+    label: 'Manager — Recipe edit iterative steps, hide, lock and ends when',
+    recipeId: 'iw-r-sword',
+    steps: [SCROLL_TO(`${STEP_ROW('iw-sword-heat')} [data-iterative-step-part="counters"]`)],
+    expectSelector:
+      `${STEP_ROW('iw-sword-heat')}:has([data-iterative-step-hide="slag"]:checked:disabled)` +
+      `:has([data-iterative-step-lock="temper"]:checked) [data-iterative-step-never-shown]`,
+    expectCenterHit: `${STEP_ROW('iw-sword-heat')} ${STEP_END('failure')} [data-rule-row-preset]`,
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-step-issues',
+    label: 'Manager — Recipe edit iterative steps, per-step issue chips',
+    recipeId: 'iw-r-sword',
+    steps: [SCROLL_TO(`${STEP_ROW('iw-sword-heat')} .fabricate-sortable-list-line`)],
+    expectSelector:
+      `${STEPS_CARD}:has([data-recipe-step-id="iw-sword-heat"] [data-recipe-step-issues="0"] .fa-circle-exclamation) ` +
+      '[data-recipe-step-id="iw-sword-etch"] [data-recipe-step-issues="1"]',
+    expectCenterHit: [
+      `${STEP_ROW('iw-sword-heat')} [data-recipe-step-issues="0"]`,
+      `${STEP_ROW('iw-sword-heat')} [data-recipe-step-delete]`,
+    ],
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-enter-multistep',
+    label: 'Manager — Recipe edit iterative, entering multi-step',
+    recipeId: 'iw-r-blade',
+    steps: [
+      { selector: '[data-recipe-step-mode-option="multi"]' },
+      SCROLL_TO(`${STEPS_CARD} [data-iterative-step-config]`),
+    ],
+    expectSelector: `${STEPS_CARD} [data-recipe-step-id] [data-iterative-step-config] [data-counter-rule="0"]`,
+    expectCenterHit: `${STEPS_CARD} [data-recipe-step-add]`,
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-collapse-confirm',
+    label: 'Manager — Recipe edit iterative, collapse to one step',
+    recipeId: 'iw-r-sword',
+    steps: [{ selector: '[data-recipe-step-mode-option="single"]' }],
+    // `dialog: 'open'` leaves the Collapse confirmation standing: the dialog is the state.
+    query: {
+      system: 'lab-ironworks',
+      iterative: 'populated',
+      iterativeRecipes: 'authoring',
+      dialog: 'open',
+    },
+    expectSelector: '.application.dialog:has([data-action="yes"])',
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-multistep-off',
+    label: 'Manager — Recipe edit iterative steps, multi-step turned off',
+    recipeId: 'iw-r-sword',
+    recipes: 'multiStepOff',
+    steps: [SCROLL_TO(`${STEPS_CARD} [data-recipe-steps-multistep-off]`)],
+    expectSelector: `${STEPS_CARD}:not(:has([data-recipe-step-add])) [data-recipe-steps-multistep-off]`,
+    expectCenterHit: `${STEPS_CARD} [data-recipe-steps-open-settings]`,
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
+  }),
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-steps-multi-narrow',
+    label: 'Manager — Recipe edit iterative steps at 880px',
+    recipeId: 'iw-r-sword',
+    width: 880,
+    steps: [SCROLL_TO(STEPS_CARD)],
+    expectSelector: `${STEP_ROW('iw-sword-etch')} [data-recipe-step-issues="1"]`,
+    expectCenterHit: `${STEP_ROW('iw-sword-etch')} [data-recipe-step-delete]`,
+    expectLayout: {
+      containerSelector: STEPS_CARD,
+      oneLineRows: `${STEPS_CARD} .fabricate-sortable-list-line, ${STEPS_CARD} .fabricate-sortable-list-content`,
+    },
+    sourceMatches: ITERATIVE_STEPS_SOURCES,
   }),
 ]);

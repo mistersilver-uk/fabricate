@@ -1,7 +1,8 @@
 /**
  * The iterative recipe editor's Overview (issue 3010), mounted over the lab's authored Ironworks:
  * the Counters table's writes, faults, adder and empty states, the mode callout, the header status,
- * and a Save that keeps `Recipe.iterative.step` through the real store's projection.
+ * each step's actions, hide and lock and end rules, the per-step chips, and a Save that keeps
+ * `Recipe.iterative.step` through the real store's projection.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -12,7 +13,9 @@ import { get } from 'svelte/store';
 
 import { Recipe } from '../../src/models/Recipe.js';
 import { normalizeIterativeLibrary } from '../../src/systems/normalize/iterativeLibrary.js';
+import { iterativeStepTally } from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
 import { iterativeStatusChip } from '../../src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js';
+import { createRecipeStepHandlers } from '../../src/ui/svelte/apps/manager/recipe/recipeStepHandlers.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices } from '../helpers/adminStoreServices.js';
 import { setInputValue } from '../helpers/manager/managerQueries.js';
@@ -56,13 +59,26 @@ async function settle() {
   flushSync();
 }
 
+/** The route model's recipe reads over `world`, as the shell builds them. */
+async function recipeReads(world) {
+  const { createIterativeRecipeReads } = await managerModule(RECIPE_READS);
+  return createIterativeRecipeReads({
+    section: () => null,
+    selectedSystem: () => world.system,
+    currentView: () => 'recipe-edit',
+  });
+}
+
 /** Mounts the editor on `draft`, applying each patch as the shell's `patchRecipeDraft` does. */
 async function mountEditor(world, draft, extra = {}) {
   const live = new SvelteMap([['recipe', draft]]);
   const calls = { patches: [], routed: 0 };
   const iterative = {
     counters: world.system.iterative.counters,
+    actions: world.system.iterative.actions,
+    library: world.system.iterative,
     systemName: world.system.name,
+    recipeIssues: (await recipeReads(world)).recipeIssues,
     openCounters: () => {
       calls.routed += 1;
     },
@@ -366,5 +382,265 @@ describe('iterative recipe Save through the real store', () => {
       saved.counters.map((entry) => entry.counterId),
       ['heat', 'temper']
     );
+  });
+});
+
+/** The editor on `draft`, its step callbacks the real handlers over the live draft. */
+async function mountWithHandlers(world, draft, extra = {}) {
+  const ref = {};
+  const handlers = createRecipeStepHandlers({
+    draft: () => ref.live.get('recipe'),
+    patch: (partial) => ref.apply(partial),
+    confirm: async () => true,
+    iterative: () => true,
+    text: (_key, fallback) => fallback,
+    localize: (key) => key,
+  });
+  const editor = await mountEditor(world, draft, {
+    onEnterMultiStep: handlers.handleEnterMultiStep,
+    onRevertToSingleStep: handlers.handleRevertToSingleStep,
+    onAddStep: handlers.handleAddStep,
+    onReorderSteps: handlers.handleReorderSteps,
+    onUpdateStep: handlers.handleUpdateStep,
+    onDeleteStep: handlers.handleDeleteStep,
+    ...extra,
+  });
+  ref.live = editor.live;
+  ref.apply = (partial) => {
+    editor.calls.patches.push(structuredClone(partial));
+    editor.live.set('recipe', { ...editor.live.get('recipe'), ...partial });
+  };
+  return editor;
+}
+
+const STEP_CARD = '[data-recipe-section="iterative-step"]';
+const stepRow = (id) => $(`[data-recipe-step-id="${id}"]`);
+const lastStep = (calls) => calls.patches.at(-1).iterative.step;
+const panelOption = (id) => document.querySelector(`[data-popover-option="${id}"]`);
+
+describe('iterative recipe Overview: a single step’s Working the recipe card', () => {
+  it('states every action under All, with no picker, and writes All once', async () => {
+    const world = ironworks();
+    const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-blade'));
+    assert.match($(STEP_CARD).textContent, /Working the recipe/);
+    await press($(`${STEP_CARD} [data-iterative-step-actions-mode="all"] input`), 'All actions');
+    assert.equal(calls.patches.length, 1);
+    assert.deepEqual(lastStep(calls).actions, { mode: 'all', actionIds: [] });
+    assert.equal(
+      $('[data-iterative-step-actions-count]').textContent.trim(),
+      'All 3, including actions added later'
+    );
+    assert.ok(!$('[data-iterative-step-actions]'), 'All draws no picker');
+  });
+
+  it('seeds every library action on Only, writes the picker on Apply only, and marks idle ones', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.step.actions = { mode: 'all', actionIds: [] };
+    const { calls } = await mountEditor(world, draft);
+    await press($(`${STEP_CARD} [data-iterative-step-actions-mode="only"] input`), 'Only these');
+    assert.deepEqual(lastStep(calls).actions, {
+      mode: 'only',
+      actionIds: ['stoke', 'strike', 'quench'],
+    });
+    assert.equal($('[data-iterative-step-actions-count]').textContent.trim(), '3 of 3 allowed');
+
+    await press($('[data-iterative-step-actions]'), 'the allowed-actions picker');
+    assert.match(panelOption('quench').textContent, /changes nothing here/, 'Quench uses no Heat');
+    assert.doesNotMatch(panelOption('strike').textContent, /changes nothing here/);
+    await press(panelOption('quench'), 'Quench');
+    assert.equal(calls.patches.length, 1, 'nothing writes before Apply');
+    await press(document.querySelector('[data-set-picker-apply]'), 'Apply');
+    assert.equal(calls.patches.length, 2);
+    assert.deepEqual(lastStep(calls).actions.actionIds, ['stoke', 'strike']);
+  });
+
+  it('states an empty Only list as an error that describes the picker', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.step.actions = { mode: 'only', actionIds: [] };
+    await mountEditor(world, draft);
+    const line = $(`${STEP_CARD} [data-iterative-step-part="actions"] .manager-iterative-fault`);
+    assert.equal(
+      line.textContent.trim(),
+      'No actions are allowed, so players can’t work this step. Pick at least one.'
+    );
+    const add = $('[data-iterative-step-actions]');
+    assert.equal(add.getAttribute('aria-invalid'), 'true');
+    assert.equal(add.getAttribute('aria-describedby'), line.id);
+  });
+
+  it('states both empty rule lists, writes a Condition, and draws no step chip', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.step.success = [];
+    const { calls } = await mountEditor(world, draft);
+    const empty = (end) =>
+      $(`[data-iterative-step-end="${end}"] [data-counter-rules-empty]`)?.textContent.trim();
+    assert.equal(empty('success'), 'No success rule. Without one, the step can never finish.');
+    assert.equal(empty('failure'), 'No failure rule. The step can only end in success.');
+    assert.ok(!$('[data-recipe-step-issues]'), 'a single step draws no chip');
+
+    await press(
+      $('[data-iterative-step-end="success"] [data-rule-row-preset="rule"]'),
+      'the success Condition adder'
+    );
+    assert.match(
+      $('[data-iterative-step-end="success"] [data-rule-row-preset]').textContent,
+      /Condition/
+    );
+    assert.deepEqual(lastStep(calls).success, [
+      { source: 'counter', counterId: 'heat', op: '>=', value: 0 },
+    ]);
+  });
+
+  it('names a rule on a counter the recipe does not track, in both lists', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    draft.iterative.step.success = [{ source: 'counter', counterId: 'temper', op: '>=', value: 2 }];
+    draft.iterative.step.failure = [{ source: 'counter', counterId: 'slag', op: '>=', value: 4 }];
+    await mountEditor(world, draft);
+    const fault = (end) =>
+      $(`[data-iterative-step-end="${end}"] .manager-iterative-fault`)?.textContent.trim();
+    assert.match(fault('success'), /^Temper isn.t tracked in this step\.$/);
+    assert.match(fault('failure'), /^Slag isn.t tracked in this step\.$/);
+  });
+
+  it('shows a single step’s lock while a list is non-empty, and hides it once cleared', async () => {
+    const world = ironworks();
+    const { calls } = await mountEditor(world, await draftOf(world, 'iw-r-hinge'));
+    assert.ok(Boolean($(`${STEP_CARD} [data-iterative-step-part="counters"]`)), 'Temper is locked');
+    await press($('[data-iterative-step-lock="temper"]'), 'the Temper lock');
+    assert.deepEqual(lastStep(calls).lockedCounterIds, []);
+    assert.ok(!$(`${STEP_CARD} [data-iterative-step-part="counters"]`), 'nothing left to show');
+  });
+});
+
+describe('iterative recipe Overview: the Steps card', () => {
+  it('writes each step’s hide, lock and rules with their joiners, explaining a never-shown counter', async () => {
+    const world = ironworks();
+    const { calls } = await mountWithHandlers(world, await draftOf(world, 'iw-r-sword'));
+    const heat = stepRow('iw-sword-heat');
+    const slagHide = heat.querySelector('[data-iterative-step-hide="slag"]');
+    assert.equal(slagHide.checked, true);
+    assert.equal(slagHide.disabled, true);
+    const reason = heat.querySelector('[data-iterative-step-never-shown]');
+    assert.equal(reason.textContent.trim(), 'Hidden from players in every step');
+    assert.equal(slagHide.getAttribute('aria-describedby'), reason.id);
+    assert.equal(
+      heat.querySelector('[data-iterative-step-hide="heat"]').getAttribute('aria-label'),
+      'Hide Heat in step 1'
+    );
+
+    await press(heat.querySelector('[data-iterative-step-lock="heat"]'), 'lock Heat');
+    const stepOf = () => calls.patches.at(-1).steps[0].iterative;
+    assert.deepEqual(stepOf().lockedCounterIds, ['temper', 'heat']);
+    assert.ok('iterative' in calls.patches.at(-1), 'the recipe iterative is carried');
+
+    for (const end of ['success', 'failure']) {
+      await press(
+        stepRow('iw-sword-heat').querySelector(
+          `[data-iterative-step-end="${end}"] [data-rule-row-preset="rule"]`
+        ),
+        `the ${end} Condition adder`
+      );
+    }
+    assert.equal(stepOf().success.length, 2);
+    assert.equal(stepOf().failure.length, 2);
+    const joiner = (end) =>
+      stepRow('iw-sword-heat')
+        .querySelector(`[data-iterative-step-end="${end}"] [data-counter-rules-joiner]`)
+        .textContent.trim();
+    assert.equal(joiner('success'), 'and');
+    assert.equal(joiner('failure'), 'or');
+  });
+
+  it('counts each step’s blocking issues, else its warnings, as its tally does', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-sword');
+    await mountEditor(world, draft);
+    const chip = (id) => stepRow(id).querySelector('[data-recipe-step-issues]');
+    assert.match(chip('iw-sword-heat').textContent, /1 warning/);
+    assert.match(chip('iw-sword-heat').textContent, /Heat the blank: 1 warning/);
+    assert.match(chip('iw-sword-etch').textContent, /1 blocking/);
+    assert.match(chip('iw-sword-etch').textContent, /Etch the fuller: 1 blocking issue/);
+    assert.ok(Boolean(chip('iw-sword-etch').querySelector('.fa-circle-exclamation')));
+
+    const issues = (await recipeReads(world)).recipeIssues(draft);
+    for (const [index, id] of ['iw-sword-heat', 'iw-sword-etch'].entries()) {
+      const tally = iterativeStepTally(issues, index);
+      const count = tally.blocking || tally.warnings;
+      assert.match(chip(id).textContent, new RegExp(String.raw`^\s*${count} `));
+    }
+  });
+
+  it('moves the single step config onto step 1, and offers no remove on a sole step', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-blade');
+    const step = structuredClone(draft.iterative.step);
+    const { calls } = await mountWithHandlers(world, draft);
+    await press($('[data-recipe-step-mode-option="multi"] input'), 'Multi-step');
+    const [patch] = calls.patches;
+    assert.deepEqual(patch.steps[0].iterative, step);
+    assert.equal(Object.hasOwn(patch.iterative, 'step'), false, 'no `iterative.step` is left');
+    const [only] = patch.steps;
+    assert.ok(Boolean(stepRow(only.id).querySelector('[data-iterative-step-config]')));
+    assert.ok(!$('[data-recipe-step-delete]'), 'the sole step offers no remove');
+
+    await press($('[data-recipe-step-add]'), 'Add a step');
+    assert.equal(target.querySelectorAll('[data-recipe-step-delete]').length, 2);
+    for (const tab of ['ingredients', 'results', 'tools']) {
+      await press($(`#recipe-tab-${tab}`), tab);
+      assert.equal(target.querySelectorAll('[data-recipe-step-delete]').length, 2, tab);
+    }
+  });
+
+  it('offers no remove on a sole step on any tab', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-sword');
+    draft.steps = draft.steps.slice(0, 1);
+    await mountEditor(world, draft);
+    for (const tab of ['overview', 'ingredients', 'results', 'tools']) {
+      await press($(`#recipe-tab-${tab}`), tab);
+      assert.ok(Boolean($('[data-recipe-step-id="iw-sword-heat"]')), `${tab} lists the step`);
+      assert.ok(!$('[data-recipe-step-delete]'), `${tab} offers no remove`);
+    }
+  });
+
+  it('warns while multi-step is off, offers no Add a step, and routes to settings', async () => {
+    const world = ironworks('multiStepOff');
+    let opened = 0;
+    const draft = await draftOf(world, 'iw-r-sword');
+    await mountEditor(world, draft, {
+      onOpenCraftingSettings: () => {
+        opened += 1;
+      },
+    });
+    const callout = $('[data-recipe-steps-multistep-off]');
+    assert.match(
+      callout.textContent,
+      /Multi-step recipes are turned off in Ironworks, so this recipe can’t be started\./
+    );
+    assert.ok(!$('[data-recipe-step-add]'), 'no Add a step');
+    assert.ok(!$('[data-recipe-section="collapsed-steps"]'));
+    await press($('[data-recipe-steps-open-settings]'), 'Crafting Settings');
+    assert.equal(opened, 1);
+    const codes = (await recipeReads(world)).recipeIssues(draft).map((issue) => issue.code);
+    assert.ok(codes.includes('iterativeMultiStepOff'));
+  });
+});
+
+describe('step headers outside iterative', () => {
+  it('draw no count and keep every delete on each tab', async () => {
+    const world = ironworks();
+    const draft = { ...(await draftOf(world, 'iw-r-sword')), iterative: undefined };
+    draft.steps = draft.steps.slice(0, 1);
+    await mountEditor(world, draft, { iterative: null, resolutionMode: 'simple' });
+    for (const tab of ['overview', 'ingredients', 'results', 'tools']) {
+      await press($(`#recipe-tab-${tab}`), tab);
+      assert.ok(Boolean($('[data-recipe-step-delete="iw-sword-heat"]')), `${tab} keeps its delete`);
+      assert.ok(!$('.manager-recipe-step-meta'), `${tab} draws no count`);
+    }
+    assert.ok(!$('[data-iterative-step-config]'));
   });
 });

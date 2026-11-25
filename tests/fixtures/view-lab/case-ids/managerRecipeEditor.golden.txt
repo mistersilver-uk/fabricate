@@ -100,3 +100,15 @@ manager-recipe-edit-iterative-counters-bad-bounds
 manager-recipe-edit-iterative-counters-all-used
 manager-recipe-edit-iterative-counter-unknown
 manager-recipe-edit-iterative-narrow
+manager-recipe-edit-iterative-step-all
+manager-recipe-edit-iterative-step-only
+manager-recipe-edit-iterative-step-none
+manager-recipe-edit-iterative-no-success-rule
+manager-recipe-edit-iterative-rule-untracked
+manager-recipe-edit-iterative-single-locked
+manager-recipe-edit-iterative-multistep
+manager-recipe-edit-iterative-step-issues
+manager-recipe-edit-iterative-enter-multistep
+manager-recipe-edit-iterative-collapse-confirm
+manager-recipe-edit-iterative-multistep-off
+manager-recipe-edit-iterative-steps-multi-narrow

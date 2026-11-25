@@ -836,6 +836,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-iterative-counters-bounds',
   'manager-recipe-edit-iterative-counters-bad-bounds',
   'manager-recipe-edit-iterative-counter-unknown',
+  // The iterative Steps card at 880px (issue 3010): each step header, chip and delete on one line.
+  'manager-recipe-edit-iterative-steps-multi-narrow',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
