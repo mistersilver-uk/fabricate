@@ -1177,7 +1177,8 @@ The gate evaluates a candidate as though its activation had already landed, whet
 ### Iterative Check Slot
 
 - An iterative system rolls `craftingCheck.routed`, and its `checkBreakage` is the routed slot's.
-- `success` and `outcomeId` come from the matched tier, and a total that matches no tier gives `success: false` and `outcomeId: null`, after routing, which clamps a relative miss to the least demanding tier as `routedByCheck` does.
+- `success` and `outcomeId` come from the matched tier.
+  Routing first clamps a relative miss to the least demanding tier, as `routedByCheck` does, and a total that still matches no tier gives `success: false` and `outcomeId: null`.
 - `minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read.
 
 ### Iterative Terminal Routing
@@ -1186,12 +1187,12 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - An empty rule list always holds, and nothing is selected when no line matches.
 - A group with no `producedWhen` is never selected, and the failure group is selected only by its `producedWhen`, never by its role.
 - A counter rule reads a counter value, the session count or the previous action, and a rule that does not parse, or names a counter with no value, holds nothing.
-- The selected group settles exactly once, through one execution journal whose effects run in this order: `record-attempt`, `apply-tools`, the versioned award effects (`award-results`, `award-rewards`) over the selected group only, `finalize-iterative-step`, `record-recipe-use` on a success, and `post-chat`.
+- The selected group settles exactly once, through one execution journal whose effects run in this order: `record-attempt`, `apply-tools` when the step has Tools, the versioned award effects (`award-results`, `award-rewards`) over the selected group only, `finalize-iterative-step`, `record-recipe-use` on a success, and `post-chat`.
 - No complication fires, because component complications are progressive-only.
 - A terminal success advances the run to its next step, unstarted, or completes it `succeeded`, and records recipe use.
 - A terminal failure ends the step and the run `failed`, keeps their inputs consumed, awards only a matching failure group, and never advances.
-- A checked terminal attempt's craft card carries a public check roll.
-  A visible roll in any other mode cannot ride the public card, so the requester posts it as its own message in that mode; `takeCraftingAction`'s non-interactive default rolls `selfroll`.
+- A checked terminal attempt rolled in the public roll mode carries its check roll on the craft card.
+  A visible roll in any other roll mode cannot ride the public card, so the requester posts it as its own message in that roll mode, and `takeCraftingAction`'s non-interactive default rolls `selfroll`.
   Either way the roll posts once.
 
 ### Iterative Validation

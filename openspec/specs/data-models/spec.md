@@ -3828,9 +3828,9 @@ IterativeStepState = {
   counters: Array<{ counterId: string, value: number }>,
   attemptCount: number,
   sessionCount: number,
-  startedWith: Array<{ counterId, value, formulaValue: number | null, rolls: number[], clamped }>,
+  startedWith: Array<{ counterId, value, formulaValue: number | null, rolls: number[], clamped: boolean }>,
   log: AttemptEntry[],
-  compacted: null | { attempts, sessions, paid: CounterTotal[], changed: CounterTotal[] },
+  compacted: null | { attempts: number, sessions: number, paid: CounterTotal[], changed: CounterTotal[] },
   labels: null | { counters: Array<{ id, label }>, actions: Array<{ id, label }> },
   toolBreakOwed: null | { attempt: number },
   terminal: null | { kind: "success" | "failure", attempt: number, resultGroupId: string | null },
@@ -3840,7 +3840,7 @@ AttemptEntry = {
   attempt: number,
   sessionNumber: number | null,
   actionId: string,
-  requestId: string, // the Attempt id
+  requestId: string, // the Attempt id, `attemptId` on the command and the public API
   check: null | { success: boolean, outcomeId: string | null, value: number },
   rolls: Array<{ effectId: string, total: number }>,
   paid: Array<{ counterId: string, delta: number }>,

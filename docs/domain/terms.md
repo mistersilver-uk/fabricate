@@ -354,6 +354,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-s
 
 ## Currency Spend Strategy
 
+It is a world setting, not a crafting-system field, and `requirements.currency.spendStrategy` and `requirements.currency.macros` are stale names that documentation never reintroduces.
+`CraftingEngine._spendCraftCurrency` drives the deduction on every craft path and `_refundCraftCurrency` drives the player-cancel refund, and component-level currency spending remains a deferred follow-up.
 One of **three peer top-level strategies**: `actorProperty` — a flat numeric actor data path per unit (e.g. dnd5e `system.currency.gp`), read/spent via batched `actor.update(...)` with Fabricate-owned change-making; `actorInventory` — coins held in the actor inventory and resolved through a preconfigured **inventory provider** (filtered by `game.system.id`); or `macro` — the GM's own currency macros (the macro receives the actor and does whatever it needs).
 Macro is **not inventory-specific**, so it is its own peer strategy rather than a sub-mode of `actorInventory` (the retired nested `inventoryMode` field is mapped forward on normalization and never re-emitted).
 A consumer resolves a symmetric **coin spender** per strategy behind a common `{ check, spend, refund }` interface and drives the up-front affordability check, the deduction, and the player-cancel refund uniformly.
@@ -670,21 +672,24 @@ Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipe-v
 Each step has exactly one ingredient set, and its result groups are selected by **Produced When** at the step's end.
 It is not **Progressive**: Progressive spends one rolled value against ordered thresholds, while Iterative repeats player-chosen Crafting Actions against Counters.
 It reuses the routed crafting check only for an action with `check: 'roll'`, reading the check's outcome tiers in an effect's `when` and never routing on them.
+`minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read, and Tools are used at every step end.
 `RESOLUTION_MODES` holds the mode, so the system normalizer accepts it on read and write.
 `SELECTABLE_RESOLUTION_MODES` leaves it out, so the admin store's mode change and the importer refuse it, and the settings surfaces do not offer it.
 Fixtures and tests write the mode directly through `createSystem` or `updateSystem`.
-Every existing craft path (the legacy craft, the versioned start and every versioned stage preparation) refuses a recipe in an iterative system before it creates a run, consumes, spends, rolls or awards.
+The versioned run start and the step start run for an iterative recipe, and each later move is an **Iterative Attempt**.
+The legacy craft, the versioned execute, the stage check description and the immediate-execute probe refuse it before anything is created, consumed, spent, rolled or awarded.
+A start is refused, with nothing spent, while the recipe has a critical iterative readiness issue, while a critical library issue names a counter or action its terms snapshot would carry, or while the library version is unsupported.
 Iterative data is kept, inert, in a system of any other mode.
 Its structural readiness runs only for an iterative system, and no iterative issue blocks the system or visibility, so a recipe stays listed and refuses a start.
 A recipe with no Counter Instance or a step with no success rule is in the derived "Needs iterative setup" tier, and no setup marker is persisted.
 
-Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`)
+Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`)
 
-Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md
 
 ## Counter
 
-A counter is `{ id, label, description?, limit, min?, max? }`, and its id matches `^[a-z][A-Za-z0-9]*$`, is unique within the library and is never minted or rewritten.
+A counter is `{ id, label, description?, limit, min?, max? }`, and its id matches `^[a-z][A-Za-z0-9]*$`, is unique within the library and is never minted or rewritten by a normalizer.
 `limit` decides how its bounds are read: `none` reads no bounds, `perRecipe` reads `min` and `max` as defaults a **Counter Instance** overrides, and `global` reads them as fixed bounds.
 `min` and `max` are kept under every limit, so switching the limit back restores them.
 A counter with a missing, malformed or repeated id is dropped, the first one winning, because every reference to it then reports `iterativeUnknownCounter`.
@@ -724,6 +729,99 @@ The term is always written in full, because a bare "action" already names UI and
 Canonical mapping: `CraftingSystem.iterative.actions[]`, `ACTION_CHECKS`, `EFFECT_OPS`, `normalizeEffectWhen`, `iterativeEntryFault` and `actionEntryFaults` (`src/systems/normalize/iterativeLibrary.js`), `Step.iterative.actions` (`src/models/iterativeStepConfig.js`)
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Iterative Step State
+
+It is `{ version, counters, attemptCount, sessionCount, startedWith, log, compacted, labels, toolBreakOwed, terminal }`, present only on a started step of an iterative run.
+Starting a step consumes its inputs once through the shared stage-start commit, arms its gate when it has an honoured time requirement, and writes the state in that commit.
+The first step's `counters` and `startedWith` come from the Counter Instances' start values, resolved once against live actor roll data before anything is consumed.
+A later step carries the previous step's final counter values verbatim, records each as a plain start, and restarts `attemptCount` and `sessionCount` at 0.
+Every write rebuilds the closed key set, and `compacted`, `labels`, `toolBreakOwed`, `terminal` and `terminal.resultGroupId` are explicit `null` when empty.
+Foundry's flag merge replaces the `steps` array whole, so a key the writer drops is never resurrected.
+`readIterativeStepState` drops unknown keys, and a state whose `version` is above the build's is kept verbatim, never trimmed, and refuses every Iterative Attempt.
+`toolBreakOwed` is `{ attempt }` from the first checked Iterative Attempt whose `checkBreakage` trigger fires under `checkDriven`, and it never moves, so the Tools break once, at the step's end.
+Hidden counters are stored unfiltered, and presentation decides what a non-GM viewer sees.
+**Evidence bound.** While the run is active, `log` keeps the newest 25 Attempt Entries, oldest first, and each older one folds into `compacted = { attempts, sessions, paid, changed }`.
+`sessions` counts the folded entries whose `sessionNumber` is not `null`, and `paid` and `changed` sum per counter in first-touch order, so `log` and `compacted` together equal the unbounded totals.
+At archive each supported state is trimmed to its newest 10 entries the same way, and `labels` is written once from the terms snapshot, which the archive then deletes.
+Each Iterative Attempt's flag write resends the whole `steps` array, so one write carries up to about 8 KiB per started step.
+A `previousAction` rule reads the newest log entry, which compaction always retains.
+
+Canonical mapping: `CraftingRunStepState.iterative`, `ITERATIVE_STEP_STATE_VERSION` (`src/systems/iterative/preflightAttempt.js`), `createIterativeStepState`, `readIterativeStepState`, `appendAttemptEntry`, `archiveRunTerms`, `ITERATIVE_LOG_LIMIT` and `ITERATIVE_ARCHIVE_LOG_LIMIT` (`src/systems/iterative/iterativeStepState.js`), `prepareIterativeStepStart` (`src/systems/iterative/iterativeStepStart.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md
+
+## Iterative Attempt
+
+**Attempt pipeline.** An Iterative Attempt is the `takeAction` journal command, executed by the active-GM command authority, and `Fabricate#takeCraftingAction` sends the same command.
+The authority first answers a replayed Attempt id from the run's log, active or archived, once none of the run's execution journals is uncommitted, and otherwise refuses `recoveryRequired`.
+It then refuses a stale `expectedRevision` before any roll, re-reads the run under its claim, re-checks the step, its gate, the action, Tool presence and preflight, and rolls the routed check only for an action with `check: 'roll'`.
+A prepared check is keyed to its action, so a roll leg for another action refuses `check-mismatch`.
+The attempt library comes from the run's `termsSnapshot.iterative` and its recipe terms, while actor roll data is read live at every attempt.
+`resolveAttempt` is a pure, synchronous function of the step state, the action, the attempt library, the actor roll data, the check summary and an injected die source, and it never rolls the check or mutates an input.
+A non-terminal attempt is one guarded run write that advances `runRevision` by one, and a terminal attempt settles once through one execution journal.
+A refused attempt changes no counter, count, Tool or item, and a refusal found after the check is evaluated returns no roll for the player to post.
+A committed attempt answers `success: true` even when its step failed, so `success: false` from `takeAction` is always a refusal.
+**Evaluation order.** `ATTEMPT_PHASES` freezes the phases: preflight, check, costs, effects, clamp, terminal, every-session effects, reclamp, countdown and routing.
+Preflight, costs and effects read the step state as it stood when the attempt began, and the terminal check and later phases read the post-clamp draft, whose `sessionCount` already counts this Crafting Session.
+Preflight prices every cost before any check is prepared, so a negative, invalid or unaffordable cost refuses with nothing spent.
+Effects apply in authored order, `add` and `subtract` accumulate, `set` replaces, and a locked counter ignores every cost and effect aimed at it.
+A failed check is not terminal: the step succeeds only when it has a success rule and every success rule holds, and otherwise fails when any failure rule holds.
+Every-session effects, the countdown and Action Adjustments are no-ops until their extensions define them, so the order never changes.
+Dice draw in a fixed order: start formulas in Counter Instance order at step start, then effects in authored order, each amount's terms left to right, and each term's base dice before its explosions.
+A skipped effect draws nothing, and a cost draws nothing.
+**Reserved expression roots.** A cost, effect or start amount is an iterative expression: the deterministic grammar plus `abs`, `min`, `max` and `NdF` dice with an optional `x` and then an optional `kh` or `kl`.
+The reserved roots `@counter.<id>`, `@min.<id>`, `@max.<id>`, `@target.<id>`, `@sessionCount` and `@check.value` resolve before actor roll data and are never shadowed by it, and every other root reads roll data.
+A reserved root ends at the first character that cannot continue it, so `@counter.heat-1` is the counter minus one, because an id never holds a hyphen.
+`@recipe`, `@circumstance` and `@status` are reserved and refuse as `forbidden-root` until their extensions define them, and `@check.value` is the only check fact an expression reads.
+A cost reads no dice and no `@check`, a start formula rolls once and reads only `@min`, `@max` and `@target` of the reserved roots, and an effect reads everything.
+A dice term of more than 1000 dice, or one whose explosions would pass 1000 results, refuses as `explode-limit`.
+At runtime the die source is `Math.ceil((1 - u) * faces)` for `u = CONFIG.Dice.randomUniform()`, built at the bootstrap edge, and effect dice post no chat roll.
+**Terminal routing.** At a step end the step's result groups are read in order, and the first with a **Produced When** line for that end whose rules all hold is selected, otherwise none.
+The selected group settles once, in the order `record-attempt`, `apply-tools`, the award effects, `finalize-iterative-step`, `record-recipe-use` on a success, and `post-chat`.
+A terminal success advances the run to its next step, unstarted, or completes it `succeeded`.
+A terminal failure ends the step and the run `failed` with `failureReason: 'iterativeFailure'`, keeps the inputs consumed, awards only a matching failure group, and never advances.
+No complication fires, because component complications are progressive-only.
+The term is always written in full, because a bare "attempt" already names gathering and alchemy attempts, and an Iterative Attempt is neither a stage start nor a stage resolution.
+
+Canonical mapping: `takeAction` in `MUTATING_ACTIONS` and `CHECKED_ACTIONS` (`src/systems/journalRunCommandActions.js`), `withIterativeOperations` (`src/systems/iterative/iterativeJournalOperation.js`), `takeIterativeAttempt` (`src/systems/iterative/IterativeAttemptExecutor.js`), `ATTEMPT_PHASES`, `resolveAttempt` and `resolveStartedWith` (`src/systems/iterative/resolveAttempt.js`), `preflightAttempt` and `ITERATIVE_ATTEMPT_REFUSALS` (`src/systems/iterative/preflightAttempt.js`), `evaluateIterativeExpression` and `ITERATIVE_EXPRESSION_PROFILES` (`src/systems/iterative/expression.js`), `selectProducedGroup` (`src/systems/iterative/routing.js`), `settleIterativeTerminal` (`src/systems/iterative/iterativeTerminalOperation.js`), `createFoundryRollDie` (`src/bootstrap/iterativeRollDie.js`), `takeCraftingAction` (`src/bootstrap/craftingFacade.js`)
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/ui-journal-app/spec.md
+
+## Attempt Entry
+
+An entry is `{ attempt, sessionNumber, actionId, requestId, check, rolls, paid, changed }`.
+`attempt` restarts at 1 on each step, and `sessionNumber` is `null` for a free action.
+`requestId` is the Attempt id, which the command and `takeCraftingAction` call `attemptId`, so a retry with the same id is answered from the log and never pays twice.
+The stored `check` is `null` or the check summary `{ success, outcomeId, value }`, and a reply hides it as `null` from a sender who cannot see a secret check's recipe.
+`rolls` holds one `{ effectId, total }` per effect whose amount drew dice, and the individual dice are not kept.
+`paid` and `changed` are per-counter deltas taken before the clamp, in first-touch order with zeros omitted, and a paid delta is negative.
+The resolver builds the entry without `requestId`, and the executor stamps it and appends it to the log.
+
+Canonical mapping: `AttemptEntry`, `appendAttemptEntry` and `findAttemptEntry` (`src/systems/iterative/iterativeStepState.js`), `ATTEMPT_ID_MAX_LENGTH` (`src/systems/iterative/iterativeJournalOperation.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-journal-app/spec.md
+
+## Crafting Session
+
+Its Attempt Entry carries `sessionNumber`, one above the `sessionCount` before the attempt.
+The extensions that add every-session effects, statuses, circumstances and session supply advance only on a Crafting Session.
+A Crafting Action with `usesSession: false` makes a free action, which counts in `attemptCount` and not in `sessionCount`.
+It is distinct from a client session, the sense the command authority already gives the bare word, so no persisted field, enum value or reserved root is a bare `session`.
+
+Canonical mapping: `usesSession` (`CraftingSystem.iterative.actions[]`), `IterativeStepState.sessionCount`, `AttemptEntry.sessionNumber`, `@sessionCount`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Workpiece
+
+A Workpiece is a Crafting Run whose system is in `iterative` mode, and no record, field or enum is named for it.
+Player copy uses it, for instance in the unaffordable-cost refusal, and a mismatched check states that the workpiece is unchanged.
+It is distinct from the alchemy **Workbench**, which holds submitted components rather than a run.
+
+Canonical mapping: no persisted name; the `IterativeCostUnaffordable`, `IterativeCheckMismatch`, `IterativeActionNotFound` and `IterativeNotReady` sentences (`FABRICATE.App.Journal.Reason.*` in `lang/en.json`)
+
+Spec reference: openspec/specs/ui-journal-app/spec.md
 
 ## Produced When
 
@@ -1646,6 +1744,9 @@ Spec reference: openspec/specs/data-models/spec.md (Registration Source Identity
 
 ## Recipe Item Match Tiers
 
+The list-aware `identity` tier is evaluated first: the durable per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf (the third `roles` sibling after `componentId` and `toolId`), then the legacy scalar `flags.fabricate.recipeItemDefinitionId`, a transitional read-only fallback.
+Each names a definition in the candidate set exclusively and otherwise falls through.
+Among the source tiers the first match wins with no fall-through: `uuid` is the item's own uuid in the definition's union refs, `compendium` is the item's compendium **Source UUID** in the union, and `duplicate` is the item's `_stats.duplicateSource` in the union.
 Definition ids are NOT globally unique (generated per system), so `systemId` scopes the identity tier exactly like components; a dotted/unsafe id degrades to the legacy-scalar + source-uuid tiers (warn once), never throws.
 There is **no clone-gate** and no derivative gate at match time (tier 3 is always trusted).
 The clone-gate is a **registration, source-replacement and source-repair** rule: a world source Item carrying `_stats.duplicateSource` at registration is a duplicate and keys on its own uuid only (excluding the inherited compendium source), so a registered duplicate becomes a NEW definition instead of overwriting the original.
@@ -2041,7 +2142,7 @@ An unresolved or non-numeric value is a **Target Refusal** and never reads as 0.
 A progressive check and a fixed-range routed check read no target, so their target source is inert.
 The crafting dynamic-DC macro runs after validation, receives the anchor (the adjusted character value under an attribute source) as `anchorDc` with a cloned `evaluation`, and its result replaces that anchor.
 
-Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `resolveCraftingCheckTarget` in `src/systems/craftingCheckRefusal.js`, `CraftingEngine._resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
+Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` (`src/systems/checkEvaluation.js`), read through `readFoundryPath` in `src/systems/expressionReader.js`; `resolveCraftingCheckTarget` in `src/systems/craftingCheckRefusal.js`, `CraftingEngine._resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
 
@@ -2180,6 +2281,8 @@ Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-mod
 
 ## Forced Outcome
 
+`resolveForcedOutcome` reuses the shared `evaluateCheckBreakageCondition` and ignores `outcomeTier` conditions as circular, because the routed tier is not known at forcing time, so an `outcomeTier` trigger pins `outcome` to `'none'`.
+That pin is scoped to forcing, and the same trigger stays live at the two later seams where a tier is known, so it can still drive a **Tier Stepping** effect and still break tools.
 Triggers are ORed and a matched **failure takes precedence over a matched success**.
 The forced disposition differs by runner: **simple** forces pass/fail; **progressive** forces award-all (`MAX_SAFE_INTEGER`) or award-none (`0`); **routed** REROUTES — a forced success routes to the best succeeding tier and a forced failure to the worst failing tier, and when no tier of that disposition exists the match is **dropped entirely** (no outcome).
 A **Tier Stepping** effect may then move that rerouted tier, but stepping is **disposition-preserving**: it moves only within the ranked subset of tiers sharing the forced disposition and clamps there, so a forced success never surfaces a failing tier's name and `data.success` never disagrees with the final tier's own `success`.
