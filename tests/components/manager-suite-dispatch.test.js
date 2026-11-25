@@ -24,7 +24,7 @@ const MOUNTED_DISPATCHER = 'manager-mounted.test.js';
 const LAYOUT_DISPATCHER = 'manager-layout.test.js';
 
 /** Exact, not a floor: a floor admits a module nothing dispatches as long as the others stay. */
-const MOUNTED_COUNT = 15;
+const MOUNTED_COUNT = 16;
 const LAYOUT_COUNT = 9;
 
 const ENTRY_POINT = /^register[A-Za-z0-9]*Cases$/;
