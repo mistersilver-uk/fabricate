@@ -584,7 +584,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
 
   defineStructureContract(
     'and the handlers localize those keys rather than embedding hardcoded English',
-    ROOT,
+    'src/ui/svelte/apps/manager/recipe/recipeStepHandlers.js',
     {
       callsLiteral: [
         ['localize', 'FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'],

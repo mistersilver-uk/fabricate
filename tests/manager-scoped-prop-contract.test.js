@@ -172,6 +172,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './navRailModel.svelte.js',
   // Added by issue 1721: the Books & Scrolls selection and recipe-item draft are their own unit.
   './recipe-item/recipeItemModel.svelte.js',
+  // Added by issue 3010: the recipe editor's step handlers are their own unit.
+  './recipe/recipeStepHandlers.js',
   // Added by issue 2513: the routed check's tiers, evaluation and gaps the recipe editor reads.
   './recipe/routedCheckFacts.js',
   './recipes/RecipeBrowserInspector.svelte',

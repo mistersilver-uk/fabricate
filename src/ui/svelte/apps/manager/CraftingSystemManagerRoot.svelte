@@ -141,6 +141,7 @@
     truncateDescription,
   } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
+  import { createRecipeStepHandlers } from './recipe/recipeStepHandlers.js';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import { isLearnedKnowledgeObservable } from '../../../../systems/learnedKnowledgeObservability.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
@@ -2715,49 +2716,20 @@
     return true;
   }
 
-  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients / results / tools
-  // so an already-craftable recipe stays craftable (the engine only falls back to top-level fields
-  // when the steps array is empty).
-  function newStepId() {
-    return (
-      globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`
-    );
-  }
-
-  function handleEnterMultiStep() {
-    if (!recipeDraft) return false;
-    const seeded = {
-      id: newStepId(),
-      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
-      description: '',
-      ingredientSets: recipeDraft.ingredientSets || [],
-      resultGroups: recipeDraft.resultGroups || [],
-      toolIds: recipeDraft.toolIds || [],
-    };
-    patchRecipeDraft({ steps: [seeded] });
-    return true;
-  }
-
-  // Reverting multi-step → single-step discards the per-step authoring, so warn
-  // before staging the empty steps array (engine falls back to top-level fields).
-  async function handleRevertToSingleStep() {
-    if (!recipeDraft) return false;
-    const name =
-      String(recipeDraft.name || '').trim() ||
-      text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
-    const confirmed = await store.confirmRecipeAction?.({
-      title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name }),
-      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepConfirm'),
-    });
-    if (!confirmed) return false;
-    patchRecipeDraft({ steps: [] });
-    return true;
-  }
-
-  function currentSteps() {
-    return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
-  }
+  const {
+    handleEnterMultiStep,
+    handleRevertToSingleStep,
+    handleAddStep,
+    handleReorderSteps,
+    handleUpdateStep,
+    handleDeleteStep,
+  } = createRecipeStepHandlers({
+    draft: () => recipeDraft,
+    patch: patchRecipeDraft,
+    confirm: (options) => store.confirmRecipeAction?.(options),
+    text,
+    localize,
+  });
 
   // Locking persists immediately (like enable) and is NEVER gated in either direction — a GM locks
   // a recipe precisely while it is unfinished.
@@ -2769,62 +2741,6 @@
     recipeDraftBaseline = recipeDraftBaseline
       ? { ...recipeDraftBaseline, locked: next === true }
       : recipeDraftBaseline;
-  }
-
-  function handleAddStep() {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    steps.push({
-      id: newStepId(),
-      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`,
-      description: '',
-    });
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  function handleReorderSteps(from, to) {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to)
-      return false;
-    const [moved] = steps.splice(from, 1);
-    steps.splice(to, 0, moved);
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  function handleUpdateStep(stepId, patch) {
-    if (!recipeDraft || !patch) return false;
-    const steps = currentSteps().map((step) => (step.id === stepId ? { ...step, ...patch } : step));
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  // Deleting a step removes the whole step (its ingredients, results, and tools).
-  async function handleDeleteStep(stepId, context = 'overview') {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    const step = steps.find((entry) => entry?.id === stepId);
-    if (!step) return false;
-    const name =
-      String(step.name || '').trim() ||
-      text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
-    const alsoDeleted = localize(
-      {
-        ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
-        results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
-        tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools',
-      }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll'
-    );
-    const confirmed = await store.confirmRecipeAction?.({
-      title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
-      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.DeleteStep'),
-    });
-    if (!confirmed) return false;
-    patchRecipeDraft({ steps: steps.filter((entry) => entry?.id !== stepId) });
-    return true;
   }
 
   function recipeEditSaveLabel() {
