@@ -32,6 +32,23 @@ const openCounter = (id) => ({
 const openBody = (id) =>
   `[data-iterative-counter="${id}"] .fabricate-sortable-list-body:not([hidden])`;
 
+const openAction = (id) => [
+  ...ACTIONS_STEPS,
+  { selector: `[data-iterative-action="${id}"] .fabricate-list-row-open` },
+];
+const openEffect = (id) => ({
+  selector: `[data-iterative-effect="${id}"] [data-sortable-disclosure]`,
+});
+
+/** One Crafting Action editor frame: `Ironworks` in `state`, with action `id` open from the browser. */
+const editorCase = ({ state, open = 'strike', steps = [], ...entry }) =>
+  iterativeCase({
+    ...(state && { state }),
+    steps: [...openAction(open), ...steps],
+    expectView: 'iterative-action-edit',
+    ...entry,
+  });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-iterative-rail',
@@ -232,5 +249,118 @@ export const CASES = Object.freeze([
     steps: ACTIONS_STEPS,
     expectView: 'iterative-actions',
     expectSelector: '[data-iterative-action-list] > [data-iterative-action="quench"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit',
+    label: 'Manager — Iterative action editor, valid and ready',
+    expectSelector: '[data-iterative-check-facts][data-iterative-check-direction="over"]',
+    expectCenterHit: '[data-iterative-open-checks]',
+  }),
+  iterativeCase({
+    id: 'manager-iterative-action-new',
+    label: 'Manager — Iterative action editor, new draft',
+    steps: [...ACTIONS_STEPS, { selector: '[data-iterative-new-action]' }],
+    expectView: 'iterative-action-edit',
+    expectSelector: '[data-iterative-action-dirty]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-unknown-counter',
+    label: 'Manager — Iterative action editor, unknown counter',
+    state: 'invalid',
+    open: 'smelt',
+    expectSelector: '[data-iterative-cost] [data-issue-code="iterativeUnknownCounter"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-malformed-expression',
+    label: 'Manager — Iterative action editor, malformed expression',
+    state: 'invalid',
+    open: 'refine',
+    expectSelector: '[data-iterative-cost] [data-issue-code="iterativeInvalidExpression"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-check-missing',
+    label: 'Manager — Iterative action editor, check not set up',
+    state: 'noCheck',
+    expectSelector: '[data-iterative-check-missing] [data-notice-action]',
+    expectCenterHit: '[data-iterative-check-missing] [data-notice-action]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-no-check',
+    label: 'Manager — Iterative action editor, no check, check fact warned',
+    state: 'noCheck',
+    open: 'stoke',
+    steps: [openEffect('warm')],
+    expectSelector: '[data-iterative-effect-no-check]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-check-count-under',
+    label: 'Manager — Iterative action editor, check counts, under',
+    state: 'countUnder',
+    expectSelector:
+      '[data-iterative-check-facts][data-iterative-check-product="count"][data-iterative-check-direction="under"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-no-effects',
+    label: 'Manager — Iterative action editor, no effects',
+    open: 'quench',
+    expectSelector: '[data-iterative-effects-empty]',
+    expectCenterHit: '[data-iterative-add-effect]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-effect-expanded',
+    label: 'Manager — Iterative action editor, effect with a workpiece rule',
+    steps: [openEffect('shape')],
+    expectSelector:
+      '[data-iterative-effect="shape"] .fabricate-sortable-list-body:not([hidden]) [data-iterative-effect-rules] [data-counter-rule]',
+    expectCenterHit: '[data-iterative-effect="shape"] [data-sortable-remove]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-effect-fault',
+    label: 'Manager — Iterative action editor, collapsed effect with a fault',
+    state: 'invalid',
+    open: 'refine',
+    expectSelector: '[data-iterative-effect="burn"] [data-issue-code="iterativeUnknownCounter"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-free',
+    label: 'Manager — Iterative action editor, free action',
+    open: 'quench',
+    expectSelector: '[data-iterative-uses-session][aria-pressed="false"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-icon-picker',
+    label: 'Manager — Iterative action editor, icon picker open',
+    steps: [{ selector: '[data-iterative-action-icon] .essence-icon-picker-trigger' }],
+    expectSelector: '.fabricate-icon-picker-popover .essence-icon-picker-option',
+    expectCenterHit: '.fabricate-icon-picker-popover .essence-icon-picker-option',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-category-create',
+    label: 'Manager — Iterative action editor, category typed near an existing one',
+    steps: [{ selector: '#iterative-action-new-category', fill: 'Forgin' }],
+    expectSelector: '[data-iterative-action-categories] .manager-vocabulary-hint.is-warning',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-discard-confirm',
+    label: 'Manager — Iterative action editor, discard prompt',
+    steps: [
+      { selector: '[data-iterative-action-label]', fill: 'Strike hard' },
+      { selector: '[data-iterative-action-back]' },
+    ],
+    query: { dialog: 'open' },
+    expectSelector: '.application.dialog',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-delete-in-use',
+    label: 'Manager — Iterative action editor, delete an action in use',
+    steps: [{ selector: '[data-iterative-action-delete]' }],
+    query: { dialog: 'open' },
+    expectSelector: '.application.dialog [data-iterative-delete-uses="action"]',
+  }),
+  editorCase({
+    id: 'manager-iterative-action-edit-narrow',
+    label: 'Manager — Iterative action editor, at 880px',
+    width: 880,
+    expectSelector: '[data-iterative-editor] [data-iterative-section="identity"]',
   }),
 ]);

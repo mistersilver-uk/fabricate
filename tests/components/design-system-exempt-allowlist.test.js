@@ -167,6 +167,21 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte': 1 },
   ],
   [
+    "a composition of the app's field-mark text with the iterative editor's readiness codes, " +
+      'shared by its cards rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/manager/iterative/FaultLine.svelte': 1 },
+  ],
+  [
+    'a composition of Field, RollDataExpressionInput and FaultLine with the iterative expression ' +
+      'profiles, shared by the Costs and Effects cards rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/manager/iterative/ActionExpressionField.svelte': 1 },
+  ],
+  [
+    "a composition of RuleRow, Select, Stepper and SetPicker over C2's CounterRule, shared by the " +
+      'action editor and recipe authoring rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/manager/iterative/CounterRuleList.svelte': 1 },
+  ],
+  [
     "a composition of the Notice member with the iterative library's two fixed sentences, " +
       'shared by the Counters and Actions screens rather than offered as a vocabulary member',
     { 'src/ui/svelte/apps/manager/iterative/UnsupportedLibraryNotice.svelte': 1 },

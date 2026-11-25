@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { flushSync, tick } from 'svelte';
 
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
@@ -66,7 +67,9 @@ async function prepareManagerSuite() {
     GatheringEventInspectorComponent: await load(
       'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
     ),
-    ChecksRightMenuComponent: await load('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte'),
+    ChecksRightMenuComponent: await load(
+      'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte'
+    ),
     CraftingCheckEditorComponent: await load(
       'src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'
     ),
@@ -102,6 +105,13 @@ export function managerComponents() {
 export async function managerComponent(sourcePath) {
   await managerComponents();
   return importCompiledComponent(tempRoot, sourcePath);
+}
+
+/** The module namespace of any compiled or copied module of the shared tree, for a suite that builds a model. */
+export async function managerModule(sourcePath) {
+  await managerComponents();
+  const file = sourcePath.endsWith('.svelte.js') ? `${sourcePath}.js` : sourcePath;
+  return import(pathToFileURL(join(tempRoot, file)));
 }
 
 /** Drop the compiled tree and the DOM, once, after every route module's cases have run. */

@@ -3,6 +3,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { isIterativeId } from '../src/systems/iterative/counterRule.js';
+import { ITERATIVE_EXPRESSION_PROFILES } from '../src/systems/iterative/expression.js';
+import {
+  actionCategoryNames,
+  describeCategoryInput,
+  editDistance,
+  nearCategory,
+} from '../src/ui/svelte/apps/manager/iterative/actionCategories.js';
+import {
+  actionLevelFaults,
+  costFaults,
+  effectFaults,
+  expressionFaults,
+  faultSentence,
+  listEntryFaults,
+  ruleFault,
+} from '../src/ui/svelte/apps/manager/iterative/iterativeFieldFaults.js';
 import {
   actionBlockingCounts,
   actionUses,
@@ -274,5 +290,172 @@ describe('actionBlockingCounts', () => {
   it('reports nothing for a system that is not iterative or has no library', () => {
     assert.equal(actionBlockingCounts({ ...system, resolutionMode: 'simple' }, []).size, 0);
     assert.equal(actionBlockingCounts(null, undefined).size, 0);
+  });
+});
+
+describe('the field marks of the Crafting Action editor', () => {
+  const context = {
+    counterIds: new Set(['heat']),
+    actionIds: new Set(['strike']),
+    tierIds: new Set(['hit']),
+  };
+  const text = (_key, fallback) => fallback;
+  const codes = (faults) => faults.map((fault) => fault.code);
+
+  it('judges an amount by its C3 profile, reason and the counters it reads', () => {
+    assert.deepEqual(expressionFaults('2', 'cost', context), []);
+    assert.deepEqual(expressionFaults('1d6', 'cost', context), [
+      { code: 'iterativeInvalidExpression', reason: 'dice' },
+    ]);
+    assert.deepEqual(expressionFaults('@check.value', 'cost', context), [
+      { code: 'iterativeInvalidExpression', reason: 'forbidden-root' },
+    ]);
+    assert.deepEqual(expressionFaults('@counter.ore', 'effect', context), [
+      { code: 'iterativeUnknownCounter', reason: 'expression' },
+    ]);
+    assert.deepEqual(codes(expressionFaults('1d6x>=1', 'effect', context)), [
+      'iterativeExplodeUnbounded',
+    ]);
+  });
+
+  it('takes the start profile a recipe Counter Instance is judged under', () => {
+    assert.ok(Object.hasOwn(ITERATIVE_EXPRESSION_PROFILES, 'start'));
+    assert.deepEqual(expressionFaults('1d6', 'start', context), []);
+    assert.deepEqual(expressionFaults('@counter.heat', 'start', context), [
+      { code: 'iterativeInvalidExpression', reason: 'forbidden-root' },
+    ]);
+  });
+
+  it('gives every C3 reason its own sentence, and each code one of its own', () => {
+    const reasons = [
+      'invalid',
+      'dice',
+      'forbidden-root',
+      'unresolved-path',
+      'non-finite',
+      'explode-limit',
+      'roll-unavailable',
+    ];
+    const sentences = reasons.map((reason) =>
+      faultSentence({ code: 'iterativeInvalidExpression', reason }, text)
+    );
+    assert.equal(new Set(sentences).size, reasons.length);
+    const coded = [
+      'iterativeExplodeUnbounded',
+      'iterativeUnknownCounter',
+      'iterativeUnknownAction',
+      'iterativeInvalidRule',
+      'iterativeInvalidEntry',
+      'iterativeUnknownCheckOutcome',
+      'iterativeCheckFactWithoutCheck',
+    ].map((code) => faultSentence({ code }, text));
+    assert.equal(new Set([...coded, ...sentences]).size, coded.length + reasons.length);
+  });
+
+  it('marks a rule that does not parse, or names a counter or action the lists lack', () => {
+    const ok = { source: 'counter', counterId: 'heat', op: '>=', value: 1 };
+    assert.equal(ruleFault(ok, context), null);
+    assert.equal(ruleFault({ source: 'counter' }, context).code, 'iterativeInvalidRule');
+    assert.equal(ruleFault({ ...ok, counterId: 'ore' }, context).code, 'iterativeUnknownCounter');
+    assert.equal(
+      ruleFault({ source: 'previousAction', actionIds: ['ghost'] }, context).code,
+      'iterativeUnknownAction'
+    );
+    assert.equal(ruleFault('rule', context).code, 'iterativeInvalidRule');
+  });
+
+  it('marks a cost and an effect once per fault, and skips the amount of an entry that does not parse', () => {
+    const cost = { id: 'Bad id', counterId: 'ore', amount: '1d6' };
+    const [entry] = listEntryFaults('cost', [cost]);
+    assert.equal(entry, 'id');
+    assert.deepEqual(codes(costFaults(cost, entry, context)), [
+      'iterativeInvalidEntry',
+      'iterativeUnknownCounter',
+    ]);
+    const fact = {
+      id: 'e',
+      when: {
+        combine: 'all',
+        success: true,
+        checkOutcomeIds: ['ghost'],
+        rules: [{ source: 'counter' }],
+      },
+      target: { kind: 'counter', counterId: 'heat' },
+      op: 'add',
+      amount: '1',
+    };
+    assert.deepEqual(codes(effectFaults(fact, { check: 'none' }, null, context)), [
+      'iterativeInvalidRule',
+      'iterativeUnknownCheckOutcome',
+      'iterativeCheckFactWithoutCheck',
+    ]);
+    assert.equal(
+      codes(effectFaults(fact, { check: 'roll' }, null, context)).at(-1),
+      'iterativeUnknownCheckOutcome'
+    );
+  });
+
+  it('marks an enum outside its set and a list that is not an array, under the field it belongs to', () => {
+    const faults = actionLevelFaults({
+      check: 'maybe',
+      availability: { combine: 'some', rules: 'x' },
+      costs: {},
+      effects: [],
+    });
+    assert.deepEqual(
+      faults.map((fault) => [fault.field, fault.reason]),
+      [
+        ['check', 'check'],
+        ['availability', 'combine'],
+        ['availability', 'list'],
+        ['costs', 'list'],
+      ]
+    );
+    const clean = {
+      check: 'roll',
+      availability: { combine: 'all', rules: [] },
+      costs: [],
+      effects: [],
+    };
+    assert.deepEqual(actionLevelFaults(clean), []);
+  });
+});
+
+describe('the categories of a Crafting Action', () => {
+  const actions = [
+    { categories: ['Fire', 'Forging'] },
+    { categories: ['forging', 'Smelting'] },
+    {},
+  ];
+  const words = (_key, fallback) => fallback;
+
+  it('unions the actions and the draft, each name once and case-folded', () => {
+    assert.deepEqual(actionCategoryNames(actions, ['Tempering', 'fire']), [
+      'Fire',
+      'Forging',
+      'Smelting',
+      'Tempering',
+    ]);
+  });
+
+  it('measures edit distance case-folded', () => {
+    assert.equal(editDistance('Forging', 'forgin'), 1);
+    assert.equal(editDistance('Fire', 'Fore'), 1);
+    assert.equal(editDistance('abc', 'xyz'), 3);
+  });
+
+  it('blocks an exact repeat, offers a near name within two edits, and ignores the rest', () => {
+    const names = ['Fire', 'Forging'];
+    assert.deepEqual(nearCategory(' fire ', names), { name: 'Fire', exact: true });
+    assert.deepEqual(nearCategory('Forgin', names), { name: 'Forging', exact: false });
+    assert.equal(nearCategory('Tempering', names), null);
+    assert.equal(describeCategoryInput('fire', names, words).blocked, true);
+    const near = describeCategoryInput('Forgin', names, words);
+    assert.deepEqual([near.blocked, near.message], [false, 'Did you mean Forging?']);
+    assert.deepEqual(describeCategoryInput('', names, words), {
+      tone: '',
+      message: '',
+      blocked: false,
+    });
   });
 });

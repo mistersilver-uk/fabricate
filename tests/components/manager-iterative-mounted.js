@@ -273,4 +273,33 @@ export function registerIterativeCases() {
       []
     );
   });
+
+  it('mounts the editor for an existing action and judges the pill against the unsaved edit', async () => {
+    const calls = await openIterativeRoute('Actions');
+    await press('[data-iterative-action="stoke"] .fabricate-list-row-open');
+    assert.equal(managerView(), 'iterative-action-edit');
+    assert.ok(target.querySelector('[data-iterative-editor]'), 'the route mounts the editor');
+    assert.equal(
+      target.querySelector('[data-iterative-action-pill]').dataset.iterativeActionPill,
+      'ready'
+    );
+    await press('[data-iterative-add-cost]');
+    const amount = target.querySelector('[data-iterative-amount="cost"]');
+    amount.value = '2 +';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(
+      target.querySelector('[data-iterative-action-pill]').dataset.iterativeActionPill,
+      'blocking'
+    );
+    assert.equal(
+      target.querySelector('[data-iterative-blocking-notice]').dataset.issueCount,
+      target.querySelector('[data-iterative-action-pill]').textContent.trim().split(' ', 1)[0]
+    );
+    assert.ok(
+      calls.every(([name]) => name !== 'updateSystem'),
+      'editing writes nothing'
+    );
+    assert.ok(target.querySelector('[data-iterative-action-dirty]'));
+  });
 }

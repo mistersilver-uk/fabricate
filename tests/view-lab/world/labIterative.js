@@ -52,7 +52,16 @@ function ironworksActions() {
       categories: ['Forging'],
       check: 'roll',
       costs: [costOf('spend', 'heat', '1')],
-      effects: [gain('shape', 'temper', '1')],
+      effects: [
+        {
+          ...gain('shape', 'temper', '1'),
+          name: 'Shape the iron',
+          when: {
+            combine: 'all',
+            rules: [{ source: 'counter', counterId: 'heat', op: '>=', value: 1 }],
+          },
+        },
+      ],
     }),
     base('quench', 'Quench', { icon: 'fas fa-droplet', categories: ['Fire'], usesSession: false }),
   ];
@@ -92,8 +101,39 @@ export const LAB_ITERATIVE_STATES = Object.freeze({
         check: 'roll',
         costs: [costOf('ore', 'ore', '2')],
       }),
+      // A cost amount that does not parse, and an effect on a counter the library lacks.
+      baseAction('refine', 'Refine ore', {
+        icon: 'fas fa-filter',
+        costs: [costOf('spend', 'heat', '2 +')],
+        effects: [
+          {
+            id: 'burn',
+            when: { combine: 'all' },
+            target: { kind: 'counter', counterId: 'ore' },
+            op: 'add',
+            amount: '1',
+          },
+        ],
+      }),
     ],
   }),
+  // The routed crafting check has no roll formula (see `ROUTED_CHECKS`), so a rolling action warns.
+  noCheck: (library) => ({
+    ...library,
+    actions: library.actions.map((action) =>
+      action.id === 'stoke'
+        ? {
+            ...action,
+            effects: action.effects.map((effect) => ({
+              ...effect,
+              when: { combine: 'all', success: true },
+            })),
+          }
+        : action
+    ),
+  }),
+  // The routed crafting check counts successes and wins under its target (see `ROUTED_CHECKS`).
+  countUnder: (library) => library,
   // Enough actions that the ten-row page breaks, so page two and the page size are reachable.
   paged: (library) => ({
     ...library,
@@ -104,6 +144,26 @@ export const LAB_ITERATIVE_STATES = Object.freeze({
       ),
     ],
   }),
+});
+
+const ROUTED_HIT = Object.freeze({
+  type: 'fixed',
+  rollFormula: '1d20',
+  fixedOutcomes: [{ id: 'hit', name: 'Hit', success: true, start: 10 }],
+});
+
+/** The states whose routed crafting check is not the default one. */
+const ROUTED_CHECKS = Object.freeze({
+  noCheck: { ...ROUTED_HIT, rollFormula: '' },
+  countUnder: {
+    ...ROUTED_HIT,
+    rollFormula: '4d10',
+    evaluation: {
+      product: 'count',
+      direction: 'under',
+      pool: { die: 10, base: '4', threshold: '3', required: 1 },
+    },
+  },
 });
 
 const IRONWORKS_RECIPES = [
@@ -140,11 +200,7 @@ export function seedIterativeState(content, stateId) {
       enabled: true,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
       failureResultPolicy: 'perRecord',
-      routed: {
-        type: 'fixed',
-        rollFormula: '1d20',
-        fixedOutcomes: [{ id: 'hit', name: 'Hit', success: true, start: 10 }],
-      },
+      routed: structuredClone(ROUTED_CHECKS[stateId] ?? ROUTED_HIT),
     },
     features: { recipeCategories: true, itemTags: true, gathering: false },
     essenceDefinitions: [],

@@ -380,10 +380,10 @@ describe('ExprInput (issue 2465)', () => {
     const tags = callSiteTags();
     assert.equal(
       new Set(tags.map(({ file }) => file)).size,
-      5,
-      "five files render it; a sixth importer updates this count and the manifest row's `why`, which names them"
+      6,
+      "six files render it; a seventh importer updates this count and the manifest row's `why`, which names them"
     );
-    assert.ok(tags.length >= 5, `only ${tags.length} tags were read`);
+    assert.ok(tags.length >= 6, `only ${tags.length} tags were read`);
     assert.deepEqual(
       tags
         .filter(({ names }) => names.some((name) => RETIRED_PROPS.includes(name)))
@@ -404,8 +404,8 @@ describe('ExprInput (issue 2465)', () => {
     const resolving = tags.filter(({ names }) => names.includes('resolve'));
     assert.deepEqual(
       [...new Set(resolving.map(({ file }) => file))],
-      [CCVF],
-      'a resolver needs an actor in scope, and one file has one: a second is read by hand first'
+      [CCVF, 'src/ui/svelte/apps/manager/iterative/ActionExpressionField.svelte'],
+      'a resolver needs a reader in scope: the check field has an actor, the action editor reads constants only; a third is read by hand first'
     );
     assert.deepEqual(
       resolving.filter(({ names }) => !names.includes('unresolvedLabel')).map(({ file }) => file),
