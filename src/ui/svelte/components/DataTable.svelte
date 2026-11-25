@@ -7,7 +7,7 @@
   `hint` is a second caption line, outside the table's accessible name, that describes the table
   through `aria-describedby`. `footer` is a snippet drawn inside the frame after the scroll container
   and, when `perPage > 0`, after the pager. `pagerDensity` is the pager's `density`, `default` or
-  `compact`, and any other value reads `default`.
+  `compact`, and any other value reads `default`; a compact pager closes the frame as its `edge`.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -185,6 +185,7 @@
       {onPageChange}
       onPageSizeChange={onPerPageChange}
       density={pagerDensity === 'compact' ? 'compact' : 'default'}
+      edge={pagerDensity === 'compact'}
     />
   {/if}
   {#if footer}<div class="fabricate-data-table-footer">{@render footer()}</div>{/if}

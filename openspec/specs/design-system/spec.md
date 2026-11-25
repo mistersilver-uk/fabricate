@@ -2762,6 +2762,7 @@ An empty table keeps its heading and count, drops the header row, and says what 
 Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
 `DataTable` gains `hint` and `footer`, and a caller that passes neither renders the HTML it rendered before.
 `DataTable` gains `pagerDensity`, `default` or `compact`, which it forwards to its pager's `density`; an omitted or unknown value reads `default`.
+A compact pager closes the table's frame as its `edge`, so it carries the section inset rather than meeting the frame's border.
 `hint` is a second caption line, outside the table's accessible name, that describes the table through `aria-describedby`.
 `footer` draws inside the frame after the scroll container and, when the table pages, after the pager, so an adder and its notes sit under the rows.
 Both are painted from the component's own style block, as `:global` rules rooted at `fabricate-data-table`, so the root's class and the family in the module sheet do not move.

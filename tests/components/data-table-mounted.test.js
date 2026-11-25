@@ -397,9 +397,13 @@ describe('DataTable', () => {
       omitted,
       'an unknown value reads default'
     );
-    assert.ok(!omitted.includes('data-pagination-compact'));
+    assert.ok(!omitted.includes('data-pagination-compact') && !omitted.includes('is-edge'));
     const root = await harness.mount(paged({ pagerDensity: 'compact' }));
     assert.ok(root.querySelector('.fabricate-pagination[data-pagination-compact]'));
+    assert.ok(
+      root.querySelector('.fabricate-pagination').classList.contains('is-edge'),
+      'a compact pager closes the frame and carries its own inset'
+    );
     assert.ok(
       root.querySelector('[data-pagination-size]').classList.contains('is-inline'),
       "the page sizes take SegmentedControl's inline rung"

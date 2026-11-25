@@ -6869,7 +6869,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
               </tbody>
             </table>
           </div>
-          <div style="display:flex;align-items:center;gap:var(--fab-space-2);padding:var(--fab-space-2) 12px;border-top:1px solid var(--fab-border);background:var(--fab-bg-1);font-size:9.5px;color:var(--fab-text-muted)">
+          <div style="display:flex;align-items:center;gap:var(--fab-space-2);padding:var(--fab-space-2);border-top:1px solid var(--fab-border);font-size:9.5px;color:var(--fab-text-muted)">
             <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Showing 1&ndash;5 of 8</span>
             <div style="display:flex;gap:var(--fab-space-2);align-items:center">
               <button class="k-btn icon s26 dis"><svg class="i"><use href="#i-cl"/></svg></button>
@@ -6885,7 +6885,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
             </div>
           </div>
         </div>
-        <span class="k-hint"><code>pagerDensity="compact"</code> hands the table&rsquo;s pager the compact bar, one line in a narrow pane with its page sizes at the <code>inline</code> rung; an omitted or unknown value draws the default bar.</span>
+        <span class="k-hint"><code>pagerDensity="compact"</code> hands the table&rsquo;s pager the compact bar, one line in a narrow pane with its page sizes at the <code>inline</code> rung, closing the frame as its <code>edge</code> so it carries the section inset itself; an omitted or unknown value draws the default bar.</span>
       </div>
     </div>
     <div class="notes">
@@ -6913,7 +6913,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
                 <li><b>search</b> a snippet drawn at the caption&rsquo;s end &middot; <b>cell</b> (row, column, index), a snippet drawing one cell; absent, the cell is <code>row[column.key]</code></li>
         <li><b>sort</b> {key, dir} &middot; <b>onSort</b> &mdash; a sortable header is a button and its <code>th</code> carries <code>aria-sort</code></li>
         <li><b>page &middot; perPage &middot; perPageOptions &middot; onPageChange &middot; onPerPageChange</b> &mdash; a table pages only with <code>perPage</code> set, and the caller passes the page&rsquo;s rows</li>
-        <li><b>pagerDensity</b> <code>default</code> | <code>compact</code> &mdash; the pager&rsquo;s <code>density</code>; an omitted or unknown value reads <code>default</code></li>
+        <li><b>pagerDensity</b> <code>default</code> | <code>compact</code> &mdash; the pager&rsquo;s <code>density</code>, a compact pager closing the frame as its <code>edge</code>; an omitted or unknown value reads <code>default</code></li>
         <li><b>loading &middot; error</b> &mdash; a store-fed table reaches both in ordinary use</li>
         <li><b>empty</b> {icon, title, hint, action}, <code>action</code> a snippet</li>
         <li><b>selectedKey</b> &middot; <b>onSelectRow</b> (row) &mdash; selection is <code>is-selected</code> on the <code>&lt;tr&gt;</code> alone, set by a pointer click or by focus entering a control in the row; the row is never focusable, and the cell&rsquo;s own button, carrying <code>aria-current</code>, is the keyboard path</li>
