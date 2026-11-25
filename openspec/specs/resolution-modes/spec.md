@@ -314,6 +314,8 @@ An executed, permitted versioned crafting check additionally records the product
 Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
 2. On crafting and salvage, `kind` is `check` when the canonical active-check derivation reported the check required or usable at execution, `ingredients` for `routedByIngredients` routing, and `none` only for a confirmed no-check resolution.
 A `simple` stage on a system with crafting checks disabled resolves to `none`, as do a no-check salvage and an alchemy fizzle.
+An iterative step records `{ kind, mode: 'iterative' }` derived from its Iterative Attempts, not from the active-check derivation.
+It is `none` at start and becomes `check` at its first checked Iterative Attempt, and finalization keeps the step's own snapshot, never retaining `product` or `direction`, because the step carries no `lastCheckResult`.
 Native gathering derives `kind` from the task's own mode instead: Direct records `none`, and every rolled mode — d100, routed and legacy progressive — records `check`.
 Reading gathering history back therefore uses `mode`, not `kind`, to choose the terminal composition.
 A recorded `d100` check-result provider, or a recorded outcome tier, overrides the captured mode, because the stored result shape is the stronger evidence of what actually resolved.
@@ -381,7 +383,8 @@ A deterministic expression accepts finite numbers, roll-data paths, arithmetic, 
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
 A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
 It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path.
-That strict own-key reader stays the default for every caller that grades a check; `checkTarget.js` and `countEvaluation.js` are the two runtime resolvers that pass the Foundry path mode instead, matched by their own preview and readiness counterparts in the Studio so a previewed reading agrees with a rolled one.
+That strict own-key reader stays the default for every caller that grades a check; `checkTarget.js`, `countEvaluation.js` and the iterative expression evaluator are the three runtime readers that pass the Foundry path mode instead, matched by their own preview and readiness counterparts in the Studio so a previewed reading agrees with a rolled one, and the iterative evaluator grades no check.
+The deterministic expression is read by the shared expression reader, which grows only through function and token tables a caller injects into its own reader instance, so the deterministic grammar accepts and refuses exactly what it does today.
 
 ### Structured Count Evaluation
 
@@ -1103,9 +1106,94 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - The admin store refuses, before its confirm and writing nothing, a change to a known mode outside the selectable set, or to a token that is neither a mode nor a legacy alias.
   A legacy alias keeps today's path, and re-selecting the current mode is still a no-op that succeeds.
 - Fixtures and tests may write the mode directly through `createSystem` or `updateSystem`, which are not gated.
-- Until Iterative Attempts ship, every existing craft path refuses a recipe in an `iterative` system before it creates a run, consumes, spends, rolls or awards.
-  That covers the legacy `craft`, the versioned start, and every fresh or started versioned stage preparation, each refusing with `Iterative crafting is not available in this version of Fabricate.`
+- The versioned run start and the step start run for a recipe in an `iterative` system.
+- The legacy `craft`, the versioned execute, the stage check description and the immediate-execute probe still refuse it before any run, consumption, spend, roll or award, each with `Iterative crafting is not available in this version of Fabricate.`
+  A versioned start therefore never answers `canExecuteImmediately: true` for an iterative recipe, and each Iterative Attempt is its own `takeAction` command.
 - `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
+
+### Iterative Expression Grammar and Field Profiles
+
+- An iterative expression accepts the deterministic grammar plus `abs` of one argument, `min` and `max` of one or more, and `NdF` dice with an optional `x` and then an optional `kh` or `kl`.
+  The shared deterministic expression never accepts them, and a default reader still refuses `abs(1)` and `2d6`.
+- A dice count and a face count are integers of at least 1, and a count defaults to 1.
+- `x` explodes on the maximum face unless a comparison is given.
+  `xK` explodes on `K`, and `x>=K`, `x>K`, `x<=K` and `x<K` explode on that comparison.
+  Each new die is checked in turn, and a term whose base dice come first draws its explosions in the order they are appended.
+- `kh` and `kl` keep the highest or lowest results, a count defaults to 1, and a count above the results keeps them all.
+  `x` placed after `kh` or `kl`, and every other dice form (`d%`, `dF`, `r`, `xo`, `cs`), is invalid.
+- A dice term whose count exceeds 1000 refuses as `explode-limit` before any draw, as does a term whose results would pass 1000.
+- A die source returns an integer from 1 to the face count, and any other value or a throw refuses as `roll-unavailable`.
+- The reserved roots `@counter.<id>`, `@min.<id>`, `@max.<id>`, `@target.<id>`, `@sessionCount` and `@check.value` resolve before actor roll data and are never shadowed by it.
+  A reserved root ends at the first character that cannot continue it, so `@counter.heat-1` is the counter minus one.
+  A reserved root in braces or with extra segments, and an unknown id under one, is an unresolved path.
+- An unbounded side of `@min` or `@max`, and an absent `@target`, is an unresolved path.
+- `@recipe`, `@circumstance` and `@status` are reserved roots that refuse as `forbidden-root` until their extensions define them.
+  `@check.value` is the only check fact an expression reads, and any other check form is `forbidden-root`.
+- Every other root reads actor roll data in the Foundry path mode, so a roll-data string such as "2d6" refuses as dice.
+- Each expression field has a profile.
+  A cost reads no dice and no `@check`.
+  A start formula rolls its dice once, reads no `@counter`, `@sessionCount` or `@check`, and reads `@min`, `@max` and `@target`.
+  An effect reads everything, and an Action Adjustment reads no dice.
+- An evaluation returns the value with each dice term's faces, results and value, or one reason: `invalid`, `dice`, `forbidden-root`, `unresolved-path`, `non-finite`, `explode-limit` or `roll-unavailable`.
+- An analysis needs no roll data and no dice.
+  It reports the same syntax, profile and limit faults, the reserved roots and ids an expression reads, and whether an explosion could never stop.
+- A counter's effective bounds are its own under `global`, the Counter Instance's over the counter's under `perRecipe`, and none under `none`.
+
+### Iterative Attempt Resolution
+
+- An Iterative Attempt is resolved by a pure, synchronous function of the step state, the action, the attempt library, the actor roll data, the check summary and an injected die source.
+  It never rolls the check, and it never mutates an input.
+- Its phases run in a fixed order: preflight, check, costs, effects, clamp, terminal, every-session effects, reclamp, countdown and routing.
+  Every extension phase exists as a no-op until its extension defines it.
+- Preflight, costs and effects read the step state, including `sessionCount`, as it stood when the attempt began.
+  The terminal check and later phases read the post-clamp draft, whose `sessionCount` already counts this Crafting Session.
+- A `previousAction` rule reads the newest log entry before the attempt in preflight, costs and effects, and the current action from the terminal check on.
+  An empty log matches no `previousAction` rule.
+- Preflight refuses, with nothing spent and in this order, an unsupported version, an ended step, an invalid entry, a disallowed action, an unknown counter, an unavailable action, an invalid cost amount and an unaffordable cost.
+  An entry is invalid when `counterRuleFault`, `iterativeEntryFault`, `producedWhenLineFault` or `stepIdListFault` faults it, when an action, the step or a counter it uses holds a value outside its enum or a list kept as authored, or when a bound, target, start or state value is `null` or missing.
+- Preflight evaluates every cost amount before any check is prepared, and a negative amount refuses as an invalid expression.
+  Each `needsEnough` cost refuses on its own when its counter holds less than its amount, so two costs on one counter are each checked alone.
+  A locked counter ignores every cost and effect aimed at it.
+- The check summary is `null` exactly when the action has no check, and otherwise holds a success flag, an outcome id or `null`, and a finite value.
+  Any other pairing refuses as a mismatched check.
+- Effects apply in authored order, `add` and `subtract` accumulate, and `set` replaces.
+  An effect is skipped when its `when` fails, and on an attempt with no check summary it is also skipped when its `when` names a check fact or its amount reads `@check`.
+- Every counter is then held to its effective bounds.
+- A failed check is not terminal.
+  The step ends in success only when it has at least one success rule and every success rule holds, and otherwise in failure when any failure rule holds.
+- At a terminal the attempt records the outcome, its attempt number and the selected result group, with an explicit `null` when none matches.
+- Dice are drawn in a fixed order: start formulas in Counter Instance order at step start, then effects in authored order, each amount's dice terms left to right, and each term's base dice before its explosions.
+  A skipped effect draws nothing, and a cost draws nothing.
+- A refused attempt changes no counter, no attempt count and no session count.
+  Its reasons are an unsupported version, an ended step, an invalid entry, a disallowed or unavailable action, an unknown counter, an invalid expression, an unaffordable cost, a mismatched check and an unavailable die.
+- An expression failure refuses as an invalid expression naming the entry and the failing reason, and an unavailable die refuses on its own naming the entry.
+- A resolved attempt returns the next state, a log entry and the terminal.
+  The next state holds exactly the persisted step-state keys, with its counters, attempt count, session count and terminal updated and every other key carried unchanged.
+  The entry holds the attempt number, the session number (`null` for a free action), the action, the check summary, one total per effect that drew dice, and the paid and changed deltas.
+  Paid deltas are negative, a `set` delta is taken against the draft at that point, and both are recorded before the clamp, per counter in first-touch order with zeros omitted.
+- Start values resolve once, in Counter Instance order, each clamped to its effective bounds.
+  Each is recorded with its formula value, one dice total per term and whether it was clamped, and a plain start records no formula value and no dice.
+
+### Iterative Check Slot
+
+- An iterative system rolls `craftingCheck.routed`, and its `checkBreakage` is the routed slot's.
+- `success` and `outcomeId` come from the matched tier.
+  Routing first clamps a relative miss to the least demanding tier, as `routedByCheck` does, and a total that still matches no tier gives `success: false` and `outcomeId: null`.
+- `minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read.
+
+### Iterative Terminal Routing
+
+- At a terminal outcome, the step's result groups are read in order, and the first with a `producedWhen` line for that outcome whose rules all hold is selected.
+- An empty rule list always holds, and nothing is selected when no line matches.
+- A group with no `producedWhen` is never selected, and the failure group is selected only by its `producedWhen`, never by its role.
+- A counter rule reads a counter value, the session count or the previous action, and a rule that does not parse, or names a counter with no value, holds nothing.
+- The selected group settles exactly once, through one execution journal whose effects run in this order: `record-attempt`, `apply-tools` when the step has Tools, the versioned award effects (`award-results`, `award-rewards`) over the selected group only, `finalize-iterative-step`, `record-recipe-use` on a success, and `post-chat`.
+- No complication fires, because component complications are progressive-only.
+- A terminal success advances the run to its next step, unstarted, or completes it `succeeded`, and records recipe use.
+- A terminal failure ends the step and the run `failed`, keeps their inputs consumed, awards only a matching failure group, and never advances.
+- A checked terminal attempt rolled in the public roll mode carries its check roll on the craft card.
+  A visible roll in any other roll mode cannot ride the public card, so the requester posts it as its own message in that roll mode, and `takeCraftingAction`'s non-interactive default rolls `selfroll`.
+  Either way the roll posts once.
 
 ### Iterative Validation
 
@@ -1134,10 +1222,19 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeUnknownCheckOutcome`: an effect's `checkOutcomeIds` names a tier the routed crafting check does not define.
   - `iterativeVersionUnsupported`: the library's `version` is above the build's, reported alone because the block cannot be read, with `entityKind: 'system'` and `entityId: null`.
 - `counterRuleFault`, `iterativeEntryFault` and `producedWhenLineFault` judge every rule and entry, for the normalizers and the readiness codes alike.
+- Expression codes judge every cost and effect amount and every start formula by the analysis the resolver's evaluator shares, so readiness and resolution agree on what parses.
+  - `iterativeInvalidExpression`: a library cost or effect amount fails its profile, as a syntax fault, a die or `@check` in a cost, an unknown function, a forbidden root, a dice count past 1000, or a reserved root in braces or with extra segments.
+    A recipe start formula that fails the start profile raises it as a recipe issue.
+  - `iterativeExplodeUnbounded`: an amount or start formula explodes a die on a face it can never leave, which is `x` on a die of fewer than two faces or a comparison every face meets.
+  - `iterativeUnknownCounter` also fires when a reserved root id names no library counter, and on a recipe when it names no Counter Instance on a step that allows the action or in a start formula.
+  - `iterativeExpressionBoundUnset`: a recipe expression reads `@min`, `@max` or `@target` of a Counter Instance that leaves that side unbounded or unset.
+  - `iterativeCheckFactWithoutCheck`: a `check: 'none'` action has an effect that reads `@check.value` or whose `when` names `checkOutcomeIds`, `success` or `value`.
+- A library warning has no `blocks`, and the other new codes follow their kind's severity and blocking above.
 - `iterativeNoCounters` and `iterativeNoSuccessRule` form the derived "Needs iterative setup" tier (`needsIterativeSetup`), and no setup marker is persisted.
 - Each code carries headless English from `ITERATIVE_READINESS_MESSAGES`, so no `message` equals its code.
-- A recipe with a critical recipe-scoped issue, or that allows an action with a critical library issue, or in a system reporting `iterativeVersionUnsupported`, refuses a new start.
-  `iterativeStartBlockers(issues, recipe)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
+- A new iterative run is refused, with nothing spent, while its recipe has a critical iterative readiness issue, while a critical library issue names a counter or action in the subset its terms snapshot would carry, or while its system's iterative library version is unsupported.
+  `iterativeStartBlockers(issues, recipe, system)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
+  The refusal is `{ success: false, reason: 'iterative-not-ready', detail: { code, message } }` from the first blocker, with no top-level `message`, so the localized reason sentence shows.
 
 ## Testing Requirements
 

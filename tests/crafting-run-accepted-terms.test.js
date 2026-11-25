@@ -330,3 +330,35 @@ test('cancelling a started run after an overwrite refunds through the accepted r
     { name: 'Recorded tonic', spends: [{ unit: 'gp', amount: 2 }] },
   ]);
 });
+
+test('an active workpiece keeps its accepted iterative terms but reads roll data live', async () => {
+  const { iterativeCommandWorld } = await import('./helpers/iterativeCommandWorld.js');
+  const world = iterativeCommandWorld();
+  world.system.iterative.actions.push({
+    id: 'temper',
+    label: 'Temper',
+    categories: [],
+    usesSession: false,
+    availability: { combine: 'all', rules: [] },
+    costs: [],
+    check: 'none',
+    effects: [
+      {
+        id: 'skilled',
+        when: { combine: 'all' },
+        target: { kind: 'counter', counterId: 'fuel' },
+        op: 'set',
+        amount: '@skill',
+      },
+    ],
+  });
+  assert.equal((await world.start()).success, true);
+  const counter = (id) => world.stepState().counters.find((row) => row.counterId === id).value;
+  world.system.iterative.actions[0].effects[0].amount = '3';
+  world.recipe.steps[0].iterative.success = [];
+  await world.take('stoke');
+  assert.equal(counter('heat'), 1, 'the live library edit changes no begun workpiece');
+  world.actor.getRollData = () => ({ skill: 7 });
+  await world.take('temper');
+  assert.equal(counter('fuel'), 7, 'roll data is read from the live actor');
+});

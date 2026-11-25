@@ -12,7 +12,7 @@ import { preparedCheckKind } from './checkRoll.js';
 import { preparedCountEvaluation } from './countCheck.js';
 import { additionalDiceOffer } from './countCheckRoll.js';
 import { resolvePool } from './countEvaluation.js';
-import { decisionAdditionalDice } from './preparedDecisionPolicy.js';
+import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 
 function failure(reason, extra = {}) {
   return { success: false, reason, ...extra };
@@ -78,6 +78,58 @@ export async function withPreparedAdditionalDiceOffer(descriptor, { actor, sende
   const reach = preparedReach(descriptor, rollOptions);
   const offer = additionalDiceOffer({ additionalDice, budget, reach });
   return { ...prompt, additionalDiceOffer: publicAdditionalDiceOffer(offer) };
+}
+
+/**
+ * Describes the command's check under a `describeCheck` grant. A refusal, or a prompt with its
+ * one-use prepare token, answers `{ response }`; a stage with no check answers the
+ * `resolvedCheckResult` it executes under.
+ */
+export async function describePreparedJournalCheck({ request, context, helpers, binding, now }) {
+  const { actor, operation, run } = context;
+  const preparationGrant = helpers.createExecutionGrant({
+    ...binding,
+    operation: 'describeCheck',
+    expectedRevision: null,
+  });
+  const descriptor = await operation.describeCheck({
+    actor,
+    run,
+    sender: context.sender,
+    payload: request.payload ?? {},
+    preparationGrant,
+    requestId: request.requestId,
+    action: request.action,
+  });
+  if (descriptor?.blocked) return { response: failure(descriptor.blocked, descriptor.detail) };
+  if (descriptor?.required) {
+    const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
+    const token = helpers.issuePrepareToken(
+      {
+        ...binding,
+        privateEvaluation: descriptor.privateEvaluation,
+        decisionPolicy: preparedDecisionPolicy(publicPrompt),
+      },
+      { expiresAt: now() + 60_000 }
+    );
+    return {
+      response: {
+        success: true,
+        checkRequired: true,
+        promptDescriptor: publicPrompt ?? {},
+        prepareToken: token,
+      },
+    };
+  }
+  return {
+    resolvedCheckResult: {
+      success: true,
+      outcome: null,
+      value: null,
+      data: {},
+      engineEvaluated: true,
+    },
+  };
 }
 
 /** The facts a refused or spent additional-dice notice names, with the actor's own name. */

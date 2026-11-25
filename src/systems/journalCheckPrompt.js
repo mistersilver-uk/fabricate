@@ -28,7 +28,11 @@ export async function settlePromptedCheck(
   for (let retries = 0; ; retries += 1) {
     const token = { prepareToken: prepared.prepareToken };
     if (!decision || decision.confirmed === false) {
-      await sendCommand({ ...command, action: 'releaseCheck', payload: token });
+      await sendCommand({
+        ...command,
+        action: 'releaseCheck',
+        payload: { ...token, releases: command.action },
+      });
       return { success: false, cancelled: true, reason: 'roll-cancelled' };
     }
     const settled = await sendCommand({

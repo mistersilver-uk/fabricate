@@ -19,7 +19,7 @@ export function worldTimeDueStep(run, { worldTime = null, owesAwardChoice = () =
   const index = Number(run.currentStepIndex);
   if (!Number.isSafeInteger(index)) return null;
   const step = run.steps?.[index];
-  if (!step?.timeGate) return null;
+  if (!step?.timeGate || step.iterative) return null;
   if (worldTime !== null && Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
   return owesAwardChoice(run) ? null : step;
 }

@@ -1534,6 +1534,14 @@
       "length": 0
     },
     {
+      "name": "takeCraftingAction",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
       "name": "toggleFavouriteRecipe",
       "enumerable": false,
       "writable": true,

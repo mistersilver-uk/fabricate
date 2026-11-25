@@ -14,7 +14,7 @@
 | "recipe item" for both the authored entry and the item a character holds | **Recipe Item** for the definition and **Owned Copy** for the per-character instance | The GM Knowledge surface mutates owned copies and never definitions, so one noun for both hides the boundary the whole surface rests on |
 | `inert` described as the flag that stops an item granting craftability | **Spent** as the engine's exhaustion predicate and **Inert** as the record of a past exhaustion | Access filtering reads `timesUsed >= maxUses` alone, so a raised `maxUses` leaves a copy `inert` and craftable at the same time |
 | `matchTier: "duplicate"` read as an ambiguous or conflicting match | **Copy-source match**, the weakest provenance tier | The matcher returns one definition and one tier, so `duplicate` reports how the link was resolved and never how many definitions matched |
-| "item tag" for both the system-level vocabulary and the thing a held item is said to carry | **Item Tag** for the authored vocabulary (`CraftingSystem.itemTags`) and **Component Tag** for a value on a component definition that matching reads | Fabricate has five readers of `flags.fabricate.tags` and no writer, so one noun for both invites the premise that the tag is on the item in the bag — the premise that shipped a false "missing materials" row in issue 1075, and the world-scope vocabulary kind (issue 1392) is named `componentTags` for the same reason — it holds the same VALUE a component definition's `tags` carries, so the world/system split stays a scope axis and the Item Tag / Component Tag distinction still stands on the value-versus-item-flag axis alone |
+| "item tag" for both the system-level vocabulary and the thing a held item is said to carry | **Item Tag** for the authored vocabulary (`CraftingSystem.itemTags`) and **Component Tag** for a value on a component definition that matching reads | Fabricate has five readers of `flags.fabricate.tags` and no writer, so one noun for both invites the premise that the tag is on the item in the bag, and the world-scope vocabulary kind is named `componentTags` because it holds the value a component definition's `tags` carries |
 | `two-tier read side` / `DETAIL tier` for the player crafting read | **Summary Phase** and **Detail Phase** | The shipped code and specs already say phase (`buildListing`'s "SUMMARY PHASE", `ui-crafting-app/spec.md` § Browse And Detail Phases), and "tier" is taken twice over by **Recipe Check Tier** and by routed outcome tiers |
 | bare "component" for both the managed **Component** and a connected component of the contention graph | **Contention Component** always written in full, with bare **Component** reserved for the managed aggregate | `ingredientAssignment.js` uses both senses in neighbouring docblocks (`component/tag group` beside `contentionComponents`), so the short form silently reads as the aggregate |
 | a bare `tier` for the cheap/expensive split a paged browse surface makes over one row | **Projection Tier** (`summary` / `detail`), always qualified | An unqualified _tier_ already means an **Outcome Tier** — the check band `checkTierId` names and a **Recipe Check Tier** points at — and issue 1081's own row projection resolves a `checkSummary.dc` (an outcome tier) inside its summary tier, so the two axes collide in one line of code and the qualifier is what keeps "the detail tier" and "the DC tier" apart |
@@ -573,8 +573,7 @@ The currency conversion ladder.
 
 #### Currency Spend Strategy
 
-The GM-selectable mechanism (`CurrencyConfig.spendStrategy`, persisted as the WORLD `fabricate.currencyConfig` setting rather than a per-crafting-system field since issue #1278 moved it — `requirements.currency.spendStrategy`/`requirements.currency.macros` are stale names for the persisted home and must not be reintroduced in documentation) for how a currency requirement is read and spent, first-class in both dnd5e and pf2e worlds (no longer derived solely from preset seeding).
-(These spenders have a LIVE craft consumer: `CraftingEngine._spendCraftCurrency` drives the deduction on every craft path and `_refundCraftCurrency` drives the player-cancel refund; component-level currency spending remains a deferred follow-up.)
+The GM-selectable mechanism, `CurrencyConfig.spendStrategy` in the world `fabricate.currencyConfig` setting, for how a currency requirement is read and spent, first-class in both dnd5e and pf2e worlds.
 
 [Notes](docs/domain/terms.md#currency-spend-strategy)
 
@@ -741,7 +740,7 @@ Blind ingredient submission with signature matching and optional learn-on-craft 
 #### Iterative
 
 The resolution mode in which a player applies Crafting Actions that move a step's Counters until a success or failure rule holds.
-It persists but is not yet selectable, and every craft path refuses a recipe in an iterative system.
+It persists but is not yet selectable, and its run starts through the versioned run start and moves one Iterative Attempt at a time.
 
 [Notes](docs/domain/terms.md#iterative)
 
@@ -763,6 +762,39 @@ A recipe's configuration of one Counter in `Recipe.iterative.counters[]`, keyed 
 A system-owned reusable choice in `CraftingSystem.iterative.actions[]` a player applies to an iterative step, with its availability rules, counter costs, optional check and counter effects.
 
 [Notes](docs/domain/terms.md#crafting-action)
+
+#### Iterative Step State
+
+The working state of one started iterative step, `run.steps[i].iterative`: its counter values, attempt and session counts, start values, bounded attempt log and step end.
+
+[Notes](docs/domain/terms.md#iterative-step-state)
+
+#### Iterative Attempt
+
+One Crafting Action applied to one Iterative Step State through the `takeAction` command, counted by `attemptCount` and recorded as an Attempt Entry.
+It is always written in full, because a bare "attempt" already names gathering and alchemy attempts.
+
+[Notes](docs/domain/terms.md#iterative-attempt)
+
+#### Attempt Entry
+
+The ids-and-numbers record of one Iterative Attempt in its step's log: attempt and session numbers, action, Attempt id, check summary, effect dice totals and counter deltas.
+
+[Notes](docs/domain/terms.md#attempt-entry)
+
+#### Crafting Session
+
+An Iterative Attempt whose Crafting Action has `usesSession` set, the default, numbered by `sessionCount`.
+It is distinct from a client session, and an Iterative Attempt that is not a Crafting Session is a free action.
+
+[Notes](docs/domain/terms.md#crafting-session)
+
+#### Workpiece
+
+The player-facing word for an active iterative Crafting Run, with no record or persisted name of its own.
+It is distinct from the alchemy **Workbench**.
+
+[Notes](docs/domain/terms.md#workpiece)
 
 #### Produced When
 
@@ -1188,7 +1220,7 @@ At registration and source replacement it keys on its own uuid alone, as a clone
 
 #### Recipe Item Match Tiers
 
-The four-tier precedence the one shared, **system-scoped** matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) uses to resolve which recipe-item definition an owned item IS (issue 555, made per-system by issue 567): the list-aware durable identity tier is evaluated first, then among the source tiers the first match wins with no fall-through: (1) `identity` — the durable per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf (the third `roles` sibling after `componentId`/`toolId`), then the legacy scalar `flags.fabricate.recipeItemDefinitionId` (a transitional read-only fallback), each naming a definition in the candidate set exclusively and otherwise falling through; (2) `uuid` — the item's own uuid in the definition's union refs; (3) `compendium` — the item's compendium **Source UUID** in the union; (4) `duplicate` — the item's `_stats.duplicateSource` in the union.
+The four-tier precedence the one shared, **system-scoped** matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) uses to resolve which recipe-item definition an owned item IS: `identity` first, then `uuid`, `compendium` and `duplicate`, the first match winning.
 
 [Notes](docs/domain/terms.md#recipe-item-match-tiers)
 
@@ -1468,7 +1500,7 @@ Under a character-value target with a multiplier, the one relative **Outcome Tie
 
 #### Forced Outcome
 
-A **Check Breakage trigger's** `outcome` (`'success' | 'failure' | 'none'`, default `'none'`) that overrides the normal threshold when the trigger's `condition` matches, resolved by `resolveForcedOutcome(triggers, {total, value, diceGroups})` (which reuses the shared `evaluateCheckBreakageCondition`, ignoring `outcomeTier` conditions as circular — the routed tier is not known at forcing time, so an `outcomeTier` trigger pins `outcome` to `'none'`; that pin is scoped to FORCING, and the same trigger stays live at the two later seams where a tier IS known, so it can still drive a **Tier Stepping** effect and still break tools).
+A **Check Breakage trigger's** `outcome` (`'success' | 'failure' | 'none'`, default `'none'`) that overrides the normal threshold when the trigger's `condition` matches, resolved by `resolveForcedOutcome(triggers, {total, value, diceGroups})`.
 
 [Notes](docs/domain/terms.md#forced-outcome)
 

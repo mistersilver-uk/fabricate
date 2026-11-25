@@ -82,6 +82,7 @@ import {
   setGatheringEngine,
 } from './gatheringRuntime.js';
 import { applyItemStackQuantityPathSetting } from './hooks.js';
+import { createFoundryRollDie } from './iterativeRollDie.js';
 import { isActiveJournalGM } from './journalFacade.js';
 import {
   createJournalAuthorityForFabricate,
@@ -237,6 +238,7 @@ function buildCoreManagers(fabricate) {
       getCraftingSystem: (systemId) => fabricate.craftingSystemManager.getSystem(systemId),
       resolveItemUuid: (uuid) => fromUuid(uuid),
       currencyConfigStore: fabricate.currencyConfigStore,
+      rollDie: createFoundryRollDie(),
     }
   );
   const journalAuthority = createJournalAuthorityForFabricate(fabricate);

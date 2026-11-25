@@ -82,6 +82,7 @@ import {
   selectedIngredientIndex,
 } from './runJournalIngredientOptions.js';
 import { nativeRecoveryProjection } from './runJournalNativeRecovery.js';
+import { craftingFailureReason, stepFailureText } from './stepFailureText.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -634,7 +635,7 @@ export class RunJournalBuilder {
     const multiStep = terminal
       ? steps.filter((step) => step.attempted).length > 1
       : multiStepFeatureEnabled && Array.isArray(recipe?.steps) && recipe.steps.length > 1;
-    const failureReason = redacted ? null : this._craftingFailureReason(runSteps);
+    const failureReason = redacted ? null : craftingFailureReason(runSteps, this.localize);
     // The step whose name annotates the label: the active step for a live run,
     // else the final step for a terminal run.
     const labelStep = terminal
@@ -1776,7 +1777,7 @@ export class RunJournalBuilder {
         requiredSeconds: recordedNumber(runStep?.timeGate?.requiredSeconds),
         tools: [],
         checkLabel: null,
-        failureText: stringOrNull(runStep?.failureReason),
+        failureText: stepFailureText(runStep?.failureReason, this.localize),
       };
     }
     // Every authored tool, with its artwork: a step has REQUIRED tools and nothing else, so
@@ -1797,7 +1798,7 @@ export class RunJournalBuilder {
     const requiredSeconds =
       laxNumberOrNull(runStep?.timeGate?.requiredSeconds) ??
       durationToSeconds(recipeStep?.timeRequirement);
-    const failureReason = stringOrNull(runStep?.failureReason);
+    const failureReason = stepFailureText(runStep?.failureReason, this.localize);
     return {
       requiredSeconds: requiredSeconds > 0 ? requiredSeconds : null,
       tools,
@@ -1868,11 +1869,6 @@ export class RunJournalBuilder {
     });
     if (check.checkUsable) return 'check';
     return check.requiresCheck ? 'unknown' : 'none';
-  }
-
-  _craftingFailureReason(runSteps) {
-    const failed = iterableToArray(runSteps).find((step) => step?.status === 'failed');
-    return stringOrNull(failed?.failureReason);
   }
 
   // Captures win over display fallbacks. Already enriched consumption disables further

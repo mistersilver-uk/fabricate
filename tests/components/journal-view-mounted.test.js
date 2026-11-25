@@ -64,6 +64,7 @@ const harness = createMountedComponentHarness({
     'src/systems/countTriggerReach.js',
     'src/systems/normalize/checkEvaluation.js',
     'src/systems/checkEvaluation.js',
+    'src/systems/expressionReader.js',
     'src/systems/checkTarget.js',
   ],
   runeModules: [

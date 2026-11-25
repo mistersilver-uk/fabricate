@@ -544,6 +544,7 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
+    `breakToolsOnFail` is inert in `iterative` mode, where Tools are used at every iterative step end, success or failure.
     Before 1.35.0 a failed alchemy check ignored this field and always broke tools; the 1.35.0 migration stamps `true` onto every existing alchemy system with no explicit value so that behaviour does not change (`destructive-changes-and-migrations/spec.md` § Alchemy Break-Tools-on-Fail Default), and `ui-system-studio/spec.md` § The On-failure section documents the Checks Studio switch that now reads and writes it for alchemy.
 14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
     A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
@@ -3566,8 +3567,12 @@ CraftingRun = {
 
   componentSourceActorUuids: string[],
 
-  // The recipe and crafting-check terms the run accepted at start; see requirement 5.
-  termsSnapshot?: { recipe: object, craftingCheck: object | null },
+  // The recipe, crafting-check and iterative terms the run accepted at start; see requirement 5.
+  termsSnapshot?: {
+    recipe: object,
+    craftingCheck: object | null,
+    iterative?: { version: number, counters: object[], actions: object[] },
+  },
 
   // Native Reconciliation's record; see requirement 6.
   gmReconciliation?: { disposition, userId, userName, note?, stepIndex: number },
@@ -3584,6 +3589,9 @@ CraftingRun = {
    It is written once, at run creation, and is never updated by a later edit to the live recipe or system.
    It is absent for a recipe that could not serialize itself and for any run begun before this field existed, and resolution for such a run falls back to the live recipe (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms).
    It is removed from the run record when the run completes, before the record is archived to history, so a history entry never carries it.
+   `termsSnapshot` also carries `iterative`, written only for an iterative system as `{ version, counters, actions }`, the library subset the recipe's steps can reach.
+   Its `actions` are the union of the actions each step allows, where a step allowing `all` reaches every action, and its `counters` are those a Counter Instance or a reachable action names, in library order.
+   It is absent for every other system, and it is removed at archive with the rest of the snapshot.
 6. `gmReconciliation` is written only by Native Reconciliation of an uncertain legacy stage, only on a `cancelled` history entry.
    Its `disposition` is `reconciled` or `abandoned`, `userName` is `null` when unknown, and `note` is trimmed, at most 500 characters and omitted when blank.
    `stepIndex` names the stage whose uncertain settlement was closed, because archiving nulls `currentStepIndex`.
@@ -3629,6 +3637,9 @@ CraftingRunStepState = {
     },
   },
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
+
+  // A started step of an iterative run; see Iterative Step State below.
+  iterative?: IterativeStepState,
 
   // Optional permitted historical meaning and purpose; never a live narrative lookup.
   resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum" | "count", direction?: "over" | "under" },
@@ -3780,6 +3791,8 @@ CraftingRunStepState = {
    An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
    A main Roll that throws after a spend refuses with `data.targetRefusal: 'roll-failed'`, the error in its message and `data.boughtDice`, never a failed check.
 6. `failureReason` is required when `status` is `failed`.
+   An iterative step's terminal failure sets `failureReason: 'iterativeFailure'`, a stable code, unlike the free text other modes write, and every display localizes it and never prints it raw.
+   An iterative step carries no `lastCheckResult`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
 8. `preparedConsumption.essenceEnabled` records each contributing essence's `enabled` state as it stood at START, and the FINISH phase evaluates the essence behaviour gate from it rather than from the live definitions.
@@ -3807,12 +3820,62 @@ CraftingRunStepState = {
    A run holding an unsettled choice survives the history limit, and a prune that would drop it forfeits the choice instead (Crafting Runs Flag, requirement 5).
    A versioned step carries no `historySettlement`, so nothing reads an owed step's awards as complete before the settle.
 
+#### Iterative Step State
+
+```js
+IterativeStepState = {
+  version: number,
+  counters: Array<{ counterId: string, value: number }>,
+  attemptCount: number,
+  sessionCount: number,
+  startedWith: Array<{ counterId, value, formulaValue: number | null, rolls: number[], clamped: boolean }>,
+  log: AttemptEntry[],
+  compacted: null | { attempts: number, sessions: number, paid: CounterTotal[], changed: CounterTotal[] },
+  labels: null | { counters: Array<{ id, label }>, actions: Array<{ id, label }> },
+  toolBreakOwed: null | { attempt: number },
+  terminal: null | { kind: "success" | "failure", attempt: number, resultGroupId: string | null },
+}
+
+AttemptEntry = {
+  attempt: number,
+  sessionNumber: number | null,
+  actionId: string,
+  requestId: string, // the Attempt id, `attemptId` on the command and the public API
+  check: null | { success: boolean, outcomeId: string | null, value: number },
+  rolls: Array<{ effectId: string, total: number }>,
+  paid: Array<{ counterId: string, delta: number }>,
+  changed: Array<{ counterId: string, delta: number }>,
+}
+
+CounterTotal = { counterId: string, total: number }
+```
+
+1. `CraftingRunStepState.iterative` is present only on a started step of an iterative run, and it is rebuilt with exactly this key set on every write.
+   A started iterative step also carries `preparedConsumption`, timed or not.
+2. `counters` holds one row per Counter Instance, in instance order.
+   A later step starts with the previous step's final values verbatim, and `attemptCount` and `sessionCount` start at 0 on every step.
+3. `startedWith` holds one row per Counter Instance.
+   Start formulas resolve once, when the first step starts, and a fixed or carried start records `formulaValue: null` and `rolls: []`.
+4. An `AttemptEntry` holds ids and numbers only.
+   `attempt` restarts at 1 on each step, `rolls` holds one total per dice-bearing effect, and `requestId` is the Attempt id, unique within the run.
+5. `toolBreakOwed` is set by the first checked Iterative Attempt whose `checkBreakage` trigger fires, and it never moves afterwards.
+6. `terminal` is set once, by the terminal Iterative Attempt.
+7. While the run is active, `log` holds at most its newest 25 entries, oldest first.
+   Each older entry folds into `compacted`: `attempts` counts the folded entries, `sessions` counts those whose `sessionNumber` is not `null`, and `paid` and `changed` sum each counter's deltas in first-touch order, so `log` and `compacted` together equal the unbounded totals.
+8. When the run is archived, each step state's `log` is trimmed to its newest 10 entries the same way, and `labels` is written once from the terms snapshot.
+9. `compacted`, `labels`, `toolBreakOwed`, `terminal` and `terminal.resultGroupId` are written as explicit `null` when empty, so every stored state has the closed key set.
+   Foundry's flag merge replaces the `steps` array whole, so a step-state key is never resurrected.
+10. Each Iterative Attempt's flag write resends the run's whole `steps` array, including finished steps' logs, so one write can carry up to about 8 KiB per started step.
+11. A step state whose `version` is above the build's is preserved verbatim, is never trimmed, is readable, and refuses every Iterative Attempt.
+12. Hidden counters are stored unfiltered, and presentation decides what a non-GM viewer sees.
+
 #### Optional historical evidence
 
 Versioned stage arming captures `presentationSnapshot` from the authoritative execution step when the initiating viewer may see the recipe.
 For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+An iterative step records `{ kind, mode: 'iterative' }` derived from its Iterative Attempts, not from the active-check derivation: `none` at start and `check` from its first checked Iterative Attempt, kept through finalization without `product` or `direction`.
 Only an executed, permitted versioned `kind: "check"` stage may additionally retain a validated `product` and `direction` (`over` or `under`); both history allowlists require an executed versioned boundary and snapshot values that agree with the check result's, beside a finite raw total in that result, and drop both when they disagree.
 No-check, ingredient-routed, fizzle, legacy and gathering d100 snapshots gain no evaluation metadata.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.

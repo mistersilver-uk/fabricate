@@ -611,9 +611,14 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   const tierStep = renderTierStep(model.tierStep, keys, loc);
   const evidence = renderCheckEvidenceRows(model.check, loc);
 
+  // `iterativeFailure` is a stable code, so it is localized and never printed.
+  const reason =
+    model.failureReason === 'iterativeFailure'
+      ? loc('FABRICATE.Chat.IterativeFailure')
+      : model.failureReason;
   const notice =
-    !succeeded && model.failureReason
-      ? `<div class="fabricate-craft-chat__notice">${esc(loc(keys.failureReason))}: ${esc(model.failureReason)}</div>`
+    !succeeded && reason
+      ? `<div class="fabricate-craft-chat__notice">${esc(loc(keys.failureReason))}: ${esc(reason)}</div>`
       : '';
 
   let sections;

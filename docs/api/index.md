@@ -190,6 +190,26 @@ Hooks.once('fabricate.ready', async () => {
   `presentTools` is the same optional station payload described for `hydrateCraftingRecipe`, and a borrowed station Tool is never worn down or used up.
   It applies to this call only: the active GM checks it against each command the craft sends and never stores it on the run, so a later step needs the station again.
   Exact craft-time validation is always authoritative, independent of what either listing phase reported.
+- `takeCraftingAction({ actorId, runId, actionId, expectedRevision, attemptId, interactive, presentTools })` takes one Iterative Attempt on an iterative run through the active-GM authority.
+  It is owner-scoped like `cancelCraftingRun`: it resolves `game.actors.get(actorId)`, so only world actors can be addressed and a synthetic token actor cannot, and a viewer who does not own the actor and every component source gets the "needs owner" message.
+  When the actor has no active run with that id and no `attemptId` was supplied, it answers the "no run" message before anything is sent.
+  It sends `{ action: 'takeAction', runType: 'crafting', actorUuid, runId, expectedRevision, payload: { actionId, attemptId, presentTools? } }` through `executeJournalRunCommand`.
+  `attemptId` defaults to a new id, and a supplied one must be a non-empty string of at most 64 characters.
+  `expectedRevision` defaults to the run's `runRevision` as this client reads it, and only when `attemptId` is also defaulted, so a supplied `attemptId` without a whole-number `expectedRevision` refuses `invalid-command`.
+  The answer returns `attemptId`.
+  A retry resends the same `attemptId` with its original `expectedRevision`, gets back the recorded attempt with `iterative.replayed: true`, and never pays twice.
+  A replay is answered from the run's attempt log, active or archived, before the revision is compared, so a retry still answers after another attempt has moved the run on.
+  The log keeps only the newest attempts, so an id that has aged out is not recognized and refuses `stale-run` once its original `expectedRevision` no longer matches.
+  A replay refuses `recoveryRequired` while an execution journal of the run is uncommitted.
+  Any other `expectedRevision` that no longer matches the run refuses `stale-run` before anything is rolled or spent.
+  A committed attempt answers `success: true` with `iterative: { attempt, stepEnd, replayed }`, even when its step ended in failure, and `success: false` is always a refusal that spent nothing.
+  A refusal found after the check was evaluated carries no `check` and no roll to post.
+  On a secret check the outcome is still `iterative.attempt` and `iterative.stepEnd`, with `iterative.attempt.check` hidden as `null`, and a replay to a sender who cannot see the recipe hides it the same way.
+  A secret check's roll is posted GM-only when the authority evaluates it, and it stands even if the attempt is then refused.
+  `interactive` defaults to `false`.
+  A checked attempt that ends its step is carried by the craft card, which includes the roll.
+  A checked attempt that does not end its step has its roll posted as its own chat message, by this call when `interactive` is `false` in the self roll mode, and by the prompt flow when `interactive` is `true`.
+  An action's effect dice always use Foundry's random generator (`CONFIG.Dice.randomUniform`) and bypass any configured dice fulfillment, such as manual or physical dice entry; they post no roll.
 
 ### Gathering Runtime Facade
 

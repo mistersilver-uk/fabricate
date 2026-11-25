@@ -247,7 +247,7 @@ Reject when the recipe's `access` grant does not admit the viewer — the viewer
 6. If the mode is `item` or `knowledge`, re-run knowledge access evaluation.
 Reject if knowledge access is denied.
 7. Reject execution when any guard fails.
-8. In an `iterative` system, a recipe with a critical iterative readiness issue refuses a new start, and until Iterative Attempts ship every iterative start refuses (`resolution-modes` § Iterative Mode Availability).
+8. In an `iterative` system, a recipe with a critical iterative readiness issue refuses a new start, and the legacy craft and the versioned execute refuse it outright (`resolution-modes` § Iterative Mode Availability, § Iterative Validation).
 
 ## Alchemy Visibility and Learning
 

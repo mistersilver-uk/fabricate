@@ -1,10 +1,13 @@
 /**
- * A crafting run's accepted terms: its recipe and its system's crafting check as they stood when
- * the run began, persisted as `run.termsSnapshot = { recipe, craftingCheck }`. Resolution reads
- * them in place of the live corpus; roll data still comes from the live actor when the check rolls.
+ * A crafting run's accepted terms: its recipe, its system's crafting check and, for an iterative
+ * system, its library subset as they stood when the run began, persisted as
+ * `run.termsSnapshot = { recipe, craftingCheck, iterative? }`. Resolution reads them in place of
+ * the live corpus; roll data still comes from the live actor when the check rolls.
  */
 import { Recipe } from '../models/Recipe.js';
 import { cloneJson } from '../utils/scalars.js';
+
+import { iterativeTermsEntry } from './iterative/iterativeTerms.js';
 
 /** An own enumerable key, so every step view spread from a terms recipe carries it too. */
 const ACCEPTED_CRAFTING_CHECK = Symbol('fabricate.acceptedCraftingCheck');
@@ -15,6 +18,7 @@ export function snapshotRunTerms(recipe, system) {
   return {
     recipe: cloneJson(recipe.toJSON()),
     craftingCheck: cloneJson(system?.craftingCheck ?? null),
+    ...iterativeTermsEntry(recipe, system),
   };
 }
 

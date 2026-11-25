@@ -9,6 +9,7 @@ import { join, dirname } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { ITERATIVE_ATTEMPT_REFUSALS } from '../src/systems/iterative/resolveAttempt.js';
 import {
   JOURNAL_RUN_REASON_KEYS,
   isResolvedFailureOutcome,
@@ -33,6 +34,11 @@ const EDGE_SOURCES = [
   'src/systems/alchemyStartSelection.js',
   'src/systems/journalPreparedCheck.js',
   'src/ui/SvelteFabricateApp.svelte.js',
+  'src/systems/iterative/IterativeAttemptExecutor.js',
+  'src/systems/iterative/iterativeAttemptCheck.js',
+  'src/systems/iterative/iterativeJournalOperation.js',
+  'src/systems/iterative/iterativeCraftGate.js',
+  'src/systems/iterative/iterativeStepStart.js',
 ];
 
 function authoritySources() {
@@ -54,8 +60,9 @@ function authoritySources() {
 const REASON_LINE = /\breason\b|unavailable\(|failure\(/;
 const REASON_LITERAL = /'([a-z][a-z0-9]*(?:-[a-z0-9]+)+)'/g;
 
+// The resolver's refusals are a frozen map of values, not `reason` lines, so they are unioned in.
 function authorityReasons() {
-  const found = new Set();
+  const found = new Set(Object.values(ITERATIVE_ATTEMPT_REFUSALS));
   for (const source of authoritySources()) {
     for (const line of readFileSync(join(ROOT, source), 'utf8').split(/\r?\n/)) {
       if (!REASON_LINE.test(line)) continue;
@@ -194,6 +201,25 @@ describe('journal run reason vocabulary', () => {
     assert.equal(langLeaf('FABRICATE.App.Journal.Status.inProgress'), 'In progress');
     assert.equal(langLeaf('FABRICATE.App.Journal.Status.waiting'), undefined, 'the retired badge word is removed');
     assert.equal(langLeaf('FABRICATE.App.Journal.Filters.Status.Waiting'), undefined, 'and so is the retired tab word');
+  });
+
+  it('words every Iterative Attempt refusal without a placeholder, saying nothing was spent', () => {
+    const keys = Object.entries(JOURNAL_RUN_REASON_KEYS).filter(([, key]) =>
+      key.startsWith('FABRICATE.App.Journal.Reason.Iterative')
+    );
+    assert.equal(keys.length, 13, 'positive control: every C4 sentence was read');
+    for (const [reason, key] of keys) {
+      const text = langLeaf(key);
+      assert.doesNotMatch(text, /\{/, reason);
+      if (reason === 'check-mismatch') assert.match(text, /workpiece is unchanged/, reason);
+      else assert.match(text, /Nothing was spent/, reason);
+      // Every attempt refusal also says the session was not counted; the start refusal has none.
+      if (reason === 'iterative-not-ready') assert.doesNotMatch(text, /session/, reason);
+      else assert.match(text, /the session wasn’t counted\.$/, reason);
+    }
+    for (const reason of Object.values(ITERATIVE_ATTEMPT_REFUSALS)) {
+      assert.ok(JOURNAL_RUN_REASON_KEYS[reason], `${reason} is mapped`);
+    }
   });
 
   it('never lets a raw slug reach a player', () => {

@@ -434,16 +434,29 @@ describe('iterativeStartBlockers', () => {
     ]);
   });
 
-  it("answers the recipe's own criticals and those on an action one of its steps allows", () => {
+  it("answers the recipe's own criticals and those on an action or counter it uses", () => {
     const blockers = (mode) => {
       const { issues, recipe } = world(mode);
       return iterativeStartBlockers(issues, recipe).map(tag);
     };
-    assert.deepEqual(blockers('only'), ['iterativeUnknownCounter@recipe:r-blade']);
+    assert.deepEqual(blockers('only'), [
+      'iterativeInvalidEntry@counter:heat',
+      'iterativeUnknownCounter@recipe:r-blade',
+    ]);
     assert.deepEqual(blockers('all'), [
+      'iterativeInvalidEntry@counter:heat',
       'iterativeInvalidEntry@action:quench',
       'iterativeUnknownCounter@recipe:r-blade',
     ]);
+  });
+
+  it('ignores a critical counter issue on a counter the recipe does not use', () => {
+    const library = clone(LIBRARY);
+    library.counters.push({ id: 'cold', label: 'Cold', limit: 'sideways' });
+    const recipes = [new Recipe(clone(RECIPE))];
+    const issues = evaluateIterativeReadiness(system({ library }), recipes);
+    assert.deepEqual(issues.map(tag), ['iterativeInvalidEntry@counter:cold']);
+    assert.deepEqual(iterativeStartBlockers(issues, recipes[0]), []);
   });
 
   it('answers iterativeVersionUnsupported for every recipe', () => {

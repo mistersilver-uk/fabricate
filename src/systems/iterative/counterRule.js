@@ -122,3 +122,26 @@ export function normalizeCounterRule(raw) {
 export function normalizeCounterRuleList(raw) {
   return arrayOrEmpty(raw).map(normalizeCounterRule);
 }
+
+/** The comparison each rule `op` applies, `(actual, value) => boolean`. */
+export const COMPARISONS = Object.freeze({
+  '>=': (actual, value) => actual >= value,
+  '<=': (actual, value) => actual <= value,
+  '>': (actual, value) => actual > value,
+  '<': (actual, value) => actual < value,
+  '=': (actual, value) => actual === value,
+});
+
+/**
+ * Whether `rule` holds against `facts`, `{ counters: Map<counterId, number>, sessionCount, previousActionId }`.
+ * A rule that does not parse, a counter with no value, and `previousAction` with no previous action hold nothing.
+ */
+export function evaluateCounterRule(rule, facts) {
+  if (counterRuleFault(rule)) return false;
+  if (rule.source === 'previousAction') {
+    return facts.previousActionId !== null && rule.actionIds.includes(facts.previousActionId);
+  }
+  const actual =
+    rule.source === 'counter' ? facts.counters.get(rule.counterId) : facts.sessionCount;
+  return typeof actual === 'number' && COMPARISONS[rule.op](actual, iterativeNumber(rule.value));
+}

@@ -338,6 +338,7 @@ const gatheringHarness = createMountedComponentHarness({
     // Its Player sees line, which resolves the target and names the Preview-as character.
     'src/systems/checkTarget.js',
     'src/systems/checkEvaluation.js',
+    'src/systems/expressionReader.js',
     'src/utils/localizeWithFallback.js',
     'src/ui/svelte/apps/manager/checks/previewActorId.js',
     'src/ui/svelte/apps/manager/component/overridePlayerSees.js',

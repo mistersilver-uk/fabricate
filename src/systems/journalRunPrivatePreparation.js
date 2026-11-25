@@ -22,7 +22,8 @@ function safePrepareRecord(record, invalidateLegacy = true) {
 }
 
 function sameBinding(actual, expected) {
-  for (const key of ['senderId', 'actorUuid', 'runType', 'runId', 'expectedRevision']) {
+  const keys = ['senderId', 'actorUuid', 'runType', 'runId', 'expectedRevision', 'operation'];
+  for (const key of keys) {
     if (String(actual?.[key] ?? '') !== String(expected?.[key] ?? '')) return false;
   }
   return true;

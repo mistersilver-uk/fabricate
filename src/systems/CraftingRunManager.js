@@ -4,7 +4,8 @@ import { persistAwardChoiceSettlement } from './awardChoiceSettle.js';
 import { forfeitOwedChoices, groupEvidenceFields, trimRunHistory } from './choiceGroupAward.js';
 import { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
 import { stringOrNull } from './gatheringEngineInternals.js';
-import { RunContainerManagerBase } from './runContainerStore.js';
+import { archiveRunTerms } from './iterative/iterativeStepState.js';
+import { findRunLocation, RunContainerManagerBase } from './runContainerStore.js';
 import {
   observeExecutionJournal,
   persistExecutionJournalTransition,
@@ -344,7 +345,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     incrementRunRevision(run);
 
     delete container.active[run.id];
-    delete run.termsSnapshot;
+    archiveRunTerms(run);
     // A duplicate history id would crash the Journal's keyed each, so a run lingering in `active`
     // after its twin was recorded is never archived again.
     const alreadyArchived =
@@ -974,12 +975,4 @@ function pruneContainer(container, { dropActiveRun, keepHistoryEntry }, now) {
 
 function cloneObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? cloneJson(value) : {};
-}
-
-function findRunLocation(container, runId) {
-  const id = String(runId ?? '').trim();
-  if (!id) return null;
-  if (container.active?.[id]) return { run: container.active[id], terminal: false };
-  const run = (container.history || []).find((entry) => entry?.id === id);
-  return run ? { run, terminal: true } : null;
 }

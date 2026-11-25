@@ -1,18 +1,17 @@
 import { settleCardRolls } from './checkCardRolls.js';
+import { validTakeActionRequest } from './iterative/iterativeJournalOperation.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
+  describePreparedJournalCheck,
   evaluatePreparedJournalCheck,
-  withPreparedAdditionalDiceOffer,
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
 import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
-import {
-  authorizeAwardChoice,
-  awardChoiceDismissalRefusal,
-  validAwardChoicePayload,
-} from './journalRunAwardChoice.js';
-import { serializedOperationResult, terminalRun, validText } from './journalRunReply.js';
-import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
+import { authorizeAwardChoice, validAwardChoicePayload } from './journalRunAwardChoice.js';
+import { CHECKED_ACTIONS, MUTATING_ACTIONS, releasedAction } from './journalRunCommandActions.js';
+import { createJournalRunDismissals } from './journalRunDismissals.js';
+import { serializedOperationResult, validText } from './journalRunReply.js';
+import { decisionAdditionalDice } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation, commandAdmitsRun } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -27,18 +26,8 @@ export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
  * `tests/journal-run-authority.test.js` pins the two together.
  */
 export const JOURNAL_RUN_COMMAND_TIMEOUT_MS = 15_000;
-const DISMISSAL_LIMIT = 500;
-const MUTATING_ACTIONS = new Set([
-  'start',
-  'beginStep',
-  'execute',
-  'pause',
-  'resume',
-  'setCompletionMode',
-  'setSelection',
-  'cancel',
-  'chooseAward',
-]);
+
+export { journalRunDismissalKey, normalizeJournalRunDismissals } from './journalRunDismissals.js';
 
 function failure(reason, extra = {}) {
   return { success: false, reason, ...extra };
@@ -55,6 +44,7 @@ function validRequest(request) {
   if (!MUTATING_ACTIONS.has(request?.action) && request?.action !== 'releaseCheck') return false;
   if (request.action !== 'start' && !validText(request?.runId)) return false;
   if (request.action === 'chooseAward' && !validAwardChoicePayload(request.payload)) return false;
+  if (request.action === 'takeAction' && !validTakeActionRequest(request)) return false;
   return Number.isInteger(request?.expectedRevision) && request.expectedRevision >= 0;
 }
 
@@ -65,34 +55,6 @@ function replyMatches(pending, payload) {
     pending.runId === payload.runId &&
     pending.expectedRevision === payload.expectedRevision
   );
-}
-
-/**
- * The JSON tuple key hiding one native run per user and world, never deleting actor history;
- * alchemy uses its native `crafting` run type.
- */
-export function journalRunDismissalKey({ actorUuid, runType, runId }) {
-  return JSON.stringify([String(actorUuid ?? ''), String(runType ?? ''), String(runId ?? '')]);
-}
-
-/**
- * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs, as a new
- * map for the replacing user-setting write.
- */
-export function normalizeJournalRunDismissals(value) {
-  const entries = Object.entries(value && typeof value === 'object' ? value : {})
-    .filter(([key, hiddenAt]) => {
-      if (!validText(key) || !Number.isFinite(Number(hiddenAt))) return false;
-      try {
-        const tuple = JSON.parse(key);
-        return Array.isArray(tuple) && tuple.length === 3 && tuple.every(validText);
-      } catch {
-        return false;
-      }
-    })
-    .sort((left, right) => Number(right[1]) - Number(left[1]))
-    .slice(0, DISMISSAL_LIMIT);
-  return Object.fromEntries(entries);
 }
 
 /**
@@ -574,6 +536,15 @@ export function createJournalRunCommandService({
 }) {
   const sessionId = randomId();
   const pending = new Map();
+  const dismissals = createJournalRunDismissals({
+    operations,
+    currentUser,
+    resolveUuid,
+    getDismissals,
+    setDismissals,
+    now,
+    onDismissalsChanged,
+  });
   const currentRealmIsActiveGm = () => {
     const user = currentUser?.();
     return user?.isGM === true && Boolean(user.id) && user.id === activeGM?.()?.id;
@@ -594,6 +565,8 @@ export function createJournalRunCommandService({
     }
     const operation = operations[request.runType];
     if (!operation) return failure('unsupported-operation');
+    const replay = await operation.answerReplay?.({ actor, request, sender });
+    if (replay) return { replay };
     const run =
       request.action === 'start' ? null : await operation.getRun?.({ actor, runId: request.runId });
     if (request.action !== 'start' && !run) return failure('run-not-found');
@@ -619,9 +592,10 @@ export function createJournalRunCommandService({
   }
 
   async function executeOperation(request, context, helpers, spent) {
-    const { actor, operation, run } = context;
+    const { actor, operation } = context;
     const binding = {
-      operation: request.action === 'releaseCheck' ? 'execute' : request.action,
+      operation:
+        request.action === 'releaseCheck' ? releasedAction(request.payload) : request.action,
       actorUuid: request.actorUuid,
       runType: request.runType,
       runId: request.runId,
@@ -659,7 +633,7 @@ export function createJournalRunCommandService({
       preparedPayload = prepared?.payload ?? preparedPayload;
       executionOperation = prepared?.executionOperation ?? executionOperation;
     }
-    if (request.action === 'execute' && request.payload?.prepareToken) {
+    if (CHECKED_ACTIONS.has(request.action) && request.payload?.prepareToken) {
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
       const { consumePrepareToken } = helpers;
@@ -687,46 +661,24 @@ export function createJournalRunCommandService({
         ...entitlement,
         payload: request.payload ?? {},
       });
-      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
-    } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
-      const preparationGrant = helpers.createExecutionGrant({
-        ...binding,
-        operation: 'describeCheck',
-        expectedRevision: null,
-      });
-      const descriptor = await operation.describeCheck({
-        actor,
-        run,
-        sender: context.sender,
-        payload: request.payload ?? {},
-        preparationGrant,
-        requestId: request.requestId,
-      });
-      if (descriptor?.blocked) return failure(descriptor.blocked, descriptor.detail);
-      if (descriptor?.required) {
-        const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
-        const token = helpers.issuePrepareToken(
-          {
-            ...binding,
-            privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: preparedDecisionPolicy(publicPrompt),
-          },
-          { expiresAt: now() + 60_000 }
-        );
-        return {
-          success: true,
-          checkRequired: true,
-          promptDescriptor: publicPrompt ?? {},
-          prepareToken: token,
-        };
-      }
-      trustedContext.resolvedCheckResult = {
-        success: true,
-        outcome: null,
-        value: null,
-        data: {},
-        engineEvaluated: true,
+      trustedContext = {
+        operationId: request.requestId,
+        resolvedCheckResult: offered,
+        preparedActionId: privateEvaluation?.actionId,
       };
+    } else if (
+      CHECKED_ACTIONS.has(request.action) &&
+      typeof operation.describeCheck === 'function'
+    ) {
+      const described = await describePreparedJournalCheck({
+        request,
+        context,
+        helpers,
+        binding,
+        now,
+      });
+      if (described.response) return described.response;
+      trustedContext.resolvedCheckResult = described.resolvedCheckResult;
     }
 
     const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
@@ -794,7 +746,7 @@ export function createJournalRunCommandService({
     const response = await authority.run(claimed, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
-      if (!context.success) return context;
+      if (!context.success) return context.replay ?? context;
       return executeOperation({ ...request, senderId }, context, helpers, spent);
     });
     return withSpentAdditionalDice(response, spent, request.expectedRevision);
@@ -894,38 +846,9 @@ export function createJournalRunCommandService({
     return settlePromptedCheck(command, first, seams);
   }
 
-  function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {
-    if (viewerId && viewerId !== currentUser?.()?.id) return new Set();
-    const normalized = normalizeJournalRunDismissals(getDismissals());
-    const actorPrefix = JSON.stringify([String(actorUuid ?? '')]).slice(0, -1) + ',';
-    return new Set(Object.keys(normalized).filter((key) => key.startsWith(actorPrefix)));
-  }
-
-  async function dismissJournalRun({ actorUuid, runType, runId } = {}) {
-    const operation = operations[runType];
-    if (!operation || !validText(actorUuid) || !validText(runId))
-      return failure('invalid-dismissal');
-    let actor;
-    try {
-      actor = await resolveUuid(actorUuid);
-    } catch {
-      return failure('actor-not-found');
-    }
-    const run = actor ? await operation.getRun?.({ actor, runId, includeHistory: true }) : null;
-    if (!run) return failure('run-not-found');
-    const refused = terminalRun(run) ? awardChoiceDismissalRefusal(run) : failure('active-run');
-    if (refused) return refused;
-    const key = journalRunDismissalKey({ actorUuid, runType, runId });
-    const next = normalizeJournalRunDismissals({ ...getDismissals(), [key]: now() });
-    await setDismissals(next);
-    onDismissalsChanged({ actorUuid, runType, runId });
-    return { success: true, key };
-  }
-
   return {
     executeJournalRunCommand,
-    dismissJournalRun,
-    getDismissedJournalRunKeys,
+    ...dismissals,
     getJournalRunAuthorityAvailability: () => authority.availability(),
     setupJournalRunAuthority: () => authority.setup(),
     reconcileJournalRunAuthority: (options) => authority.reconcile(options),

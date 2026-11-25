@@ -455,6 +455,10 @@ export class ResolutionModeService {
     if (mode === 'alchemy') {
       return this._resolveAlchemyResultGroups({ recipe, checkResult, allGroups });
     }
+    if (mode === 'iterative') {
+      const group = allGroups.find((entry) => entry.id === selectedResultGroupId);
+      return { groups: group ? [group] : [], meta: { disposition: group ? 'success' : 'none' } };
+    }
 
     return {
       groups: [],
