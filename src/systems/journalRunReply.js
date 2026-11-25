@@ -12,6 +12,12 @@ export function terminalRun(run) {
 
 export const validText = (value) => typeof value === 'string' && value.trim() !== '';
 
+/** An Iterative Attempt's outcome with its check hidden, as a secret check's reply carries it. */
+export function withSecretAttemptCheck(iterative) {
+  if (!iterative?.attempt) return iterative;
+  return { ...iterative, attempt: { ...iterative.attempt, check: null } };
+}
+
 export function serializedOperationResult(result, { secret = false, runId = '' } = {}) {
   const source =
     result && typeof result === 'object'
@@ -29,6 +35,9 @@ export function serializedOperationResult(result, { secret = false, runId = '' }
       ...base,
       secret: true,
       reason: source.success === true ? null : 'operation-failed',
+      ...(Object.hasOwn(source, 'iterative') && {
+        iterative: withSecretAttemptCheck(source.iterative),
+      }),
     };
   }
   const results = Array.isArray(source.results) ? source.results : [];

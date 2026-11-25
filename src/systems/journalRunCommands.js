@@ -565,7 +565,7 @@ export function createJournalRunCommandService({
     }
     const operation = operations[request.runType];
     if (!operation) return failure('unsupported-operation');
-    const replay = await operation.answerReplay?.({ actor, request });
+    const replay = await operation.answerReplay?.({ actor, request, sender });
     if (replay) return { replay };
     const run =
       request.action === 'start' ? null : await operation.getRun?.({ actor, runId: request.runId });

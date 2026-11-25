@@ -264,7 +264,7 @@ The two are told apart by the `disposition` the stage's own outcome mints — `f
 A resolved failure MUST be reported in its own words, which state that the check failed and assert NOTHING about what the attempt consumed.
 The generic craft-failure text promises that nothing was consumed, and that promise is false whenever the recipe's `consumeIngredientsOnFail` or `breakToolsOnFail` policy spent something; the chat card is the surface that itemises it.
 It MUST NOT be recorded as a command error on the Journal run, whose own history already records the outcome.
-A committed Iterative Attempt answers `success: true` whether its check failed or its step ended, and its outcome is `iterative.attempt` and `iterative.stepEnd`.
+A committed Iterative Attempt answers `success: true` whether its check failed or its step ended, and its outcome is `iterative.attempt` and `iterative.stepEnd`, with `iterative.attempt.check` hidden as `null` on a secret check, in its reply and in a replay to a sender who cannot see the recipe.
 For `takeAction`, `success: false` is always a refusal, never carries a `disposition`, and posts no roll.
 The Alchemy workbench banner MUST give it a distinct non-success state rather than the no-reaction fizzle, because the bench did react.
 

@@ -199,7 +199,9 @@ Hooks.once('fabricate.ready', async () => {
   The answer returns `attemptId`.
   A retry resends the same `attemptId` with its original `expectedRevision`, gets back the recorded attempt with `iterative.replayed: true`, and never pays twice.
   A committed attempt answers `success: true` with `iterative: { attempt, stepEnd, replayed }`, even when its step ended in failure, and `success: false` is always a refusal that spent nothing.
+  On a secret check the outcome is still `iterative.attempt` and `iterative.stepEnd`, with `iterative.attempt.check` hidden as `null`, and a replay to a sender who cannot see the recipe hides it the same way.
   `interactive` defaults to `false`, and then the call itself posts the check roll of a checked attempt whose roll no craft card carried.
+  An action's effect dice always use Foundry's random generator (`CONFIG.Dice.randomUniform`) and bypass any configured dice fulfillment, such as manual or physical dice entry; they post no roll.
 
 ### Gathering Runtime Facade
 

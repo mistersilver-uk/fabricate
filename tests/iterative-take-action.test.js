@@ -350,8 +350,56 @@ describe('a checked Iterative Attempt', () => {
     assert.equal(reply.success, false);
     assert.equal(world.messages.length, 1, 'only the GM roll posted at evaluation');
     assert.ok(world.messages[0].rolls?.length > 0, 'it is the roll message');
+    assert.equal(world.messages[0].rollOptions?.rollMode, 'gmroll');
     assert.equal(Object.hasOwn(reply, 'rollHandoff'), false);
     assert.equal(world.stepState().log.length, 0);
+  });
+});
+
+describe('a secret checked Iterative Attempt', () => {
+  /** A world whose recipe only the GM sees, so the player's checks are secret. */
+  async function secretWorld() {
+    const world = await startedWorld();
+    world.visibility.getVisibleRecipes = ({ viewer }) =>
+      viewer?.isGM ? [{ recipe: world.recipe }] : [];
+    const leg = (extra = {}) =>
+      request(world, 'takeAction', { actionId: 'hammer', attemptId: 'hidden', ...extra });
+    const described = await world.service.handleRequest(leg(), 'player');
+    assert.equal(described.checkRequired, true, JSON.stringify(described));
+    const revision = world.revision();
+    const reply = await world.service.handleRequest(
+      leg({ prepareToken: described.prepareToken, rollDecision: {} }),
+      'player'
+    );
+    return { world, leg, revision, reply };
+  }
+
+  it('answers its outcome with the check hidden', async () => {
+    const { world, reply } = await secretWorld();
+    assert.equal(reply.success, true, JSON.stringify(reply));
+    assert.equal(reply.secret, true);
+    assert.equal(reply.iterative.attempt.actionId, 'hammer');
+    assert.equal(reply.iterative.attempt.check, null);
+    assert.equal(reply.iterative.stepEnd, null);
+    assert.deepEqual(world.stepState().log[0].check, {
+      success: true,
+      outcomeId: 'hit',
+      value: 15,
+    });
+  });
+
+  it('replays it with the check hidden from the player and shown to the GM', async () => {
+    const { world, leg, revision } = await secretWorld();
+    const replay = (sender) =>
+      unchangedBy(world, () =>
+        world.service.handleRequest({ ...leg(), expectedRevision: revision }, sender)
+      );
+    const player = await replay('player');
+    assert.equal(player.replayed, true, JSON.stringify(player));
+    assert.equal(player.iterative.attempt.check, null);
+    assert.equal(player.iterative.attempt.requestId, 'hidden');
+    const gm = await replay('gm');
+    assert.deepEqual(gm.iterative.attempt.check, { success: true, outcomeId: 'hit', value: 15 });
   });
 });
 

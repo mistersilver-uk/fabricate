@@ -3,6 +3,7 @@
  * and `answerReplay`, which answers a replayed Attempt id from the run's attempt log before any
  * revision test or authorization, changing nothing.
  */
+import { withSecretAttemptCheck } from '../journalRunReply.js';
 import { RUN_JOURNAL_KEYS } from '../runJournalReconstruction.js';
 import { engineWithStationPresence } from '../stationPresence.js';
 
@@ -25,9 +26,24 @@ export function validTakeActionPayload(payload) {
   );
 }
 
+/** Whether `sender` sees the run's recipe, so its checks were not secret (`evaluateCheck`). */
+async function senderSeesRecipe(fabricate, resolveSourceActors, { actor, run, sender }) {
+  if (sender?.isGM === true) return true;
+  const recipe = fabricate.recipeManager?.getRecipe?.(run.recipeId) ?? null;
+  if (!recipe) return false;
+  const visible = fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+    viewer: sender,
+    craftingActor: actor,
+    componentSourceActors: (await resolveSourceActors(run, {}, actor)) ?? [],
+    craftingSystemId: recipe.craftingSystemId,
+  });
+  return Boolean(visible?.some?.((candidate) => candidate?.recipe?.id === recipe.id));
+}
+
 /** The recorded attempt a replayed Attempt id names on the run, active or archived, or `null`. */
-function answerReplay(runManager, { actor, request }) {
+async function answerReplay(fabricate, resolveSourceActors, { actor, request, sender }) {
   if (request.action !== 'takeAction') return null;
+  const runManager = fabricate.craftingRunManager;
   runManager?.invalidateCache?.(actor?.id);
   const run = runManager?.getRun?.(actor, request.runId) ?? null;
   const found = findAttemptEntry(run, request.payload?.attemptId);
@@ -35,13 +51,17 @@ function answerReplay(runManager, { actor, request }) {
   if (RUN_JOURNAL_KEYS.some((key) => run[key] && run[key].status !== 'committed')) {
     return failure('recoveryRequired');
   }
+  const iterative = { ...found, replayed: true };
+  const secret =
+    found.attempt?.check != null &&
+    !(await senderSeesRecipe(fabricate, resolveSourceActors, { actor, run, sender }));
   return {
     success: true,
     replayed: true,
     runId: run.id,
     status: run.status,
     runRevision: run.runRevision,
-    iterative: { ...found, replayed: true },
+    iterative: secret ? withSecretAttemptCheck(iterative) : iterative,
   };
 }
 
@@ -52,7 +72,7 @@ function answerReplay(runManager, { actor, request }) {
 export function withIterativeOperations(operations, { fabricate, resolveSourceActors }) {
   return {
     ...operations,
-    answerReplay: (context) => answerReplay(fabricate.craftingRunManager, context),
+    answerReplay: (context) => answerReplay(fabricate, resolveSourceActors, context),
     takeAction: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const componentSourceActors = await resolveSourceActors(run, payload, actor);
       if (!componentSourceActors) return failure('source-actor-not-found');
