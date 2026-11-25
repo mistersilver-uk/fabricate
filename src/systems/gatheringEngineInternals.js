@@ -187,7 +187,7 @@ export {
  * receipt; a legacy waiting run recorded none, so its `stamina` stays undefined. */
 export function runStartCommit(run) {
   if (!run) return null;
-  const start = normalizeList(run.executionJournal?.effects).find(
+  const start = iterableToArray(run.executionJournal?.effects).find(
     (effect) => effect?.kind === 'commitGatheringEconomy' && effect.phase === 'applied'
   );
   return start ? { stamina: plainObjectOrNull(start.receipt)?.stamina ?? null } : {};
