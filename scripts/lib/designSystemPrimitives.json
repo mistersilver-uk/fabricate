@@ -1003,7 +1003,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The condition-to-effect rule row: a head stating the rule, a field chain the caller's `schema` draws step by step, a `RuleSentence` restating it, and presets offered while the rule is unauthored.",
+        "The condition-to-effect rule row, or one condition the caller combines (All/Any): a head stating the rule, a field chain the caller's `schema` draws step by step, a `RuleSentence` restating it, and presets offered while the rule is unauthored.",
         "It has two importers and is shared."
       ]
     },

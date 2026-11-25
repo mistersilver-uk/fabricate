@@ -1,6 +1,6 @@
 <!--
-  One condition → effect rule, edited in place: its head states the rule, its field chain edits it,
-  and its `RuleSentence` restates it. A rule not yet authored offers its presets instead.
+  One condition → effect rule, or one condition its caller combines (All/Any), edited in place: a
+  head states it, a field chain edits it, a `RuleSentence` restates it; unauthored: presets.
 
   Props:
   | prop | values | default | contract |
