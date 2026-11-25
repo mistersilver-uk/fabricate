@@ -57,7 +57,7 @@ export const CASES = Object.freeze([
     steps: COUNTERS_STEPS,
     expectView: 'iterative-counters',
     expectSelector: '[data-iterative-counters] [data-iterative-counter-list]',
-    expectCenterHit: '[data-iterative-counter="iron"] [data-sortable-move="down"]',
+    expectCenterHit: '[data-iterative-counter="heat"] [data-sortable-move="down"]',
   }),
   iterativeCase({
     id: 'manager-iterative-counters-searched',
