@@ -66,6 +66,11 @@ export function createIterativeActionDraft({ selectedSystem, library, actions, s
     saving = false;
   }
 
+  /** Runs `change(draft)` against the staged copy; the sections write only through here. */
+  function edit(change) {
+    if (draft) change(draft);
+  }
+
   function clear() {
     draft = null;
     baseline = null;
@@ -108,6 +113,7 @@ export function createIterativeActionDraft({ selectedSystem, library, actions, s
       return heading;
     },
     begin,
+    edit,
     clear,
     save,
   };

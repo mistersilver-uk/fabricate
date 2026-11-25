@@ -317,8 +317,8 @@
       "evidence": "targeted",
       "scope": "manager-only",
       "why": [
-        "The inline vocabulary add field, with 2 callers, `VocabularyPanel.svelte` and `ImportFolderMappingModal.svelte`.",
-        "No `library.html` entry names it, and both callers are manager screens, so it is manager-only."
+        "The inline vocabulary add field, with 3 callers, `VocabularyPanel.svelte`, `ImportFolderMappingModal.svelte` and the Crafting Action editor's `ActionIdentitySection.svelte`.",
+        "No `library.html` entry names it, and all three callers are manager screens, so it is manager-only."
       ]
     },
     {
@@ -373,7 +373,7 @@
       "evidence": "broad",
       "scope": "manager-only",
       "why": [
-        "The roll-data expression field, with tokens the author inserts and a row beneath the input, imported by five files including `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte` and `src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte`.",
+        "The roll-data expression field, with tokens the author inserts and a row beneath the input, imported by six files including `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte`, `src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte` and `src/ui/svelte/apps/manager/iterative/ActionExpressionField.svelte`.",
         "`library.html`'s `<ExprInput>` specifies it, and every importer is a manager editor, so it is manager-only."
       ]
     },
@@ -1004,7 +1004,7 @@
       "scope": "shared",
       "why": [
         "The condition-to-effect rule row, or one condition the caller combines (All/Any): a head stating the rule, a field chain the caller's `schema` draws step by step, a `RuleSentence` restating it, and presets offered while the rule is unauthored.",
-        "It has two importers and is shared."
+        "It has three importers and is shared."
       ]
     },
     {
@@ -1059,7 +1059,7 @@
       "scope": "shared",
       "why": [
         "The strip of current values: an optional kicker naming the group, an optional read-only badge drawn through `Chip`, and glyph-led facts whose values arrive caller-formatted in mono, with nothing focusable inside it.",
-        "The crafting check card and the gathering detail's stamina pool are its two importers, so it is shared."
+        "The crafting check card, the gathering detail's stamina pool and the Crafting Action editor's Check card are its three importers, so it is shared."
       ]
     },
     {

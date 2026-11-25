@@ -12,6 +12,7 @@
   | `text` | the shell's localizer | — | `(key, fallback)` |
 -->
 <script>
+  import ActionEditorView from './ActionEditorView.svelte';
   import ActionsBrowserView from './ActionsBrowserView.svelte';
   import CountersView from './CountersView.svelte';
 
@@ -63,5 +64,7 @@
       onOpen={route.openAction}
       onNew={route.startNewAction}
     />
+  {:else if currentView === 'iterative-action-edit'}
+    <ActionEditorView {route} {text} />
   {/if}
 </main>

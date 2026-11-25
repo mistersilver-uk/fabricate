@@ -9,31 +9,51 @@ import { createActionsBrowserState } from '../../../../model/managerBrowserViewS
 
 import { createIterativeActionDraft } from './iterativeActionDraft.svelte.js';
 import { createIterativeCounterRoute } from './iterativeCounterRoute.svelte.js';
-import { actionBlockingCounts } from './iterativeLibraryModel.js';
+import { confirmActionDelete } from './iterativeDeleteConfirm.js';
+import { actionBlockingCounts, actionUses } from './iterativeLibraryModel.js';
 
 /** Read-only accessors for `reads`, each a thunk, so the model hands out live values. */
 const accessors = (reads) =>
   Object.fromEntries(Object.entries(reads).map(([name, get]) => [name, { get, enumerable: true }]));
 
-/** Confirms through `services().confirmDialog`, then deletes the staged action; answers whether it did. */
-async function deleteStagedAction({ staged, section, services, text }) {
+/** Confirms with where the staged action is named, then deletes it; answers whether it did. */
+async function deleteStagedAction({ staged, section, services, text, uses }) {
   if (!staged.draft?.id) return false;
   const { id, label } = staged.draft;
-  const title = text('FABRICATE.Admin.Manager.Iterative.DeleteActionTitle', 'Delete {name}?');
-  const body = text(
-    'FABRICATE.Admin.Manager.Iterative.DeleteActionBody',
-    'Steps and rules that name it will need another action.'
-  );
-  const confirmed = await services().confirmDialog?.({
-    title: title.replace('{name}', label),
-    content: `<p>${body}</p>`,
-    yes: { callback: () => true },
-    no: { callback: () => false },
+  const confirmed = await confirmActionDelete({
+    confirmDialog: services()?.confirmDialog,
+    text,
+    action: { id, label },
+    uses: uses(id),
   });
-  if (confirmed !== true || !(await section().deleteAction(id))) return false;
+  if (!confirmed || !(await section().deleteAction(id))) return false;
   staged.clear();
   return true;
 }
+
+/** The route-exit guard of a dirty staged action, in the shape the shell's confirm-discard chain reads. */
+const actionExitGuard = ({ staged, section, currentView }) => ({
+  active: () => currentView() === 'iterative-action-edit',
+  isDirty: () => staged.isDirty,
+  confirm: () => section()?.confirmDiscardDirtyActionDraft(),
+  finish: async (action) => {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') return (await staged.save()) !== false;
+    staged.clear();
+    return true;
+  },
+});
+
+/** Thunks for the staged action's read-only accessors. */
+const stagedReads = (staged) => ({
+  actionDraft: () => staged.draft,
+  actionSaving: () => staged.saving,
+  isNewAction: () => staged.isNew,
+  isActionDirty: () => staged.isDirty,
+  hasEditableAction: () => staged.hasEditable,
+  actionIssues: () => staged.issues,
+  actionHeading: () => staged.heading,
+});
 
 /**
  * @param {object} seams
@@ -89,26 +109,23 @@ export function createIterativeRouteModel({
     return Boolean(id);
   }
 
-  const deleteAction = () => deleteStagedAction({ staged, section, services, text });
-
-  const exitGuard = {
-    active: () => currentView() === 'iterative-action-edit',
-    isDirty: () => staged.isDirty,
-    confirm: () => section()?.confirmDiscardDirtyActionDraft(),
-    finish: async (action) => {
-      if (action === 'cancel' || action === false) return false;
-      if (action === 'save') return (await staged.save()) !== false;
-      staged.clear();
-      return true;
-    },
-  };
+  const deleteAction = () =>
+    deleteStagedAction({
+      staged,
+      section,
+      services,
+      text,
+      uses: (id) => actionUses(library, recipes, id),
+    });
 
   const methods = {
-    exitGuard,
+    exitGuard: actionExitGuard({ staged, section, currentView }),
     openAction,
     duplicateAction,
     deleteAction,
     saveAction: staged.save,
+    editAction: staged.edit,
+    openChecks: () => setView('checks'),
     ...counterRoute.handlers,
     startNewAction: () =>
       setView('iterative-action-edit', () => staged.begin(section().newActionDraft())),
@@ -130,13 +147,8 @@ export function createIterativeRouteModel({
       ...counterRoute.reads,
       actionsBrowse: () => actionsBrowse,
       actionBlocking: () => blocking,
-      actionDraft: () => staged.draft,
-      actionSaving: () => staged.saving,
-      isNewAction: () => staged.isNew,
-      isActionDirty: () => staged.isDirty,
-      hasEditableAction: () => staged.hasEditable,
-      actionIssues: () => staged.issues,
-      actionHeading: () => staged.heading,
+      routedCheck: () => selectedSystem()?.craftingCheck?.routed ?? null,
+      ...stagedReads(staged),
     })
   );
 }
