@@ -13,6 +13,9 @@ The Manager recipe-edit view is a **five-tab editor** — Overview, Ingredients,
 Every edit stages into that draft and commits in one `updateRecipe` call on Save (through the `allowIncomplete` authoring path, which gates on structural validity only); the `enabled` toggle is the single immediate exception, because enabling validates against the persisted recipe.
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
 A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows the derived authoring-state pill for a recipe the activation check would refuse — `Incomplete` while it is on, `Can't enable` while it is off.
+In an `iterative` system the browse row also shows "Needs iterative setup", or "N blocking", which counts the blocking iterative issues the editor's Validation tab lists.
+It shows "Ready" when it has neither and no structural gap blocks enabling, so "Ready" never sits beside `Incomplete` or `Can't enable`.
+The Recipes page lede then says that every recipe in the system resolves as Iterative.
 
 ### Resolution-mode callout
 
