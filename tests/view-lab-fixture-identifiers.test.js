@@ -305,6 +305,63 @@ test('every query.iterativeRecipes names a recipe state the lab seeds, beside an
   assert.deepEqual(unknown, [], `these cases cannot seed their recipes: ${unknown.join(', ')}`);
 });
 
+/** Issue 3010's reachable-state matrix, one case per row, written out by hand. */
+const ITERATIVE_RECIPE_CASE_IDS = Object.freeze([
+  'manager-recipes-iterative',
+  'manager-recipe-edit-iterative',
+  'manager-recipe-edit-iterative-counters-empty',
+  'manager-recipe-edit-iterative-counters-no-library',
+  'manager-recipe-edit-iterative-counters-bounds',
+  'manager-recipe-edit-iterative-counters-bad-bounds',
+  'manager-recipe-edit-iterative-counters-all-used',
+  'manager-recipe-edit-iterative-counter-unknown',
+  'manager-recipe-edit-iterative-step-all',
+  'manager-recipe-edit-iterative-step-only',
+  'manager-recipe-edit-iterative-step-none',
+  'manager-recipe-edit-iterative-no-success-rule',
+  'manager-recipe-edit-iterative-rule-untracked',
+  'manager-recipe-edit-iterative-multistep',
+  'manager-recipe-edit-iterative-single-locked',
+  'manager-recipe-edit-iterative-step-issues',
+  'manager-recipe-edit-iterative-enter-multistep',
+  'manager-recipe-edit-iterative-collapse-confirm',
+  'manager-recipe-edit-iterative-multistep-off',
+  'manager-recipe-edit-iterative-steps-multi-narrow',
+  'manager-recipe-edit-iterative-mid-run',
+  'manager-recipe-edit-iterative-results',
+  'manager-recipe-edit-iterative-results-never',
+  'manager-recipe-edit-iterative-results-empty',
+  'manager-recipe-edit-iterative-results-narrow',
+  'manager-recipe-edit-iterative-validation',
+  'manager-recipe-edit-iterative-validation-ready',
+  'manager-recipe-edit-iterative-narrow',
+  'manager-iterative-action-edit-in-progress',
+]);
+
+test('every iterative recipe matrix row has its own case, and no other case seeds the recipes', () => {
+  const byId = new Map(VIEW_LAB_CASES.map((viewCase) => [viewCase.id, viewCase]));
+  const seeding = VIEW_LAB_CASES.filter((viewCase) => viewCase.query?.iterativeRecipes);
+  assert.deepEqual(
+    seeding.map((viewCase) => viewCase.id).sort(byCodePoint),
+    [...ITERATIVE_RECIPE_CASE_IDS].sort(byCodePoint)
+  );
+  for (const id of ITERATIVE_RECIPE_CASE_IDS) {
+    const viewCase = byId.get(id);
+    assert.equal(viewCase.reaches, 'beyond', `${id} is beyond the smoke walk`);
+    assert.deepEqual(viewCase.smokeLabels, [], id);
+    assert.ok(viewCase.expectView && viewCase.expectSelector, `${id} states its view and state`);
+  }
+  const selectors = ITERATIVE_RECIPE_CASE_IDS.map((id) => byId.get(id).expectSelector);
+  assert.equal(new Set(selectors).size, selectors.length, 'each row asserts its own state');
+  for (const control of ['manager-recipes-normal', 'manager-recipe-edit-normal']) {
+    assert.equal(
+      byId.get(control)?.query?.iterativeRecipes,
+      undefined,
+      `${control} is the control`
+    );
+  }
+});
+
 test('the iterative recipe states leave every other world as it was', () => {
   const base = buildLabContent();
   const seeded = () => {

@@ -1336,6 +1336,8 @@ const EXPRESSION_FIELD_CASES = [
   'manager-recipe-edit-results-group-rolled-overlap',
   'manager-recipe-edit-results-group-rolled-overlap-narrow',
   'manager-recipe-edit-results-group-failure-role',
+  // An iterative counter's Start formula, which claims the amount's own override (issue 3010).
+  'manager-recipe-edit-iterative-counters-bounds',
 ];
 
 /**

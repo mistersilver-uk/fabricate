@@ -92,11 +92,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
   ]),
   // The data table (issue 1782): the drop rules with a row selected, ranked at the intermediate width,
-  // and the crafting detail's tool and output groups, one holding a choice group.
+  // and the crafting detail's tool and output groups, one holding a choice group; then an iterative
+  // recipe's Counters table, with its hint and footer (issue 3010).
   'src/ui/svelte/components/DataTable.svelte': Object.freeze([
     'manager-gathering-task-drop-modifiers-normal',
     'manager-gathering-task-drops-ranked-narrow',
     'player-crafting-results-choice-group',
+    'manager-recipe-edit-iterative',
   ]),
   // The typeahead (issue 1782): the limits tab's two 38px fields, and each site's open list; then
   // the specimens that mount it through the published seam (issue 2860).
@@ -929,6 +931,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-group-rolled-overlap',
     'manager-recipe-edit-results-group-rolled-overlap-narrow',
     'manager-recipe-edit-results-group-failure-role',
+    // An iterative counter's Start formula, through the amount's formula mode (issue 3010).
+    'manager-recipe-edit-iterative-counters-bounds',
   ]),
   // The requirement row family (issue 2510), each part on the states that draw it: the row itself on
   // ingredients, results, every chooser and strategy cell, salvage, a gathering task and Tool repair.
@@ -994,6 +998,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-editor-straight-rolled',
     'manager-tool-stress-repair',
     'world-tool-entry-on-break-repair',
+    // The formula mode's Fixed | Formula toggle on an iterative counter's Start (issue 3010).
+    'manager-recipe-edit-iterative-counters-bounds',
   ]),
   'src/ui/svelte/components/PickerRowKindMenu.svelte': Object.freeze([
     'manager-recipe-edit-ingredients',
