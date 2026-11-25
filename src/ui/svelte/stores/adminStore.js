@@ -1419,19 +1419,14 @@ export function createAdminStore(services) {
   // Thin yes/no confirm for the recipe editor's destructive in-draft actions; the editor stages the
   // result into its root-held draft. `confirmLabel` is required of every caller in practice (issue
   // 1154): the routed actions are not all the same verb, and the dialog default is a generic Yes.
-  async function confirmRecipeAction({ title, content, confirmLabel } = {}) {
-    // `label` is OMITTED, never set to `undefined`, when a caller supplies none: `mergeObject`
-    // iterates the keys it is handed, so `label: undefined` OVERWRITES the default with nothing and
-    // the button renders the literal word "undefined" — worse than the generic default it replaced.
+  async function confirmRecipeAction({ title, content, confirmLabel, cancelLabel } = {}) {
+    // Each `label` is OMITTED, never `undefined`, when none is supplied: `mergeObject` iterates
+    // its keys, so `label: undefined` OVERWRITES the default and the button reads "undefined".
     const yes = { callback: () => true };
     if (confirmLabel) yes.label = confirmLabel;
-    const confirmed = await services.confirmDialog?.({
-      title,
-      content,
-      yes,
-      no: { callback: () => false },
-    });
-    return confirmed === true;
+    const no = { callback: () => false };
+    if (cancelLabel) no.label = cancelLabel;
+    return (await services.confirmDialog?.({ title, content, yes, no })) === true;
   }
 
   function confirmDiscardDirtyGatheringTaskDraft() {

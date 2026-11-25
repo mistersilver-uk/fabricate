@@ -47,6 +47,7 @@
     margin: 0;
     color: var(--fab-danger-text);
     font-size: 0.66rem;
+    font-weight: 500;
     line-height: 1.5;
     text-wrap: pretty;
   }

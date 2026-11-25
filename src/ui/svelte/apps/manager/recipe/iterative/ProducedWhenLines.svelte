@@ -174,7 +174,8 @@
     align-items: center;
     min-height: 30px;
     color: var(--fab-text-muted);
-    font-size: 0.72rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
   }
 
   .manager-produced-when-fault {

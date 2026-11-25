@@ -260,12 +260,13 @@
     align-items: center;
     gap: var(--fab-space-1);
     color: var(--fab-text-muted);
-    font-size: 11px;
+    font-size: 0.66rem;
+    font-weight: 500;
   }
 
   .manager-counter-instances-optional {
     margin-inline-start: auto;
     color: var(--fab-text-subtle);
-    font-size: 11px;
+    font-size: 0.625rem;
   }
 </style>

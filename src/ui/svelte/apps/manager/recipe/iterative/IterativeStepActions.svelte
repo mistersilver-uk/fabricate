@@ -163,5 +163,6 @@
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 0.66rem;
+    font-weight: 500;
   }
 </style>

@@ -301,6 +301,7 @@ describe('recipe step handlers under iterative', () => {
       title: `${KEY}.RevertToSingleStepTitle`,
       content: `${KEY}.Iterative.CollapseContent|{"first":"Étape 1","others":"Quench, Étape 3"}`,
       confirmLabel: `${KEY}.Iterative.CollapseConfirm`,
+      cancelLabel: `${KEY}.Iterative.KeepMultiStep`,
     });
   });
 
@@ -388,7 +389,7 @@ describe('recipe step handlers under iterative', () => {
     assert.equal(state.patches.length, 1);
   });
 
-  it('patches nothing on a cancelled or dismissed collapse, having asked with the shipped keys', async () => {
+  it('patches nothing on a cancelled or dismissed collapse, having asked with its keys', async () => {
     for (const answer of [false, null]) {
       const { state, handlers } = harness({
         iterative: true,
@@ -397,7 +398,12 @@ describe('recipe step handlers under iterative', () => {
       });
       assert.equal(await handlers.handleRevertToSingleStep(), false);
       assert.deepEqual(state.patches, []);
-      assert.deepEqual(Object.keys(state.asked[0]), ['title', 'content', 'confirmLabel']);
+      assert.deepEqual(Object.keys(state.asked[0]), [
+        'title',
+        'content',
+        'confirmLabel',
+        'cancelLabel',
+      ]);
     }
   });
 

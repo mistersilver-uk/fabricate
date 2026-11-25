@@ -66,7 +66,7 @@
         disabled={disabled || !row.visible}
         ariaLabel={name(
           'FABRICATE.Admin.Manager.Recipe.Iterative.HideName',
-          'Hide {counter} in step {n}',
+          'Hide from players: {counter} in step {n}',
           row
         )}
         aria-describedby={row.visible ? undefined : `${uid}-${row.id}-never`}

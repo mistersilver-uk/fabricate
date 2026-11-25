@@ -49,6 +49,7 @@ function collapsePrompt(steps, { text, localize }) {
       others: others.join(', '),
     }),
     confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.Iterative.CollapseConfirm'),
+    cancelLabel: localize('FABRICATE.Admin.Manager.Recipe.Iterative.KeepMultiStep'),
   };
 }
 

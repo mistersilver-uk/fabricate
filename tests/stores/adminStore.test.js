@@ -2610,6 +2610,12 @@ describe('createAdminStore', () => {
       assert.equal(yes, true, 'returns true when the user confirms');
       assert.equal(captured.title, 'Delete step?', 'forwards the title');
       assert.equal(captured.content, '<p>Remove it?</p>', 'forwards the content');
+      assert.equal('label' in captured.yes, false, 'no confirm label is omitted, never undefined');
+      assert.equal('label' in captured.no, false, 'and so is no cancel label');
+
+      await store.confirmRecipeAction({ title: 't', confirmLabel: 'Go', cancelLabel: 'Keep' });
+      assert.equal(captured.yes.label, 'Go', 'a confirm label is forwarded');
+      assert.equal(captured.no.label, 'Keep', 'and so is a cancel label');
 
       const noServices = createMockServices({ confirmDialog: async () => false });
       const noStore = createAdminStore(noServices);

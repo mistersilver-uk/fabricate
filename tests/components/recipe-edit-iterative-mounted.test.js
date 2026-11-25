@@ -544,7 +544,7 @@ describe('iterative recipe Overview: the Steps card', () => {
     assert.equal(slagHide.getAttribute('aria-describedby'), reason.id);
     assert.equal(
       heat.querySelector('[data-iterative-step-hide="heat"]').getAttribute('aria-label'),
-      'Hide Heat in step 1'
+      'Hide from players: Heat in step 1'
     );
 
     await press(heat.querySelector('[data-iterative-step-lock="heat"]'), 'lock Heat');
