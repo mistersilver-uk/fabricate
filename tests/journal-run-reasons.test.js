@@ -213,6 +213,9 @@ describe('journal run reason vocabulary', () => {
       assert.doesNotMatch(text, /\{/, reason);
       if (reason === 'check-mismatch') assert.match(text, /workpiece is unchanged/, reason);
       else assert.match(text, /Nothing was spent/, reason);
+      // Every attempt refusal also says the session was not counted; the start refusal has none.
+      if (reason === 'iterative-not-ready') assert.doesNotMatch(text, /session/, reason);
+      else assert.match(text, /the session wasn’t counted\.$/, reason);
     }
     for (const reason of Object.values(ITERATIVE_ATTEMPT_REFUSALS)) {
       assert.ok(JOURNAL_RUN_REASON_KEYS[reason], `${reason} is mapped`);

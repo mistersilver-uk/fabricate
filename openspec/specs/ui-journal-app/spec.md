@@ -249,7 +249,7 @@ Every surface that can mint a refusal reason keeps that vocabulary as its single
 Native Reconciliation's `run-not-uncertain`, a run with no uncertain effect to close, joins that vocabulary.
 An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
 Every reason a `takeAction` can return is mapped to a localized sentence.
-Every reason an Iterative Attempt adds states that nothing was spent, except `check-mismatch`, which states that the workpiece is unchanged, and `roll-unavailable` keeps its shared sentence.
+Every reason an Iterative Attempt adds states that nothing was spent, except `check-mismatch`, which states that the workpiece is unchanged, and `roll-unavailable` keeps its shared sentence; the existing `version-unsupported` keeps its sentence.
 A refused `takeAction` reply carries no `check` and no `rollHandoff`, so the player posts no roll for it, and it carries the resolver's `detail` verbatim, ids and numbers only.
 A secret check's GM-only roll, posted when the authority evaluates it, stands as the record of a roll that changed nothing.
 A replayed Iterative Attempt answers `iterative.replayed: true` with its recorded entry and changes nothing.

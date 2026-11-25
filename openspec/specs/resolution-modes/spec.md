@@ -1177,7 +1177,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
 ### Iterative Check Slot
 
 - An iterative system rolls `craftingCheck.routed`, and its `checkBreakage` is the routed slot's.
-- `success` and `outcomeId` come from the matched tier, and a total that matches no tier gives `success: false` and `outcomeId: null`.
+- `success` and `outcomeId` come from the matched tier, and a total that matches no tier gives `success: false` and `outcomeId: null`, after routing, which clamps a relative miss to the least demanding tier as `routedByCheck` does.
 - `minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read.
 
 ### Iterative Terminal Routing
@@ -1190,7 +1190,9 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - No complication fires, because component complications are progressive-only.
 - A terminal success advances the run to its next step, unstarted, or completes it `succeeded`, and records recipe use.
 - A terminal failure ends the step and the run `failed`, keeps their inputs consumed, awards only a matching failure group, and never advances.
-- A checked terminal attempt's craft card carries its check roll, so the roll posts once.
+- A checked terminal attempt's craft card carries a public check roll.
+  A visible roll in any other mode cannot ride the public card, so the requester posts it as its own message in that mode; `takeCraftingAction`'s non-interactive default rolls `selfroll`.
+  Either way the roll posts once.
 
 ### Iterative Validation
 
