@@ -280,6 +280,24 @@ export class GatheringStaminaService {
     return cloneJson(next);
   }
 
+  /**
+   * Spend one accepted attempt's stamina and return its evidence. A later commit of a run passes
+   * `startCommit`, what its start recorded: it spends none and keeps that record, or reports the
+   * cost when the run kept none (a legacy waiting run).
+   */
+  async spendForCommit({ actor, systemId, system, environment, task, startCommit, resolveCost }) {
+    if (startCommit?.stamina !== undefined) return cloneJson(startCommit.stamina);
+    const base = Number(task?.staminaCost || 0);
+    if (this.getSystemEconomy(systemId).stamina?.enabled !== true || base <= 0) return null;
+    await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+    // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
+    if (this.getActorStamina(actor, systemId).max == null) return null;
+    const cost = await resolveCost();
+    if (cost <= 0) return null;
+    if (!startCommit) await this.adjustActorStamina(actor, { systemId, delta: -cost });
+    return { spent: cost, base };
+  }
+
   async adjustActorStamina(actor, { systemId = 'default', delta = 0 } = {}) {
     const key = systemId || 'default';
     const effective = this.getActorStamina(actor, key);
