@@ -61,5 +61,6 @@ export function runPrettierCheck(argv, { cwd = repoRoot } = {}) {
     status: result.status,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
+    error: result.error ?? null,
   };
 }
