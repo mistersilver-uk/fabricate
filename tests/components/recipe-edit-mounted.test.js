@@ -1607,10 +1607,11 @@ describe('RecipeEditView (mounted)', () => {
   it('renders the identity inputs in Overview and no recipe-item card', async () => {
     const target = await editHarness.mount(identityProps());
     assert.ok(target.querySelector('[data-recipe-field="name"]'), 'name input renders');
-    assert.ok(
-      target.querySelector('[data-recipe-field="description"]'),
-      'description textarea renders'
-    );
+    const description = target.querySelector('[data-recipe-field="description"]');
+    assert.ok(description, 'description textarea renders');
+    // Named by its wrapping label. Never assert `labels.length`: happy-dom returns the
+    // Overview's `<label>` twice.
+    assert.match(description.labels[0].textContent.trim(), /^Flavour text/);
     assert.ok(target.querySelector('[data-recipe-field="enabled"]'), 'enabled toggle renders');
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-item"]') === null,
@@ -9252,10 +9253,9 @@ describe('RecipeStepsCard (mounted)', () => {
       target.querySelector('[data-recipe-step-field="name"]'),
       'name input renders when expanded'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-step-field="description"]'),
-      'description input renders when expanded'
-    );
+    const stepDescription = target.querySelector('[data-recipe-step-field="description"]');
+    assert.ok(stepDescription, 'description input renders when expanded');
+    assert.match(stepDescription.labels[0].textContent.trim(), /^Description/);
     // Requirement sections live on their own tabs, never inside the Overview step card. Asserted as
     // booleans rather than against `null`: on failure `node:assert` serialises a mounted node and
     // walks its circular tree until the heap dies.

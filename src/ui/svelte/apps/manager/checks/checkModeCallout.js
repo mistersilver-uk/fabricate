@@ -188,6 +188,7 @@ const FACT_VALUES = Object.freeze({
   'check:optional': OPTIONAL,
   'check:fixedD100': FIXED_D100,
   'check:perAction': PER_ACTION,
+  'outcomes:tier': ['OutcomesTier', '{count} tier'],
   'outcomes:tiers': ['OutcomesTiers', '{count} tiers'],
   'outcomes:passFail': ['OutcomesPassFail', 'Pass or fail'],
   'outcomes:ordered': ['OutcomesOrdered', 'An ordered list'],
@@ -251,11 +252,16 @@ export function describeCheckMode({
     icon: entry.icon,
     title: copy(entry.title),
     body: copy(entry.body),
-    facts: entry.facts.map((token) => ({
-      ...fact(token.slice(0, token.indexOf(':')), FACT_VALUES[token]),
-      // Interpolated through the same `{count}` syntax Foundry's `i18n.format` uses, so the
-      // fallback path renders a number rather than a literal `{count}`.
-      data: { count: String(Number(outcomeCount) || 0) },
-    })),
+    facts: entry.facts.map((listed) => {
+      // A count of exactly 1 reads "1 tier"; 0 and every other count keep the plural.
+      const token =
+        listed === 'outcomes:tiers' && Number(outcomeCount) === 1 ? 'outcomes:tier' : listed;
+      return {
+        ...fact(token.slice(0, token.indexOf(':')), FACT_VALUES[token]),
+        // Interpolated through the same `{count}` syntax Foundry's `i18n.format` uses, so the
+        // fallback path renders a number rather than a literal `{count}`.
+        data: { count: String(Number(outcomeCount) || 0) },
+      };
+    }),
   };
 }
