@@ -42,7 +42,7 @@ export function craftingStageModels({
         : null;
     return { steps: [], currentStep: null, readiness: judged ? { blocker: judged.blocker } : null };
   }
-  const steps = runSteps.map(stageModel);
+  const steps = runSteps.map((runStep, index) => stageModel(runStep, index));
   const currentStep = live ? (steps[currentStepIndex] ?? null) : null;
   return { steps, currentStep, readiness: currentStep?.selectionAvailability };
 }
