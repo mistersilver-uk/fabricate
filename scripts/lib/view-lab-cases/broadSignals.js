@@ -495,12 +495,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-normal',
     'manager-world-travel-with-gathering-expanded',
   ]),
-  // The editor validation surface (issue 1444).
+  // The editor validation surface (issue 1444), then one frame per host (issue 3037), because its
+  // toned chips and type read the same in every mode and a host-less set photographs only four.
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
+    'manager-recipe-edit-iterative-validation',
+    'manager-component-edit-validation',
+    'manager-essence-edit-validation',
+    'manager-environment-validation',
+    'manager-gathering-task-editor-validation',
+    'world-tool-entry-validation',
+    'world-component-entry-validation',
   ]),
   // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
   // a `compact fill` journal body and the hero in a narrow host.

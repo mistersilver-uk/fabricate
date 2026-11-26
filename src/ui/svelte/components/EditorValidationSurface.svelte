@@ -37,6 +37,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import Kicker from './Kicker.svelte';
   import Button from './Button.svelte';
   import { localize } from '../util/foundryBridge.js';
 
@@ -73,6 +74,8 @@
     warn: 'fas fa-triangle-exclamation',
     block: 'fas fa-circle-exclamation',
   };
+
+  const STATUS_TONES = Object.freeze({ pass: 'positive', warn: 'warning', block: 'danger' });
 
   const SUMMARY_STATUSES = ['pass', 'warn', 'block'];
   const SUMMARY_STATUS_ALIASES = { clear: 'pass', warning: 'warn', blocked: 'block' };
@@ -181,7 +184,7 @@
   {#each groups as group (group.id)}
     <div class="manager-recipe-val-group" data-validation-group={group.id} {...attributesOf(group)}>
       <p class="manager-recipe-val-group-label">
-        <i class={group.icon} aria-hidden="true"></i><span>{group.label}</span>
+        <i class={group.icon} aria-hidden="true"></i><Kicker as="span">{group.label}</Kicker>
       </p>
       <ul class="manager-recipe-val-rows">
         {#each orderedRows(group.rows) as row, index (`${group.id}-${row.id || index}`)}
@@ -222,7 +225,7 @@
                   id={descriptionId(group, index)}>{localize(row.action.descriptionKey)}</span
                 >{/if}
             {/if}
-            <Chip class={`manager-recipe-val-pill is-${row.status}`}
+            <Chip tone={STATUS_TONES[row.status]} class={`manager-recipe-val-pill is-${row.status}`}
               >{statusLabels[row.status]}</Chip
             >
           </li>

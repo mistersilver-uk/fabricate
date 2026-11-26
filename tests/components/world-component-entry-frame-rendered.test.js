@@ -52,6 +52,7 @@ const compiledExtras = [
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',

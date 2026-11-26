@@ -127,6 +127,17 @@ const FIXTURE = `
               </li>
             </ul>
           </section>
+          <div class="manager-recipe-val-group">
+            <ul class="manager-recipe-val-rows">
+              <li class="manager-recipe-val-row is-block">
+                <i class="manager-recipe-val-status fas fa-circle-exclamation"></i>
+                <div class="manager-recipe-val-copy">
+                  <span class="manager-recipe-val-title" data-m="val-title">Has a name</span>
+                  <span class="manager-recipe-val-detail manager-muted" data-m="val-detail">Give the recipe a name before enabling it.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
         <input type="text" data-m="bleed-baseline" value="bare">
       </div>
@@ -358,7 +369,11 @@ const EXPECTED = {
   // deleted RecipeContextRail committed for the same roles; the rehome changed the
   // layout, not the type scale.
   'summary-medallion': 21.6, // 1.35rem — the 52px status medallion's glyph
-  'summary-title': 16, // 1rem serif 600
+  'summary-title': 15, // 0.9375rem serif 600
+  // The validation row's title and its detail, at the specimen's 12px and 10.5px (issue 3037). The
+  // detail row also carries `.manager-muted`, so it proves the nested rule beats the recipe-edit scope.
+  'val-title': 12, // 0.75rem 600
+  'val-detail': 10.5, // 0.656rem
   'summary-sub': 11.52, // 0.72rem
   'count-label': 12.48, // 0.78rem — the count row
   'count-value': 12.48, // 0.78rem mono 700 — inherits the count row's size
