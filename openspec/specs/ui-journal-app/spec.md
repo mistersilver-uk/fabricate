@@ -38,11 +38,13 @@ The crafting progress reading MUST NOT be conditioned on that gate: a run whose 
 A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
 A run with fewer than two stages renders no rail: gathering and salvage project no steps at all, and a lone track on a single-stage craft asserts a 0% where progress has no meaning.
 The rail's accessible value MUST state what its tracks DRAW — completed stages over total where it is the stage rail, the clock fraction where a gate runs — never a clock fraction of zero beside filled tracks.
+An iterative workpiece's rail reads its per-step progress, the focus step filled toward the goal it works toward whether or not a gate runs; its step line counts completed sessions, and it reads `Ready` while an action can be taken.
 - Active status pills reflect the projection's `derivedStatus`, with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
 The player-facing badge vocabulary is `Ready`, `In progress` and `Paused`: `waiting` and `inProgress` present as ONE badge, `In progress`, with one word, one tone and one glyph, because an unpaused active craft is in progress whether it is counting world time down or sitting between stages.
 `derivedStatus` keeps both values, because the projection still distinguishes where the clock is; what merges is what the player is shown.
 The distinction a player can act on is carried BESIDE the badge by the attention vocabulary and BENEATH it by the progress rail, never by the badge itself.
 Finished rows MUST show a labeled right-side outcome icon instead of an aggregate result quantity or below-title status chip.
+An iterative record's row adds its session count after its finish time.
 Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal status shows localized Outcome unknown, and settlement or recovery evidence takes precedence over a terminal success face.
 - The layout has a browse zone and a selected-detail zone.
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
@@ -121,6 +123,7 @@ An unstarted stage has no countdown, so its run status alone reads the same whet
 A run whose current stage cannot proceed until the viewer chooses (`awaitingChoice`, see `data-models/spec.md`) MUST therefore be distinguishable at a glance on the Active list row, on the opened run's header, and in the run's single state notice.
 So MUST a stage that is waiting only for the player to BEGIN it: it owes nothing and is refused by nothing, so under the merged badge it otherwise reads exactly like a run counting world time down, while the act it needs is an irreversible click.
 That signal is reported from the projection's own begin predicate (`actions.atStageStart` with `actions.beginStep`), so it can never invite a click the command refuses, and it is ranked UNDER the blocked states, because a stage that cannot be begun must not advertise that it can be.
+At an iterative step boundary that member reads "Step done" beside "In progress" instead, because the step has ended and the workpiece has not; it still reads so where the next step cannot be begun for a reason no acquisition member names.
 That signal is carried BESIDE the run's status rather than in place of it, because what the clock is doing and what the player owes are two different facts.
 Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
 Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.
@@ -218,6 +221,10 @@ Each occurrence MUST retain its stage association, recorded quantity and affirma
 Virtual and ambiguous identities MUST remain separate occurrence cards, and omitted tool evidence MUST NOT assert that no tools were used.
 A run closed by GM disposition uses its own closed guidance: a GM closed it without repeating, undoing or refunding anything, and anything marked uncertain stays uncertain.
 It shows its receipts, uncertain ones as uncertain, who closed it as checked or abandoned, and any note, and never lists them under Crafted, Recovered or Brought back.
+
+An iterative record keeps that composition and adds, after its receipts and before This run, its final counters as the viewer may see them (_Hidden counters_), the Sessions of the step it closed on, and inert per-step bars, a failed step's drawn full in danger and read as failed.
+It shows no StageNav, action card or route strip, and draws no Sessions table for a record with no attempts.
+The verdict the Iterative Attempt that ended the run froze, with its rule text and what its set gives, shows on the entry that attempt left selected; a later open reads the shipped success or failure text, because the archive is never rebuilt into rules.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.
