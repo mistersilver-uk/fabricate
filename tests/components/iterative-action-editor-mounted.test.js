@@ -917,6 +917,13 @@ describe('the Crafting Action editor (issue 3009)', () => {
       );
     const adder = () => host.querySelector('[data-rule-row-preset="rule"]').textContent.trim();
 
+    it('draws every rule title as a connective', () => {
+      mountList({});
+      const titles = [...host.querySelectorAll('[data-counter-rule] [data-rule-row-title]')];
+      assert.equal(titles.length, RULES.length);
+      assert.ok(titles.every((title) => title.classList.contains('is-connective')));
+    });
+
     it('draws a joiner word before every rule after the first when its caller owns the combine', () => {
       mountList({ combineControl: false, joiner: 'and' });
       assert.deepEqual(joiners(), ['and']);
