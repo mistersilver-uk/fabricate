@@ -1416,9 +1416,12 @@ export function createAdminStore(services) {
     );
   }
 
-  // Thin yes/no confirm for the recipe editor's destructive in-draft actions; the editor stages the
-  // result into its root-held draft. `confirmLabel` is required of every caller in practice (issue
-  // 1154): the routed actions are not all the same verb, and the dialog default is a generic Yes.
+  /**
+   * Thin yes/no confirm for the recipe editor's destructive in-draft actions; the editor stages the
+   * result into its root-held draft. `confirmLabel` is required of every caller in practice (issue
+   * 1154): the routed actions are not all the same verb, and the dialog default is a generic Yes.
+   * `cancelLabel` renames the No button, as "Keep multi-step" does beside "Collapse to one step".
+   */
   async function confirmRecipeAction({ title, content, confirmLabel, cancelLabel } = {}) {
     // Each `label` is OMITTED, never `undefined`, when none is supplied: `mergeObject` iterates
     // its keys, so `label: undefined` OVERWRITES the default and the button reads "undefined".
