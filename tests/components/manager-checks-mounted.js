@@ -3414,6 +3414,61 @@ export function registerChecksCases() {
     assert.match(locked.getAttribute('aria-label'), /Check is on — locked by the resolution mode/);
   });
 
+  it('reads the digest counts in their singular at exactly 1 and their plural otherwise', () => {
+    const outcomes = (count) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `o${index}`,
+        name: `Tier ${index}`,
+        success: true,
+        dc: index,
+      }));
+    const cases = [
+      [
+        1,
+        {
+          outcomes: '1 outcome tier, 1 counts as success',
+          triggers: '1 trigger active',
+          modifiers: '1 check modifier applies',
+        },
+      ],
+      [
+        2,
+        {
+          outcomes: '2 outcome tiers, 2 count as success',
+          triggers: '2 triggers active',
+          modifiers: '2 check modifiers apply',
+        },
+      ],
+    ];
+    for (const [count, rows] of cases) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(ChecksRightMenuComponent, {
+        target,
+        props: {
+          activeTab: 'crafting',
+          activeCheck: { type: 'relative', relativeOutcomes: outcomes(count) },
+          outcomeCount: count,
+          triggerCount: count,
+          modifierCount: count,
+        },
+      });
+      flushSync();
+      for (const [id, expected] of Object.entries(rows)) {
+        const row = target.querySelector(`[data-checks-digest-row="${id}"]`);
+        assert.ok(Boolean(row), `the ${id} digest row renders at ${count}`);
+        assert.equal(
+          row.querySelector('.manager-checks-rail-row-text').textContent.trim(),
+          expected
+        );
+      }
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
   it('opens the section a digest row describes, and offers nothing to press on an absence', async () => {
     // The digest rows grew the prototype's trailing chevron.
     await mountChecks([], routedCraftingOptions('1d20'));
