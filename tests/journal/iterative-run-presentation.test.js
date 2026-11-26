@@ -345,6 +345,16 @@ describe('cost and hazard chips', () => {
     assert.deepEqual(card(locked, 'stoke').hazards, []);
   });
 
+  test('an effect with no target is no hazard, even on a card preflight never reads', () => {
+    const entry = model('iterative-starting', {
+      mutate: (run) =>
+        editAction(run, 'stoke', (action) => {
+          delete action.effects[1].target;
+        }),
+    });
+    assert.deepEqual([card(entry, 'stoke').note, card(entry, 'stoke').hazards], ['ended', []]);
+  });
+
   test('a check fact makes an effect no hazard, because the check decides it', () => {
     const entry = model('iterative-cards', {
       mutate: (run) =>

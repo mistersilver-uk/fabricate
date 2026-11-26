@@ -109,7 +109,7 @@ function hazardsOf(action, { state, library, labels, localize }) {
   const facts = stateFacts(state);
   const locked = new Set(arrayOrEmpty(stepOf(library).lockedCounterIds));
   const visible = (entry) =>
-    labels.counter(entry.target.counterId) &&
+    labels.counter(entry?.target?.counterId) &&
     entry.when.rules.every((rule) => !ruleCounterId(rule) || labels.counter(rule.counterId));
   return arrayOrEmpty(action.effects)
     .filter((entry) => isHazard(entry, { facts, locked }) && visible(entry))
