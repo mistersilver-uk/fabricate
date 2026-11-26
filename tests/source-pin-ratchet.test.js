@@ -90,6 +90,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/inspectorDockGeometry.js': 'fixture',
   'tests/helpers/interactablesSmokeLocators.js': 'legacy-scan',
   'tests/helpers/interactablesWindowContract.js': 'ast',
+  'tests/helpers/iterativeJournalListing.js': 'fixture',
   'tests/helpers/labFixtureLiterals.js': 'ast',
   'tests/helpers/langBackedI18n.js': 'fixture',
   'tests/helpers/logicalStylesheet.js': 'corpus',
