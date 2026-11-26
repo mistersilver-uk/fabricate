@@ -134,12 +134,8 @@
     Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
   const availableAt = $derived(Number(summaryGate?.availableAt));
-  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). An unstarted stage holds
-  // no `timeGate`, so `availableAt` is NaN and this row fell through to `Summary.None`, the string
-  // a MATURED wait prints, beside a button offering to start the clock (D-025 governs a duration's
-  // FORMAT, not which duration is shown). It reads `run.stageStart`, the projection's STAGE fact:
-  // `actions.atStageStart` also requires that this viewer may act, so keying on it lost the row to
-  // a held claim, a non-owner viewer or a run awaiting recovery (UX2-2); it needs no online GM.
+  // An unstarted stage holds no `timeGate`; this reads `run.stageStart`, the projection's STAGE
+  // fact, because `actions.atStageStart` also needs a viewer who may act (issue 1648, UX2-2).
   const notStarted = $derived(viewedIsCurrent && run?.stageStart?.required === true);
   const remainingTime = $derived.by(() => {
     const pausedRemaining = viewedIsCurrent
@@ -663,7 +659,9 @@
             label={localize('FABRICATE.App.Journal.Summary.Needs')}
             value={requiredSeconds > 0
               ? formatAuthoredDuration(requiredSeconds, { localize })
-              : localize('FABRICATE.App.Journal.Summary.None')}
+              : run?.redacted === true && notStarted
+                ? localize('FABRICATE.App.Journal.Summary.Hidden')
+                : localize('FABRICATE.App.Journal.Summary.None')}
           />
           <JournalFactRow
             icon="fa-hourglass-half"

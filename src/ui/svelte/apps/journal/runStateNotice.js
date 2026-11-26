@@ -40,6 +40,31 @@ function rewardNoticeKeys(run) {
   return ['RewardTitle', claimable ? 'RewardDetail' : 'RewardNoneClaimableDetail'];
 }
 
+/** The picks a hidden recipe withholds from this viewer, as `stageReadiness.js` names them. */
+const WITHHELD_PICKS = Object.freeze(['routeRequired', 'choiceRequired']);
+
+/**
+ * A redacted run's stage that owes a route or option pick (issue 3033). No pick is offered to a
+ * viewer the recipe is hidden from and its code raises no banner, while a disabled control's
+ * title is not reliably announced, so the notice says what waits and who resolves it.
+ */
+function withheldChoiceNotice(run, text, pausedHook) {
+  if (run?.redacted !== true || !WITHHELD_PICKS.includes(run?.actions?.disabledReason)) return null;
+  return {
+    tone: 'info',
+    blocking: false,
+    title: text('RedactedChoiceTitle'),
+    detail: text('RedactedChoiceDetail'),
+    hooks: {
+      'data-journal-awaiting-choice': 'true',
+      'data-journal-choice-withheld': 'true',
+      ...pausedHook,
+    },
+    evidence: false,
+    claim: null,
+  };
+}
+
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
   const code = run?.actions?.disabledReason;
@@ -100,7 +125,7 @@ export function runStateNotice(run, localize) {
       tone: ['recovery-required', 'recoveryRequired'].includes(blocker) ? 'danger' : 'warning',
       blocking: false,
       title:
-        journalRunReasonMessage(blocker, localize) ||
+        journalRunReasonMessage(blocker, localize, { redacted: run?.redacted === true }) ||
         localize('FABRICATE.App.Journal.Actions.Unavailable'),
       detail: claim ? retainedClaimDetail(claim, localize) : paused ? text('PausedInline') : '',
       hooks: { 'data-journal-action-blocker': blocker, ...pausedHook },
@@ -122,6 +147,9 @@ export function runStateNotice(run, localize) {
       claim: null,
     };
   }
+
+  const withheld = withheldChoiceNotice(run, text, pausedHook);
+  if (withheld) return withheld;
 
   // Waiting on the player's OWN choice. It reads as guidance rather than as a refusal,
   // because a stage that has not been given its materials yet is ordinary play — the same

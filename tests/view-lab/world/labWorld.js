@@ -15,7 +15,11 @@ import {
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { seedIterativeRecipes, seedIterativeState } from './labIterative.js';
-import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
+import {
+  REDACTED_STAGE_STATES,
+  journalPrototypeRecipeId,
+  stockJournalPrototype,
+} from './labJournalPrototype.js';
 import { LAB_MACRO_UUIDS, registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
 import {
@@ -1194,7 +1198,11 @@ export async function buildLabWorld({
   await stockJournalPrototype(journalActor, content, journalCaseState);
   // If the viewer can see none of them, fall back to the full set: a journal of redacted rows still
   // shows how each STATUS renders, where an empty journal shows nothing at all.
-  const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
+  // A redacted-stage state's own recipe is the one the player cannot see, so it resolves against all.
+  const runRecipes =
+    journalRecipes.length > 0 && !REDACTED_STAGE_STATES.includes(journalCaseState)
+      ? journalRecipes
+      : allRecipes;
   if (runRecipes.length > 0) {
     const runContainers = buildLabRunStates({
       actor: journalActor,

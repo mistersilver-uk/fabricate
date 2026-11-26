@@ -1,6 +1,10 @@
 import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
 import { RUN_KINDS, runActivityKind } from '../util/journalRunKinds.js';
-import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
+import {
+  isResolvedFailureOutcome,
+  journalRedactedRefusal,
+  resolvedFailureMessage,
+} from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
@@ -306,8 +310,7 @@ export function createJournalStore({ services } = {}) {
       let message = safeCommandMessage(result?.message);
       if (outcome) message = resolvedFailureMessage(services?.localize);
       if (refused) {
-        const generic = services?.craftErrorMessage?.();
-        message = journalCommandRefusal(result, services?.localize, generic);
+        message = commandRefusal(run, result, services);
         setCommandError(request, message);
       }
       notifyEach(services, [message, spentDiceNotice(result, services?.localize)]);
@@ -566,6 +569,13 @@ export function createJournalStore({ services } = {}) {
 
 function notifyEach(services, messages) {
   for (const message of messages) if (message) services?.notify?.(message);
+}
+
+/** A refused command's wording; a redacted run's reason is read by its code, never `message`. */
+function commandRefusal(run, result, services) {
+  const fallback = run.redacted === true ? journalRedactedRefusal : undefined;
+  const generic = services?.craftErrorMessage?.();
+  return journalCommandRefusal(result, services?.localize, generic, fallback);
 }
 
 /** A legacy cancel's one toast: its message, else a refusal's localized reason, never a Retry. */
