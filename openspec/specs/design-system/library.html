@@ -5239,7 +5239,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Card API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 42 importing files: 41 components render 91 tags, 17 of them <code>flush</code>, and the published-component module imports it.
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 43 importing files: 42 components render 91 tags, 17 of them <code>flush</code>, and the published-component module imports it.
             It was extracted from 80 hand-written card sections across 20 components, and draws both card units above: radius 11, padding <code>--fab-space-4</code>, a 1px <code>--fab-border</code> edge on <code>--fab-bg-2</code>.</li>
           <li><b>flush</b> boolean, default <code>false</code> &mdash; padding 0, for a card whose head and body inset themselves, the second unit above.
             It emits <code>is-flush</code> and is unpublished: the published card takes <code>children</code>, <code>tone</code> and the head below, never <code>flush</code>.</li>
@@ -5408,7 +5408,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Svelte API</h5>
         <ul>
-          <li><b>shipped</b> <code>components/AppTitleBar.svelte</code>, read from its <code>$props()</code>; its one importer, <code>apps/manager/ManagerTitleBar.svelte</code>, composes the summary, so it is a non-member on the <code>LogList</code>, <code>StageNav</code> and <code>XrefList</code> precedent</li>
+          <li><b>shipped</b> <code>components/AppTitleBar.svelte</code>, read from its <code>$props()</code>; its one importer, <code>apps/manager/ManagerTitleBar.svelte</code>, composes the summary, so it is a non-member on the <code>LogList</code> and <code>XrefList</code> precedent</li>
           <li><b>premiumInstalled</b> boolean, default false: draws the mark while a companion is installed</li>
           <li><b>statusLabel</b> the status part&rsquo;s visible text, composed and localized by the caller and drawn verbatim as the caption and its <code>title</code>; empty draws no status; one caption rather than a snippet, because no control fits the band</li>
           <li><b>own copy</b> the mark word, its read name and the status prefix, from the <code>FABRICATE.Admin.Manager.Titlebar</code> keys</li>
@@ -6121,7 +6121,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li class="k-hint"><b>SHIPPED</b> &mdash; shipped as <code>components/XrefList.svelte</code> and read here from its <code>$props()</code>, to the dense unit above, which is the cross-reference form: a kicker, then rows at a 22px mark, a 12px semibold name and an inline quantity, at radius 9.
           A <b>cross-reference list</b> is a read-only list that states which records a record relates to: what uses it, what produces it, what it is required for, who holds it or what contributes to it.
           It is not import-export&rsquo;s stored cross-reference, which is a persisted reference between documents, and a list whose rows carry actions, or open a body in place, is not one.
-          Its callers are the player inventory inspector&rsquo;s Sources, Contributing, Used by, Required for and Produced by sections, all in <code>InventoryComponentDetail.svelte</code>; with that one importer it is recorded as a non-member on the <code>LogList</code> and <code>StageNav</code> precedent, and the manager&rsquo;s cross-reference lists are adoption debt.</li>
+          Its callers are the player inventory inspector&rsquo;s Sources, Contributing, Used by, Required for and Produced by sections, all in <code>InventoryComponentDetail.svelte</code>; with that one importer it is recorded as a non-member on the <code>LogList</code> precedent, and the manager&rsquo;s cross-reference lists are adoption debt.</li>
         <li><b>Props:</b> <b>label</b> the kicker above the list, required and already localized &middot; <b>items</b> an ordered list, each a name, a mark and an optional caller-formatted quantity.
           Each row IS the dense &lt;ListRow&gt;, or its selectable dense form for a row that opens, composed rather than restated, so a change to that row reaches every cross-reference in the app; every row is one ellipsized line, 40px border-box whether it opens or not.
           Four item extensions: <b>id</b>, the row&rsquo;s key, its position when absent &middot; <b>detail</b>, the caller-formatted role or kind, drawn at the row&rsquo;s trailing edge in the muted ink and never as a quantity &middot; <b>opens: false</b>, which keeps that row from being a control in a list given <b>onOpen</b> &middot; <b>attrs</b>, spread on that row&rsquo;s root, because Required for and Produced by need two hook names with different values.
@@ -10205,6 +10205,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>stageLabel</b> (stage, index) — each numeral’s accessible name, since the numeral is a bare number; it defaults to the number</li>
         <li><b>previousLabel</b> · <b>nextLabel</b> — the arrows’ names · <b>positionLabel</b> (view, count) — the nav’s name and its <em>Viewing stage n of m</em> line · <b>returnLabel</b> (current) — the <em>Return to current stage N</em> text</li>
         <li>Fewer than two stages render nothing; no rest spread.</li>
+        <li><b>Shared</b> &mdash; two importers draw it: <code>apps/journal/RunDetail.svelte</code>&rsquo;s stage browser and <code>apps/journal/iterative/WorkpieceView.svelte</code>&rsquo;s step browser, each with its own copy.</li>
       </ul>
       </div>
       <div>

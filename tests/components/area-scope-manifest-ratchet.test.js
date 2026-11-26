@@ -25,6 +25,8 @@ const UNCOVERED_SHARED = Object.freeze([
   'src/ui/svelte/components/ListState.svelte',
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/StageCard.svelte',
+  // Shared since issue 3011 gave it a second importer; like StageCard, its rules are all scoped.
+  'src/ui/svelte/components/StageNav.svelte',
   'src/ui/svelte/components/YieldScale.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',

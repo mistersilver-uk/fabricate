@@ -46,6 +46,17 @@
       ]
     },
     {
+      "path": "src/ui/svelte/components/StageNav.svelte",
+      "library": "<StageNav>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": [
+        "The stage browser: arrows, a window of numbered stages and a return to the executable stage, which chooses the stage on screen and never the one being executed.",
+        "`src/ui/svelte/apps/journal/RunDetail.svelte` and `src/ui/svelte/apps/journal/iterative/WorkpieceView.svelte` draw it, so it is shared."
+      ]
+    },
+    {
       "path": "src/ui/svelte/components/YieldScale.svelte",
       "library": "<YieldScale>",
       "status": "shipped",
@@ -1168,7 +1179,7 @@
       "callers": ["src/ui/svelte/apps/manager/ManagerTitleBar.svelte"],
       "why": [
         "The manager's title band: the PREMIUM mark while a companion is installed, then a caller's status caption.",
-        "ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, which formats the summary, so it is a non-member on the `LogList`, `StageNav` and `XrefList` precedent."
+        "ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, which formats the summary, so it is a non-member on the `LogList` and `XrefList` precedent."
       ]
     },
     {
@@ -1290,16 +1301,6 @@
       "why": [
         "The Journal's slot row, implementing the specified library component.",
         "ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar, and crafting draws `RequirementChooser` instead."
-      ]
-    },
-    {
-      "path": "src/ui/svelte/components/StageNav.svelte",
-      "library": "<StageNav>",
-      "evidence": "broad",
-      "callers": ["src/ui/svelte/apps/journal/RunDetail.svelte"],
-      "why": [
-        "The Journal's stage navigation, implementing the specified library component.",
-        "ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar."
       ]
     },
     {

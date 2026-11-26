@@ -114,7 +114,7 @@ Without `onOpen`, or for an item carrying `opens: false`, the row is not a contr
 Every row MUST stand one height whether it opens or not.
 A cross-reference list has no remove and no reorder.
 The player inventory inspector's Sources, Contributing, Used by, Required for and Produced by sections are its first callers.
-With one importer, `XrefList` is recorded as a non-member on the `LogList` and `StageNav` precedent.
+With one importer, `XrefList` is recorded as a non-member on the `LogList` precedent.
 The manager's cross-reference lists are adoption debt.
 
 #### Scenario: A list mixes rows that open with rows that do not
@@ -240,7 +240,7 @@ Its props are `tiers`, each `{ id?, name, figure?, notes?, valence? }` in drawn 
 `valence` is `positive` (the default), `negative` or `neutral`.
 An unknown `direction` or `layout` reads as `ascending` or `row`, and a `currentIndex` that is not an in-range integer reaches nothing.
 It is stated, never operated: it has no event.
-Its one importer is the published-component seam's runtime adapter, through which the premium companion's player faction ladder draws it, so it is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+Its one importer is the published-component seam's runtime adapter, through which the premium companion's player faction ladder draws it, so it is recorded as a non-member on the `LogList` and `XrefList` precedent.
 A tier's valence restates what its name already says and is never the only carrier of it: it is drawn in colour alone and reaches no assistive technology, so a caller MUST NOT use valence to convey a standing its tier names do not state.
 
 #### Scenario: A character stands on the middle rung of a descending ladder
@@ -1750,6 +1750,7 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
 `StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
+`StageNav` is a shared primitive: the run detail's stage browser and the Workpiece view's step browser both draw it, each with its own copy.
 `RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and `<RunProgress>` keeps its own entry in the run-surface block, `shipped` since its kicker adopted `Kicker`.
 A counter's card is a composition of `Well`, `Kicker`, a `Meter` with marks and a `Chip`, so `<CounterGauge>` is ruled out.
 A `RuleRow` edits one condition→effect rule, or one condition the caller combines (All/Any): a Check Breakage trigger, a gathering condition modifier's condition and drop-chance change, or an iterative counter predicate.
