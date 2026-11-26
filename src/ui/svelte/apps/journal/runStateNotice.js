@@ -73,15 +73,54 @@ export function runBlockerCode(run) {
 }
 
 /**
+ * The ranked tiers of one run's notice, highest first: recovery, an unsupported version (a record,
+ * so non-blocking), any other blocker, the Iterative Attempt notice, then the shipped reward,
+ * choice and paused notices. Only the first tier that applies is shown.
+ */
+export const NOTICE_RANK = Object.freeze([
+  'recovery',
+  'unsupported',
+  'blocker',
+  'iterative',
+  'award',
+  'choice',
+  'paused',
+]);
+
+const UNSUPPORTED_BLOCKERS = new Set(['unsupportedLifecycle', 'version-unsupported']);
+
+/** An iterative descriptor as a notice: polite, with its glyph and ledger, and its own two hooks. */
+function iterativeState(descriptor, pausedHook) {
+  return {
+    tone: descriptor.tone,
+    blocking: false,
+    title: descriptor.title,
+    detail: descriptor.detail,
+    hooks: {
+      'data-iterative-notice': descriptor.kind,
+      'data-iterative-reason': descriptor.reason,
+      ...pausedHook,
+    },
+    evidence: false,
+    claim: null,
+    icon: descriptor.icon,
+    ledger: descriptor.ledger ?? null,
+  };
+}
+
+/**
  * Compose the run's single state notice.
  *
  * @param {object|null} run The RunModel.
  * @param {(key: string, data?: object) => string} localize
+ * @param {object|null} [iterativeNotice] The workpiece's own notice (`iterativeAttempt` store), which
+ *   outranks the shipped reward, choice and paused notices and nothing above them.
  * @returns {{tone: string, blocking: boolean, title: string, detail: string,
- *   hooks: Record<string, string>, evidence: boolean, claim: object|null}|null} `hooks` is the
- *   notice's own `data-*` hook followed by the paused one; `null` when the run has nothing to report.
+ *   hooks: Record<string, string>, evidence: boolean, claim: object|null, icon?: string,
+ *   ledger?: object|null}|null} `hooks` is the notice's own `data-*` hook followed by the paused
+ *   one; `null` when the run has nothing to report.
  */
-export function runStateNotice(run, localize) {
+export function runStateNotice(run, localize, iterativeNotice = null) {
   const text = (key, ...data) => localize(`FABRICATE.App.Journal.Notice.${key}`, ...data);
   const paused = Boolean(run?.pauseState);
   const blocker = runBlockerCode(run);
@@ -107,7 +146,7 @@ export function runStateNotice(run, localize) {
   }
 
   // A run created by an unsupported version is a RECORD, not a refusal to act on.
-  if (blocker === 'unsupportedLifecycle') {
+  if (UNSUPPORTED_BLOCKERS.has(blocker)) {
     return {
       tone: 'warning',
       blocking: false,
@@ -133,6 +172,8 @@ export function runStateNotice(run, localize) {
       claim,
     };
   }
+
+  if (iterativeNotice) return iterativeState(iterativeNotice, pausedHook);
 
   // A reward waiting for a pick, worded for whether this viewer can make it (issue 1773).
   if (run?.awardChoicePending === true) {

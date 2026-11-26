@@ -1283,6 +1283,33 @@
             "StartedWith": "Started with {counters}.",
             "StepOf": "Step {index} of {count}"
           },
+          "Notice": {
+            "BusyDetail": "Saving…",
+            "BusyTitle": "Working session {session}: {action}",
+            "BusyTitleFree": "Working: {action}",
+            "CheckAsk": "Ask your GM to check the crafting check.",
+            "CheckDetail": "The {check} couldn’t be rolled, so nothing happened.",
+            "RefusalTitle": "Couldn’t take that action",
+            "ResultFailed": "The check failed. The costs were paid.",
+            "ResultFailedEffect": "The check failed. The costs were paid and the failure effect applied.",
+            "ResultSaved": "Saved. The workpiece below shows the new state.",
+            "ResultTitle": "Session {session} · {action} · {outcome} ({value})",
+            "ResultTitleFree": "{action} · {outcome} ({value})",
+            "ResultTitlePlain": "Session {session} · {action}",
+            "ResultTitlePlainFree": "{action}",
+            "ResumeDetail": "This is the saved workpiece, read fresh when the window opened. Session {session} is next.",
+            "ResumeDetailFree": "This is the saved workpiece, read fresh when the window opened.",
+            "ResumeTitle": "Picked up where you left off",
+            "StaleDetail": "Someone took {other} in another window first. Your {action} wasn’t applied and nothing was spent. Choose again.",
+            "StaleDetailAlone": "Your {action} wasn’t applied and nothing was spent. Choose again.",
+            "StaleDetailAloneBought": "Your {action} wasn’t applied. Choose again.",
+            "StaleDetailBought": "Someone took {other} in another window first. Your {action} wasn’t applied. Choose again.",
+            "StaleTitle": "This workpiece changed elsewhere and was reloaded",
+            "StartedDetail": "Its inputs were taken once, now. Step {index} starts with {counters}.",
+            "StartedDetailBare": "Its inputs were taken once, now.",
+            "StartedTitle": "Step {index} started",
+            "UnansweredTitle": "No answer from the GM yet"
+          },
           "Progress": {
             "Note": "Step {index}: {counter} {value} of {n}",
             "NoteSingle": "{counter} {value} of {n}"
