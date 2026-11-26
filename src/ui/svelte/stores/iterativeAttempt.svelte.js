@@ -262,6 +262,7 @@ class IterativeAttemptStore {
       };
       return this.#o.reload();
     }
+    if (this.pending?.attemptId === attemptId) this.pending = null;
     await this.#o.reload();
     if (outcome.kind === 'stale') {
       const other = this.#memory.otherActions(key, this.#active(key), press.attemptCount);

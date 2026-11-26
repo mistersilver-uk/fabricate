@@ -677,6 +677,30 @@ describe('an unanswered command', () => {
     assert.equal(world.journal.iterative.pending, null);
   });
 
+  for (const [name, reply, kind] of [
+    ['queue-timeout', { success: false, reason: 'queue-timeout' }, 'refusal'],
+    ['cost-unaffordable', { success: false, reason: 'cost-unaffordable' }, 'refusal'],
+    ['an unrollable check', { success: false, reason: 'roll-unavailable' }, 'check'],
+  ]) {
+    test(`a timeout, then a resend refused by ${name}, clears pending and shows a ${kind} notice`, async () => {
+      const world = await setup({ replies: [timeout, reply] });
+      await world.press('stoke');
+      await world.press('stoke');
+      assert.equal(world.calls.command[1].payload.attemptId, 'attempt-1');
+      assert.equal(world.journal.iterative.pending, null);
+      assert.equal(world.notice().kind, kind);
+    });
+  }
+
+  test('a resend from a run object at a new revision mints a new id at that revision', async () => {
+    const world = await setup({ replies: [timeout, timeout] });
+    await world.press('stoke');
+    await world.press('stoke', iterativeRun({ revision: 5 }));
+    const [first, second] = world.calls.command;
+    assert.notEqual(second.payload.attemptId, first.payload.attemptId);
+    assert.equal(second.expectedRevision, 5);
+  });
+
   test('a load whose log holds the pending entry shows its result and clears pending', async () => {
     const world = await setup({ replies: [timeout] });
     await world.press();
