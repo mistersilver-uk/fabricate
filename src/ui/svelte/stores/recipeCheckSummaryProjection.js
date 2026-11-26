@@ -75,6 +75,9 @@ export function recipeCheckContext(system) {
     return constantOf('checkOff');
   }
 
+  // An iterative recipe carries no check: each Crafting Action rolls the system's own, or doesn't.
+  if (mode === 'iterative') return constantOf('perAction');
+
   const config = _recipeCheckConfig(system);
   const rolls = isCountCheck(config) || Boolean(String(config?.rollFormula ?? '').trim());
   if (!config || !rolls) {
