@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): a composition of the DataTable and Chip members, shared by the live workpiece and its closed record rather than offered as a vocabulary member -->
 <!-- The live step's Iterative Attempts (issue 3011, D-11), newest first, five a page: each one's
      session, action, check, what it paid and what it changed. The page returns to the first on a
      new session and on a change of run or step; a compacted log says how many are not listed. -->

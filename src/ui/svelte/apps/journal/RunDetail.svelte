@@ -475,7 +475,7 @@
   {/if}
 
   {#if terminal}
-    <HistoricalRunDetail {run} {services} {transient} />
+    <HistoricalRunDetail {run} {services} {transient} {journal} />
   {:else}
     {#if workpiece}
       <WorkpieceView {run} runKey={runIdentity} {journal} {services} />

@@ -205,6 +205,16 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/journal/RecoveryEvidence.svelte': 1 },
   ],
   [
+    'a composition of the Well, Meter and Chip members, ruled out as a <CounterGauge> member and ' +
+      'shared by the live workpiece and its closed record',
+    { 'src/ui/svelte/apps/journal/iterative/CounterCard.svelte': 1 },
+  ],
+  [
+    'a composition of the DataTable and Chip members, shared by the live workpiece and its closed ' +
+      'record rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/journal/iterative/SessionsTable.svelte': 1 },
+  ],
+  [
     'ProgressiveStageRow is a new shared member at target, because the crafting and salvage ' +
       "progressive bodies both render it as SortableList's row (issue 2381)",
     { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte': 1 },

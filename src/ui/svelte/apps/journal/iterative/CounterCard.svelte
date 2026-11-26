@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): a composition of the Well, Meter and Chip members, ruled out as a <CounterGauge> member and shared by the live workpiece and its closed record -->
 <!-- One counter of the workpiece (issue 3011, D-7): a `Well` named by the counter, its reading in
      mono, a `Meter` against its scale with the route thresholds as marks, and its one caption. A
      GM sees a hidden counter marked "Hidden from players"; a player is never handed one. -->

@@ -441,8 +441,8 @@ export const ITERATIVE_ATTEMPT_RAW_MODULES = Object.freeze([
   'src/ui/presenters/iterative/iterativeVerdict.js',
 ]);
 
-// The Workpiece view an active iterative run's detail draws (issue 3011): its own parts, the
-// moved crafting yield preview, the primitives they render and the helpers they import.
+// The Workpiece view an active iterative run's detail draws (issue 3011): its own parts, a closed
+// run's record, the moved crafting yield preview, the primitives they render and their helpers.
 export const WORKPIECE_VIEW_RAW_MODULES = Object.freeze([
   ...OUTCOME_LADDER_RAW_MODULES,
   'src/systems/iterative/counterRule.js',
@@ -478,6 +478,7 @@ export const WORKPIECE_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/journal/iterative/SessionsTable.svelte',
   'src/ui/svelte/apps/journal/iterative/WorkpieceStep.svelte',
   'src/ui/svelte/apps/journal/iterative/WorkpieceView.svelte',
+  'src/ui/svelte/apps/journal/iterative/WorkpieceRecord.svelte',
 ]);
 
 // The run detail's whole tree, shared by the suites that mount `RunDetail.svelte` itself (issue
