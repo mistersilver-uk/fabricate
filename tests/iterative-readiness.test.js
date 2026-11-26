@@ -933,4 +933,98 @@ describe('counter and action addresses (#3038)', () => {
       ]
     );
   });
+
+  it('addresses the first unknown expression root in counter, min, max, target order', () => {
+    for (const [amount, wanted] of [
+      ['@min.b + @counter.a', 'a'],
+      ['@max.c + @min.b', 'b'],
+      ['@target.d + @max.c', 'c'],
+    ]) {
+      const issue = only(reads(amount), 'iterativeUnknownCounter');
+      assert.equal(issue.counterId, wanted, amount);
+    }
+  });
+
+  it('addresses the first unset expression root in min, max, target order', () => {
+    const unset =
+      (amount, ...extra) =>
+      (context) => {
+        const { library, recipe } = context;
+        library.counters.push(
+          { id: 'a', limit: 'perRecipe', max: 5 },
+          { id: 'b', limit: 'perRecipe', min: 0 },
+          { id: 'c', limit: 'perRecipe', min: 0, max: 5 }
+        );
+        recipe.iterative.counters.push(
+          { counterId: 'a', target: 1 },
+          { counterId: 'b', target: 1 },
+          { counterId: 'c' }
+        );
+        library.actions[0].effects[0].amount = amount;
+        extra.forEach((edit) => edit(context));
+      };
+    for (const [amount, wanted] of [
+      ['@max.b + @min.a', 'a'],
+      ['@target.c + @max.b', 'b'],
+      ['@target.c + @min.a', 'a'],
+    ]) {
+      assert.equal(only(unset(amount), 'iterativeExpressionBoundUnset').counterId, wanted, amount);
+    }
+  });
+
+  it('addresses the first unset root of the first analysis, a start formula before an amount', () => {
+    const both =
+      (startFormula, amount) =>
+      ({ library, recipe }) => {
+        library.counters.push(
+          { id: 'a', limit: 'perRecipe', min: 0 },
+          { id: 'b', limit: 'perRecipe', min: 0 }
+        );
+        recipe.iterative.counters.push(
+          { counterId: 'a', target: 1, startFormula },
+          { counterId: 'b', target: 1 }
+        );
+        library.actions[0].effects[0].amount = amount;
+      };
+    const unset = (edit) => only(edit, 'iterativeExpressionBoundUnset').counterId;
+    assert.equal(unset(both('1', '@max.a')), 'a', 'a lone amount');
+    assert.equal(unset(both('@max.b', '@max.a')), 'b', 'the start formula reads first');
+    assert.equal(unset(both('1', '@max.b + @max.a')), 'b', 'the first root of one amount');
+    const second = ({ library, recipe }) => {
+      both('1', '@max.b')({ library, recipe });
+      library.actions[0].effects.push({
+        ...library.actions[0].effects[0],
+        id: 'cool',
+        amount: '@max.a',
+      });
+    };
+    assert.equal(unset(second), 'b', 'the first analysis of two');
+  });
+
+  it('carries no address when the first offender has no readable id', () => {
+    for (const hiddenCounterIds of [[''], [7]]) {
+      const issue = only(({ recipe }) => {
+        step(recipe).hiddenCounterIds = hiddenCounterIds;
+      }, 'iterativeUnknownCounter');
+      assert.deepEqual(addressKeysOf(issue), [], JSON.stringify(hiddenCounterIds));
+    }
+    const action = only(({ recipe }) => {
+      step(recipe).actions.actionIds = [''];
+    }, 'iterativeUnknownAction');
+    assert.deepEqual(addressKeysOf(action), []);
+  });
+
+  it('names a counter by its trimmed label even when the library arrives unnormalized', () => {
+    const issue = only(({ library, recipe }) => {
+      recipe.iterative.counters[0].start = null;
+      return {
+        iterative: {
+          ...normalizeIterativeLibrary(library),
+          counters: [{ ...normalizeIterativeLibrary(library).counters[0], label: '  Heat  ' }],
+          actions: normalizeIterativeLibrary(library).actions.map((a) => ({ ...a, label: ' \t' })),
+        },
+      };
+    }, 'iterativeInvalidNumber');
+    assert.equal(issue.counterName, 'Heat');
+  });
 });
