@@ -51,6 +51,21 @@ test('a row whose count is not a number is omitted', () => {
   );
 });
 
+test('a string or undefined count omits its row too', () => {
+  const rows = digestCountRows({
+    activeTab: 'salvage',
+    outcomeCount: undefined,
+    successCount: 0,
+    triggerCount: '3',
+    modifierCount: '1',
+    text: (key, fallback) => fallback,
+  });
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    []
+  );
+});
+
 test('every key it asks for resolves in lang/en.json to the fallback it carries', () => {
   const asked = new Map();
   titles(1, (key, fallback) => asked.set(key, fallback).get(key));
