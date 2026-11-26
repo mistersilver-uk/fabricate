@@ -740,7 +740,7 @@ Blind ingredient submission with signature matching and optional learn-on-craft 
 #### Iterative
 
 The resolution mode in which a player applies Crafting Actions that move a step's Counters until a success or failure rule holds.
-It persists but is not yet selectable, and its run starts through the versioned run start and moves one Iterative Attempt at a time.
+It persists but is not yet selectable, its recipe editor states each recipe as Needs iterative setup, N blocking or Ready, and its run starts through the versioned run start and moves one Iterative Attempt at a time.
 
 [Notes](docs/domain/terms.md#iterative)
 
@@ -755,6 +755,7 @@ It is distinct from a Tool's usage counter (`flags.fabricate.toolUsage`), which 
 #### Counter Instance
 
 A recipe's configuration of one Counter in `Recipe.iterative.counters[]`, keyed by `counterId`, giving its start, optional bounds and target, and whether the player sees it.
+Removing one also drops its id from every step's hide and lock lists.
 
 [Notes](docs/domain/terms.md#counter-instance)
 
@@ -792,7 +793,7 @@ It is distinct from a client session, and an Iterative Attempt that is not a Cra
 
 #### Workpiece
 
-The player-facing word for an active iterative Crafting Run, with no record or persisted name of its own.
+The player and GM copy word for an active iterative Crafting Run, with no record or persisted name of its own.
 It is distinct from the alchemy **Workbench**.
 
 [Notes](docs/domain/terms.md#workpiece)

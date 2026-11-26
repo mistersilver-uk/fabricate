@@ -473,7 +473,7 @@ If multistep is disabled:
 ### Iterative Recipe Editor
 
 In an `iterative` system, Overview lists the recipe's Counter Instances in a table with Start, Min, Max, Target and Player sees, and each row can be removed.
-Removing a row also removes its counter from every step's hide and lock lists, once no other row names it.
+Removing a row also removes its counter from every step's hide and lock lists in the same write, once no other row names it, and a rule that names it is kept.
 The table sits after the step-mode card, and its Counter Instances carry on across every step.
 Start is a fixed number, or a formula that rolls once when the first step starts, and switching back to a fixed number restores the kept start.
 Min and Max are editable only for a Per recipe counter, which shows the counter's defaults while unset, and a Global or No limit counter shows its system bound read-only.
@@ -483,7 +483,7 @@ A recipe with no Counter Instances offers to add every library counter, and says
 A Counter Instance naming no library counter is marked on its row and links to Counters.
 Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error and blocks enabling the recipe.
 A multi-step recipe's step hides or locks each Counter Instance for that step, and a Counter Instance the player never sees offers no per-step hide.
-A single-step recipe shows its hide and lock lists once one is non-empty, and keeps them shown while the editor stays open, so clearing the last one keeps its focus.
+A single-step recipe shows its hide and lock lists once one is non-empty, and keeps them shown until the Overview tab is left, so clearing the last one keeps its focus.
 Each step's Ends when holds success rules, which must all hold, and failure rules, any one of which is enough.
 The rules range over the recipe's Counter Instances, Session number and Previous action.
 A rule naming a counter that is not a Counter Instance is marked as not tracked.
@@ -499,7 +499,7 @@ Each set states its Produced when lines, each a Success or Failure end with rule
 A set with no line says it is never produced, and a scope with no set says it produces nothing.
 The Validation tab groups the recipe's counter and step checks under Steps, first, with one row per step, which passes when the step has no issue.
 The Validation tab names each addressed issue's step and lists the library issues that refuse the recipe's start, using the copy the system Validation tab uses.
-A library issue counts as blocking on the Validation tab but does not block enabling the recipe.
+A library issue counts as blocking on the Validation tab and in the status, because it refuses the recipe's start, but it does not block enabling the recipe.
 While active workpieces of the recipe exist in the system, every tab except Validation states how many there are, and that they keep the terms they started with.
 The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and while Ready is withheld it shows the row's own "Incomplete" or "Can't enable"; its subline names the Iterative mode and a multi-step recipe's step count.
 The Preview tab is not offered.
