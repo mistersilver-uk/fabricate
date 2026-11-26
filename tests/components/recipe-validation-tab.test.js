@@ -668,7 +668,10 @@ describe('RecipeValidationTab (mounted)', () => {
         return (row.querySelector('.manager-recipe-val-detail') ?? row.querySelector('.manager-recipe-val-title')).textContent;
       };
       assert.equal(sentence('iterativeUnknownCounter:recipe'), 'rust is not a counter this recipe can use.');
-      assert.equal(sentence('iterativeBoundsInverted:recipe'), "Heat's minimum is above its maximum.");
+      assert.equal(
+        sentence('iterativeBoundsInverted:recipe'),
+        'The minimum of Heat is above its maximum.'
+      );
       assert.equal(sentence('iterativeUnknownAction:0'), 'Heat the blank: anneal is not a crafting action in this system.');
       assert.equal(sentence('iterativeCheckUnavailable:recipe'), 'Stoke rolls a check, but the routed crafting check has no roll formula.');
       harness.remount();
@@ -719,6 +722,15 @@ describe('RecipeValidationTab (mounted)', () => {
       harness.remount();
     });
 
+    it('hands View the step configuration for a counter fault under a step check (issue 3038)', () => {
+      const { issues } = iterativeRecipeReadiness({
+        counterIds: ['heat'],
+        steps,
+        issues: [{ ...counterIssue('iterativeUnknownCounter', 'rust'), stepIndex: 1 }]
+      });
+      assert.equal(issues[0].focusTarget, 'iterative-step-1');
+    });
+
     it('forwards counterId, counterName and actionName, and never an actionId (issue 3038)', () => {
       const input = {
         counterIds: ['heat'],
@@ -738,6 +750,14 @@ describe('RecipeValidationTab (mounted)', () => {
       for (const key of ['counterId', 'counterName', 'actionName']) {
         assert.ok(!Object.hasOwn(bare, key), `an unaddressed issue carries no ${key}`);
       }
+    });
+
+    it('hands View the counters section for an addressed issue when the input carries no counterIds', () => {
+      const { issues } = iterativeRecipeReadiness({
+        steps,
+        issues: [counterIssue('iterativeBoundsInverted', 'heat', 'Heat')]
+      });
+      assert.equal(issues[0].focusTarget, 'iterative-counters');
     });
 
     it('reads a ready single-step recipe as pass rows with nothing blocking', async () => {

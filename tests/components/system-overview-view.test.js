@@ -333,7 +333,7 @@ describe('SystemOverviewView (mounted)', () => {
       assert.equal(sentences.length, 3);
       const group = (kind) => target.querySelector(`[data-system-overview-group="${kind}"]`);
       assert.ok(
-        group('recipe').textContent.includes("Heat's minimum is above its maximum."),
+        group('recipe').textContent.includes('The minimum of Heat is above its maximum.'),
         sentences.join(' | ')
       );
       assert.ok(group('recipe').textContent.includes('anneal is not a crafting action in this system.'));
@@ -341,7 +341,7 @@ describe('SystemOverviewView (mounted)', () => {
         group('counter').textContent.includes('A counter minimum is above its maximum.'),
         'a library issue reads the unnamed sentence'
       );
-      assert.ok(!group('counter').textContent.includes("'s minimum"));
+      assert.ok(!group('counter').textContent.includes('The minimum of'));
     } finally {
       globalThis.game.i18n.localize = original;
       harness.remount();

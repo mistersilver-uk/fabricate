@@ -109,14 +109,17 @@ test('a named issue reads its counter or action in each of the seven sentences',
     sentence('iterativeInvalidNumber', 'Heat'),
     'Heat has a start, start formula, bound or target that cannot be read.'
   );
-  assert.equal(sentence('iterativeBoundsInverted', 'Heat'), "Heat's minimum is above its maximum.");
+  assert.equal(
+    sentence('iterativeBoundsInverted', 'Heat'),
+    'The minimum of Heat is above its maximum.'
+  );
   assert.equal(
     sentence('iterativeStartOutOfBounds', 'Heat'),
     'Heat starts outside its minimum or maximum.'
   );
   assert.equal(
     sentence('iterativeExpressionBoundUnset', 'Heat'),
-    "An expression reads Heat's minimum, maximum or target, which is not set."
+    'An expression reads the minimum, maximum or target of Heat that is not set.'
   );
   assert.equal(
     sentence('iterativeUnknownAction', 'anneal'),
@@ -158,7 +161,7 @@ test('a name is filled verbatim, whatever replacement pattern it contains', () =
     named('iterativeBoundsInverted', 'Cost $& $1 $$'),
     english
   );
-  assert.equal(sentence, "Cost $& $1 $$'s minimum is above its maximum.");
+  assert.equal(sentence, 'The minimum of Cost $& $1 $$ is above its maximum.');
   const action = iterativeIssueSentence(named('iterativeUnknownAction', '$`x'), english);
   assert.equal(action, '$`x is not a crafting action in this system.');
 });
@@ -178,4 +181,12 @@ test('each named key is a code of the unnamed map, in its namespace, with its ow
     assert.equal(sentence.split(wanted).length, 2, `${key} names ${wanted} once`);
     assert.ok(!sentence.includes(other), `${key} must not name ${other}`);
   }
+});
+
+test('a named key that resolves to a non-string reads the unnamed message', () => {
+  const nonString = (key, fallback) => (key.endsWith('Named') ? 7 : fallback);
+  assert.equal(
+    iterativeIssueSentence(named('iterativeUnknownCounter', 'Rust'), nonString),
+    'headless'
+  );
 });
