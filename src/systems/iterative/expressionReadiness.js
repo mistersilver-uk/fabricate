@@ -1,7 +1,8 @@
 /**
- * The expression-validity readiness checks (`resolution-modes` § Iterative Validation). Each
- * returns the codes (the recipe one, entries addressed to a counter) it raises, and
- * `iterativeReadiness.js` turns them into issues. Every amount and
+ * The expression-validity readiness checks (`resolution-modes` § Iterative Validation), and the
+ * `{ code, counterId?, actionId? }` entry builders the iterative readiness producers share. The
+ * library check returns codes and the recipe check returns entries; `iterativeReadiness.js` turns
+ * both into issues. Every amount and
  * start formula is judged by the analysis the resolver's evaluator shares, so readiness and
  * resolution never disagree on what parses.
  */
@@ -11,15 +12,13 @@ import { iterativeEntryFault } from '../normalize/iterativeLibrary.js';
 import { effectiveBounds, namesCheckFact } from './attemptLibrary.js';
 import { analyzeIterativeExpression } from './expression.js';
 
-/*
- * The `{ code, counterId?, actionId? }` entries the iterative readiness producers return. The id
- * names the first offender of its code; an entry whose offender has no readable id carries none.
- */
-
 /** `{ code }` for each of `codes`, the entry of a fault that names no counter or action. */
 export const bareEntries = (codes) => codes.map((code) => ({ code }));
 
-/** `{ code, [key]: id }` for a readable id, else `{ code }`; `key` is `'counterId'` or `'actionId'`. */
+/**
+ * `{ code, [key]: id }` for a readable id, else `{ code }`; `key` is `'counterId'` or `'actionId'`.
+ * The id names the first offender of its code; an entry whose offender has no readable id carries none.
+ */
 export function addressedEntry(code, key, id) {
   return typeof id === 'string' && id !== '' ? { code, [key]: id } : { code };
 }

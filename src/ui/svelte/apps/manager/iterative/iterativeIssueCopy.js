@@ -2,9 +2,9 @@
  * The Validation tab's words for the iterative readiness codes, with no local imports so the tab's
  * hand-listed test closure stays complete. `ITERATIVE_ISSUE_KEYS` is the one code-to-lang-key map,
  * its keys literal so the orphan scan sees them, and recipe issues of the same codes read it
- * too; `iterativeIssueSentence(issue, text)` resolves one issue through it, falling back to the
- * issue's own `message`, and through `ITERATIVE_ISSUE_NAMED_KEYS` when the issue names its counter
- * or action. `overviewIssueGroup(issue)` names the group an issue is listed under.
+ * too; `iterativeIssueSentence(issue, text)` resolves one issue through it, or through
+ * `ITERATIVE_ISSUE_NAMED_KEYS` when the issue names its counter or action, falling back to the
+ * issue's own `message`. `overviewIssueGroup(issue)` names the group an issue is listed under.
  */
 
 /** Each iterative readiness code's `SystemOverview` lang key; its English equals the headless message. */

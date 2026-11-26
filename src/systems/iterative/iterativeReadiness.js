@@ -263,7 +263,7 @@ function stepConfigEntries(config, references, context) {
     ...arrayOrEmpty(config.hiddenCounterIds),
     ...arrayOrEmpty(config.lockedCounterIds),
   ];
-  const rolls = allowedActions(config, context).find((action) => action.check === 'roll');
+  const roller = allowedActions(config, context).find((action) => action.check === 'roll');
   return [
     ...bareEntries([
       ...(arrayOrEmpty(config.success).length === 0 ? ['iterativeNoSuccessRule'] : []),
@@ -272,8 +272,8 @@ function stepConfigEntries(config, references, context) {
     ...stepActionEntries(config.actions, references),
     ...unknownEntries('iterativeUnknownCounter', 'counterId', named, references.counterIds),
     ...ruleEntries([...arrayOrEmpty(config.success), ...arrayOrEmpty(config.failure)], references),
-    ...(rolls && !context.routedCheckActive
-      ? [addressedEntry('iterativeCheckUnavailable', 'actionId', rolls.id)]
+    ...(roller && !context.routedCheckActive
+      ? [addressedEntry('iterativeCheckUnavailable', 'actionId', roller.id)]
       : []),
   ];
 }
