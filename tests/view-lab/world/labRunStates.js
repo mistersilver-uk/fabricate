@@ -51,6 +51,9 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'stage-not-started': 'lab-v1-stage-not-started',
   'stage-paid': 'lab-v1-stage-paid',
   'awaiting-choice': 'lab-v1-awaiting-choice',
+  // Issue 3033: `stage-not-started` and `awaiting-choice` on a recipe hidden from the player.
+  'redacted-stage-start': 'lab-v1-redacted-stage-start',
+  'redacted-stage-pick': 'lab-v1-redacted-stage-pick',
   'stage-consumed': 'lab-v1-stage-consumed',
   'material-shortage': 'lab-v1-material-shortage',
   'ingredient-route': 'lab-v1-ingredient-route',
@@ -1120,7 +1123,7 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.craftingRuns, run, false);
     return true;
   }
-  if (state === 'awaiting-choice') {
+  if (['awaiting-choice', 'redacted-stage-pick'].includes(state)) {
     const run = prototypeCraft(context, 'buckler', id);
     const last = run.steps.length - 1;
     run.steps.forEach((entry, index) => {
@@ -1146,7 +1149,14 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.craftingRuns, run, false);
     return true;
   }
-  if (['stage-not-started', 'stage-consumed', 'current-choice-closed'].includes(state)) {
+  if (
+    [
+      'stage-not-started',
+      'redacted-stage-start',
+      'stage-consumed',
+      'current-choice-closed',
+    ].includes(state)
+  ) {
     const run = prototypeCraft(context, 'rivets', id);
     const current = run.steps[run.currentStepIndex];
     // `stage-consumed` keeps the start receipt `prototypeCraft` already armed the gate with, so the

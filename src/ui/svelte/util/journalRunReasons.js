@@ -116,17 +116,34 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
 });
 
 /**
+ * The codes worded differently for a viewer the recipe is hidden from (issue 3033): each shared
+ * sentence names a route, material or tool to fix, which that viewer cannot see.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const REDACTED_REASON_KEYS = Object.freeze({
+  routeRequired: 'FABRICATE.App.Journal.Actions.Redacted.RouteRequired',
+  choiceRequired: 'FABRICATE.App.Journal.Actions.Redacted.ChoiceRequired',
+  awardChoicePending: 'FABRICATE.App.Journal.Actions.Redacted.AwardChoicePending',
+  toolRequired: 'FABRICATE.App.Journal.Actions.Redacted.ToolRequired',
+  selectionRequired: 'FABRICATE.App.Journal.Actions.Redacted.SelectionRequired',
+  essenceRequired: 'FABRICATE.App.Journal.Actions.Redacted.EssenceRequired',
+});
+
+/**
  * Localize one refusal/disabled-reason code.
  *
  * @param {unknown} reason The authority `reason` (or UI `disabledReason`) code.
  * @param {(key: string) => string} localize
+ * @param {{redacted?: boolean}} [options] `redacted` reads `REDACTED_REASON_KEYS` first.
  * @returns {string} The localized sentence, or `''` when the code is absent,
  *   blank, unmapped, or no usable `localize` was supplied — so every caller
  *   falls through to its own readable generic rather than to a raw slug.
  */
-export function journalRunReasonMessage(reason, localize) {
+export function journalRunReasonMessage(reason, localize, { redacted = false } = {}) {
   if (typeof reason !== 'string' || typeof localize !== 'function') return '';
-  const key = JOURNAL_RUN_REASON_KEYS[reason.trim()];
+  const code = reason.trim();
+  const key = (redacted && REDACTED_REASON_KEYS[code]) || JOURNAL_RUN_REASON_KEYS[code];
   if (!key) return '';
   const text = localize(key);
   return typeof text === 'string' && text.trim() !== '' ? text : '';
@@ -148,6 +165,24 @@ export function journalRefusalMessage(result, localize, generic) {
   const reasonText = journalRunReasonMessage(result?.reason, localize);
   if (reasonText) return reasonText;
   return typeof generic === 'string' ? generic.trim() : '';
+}
+
+/**
+ * A refusal on a run whose recipe is hidden from this viewer, worded by its code alone: the
+ * engine's own sentence can name a hidden tool or ingredient, so `message` is never read.
+ *
+ * @param {{blocker?: unknown, reason?: unknown}|null|undefined} result
+ * @param {(key: string) => string} localize
+ * @param {unknown} [generic] The caller's existing fallback message.
+ * @returns {string}
+ */
+export function journalRedactedRefusal(result, localize, generic) {
+  const worded = (code) => journalRunReasonMessage(code, localize, { redacted: true });
+  return (
+    worded(result?.blocker) ||
+    worded(result?.reason) ||
+    (typeof generic === 'string' ? generic.trim() : '')
+  );
 }
 
 /**

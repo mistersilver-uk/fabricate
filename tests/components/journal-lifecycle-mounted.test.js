@@ -1326,6 +1326,58 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.commands.at(-1).action, 'beginStep');
   });
 
+  // Issue 3033: redaction hides the recipe, never the owner's begin control.
+  const redactedFixture = (sets, plan) => {
+    const fixture = selectionFixture(sets, plan);
+    return { ...fixture, builderOptions: { ...fixture.builderOptions, visible: false } };
+  };
+  const ACTIONS = english.FABRICATE.App.Journal.Actions;
+
+  it('offers a redacted run its begin control, worded for a viewer who sees no detail', async () => {
+    const mounted = await mountState(
+      'ready-single',
+      redactedFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id })
+    );
+    assert.equal(mounted.store.selectedRun.redacted, true);
+    const begin = mounted.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin, 'a redacted unstarted stage offers its own begin control');
+    assert.equal(begin.disabled, false);
+    assert.equal(begin.textContent.trim(), ACTIONS.BeginStep, 'under the same name and in the same slot');
+    const prompt = mounted.target.querySelector('[data-run-begin-prompt]')?.textContent ?? '';
+    assert.ok(prompt.includes(ACTIONS.RedactedBeginStepPrompt), prompt);
+    assert.ok(!prompt.includes(ACTIONS.BeginStepPrompt), 'never the prompt that lists the choices');
+    assert.ok(!mounted.target.querySelector('[data-run-action="primary"]'));
+    begin.click();
+    await settleAction();
+    assert.equal(mounted.commands.at(-1).action, 'beginStep');
+    assert.deepEqual(mounted.commands.at(-1).payload, {}, 'the engine takes the persisted plan');
+    for (const name of ['Selection trial', 'Stage 1', 'fixed-set', 'Metal'])
+      assert.ok(!mounted.target.textContent.includes(name), `${name} stays hidden`);
+  });
+
+  it('holds a redacted run that owes a route pick, and says who makes it', async () => {
+    const second = ingredientSet('second-set', [
+      { id: 'alloy', name: 'Alloy', options: [componentOption('copper', 'copper')] },
+    ]);
+    const mounted = await mountState('ready-single', redactedFixture([FIXED_SET, second], {}));
+    assert.equal(mounted.store.selectedRun.actions.disabledReason, 'routeRequired');
+    const begin = mounted.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin, 'the begin control still renders');
+    assert.equal(begin.disabled, true);
+    assert.equal(begin.getAttribute('title'), ACTIONS.Redacted.RouteRequired);
+    const cancel = mounted.target.querySelector('[data-run-action="cancel-arm"]');
+    assert.ok(cancel && !cancel.disabled, 'cancel is the way out that needs no GM');
+    const withheld = mounted.target.querySelector('[data-journal-choice-withheld="true"]');
+    assert.ok(withheld, 'the withheld pick is announced, not left to a tooltip');
+    assert.equal(withheld.getAttribute('data-notice-tone'), 'info');
+    const NOTICE = english.FABRICATE.App.Journal.Notice;
+    assert.ok(withheld.textContent.includes(NOTICE.RedactedChoiceTitle));
+    assert.ok(withheld.textContent.includes(NOTICE.RedactedChoiceDetail));
+    assert.ok(!mounted.target.querySelector('[data-journal-route]'), 'no route control is offered');
+    for (const name of ['fixed-set', 'second-set', 'Alloy', 'Metal'])
+      assert.ok(!mounted.target.textContent.includes(name), `${name} stays hidden`);
+  });
+
   // Issue 1648, M21. The rail this used to assert is a LIVE held/needed probe.
   it('reads a started stage from its consumption receipt, not from a live inventory probe', async () => {
     // One route with a component requirement AND an essence requirement.
@@ -1985,6 +2037,20 @@ describe('Journal versioned lifecycle (mounted)', () => {
         const begin = mounted.target.querySelector('[data-run-action="begin"]');
         assert.ok(begin, 'the begin control still renders instead of the primary');
         assert.equal(begin.disabled, true);
+      }
+      // Issue 3033, under the same caveat: the hidden recipe's row, control and notice, plainly.
+      if (state.startsWith('redacted-stage-')) {
+        const picked = state === 'redacted-stage-pick';
+        assert.equal(mounted.store.selectedRun.redacted, true, `${suffix} is redacted`);
+        const row = mounted.target.querySelector(`[data-run-id="${selectedId}"]`);
+        assert.equal(row.querySelector('[data-run-attention]')?.dataset.runAttention,
+          picked ? undefined : 'start');
+        const begin = mounted.target.querySelector('[data-journal-detail]')?.querySelector('[data-run-action="begin"]');
+        assert.ok(begin, `${suffix} renders its begin control`);
+        assert.equal(begin.disabled, picked);
+        assert.equal(Boolean(mounted.target.querySelector('[data-journal-choice-withheld="true"]')), picked);
+        for (const absent of ['[data-journal-route]', '[data-journal-stages]', '[data-slot-row]'])
+          assert.ok(!mounted.target.querySelector(absent), `${suffix} renders no ${absent}`);
       }
       // The same `:has(A B)` caveat: each native-recovery witness is queried plainly too.
       for (const selector of NATIVE_RECOVERY_WITNESS[state] ?? []) {

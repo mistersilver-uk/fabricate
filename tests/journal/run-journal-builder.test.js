@@ -241,6 +241,7 @@ function makeBuilder({
   resolutionModeService = null,
   getTool = null,
   isActiveGM = null,
+  recipeTools = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -258,6 +259,7 @@ function makeBuilder({
     recipeManager: {
       getRecipe: (id) => (id === recipe.id ? recipe : null),
       ingredientMatchesItem,
+      ...recipeTools,
     },
     resolutionModeService: resolutionModeService ?? { getMode: () => mode },
     recipeVisibility,
@@ -2205,22 +2207,26 @@ test('redaction preserves owner execution/cancel availability without leaking se
     },
     selectedRequirementSnapshot: { id: 'set-secret', hiddenRoute: 'critical-secret' },
   };
-  const listing = makeBuilder({
-    active: [
-      activeCraftingRun({
-        lifecycleVersion: 1,
-        runRevision: 1,
-        steps: [activeCraftingRun().steps[0], hiddenStep],
-      }),
-    ],
-    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
-    worldTime: 5000,
-  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
-  const run = listing.activeRuns[0];
+  const project = (recipeVisibility) =>
+    makeBuilder({
+      active: [
+        activeCraftingRun({
+          lifecycleVersion: 1,
+          runRevision: 1,
+          steps: [activeCraftingRun().steps[0], hiddenStep],
+        }),
+      ],
+      recipeVisibility,
+      worldTime: 5000,
+    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+  const run = project({ evaluateRecipeAccess: () => ({ visible: false }) });
 
   assert.equal(run.redacted, true);
   assert.deepEqual(run.steps, []);
-  assert.equal(run.actions.execute, true);
+  // Issue 3033: the owner's actions are the visible run's, judged on the same stage, less the pick.
+  const visible = project(undefined);
+  assert.equal(visible.redacted, false);
+  assert.deepEqual(run.actions, { ...visible.actions, setSelection: false });
   assert.equal(run.actions.cancel, true);
   assert.equal(JSON.stringify(run).includes('critical-secret'), false);
   assert.equal(JSON.stringify(run).includes('secret-item'), false);
@@ -2443,19 +2449,20 @@ const essenceSet = () => new IngredientSet({ id: 'ess', ingredientGroups: [{ id:
   options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] }] });
 
 function projectChoiceRun({ executionSteps, runSteps, currentStepIndex = 0, actor = CHOICE_OWNER,
-  run = {}, dependencies = {} }) {
+  run = {}, dependencies = {}, viewer = PLAYER }) {
   const recipe = { ...RECIPE, steps: executionSteps.map((entry) => ({ id: entry.id })),
     getExecutionSteps: () => executionSteps };
   const raw = { ...activeCraftingRun(), lifecycleVersion: 1, status: 'inProgress',
     currentStepIndex, steps: runSteps, ...run };
   return makeBuilder({ active: [raw], recipe,
     ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match?.componentId === item.id,
-    ...dependencies }).buildListing({ actor, viewer: PLAYER }).activeRuns[0];
+    ...dependencies }).buildListing({ actor, viewer }).activeRuns[0];
 }
 
 /** Stage 2 of a multi-step craft, advanced into by `completeStepSuccess` and never begun. */
-function unbegunSecondStage(sets, stepOverrides = {}) {
+function unbegunSecondStage(sets, stepOverrides = {}, rest = {}) {
   return projectChoiceRun({
+    ...rest,
     executionSteps: [
       { id: 's0', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
       { id: 's1', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: sets },
@@ -2546,6 +2553,130 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   assert.equal(picked.actions.beginStep, true);
   assert.equal(picked.actions.disabledReason, 'stageNotStarted');
   assert.equal(runAttentionPresentation(picked).kind, 'start', 'and now it says so on the row');
+});
+
+// Issue 3033: a redacted run is judged as a visible one is, and only the blocker code crosses.
+const HIDDEN = { evaluateRecipeAccess: () => ({ visible: false }) };
+const heldTongs = (available) => ({
+  getToolsForSet: () => [{ id: 'qzx-tongs', name: 'Qzx Tongs' }],
+  resolveToolStates: () => [{ name: 'Qzx Tongs', img: null, available }],
+});
+const hidden = (rest = {}) => ({ ...rest, dependencies: { recipeVisibility: HIDDEN, ...rest.dependencies } });
+const redactedStage = (sets, stepOverrides = {}, rest = {}) =>
+  unbegunSecondStage(sets, stepOverrides, hidden(rest));
+/** The base commit's actions for a visible, held, unbegun second stage. */
+const VISIBLE_HELD_ACTIONS = Object.freeze({
+  execute: false, pause: false, resume: false, setCompletionMode: false, atStageStart: true,
+  beginStep: true, setSelection: true, cancel: true, dismiss: false,
+  disabledReason: 'stageNotStarted', reconcileUncertain: false,
+});
+const multiOptionSet = () => new IngredientSet({ id: 'only', ingredientGroups: [{ id: 'metal',
+  name: 'Metal', options: [componentOption('iron'), componentOption('silver')] }] });
+
+test('3033: a redacted single-route stage that holds everything offers its begin control', () => {
+  const run = redactedStage([ironRoute()]);
+  assert.equal(run.redacted, true);
+  assert.equal(run.names.title, 'FABRICATE.App.Journal.Redacted.Title');
+  assert.deepEqual(run.steps, []);
+  assert.equal(run.currentStep, null);
+  assert.equal(run.actions.atStageStart, true, 'redaction hides identity, never the owner action');
+  assert.equal(run.actions.beginStep, true);
+  assert.equal(run.actions.disabledReason, 'stageNotStarted');
+  assert.equal(run.actions.setSelection, false, 'a pick reads the routes, which are identity');
+  assert.equal(run.awaitingChoice, false);
+});
+
+test('3033: a redacted stage is refused for every cause a visible one is, by code alone', () => {
+  const cases = [
+    ['a material shortfall', redactedStage([routeSet('route-gold', 'gold')]), 'selectionRequired'],
+    ['a required tool not held',
+      redactedStage([ironRoute()], {}, { dependencies: { recipeTools: heldTongs(false) } }), 'toolRequired'],
+    ['a recorded source the world lost',
+      redactedStage([ironRoute()], {}, { run: { componentSourceActorUuids: [ACTOR.uuid, 'Actor.gone'] } }),
+      'sourcesUnavailable'],
+    ['an unchosen route', redactedStage([ironRoute(), silverRoute()]), 'routeRequired'],
+    ['an unrecorded option', redactedStage([multiOptionSet()]), 'choiceRequired'],
+  ];
+  for (const [label, run, code] of cases) {
+    assert.equal(run.actions.atStageStart, true, `${label}: the begin control renders`);
+    assert.equal(run.actions.beginStep, false, `${label}: and is refused`);
+    assert.equal(run.actions.disabledReason, code, label);
+    assert.equal(run.actions.setSelection, false, `${label}: no pick is offered`);
+    assert.equal(run.awaitingChoice, false, `${label}: nor asked for`);
+    assert.equal(run.currentStep, null, label);
+  }
+});
+
+test('3033: an award an earlier stage owes still holds a redacted stage', () => {
+  const run = projectChoiceRun(hidden({
+    executionSteps: [
+      { id: 's0', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
+      { id: 's1', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
+    ],
+    currentStepIndex: 1,
+    runSteps: [
+      { stepId: 's0', stepName: 'Forge', index: 0, status: 'succeeded', createdResults: [],
+        preparedConsumption: { consumedSummary: [] },
+        pendingAwardChoices: [{ choiceId: 'pick', alternatives: [{ kind: 'item' }] }] },
+      { stepId: 's1', stepName: 'Temper', index: 1, status: 'inProgress' },
+    ],
+  }));
+  assert.equal(run.actions.atStageStart, true);
+  assert.equal(run.actions.beginStep, false);
+  assert.equal(run.actions.disabledReason, 'awardChoicePending');
+});
+
+test('3033: an untimed redacted stage withholds execute for the same causes', () => {
+  const unchosen = untimedStage([ironRoute(), silverRoute()], {}, hidden());
+  assert.equal(unchosen.actions.execute, false, 'a stage owing a pick is not resolvable');
+  assert.equal(unchosen.actions.disabledReason, 'routeRequired');
+  const short = untimedStage([routeSet('route-gold', 'gold')], {}, hidden());
+  assert.equal(short.actions.execute, false);
+  assert.equal(short.actions.disabledReason, 'selectionRequired');
+  const ready = untimedStage([ironRoute()], {}, hidden());
+  assert.equal(ready.actions.execute, true, 'and one owing nothing still resolves');
+});
+
+test('3033: a run whose recipe no longer resolves offers no begin, and a GM keeps its availability', () => {
+  const seen = [];
+  const recipeTools = { getToolsForSet: () => [{ id: 'qzx-tongs' }],
+    resolveToolStates: (_view, tools, sources) => {
+      seen.push(sources.map((source) => source.uuid));
+      return tools.map(() => ({ available: true }));
+    } };
+  const orphan = (viewer) => unbegunSecondStage([ironRoute()], {},
+    { viewer, run: { recipeId: 'recipe-gone' }, dependencies: { recipeTools } });
+  const player = orphan(PLAYER);
+  assert.equal(player.redacted, true);
+  assert.equal(player.actions.atStageStart, false, 'no recipe step, so no start to take');
+  assert.equal(player.actions.beginStep, false);
+  assert.deepEqual(seen, [], 'nothing is judged against a recipe that is not there');
+  const gm = orphan(GM);
+  assert.equal(gm.redacted, false);
+  assert.deepEqual(seen, [[ACTOR.uuid]], 'the GM stage is still judged against its sources');
+  assert.ok(gm.currentStep.selectionAvailability, 'and still projects its availability');
+});
+
+test('3033: a visible run projects the actions it did before redaction was judged', () => {
+  const run = unbegunSecondStage([ironRoute()]);
+  assert.equal(run.redacted, false);
+  assert.deepEqual(run.actions, VISIBLE_HELD_ACTIONS);
+  assert.equal(run.currentStep.stepName, 'Temper');
+});
+
+test('3033: a redacted run carries no recipe, step, route, ingredient or tool name', () => {
+  const names = /Iron|Silver|Forge|Temper|route-iron|route-silver|Metal|Qzx/;
+  const fixture = (viewer, sets, rest = {}) => unbegunSecondStage(sets, {}, hidden({ viewer,
+    ...rest, dependencies: { recipeTools: heldTongs(true), ...rest.dependencies } }));
+  const variants = [[ironRoute()], [ironRoute(), silverRoute()], [multiOptionSet()]];
+  for (const sets of variants) {
+    const redacted = fixture(PLAYER, sets);
+    assert.equal(redacted.redacted, true);
+    assert.doesNotMatch(JSON.stringify(redacted), names);
+  }
+  const control = variants.map((sets) => JSON.stringify(fixture(GM, sets))).join(' ');
+  for (const name of ['Iron Sword', 'Forge', 'Temper', 'route-iron', 'route-silver', 'Metal', 'Qzx Tongs'])
+    assert.ok(control.includes(name), `the GM control carries ${name}`);
 });
 
 test('a stored Sharp essence icon reaches the journal on a face Foundry 14 draws', () => {

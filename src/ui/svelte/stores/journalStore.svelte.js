@@ -1,6 +1,10 @@
 import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
 import { RUN_KINDS, runActivityKind } from '../util/journalRunKinds.js';
-import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
+import {
+  isResolvedFailureOutcome,
+  journalRedactedRefusal,
+  resolvedFailureMessage,
+} from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
@@ -306,8 +310,8 @@ export function createJournalStore({ services } = {}) {
       let message = safeCommandMessage(result?.message);
       if (outcome) message = resolvedFailureMessage(services?.localize);
       if (refused) {
-        const generic = services?.craftErrorMessage?.();
-        message = journalCommandRefusal(result, services?.localize, generic);
+        const refusal = run.redacted === true ? journalRedactedRefusal : journalCommandRefusal;
+        message = refusal(result, services?.localize, services?.craftErrorMessage?.());
         setCommandError(request, message);
       }
       notifyEach(services, [message, spentDiceNotice(result, services?.localize)]);

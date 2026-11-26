@@ -1496,7 +1496,9 @@
           "RewardOwnerDetail": "This character's owner or the GM chooses it.",
           "RewardGmDetail": "Your GM can choose this reward for you.",
           "ChoiceTitle": "Waiting on your choice",
-          "ChoiceDetail": "Nothing is counting down: this stage needs you to choose how to meet it before it can go on."
+          "ChoiceDetail": "Nothing is counting down: this stage needs you to choose how to meet it before it can go on.",
+          "RedactedChoiceTitle": "A choice is waiting on this stage",
+          "RedactedChoiceDetail": "Its details are hidden from you. Your GM can make it, or you can once the recipe is revealed to you. You can also cancel the run."
         },
         "Recovery": {
           "Title": "Release the retained execution claim",
@@ -1712,6 +1714,7 @@
           "Wait": "{time} to wait",
           "BeginStep": "Begin step",
           "BeginStepPrompt": "Begins the step now: locks these choices, consumes the materials listed and starts the clock. It cannot be undone.",
+          "RedactedBeginStepPrompt": "Begins the step now: consumes the materials it needs and starts the clock. Its details are hidden from you, and it cannot be undone.",
           "RollCheck": "Roll check",
           "RollD100": "Roll a d100",
           "Complete": "Complete",
@@ -1754,6 +1757,14 @@
           "RouteRequired": "Choose this stage's route before it can begin.",
           "AwardChoicePending": "Choose the reward an earlier stage left you before this stage can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",
+          "Redacted": {
+            "RouteRequired": "This stage needs a route chosen, which only your GM can do while the recipe is hidden from you.",
+            "ChoiceRequired": "This stage needs choices made, which only your GM can make while the recipe is hidden from you.",
+            "AwardChoicePending": "A reward from an earlier stage is waiting to be chosen. Your GM can choose it for you, and this stage can begin afterwards.",
+            "ToolRequired": "This stage needs a tool you do not hold, and the recipe is hidden from you. Ask your GM which one, or cancel the run.",
+            "SelectionRequired": "You do not hold everything this stage needs, and the recipe is hidden from you. Ask your GM what is missing, or cancel the run.",
+            "EssenceRequired": "You do not hold everything this stage needs, and the recipe is hidden from you. Ask your GM what is missing, or cancel the run."
+          },
           "Completion": {
             "Label": "When ready",
             "Manual": "Ask me",

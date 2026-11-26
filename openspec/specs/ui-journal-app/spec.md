@@ -320,6 +320,15 @@ A redacted crafting run retains its manual-advance compatibility signal and the 
 Legacy crafting requires manual advancement: its world-time processing only flips a matured `waitingTime` step to `inProgress`.
 Versioned checks and automatic blockers also require owner actions, so redaction must not suppress those affordances.
 Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
+- A redacted versioned crafting run at an unstarted stage's start boundary shows its begin control, because beginning a stage is an owner action its lifecycle permits (issue 3033).
+The control is enabled exactly when the engine would commit the stage, judged on the shared readiness predicate a visible run uses.
+The viewer receives only the resulting `actions.disabledReason` code, never the route, requirement, choice, tool or essence detail it was judged from.
+Making a pick reads the stage's routes and options, which are identity, so a redacted viewer is offered no pick.
+A stage that owes one (`routeRequired`, `choiceRequired` or `awardChoicePending`) shows begin disabled with that code.
+It is resolved by the GM, by the viewer once the recipe is visible to them again, or by cancelling.
+A stage that owes a route or option pick also says so in an info notice.
+A redacted run's begin prompt and reasons are worded for a viewer who sees no route, material or tool.
+A refused command on a redacted run is reported by its localized reason, never by the engine's sentence, which can name a hidden tool or ingredient.
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 - The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.

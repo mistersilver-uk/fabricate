@@ -82,6 +82,7 @@ import {
   selectedIngredientIndex,
 } from './runJournalIngredientOptions.js';
 import { nativeRecoveryProjection } from './runJournalNativeRecovery.js';
+import { craftingStageModels } from './runJournalRedactedStage.js';
 import { craftingFailureReason, stepFailureText } from './stepFailureText.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -603,30 +604,28 @@ export class RunJournalBuilder {
 
     const systemId = stringOrNull(run.craftingSystemId);
     const availability =
-      redacted || terminal
+      terminal || (redacted && !recipe)
         ? null
         : this._stageAvailability({ actor, run, recipe, fallback: snapshot });
-    const steps = redacted
-      ? []
-      : runSteps.map((runStep, index) =>
-          this._craftingStepModel({
-            runStep,
-            recipeStep: recipeSteps[index] ?? null,
-            system,
-            recipe,
-            index,
-            systemId,
-            actor,
-            run,
-            availability,
-            isCurrent: !terminal && index === currentStepIndex,
-            terminal,
-            historyEntitled,
-            entitledHistory,
-          })
-        );
-    const currentStep =
-      activeStep && Number.isFinite(currentStepIndex) ? (steps[currentStepIndex] ?? null) : null;
+    const { steps, currentStep, readiness } = craftingStageModels({
+      buildStep: (args) => this._craftingStepModel(args),
+      redacted,
+      runSteps,
+      recipeSteps,
+      currentStepIndex,
+      activeStep,
+      shared: {
+        system,
+        recipe,
+        systemId,
+        actor,
+        run,
+        availability,
+        terminal,
+        historyEntitled,
+        entitledHistory,
+      },
+    });
 
     const derivedStatus = this._deriveCraftingStatus({ status, activeStep, worldTime, run });
     // Active browsing follows the enabled multi-step feature. A terminal account
@@ -653,7 +652,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
-      selectionAvailability: this._awardHeld(run, actor, currentStep?.selectionAvailability),
+      selectionAvailability: this._awardHeld(run, actor, readiness),
       stageStart: this._stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
@@ -2537,7 +2536,7 @@ export class RunJournalBuilder {
       derivedStatus !== 'paused' &&
       !materialBlocked &&
       !awaitingStageStart &&
-      !choiceRequired;
+      !isChoiceBlocker(stageBlocker);
     const legacyExecute =
       lifecycleContract === 'legacy' &&
       live &&
@@ -2640,8 +2639,7 @@ export class RunJournalBuilder {
     // decision, not the ordinary primary — so gating `beginStep` on the player's own
     // unmade choice can never also make the control disappear and hand back an
     // enabled primary that the command refuses.
-    const atStageStart =
-      mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart && entitled;
+    const atStageStart = mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart;
     return {
       execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
       pause:

@@ -300,6 +300,9 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'waiting-open-choice': 'rivets',
   'stage-not-started': 'rivets',
   'awaiting-choice': 'buckler',
+  // Issue 3033: the same two stages, their recipe hidden from the lab player.
+  'redacted-stage-start': 'rivets',
+  'redacted-stage-pick': 'buckler',
   'stage-consumed': 'rivets',
   'stage-paid': 'canonical/currency-only-requirement',
   'current-choice-closed': 'rivets',
@@ -355,6 +358,9 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   wide: 'rivets',
   narrow: 'rivets',
 });
+
+/** The states whose bound recipe is restricted and granted to nobody, so a player sees it redacted. */
+export const REDACTED_STAGE_STATES = Object.freeze(['redacted-stage-start', 'redacted-stage-pick']);
 
 function requirements(id, entries) {
   return {
@@ -457,6 +463,8 @@ export function seedJournalPrototype(content, state, { component, recipe }) {
   const template = content.systems[0];
   for (const [key, spec] of Object.entries(JOURNAL_PROTOTYPE_RECIPES)) {
     const formula = spec.dc ? `1d20 + ${spec.mod}` : '';
+    const hidden =
+      REDACTED_STAGE_STATES.includes(state) && JOURNAL_PROTOTYPE_BINDINGS[state] === key;
     content.systems.push({
       ...structuredClone(template),
       id: systemId(key),
@@ -465,7 +473,7 @@ export function seedJournalPrototype(content, state, { component, recipe }) {
       components: recipeComponents(key, components),
       tools: [],
       essenceDefinitions: definitions,
-      visibilityMode: spec.mode === 'alchemy' ? 'restricted' : 'global',
+      visibilityMode: hidden || spec.mode === 'alchemy' ? 'restricted' : 'global',
       features: { ...template.features, multiStepRecipes: true },
       alchemy: { ...template.alchemy, enabled: true, checkMode: 'simple' },
       craftingCheck: {
@@ -487,7 +495,7 @@ export function seedJournalPrototype(content, state, { component, recipe }) {
     content.recipes.push(
       recipe(journalPrototypeRecipeId(key), spec.name, systemId(key), raster, {
         description: spec.description ?? '',
-        access: { playerIds: ['user-lab-player'], characterIds: [] },
+        access: { playerIds: hidden ? [] : ['user-lab-player'], characterIds: [] },
         steps: steps.length > 1 ? steps : [],
         ...(steps.length === 1 ? steps[0] : {}),
         id: journalPrototypeRecipeId(key),
