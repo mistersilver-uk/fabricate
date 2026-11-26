@@ -140,14 +140,21 @@ function hazardNote(hazards, { state, labels, localize }) {
   });
 }
 
-/** "Needs {a} and {b}", or the generic line when an unmet requirement reads a hidden counter. */
-function needsNote(action, { state, labels, localize }) {
+/** The unmet requirements as "{a} and {b}", or `''` when none is unmet or one reads a hidden counter. */
+function unmetRequirements(action, { state, labels, localize }) {
   const facts = stateFacts(state);
   const { combine, rules } = action.availability;
   const unmet = arrayOrEmpty(rules).filter((rule) => !evaluateCounterRule(rule, facts));
   const words = unmet.map((rule) => ruleText(rule, labels, localize));
-  if (words.length === 0 || words.some((word) => !word)) return localize(K.needsHidden);
-  return localize(K.needs, { requirements: listText(words, combine, localize) });
+  if (words.length === 0 || words.some((word) => !word)) return '';
+  return listText(words, combine, localize);
+}
+
+/** "Needs {a} and {b}", or the generic line when an unmet requirement reads a hidden counter. */
+function needsNote(action, context) {
+  const requirements = unmetRequirements(action, context);
+  if (!requirements) return context.localize(K.needsHidden);
+  return context.localize(K.needs, { requirements });
 }
 
 function shortNote(detail, { labels, localize }) {
@@ -184,6 +191,20 @@ function busyNote(action, { state, localize }) {
   return localize(K.working, { session: Number(state?.sessionCount ?? 0) + 1 });
 }
 
+/** What a refusal of this card names: its unmet requirements, and its visible cost entries. */
+function refusalFacts(action, context) {
+  const { labels } = context;
+  const costEntries = {};
+  for (const entry of arrayOrEmpty(action.costs)) {
+    if (labels.counter(entry?.counterId)) costEntries[entry.id] = entry.counterId;
+  }
+  return {
+    requirements: unmetRequirements(action, context),
+    costEntries,
+    effectIds: arrayOrEmpty(action.effects).map((entry) => entry?.id),
+  };
+}
+
 function cardOf(action, context) {
   const preflight = preflightAttempt({
     state: context.state,
@@ -207,10 +228,12 @@ function cardOf(action, context) {
     noteText: note.text,
     noteTone: note.tone,
     busyNote: busyNote(action, context),
+    free: action.usesSession === false,
     ...(note.note === 'waiting' && { availableAt: context.availableAt }),
     costs: chips,
     hazards: hazards.map(({ rule, ...chip }) => chip),
     noCost: chips.length === 0 && hazards.length === 0 && !hiddenCost,
+    ...refusalFacts(action, context),
   };
 }
 

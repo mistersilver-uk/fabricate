@@ -32,17 +32,36 @@ export function outcomeNames(craftingCheck) {
 export const outcomeLabel = (check, outcomes, localize) =>
   outcomes.get(check?.outcomeId) ?? localize(check?.success ? K.success : K.failure);
 
-/** What the CHECK reading says: private, none, or "{outcome} · {value}" in its tone. */
+/** What the CHECK reading says: private, none, or "{outcome} · {value}" in its tone, with its parts. */
 export function checkReading(check, { rolls, privately, outcomes, localize }) {
   if (privately || (check == null && rolls)) {
-    return { text: localize(K.private), tone: null, private: true };
+    return {
+      text: localize(K.private),
+      tone: null,
+      private: true,
+      outcome: null,
+      value: null,
+      success: null,
+    };
   }
-  if (check == null) return { text: localize(K.noCheck), tone: null, private: false };
+  if (check == null) {
+    return {
+      text: localize(K.noCheck),
+      tone: null,
+      private: false,
+      outcome: null,
+      value: null,
+      success: null,
+    };
+  }
   const outcome = outcomeLabel(check, outcomes, localize);
   return {
     text: localize(K.check, { outcome, value: check.value }),
     tone: check.success ? 'positive' : 'warning',
     private: false,
+    outcome,
+    value: check.value,
+    success: check.success === true,
   };
 }
 

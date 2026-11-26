@@ -123,7 +123,7 @@ function counterView(row, context) {
   const value = Number(row.value);
   const meta = arrayOrEmpty(library.counters).find((entry) => entry?.id === counterId);
   const instance = arrayOrEmpty(library.instances).find((entry) => entry?.counterId === counterId);
-  const { max } = effectiveBounds(counterId, library);
+  const { min, max } = effectiveBounds(counterId, library);
   const read = {
     value,
     max,
@@ -148,6 +148,7 @@ function counterView(row, context) {
     description: meta?.description ?? '',
     value,
     scale,
+    min,
     max,
     target: read.target,
     tone: toneOf(read),
@@ -184,6 +185,7 @@ export function recordCounterViews({ state, labels, hiddenIds, markedIds }) {
       description: '',
       value: Number(value),
       scale: null,
+      min: null,
       max: null,
       target: null,
       tone: null,

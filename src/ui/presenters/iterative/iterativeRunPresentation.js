@@ -103,6 +103,12 @@ function startedWithRows(state, labels, localize) {
     });
 }
 
+/** `{ counterId: label }` for the library counters this viewer may see, so a refusal can name one. */
+function visibleCounterLabels(counters, labels) {
+  const named = arrayOrEmpty(counters).map((entry) => [entry?.id, labels.counter(entry?.id)]);
+  return Object.fromEntries(named.filter(([, label]) => label));
+}
+
 function namedRows(state, labels) {
   return arrayOrEmpty(state?.counters)
     .filter((row) => labels.counter(row?.counterId))
@@ -276,6 +282,8 @@ function livePresentation(ctx) {
     ...sharedFields(ctx, { state, counters, hiddenCount, startedWith, ended }),
     boundary: boundaryOf(ctx, { state, routes, counters, progress, goal }),
     cards,
+    nextSession: state && !ended ? Number(state.sessionCount ?? 0) + 1 : null,
+    counterLabels: visibleCounterLabels(ctx.terms.iterative?.counters, labels),
     routes,
     sessions: sessionRows(state, {
       labels,
@@ -306,6 +314,8 @@ function recordPresentation(ctx) {
     ...sharedFields(ctx, { state, counters, hiddenCount, startedWith, ended: true }),
     boundary: null,
     cards: [],
+    nextSession: null,
+    counterLabels: {},
     routes: null,
     sessions: sessionRows(state, {
       labels,
@@ -386,8 +396,8 @@ function contextOf({ run, model, actor, viewer, system, recipe, localize, checkL
 /**
  * `{}` for a run that is not iterative, else `{ iterative, derivedStatus, stepLabel }`, spread
  * over the run model. `iterative` holds `redacted`, `supported`, `viewer`, `focusStepIndex`,
- * `boundary`, `meta`, `counters`, `hiddenCount`, `startedWith`, `cards`, `routes`, `sessions`,
- * `compactedCount`, `progress` and `goal`.
+ * `boundary`, `meta`, `counters`, `hiddenCount`, `startedWith`, `cards`, `nextSession`,
+ * `counterLabels`, `routes`, `sessions`, `compactedCount`, `progress` and `goal`.
  */
 export function iterativeRunFields(args) {
   const ctx = contextOf(args);
