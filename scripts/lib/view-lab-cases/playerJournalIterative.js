@@ -228,7 +228,7 @@ export const CASES = Object.freeze([
     label: 'Player Journal — workpiece failed with a set',
     query: workpiece('failed'),
     steps: [press('hammer'), { selector: '[data-journal-verdict]', scroll: true }],
-    expectSelector: '[data-journal-verdict] [data-list-row]',
+    expectSelector: '[data-journal-verdict="failed"] [data-list-row]',
   }),
   workpieceCase({
     id: 'player-journal-iterative-failed-nothing',
