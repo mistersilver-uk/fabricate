@@ -273,14 +273,16 @@ describe('The Workpiece view', () => {
     );
 
     harness.remount();
-    const ahead = await mount(workpieceModel('iterative-future-step'));
+    const later = workpieceModel('iterative-future-step');
+    const ahead = await mount(later);
     await click(query(ahead, '[data-stage-nav-index="1"]'));
     const future = query(
       ahead,
       '[data-iterative-step-card="1"][data-iterative-step-view="future"]'
     );
     assert.ok(Boolean(future));
-    assert.ok(Boolean(query(future, '[data-stage-fact="starts"]')), 'it says what it starts with');
+    const carried = later.iterative.progress.stages[1].carriedWith;
+    assert.ok(carried && query(future, '[data-stage-fact="starts"]').textContent.includes(carried));
     assert.ok(Boolean(query(future, '[data-stage-io="consumed"]')), 'it lists what it takes');
     const produced = query(future, '[data-stage-io="produced"]');
     assert.match(produced.textContent, new RegExp(K('Step.WillProduceOne')));

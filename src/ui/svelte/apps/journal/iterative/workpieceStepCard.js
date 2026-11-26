@@ -84,7 +84,7 @@ export function stepHeading(stage, view, localize) {
 }
 
 /** A frozen card's facts: its time, check and rules, then how it ended or what it starts with. */
-export function frozenFacts({ stage, runStep, view, heading, carried, localize }) {
+export function frozenFacts({ stage, runStep, view, heading, localize }) {
   const seconds = Number(runStep?.detail?.requiredSeconds);
   const rows = [
     [
@@ -98,7 +98,7 @@ export function frozenFacts({ stage, runStep, view, heading, carried, localize }
     ['fails', '', K.failsWhen, stage?.failsWhen ?? ''],
     view === 'past'
       ? ['ended', '', K.ended, heading.sub]
-      : ['starts', '', K.startsWith, stage?.startsWith || carried || ''],
+      : ['starts', '', K.startsWith, stage?.startsWith || stage?.carriedWith || ''],
   ];
   return rows
     .map(([id, icon, label, value]) => ({ id, icon, label: localize(label), value }))

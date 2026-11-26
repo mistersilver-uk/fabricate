@@ -107,7 +107,7 @@ function iterativeRun({
       progress: {
         stages: [
           { name: 'Forge 1', failure: [] },
-          { name: 'Forge 2', failure: [] },
+          { name: 'Forge 2', failure: [], carriedIds: ['heat', 'fuel'] },
         ],
       },
       goal: null,

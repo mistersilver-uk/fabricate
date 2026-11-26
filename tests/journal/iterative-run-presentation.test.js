@@ -729,6 +729,26 @@ describe('hidden counters (D18) and redaction', () => {
     assert.doesNotMatch(entry.iterative.progress.stages[1].startsWith, /Heat/);
   });
 
+  test('a future step’s carried counters and the boundary verdict drop that step’s hidden ids', () => {
+    const hideHeat = (run) => (run.termsSnapshot.recipe.steps[1].iterative.hiddenCounterIds = ['heat']);
+    const ahead = model('iterative-cards').iterative.progress.stages[1];
+    assert.equal(ahead.carriedWith, 'Shape 0, Integrity 12 and Heat 40');
+    const hidden = model('iterative-cards', { mutate: hideHeat }).iterative;
+    assert.equal(hidden.progress.stages[1].carriedWith, 'Shape 0 and Integrity 12');
+    assert.deepEqual(hidden.progress.stages[1].carriedIds, ['shape', 'integrity']);
+    assert.equal(hidden.progress.stages[0].carriedWith, '');
+    const boundary = model('iterative-starting', { mutate: hideHeat }).iterative;
+    assert.match(boundary.boundary.verdict.detail, /including Shape 60 and Integrity 9\.$/);
+    const counters = [
+      { counterId: 'shape', label: 'Shape', value: 70 },
+      { counterId: 'heat', label: 'Heat', value: 20 },
+    ];
+    const pressed = { ...hidden, boundary: null };
+    const ended = { kind: 'success', resultGroupId: null };
+    const verdict = iterativeStepEndVerdict(pressed, { stepEnd: ended, counters }, localize);
+    assert.match(verdict.detail, /including Shape 70\.$/);
+  });
+
   test('a redacted run keeps its cards, counters and sessions but no routes, goal or names', () => {
     const { iterative } = model('iterative-redacted');
     assert.equal(iterative.redacted, true);

@@ -154,6 +154,7 @@ function stageOf(index, ctx) {
   const failure = live ? visibleRules(step?.failure) : [];
   const groupId = state?.terminal?.resultGroupId ?? null;
   const set = rawGroups(recipeLike, index).find((group) => group?.id === groupId);
+  const carried = live && index === ctx.focusStepIndex + 1 ? namedRows(ctx.state, labels) : [];
   return {
     index,
     name: redacted
@@ -181,6 +182,8 @@ function stageOf(index, ctx) {
         : { groups: 0, items: [] },
     startsWith: state ? namedCounters(startedWithRows(state, labels, localize), localize) : '',
     endedWith: state?.terminal ? namedCounters(namedRows(state, labels), localize) : '',
+    carriedWith: namedCounters(carried, localize),
+    carriedIds: carried.map((row) => row.counterId),
   };
 }
 
@@ -244,6 +247,7 @@ function boundaryOf(ctx, { state, routes, counters, progress, goal }) {
     redacted: ctx.redacted,
     set: tier ?? null,
     counters: counters.map(({ counterId, label, value }) => ({ counterId, label, value })),
+    carried: namedRows(state, ctx.labelsOf(focus + 1)),
     goal,
     next: next ? { index: focus + 1, name: next.name } : null,
     localize: ctx.localize,

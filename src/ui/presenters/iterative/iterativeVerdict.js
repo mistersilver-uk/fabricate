@@ -43,7 +43,7 @@ export function namedCounters(counters, localize) {
   );
 }
 
-function successDetail({ set, counters, next, localize }) {
+function successDetail({ set, counters, carried, next, localize }) {
   const values = new Map(counters.map((row) => [row.counterId, row]));
   const chose = set?.rule && values.get(set.rule.counterId);
   const reaches =
@@ -55,9 +55,9 @@ function successDetail({ set, counters, next, localize }) {
       threshold: thresholdText(set.rule.op, set.rule.value, localize),
     });
   if (!next) return sentences(reaches, localize(K.finished));
-  const carried = namedCounters(counters, localize);
-  const onward = carried
-    ? localize(K.nextCarries, { index: next.index + 1, name: next.name, counters: carried })
+  const named = namedCounters(carried, localize);
+  const onward = named
+    ? localize(K.nextCarries, { index: next.index + 1, name: next.name, counters: named })
     : localize(K.next, { index: next.index + 1, name: next.name });
   return sentences(reaches, onward);
 }
@@ -82,7 +82,8 @@ function failureDetail({ set, counters, failure, goal, localize }) {
 /**
  * `{ end, tone, icon, title, detail, yields }` for a step that ended in `end`. `set` is the
  * selected tier `{ name, rule, yields }` or `null`, `counters` the final counters the viewer may
- * see, `failure` the step's visible failure rules, and `next` the following step `{ index, name }`.
+ * see, `carried` those the next step shows (default `counters`), `failure` the step's visible
+ * failure rules, and `next` the following step `{ index, name }`.
  */
 export function iterativeVerdict({
   end,
@@ -90,6 +91,7 @@ export function iterativeVerdict({
   redacted,
   set = null,
   counters = [],
+  carried = counters,
   failure = [],
   goal = null,
   next = null,
@@ -102,7 +104,7 @@ export function iterativeVerdict({
     : localize(named ? K.failedSet : K.failed, { step, set: set?.name });
   let detail;
   if (redacted) detail = success ? localize(next ? K.redactedNext : K.finished) : '';
-  else if (success) detail = successDetail({ set, counters, next, localize });
+  else if (success) detail = successDetail({ set, counters, carried, next, localize });
   else detail = failureDetail({ set, counters, failure, goal, localize });
   return {
     end: success ? 'success' : 'failure',
@@ -115,7 +117,8 @@ export function iterativeVerdict({
 
 /**
  * The verdict of the step `iterative` describes, for a `stepEnd` (`{ kind, resultGroupId }`)
- * whose final `counters` the caller derived from that projection's own D18-filtered counters.
+ * whose final `counters` the caller derived from that projection's own D18-filtered counters;
+ * the next step carries only the ones its stage lists in `carriedIds`.
  */
 export function iterativeStepEndVerdict(iterative, { stepEnd, counters }, localize) {
   const focus = iterative.focusStepIndex;
@@ -124,12 +127,14 @@ export function iterativeStepEndVerdict(iterative, { stepEnd, counters }, locali
     (entry) => entry.id === stepEnd?.resultGroupId
   );
   const next = stepEnd?.kind === 'success' ? stages[focus + 1] : null;
+  const carriedIds = new Set(arrayOrEmpty(next?.carriedIds));
   return iterativeVerdict({
     end: stepEnd?.kind,
     step: stages[focus]?.name ?? '',
     redacted: iterative.redacted === true,
     set: tier ?? null,
     counters,
+    carried: counters.filter((row) => carriedIds.has(row.counterId)),
     failure: stages[focus]?.failure,
     goal: iterative.goal,
     next: next ? { index: focus + 1, name: next.name } : null,

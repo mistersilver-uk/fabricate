@@ -10,7 +10,6 @@
   import RunProgress from '../../../components/RunProgress.svelte';
   import StageCard from '../../../components/StageCard.svelte';
   import StageNav from '../../../components/StageNav.svelte';
-  import { namedCounters } from '../../../../presenters/iterative/iterativeVerdict.js';
   import SessionsTable from './SessionsTable.svelte';
   import WorkpieceStep from './WorkpieceStep.svelte';
   import { focusSettled } from './workpieceFocus.js';
@@ -42,9 +41,6 @@
   const pressed = $derived(journal?.iterative?.pressed ?? null);
   const saving = $derived(pressed?.runKey === runKey);
   const anyBusy = $derived(Boolean(journal?.busyRunKey));
-  const carried = $derived(
-    viewed === focus + 1 ? namedCounters(iterative.counters ?? [], localize) : ''
-  );
 
   let root = $state(null);
   let lastSerial = untrack(() => journal?.iterative?.settled?.serial ?? 0);
@@ -109,7 +105,7 @@
         body={view === 'live' ? live : null}
         facts={view === 'live'
           ? []
-          : frozenFacts({ stage, runStep, view, heading, carried, localize })}
+          : frozenFacts({ stage, runStep, view, heading, localize })}
         io={view === 'live' ? [] : frozenIo({ stage, runStep, view, localize })}
         note={view === 'live' ? '' : frozenNote(view, localize)}
       />
