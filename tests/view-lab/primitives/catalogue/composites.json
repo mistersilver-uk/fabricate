@@ -1120,13 +1120,14 @@
     "data": {
       "icon": "fas fa-bolt",
       "title": "When",
+      "connective": true,
       "removeLabel": "Remove rule",
       "sourceLabel": "Heat",
       "opLabel": "≥",
       "selectSize": "inline",
       "valueLabel": "Value"
     },
-    "note": "Wired as `CounterRuleList` wires a counter predicate: the rule carries no sentence of its own, because the caller combines its siblings with All or Any and states that once above the list; its source, comparison and value are the field chain, drawn through `Select` and `Stepper`."
+    "note": "Wired as `CounterRuleList` wires a counter predicate: the rule carries no sentence of its own, because the caller combines its siblings with All or Any and states that once above the list; its source, comparison and value are the field chain, drawn through `Select` and `Stepper`. Its \"When\" passes `head.connective`, so it draws muted at weight 500."
   },
   {
     "spec": "<SortableList>",
