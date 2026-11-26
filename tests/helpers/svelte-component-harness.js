@@ -475,6 +475,7 @@ export const WORKPIECE_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/journal/iterative/ActionCard.svelte',
   'src/ui/svelte/apps/journal/iterative/AttemptLedger.svelte',
   'src/ui/svelte/apps/journal/iterative/CounterCard.svelte',
+  'src/ui/svelte/apps/journal/iterative/CounterSection.svelte',
   'src/ui/svelte/apps/journal/iterative/SessionsTable.svelte',
   'src/ui/svelte/apps/journal/iterative/WorkpieceStep.svelte',
   'src/ui/svelte/apps/journal/iterative/WorkpieceView.svelte',

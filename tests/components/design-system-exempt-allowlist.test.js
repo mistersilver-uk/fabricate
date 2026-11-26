@@ -210,6 +210,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/journal/iterative/CounterCard.svelte': 1 },
   ],
   [
+    'a composition of the Kicker and CounterCard members, shared by the live workpiece and its ' +
+      'closed record rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/journal/iterative/CounterSection.svelte': 1 },
+  ],
+  [
     'a composition of the DataTable and Chip members, shared by the live workpiece and its closed ' +
       'record rather than offered as a vocabulary member',
     { 'src/ui/svelte/apps/journal/iterative/SessionsTable.svelte': 1 },

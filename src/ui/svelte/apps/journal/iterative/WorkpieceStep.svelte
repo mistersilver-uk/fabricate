@@ -8,10 +8,9 @@
   import OutcomeLadder from '../../../components/OutcomeLadder.svelte';
   import { quantityText } from '../runDetailPresentation.js';
   import ActionCard from './ActionCard.svelte';
-  import CounterCard from './CounterCard.svelte';
+  import CounterSection from './CounterSection.svelte';
 
   const K = Object.freeze({
-    kicker: 'FABRICATE.App.Journal.Iterative.Workpiece.Kicker',
     saved: 'FABRICATE.App.Journal.Iterative.Workpiece.Saved',
     saving: 'FABRICATE.App.Journal.Iterative.Workpiece.Saving',
     actions: 'FABRICATE.App.Journal.Iterative.Workpiece.ActionsKicker',
@@ -49,11 +48,7 @@
 </script>
 
 <div class="workpiece-step">
-  <section class="workpiece-step-section">
-    <div class="workpiece-step-heading">
-      <Kicker as="span">{localize(K.kicker)}</Kicker>
-      <span class="workpiece-step-caption">{caption}</span>
-    </div>
+  <CounterSection counters={iterative.counters ?? []} {caption}>
     {#if !iterative.redacted && tiers.length > 0}
       <OutcomeLadder
         {tiers}
@@ -65,12 +60,7 @@
         failureLabel={localize(K.failure)}
       />
     {/if}
-    <div class="workpiece-counters">
-      {#each iterative.counters ?? [] as counter (counter.counterId)}
-        <CounterCard {counter} />
-      {/each}
-    </div>
-  </section>
+  </CounterSection>
   <section class="workpiece-step-section">
     <div class="workpiece-step-heading">
       <Kicker as="span">{localize(K.actions)}</Kicker>
@@ -100,11 +90,6 @@
   .workpiece-step-caption {
     font-size: 10.5px;
     color: var(--fab-text-muted);
-  }
-  .workpiece-counters {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--fab-space-2);
   }
   .workpiece-cards {
     display: grid;
