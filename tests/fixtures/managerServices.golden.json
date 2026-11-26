@@ -9,6 +9,7 @@
     "eraseLearnedRecipe": "function",
     "expendRecipeItemUse": "function",
     "getAccessCharacterActors": "function",
+    "getActiveIterativeRuns": "function",
     "getActorOptions": "function",
     "getActorRollData": "function",
     "getActorUuidsInSceneRegion": "function",
@@ -91,6 +92,16 @@
         "img": "icons/grond.webp",
         "name": "Grond",
         "sharedWithAllPlayers": false
+      }
+    ],
+    "getActiveIterativeRuns": [
+      {
+        "actionIds": [
+          "strike",
+          "stoke"
+        ],
+        "craftingSystemId": "sys-1",
+        "recipeId": "recipe-alpha"
       }
     ],
     "getActorOptions": [

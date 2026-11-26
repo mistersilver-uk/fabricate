@@ -24,6 +24,7 @@ import {
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   buildLabActors,
@@ -33,7 +34,12 @@ import {
 import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
-import { LAB_ITERATIVE_STATES, seedIterativeState } from './view-lab/world/labIterative.js';
+import {
+  LAB_ITERATIVE_RECIPE_STATES,
+  LAB_ITERATIVE_STATES,
+  seedIterativeRecipes,
+  seedIterativeState,
+} from './view-lab/world/labIterative.js';
 import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
@@ -100,6 +106,21 @@ function modifierLibraryIds() {
     ].map((entry) => entry.id)
   );
 }
+
+/** The Ironworks recipe ids a frame seeds through `query.iterativeRecipes`, which a step may open. */
+function ironworksRecipeIds() {
+  const seeded = buildLabContent();
+  seedIterativeState(seeded, 'populated');
+  seedIterativeRecipes(seeded, buildLabActors(seeded), 'authoring');
+  return seeded.recipes.map((entry) => entry.id);
+}
+const IRONWORKS_RECIPE_IDS = ironworksRecipeIds();
+
+/** The ids only a frame that seeds `query.iterativeRecipes` holds, so only such a case may name them. */
+const SEEDED_IRONWORKS_SOURCES = Object.freeze({
+  'data-recipe-id': new Set(IRONWORKS_RECIPE_IDS),
+  'data-recipe-edit': new Set(IRONWORKS_RECIPE_IDS),
+});
 
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
@@ -187,14 +208,17 @@ function attributePairs(selector) {
 
 /**
  * The identifier pins in a selector that `IDENTITY_SOURCES` recognises, each marked with whether
- * its value exists in the lab world.
+ * its value exists in the lab world `viewCase` opens, which holds the Ironworks recipes only when
+ * the case seeds them (issue 3010).
  */
-function identifierPins(selector) {
+function identifierPins(selector, viewCase) {
+  const seeded = Boolean(viewCase?.query?.iterativeRecipes);
   const pins = [];
   for (const { name, value } of attributePairs(selector)) {
     const source = IDENTITY_SOURCES[name];
     if (!source || value === '') continue;
-    pins.push({ name, value, known: source.has(value) });
+    const known = source.has(value) || (seeded && SEEDED_IRONWORKS_SOURCES[name]?.has(value));
+    pins.push({ name, value, known: Boolean(known) });
   }
   return pins;
 }
@@ -271,6 +295,126 @@ test('the lab world holds no iterative system unless a frame asks for one', () =
   }
 });
 
+test('every query.iterativeRecipes names a recipe state the lab seeds, beside an iterative one', () => {
+  const unknown = [];
+  let named = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    const state = viewCase.query?.iterativeRecipes;
+    if (!state) continue;
+    named += 1;
+    if (!Object.hasOwn(LAB_ITERATIVE_RECIPE_STATES, state))
+      unknown.push(`${viewCase.id}: ${state}`);
+    if (!viewCase.query.iterative) unknown.push(`${viewCase.id}: sets no iterative state`);
+  }
+  assert.ok(named > 0, 'no case names an iterative recipe state, so this sweep proves nothing');
+  assert.deepEqual(unknown, [], `these cases cannot seed their recipes: ${unknown.join(', ')}`);
+});
+
+/** Issue 3010's reachable-state matrix, one case per row, written out by hand. */
+const ITERATIVE_RECIPE_CASE_IDS = Object.freeze([
+  'manager-recipes-iterative',
+  'manager-recipe-edit-iterative',
+  'manager-recipe-edit-iterative-counters-empty',
+  'manager-recipe-edit-iterative-counters-no-library',
+  'manager-recipe-edit-iterative-counters-bounds',
+  'manager-recipe-edit-iterative-counters-bad-bounds',
+  'manager-recipe-edit-iterative-counters-all-used',
+  'manager-recipe-edit-iterative-counter-unknown',
+  'manager-recipe-edit-iterative-step-all',
+  'manager-recipe-edit-iterative-step-only',
+  'manager-recipe-edit-iterative-step-none',
+  'manager-recipe-edit-iterative-no-success-rule',
+  'manager-recipe-edit-iterative-rule-untracked',
+  'manager-recipe-edit-iterative-multistep',
+  'manager-recipe-edit-iterative-single-locked',
+  'manager-recipe-edit-iterative-step-issues',
+  'manager-recipe-edit-iterative-enter-multistep',
+  'manager-recipe-edit-iterative-collapse-confirm',
+  'manager-recipe-edit-iterative-multistep-off',
+  'manager-recipe-edit-iterative-steps-multi-narrow',
+  'manager-recipe-edit-iterative-mid-run',
+  'manager-recipe-edit-iterative-results',
+  'manager-recipe-edit-iterative-results-never',
+  'manager-recipe-edit-iterative-results-empty',
+  'manager-recipe-edit-iterative-results-narrow',
+  'manager-recipe-edit-iterative-validation',
+  'manager-recipe-edit-iterative-validation-ready',
+  'manager-recipe-edit-iterative-narrow',
+  'manager-iterative-action-edit-in-progress',
+]);
+
+test('every iterative recipe matrix row has its own case, and no other case seeds the recipes', () => {
+  const byId = new Map(VIEW_LAB_CASES.map((viewCase) => [viewCase.id, viewCase]));
+  const seeding = VIEW_LAB_CASES.filter((viewCase) => viewCase.query?.iterativeRecipes);
+  assert.deepEqual(
+    seeding.map((viewCase) => viewCase.id).sort(byCodePoint),
+    [...ITERATIVE_RECIPE_CASE_IDS].sort(byCodePoint)
+  );
+  for (const id of ITERATIVE_RECIPE_CASE_IDS) {
+    const viewCase = byId.get(id);
+    assert.equal(viewCase.reaches, 'beyond', `${id} is beyond the smoke walk`);
+    assert.deepEqual(viewCase.smokeLabels, [], id);
+    assert.ok(viewCase.expectView && viewCase.expectSelector, `${id} states its view and state`);
+  }
+  const selectors = ITERATIVE_RECIPE_CASE_IDS.map((id) => byId.get(id).expectSelector);
+  assert.equal(new Set(selectors).size, selectors.length, 'each row asserts its own state');
+  for (const control of ['manager-recipes-normal', 'manager-recipe-edit-normal']) {
+    assert.equal(
+      byId.get(control)?.query?.iterativeRecipes,
+      undefined,
+      `${control} is the control`
+    );
+  }
+});
+
+test('the iterative recipe states leave every other world as it was', () => {
+  const base = buildLabContent();
+  const seeded = () => {
+    const content = structuredClone(base);
+    seedIterativeState(content, 'populated');
+    return content;
+  };
+  const without = seeded();
+  for (const absent of [null, undefined, '', 'nonsense', 'toString', '__proto__']) {
+    const content = seeded();
+    seedIterativeRecipes(content, [], absent);
+    assert.deepEqual(content, without, `${String(absent)} must leave the world as it was`);
+  }
+  const bare = structuredClone(base);
+  seedIterativeRecipes(bare, [], 'authoring');
+  assert.deepEqual(bare, base, 'a world with no Ironworks has nothing to author');
+});
+
+test('each iterative recipe state authors the Ironworks recipes once, by id', () => {
+  const expectedIds = [
+    'iw-r-blade',
+    'iw-r-hinge',
+    'iw-r-ingot',
+    'iw-r-nail',
+    'iw-r-rivet',
+    'iw-r-sword',
+  ];
+  for (const state of Object.keys(LAB_ITERATIVE_RECIPE_STATES)) {
+    const content = buildLabContent();
+    seedIterativeState(content, 'populated');
+    const actors = buildLabActors(content);
+    seedIterativeRecipes(content, actors, state);
+    const ids = content.recipes
+      .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.IRONWORKS)
+      .map((entry) => entry.id);
+    assert.deepEqual([...ids].sort(byCodePoint), expectedIds, state);
+    assert.equal(new Set(content.recipes.map((entry) => entry.id)).size, content.recipes.length);
+    const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
+    const held = new Set(system.components.map((entry) => entry.id));
+    assert.deepEqual([...held].sort(byCodePoint), ['iw-iron-bar', 'iw-steel-blade'], state);
+    for (const entry of held) {
+      assert.equal(content.components.filter((c) => c.id === entry).length, 1, `${state} ${entry}`);
+    }
+    assert.equal(system.features.multiStepRecipes, state !== 'multiStepOff', state);
+    assert.equal(system.iterative.counters.length === 0, state === 'noLibrary', state);
+  }
+});
+
 test('every iterative case asserts a selector of its own', () => {
   const selectors = new Map();
   for (const viewCase of VIEW_LAB_CASES) {
@@ -292,7 +436,7 @@ test('every fixture id a selector names exists in the lab world', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step !== 'object') continue;
-      for (const pin of identifierPins(step.selector)) {
+      for (const pin of identifierPins(step.selector, viewCase)) {
         if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
       }
     }
@@ -311,7 +455,7 @@ test('every fixture id an expectSelector names exists in the lab world', () => {
   let recognized = 0;
   for (const viewCase of VIEW_LAB_CASES) {
     if (typeof viewCase.expectSelector !== 'string') continue;
-    for (const pin of identifierPins(viewCase.expectSelector)) {
+    for (const pin of identifierPins(viewCase.expectSelector, viewCase)) {
       recognized++;
       if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
     }

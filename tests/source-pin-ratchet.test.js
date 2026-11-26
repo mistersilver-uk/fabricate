@@ -68,6 +68,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-layout-tools.js': 'legacy-scan',
   'tests/components/manager-mounted-shared.js': 'fixture',
   'tests/components/manager-rail-mounted.js': 'fixture',
+  'tests/components/manager-recipe-steps-mounted.js': 'fixture',
   'tests/components/manager-recipes-mounted.js': 'fixture',
   'tests/components/manager-systems-mounted.js': 'fixture',
   'tests/components/manager-tags-mounted.js': 'fixture',

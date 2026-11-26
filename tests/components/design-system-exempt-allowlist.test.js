@@ -183,6 +183,12 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/iterative/CounterRuleList.svelte': 1 },
   ],
   [
+    'a composition of SegmentedControl, SetPicker, DataTable, SelectionCheckbox and ' +
+      'CounterRuleList for one recipe step, shared by the single-step Working the recipe card ' +
+      'and the multi-step Steps card rather than offered as a vocabulary member',
+    { 'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepConfig.svelte': 1 },
+  ],
+  [
     "a composition of the Notice member with the iterative library's two fixed sentences, " +
       'shared by the Counters and Actions screens rather than offered as a vocabulary member',
     { 'src/ui/svelte/apps/manager/iterative/UnsupportedLibraryNotice.svelte': 1 },

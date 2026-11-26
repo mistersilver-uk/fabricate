@@ -12,6 +12,7 @@ import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { settingsKey } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { seedIterativeRecipes, seedIterativeState } from './view-lab/world/labIterative.js';
 import { seedSettings } from './view-lab/world/labWorld.js';
 
 const content = buildLabContent();
@@ -20,12 +21,22 @@ const parties = seedSettings(content, buildLabActors(content), null, true, false
 );
 const ids = (records) => new Set((records ?? []).map((record) => record.id));
 
+/** The recipes a frame reaches once `query.iterativeRecipes` authors the Ironworks ones. */
+function withIronworksRecipes() {
+  const seeded = buildLabContent();
+  seedIterativeState(seeded, 'populated');
+  seedIterativeRecipes(seeded, [], 'authoring');
+  return seeded.recipes;
+}
+const SEEDED_RECIPE_IDS = ids(withIronworksRecipes());
+
 /** The fixture collection each id-bearing attribute addresses. */
 const COLLECTION_BY_ATTRIBUTE = Object.freeze({
   'data-environment-id': ids(content.environments),
-  'data-recipe-edit': ids(content.recipes),
+  'data-recipe-edit': SEEDED_RECIPE_IDS,
   'data-recipe-select': ids(content.recipes),
-  'data-recipe-id': ids(content.recipes),
+  // The library rows a frame lists once it authors the Ironworks recipes too (issue 3010).
+  'data-recipe-id': SEEDED_RECIPE_IDS,
   'data-books-scrolls-edit': ids(content.recipeItems),
   'data-books-scrolls-select': ids(content.recipeItems),
   'data-component-id': ids(content.components),

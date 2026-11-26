@@ -164,6 +164,30 @@ const RAW_MODULES = [
   'src/utils/scalars.js',
   // The tag adder's exact component counts (issue 2430).
   'src/ui/model/vocabularyUsage.js',
+  // The editor's tab counts and modifier disposition, each a leaf beside its host (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/recipeModifierDisposition.js',
+  'src/ui/svelte/apps/manager/recipe/recipeTabCounts.js',
+  // The iterative Counters table's rows and copy, and the judges they read (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/iterativeCounterRows.js',
+  'src/ui/svelte/apps/manager/recipe/iterative/counterInstanceCopy.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeFieldFaults.js',
+  'src/systems/iterative/attemptLibrary.js',
+  'src/systems/iterative/expression.js',
+  'src/systems/expressionReader.js',
+  'src/systems/normalize/iterativeLibrary.js',
+  'src/ui/svelte/components/stepperLabels.js',
+  // The iterative step card's config reading, its rule copy, and the issues its chips count.
+  'src/ui/svelte/apps/manager/recipe/iterative/iterativeStepConfig.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeLibraryModel.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js',
+  // The iterative Validation rows' mapper and their words (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/iterativeRecipeReadiness.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeIssueCopy.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeEffectCopy.js',
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
+  'src/systems/iterative/iterativeReadiness.js',
+  'src/systems/iterative/iterativeTerms.js',
+  'src/systems/iterative/expressionReadiness.js',
 ];
 
 // The new tab + section components the editor shell composes.
@@ -255,6 +279,28 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
+  // The iterative Overview and its Counters table (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeOverview.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeCountersCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeCounterCell.svelte',
+  'src/ui/svelte/components/DataTable.svelte',
+  'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/apps/manager/iterative/FaultLine.svelte',
+  // The iterative step card, its rule lists and the per-step chip (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepConfig.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepActions.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepCounters.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepIssueChip.svelte',
+  'src/ui/svelte/apps/manager/iterative/CounterRuleList.svelte',
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
+  'src/ui/svelte/components/SetPicker.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // The iterative Results tab's sets and their Produced when lines (issue 3010).
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeResultsSection.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/ProducedWhenLines.svelte',
+  'src/ui/svelte/apps/manager/recipe/iterative/IterativeMidRunBanner.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 ];
 
@@ -292,6 +338,27 @@ const stepsHarness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
+    // The iterative step card, its rule lists and the per-step chip (issue 3010).
+    'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepConfig.svelte',
+    'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepActions.svelte',
+    'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepCounters.svelte',
+    'src/ui/svelte/apps/manager/recipe/iterative/IterativeStepIssueChip.svelte',
+    'src/ui/svelte/apps/manager/iterative/CounterRuleList.svelte',
+    'src/ui/svelte/apps/manager/iterative/FaultLine.svelte',
+    'src/ui/svelte/components/RuleRow.svelte',
+    'src/ui/svelte/components/RuleSentence.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
+    'src/ui/svelte/components/Avatar.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/DataTable.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',

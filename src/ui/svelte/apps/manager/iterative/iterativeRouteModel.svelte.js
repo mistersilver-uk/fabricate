@@ -1,7 +1,7 @@
 /**
- * The iterative library's route state: which Counter row is open, and the Crafting Action the
- * editor stages with its route-exit guard. Every input is a thunk read at call time, and the model
- * owns no effect.
+ * The iterative library's route state: which Counter row is open, the Crafting Action the editor
+ * stages with its route-exit guard, and what the recipe and action editors read about the recipe's
+ * issues and the active runs. Every input is a thunk read at call time.
  */
 import { iterativeLibraryVersionUnsupported } from '../../../../../systems/normalize/iterativeLibrary.js';
 import { arrayOrEmpty } from '../../../../../utils/scalars.js';
@@ -11,6 +11,7 @@ import { createIterativeActionDraft } from './iterativeActionDraft.svelte.js';
 import { createIterativeCounterRoute } from './iterativeCounterRoute.svelte.js';
 import { confirmActionDelete } from './iterativeDeleteConfirm.js';
 import { actionIssueCounts, actionUses } from './iterativeLibraryModel.js';
+import { createIterativeRecipeReads } from './iterativeRecipeReads.svelte.js';
 
 /** Read-only accessors for `reads`, each a thunk, so the model hands out live values. */
 const accessors = (reads) =>
@@ -100,6 +101,8 @@ export function createIterativeRouteModel({
     section,
   });
 
+  const recipeReads = createIterativeRecipeReads({ section, selectedSystem, currentView });
+
   const openAction = (id) => {
     const action = actions.find((entry) => entry.id === id);
     if (action) setView('iterative-action-edit', () => staged.begin(action));
@@ -129,16 +132,19 @@ export function createIterativeRouteModel({
     saveAction: staged.save,
     editAction: staged.edit,
     openChecks: () => setView('checks'),
+    openCounters: () => setView('iterative-counters'),
     ...counterRoute.handlers,
     startNewAction: () =>
       setView('iterative-action-edit', () => staged.begin(section().newActionDraft())),
     backToActions: () => setView('iterative-actions'),
+    ...recipeReads,
   };
 
   return Object.defineProperties(
     methods,
     accessors({
       library: () => library,
+      system: () => selectedSystem(),
       systemId: () => selectedSystem()?.id ?? '',
       systemName: () => selectedSystem()?.name ?? '',
       unsupported: () => unsupported,

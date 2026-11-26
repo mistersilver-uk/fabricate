@@ -1,6 +1,7 @@
 /**
- * What the page header says on the three iterative library routes: its title, its lede and the
- * name of its action group. `null` for any other route, so the header model asks this first.
+ * What the page header says on the three iterative library routes, and on Recipes in an iterative
+ * system: its title, its lede and the name of its action group. `null` for any other route, so the
+ * header model asks this first.
  * Every key is a literal, because `lang-keys-no-orphans` cannot see a built one.
  */
 import { interpolate } from '../checks/checksCopy.js';
@@ -34,9 +35,27 @@ function editorLede(text, system, heading) {
   return interpolate(sentence, { system, count });
 }
 
+/** The Recipes library's copy in an iterative system, whose lede names the mode. */
+function recipesCopy(text, system) {
+  return {
+    title: text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes'),
+    subtitle: interpolate(
+      text(
+        'FABRICATE.Admin.Manager.Iterative.RecipesSubtitle',
+        'Every recipe in {system} resolves as Iterative: each step is worked over sessions.'
+      ),
+      { system }
+    ),
+    actionsLabel: text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions'),
+  };
+}
+
 /** @returns {{ title: string, subtitle: string, actionsLabel: string } | null} */
 export function iterativeHeaderCopy({ currentView, selectedSystem, text, iterativeRoute }) {
   const system = selectedSystem?.name || '';
+  if (currentView === 'recipes') {
+    return selectedSystem?.resolutionMode === 'iterative' ? recipesCopy(text, system) : null;
+  }
   const actionsLabel = () =>
     text('FABRICATE.Admin.Manager.Iterative.HeaderActions', 'Counter and action actions');
   if (currentView === 'iterative-counters') {

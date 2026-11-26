@@ -12,6 +12,7 @@
   | `label` / `ariaLabel` | localized strings | `''` | Exactly one names the token group and the panel; `label` also draws as the group's `Kicker`. |
   | `searchLabel` / `emptyLabel` | localized strings | `Common.SetPicker.Search` / `''` | The query field's placeholder and name, and the line a panel with no candidates shows. |
   | `addLabel` / `addProps` | localized string / attribute object | `Common.SetPicker.Add` / `{}` | The dashed Add's visible name, and hooks stamped on that button itself. |
+  | `ariaDescribedBy` | id string | `''` | The dashed Add's description, such as a caller's fault line. |
   | `loading` / `error` | boolean / localized string | `false` / `''` | Forwarded to the panel, whose one status they feed; an error disables Apply. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces the dashed Add, forwarded to `SearchablePopover`'s own `trigger`. |
 
@@ -51,6 +52,7 @@
     emptyLabel = '',
     addLabel = '',
     addProps = {},
+    ariaDescribedBy = '',
     loading = false,
     error = '',
     trigger = undefined,
@@ -193,6 +195,7 @@
     triggerIcon="fas fa-plus"
     triggerLabel={addLabel || localizeOr('FABRICATE.Common.SetPicker.Add', 'Add')}
     triggerProps={addProps}
+    {ariaDescribedBy}
     showChevron={false}
     popoverClass="fabricate-set-picker-popover"
     optionClass="fabricate-set-picker-option"

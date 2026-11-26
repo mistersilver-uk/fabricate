@@ -1,6 +1,6 @@
 /**
  * The Overview tab's four converted select vocabularies, in the shared `<Select>`'s option shape
- * (issue 1510). Every label is carried verbatim from the `<option>` text it replaced — the
+ * (issue 1510), and its step-mode control's options and hint. Every label is carried verbatim from the `<option>` text it replaced — the
  * localized category name, the tier's `name (DC n)` join and its unnamed fallback — so nothing a
  * GM reads changes with the control, and each blank row stays first with its exact copy. It lives
  * beside the tab rather than in it because the tab is at its size ledger's ceiling.
@@ -200,4 +200,39 @@ export function buildModifierSetOptions(text) {
       label: text('FABRICATE.Admin.Manager.Recipe.CraftingModifierSetNone', 'No modifiers'),
     },
   ];
+}
+
+/** The step-mode `SegmentedControl`'s two options. */
+export function buildStepModeOptions(text) {
+  return [
+    {
+      value: 'single',
+      icon: 'fas fa-square',
+      label: text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step'),
+    },
+    {
+      value: 'multi',
+      icon: 'fas fa-list-ol',
+      label: text('FABRICATE.Admin.Manager.Recipe.MultiStep', 'Multi-step'),
+    },
+  ];
+}
+
+/** The step-mode hint; an iterative recipe's says how its steps and counters run. */
+export function stepModeHintText(text, iterative, multi) {
+  if (!iterative) {
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.StepModeHint',
+      'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.'
+    );
+  }
+  return multi
+    ? text(
+        'FABRICATE.Admin.Manager.Recipe.Iterative.StepModeHintMulti',
+        'Steps are worked in order. Each starts when the one before succeeds, and counters carry on between them.'
+      )
+    : text(
+        'FABRICATE.Admin.Manager.Recipe.Iterative.StepModeHintSingle',
+        'One piece of work from start to finish.'
+      );
 }

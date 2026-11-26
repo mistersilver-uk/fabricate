@@ -1204,8 +1204,11 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeNoSuccessRule`: a step has no success rule, so it never succeeds vacuously.
   - `iterativeUnknownCounter`: a Counter Instance names no library counter, or a hidden or locked id or a rule names no Counter Instance.
   - `iterativeUnknownAction`: an allowed or `previousAction` id names no library action.
+  - `iterativeNoAllowedActions`: a step's `actions.mode` is `only` and its `actionIds` is empty, so the step can't be worked.
   - `iterativeInvalidNumber`: a `null` start, `startFormula`, bound or target.
   - `iterativeBoundsInverted`: a `perRecipe` Counter Instance's effective `min` is above its effective `max`.
+  - `iterativeStartOutOfBounds`: a Counter Instance's fixed `start` lies outside its effective minimum or maximum, as Effective Bounds defines them: the instance's bound over the counter's under `perRecipe`, the counter's bound only under `global`, and never under `none`.
+    Only a present bound is judged, and it is not raised for a start formula, a `null` start or inverted bounds.
   - `iterativeInvalidRule`: a `CounterRule` kept as authored.
   - `iterativeInvalidEntry`: a `producedWhen` line kept as authored, or an `actions.mode` outside its enum.
   - `iterativeCheckUnavailable`: an allowed action has `check: 'roll'` and the routed crafting check has no active roll.
@@ -1213,6 +1216,14 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - Two recipe-scoped codes are warnings with no `blocks`:
   - `iterativeSuccessLineOnFailureGroup`: an `end: 'success'` line on the `role: 'failure'` group.
   - `iterativeFinalStepProducesNothing`: no final-step group has an `end: 'success'` line.
+- Each recipe-scoped issue carries `stepId` and `stepIndex`: the id and zero-based position in `recipe.steps` of the explicit step whose configuration or result groups raise it.
+  Both are `null` on a recipe with no explicit steps and on a recipe-wide issue.
+  - The step-scoped codes are `iterativeNoSuccessRule`, `iterativeSuccessLineOnFailureGroup`, and a step's `iterativeInvalidEntry`, `iterativeUnknownAction`, `iterativeNoAllowedActions`, `iterativeUnknownCounter` and `iterativeInvalidRule`.
+    `iterativeFinalStepProducesNothing` is addressed to the final step.
+  - `iterativeNoCounters`, `iterativeMultiStepOff`, `iterativeCheckUnavailable`, a Counter Instance's codes and the expression codes are recipe-wide.
+  - A recipe raises one issue per code and step address, in first-raised order, with every step's configuration codes before any `producedWhen` code.
+    A fault repeated in two steps is two issues, and the recipe-wide issues of one code are one.
+  - Library issues carry neither key, and no severity, `blocks`, message or `nav` depends on the address.
 - Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id.
   Each carries `entityKind: 'counter'` or `'action'` for the record it names:
   - `iterativeUnknownCounter`, `iterativeUnknownAction` and `iterativeInvalidRule` over availability rules, effect `when` rules, cost counters and effect targets.

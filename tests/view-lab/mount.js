@@ -135,6 +135,8 @@ function readParams() {
     checkPreviewState: params.get('checkPreviewState') ?? null,
     // Adds the `iterative` Ironworks system to the lab world in this state (issue 3009).
     iterative: params.get('iterative') ?? null,
+    // Authors the Ironworks recipes in this state; it needs `iterative` too (issue 3010).
+    iterativeRecipes: params.get('iterativeRecipes') ?? null,
     // Brenna holds a knowledge book she can learn whole, for the Read & learn header action.
     learnableBook: params.get('learnableBook') === '1',
     journalCaseState: params.get('journalCaseState') ?? null,
@@ -1146,6 +1148,7 @@ async function boot() {
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
         iterative: params.iterative,
+        iterativeRecipes: params.iterativeRecipes,
         learnableBook: params.learnableBook,
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,

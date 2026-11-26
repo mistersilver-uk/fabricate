@@ -12,6 +12,8 @@ export const ITERATIVE_ISSUE_KEYS = Object.freeze({
   iterativeNoSuccessRule: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeNoSuccessRule',
   iterativeUnknownCounter: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeUnknownCounter',
   iterativeUnknownAction: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeUnknownAction',
+  iterativeNoAllowedActions:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeNoAllowedActions',
   iterativeInvalidNumber: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeInvalidNumber',
   iterativeBoundsInverted: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeBoundsInverted',
   iterativeInvalidRule: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeInvalidRule',
@@ -35,6 +37,8 @@ export const ITERATIVE_ISSUE_KEYS = Object.freeze({
     'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeExpressionBoundUnset',
   iterativeCheckFactWithoutCheck:
     'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeCheckFactWithoutCheck',
+  iterativeStartOutOfBounds:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeStartOutOfBounds',
 });
 
 /** The Validation group of `issue`: its Counter or Crafting Action library entity, else its `kind`. */

@@ -29,8 +29,21 @@ import {
 import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { evaluateIterativeReadiness } from '../../src/systems/iterative/iterativeReadiness.js';
+import { normalizeIterativeLibrary } from '../../src/systems/normalize/iterativeLibrary.js';
+import {
+  iterativeRecipeIssues,
+  iterativeRecipeStatus,
+  iterativeStatusPill
+} from '../../src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js';
+import {
+  createIterativeStatusContext,
+  defineIterativeStatus
+} from '../../src/ui/svelte/stores/recipeIterativeStatus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { choosePageSize } from '../helpers/page-size-control.js';
+import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
+import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labIterative.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -49,6 +62,25 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // The row's labelled pills, and the iterative pill rule the model reads with its closure (#3010).
+  'src/ui/svelte/apps/manager/recipes/recipeStatusPills.js',
+  'src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js',
+  // ... and the one status table both editors' headers read too.
+  'src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js',
+  'src/systems/iterative/iterativeReadiness.js',
+  'src/systems/iterative/counterRule.js',
+  'src/systems/iterative/attemptLibrary.js',
+  'src/systems/iterative/expressionReadiness.js',
+  'src/systems/iterative/expression.js',
+  'src/systems/iterative/iterativeTerms.js',
+  'src/systems/normalize/iterativeLibrary.js',
+  'src/systems/salvageCheckUsability.js',
+  'src/models/iterativeStepConfig.js',
+  'src/utils/scalars.js',
+  'src/utils/recipeActivationMessages.js',
+  'src/utils/routedOutcomeKeywords.js',
+  'src/utils/failureResultPolicy.js',
+  'src/utils/craftingCheckExpression.js',
   // ... which reads a stored essence icon through the shared normaliser and its catalogue.
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
@@ -674,6 +706,95 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
       recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })]
     });
     assert.deepEqual(pills(root, 'r1'), [['subtle', 'Disabled']]);
+  });
+});
+
+// Issue 3010: an iterative system's row adds ONE iterative pill, read from the row's status.
+describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
+  const pillsOf = (root, id) =>
+    [
+      ...root.querySelectorAll(`[data-recipe-id="${id}"] .manager-recipe-name-row .manager-chip`)
+    ].map((pill) => [
+      pill.dataset.recipeStatus,
+      chipToneOf(pill),
+      [...(pill.querySelector('i')?.classList ?? [])]
+        .filter((name) => !name.startsWith('svelte-'))
+        .join(' '),
+      pill.textContent.trim()
+    ]);
+  // What `iterativeRecipeStatus` answers is drawn as, written out by hand.
+  const DRAWN = {
+    setup: () => ['iterativeSetup', 'warning', 'fas fa-flag', 'Needs iterative setup'],
+    blocking: (status) => [
+      'iterativeBlocking',
+      'danger',
+      'fas fa-circle-xmark',
+      `${status.count} blocking`
+    ],
+    ready: () => ['iterativeReady', 'positive', 'fas fa-circle-check', 'Ready']
+  };
+
+  /** The lab's authored Ironworks as library rows, each status read through the store's own field. */
+  function ironworksRows() {
+    const content = buildLabContent();
+    seedIterativeState(content, 'populated');
+    seedIterativeRecipes(content, [], 'authoring');
+    const persisted = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
+    const system = { ...persisted, iterative: normalizeIterativeLibrary(persisted.iterative) };
+    // The persisted entries: the oracle suite pins the same statuses over the Recipe models.
+    const recipes = content.recipes.filter((entry) => entry.craftingSystemId === system.id);
+    const context = createIterativeStatusContext(system, recipes);
+    const rows = recipes.map((recipe) => {
+      // Hinge is the one recipe with no ingredient set anywhere, so activation refuses it.
+      const enableBlocked = !recipe.ingredientSets?.length && !recipe.steps?.length;
+      const row = makeRecipe({ id: recipe.id, name: recipe.name, enableBlocked });
+      defineIterativeStatus(row, recipe, context);
+      return row;
+    });
+    const statuses = new Map(
+      recipes.map((recipe) => [
+        recipe.id,
+        iterativeRecipeStatus(
+          iterativeRecipeIssues(evaluateIterativeReadiness(system, [recipe]), recipe, system)
+        )
+      ])
+    );
+    return { rows, statuses };
+  }
+
+  it('draws each row’s pill from its status, with Ready withheld while enabling is blocked', async () => {
+    const { rows, statuses } = ironworksRows();
+    const root = await browser.mount({ recipes: rows, showRecipeCategories: false });
+
+    for (const row of rows) {
+      const status = iterativeStatusPill(statuses.get(row.id), row.enableBlocked);
+      const expected = [
+        ...(row.enableBlocked ? [['incomplete', 'warning', 'fas fa-pen-ruler', 'Incomplete']] : []),
+        ...(status ? [DRAWN[status.id](status)] : [])
+      ];
+      assert.deepEqual(pillsOf(root, row.id), expected, `${row.id} draws its status`);
+    }
+    // The oracle's rows, literally, so the agreement above is not vacuous.
+    assert.deepEqual(pillsOf(root, 'iw-r-nail').map((pill) => pill[3]), ['2 blocking']);
+    assert.deepEqual(pillsOf(root, 'iw-r-rivet').map((pill) => pill[3]), ['3 blocking']);
+    assert.deepEqual(pillsOf(root, 'iw-r-ingot').map((pill) => pill[0]), ['iterativeSetup']);
+    assert.deepEqual(pillsOf(root, 'iw-r-blade').map((pill) => pill[0]), ['iterativeReady']);
+    assert.deepEqual(
+      pillsOf(root, 'iw-r-hinge').map((pill) => pill[0]),
+      ['incomplete'],
+      'Hinge is ready by its issues, but activation refuses it, so it wears no Ready'
+    );
+  });
+
+  it('draws no iterative pill on a row of another mode', async () => {
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1' }), makeRecipe({ id: 'r2', enabled: false })]
+    });
+    assert.deepEqual(pillsOf(root, 'r1'), []);
+    assert.deepEqual(
+      pillsOf(root, 'r2').map((pill) => pill[0]),
+      ['disabled']
+    );
   });
 });
 

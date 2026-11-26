@@ -1320,7 +1320,7 @@
   },
   {
     "spec": "<DataTable>",
-    "draws": ".stage.col ~ .stage.col > div",
+    "draws": ".stage.col:nth-child(3) > div",
     "path": "src/ui/svelte/components/DataTable.svelte",
     "props": {
       "heading": "Craft history",
@@ -1330,6 +1330,29 @@
       }
     },
     "note": "The empty table: the heading and the count, and no header row."
+  },
+  {
+    "spec": "<DataTable>",
+    "cap": "hint and footer — a second caption line and a band under the rows",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "fixture": "DataTableFooter",
+    "note": "The hint is a second caption line, described by the table and outside its name, and the footer is the caller’s band inside the frame, after the scroll container (this table is unpaged, so no pager stands between them).",
+    "props": {
+      "heading": "Counters",
+      "hint": "Start values, bounds and targets.",
+      "columns": [
+        { "key": "counter", "label": "Counter" },
+        { "key": "start", "label": "Start", "mono": true }
+      ],
+      "rows": [
+        { "id": "heat", "counter": "Heat", "start": "0" },
+        { "id": "temper", "counter": "Temper", "start": "4" }
+      ]
+    },
+    "snippets": {
+      "footer": [{ "tag": "span", "text": "Max and target are optional." }]
+    }
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",

@@ -27,6 +27,8 @@
   import ManagerHeaderActions from './ManagerHeaderActions.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
   import { headerBreadcrumbs } from './headerBreadcrumbs.js';
+  import { iterativeStatusChip } from './iterative/iterativeStatusCopy.js';
+  import { recipeHeaderChip } from './recipes/recipeStatusPills.js';
 
   let {
     header,
@@ -58,6 +60,26 @@
     iterativeRoute = null,
     ...rest
   } = $props();
+
+  // The iterative editors state the active runs, so the store's memo is watched while one is open.
+  $effect(() => iterativeRoute?.watchRuns?.(currentView));
+
+  // An iterative recipe's status, by the rule its library row follows; `null` outside iterative.
+  const recipeStatus = $derived(
+    header.headingVariant === 'recipe-edit'
+      ? recipeHeaderChip(
+          iterativeRoute?.recipeHeaderStatus?.(recipeDraft) ?? null,
+          recipeDraft,
+          text
+        )
+      : null
+  );
+  // A Crafting Action's status, from the same table: Ready, else its blocking count.
+  const actionStatus = $derived.by(() => {
+    if (header.headingVariant !== 'iterative-action-edit') return null;
+    const count = iterativeRoute?.actionHeading?.issueCount ?? 0;
+    return iterativeStatusChip(count === 0 ? { id: 'ready' } : { id: 'blocking', count }, text);
+  });
 
   const crumbs = $derived(
     headerBreadcrumbs({
@@ -102,6 +124,14 @@
             </h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
           </div>
+          {#if recipeStatus}
+            <Chip
+              density="header"
+              tone={recipeStatus.tone}
+              icon={recipeStatus.icon}
+              data-recipe-edit-status={recipeStatus.id}>{recipeStatus.label}</Chip
+            >
+          {/if}
         </div>
       {:else if header.headingVariant === 'component-edit'}
         <!-- The component editor's identity header, which must match the recipe editor's
@@ -127,6 +157,15 @@
             </h1>
             <p class="manager-subtitle" data-iterative-action-subline>{header.subtitle}</p>
           </div>
+          <!-- The recipe editor's chip, in the same slot and at the same rung. -->
+          {#if actionStatus}
+            <Chip
+              density="header"
+              tone={actionStatus.tone}
+              icon={actionStatus.icon}
+              data-iterative-action-pill={actionStatus.id}>{actionStatus.label}</Chip
+            >
+          {/if}
         </div>
       {:else if header.headingVariant === 'downtime-artwork'}
         <!-- A companion's drill-down identity, drawn in core's header from the recipe editor's
@@ -222,22 +261,6 @@
       {:else if header.headingVariant === 'default'}
         <h1 class="manager-title">{header.title}</h1>
         <p class="manager-subtitle">{header.subtitle}</p>
-      {/if}
-      {#if header.headingVariant === 'iterative-action-edit'}
-        <div class="manager-environment-header-pills" data-iterative-action-status>
-          {#if iterativeRoute.actionHeading.issueCount === 0}
-            <Chip tone="active" data-iterative-action-pill="ready">
-              {text('FABRICATE.Admin.Manager.Iterative.StatusReady', 'Ready')}
-            </Chip>
-          {:else}
-            <Chip tone="danger" data-iterative-action-pill="blocking">
-              {text('FABRICATE.Admin.Manager.Iterative.StatusBlocking', '{count} blocking').replace(
-                '{count}',
-                String(iterativeRoute.actionHeading.issueCount)
-              )}
-            </Chip>
-          {/if}
-        </div>
       {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-chips>

@@ -3,6 +3,10 @@
   `heading` and `count`, with the shipped pager when `perPage` is set. A row is selected by a pointer
   click on the `<tr>` or by focus entering a control in it (`selectedKey` + `onSelectRow`), and is
   never focusable itself. `rowData(row)` spreads on each `<tr>` and `rowAction` runs on it.
+
+  `hint` is a second caption line, outside the table's accessible name, that describes the table
+  through `aria-describedby`. `footer` is a snippet drawn inside the frame after the scroll container
+  and, when `perPage > 0`, after the pager.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -16,6 +20,8 @@
     heading = '',
     count = null,
     search = undefined,
+    hint = '',
+    footer = undefined,
     cell = undefined,
     sort = null,
     onSort = null,
@@ -75,6 +81,7 @@
     <table
       class="fabricate-data-table-table"
       aria-labelledby={`${id}-heading ${id}-count`}
+      aria-describedby={hint ? `${id}-hint` : undefined}
       aria-busy={loading || undefined}
     >
       <caption class="fabricate-data-table-caption">
@@ -83,6 +90,7 @@
           <span class="fabricate-data-table-count" id={`${id}-count`}>{shownCount}</span>
           {#if search}<span class="fabricate-data-table-search">{@render search()}</span>{/if}
         </span>
+        {#if hint}<span class="fabricate-data-table-hint" id={`${id}-hint`}>{hint}</span>{/if}
       </caption>
       {#if phase === 'rows'}
         <colgroup>
@@ -176,4 +184,28 @@
       onPageSizeChange={onPerPageChange}
     />
   {/if}
+  {#if footer}<div class="fabricate-data-table-footer">{@render footer()}</div>{/if}
 </div>
+
+<style>
+  /* Global, so the root and every caller's HTML stay as they were: a scoped rule would add its hash class to the dynamic root. */
+  :global(.fabricate-data-table .fabricate-data-table-hint) {
+    display: block;
+    margin-top: var(--fab-space-1);
+    color: var(--fab-text-muted);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  /* Inside the frame, below the scroll container and the pager, on the pager's own band. */
+  :global(.fabricate-data-table .fabricate-data-table-footer) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-bg-1);
+  }
+</style>

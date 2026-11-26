@@ -37,8 +37,8 @@
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
-    deriveRecipeStatuses,
   } from '../../../model/recipeBrowserModel.js';
+  import { statusPills } from './recipes/recipeStatusPills.js';
   import IconButton from '../../components/IconButton.svelte';
   import Notice from '../../components/Notice.svelte';
   import SearchField from '../../components/SearchField.svelte';
@@ -292,23 +292,6 @@
     if (next.has(category)) next.delete(category);
     else next.add(category);
     ui.collapsedCategories = next;
-  }
-
-  // The four row states. Both authoring states read ONE predicate, `recipe.enableBlocked` (issue
-  // 1010), so the pilled rows, the bulk panel's pre-flight count and the set-apply write are the
-  // same set by construction.
-  const STATUS_LABELS = {
-    disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
-    locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
-    blocked: ['FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable"],
-    incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete'],
-  };
-
-  function statusPills(recipe) {
-    return deriveRecipeStatuses(recipe).map((pill) => {
-      const [labelKey, fallback] = STATUS_LABELS[pill.id];
-      return { ...pill, label: text(labelKey, fallback) };
-    });
   }
 
   // The I/O readout (issue 643 §9): always "N in"; "N out" ONLY in simple and progressive — a
@@ -643,12 +626,13 @@
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
-                          {#each statusPills(recipe) as pill (pill.id)}
+                          {#each statusPills(recipe, { text, format }) as pill (pill.id)}
                             <Chip
                               tone={statusChipTone(pill.tone)}
                               icon={pill.icon}
                               truncate
-                              title={pill.label}>{pill.label}</Chip
+                              title={pill.label}
+                              data-recipe-status={pill.id}>{pill.label}</Chip
                             >
                           {/each}
                         </span>

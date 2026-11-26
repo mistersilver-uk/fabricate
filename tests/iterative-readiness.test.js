@@ -134,11 +134,17 @@ const FIRES = {
   iterativeUnknownAction: ({ recipe }) => {
     step(recipe).actions.actionIds = ['quench'];
   },
+  iterativeNoAllowedActions: ({ recipe }) => {
+    step(recipe).actions = { mode: 'only', actionIds: [] };
+  },
   iterativeInvalidNumber: ({ recipe }) => {
     recipe.iterative.counters[0].start = 'warm';
   },
   iterativeBoundsInverted: ({ recipe }) => {
     Object.assign(recipe.iterative.counters[0], { min: 15, max: 5 });
+  },
+  iterativeStartOutOfBounds: ({ recipe }) => {
+    recipe.iterative.counters[0].start = 25;
   },
   iterativeInvalidRule: ({ recipe }) => {
     step(recipe).failure = [{ source: 'mystery' }];
@@ -496,5 +502,219 @@ describe('needsIterativeSetup and the step-mode issue', () => {
     );
     assert.match(issues[1].message, /exactly 1 ingredient set in iterative mode/u);
     assert.deepEqual(iterativeStepModeIssues(steps, { requireComplete: false }), []);
+  });
+});
+
+/** Each recipe-scoped issue as `code@stepIndex`, with `:stepId` when the step has one. */
+const addressOf = (issue) =>
+  `${issue.code}@${issue.stepIndex}${issue.stepId === null ? '' : `:${issue.stepId}`}`;
+
+/** `RECIPE` with its one step made two explicit steps; `edit` may adjust them. */
+function multiStepRecipe(edit = () => {}) {
+  const recipe = clone(RECIPE);
+  const stepOf = (id, name) => ({
+    id,
+    name,
+    iterative: clone(step(recipe)),
+    ingredientSets: clone(recipe.ingredientSets),
+    resultGroups: clone(recipe.resultGroups),
+  });
+  recipe.steps = [stepOf('s-1', 'Heat'), stepOf('s-2', 'Quench')];
+  delete recipe.iterative.step;
+  delete recipe.resultGroups;
+  delete recipe.ingredientSets;
+  edit(recipe);
+  return recipe;
+}
+
+const addressesOf = (recipe, sys = system()) =>
+  evaluateIterativeReadiness(sys, [new Recipe(recipe)])
+    .filter((issue) => issue.kind === 'recipe')
+    .map(addressOf);
+
+describe('step address (D-1)', () => {
+  it('premise: the multi-step twin raises nothing', () => {
+    assert.deepEqual(addressesOf(multiStepRecipe()), []);
+  });
+
+  it('addresses a step-scoped fault to the explicit step that raises it', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.steps[1].iterative.success = [];
+    });
+    assert.deepEqual(addressesOf(recipe), ['iterativeNoSuccessRule@1:s-2']);
+  });
+
+  it('gives an id-less step its index and a null id', () => {
+    const recipe = multiStepRecipe((r) => {
+      delete r.steps[1].id;
+      r.steps[1].iterative.success = [];
+    });
+    const issues = evaluateIterativeReadiness(system(), [recipe]);
+    assert.deepEqual(issues.map(addressOf), ['iterativeNoSuccessRule@1']);
+  });
+
+  it('raises one issue per step for a fault repeated in two steps', () => {
+    const recipe = multiStepRecipe((r) => {
+      for (const entry of r.steps) entry.iterative.success = [];
+    });
+    assert.deepEqual(addressesOf(recipe), [
+      'iterativeNoSuccessRule@0:s-1',
+      'iterativeNoSuccessRule@1:s-2',
+    ]);
+  });
+
+  it('puts every step configuration code before any produced-when code', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.steps[0].resultGroups[1].producedWhen = [{ end: 'success', rules: [HEAT_AT_TEN] }];
+      r.steps[1].iterative.success = [];
+    });
+    assert.deepEqual(addressesOf(recipe), [
+      'iterativeNoSuccessRule@1:s-2',
+      'iterativeSuccessLineOnFailureGroup@0:s-1',
+    ]);
+  });
+
+  it('addresses the final-step warning to the final step', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.steps[1].resultGroups[0].producedWhen = [{ end: 'failure' }];
+    });
+    assert.deepEqual(addressesOf(recipe), ['iterativeFinalStepProducesNothing@1:s-2']);
+  });
+
+  it('keeps a Counter Instance fault recipe-wide beside a step rule naming the same code', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.iterative.counters.push({ counterId: 'cold' });
+      r.steps[0].iterative.success.push({ ...HEAT_AT_TEN, counterId: 'ember' });
+    });
+    assert.deepEqual(addressesOf(recipe), [
+      'iterativeUnknownCounter@null',
+      'iterativeUnknownCounter@0:s-1',
+    ]);
+  });
+
+  it('keeps recipe-wide codes null on a multi-step recipe', () => {
+    const off = system({ multiStep: false });
+    assert.deepEqual(addressesOf(multiStepRecipe(), off), ['iterativeMultiStepOff@null']);
+    const unchecked = { ...system(), craftingCheck: { routed: {} } };
+    assert.deepEqual(addressesOf(multiStepRecipe(), unchecked), ['iterativeCheckUnavailable@null']);
+    const noCounters = multiStepRecipe((r) => {
+      r.iterative.counters = [];
+    });
+    assert.deepEqual(addressesOf(noCounters), [
+      'iterativeNoCounters@null',
+      'iterativeUnknownCounter@0:s-1',
+      'iterativeUnknownCounter@1:s-2',
+    ]);
+  });
+
+  it('is null on both keys for every issue of a recipe with no explicit steps', () => {
+    const issues = issuesAfter(({ recipe }) => {
+      step(recipe).success = [];
+      recipe.resultGroups[0].producedWhen = [{ end: 'failure' }];
+    }).filter((issue) => issue.kind === 'recipe');
+    assert.deepEqual(issues.map(addressOf), [
+      'iterativeNoSuccessRule@null',
+      'iterativeFinalStepProducesNothing@null',
+    ]);
+  });
+
+  it('gives a library issue neither key', () => {
+    const issues = issuesAfter(({ library }) => {
+      library.counters[0].limit = 'sideways';
+    }).filter((issue) => issue.kind === 'system');
+    assert.deepEqual(
+      issues.map((issue) => issue.code),
+      ['iterativeInvalidEntry']
+    );
+    assert.ok(issues.every((issue) => !('stepId' in issue) && !('stepIndex' in issue)));
+  });
+});
+
+describe('iterativeNoAllowedActions', () => {
+  const codesWith = (actions) =>
+    codesAfter(({ recipe }) => {
+      step(recipe).actions = actions;
+    });
+
+  it('is raised for an empty Only list alone, and not under All or for a list that does not parse', () => {
+    assert.deepEqual(codesWith({ mode: 'only', actionIds: [] }), ['iterativeNoAllowedActions']);
+    assert.deepEqual(codesWith({ mode: 'all', actionIds: [] }), []);
+    assert.deepEqual(codesWith({ mode: 'only', actionIds: 'stoke' }), ['iterativeInvalidEntry']);
+  });
+
+  it('is critical, blocks enabling and is addressed to the step that raises it', () => {
+    const recipe = multiStepRecipe((r) => {
+      r.steps[1].iterative.actions = { mode: 'only', actionIds: [] };
+    });
+    assert.deepEqual(addressesOf(recipe), ['iterativeNoAllowedActions@1:s-2']);
+    const [raised] = evaluateIterativeReadiness(system(), [new Recipe(recipe)]);
+    assert.deepEqual(
+      [raised.severity, raised.blocks, raised.message],
+      ['critical', 'enable', "A step allows no actions, so it can't be worked."]
+    );
+  });
+});
+
+describe('iterativeStartOutOfBounds', () => {
+  const COUNTERS = [
+    { id: 'heat', label: 'Heat', limit: 'perRecipe', min: 2, max: 10 },
+    { id: 'temper', label: 'Temper', limit: 'global', min: 0, max: 5 },
+    { id: 'slag', label: 'Slag', limit: 'none' },
+  ];
+  const codesWith = (counterId, instance, counters = COUNTERS) => {
+    const library = { ...clone(LIBRARY), counters: clone(counters) };
+    const recipe = clone(RECIPE);
+    recipe.iterative.counters = [{ counterId, ...instance }];
+    recipe.iterative.step.success = [{ ...HEAT_AT_TEN, counterId }];
+    recipe.iterative.step.hiddenCounterIds = [];
+    return evaluateIterativeReadiness(system({ library }), [new Recipe(recipe)])
+      .filter((issue) => issue.kind === 'recipe')
+      .map((issue) => issue.code);
+  };
+  const RAISED = ['iterativeStartOutOfBounds'];
+
+  it('is raised below and above the counter bound of a per-recipe counter', () => {
+    assert.deepEqual(codesWith('heat', { start: 1 }), RAISED);
+    assert.deepEqual(codesWith('heat', { start: 11 }), RAISED);
+    assert.deepEqual(codesWith('heat', { start: 2 }), []);
+    assert.deepEqual(codesWith('heat', { start: 10 }), []);
+  });
+
+  it('prefers the instance bound over the counter bound under perRecipe', () => {
+    assert.deepEqual(codesWith('heat', { start: 6, min: 7 }), RAISED);
+    assert.deepEqual(codesWith('heat', { start: 12, max: 20 }), []);
+  });
+
+  it('judges only a present bound', () => {
+    const bare = [{ id: 'heat', label: 'Heat', limit: 'perRecipe' }];
+    assert.deepEqual(codesWith('heat', { start: -50, max: 10 }, bare), []);
+    assert.deepEqual(codesWith('heat', { start: 50, max: 10 }, bare), RAISED);
+  });
+
+  it('ignores a stray instance bound under global, and judges the counter bound', () => {
+    assert.deepEqual(codesWith('temper', { start: 9, max: 20 }), RAISED);
+    assert.deepEqual(codesWith('temper', { start: 4, max: 1 }), []);
+  });
+
+  it('is never raised under none', () => {
+    assert.deepEqual(codesWith('slag', { start: 999, min: 0, max: 1 }), []);
+  });
+
+  it('is not raised for a formula, a null start or inverted bounds', () => {
+    assert.deepEqual(codesWith('heat', { startFormula: '99' }), []);
+    assert.deepEqual(codesWith('heat', { start: null }), ['iterativeInvalidNumber']);
+    assert.deepEqual(codesWith('heat', { start: 0, min: 8, max: 4 }), ['iterativeBoundsInverted']);
+  });
+
+  it('is critical, blocks enabling and refuses the start like iterativeBoundsInverted', () => {
+    const recipe = clone(RECIPE);
+    recipe.iterative.counters[0].start = 25;
+    const issues = evaluateIterativeReadiness(system(), [new Recipe(recipe)]);
+    const raised = issues.find((issue) => issue.code === 'iterativeStartOutOfBounds');
+    assert.deepEqual(
+      [raised.severity, raised.blocks, raised.nav.view, raised.message],
+      ['critical', 'enable', 'recipe-edit', 'A counter starts outside its minimum or maximum.']
+    );
+    assert.deepEqual(iterativeStartBlockers(issues, recipe), [raised]);
   });
 });

@@ -761,6 +761,43 @@
     }
   },
   {
+    "spec": "<PickerRowAmount>",
+    "cap": "formula — Fixed at 0, unbounded",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "fixture": "PickerRowAmountFormula",
+    "note": "Under `formula` a stored 0 shows as 0 and the stepper clamps nothing, and the hint is drawn only under Formula. The slot renders a flex-wrapping root, so the toggle and the stepper stand at the root's 8px gap, as the drawing's wrapper draws it.",
+    "undrawn": {
+      "Unresolved": "the caller’s statement for an expression that does not reduce; Fixed draws no expression"
+    },
+    "props": {
+      "value": { "kind": "component", "quantity": 0 },
+      "name": "Heat"
+    },
+    "data": {
+      "unresolvedKey": "FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved"
+    }
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "formula — the expression, its reading and its hint",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "fixture": "PickerRowAmountFormula",
+    "note": "Measured: the expression stays 102 by 28, the reading chip stands under it and the hint is muted text on a line of its own under the controls, so a Formula row grows by those two lines alone.",
+    "undrawn": {
+      "Unresolved": "the caller’s statement for an expression that does not reduce; the drawing draws one that does"
+    },
+    "props": {
+      "value": { "kind": "component", "quantityFormula": "40 + 2" },
+      "name": "Heat"
+    },
+    "data": {
+      "unresolvedKey": "FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved",
+      "hint": "A number, dice, or character data such as @abilities.con.mod. Dice roll once, when the step starts."
+    }
+  },
+  {
     "spec": "<KindAdder>",
     "cap": "one kind offered — appends directly",
     "draws": ".k-btn",

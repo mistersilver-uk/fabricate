@@ -682,12 +682,18 @@ A start is refused, with nothing spent, while the recipe has a critical iterativ
 Iterative data is kept, inert, in a system of any other mode.
 Its structural readiness runs only for an iterative system, and no iterative issue blocks the system or visibility, so a recipe stays listed and refuses a start.
 A recipe with no Counter Instance or a step with no success rule is in the derived "Needs iterative setup" tier, and no setup marker is persisted.
+A recipe-scoped iterative issue carries `stepId` and `stepIndex`, the explicit step that raises it, and is `null` for both on a recipe-wide issue, so a recipe has one issue per code and step address.
+`iterativeStartOutOfBounds` is a recipe-scoped blocking issue for a fixed start outside its effective bounds, and `iterativeNoAllowedActions` is one for an "Only these" step that allows no action.
+In the GM recipe editor an iterative recipe's status is one of "Needs iterative setup", "N blocking" or "Ready", and its Recipes library row shows the same status by the same rule.
+"Ready" means `iterativeStartRefusal` is `null`, and it is withheld while a structural gap still blocks enabling, when the editor header draws the row's own "Incomplete" or "Can't enable" pill instead.
+A library issue counts as blocking in that status and on the recipe's Validation tab, because it refuses the recipe's start, but it carries no `blocks`, so it never blocks enabling the recipe, and activation enforces only a recipe-scoped `blocks: 'enable'` issue.
+The recipe editor offers no Preview tab, and the Recipes page lede says that every recipe in the system resolves as Iterative.
 For an iterative system the Crafting rail adds Counters and Actions entries after Recipes, and Checks › Crafting shows the **Routed by Check** editor with a callout that one check serves the whole system and each Crafting Action either rolls it or does not.
 The system's iterative issues are grouped under Counters and Actions in the Systems › Validation tab, and none of them blocks the system.
 
-Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`)
+Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`), `iterativeRecipeIssues` and `iterativeRecipeStatus` (`src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js`), `ITERATIVE_STATUS` (`src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js`)
 
-Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md, openspec/specs/ui-entity-editors/spec.md
 
 ## Counter
 
@@ -715,10 +721,14 @@ Its `min` and `max` override the counter's only under `perRecipe`, and are kept 
 A present start, start formula, bound or target that cannot be read normalizes to `null` and raises the blocking `iterativeInvalidNumber`.
 An instance with a missing, malformed or repeated `counterId` is dropped, and one naming no library counter raises `iterativeUnknownCounter`.
 A step's `hiddenCounterIds` and `lockedCounterIds` name Counter Instances, and a recipe with none raises `iterativeNoCounters`.
+A present fixed `start` outside the instance's effective bounds raises the blocking `iterativeStartOutOfBounds`, and a start formula, a `null` start or inverted bounds do not.
+The recipe editor lists the instances in a Counters table on Overview, with Start, Min, Max, Target and Player sees, and its start amount shows `null` as an unset "—".
+A multi-step recipe's step hides or locks each instance, and a single-step recipe shows its hide and lock lists once one is non-empty and keeps them until the Overview tab is left.
+Removing an instance prunes its id from every step's hide and lock lists in the same write, once no other instance names it, and a rule that names it is kept and reads "not tracked".
 
-Canonical mapping: `Recipe.iterative.counters[]`, `normalizeRecipeIterative` (`src/models/iterativeStepConfig.js`)
+Canonical mapping: `Recipe.iterative.counters[]`, `normalizeRecipeIterative` (`src/models/iterativeStepConfig.js`), `counterRemovalPatch` (`src/ui/svelte/apps/manager/recipe/iterative/iterativeCounterRows.js`)
 
-Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-entity-editors/spec.md
 
 ## Crafting Action
 
@@ -728,7 +738,7 @@ An action is `{ id, label, description?, icon?, categories, usesSession, availab
 A cost is `{ id, counterId, amount, needsEnough }`, with `needsEnough` defaulting to `true`.
 `check` is `'roll'` or `'none'` (the default), and a `'roll'` action reads the routed crafting check, so an allowed one raises `iterativeCheckUnavailable` when that check has no active roll.
 An effect changes one counter by `add`, `subtract` or `set` with an `amount`, under an `EffectWhen` that may read check outcome tiers, the check's success, a rolled value and Counter Rules.
-A step allows every action under `actions.mode: 'all'` and only the named ones under `'only'`, so `{ mode: 'only', actionIds: [] }` allows none.
+A step allows every action under `actions.mode: 'all'` and only the named ones under `'only'`, so `{ mode: 'only', actionIds: [] }` allows none and raises the blocking `iterativeNoAllowedActions`.
 A cost or effect that does not parse is kept as authored and raises the blocking `iterativeInvalidEntry`, and is never dropped.
 The term is always written in full, because a bare "action" already names UI and run-control actions.
 The GM-facing screens shorten it to "action" inside the Actions screen and the Crafting Action editor, where the context removes the collision, and still say "Crafting Action" wherever it could be mistaken for a UI action.
@@ -830,12 +840,13 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 A Workpiece is a Crafting Run whose system is in `iterative` mode, and no record, field or enum is named for it.
 Player copy uses it, for instance in the unaffordable-cost refusal, and a mismatched check states that the workpiece is unchanged.
-GM copy uses it only in the Counters subtitle and in the delete confirmations, which say workpieces in progress are not affected.
+GM copy uses it in the Counters subtitle, in the delete confirmations, which say workpieces in progress are not affected, and in the recipe and Crafting Action editors' in-progress notices.
+Those notices count the system's active iterative runs, read from a store-owned memo (`activeIterativeRuns`), and say each workpiece keeps the terms it started with, so an edit applies only to workpieces started after the save.
 It is distinct from the alchemy **Workbench**, which holds submitted components rather than a run.
 
-Canonical mapping: no persisted name; the `IterativeCostUnaffordable`, `IterativeCheckMismatch`, `IterativeActionNotFound` and `IterativeNotReady` sentences (`FABRICATE.App.Journal.Reason.*` in `lang/en.json`)
+Canonical mapping: no persisted name; the `IterativeCostUnaffordable`, `IterativeCheckMismatch`, `IterativeActionNotFound` and `IterativeNotReady` sentences (`FABRICATE.App.Journal.Reason.*` in `lang/en.json`), the `MidRunTitle` and `ActionInProgress` sentences (`FABRICATE.Admin.Manager.*`), `activeIterativeRuns` and `createActiveRunsMemo`
 
-Spec reference: openspec/specs/ui-journal-app/spec.md
+Spec reference: openspec/specs/ui-journal-app/spec.md, openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-system-studio/spec.md
 
 ## Produced When
 
@@ -845,10 +856,11 @@ It is normalized on recipe and step groups only, salvage and gathering normalize
 In iterative mode the reserved `role: 'failure'` group is selected only by its `producedWhen`, never by its role.
 A line that does not parse is kept as authored and raises the blocking `iterativeInvalidEntry`.
 An `end: 'success'` line on the failure group raises the warning `iterativeSuccessLineOnFailureGroup`, and a final step with no `end: 'success'` line raises `iterativeFinalStepProducesNothing`.
+The recipe editor's Results tab lists each scope's result sets in checked order, marks the failure set, and says a set with no line is never produced.
 
 Canonical mapping: `ResultGroup.producedWhen`, `PRODUCED_WHEN_ENDS`, `normalizeProducedWhen`, `producedWhenLineFault` and `iterativeStepsOf` (`src/models/iterativeStepConfig.js`), `CounterRule` and `counterRuleFault` (`src/systems/iterative/counterRule.js`)
 
-Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-entity-editors/spec.md
 
 ## Legacy Resolution Mode (`mapped` / `tiered`)
 

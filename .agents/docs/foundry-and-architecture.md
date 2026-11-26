@@ -753,6 +753,9 @@ The two kinds whose dirty state lives in the store (environment, tools) wrap the
 **3.
 Foundry layer — `src/ui/svelte/util/foundryBridge.js`.** `services.confirmDialog` is wired to `foundry.applications.api.DialogV2.confirm`.
 In tests, `services.confirmDialog` is absent and the store helpers are stubbed directly on the test fixture — the Svelte layer never knows the difference.
+`DialogV2.confirm` is not modal by default, so the GM can keep editing while it is open.
+A handler that confirms reads its draft (`draft()`) only after the confirm resolves, and treats a closed draft as a cancel, as `recipeStepHandlers.js` does (issue 3010).
+Recipe definitions persist as one whole `recipes` settings value, merged only at the top level, so an editor patch that changes a nested part (`Recipe.iterative`, a step's `iterative`) carries that whole part in one write (issue 3010).
 
 **Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/helpers/manager/managerStoreFake.js` (locate it with `grep -n confirmDiscardDirty`).
 Steps (1), (2), (4) and (5) are unchanged by the table; step (3) is now a row of `ROUTE_EXIT_GUARDS` and its entry in the manager's guard context, which is what `confirmRouteExit` chains.

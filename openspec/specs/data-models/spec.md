@@ -885,6 +885,7 @@ Requirements:
    hot-path and the GM overview view.
 5. An `iterative` system adds the iterative readiness codes (`resolution-modes` § Iterative Validation), as `kind: 'recipe'` or `kind: 'system'`, none carrying `blocks: 'system'` or `blocks: 'visibility'`.
    Each iterative issue also carries `entityKind: 'recipe' | 'counter' | 'action' | 'system'`, naming the record its `entityId` identifies, because counter ids and action ids are unique only within their own list.
+   A recipe-scoped iterative issue also carries `stepId` and `stepIndex` (`resolution-modes` § Iterative Validation), and no other issue carries either key.
 
 ## CurrencyConfig
 
@@ -1844,7 +1845,8 @@ StepIterative = {
     - A present non-finite `start`, `min`, `max` or `target` normalizes to `null` and is a blocking readiness issue, and an absent optional number stays absent.
       A blank string is not a number.
     - `Recipe.iterative.step` configures a recipe with no explicit steps and is dropped on one with explicit steps.
-    - A write that gives a recipe its first explicit step moves `Recipe.iterative.step` to that step's `Step.iterative` in the same write, and the reverse when the last explicit step is removed, because the normalizer drops it.
+    - A write that gives a recipe its first explicit step moves `Recipe.iterative.step` to that step's `Step.iterative` in the same write.
+      A write that leaves it with no explicit step moves the first prior step's `Step.iterative` to `Recipe.iterative.step`, or removes `step` when that step had none, because the normalizer drops it.
     - `getExecutionSteps()` gives the implicit step that configuration, and plain-JSON readers use `iterativeStepsOf`.
     - `iterativeStepsOf` answers one `{ stepIndex, iterative, resultGroups }` per execution step, the implicit step included, where `resultGroups` holds each group's `id`, `role` and `producedWhen`, and an implicit step's groups are the recipe-level groups.
     - `toJSON()` emits `iterative` and each step's `iterative` as deep clones, so `termsSnapshot.recipe` carries them.

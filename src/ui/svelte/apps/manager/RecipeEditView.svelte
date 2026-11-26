@@ -25,8 +25,10 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
+  import IterativeMidRunBanner from './recipe/iterative/IterativeMidRunBanner.svelte';
   import { resultsProjection, scopeWrites } from './recipe/recipeRoutingEdits.js';
   import { routedMinimum } from './recipe/recipeRoutingModel.js';
+  import { recipeTabCounts } from './recipe/recipeTabCounts.js';
   import {
     blocksEnable,
     countRecipeReadiness,
@@ -121,6 +123,8 @@
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {},
+    // The iterative route model in an iterative system, else `null`: Overview reads its library.
+    iterative = null,
   } = $props();
 
   // Current single-step requirement scopes default to empty arrays so an unconfigured recipe still
@@ -142,8 +146,9 @@
 
   // COLLAPSED chain (issue 710): a recipe still carrying authored steps while multi-step is OFF.
   // They are preserved and restored on re-enable, and meanwhile the editor presents the recipe as
-  // single-step over the FINAL step's results.
-  const collapsed = $derived(!multiStepEnabled && steps.length > 1);
+  // single-step over the FINAL step's results. Never under `iterative`, which keeps its steps.
+  const collapsed = $derived(!multiStepEnabled && steps.length > 1 && !iterative);
+  const soleStepLocked = $derived(Boolean(iterative));
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
   // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
@@ -233,8 +238,13 @@
 
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
+  // The recipe's workpieces in progress, stated on every tab but Validation.
+  const runCount = $derived(
+    iterative && activeTab !== 'validation' ? iterative.activeRunCount(recipe?.id) : 0
+  );
 
   // Validation badges, read straight off the draft, which is the single source of truth.
+  const iterativeReadiness = $derived(iterative ? iterative.recipeReadinessInput(recipe) : null);
   const readiness = $derived(
     evaluateRecipeReadiness(
       { ...(recipe || {}) },
@@ -246,6 +256,7 @@
         alchemy,
         signatureConflicts,
         progressive,
+        iterative: iterativeReadiness,
       }
     )
   );
@@ -254,41 +265,16 @@
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
 
-  // Tab record counts (issue 643 §F1). Multi-step recipes sum each tab's count across every step;
-  // single-step recipes read the recipe-scope arrays.
-  function countIngredients(scope) {
-    const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
-    return sets.reduce((total, set) => {
-      const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups.length : 0;
-      const essences =
-        set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
-      return total + groups + essences;
-    }, 0);
-  }
-  function countResults(scope) {
-    const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-    return groups.reduce((total, group) => total + arrayOrEmpty(group?.results).length, 0);
-  }
-  const countTools = (scope) => arrayOrEmpty(scope?.toolIds).length;
-  function sumOverScopes(counter) {
-    if (isMultiStep) return steps.reduce((total, step) => total + counter(step), 0);
-    return counter(recipe || {});
-  }
-  const ingredientsCount = $derived(sumOverScopes(countIngredients));
-  const resultsCount = $derived(sumOverScopes(countResults));
-  // Tools also carries the recipe-level (global) tools in multi-step mode.
-  const toolsCount = $derived(
-    sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0)
-  );
+  const tabCounts = $derived(recipeTabCounts(recipe, steps));
   // While the recipe is OFF, an enable-blocking issue disables the toggle so the GM cannot trigger
   // the hard activation failure (issue 549); disabling stays free. NOT the activation gate
   // `canActivateRecipe` (issue 1018): the two are INCOMPARABLE in both directions, and DOMAIN.md
   // carries the ledger row.
   const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
-    ingredients: { vehicle: 'count', label: ingredientsCount },
-    results: { vehicle: 'count', label: resultsCount },
-    tools: { vehicle: 'count', label: toolsCount },
+    ingredients: { vehicle: 'count', label: tabCounts.ingredients },
+    results: { vehicle: 'count', label: tabCounts.results },
+    tools: { vehicle: 'count', label: tabCounts.tools },
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
       ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),
@@ -407,17 +393,22 @@
 
       <!-- The blocking notice's page position, outside the scroller so a failed save stays in view
            on every tab, inset as the panel insets its cards. -->
-      {#if saveFailed}
-        <div class="manager-editor-notice-position" data-notice-position="page">
-          <Notice
-            blocking
-            tone="danger"
-            title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
-            detail={text(
-              'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
-              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
-            )}
-          />
+      {#if saveFailed || runCount > 0}
+        <div class="manager-editor-notice-position fab-stack" data-notice-position="page">
+          {#if saveFailed}
+            <Notice
+              blocking
+              tone="danger"
+              title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
+              detail={text(
+                'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
+                'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+              )}
+            />
+          {/if}
+          {#if runCount > 0}
+            <IterativeMidRunBanner count={runCount} recipeName={name} {text} />
+          {/if}
         </div>
       {/if}
 
@@ -437,6 +428,7 @@
           <RecipeOverviewTab
             {modeCallout}
             {recipe}
+            {iterative}
             {name}
             {description}
             {img}
@@ -473,6 +465,8 @@
             {onReorderSteps}
             {onUpdateStep}
             onDeleteStep={deleteStepFrom('overview')}
+            {soleStepLocked}
+            {onOpenCraftingSettings}
           />
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
@@ -491,11 +485,13 @@
             {routingProvider}
             onUpdateIngredientSets={writes.sets}
             onDeleteStep={deleteStepFrom('ingredients')}
+            {soleStepLocked}
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
             {modeCallout}
             recipe={resultsRecipe}
+            {iterative}
             {alchemySimple}
             {simpleFailureSlot}
             isMultiStep={collapsed ? false : isMultiStep}
@@ -519,6 +515,7 @@
             onAssignIngredientSet={writes.assignSet}
             onUpdateResultGroups={writes.groups}
             onDeleteStep={deleteStepFrom('results')}
+            {soleStepLocked}
             onToggleAllowPlayerResultReorder={toggleAllowPlayerResultReorder}
           />
         {:else if activeTab === 'tools'}
@@ -538,6 +535,7 @@
             onAddIngredientSetTool={addIngredientSetTool}
             onRemoveIngredientSetTool={removeIngredientSetTool}
             onDeleteStep={deleteStepFrom('tools')}
+            {soleStepLocked}
           />
         {:else if activeTab === 'access'}
           <RecipeAccessTab {accessPlayers} {accessCharacters} {onOpenAccess} />
@@ -558,6 +556,7 @@
             {alchemy}
             {signatureConflicts}
             {progressive}
+            {iterativeReadiness}
             systemRecipes={recipeOptions}
             onSelectIssue={selectIssue}
           />

@@ -92,7 +92,8 @@ let mounted;
 let target;
 let ctx;
 
-function makeRoute({ library = LIBRARY, routed = HIT, answer = true } = {}) {
+/** `runs` are the active runs the services report, watched as the mounted header watches them. */
+function makeRoute({ library = LIBRARY, routed = HIT, answer = true, runs = null } = {}) {
   const calls = { updates: [], views: [], dialogs: [] };
   const live = new SvelteMap([
     [
@@ -113,6 +114,7 @@ function makeRoute({ library = LIBRARY, routed = HIT, answer = true } = {}) {
       return answer;
     },
     getRecipeManager: () => ({ getRecipes: () => RECIPES }),
+    ...(runs && { getActiveIterativeRuns: () => runs }),
     getCraftingSystemManager: () => ({
       getSystem: () => live.get('system'),
       updateSystem: async (id, patch) => {
@@ -127,6 +129,7 @@ function makeRoute({ library = LIBRARY, routed = HIT, answer = true } = {}) {
     refresh: async () => {},
     confirmDiscardDirty: async () => 'discard',
   });
+  if (runs) section.watchActiveRuns(true);
   const route = createRoute({
     store: () => ({ iterative: section }),
     selectedSystem: () => live.get('system'),
@@ -302,6 +305,8 @@ describe('the Crafting Action editor (issue 3009)', () => {
       'iterativeNoSuccessRule',
       'iterativeInvalidNumber',
       'iterativeBoundsInverted',
+      'iterativeStartOutOfBounds',
+      'iterativeNoAllowedActions',
       'iterativeCheckUnavailable',
       'iterativeMultiStepOff',
       'iterativeSuccessLineOnFailureGroup',
@@ -823,6 +828,51 @@ describe('the Crafting Action editor (issue 3009)', () => {
     assert.ok(Boolean($('[data-iterative-unsupported-notice]')));
     assert.equal($$('[data-iterative-section]').length, 0);
     assert.equal(calls.updates.length, 0);
+  });
+
+  describe('the in-progress note (issue 3010)', () => {
+    const run = (actionIds, craftingSystemId = 'ironworks') => ({
+      recipeId: 'r-blade',
+      craftingSystemId,
+      actionIds,
+    });
+    const note = () => $('[data-iterative-in-progress]');
+
+    it('heads the editor with the workpieces that can use the action, singular for one', async () => {
+      await openEditor('strike', {
+        runs: [
+          run(['strike']),
+          run(['strike', 'quench']),
+          run(['quench']),
+          run(['strike'], 'other'),
+        ],
+      });
+      assert.ok(note() === $('[data-iterative-editor]').firstElementChild, 'the first child');
+      assert.equal(note().dataset.iterativeInProgress, '2');
+      assert.equal(
+        note().textContent.trim(),
+        '2 workpieces in progress can use Strike. They keep the version of this action they started with; your changes apply to workpieces started after you save.'
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+
+      await openEditor('quench', { runs: [run(['quench'])] });
+      assert.match(note().textContent, /^\s*1 workpiece in progress can use Quench\. It keeps/);
+    });
+
+    it('is absent at zero, and on a new draft', async () => {
+      await openEditor('chain', { runs: [run(['strike'])] });
+      assert.ok(!note(), 'no run can use Chain');
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+
+      // A run naming the new draft's empty id, so only the new-draft rule keeps the note away.
+      await openEditor(null, { runs: [run([''])] });
+      assert.equal(ctx.route.actionDraft.id, '');
+      assert.ok(!note(), 'a new draft has no workpieces');
+    });
   });
 
   describe('CounterRuleList, as recipe authoring will mount it (issue 3009)', () => {

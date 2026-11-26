@@ -13,13 +13,16 @@ The Manager recipe-edit view is a **five-tab editor** — Overview, Ingredients,
 Every edit stages into that draft and commits in one `updateRecipe` call on Save (through the `allowIncomplete` authoring path, which gates on structural validity only); the `enabled` toggle is the single immediate exception, because enabling validates against the persisted recipe.
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
 A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows the derived authoring-state pill for a recipe the activation check would refuse — `Incomplete` while it is on, `Can't enable` while it is off.
+In an `iterative` system the browse row also shows "Needs iterative setup", or "N blocking", which counts the blocking iterative issues the editor's Validation tab lists.
+It shows "Ready" when it has neither and no structural gap blocks enabling, so "Ready" never sits beside `Incomplete` or `Can't enable`.
+The Recipes page lede then says that every recipe in the system resolves as Iterative.
 
 ### Resolution-mode callout
 
 Overview, Ingredients, Results and Tools — the tabs the mode shapes — each carry in their heading block a neutral callout naming the system's `resolutionMode`, describing it, and offering an action that routes to Crafting Settings; the action gives it `role="note"`.
 Resolution mode is a property of the **system**, never of a recipe: the callout reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
 Access, Books & Scrolls and Validation carry no mode callout.
-Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, so no second, drifting table exists.
+Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, whose iterative entry is not offered as a choice while iterative mode is not selectable, so no second, drifting table exists.
 
 ### No right rail
 
@@ -466,6 +469,40 @@ If multistep is enabled:
 If multistep is disabled:
 
 - Show implicit single-step editors at the recipe level
+
+### Iterative Recipe Editor
+
+In an `iterative` system, Overview lists the recipe's Counter Instances in a table with Start, Min, Max, Target and Player sees, and each row can be removed.
+Removing a row also removes its counter from every step's hide and lock lists in the same write, once no other row names it, and a rule that names it is kept.
+The table sits after the step-mode card, and its Counter Instances carry on across every step.
+Start is a fixed number, or a formula that rolls once when the first step starts, and switching back to a fixed number restores the kept start.
+Min and Max are editable only for a Per recipe counter, which shows the counter's defaults while unset, and a Global or No limit counter shows its system bound read-only.
+A row states each of its faults on its own line under its counter: a minimum above its maximum, a fixed start above the maximum or below the minimum, and a value that is not a number.
+Each faulted control is marked invalid and described by its line.
+A recipe with no Counter Instances offers to add every library counter, and says so when the library has none, and the adder states when every counter is already used.
+A Counter Instance naming no library counter is marked on its row and links to Counters.
+Each step states its allowed actions as all, or as only those chosen through a staged picker, and choosing none is shown as an error and blocks enabling the recipe.
+A multi-step recipe's step hides or locks each Counter Instance for that step, and a Counter Instance the player never sees offers no per-step hide.
+A single-step recipe shows its hide and lock lists once one is non-empty, and keeps them shown until the Overview tab is left, so clearing the last one keeps its focus.
+Each step's Ends when holds success rules, which must all hold, and failure rules, any one of which is enough.
+The rules range over the recipe's Counter Instances, Session number and Previous action.
+A rule naming a counter that is not a Counter Instance is marked as not tracked.
+A step with no success rule says it can never finish, and a step with no failure rule says it can only end in success.
+Each multi-step recipe's step header shows that step's blocking count, or else its warning count, and nothing when it has none.
+A single-step recipe shows no step header count.
+Turning a single-step recipe multi-step makes its ingredient set, result sets and step configuration step 1's in the same edit.
+Collapsing to one step keeps step 1 whole as the single step, and removes the other steps with their result sets.
+A sole step offers no remove.
+With multi-step recipes turned off, an iterative multi-step recipe is never presented as collapsed, and its Steps card warns that it cannot be started.
+In an iterative system, Results lists each scope's result sets in a reorderable list, checked top to bottom, and marks the failure set.
+Each set states its Produced when lines, each a Success or Failure end with rules that all hold.
+A set with no line says it is never produced, and a scope with no set says it produces nothing.
+The Validation tab groups the recipe's counter and step checks under Steps, first, with one row per step, which passes when the step has no issue.
+The Validation tab names each addressed issue's step and lists the library issues that refuse the recipe's start, using the copy the system Validation tab uses.
+A library issue counts as blocking on the Validation tab and in the status, because it refuses the recipe's start, but it does not block enabling the recipe.
+While active workpieces of the recipe exist in the system, every tab except Validation states how many there are, and that they keep the terms they started with.
+The editor header shows "Needs iterative setup", "N blocking" or "Ready" by the same rule as the library row, and while Ready is withheld it shows the row's own "Incomplete" or "Can't enable"; its subline names the Iterative mode and a multi-step recipe's step count.
+The Preview tab is not offered.
 
 ## Component Studio
 

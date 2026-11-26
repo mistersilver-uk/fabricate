@@ -1816,7 +1816,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <b>Name:</b> it shows its accessible name as a plain-text tooltip under the pointer and keyboard focus alike, no call site writes a native <code>title</code>, and the three information-bearing hints pass <code>tooltip</code>.
       The bare &times; above is <code>role="ghost"</code> at the 24 rung &mdash; the ghost&rsquo;s transparent, borderless paint at the rung&rsquo;s 24px box, the journal history&rsquo;s dismiss &mdash; and the <b>icon 24</b> unit draws the same rung neutral and bordered.
       A labelled control is a <code>Button</code>, not an IconButton: the essence row&rsquo;s &ldquo;Edit rules&rdquo; is drawn by <code>Button</code> with its trailing arrow as a child, so no IconButton call site renders a visible label.
-      What it also enforces is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 42 importers, 72 render sites &middot; <b>icon-button-source-contract.test.js</b> &middot; <b>ui-visual-style/spec.md</b></span></div>
+      What it also enforces is the rule opposite: the accessible name is a required-shaped prop, because a missing one on an icon-only control is invisible in every frame.<span class="cite"><b>IconButton.svelte</b> &mdash; 44 importers, 74 render sites &middot; <b>icon-button-source-contract.test.js</b> &middot; <b>ui-visual-style/spec.md</b></span></div>
     <div class="delta ok"><b>Both button families are now rooted at a class the primitive emits, and each declares its own focus ring.</b>
       <code>Button</code> emits <code>fabricate-button</code> and <code>IconButton</code> emits <code>fabricate-icon-button</code>, each as the FIRST literal of its own <code>classes</code> array, and every rule in the two families is a COMPOUND on that root at the specificity an application-rooted rule would have &mdash; one class for one class.
       81 of <code>Button</code>&rsquo;s 109 sheet selectors and 16 of IconButton&rsquo;s 22 are rooted there; the rest name a caller&rsquo;s own container in their ancestor chain &mdash; or, for one per-view override each, an application root qualified by an attribute &mdash; and are exempt.
@@ -6732,6 +6732,42 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <span class="k-hint">Empty keeps the heading and the count, and drops the header row: a column head above no rows is furniture.
         It says what would put a row here, through the empty panel&rsquo;s own way out.</span>
     </div>
+    <div class="stage col" style="border-top:1px solid var(--fab-border)">
+      <div class="unit" style="width:100%">
+        <span class="cap">hint and footer &mdash; a second caption line and a band under the rows</span>
+        <div style="border:1px solid var(--fab-border);border-radius:11px;background:var(--fab-bg-2);overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="border-collapse:collapse;width:100%">
+              <caption style="caption-side:top;text-align:left;padding:12px"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600;color:var(--fab-text)">Counters</span>
+                  <span class="k-count">2</span>
+                </span><span style="display:block;margin-top:4px;font-size:11.5px;font-weight:400;line-height:1.4;color:var(--fab-text-muted)">Start values, bounds and targets.</span></caption>
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:0 12px 8px 12px;font-family:var(--fab-font-mono);font-size:8.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);white-space:nowrap">Counter</th>
+                  <th style="text-align:left;padding:0 12px 8px 0;font-family:var(--fab-font-mono);font-size:8.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);white-space:nowrap">Start</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Heat</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">0</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Temper</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">4</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--fab-border);background:var(--fab-bg-1)">
+            <span class="k-hint">Max and target are optional.</span>
+          </div>
+        </div>
+        <span class="k-hint">The hint is a second line of the caption, outside the name the heading and the count give the table, and describes it.
+          The footer is the caller&rsquo;s band inside the frame, after the scroll container and, when the table pages, after the pager: an adder and its notes, never a row.</span>
+      </div>
+    </div>
     <div class="notes">
       <div>
         <h5>Canonical spec</h5>
@@ -6740,6 +6776,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>header row</b> mono kicker, 8.5px, .12em &mdash; the sorted column takes the accent and its direction glyph</li>
         <li><b>row</b> 1px hairline above, 12px text, 8px by 12px cells, numerics in mono with <code>tabular-nums</code></li>
         <li><b>footer</b> the standard pagination bar, full width</li>
+        <li><b>hint</b> 11.5px <code>--fab-text-muted</code> on a line of its own under the heading line; <b>caller footer</b> a band inside the frame under the pager, on the pager&rsquo;s ground</li>
         <li><b>scroll</b> the table scrolls horizontally inside its own container; the page never does</li>
       </ul>
       </div>
@@ -6752,7 +6789,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>columns</b> {key, label, align?, mono?, sortable?, width?, rowHeader?, ariaLabel?}[] &mdash; a <code>rowHeader</code> column&rsquo;s cells are <code>&lt;th scope="row"&gt;</code></li>
         <li><b>rows</b> any[] &middot; <b>rowKey</b> (row, index) <span class="req">required</span></li>
         <li><b>heading</b> &middot; <b>count</b>, defaulting to the row count &mdash; the visible caption and the table&rsquo;s name</li>
-        <li><b>search</b> a snippet drawn at the caption&rsquo;s end &middot; <b>cell</b> (row, column, index), a snippet drawing one cell; absent, the cell is <code>row[column.key]</code></li>
+        <li><b>hint</b> a second caption line, outside the table&rsquo;s accessible name, that describes it &middot; <b>footer</b> a snippet drawn inside the frame after the scroll container and, when <code>perPage</code> is set, after the pager</li>
+                <li><b>search</b> a snippet drawn at the caption&rsquo;s end &middot; <b>cell</b> (row, column, index), a snippet drawing one cell; absent, the cell is <code>row[column.key]</code></li>
         <li><b>sort</b> {key, dir} &middot; <b>onSort</b> &mdash; a sortable header is a button and its <code>th</code> carries <code>aria-sort</code></li>
         <li><b>page &middot; perPage &middot; perPageOptions &middot; onPageChange &middot; onPerPageChange</b> &mdash; a table pages only with <code>perPage</code> set, and the caller passes the page&rsquo;s rows</li>
         <li><b>loading &middot; error</b> &mdash; a store-fed table reaches both in ordinary use</li>
@@ -8401,6 +8439,37 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         </div>
         <span class="k-hint">Rolled swaps the stepper for the expression at the same 102&times;28, so the toggle moves nothing else in the row; switching back to Fixed keeps what was typed.</span>
         </div>
+      <div class="unit">
+        <span class="cap">formula &mdash; Fixed at 0, unbounded</span>
+        <div style="display:flex;align-items:center;gap:8px;align-self:flex-start">
+          <div class="k-seg inline" role="radiogroup" aria-label="Amount for Heat" style="flex:none">
+            <button class="sel">Fixed</button>
+            <button class="">Formula</button>
+          </div>
+          <div class="k-step">
+            <button><svg class="i"><use href="#i-minus"/></svg></button>
+            <input id="spec-pra-4" aria-label="Quantity for Heat" value="0" readonly>
+            <button><svg class="i"><use href="#i-plus"/></svg></button>
+          </div>
+        </div>
+        <span class="k-hint">Under <code>formula</code> the toggle draws for every kind, and a stored 0 shows as 0: an absent min or max is unbounded, so the stepper never clamps the number it holds.</span>
+      </div>
+      <div class="unit">
+        <span class="cap">formula &mdash; the expression, its reading and its hint</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;align-self:flex-start;width:fit-content">
+          <div class="k-seg inline" role="radiogroup" aria-label="Amount for Heat" style="flex:none">
+            <button class="">Fixed</button>
+            <button class="sel">Formula</button>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-start;align-self:flex-start;gap:4px;padding-top:1px">
+            <input id="spec-pra-5" aria-label="Rolled amount for Heat" value="40 + 2" readonly style="box-sizing:border-box;width:102px;height:28px;padding:0 8px;border:1px solid var(--fab-border);border-radius:7px;background:var(--fab-surface-soft);color:var(--fab-text);font-family:var(--fab-font-mono);font-size:11.5px;font-weight:500">
+            <span class="k-badge info k-mono" style="font-weight:500;line-height:1;border:1px solid var(--fab-info-border)">= 42</span>
+          </div>
+          <span style="flex:0 0 100%;contain:inline-size;margin-inline-end:-8px;font-size:.66rem;color:var(--fab-text-muted)">A number, dice, or character data such as @abilities.con.mod. Dice roll once, when the step starts.</span>
+        </div>
+        <span class="k-hint">The expression keeps the 102&times;28 and its placeholder may truncate, so the hint carries the full example: muted text under the input, drawn only under Formula and read after the reading.
+          An invalid message wraps on the line under the controls, whatever the host.</span>
+      </div>
     </div>
     <div class="notes">
       <div>
@@ -8411,6 +8480,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>toggle</b> the Fixed | Rolled <code>SegmentedControl</code> at its 30px <code>inline</code> rung</li>
           <li><b>unit</b> 10/500 <code>--fab-text-subtle</code>, right of the stepper</li>
           <li><b>invalid</b> its reason on a line of its own</li>
+          <li><b>formula</b> one wrapping root, its controls aligned to their top edge; the hint and the invalid message each on a line under the controls</li>
           <li><b>gap</b> the host row&rsquo;s 8 between parts: the slot renders a fragment and owns no wrapper</li>
         </ul>
       </div>
@@ -8422,6 +8492,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li><b>amount</b> {min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel}</li>
           <li><b>name</b> — the subject&rsquo;s name in each control&rsquo;s accessible name</li>
           <li><b>rollable</b> — the Fixed | Rolled toggle on a component or currency row</li>
+          <li><b>formula</b> — {resolve, unresolvedLabel, tokens?, tokensLabel?, placeholder?, hint?}, superseding <b>rollable</b>: the Fixed | Formula toggle for every kind, an absent min or max unbounded, a <code>null</code> amount unset as &ldquo;&mdash;&rdquo;, and the hint under the Formula input</li>
           <li><b>readonly · disabled</b></li>
           <li><b>invalid</b> — the message that marks the amount invalid</li>
           <li><b>onChange</b>(patch) — <code>{quantity}</code> or <code>{quantityFormula}</code></li>
@@ -8578,6 +8649,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>label</b> | <b>ariaLabel</b> &mdash; exactly one; names the token group and the panel</li>
         <li><b>searchLabel</b> &middot; <b>emptyLabel</b> &middot; <b>loading</b> &middot; <b>error</b></li>
         <li><b>addLabel</b> = &ldquo;Add&rdquo; &middot; <b>addProps</b> {} &mdash; the dashed Add&rsquo;s name, and hooks stamped on that button</li>
+        <li><b>ariaDescribedBy</b> = &lsquo;&rsquo; &mdash; the dashed Add&rsquo;s description, such as the caller&rsquo;s fault line</li>
         <li><b>trigger</b> snippet &mdash; replaces the dashed Add &middot; <b>class</b> &middot; rest</li>
       </ul>
       </div>

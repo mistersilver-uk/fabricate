@@ -1154,3 +1154,154 @@ describe('a result id repeated within one scope (issue 2713)', () => {
   });
 });
 
+
+describe('iterative recipe readiness (issue 3010)', () => {
+  const RECIPE = { name: 'Etched Sword', enabled: false, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1' }] };
+  const STEPS = [
+    { index: 0, id: 'heat', name: 'Heat the blank' },
+    { index: 1, id: 'etch', name: 'Etch the fuller' },
+  ];
+  const recipeIssue = (code, stepIndex, severity = 'critical') => ({
+    kind: 'recipe', entityKind: 'recipe', entityId: 'r', entityName: 'Etched Sword', code, stepIndex, severity,
+  });
+  const libraryIssue = (code, entityKind, entityId, entityName) => ({
+    kind: 'system', entityKind, entityId, entityName, code, severity: 'critical',
+  });
+  const iterativeOf = (issues, steps = STEPS) => ({ issues, steps });
+
+  it('adds nothing without the input, so every other mode is unchanged', () => {
+    const recipes = [
+      RECIPE,
+      { name: '', enabled: true, ingredientSets: [], resultGroups: [] },
+      { name: 'Two', steps: [{ id: 'a', name: '', ingredientSets: [], resultGroups: [] }] },
+    ];
+    for (const recipe of recipes) {
+      const base = evaluateRecipeReadiness(recipe, { progressive: false });
+      assert.deepEqual(evaluateRecipeReadiness(recipe, { progressive: false, iterative: null }), base);
+      assert.ok(base.checks.every((entry) => !('owners' in entry)));
+      assert.ok(base.issues.every((entry) => !('iterativeCode' in entry)));
+    }
+  });
+
+  it('appends Counters are set up and one check per step after every base check', () => {
+    const base = evaluateRecipeReadiness(RECIPE);
+    const multi = evaluateRecipeReadiness(RECIPE, { iterative: iterativeOf([]) });
+    assert.deepEqual(multi.checks.slice(0, base.checks.length), base.checks);
+    assert.deepEqual(multi.issues, base.issues);
+    assert.deepEqual(multi.checks.slice(base.checks.length), [
+      { id: 'iterativeCounters', satisfied: true, owners: [] },
+      { id: 'iterativeStep:0', satisfied: true, owners: [], stepIndex: 0, stepName: 'Heat the blank' },
+      { id: 'iterativeStep:1', satisfied: true, owners: [], stepIndex: 1, stepName: 'Etch the fuller' },
+    ]);
+    const single = evaluateRecipeReadiness(RECIPE, { iterative: iterativeOf([], []) });
+    assert.deepEqual(single.checks.slice(base.checks.length).map((entry) => entry.id), [
+      'iterativeCounters',
+      'iterativeStep:single',
+    ]);
+  });
+
+  it('maps each issue to its row: id, blocks, route, control and step', () => {
+    const { issues } = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([
+        recipeIssue('iterativeNoCounters', null),
+        recipeIssue('iterativeBoundsInverted', null),
+        recipeIssue('iterativeNoSuccessRule', 1),
+        recipeIssue('iterativeUnknownAction', 0),
+        recipeIssue('iterativeSuccessLineOnFailureGroup', 0, 'warning'),
+        recipeIssue('iterativeMultiStepOff', null),
+        libraryIssue('iterativeBoundsInverted', 'counter', 'temper', 'Temper'),
+      ]),
+    });
+    assert.deepEqual(issues.filter((entry) => entry.iterativeCode), [
+      { id: 'iterativeNoCounters:recipe', iterativeCode: 'iterativeNoCounters', severity: 'critical', blocks: 'enable', target: 'overview', focusTarget: 'iterative-counters-add' },
+      { id: 'iterativeBoundsInverted:recipe', iterativeCode: 'iterativeBoundsInverted', severity: 'critical', blocks: 'enable', target: 'overview', focusTarget: 'iterative-counters' },
+      { id: 'iterativeNoSuccessRule:1', iterativeCode: 'iterativeNoSuccessRule', severity: 'critical', blocks: 'enable', target: 'overview', focusTarget: 'iterative-step-1-success', stepId: 'etch', stepName: 'Etch the fuller' },
+      { id: 'iterativeUnknownAction:0', iterativeCode: 'iterativeUnknownAction', severity: 'critical', blocks: 'enable', target: 'overview', focusTarget: 'iterative-step-0-actions', stepId: 'heat', stepName: 'Heat the blank' },
+      { id: 'iterativeSuccessLineOnFailureGroup:0', iterativeCode: 'iterativeSuccessLineOnFailureGroup', severity: 'warning', target: 'results', stepId: 'heat', stepName: 'Heat the blank' },
+      { id: 'iterativeMultiStepOff:recipe', iterativeCode: 'iterativeMultiStepOff', severity: 'critical', blocks: 'enable', target: 'overview' },
+      { id: 'iterativeBoundsInverted:counter:temper', iterativeCode: 'iterativeBoundsInverted', severity: 'critical', target: 'overview', entityName: 'Temper' },
+    ]);
+  });
+
+  it('gives a single step its step codes, and Counters an unknown counter it cannot tell apart', () => {
+    const { checks, issues } = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf(
+        [
+          recipeIssue('iterativeUnknownCounter', null),
+          recipeIssue('iterativeNoSuccessRule', null),
+          recipeIssue('iterativeFinalStepProducesNothing', null, 'warning'),
+        ],
+        []
+      ),
+    });
+    const owners = (id) => check(checks, id).owners;
+    assert.deepEqual(owners('iterativeCounters'), ['iterativeUnknownCounter:recipe']);
+    assert.deepEqual(owners('iterativeStep:single'), [
+      'iterativeNoSuccessRule:recipe',
+      'iterativeFinalStepProducesNothing:recipe',
+    ]);
+    assert.equal(
+      issues.find((entry) => entry.iterativeCode === 'iterativeNoSuccessRule').focusTarget,
+      'iterative-step-single-success'
+    );
+    assert.ok(issues.every((entry) => !('stepName' in entry)), 'no step is addressed');
+  });
+
+  it('lands an empty Only list on its step’s actions picker, on a multi-step or a single step', () => {
+    const issueOf = (readiness) =>
+      readiness.issues.find((entry) => entry.iterativeCode === 'iterativeNoAllowedActions');
+    const multi = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([recipeIssue('iterativeNoAllowedActions', 1)]),
+    });
+    assert.deepEqual(check(multi.checks, 'iterativeStep:1').owners, ['iterativeNoAllowedActions:1']);
+    assert.equal(issueOf(multi).focusTarget, 'iterative-step-1-actions');
+    assert.equal(issueOf(multi).blocks, 'enable');
+    const single = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([recipeIssue('iterativeNoAllowedActions', null)], []),
+    });
+    assert.deepEqual(check(single.checks, 'iterativeStep:single').owners, [
+      'iterativeNoAllowedActions:recipe',
+    ]);
+    assert.equal(issueOf(single).focusTarget, 'iterative-step-single-actions');
+  });
+
+  it('lets a step check claim its first issue, leaving the rest as their own rows', () => {
+    const readiness = evaluateRecipeReadiness(RECIPE, {
+      iterative: iterativeOf([
+        recipeIssue('iterativeUnknownAction', 1),
+        recipeIssue('iterativeNoSuccessRule', 1),
+      ]),
+    });
+    const rows = recipeValidationRowStates(readiness).filter(
+      (row) => row.checkId.startsWith('iterative') || row.issue?.iterativeCode
+    );
+    assert.deepEqual(
+      rows.map((row) => [row.checkId, row.issue?.id ?? null, row.status]),
+      [
+        ['iterativeCounters', null, 'pass'],
+        ['iterativeStep:0', null, 'pass'],
+        ['iterativeStep:1', 'iterativeUnknownAction:1', 'block'],
+        ['', 'iterativeNoSuccessRule:1', 'block'],
+      ]
+    );
+  });
+
+  describe('the Enable gate, by issue class', () => {
+    const gate = (issues) => {
+      const readiness = evaluateRecipeReadiness({ ...RECIPE, incomplete: false }, { iterative: iterativeOf(issues) });
+      const blockRows = recipeValidationRowStates(readiness).filter(
+        (row) => row.status === 'block' && row.issue?.iterativeCode
+      ).length;
+      return { blocks: blocksEnable(readiness.issues), blockRows };
+    };
+    const ROWS = [
+      ['a recipe-scoped critical issue blocks Enable', [recipeIssue('iterativeNoCounters', null)], { blocks: true, blockRows: 1 }],
+      ['a library start blocker raises a block row and leaves Enable free', [libraryIssue('iterativeInvalidNumber', 'counter', 'heat', 'Heat')], { blocks: false, blockRows: 1 }],
+      ['a warning neither blocks nor raises a block row', [recipeIssue('iterativeFinalStepProducesNothing', 1, 'warning')], { blocks: false, blockRows: 0 }],
+      ['no issue leaves Enable free', [], { blocks: false, blockRows: 0 }],
+    ];
+    for (const [title, issues, expected] of ROWS) {
+      it(title, () => assert.deepEqual(gate(issues), expected));
+    }
+  });
+});

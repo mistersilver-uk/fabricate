@@ -404,8 +404,12 @@ describe('ExprInput (issue 2465)', () => {
     const resolving = tags.filter(({ names }) => names.includes('resolve'));
     assert.deepEqual(
       [...new Set(resolving.map(({ file }) => file))],
-      [CCVF, 'src/ui/svelte/apps/manager/iterative/ActionExpressionField.svelte'],
-      'a resolver needs a reader in scope: the check field has an actor, the action editor reads constants only; a third is read by hand first'
+      [
+        CCVF,
+        'src/ui/svelte/apps/manager/iterative/ActionExpressionField.svelte',
+        'src/ui/svelte/components/PickerRowAmount.svelte',
+      ],
+      'a resolver needs a reader in scope: the check field has an actor, the action editor reads constants only, and the amount slot forwards the formula caller’s; a fourth is read by hand first'
     );
     assert.deepEqual(
       resolving.filter(({ names }) => !names.includes('unresolvedLabel')).map(({ file }) => file),

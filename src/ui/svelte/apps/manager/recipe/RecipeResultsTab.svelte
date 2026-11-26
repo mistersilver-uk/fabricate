@@ -8,7 +8,8 @@
 
   Each section emits the whole replacement groups array via one `onChange(nextGroups)`; the shell
   maps it to the right scope through `onUpdateResultGroups(stepId, nextGroups)`, `stepId` being
-  null for the single-step scope.
+  null for the single-step scope. In an iterative system every scope is an
+  `IterativeResultsSection` instead.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -16,6 +17,7 @@
   import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
+  import IterativeResultsSection from './iterative/IterativeResultsSection.svelte';
   import { recipeResultKinds } from '../../../components/resultRows.js';
 
   let {
@@ -61,8 +63,12 @@
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {},
+    // An iterative recipe's sole step offers no delete: Collapse is the way back to one step.
+    soleStepLocked = false,
     // GM policy: may a player reorder this recipe's progressive stages? Default true.
     onToggleAllowPlayerResultReorder = () => {},
+    // The iterative route model in an iterative system, else `null`.
+    iterative = null,
   } = $props();
 
   // Default-true: only an explicit `false` turns the switch off, matching the model.
@@ -91,7 +97,7 @@
   // Per-mode heading and intro, OUTSIDE any card. The progressive heading is "Results", matching
   // the progressive SALVAGE editor: the two are the same surface and must not drift, and the
   // strip above the list is the one place the roll-budget explanation belongs.
-  const heading = $derived(
+  const modeHeading = $derived(
     progressive
       ? {
           title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Results'),
@@ -128,6 +134,23 @@
             }
   );
 
+  // An iterative system's heading replaces every mode's.
+  const iterativeHeading = $derived(
+    iterative && {
+      title: text('FABRICATE.Admin.Manager.Recipe.Tabs.Results', 'Results'),
+      intro: isMultiStep
+        ? text(
+            'FABRICATE.Admin.Manager.Recipe.Iterative.ResultsIntroMulti',
+            'What each step produces. Result sets are checked top to bottom, and the first match is produced. If none match, nothing is produced.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Recipe.Iterative.ResultsIntroSingle',
+            'What the work produces. Result sets are checked top to bottom, and the first match is produced. If none match, nothing is produced.'
+          ),
+    }
+  );
+  const heading = $derived(iterativeHeading || modeHeading);
+
   function stepResultGroups(step) {
     return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
   }
@@ -136,6 +159,21 @@
     return Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   }
 </script>
+
+{#snippet iterativeScope(groups, stepId, isTerminalStep)}
+  <IterativeResultsSection
+    resultGroups={groups}
+    instances={recipe?.iterative?.counters ?? []}
+    {iterative}
+    {componentOptions}
+    {resultKinds}
+    {isTerminalStep}
+    idPrefix={stepId ? `step-${stepId}-` : ''}
+    {text}
+    {onOpenComponent}
+    onChange={(nextGroups) => onUpdateResultGroups(stepId, nextGroups)}
+  />
+{/snippet}
 
 <section
   class="manager-recipe-tab manager-recipe-results-tab"
@@ -203,35 +241,46 @@
         )}
       </p>
     {:else}
-      <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
+      <RecipeStepAccordion
+        {steps}
+        alwaysOpen
+        {onDeleteStep}
+        removable={!soleStepLocked || steps.length > 1}
+      >
         {#snippet body(step, index)}
-          <RecipeResultsSection
-            idPrefix={`step-${step.id}-`}
-            resultGroups={stepResultGroups(step)}
-            {alchemySimple}
-            {componentOptions}
-            surface="recipe"
-            {resultKinds}
-            {routingProvider}
-            {progressive}
-            isTerminalStep={index === steps.length - 1}
-            {onOpenComponent}
-            {onOpenChecks}
-            {macroOptions}
-            {complicationTriggerOptions}
-            ingredientSets={stepIngredientSets(step)}
-            {outcomeTierOptions}
-            {routedOutcomeTiers}
-            {routedMinimum}
-            {outcomeTiersDefined}
-            {failureResultsAllowed}
-            onAssignIngredientSet={(groupId, setId, assigned) =>
-              onAssignIngredientSet(step.id, groupId, setId, assigned)}
-            onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
-          />
+          {#if iterative}
+            {@render iterativeScope(stepResultGroups(step), step.id, index === steps.length - 1)}
+          {:else}
+            <RecipeResultsSection
+              idPrefix={`step-${step.id}-`}
+              resultGroups={stepResultGroups(step)}
+              {alchemySimple}
+              {componentOptions}
+              surface="recipe"
+              {resultKinds}
+              {routingProvider}
+              {progressive}
+              isTerminalStep={index === steps.length - 1}
+              {onOpenComponent}
+              {onOpenChecks}
+              {macroOptions}
+              {complicationTriggerOptions}
+              ingredientSets={stepIngredientSets(step)}
+              {outcomeTierOptions}
+              {routedOutcomeTiers}
+              {routedMinimum}
+              {outcomeTiersDefined}
+              {failureResultsAllowed}
+              onAssignIngredientSet={(groupId, setId, assigned) =>
+                onAssignIngredientSet(step.id, groupId, setId, assigned)}
+              onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
+            />
+          {/if}
         {/snippet}
       </RecipeStepAccordion>
     {/if}
+  {:else if iterative}
+    {@render iterativeScope(resultGroups, null, true)}
   {:else}
     <RecipeResultsSection
       {resultGroups}

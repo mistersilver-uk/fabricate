@@ -11,6 +11,8 @@ import {
 } from '../../systems/currencyProfile.js';
 import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
 import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
+import { iterativeStatusPill } from '../svelte/apps/manager/iterative/iterativeRecipeIssues.js';
+import { iterativeStatusEntry } from '../svelte/apps/manager/iterative/iterativeStatusCopy.js';
 import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
 import {
@@ -292,6 +294,15 @@ export function deriveRecipeIo(recipe, resolutionMode) {
   };
 }
 
+/** The row's iterative pill, from `ITERATIVE_STATUS`, or `null` for another mode or a withheld Ready. */
+function iterativeRecipePill(recipe) {
+  const status = iterativeStatusPill(recipe?.iterativeStatus, recipe?.enableBlocked);
+  const entry = iterativeStatusEntry(status?.id);
+  if (!entry) return null;
+  const pill = { id: entry.pill, tone: entry.tone, icon: entry.icon };
+  return status.id === 'blocking' ? { ...pill, count: status.count } : pill;
+}
+
 /** The row's status pills, in render order. */
 export function deriveRecipeStatuses(recipe) {
   const pills = [];
@@ -308,6 +319,8 @@ export function deriveRecipeStatuses(recipe) {
         : { id: 'incomplete', tone: 'warning', icon: 'fas fa-pen-ruler' }
     );
   }
+  const iterative = iterativeRecipePill(recipe);
+  if (iterative) pills.push(iterative);
   return pills;
 }
 

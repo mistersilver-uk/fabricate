@@ -17,8 +17,8 @@
  * this file hands the row action, and `tests/components/recipe-edit-mounted.test.js` resolves that
  * address onto a real control. Either half alone would pass while the other drifted.
  *
- * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
- * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', focusTarget?: string, stepId?: string, stepName?: string }} ReadinessIssue
+ * @typedef {{ id: string, satisfied: boolean, owners?: string[] }} ReadinessCheck
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', focusTarget?: string, stepId?: string, stepName?: string, iterativeCode?: string, entityName?: string }} ReadinessIssue
  * @typedef {{ id: string, name: string, success?: boolean }} RoutedOutcomeTier
  */
 
@@ -28,6 +28,7 @@ import { buildRecipeActivationIssue } from '../../../../../utils/recipeActivatio
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 import { groupProblems } from '../../../components/resultGroupEdits.js';
 
+import { iterativeRecipeReadiness } from './iterative/iterativeRecipeReadiness.js';
 import { buildRoutingModel } from './recipeRoutingModel.js';
 
 function asArray(value) {
@@ -558,7 +559,8 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
  * one on `ingredientSet`;
  * `routedOutcomeTierOptions`, the system's policy-conditional tiers; `progressive`, the system's
  * mode, under which a set may hold no choice group; and `alchemy` with
- * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
+ * `signatureConflicts`, which drive the two enable blockers above and are ignored without it;
+ * and `iterative`, the iterative route model's `recipeReadinessInput`, whose absence adds nothing.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
@@ -642,6 +644,9 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   issues.push(...alchemyReadiness.issues);
   checks.push(...alchemyReadiness.checks);
 
+  if (options.iterative)
+    appendReadiness({ checks, issues }, iterativeRecipeReadiness(options.iterative));
+
   // A disabled recipe still saves, but cannot be ENABLED until the critical requirements above
   // are met; the projected `incomplete` is preferred, with the local gaps as the fallback.
   const incomplete =
@@ -653,6 +658,12 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   }
 
   return { checks, issues };
+}
+
+/** Appends `part`'s checks and issues to `into`'s, in order. */
+function appendReadiness(into, part) {
+  into.checks.push(...part.checks);
+  into.issues.push(...part.issues);
 }
 
 export function countIssues(severity, issues = []) {
@@ -709,7 +720,7 @@ export function recipeValidationRowStates(readiness = {}) {
   const issues = Array.isArray(readiness?.issues) ? readiness.issues : [];
   const claimed = new Set();
   const rows = checks.map((check) => {
-    const owners = CHECK_TO_ISSUES[check.id] || [];
+    const owners = check.owners ?? CHECK_TO_ISSUES[check.id] ?? [];
     const issue = check.satisfied
       ? null
       : issues.find((entry) => owners.includes(entry.id)) || null;

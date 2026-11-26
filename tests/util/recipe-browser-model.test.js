@@ -451,6 +451,39 @@ describe('recipeBrowserModel — row derivations', () => {
     );
   });
 
+  // Issue 3010 — an iterative row's status appends ONE pill, and Ready never sits beside a gap.
+  it('appends the iterative status pill last, withholding Ready while enabling is blocked', () => {
+    const pills = (overrides) =>
+      deriveRecipeStatuses(makeRecipe(overrides)).map(({ id, tone, icon, count }) =>
+        count === undefined ? [id, tone, icon] : [id, tone, icon, count]
+      );
+    assert.deepEqual(pills({ iterativeStatus: { id: 'setup' } }), [
+      ['iterativeSetup', 'warning', 'fas fa-flag'],
+    ]);
+    assert.deepEqual(pills({ enabled: false, iterativeStatus: { id: 'blocking', count: 2 } }), [
+      ['disabled', 'subtle', ''],
+      ['iterativeBlocking', 'danger', 'fas fa-circle-xmark', 2],
+    ]);
+    assert.deepEqual(pills({ iterativeStatus: { id: 'ready' } }), [
+      ['iterativeReady', 'success', 'fas fa-circle-check'],
+    ]);
+    assert.deepEqual(
+      pills({ enableBlocked: true, iterativeStatus: { id: 'ready' } }),
+      [['incomplete', 'warning', 'fas fa-pen-ruler']],
+      'a structural gap withholds Ready'
+    );
+    assert.deepEqual(
+      pills({ enabled: false, enableBlocked: true, iterativeStatus: { id: 'setup' } }),
+      [
+        ['disabled', 'subtle', ''],
+        ['blocked', 'danger', 'fas fa-circle-exclamation'],
+        ['iterativeSetup', 'warning', 'fas fa-flag'],
+      ],
+      'only Ready is withheld'
+    );
+    assert.deepEqual(pills({}), [], 'a row of another mode carries no status and draws no pill');
+  });
+
   // Issue 1010 — BOTH authoring pills were re-pointed from `incomplete` to `enableBlocked`, and the
   // two directions are stated separately because only one of them is a widening.
   describe('the row pill reads the activation predicate, not `incomplete`', () => {

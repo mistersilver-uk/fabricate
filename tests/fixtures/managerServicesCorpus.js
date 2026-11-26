@@ -17,6 +17,7 @@ export const MANAGER_SERVICE_KEYS = Object.freeze([
   'eraseLearnedRecipe',
   'expendRecipeItemUse',
   'getAccessCharacterActors',
+  'getActiveIterativeRuns',
   'getActorOptions',
   'getActorRollData',
   'getActorUuidsInSceneRegion',
@@ -526,6 +527,21 @@ export function buildManagerWorld(options = {}) {
       },
       importRecipes: async (data, overwrite) => record('recipeManager.importRecipes', data, overwrite),
     },
+    // One active iterative run, on the first actor only, for `getActiveIterativeRuns`.
+    craftingRunManager: {
+      getActiveRuns: (actor) =>
+        actor === actorDocuments[0]
+          ? [
+              {
+                id: 'run-forge',
+                recipeId: 'recipe-alpha',
+                craftingSystemId: 'sys-1',
+                termsSnapshot: { iterative: { actions: [{ id: 'strike' }, { id: 'stoke' }] } },
+              },
+              { id: 'run-plain', recipeId: 'recipe-beta', craftingSystemId: 'sys-1' },
+            ]
+          : [],
+    },
     gatheringEnvironmentStore: { kind: 'gatheringEnvironmentStore' },
     gatheringPartyStore: { kind: 'gatheringPartyStore' },
     currencyConfigStore: { kind: 'currencyConfigStore' },
@@ -544,6 +560,7 @@ export function buildManagerWorld(options = {}) {
     ready: true,
     getCraftingSystemManager: () => handles.craftingSystemManager,
     getRecipeManager: () => handles.recipeManager,
+    getCraftingRunManager: () => handles.craftingRunManager,
     getGatheringEnvironmentStore: () => handles.gatheringEnvironmentStore,
     getGatheringPartyStore: () => handles.gatheringPartyStore,
     getCurrencyConfigStore: () => handles.currencyConfigStore,
@@ -575,7 +592,11 @@ export function buildManagerWorld(options = {}) {
     },
   };
 
-  const actors = actorCollection ?? { contents: actorDocuments, get: (id) => actorDocuments.find((a) => a.id === id) ?? null };
+  const actors = actorCollection ?? {
+    contents: actorDocuments,
+    get: (id) => actorDocuments.find((a) => a.id === id) ?? null,
+    [Symbol.iterator]: () => actorDocuments[Symbol.iterator](),
+  };
 
   const game = {
     fabricate: fabricate ? facade : undefined,

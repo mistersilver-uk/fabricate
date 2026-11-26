@@ -1574,6 +1574,7 @@ Opening an entry opens the Crafting Action editor.
 The Crafting Action editor edits a staged copy of one Crafting Action, saved by "Save action".
 Leaving it with unsaved edits runs the Manager confirm-discard route-exit guard.
 Its header shows `Ready` or the Crafting Action's blocking count, from the same readiness evaluation the Validation tab reports, computed against the unsaved edit.
+That status is drawn as the recipe editor draws its own, beside the title at the header rung, from the one status table both editors and the Recipes library row read.
 The count and the blocking notice count only critical issues, so a Crafting Action with only warnings reads `Ready` and each warning is drawn only as its field mark.
 
 - A Crafting Action with blocking issues still saves, and the editor states that players cannot take it until those issues are fixed, marking each affected field.
@@ -1589,4 +1590,5 @@ The count and the blocking notice count only critical issues, so a Crafting Acti
 - When it applies covers the outcome tiers, check success or failure, a check-value comparison and workpiece rules, all combined by the effect's All or Any.
 - An effect that reads a check fact on a Crafting Action with no check is shown as a warning.
 - "Duplicate" copies the Crafting Action under a new id, and "Delete" removes it after confirmation.
+- While active workpieces of the system can use the saved Crafting Action, the editor states how many there are, and that they keep the version they started with.
 - The editor shows only a blocking notice and no card when the system's iterative settings were made by a newer version of Fabricate.

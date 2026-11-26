@@ -53,6 +53,7 @@ import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { countRecipeTagPlaceholderUsage } from '../../model/vocabularyUsage.js';
 
 import { recipeCheckContext, recipeCheckSummary } from './recipeCheckSummaryProjection.js';
+import { createIterativeStatusContext, defineIterativeStatus } from './recipeIterativeStatus.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.
@@ -436,6 +437,7 @@ function _buildRecipeRowDetail(recipe, executionSteps, summary, context) {
     requirementsPreview: display.requirementsPreview,
     ingredients: new Array(summary.ingredientCount),
     tools: new Array(display.toolCount),
+    iterative: raw.iterative,
   };
 }
 
@@ -444,9 +446,10 @@ function _buildRecipeRowDetail(recipe, executionSteps, summary, context) {
  *
  * @param {object} recipeManager
  * @param {object} selectedSystem the RAW manager system.
+ * @param {object[]} roster the system's recipe models, whose iterative readiness is shared.
  * @returns {object}
  */
-function _createRecipeRowContext(recipeManager, selectedSystem) {
+function _createRecipeRowContext(recipeManager, selectedSystem, roster) {
   const definitions = Array.isArray(selectedSystem.recipeItemDefinitions)
     ? selectedSystem.recipeItemDefinitions
     : [];
@@ -457,6 +460,7 @@ function _createRecipeRowContext(recipeManager, selectedSystem) {
     definitions,
     membershipResolvesByRecipeIds: selectedSystem.membershipResolvesByRecipeIds,
     membershipLookups: _cohortMembershipLookups(definitions),
+    iterativeStatus: createIterativeStatusContext(selectedSystem, roster),
   };
 }
 
@@ -597,9 +601,14 @@ function _createRecipeRow(recipe, context) {
   _defineLazyFields(row, ['enableBlocked'], () => ({
     enableBlocked: _isRecipeEnableBlocked(context.recipeManager, recipe),
   }));
-  _defineLazyFields(row, RECIPE_DETAIL_FIELDS, () =>
+  // An iterative recipe's draft carries its Counter Instances and `Recipe.iterative.step`.
+  const detailFields = recipe.iterative
+    ? [...RECIPE_DETAIL_FIELDS, 'iterative']
+    : RECIPE_DETAIL_FIELDS;
+  _defineLazyFields(row, detailFields, () =>
     _buildRecipeRowDetail(recipe, executionSteps, { isSimple, ...counts }, context)
   );
+  defineIterativeStatus(row, recipe, context.iterativeStatus);
   return row;
 }
 
@@ -692,7 +701,7 @@ export function buildRecipeList(
 
   const recipeCategories = _countRecipeCategories(roster);
 
-  const context = _createRecipeRowContext(recipeManager, selectedSystem);
+  const context = _createRecipeRowContext(recipeManager, selectedSystem, roster);
   const rosterRecipes = roster.map((recipe) => _createRecipeRow(recipe, context));
 
   // The filter selects an INDEX MASK over the roster and both arrays are read positionally,
@@ -751,7 +760,7 @@ export function buildRecipeList(
  * They exist for display — the browser's book column, the editor's Books & Scrolls tab,
  * and `handleRemoveRecipeItem`'s post-unlink refresh all read them — but the editor
  * seeds its draft from a whole projected row and Save posts the whole draft, so without
- * a strip at the write boundary `recipeItemId` (the only one of the four that is also a
+ * a strip at the write boundary `recipeItemId` (the only one of them that is also a
  * real `Recipe` field) is persisted onto the model. Its value is
  * `containingDefinitions[0]`, i.e. definition order — an authoring accident.
  *
@@ -764,6 +773,7 @@ export const DERIVED_RECIPE_PROJECTION_FIELDS = Object.freeze([
   'recipeItemIds',
   'recipeItemName',
   'recipeItemSourceUuid',
+  'iterativeStatus',
 ]);
 
 /**

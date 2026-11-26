@@ -830,7 +830,7 @@
       "evidence": "broad",
       "scope": "manager-only",
       "why": [
-        "The requirement row's amount slot, the fixed-or-rolled amount over `SegmentedControl`, `Stepper` and `RollDataExpressionInput`, with 2 callers: `src/ui/svelte/components/PickerRow.svelte` and `ChoiceGroup`.",
+        "The requirement row's amount slot, the fixed-or-rolled amount over `SegmentedControl`, `Stepper` and `RollDataExpressionInput`, with 3 callers: `src/ui/svelte/components/PickerRow.svelte`, `ChoiceGroup` and the iterative recipe's `IterativeCounterCell.svelte`; a `formula` object draws the Fixed | Formula toggle for any kind, over an unbounded stepper and an expression with a reading and a hint.",
         "`library.html`'s `<PickerRowAmount>` specifies it, and it is manager-only."
       ]
     },
@@ -1091,7 +1091,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The table for records compared down columns: a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `cell` snippet and sortable column headers.",
+        "The table for records compared down columns: a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `hint` as a second caption line that describes the table outside its name, a `cell` snippet, sortable column headers, and a caller `footer` inside the frame after the pager.",
         "`library.html`'s `<DataTable>` specifies it, and it is shared."
       ]
     },

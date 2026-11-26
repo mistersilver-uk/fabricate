@@ -1416,22 +1416,20 @@ export function createAdminStore(services) {
     );
   }
 
-  // Thin yes/no confirm for the recipe editor's destructive in-draft actions; the editor stages the
-  // result into its root-held draft. `confirmLabel` is required of every caller in practice (issue
-  // 1154): the routed actions are not all the same verb, and the dialog default is a generic Yes.
-  async function confirmRecipeAction({ title, content, confirmLabel } = {}) {
-    // `label` is OMITTED, never set to `undefined`, when a caller supplies none: `mergeObject`
-    // iterates the keys it is handed, so `label: undefined` OVERWRITES the default with nothing and
-    // the button renders the literal word "undefined" — worse than the generic default it replaced.
+  /**
+   * Thin yes/no confirm for the recipe editor's destructive in-draft actions; the editor stages the
+   * result into its root-held draft. `confirmLabel` is required of every caller in practice (issue
+   * 1154): the routed actions are not all the same verb, and the dialog default is a generic Yes.
+   * `cancelLabel` renames the No button, as "Keep multi-step" does beside "Collapse to one step".
+   */
+  async function confirmRecipeAction({ title, content, confirmLabel, cancelLabel } = {}) {
+    // Each `label` is OMITTED, never `undefined`, when none is supplied: `mergeObject` iterates
+    // its keys, so `label: undefined` OVERWRITES the default and the button reads "undefined".
     const yes = { callback: () => true };
     if (confirmLabel) yes.label = confirmLabel;
-    const confirmed = await services.confirmDialog?.({
-      title,
-      content,
-      yes,
-      no: { callback: () => false },
-    });
-    return confirmed === true;
+    const no = { callback: () => false };
+    if (cancelLabel) no.label = cancelLabel;
+    return (await services.confirmDialog?.({ title, content, yes, no })) === true;
   }
 
   function confirmDiscardDirtyGatheringTaskDraft() {
@@ -2707,9 +2705,8 @@ export function createAdminStore(services) {
       featureCount: Object.values(s.features || {}).filter((value) => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
-      // Whether this system participates in the world currency (issue 1278). A flat boolean because this
-      // list is an allowlist carrying no `requirements`: a consumer reaching for
-      // `requirements.currency.enabled` reads undefined and silently counts zero.
+      // Whether this system participates in the world currency (issue 1278): a flat boolean, because this
+      // allowlist carries no `requirements` and `requirements.currency.enabled` reads undefined.
       currencyEnabled: s?.requirements?.currency?.enabled === true,
       // Whether this system authors its own tool break mode, and what it authored (issue 1373).
       toolBreakage: {
@@ -2941,6 +2938,7 @@ export function createAdminStore(services) {
       ...buildCharacterLibrariesState(),
       ...worldScopeState,
     }));
+    iterative.scheduleActiveRunsRefresh();
   }
 
   // The three world-scope entity corpora (issue 1362), read straight from their stores on every
@@ -6669,6 +6667,7 @@ export function createAdminStore(services) {
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
     knowledge.deactivate();
+    iterative.watchActiveRuns(false);
     // The graph index retains the whole recipe corpus's component sets (issue 1082); a closed
     // manager must not keep them alive alongside the knowledge snapshot.
     graphIndexCache = null;

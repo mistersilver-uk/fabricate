@@ -30,7 +30,7 @@ const FORMS = Object.freeze({
   default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field, .compact, .info)', uses: 10 },
   tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
   info: { props: { tone: 'info' }, drawn: '.k-seg.info', uses: 1 },
-  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 33 },
+  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 35 },
   compact: {
     props: { density: 'compact' },
     drawn: '.k-seg.compact:not(.panel, .size-34)',

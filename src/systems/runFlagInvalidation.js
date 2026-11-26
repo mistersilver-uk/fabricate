@@ -49,3 +49,9 @@ export function runContainersChanged(changes, hasProperty = hasByPath) {
     diffPaths.some((path) => probe(changes, path))
   ).map(({ manager }) => manager);
 }
+
+/** Whether an `updateActor` diff touches crafting runs, which begin on world actors only. */
+export function worldCraftingRunsChanged(actor, changes) {
+  if (actor?.pack || actor?.isToken === true) return false;
+  return runContainersChanged(changes).includes('crafting');
+}

@@ -119,6 +119,17 @@ describe('the system import service', () => {
     });
   });
 
+  it('answers no active iterative runs while the run manager is absent', async () => {
+    const io = { ...KNOWLEDGE_IO, adminStore: () => null };
+    await withWorld({}, async () => {
+      globalThis.game.fabricate.getCraftingRunManager = undefined;
+      assert.deepEqual(createManagerServices(io).getActiveIterativeRuns(), []);
+    });
+    await withWorld({ fabricate: false }, async () => {
+      assert.deepEqual(createManagerServices(io).getActiveIterativeRuns(), []);
+    });
+  });
+
   it('refreshes and returns null when the system already exists', async () => {
     await withWorld({}, async (world) => {
       const services = createManagerServices({

@@ -13,11 +13,7 @@
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
-  import {
-    getEffectiveRecipeCategories,
-    getRecipeCategoryLabel,
-    normalizeRecipeCategory,
-  } from '../../../../utils/recipeCategories.js';
+  import { getEffectiveRecipeCategories } from '../../../../utils/recipeCategories.js';
   import {
     getComponentCategoryLabel,
     normalizeComponentCategory,
@@ -32,10 +28,7 @@
   import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
-  import {
-    createRecipeBrowserState,
-    recipeCheckSubtitleSuffix,
-  } from '../../../model/recipeBrowserModel.js';
+  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
@@ -141,6 +134,11 @@
     truncateDescription,
   } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
+  import { createRecipeStepHandlers } from './recipe/recipeStepHandlers.js';
+  import {
+    recipeEditSubtitle as composeRecipeEditSubtitle,
+    resolutionModeLabel as modeLabelOf,
+  } from './recipe/recipeEditSubtitle.js';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import { isLearnedKnowledgeObservable } from '../../../../systems/learnedKnowledgeObservability.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
@@ -468,9 +466,9 @@
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   // Complex recipes need a resolution mode that allows multiple ingredient/result
-  // sets; simple/progressive systems craft exactly one set into one result.
+  // sets; simple, progressive and iterative systems author exactly one set into one result.
   const recipeMultiSetAllowed = $derived(
-    !['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple')
+    !['simple', 'progressive', 'iterative'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const essenceOptions = $derived(canShowEssences ? selectedSystem?.essenceDefinitions || [] : []);
@@ -1919,18 +1917,14 @@
     return result;
   }
 
-  // The recipe editor's header subline: "<category> · <resolution mode>".
-  function recipeEditSubtitle() {
-    const category = getRecipeCategoryLabel(
-      normalizeRecipeCategory(recipeDraft?.category),
-      localize
-    );
-    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check from the same projected
-    // `checkSummary` the browser row's check pill reads, naming a Target as the pill does.
-    const suffix = recipeCheckSubtitleSuffix(selectedRecipe?.checkSummary || null, text);
-    return `${category} · ${mode}${suffix}`;
-  }
+  const recipeEditSubtitle = () =>
+    composeRecipeEditSubtitle({
+      recipe: recipeDraft,
+      mode: selectedSystem?.resolutionMode,
+      checkSummary: selectedRecipe?.checkSummary || null,
+      text,
+      localize,
+    });
 
   // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).
   function componentEditSubtitle() {
@@ -1948,21 +1942,7 @@
     );
   }
 
-  function resolutionModeLabel(mode) {
-    const labels = {
-      simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routedByIngredients: text(
-        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
-        'Routed by ingredients'
-      ),
-      routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
-      progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
-      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'),
-    };
-    return (
-      labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple')
-    );
-  }
+  const resolutionModeLabel = (mode) => modeLabelOf(mode, text);
 
   // The title bar's status line: no selection draws none.
   const titlebarModeLabel = $derived(
@@ -2715,49 +2695,14 @@
     return true;
   }
 
-  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients / results / tools
-  // so an already-craftable recipe stays craftable (the engine only falls back to top-level fields
-  // when the steps array is empty).
-  function newStepId() {
-    return (
-      globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`
-    );
-  }
-
-  function handleEnterMultiStep() {
-    if (!recipeDraft) return false;
-    const seeded = {
-      id: newStepId(),
-      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
-      description: '',
-      ingredientSets: recipeDraft.ingredientSets || [],
-      resultGroups: recipeDraft.resultGroups || [],
-      toolIds: recipeDraft.toolIds || [],
-    };
-    patchRecipeDraft({ steps: [seeded] });
-    return true;
-  }
-
-  // Reverting multi-step → single-step discards the per-step authoring, so warn
-  // before staging the empty steps array (engine falls back to top-level fields).
-  async function handleRevertToSingleStep() {
-    if (!recipeDraft) return false;
-    const name =
-      String(recipeDraft.name || '').trim() ||
-      text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
-    const confirmed = await store.confirmRecipeAction?.({
-      title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name }),
-      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepConfirm'),
-    });
-    if (!confirmed) return false;
-    patchRecipeDraft({ steps: [] });
-    return true;
-  }
-
-  function currentSteps() {
-    return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
-  }
+  const stepHandlers = createRecipeStepHandlers({
+    draft: () => recipeDraft,
+    patch: patchRecipeDraft,
+    confirm: (options) => store.confirmRecipeAction?.(options),
+    iterative: () => selectedSystem?.resolutionMode === 'iterative',
+    text,
+    localize,
+  });
 
   // Locking persists immediately (like enable) and is NEVER gated in either direction — a GM locks
   // a recipe precisely while it is unfinished.
@@ -2769,62 +2714,6 @@
     recipeDraftBaseline = recipeDraftBaseline
       ? { ...recipeDraftBaseline, locked: next === true }
       : recipeDraftBaseline;
-  }
-
-  function handleAddStep() {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    steps.push({
-      id: newStepId(),
-      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`,
-      description: '',
-    });
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  function handleReorderSteps(from, to) {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to)
-      return false;
-    const [moved] = steps.splice(from, 1);
-    steps.splice(to, 0, moved);
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  function handleUpdateStep(stepId, patch) {
-    if (!recipeDraft || !patch) return false;
-    const steps = currentSteps().map((step) => (step.id === stepId ? { ...step, ...patch } : step));
-    patchRecipeDraft({ steps });
-    return true;
-  }
-
-  // Deleting a step removes the whole step (its ingredients, results, and tools).
-  async function handleDeleteStep(stepId, context = 'overview') {
-    if (!recipeDraft) return false;
-    const steps = currentSteps();
-    const step = steps.find((entry) => entry?.id === stepId);
-    if (!step) return false;
-    const name =
-      String(step.name || '').trim() ||
-      text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
-    const alsoDeleted = localize(
-      {
-        ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
-        results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
-        tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools',
-      }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll'
-    );
-    const confirmed = await store.confirmRecipeAction?.({
-      title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
-      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.DeleteStep'),
-    });
-    if (!confirmed) return false;
-    patchRecipeDraft({ steps: steps.filter((entry) => entry?.id !== stepId) });
-    return true;
   }
 
   function recipeEditSaveLabel() {
@@ -4784,6 +4673,7 @@
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
         recipe={recipeDraft}
+        iterative={selectedSystem?.resolutionMode === 'iterative' ? iterativeRoute : null}
         canAddSet={recipeCanAddSet}
         alchemySimple={recipeAlchemySimple}
         simpleFailureSlot={recipeSimpleWithCheck}
@@ -4832,16 +4722,16 @@
         onOpenAccess={openRecipeAccess}
         onOpenBooksScrolls={() => openCraftingSection('books-scrolls')}
         multiStepEnabled={recipeMultiStepEnabled}
-        onEnterMultiStep={handleEnterMultiStep}
-        onRevertToSingleStep={handleRevertToSingleStep}
+        onEnterMultiStep={stepHandlers.handleEnterMultiStep}
+        onRevertToSingleStep={stepHandlers.handleRevertToSingleStep}
         onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onToggleLocked={handleToggleRecipeLocked}
-        onAddStep={handleAddStep}
-        onReorderSteps={handleReorderSteps}
-        onUpdateStep={handleUpdateStep}
-        onDeleteStep={handleDeleteStep}
+        onAddStep={stepHandlers.handleAddStep}
+        onReorderSteps={stepHandlers.handleReorderSteps}
+        onUpdateStep={stepHandlers.handleUpdateStep}
+        onDeleteStep={stepHandlers.handleDeleteStep}
       />
     {:else if currentView === 'crafting-settings' && selectedSystem}
       <CraftingSettingsView

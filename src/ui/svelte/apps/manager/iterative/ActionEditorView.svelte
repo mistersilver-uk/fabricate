@@ -16,10 +16,11 @@
   - The blocking Notice, the header pill and every mark come from `evaluateIterativeReadiness` and
     `iterativeFieldFaults.js` over the same unsaved draft, so they agree with Validation after a Save;
     the Notice and the pill count only critical issues, and a warning draws only its mark.
-  - C6 mounts its in-progress `Callout` as this root's first child, above the blocking Notice and
-    the Identity card; nothing is reserved there until it does.
+  - The in-progress `Callout` is this root's first child, above the blocking Notice and the
+    Identity card, while workpieces in progress can use a saved action; it is absent on a new one.
 -->
 <script>
+  import Callout from '../../../components/Callout.svelte';
   import Notice from '../../../components/Notice.svelte';
   import { routedOutcomeTierOptions } from '../../../../../utils/routedOutcomeKeywords.js';
   import { interpolate } from '../checks/checksCopy.js';
@@ -49,6 +50,22 @@
     draft?.label?.trim() || text('FABRICATE.Admin.Manager.Iterative.UnnamedAction', 'New action')
   );
 
+  const runCount = $derived(draft && !route.isNewAction ? route.actionActiveRunCount(draft.id) : 0);
+  const inProgress = $derived(
+    interpolate(
+      runCount === 1
+        ? text(
+            'FABRICATE.Admin.Manager.Iterative.ActionInProgressOne',
+            '1 workpiece in progress can use {name}. It keeps the version of this action it started with; your changes apply to workpieces started after you save.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Iterative.ActionInProgress',
+            '{count} workpieces in progress can use {name}. They keep the version of this action they started with; your changes apply to workpieces started after you save.'
+          ),
+      { count: runCount, name }
+    )
+  );
+
   const blockingTitle = $derived(
     interpolate(
       issueCount === 1
@@ -66,6 +83,14 @@
 </script>
 
 <div class="manager-iterative-screen manager-iterative-editor" data-iterative-editor>
+  {#if runCount > 0}
+    <Callout
+      tone="info"
+      icon="fas fa-clock-rotate-left"
+      text={inProgress}
+      data-iterative-in-progress={runCount}
+    />
+  {/if}
   {#if route.unsupported}
     <UnsupportedLibraryNotice {text} />
   {:else if draft}

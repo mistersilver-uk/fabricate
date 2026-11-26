@@ -13,7 +13,7 @@ import { getSetting, setSetting } from '../config/settings.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { prepareForImport, validateImportData } from '../systems/CraftingSystemExporter.js';
-import { activeRunRecipeIds } from '../systems/runTerms.js';
+import { activeIterativeRuns, activeRunRecipeIds } from '../systems/runTerms.js';
 import { descriptionTextCandidate, plainTextDescription } from '../utils/plainTextDescription.js';
 
 import { choiceDialog, confirmDialog } from './foundryCompat.js';
@@ -119,6 +119,8 @@ function worldStoreServices() {
     setSetting: async (key, value) => setSetting(key, value),
     getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
     getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
+    getActiveIterativeRuns: () =>
+      activeIterativeRuns(game?.fabricate?.getCraftingRunManager?.() ?? null, game?.actors),
     getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
     getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
     getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,

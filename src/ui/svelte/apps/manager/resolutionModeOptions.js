@@ -49,6 +49,18 @@ export const resolutionModeOptions = [
   },
 ];
 
+// Iterative mode, kept out of the list above while it is not offered as a choice; the recipe mode
+// callout and the editor subline read it.
+export const iterativeResolutionModeOption = Object.freeze({
+  value: 'iterative',
+  icon: 'fas fa-arrows-rotate',
+  labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionIterative',
+  fallback: 'Iterative',
+  descKey: 'FABRICATE.Admin.SystemSettings.ResolutionIterativeDesc',
+  descFallback:
+    'Crafters work a piece over many sessions, choosing an action each session. Counters you define decide when it is finished and how well.',
+});
+
 // Salvage has exactly one ingredient, so ingredient-set routing is meaningless and
 // `alchemy` is not offered. The default `simple` returns one result group with an
 // optional pass/fail salvage check. For routed, the canonical persisted token stays

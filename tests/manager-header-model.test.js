@@ -24,6 +24,11 @@ import {
   activeChecksTab,
   isChecksRoute,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
+import { iterativeHeaderCopy } from '../src/ui/svelte/apps/manager/iterative/iterativeHeaderCopy.js';
+import {
+  recipeEditSubtitle,
+  resolutionModeLabel,
+} from '../src/ui/svelte/apps/manager/recipe/recipeEditSubtitle.js';
 
 const MODULE_PATH = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 
@@ -452,7 +457,7 @@ describe('headerModel', () => {
         playerCharacterUuids: read('playerCharacterUuids'),
         premiumInstalled: read('premiumInstalled'),
         recipeDraft: read('recipeDraft'),
-        recipeEditSubtitle: () => () => RECIPE_SUBLINE,
+        recipeEditSubtitle: () => inputs.get('recipeEditSubtitle') ?? (() => RECIPE_SUBLINE),
         selectedCharacterPrerequisites: read('selectedCharacterPrerequisites'),
         selectedCurrencyUnits: read('selectedCurrencyUnits'),
         selectedSystem: read('selectedSystem'),
@@ -626,6 +631,37 @@ describe('headerModel', () => {
     assert.equal(model.headingVariant, 'default', 'and closes again when the draft is dropped');
   });
 
+  it('states an iterative recipe’s mode and its step count in the editor subline', () => {
+    const english = (_key, fallback) => fallback;
+    const subline = (mode, steps) => {
+      const recipe = { name: 'Etched Sword', category: 'Forging', steps };
+      const compose = () =>
+        recipeEditSubtitle({
+          recipe,
+          mode,
+          checkSummary: { kind: 'dc', dc: 12 },
+          text: english,
+          localize: (key) => key,
+        });
+      return openModel('recipe-edit', { recipeDraft: recipe, recipeEditSubtitle: compose }).model
+        .subtitle;
+    };
+    const twoSteps = [{ id: 's1' }, { id: 's2' }];
+    assert.equal(
+      subline('iterative', twoSteps),
+      'Forging · Iterative · 2 steps, each worked over sessions'
+    );
+    assert.equal(subline('iterative', []), 'Forging · Iterative', 'a single step states no count');
+    assert.equal(subline('iterative', [{ id: 's1' }]), 'Forging · Iterative');
+    assert.equal(
+      subline('routedByCheck', twoSteps),
+      'Forging · Routed by check · DC 12',
+      'every other mode keeps its check and states no step count'
+    );
+    assert.equal(resolutionModeLabel('iterative', english), 'Iterative');
+    assert.equal(resolutionModeLabel(undefined, english), 'Simple');
+  });
+
   it('words the action editor lede by whether the action rolls and how many effects it has', () => {
     const lede = (actionHeading) =>
       openModel('iterative-action-edit', { iterativeRoute: { actionHeading } }).model.subtitle;
@@ -634,6 +670,40 @@ describe('headerModel', () => {
     assert.equal(lede({ rollsCheck: true, effectCount: 1 }), key('ActionSubtitleRollsOne'));
     assert.equal(lede({ rollsCheck: false, effectCount: 0 }), key('ActionSubtitleNoCheck'));
     assert.equal(lede({ rollsCheck: false, effectCount: 1 }), key('ActionSubtitleNoCheckOne'));
+  });
+
+  it('heads Recipes in an iterative system with the mode’s lede, and every other route as before', () => {
+    const iterativeSystem = { name: SYSTEM_NAME, resolutionMode: 'iterative' };
+    const { model } = openModel('recipes', { selectedSystem: iterativeSystem });
+    assert.deepEqual(answersOf(model), {
+      ...ROUTES.recipes,
+      subtitle: 'FABRICATE.Admin.Manager.Iterative.RecipesSubtitle',
+      headingVariant: 'default',
+    });
+    for (const view of Object.keys(ROUTES)) {
+      if (view === 'recipes') continue;
+      assert.deepEqual(
+        answersOf(openModel(view, { selectedSystem: iterativeSystem }).model),
+        answersOf(openModel(view).model),
+        `${view} says the same in an iterative system`
+      );
+    }
+  });
+
+  it('words the iterative Recipes lede with the system’s name', () => {
+    const copy = (resolutionMode) =>
+      iterativeHeaderCopy({
+        currentView: 'recipes',
+        selectedSystem: { name: 'Ironworks', resolutionMode },
+        text: (key, fallback) => fallback,
+      });
+    assert.deepEqual(copy('iterative'), {
+      title: 'Recipes',
+      subtitle:
+        'Every recipe in Ironworks resolves as Iterative: each step is worked over sessions.',
+      actionsLabel: 'Recipe actions',
+    });
+    assert.equal(copy('routedByCheck'), null, 'another mode keeps the shipped copy');
   });
 
   it('opens the action editor heading when its draft appears, and closes it when it goes', () => {

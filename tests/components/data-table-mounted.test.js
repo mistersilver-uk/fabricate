@@ -1,5 +1,6 @@
 /** Issue 1782 — the library's `<DataTable>`: a captioned table, its rows, its pager and its states. */
 import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
@@ -51,6 +52,36 @@ const cell = createRawSnippet((row, column) => ({
   render: () => `<span data-probe-cell="${row().id}:${column().key}">${row()[column().key]}</span>`,
 }));
 const search = createRawSnippet(() => ({ render: () => '<input data-probe-search="" />' }));
+
+const BASELINE_PATH = resolve(import.meta.dirname, '../fixtures/dataTableBaseline.json');
+const noop = () => {};
+const addAction = createRawSnippet(() => ({ render: () => '<button type="button">Add</button>' }));
+/** The props each shipped caller passes, kept as the HTML they rendered before `hint` and `footer`. */
+const CALLERS = {
+  plain: base(),
+  searched: base({ search, cell }),
+  paged: base({
+    rows: rowsOf(5),
+    count: 12,
+    perPage: 5,
+    perPageOptions: [5, 10],
+    onPageChange: noop,
+    onPerPageChange: noop,
+  }),
+  selectable: base({ selectedKey: 'r2', onSelectRow: noop, rowData: (row) => ({ id: row.id }) }),
+  sorted: base({
+    columns: [{ ...COLUMNS[0], sortable: true }, COLUMNS[1]],
+    sort: { key: 'name', dir: 'asc' },
+    onSort: noop,
+  }),
+  empty: base({
+    rows: [],
+    empty: { icon: 'fas fa-gift', title: 'No crafts yet.', hint: 'Craft one.', action: addAction },
+  }),
+  loading: base({ loading: true }),
+  failed: base({ error: 'The history could not load' }),
+  caller: base({ class: 'is-caller', 'data-probe-table': '' }),
+};
 
 const tableIn = (root) => root.querySelector('table');
 const bodyRows = (root) => [...root.querySelectorAll(':scope tbody tr.fabricate-data-table-row')];
@@ -329,5 +360,70 @@ describe('DataTable', () => {
     assert.equal(button.dataset.keyboardFocus, 'true');
     button.click();
     assert.deepEqual(sorts, [{ key: 'name', dir: 'desc' }]);
+  });
+
+  it('renders every caller that passes no hint or footer as it rendered before', async () => {
+    const found = {};
+    for (const [caller, props] of Object.entries(CALLERS)) {
+      const root = await harness.mount(props);
+      // Svelte's block anchors and the whitespace between tags are not part of what a caller draws.
+      found[caller] = root.innerHTML
+        .replaceAll(/\bc\d+-(heading|count)\b/g, 'id-$1')
+        .replaceAll('<!---->', '')
+        .replaceAll(/>\s+</g, '><');
+      harness.remount();
+    }
+    if (process.env.WRITE_BASELINE) {
+      writeFileSync(BASELINE_PATH, JSON.stringify(found, null, 2) + '\n');
+    }
+    assert.deepEqual(found, JSON.parse(readFileSync(BASELINE_PATH, 'utf8')));
+  });
+
+  it('describes the table by its hint, outside the name the heading and count give it', async () => {
+    const root = await harness.mount(base({ hint: 'Start values, bounds and targets.' }));
+    const table = tableIn(root);
+    const hint = root.querySelector('.fabricate-data-table-hint');
+    assert.ok(table.querySelector('caption').contains(hint), 'a second line of the caption');
+    assert.equal(hint.textContent, 'Start values, bounds and targets.');
+    assert.equal(table.getAttribute('aria-describedby'), hint.id);
+    assert.equal(nameOf(root, table), 'Crafts 3', 'the name stays the heading and the count');
+    assert.ok(
+      !root.querySelector('.fabricate-data-table-caption-line').contains(hint),
+      'not on the heading line'
+    );
+    harness.remount();
+    const bare = await harness.mount(base({ hint: '' }));
+    assert.ok(!bare.querySelector('.fabricate-data-table-hint'), 'a blank hint draws nothing');
+    assert.ok(!tableIn(bare).hasAttribute('aria-describedby'), 'and describes nothing');
+  });
+
+  it('draws the footer inside the frame, after the scroll container and the pager', async () => {
+    const footer = createRawSnippet(() => ({
+      render: () => '<span data-probe-footer="">Note</span>',
+    }));
+    const frame = (root) => root.querySelector('.fabricate-data-table');
+    let root = await harness.mount(base({ footer }));
+    let drawn = root.querySelector('.fabricate-data-table-footer');
+    assert.equal(drawn.parentElement, frame(root), 'a child of the frame');
+    assert.equal(drawn.previousElementSibling.className, 'fabricate-data-table-scroll');
+    assert.ok(Boolean(drawn.querySelector('[data-probe-footer]')), 'the caller draws into it');
+    harness.remount();
+    root = await harness.mount(
+      base({ footer, rows: rowsOf(5), count: 12, perPage: 5, perPageOptions: [5, 10] })
+    );
+    drawn = root.querySelector('.fabricate-data-table-footer');
+    assert.ok(
+      drawn.previousElementSibling === root.querySelector('.fabricate-pagination'),
+      'the pager comes before the footer when the table pages'
+    );
+    harness.remount();
+    root = await harness.mount(base({ rows: [], footer }));
+    assert.ok(
+      Boolean(root.querySelector('.fabricate-data-table-footer')),
+      'an empty table keeps its footer'
+    );
+    harness.remount();
+    root = await harness.mount(base());
+    assert.ok(!root.querySelector('.fabricate-data-table-footer'), 'no footer without a snippet');
   });
 });

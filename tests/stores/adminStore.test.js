@@ -2610,6 +2610,12 @@ describe('createAdminStore', () => {
       assert.equal(yes, true, 'returns true when the user confirms');
       assert.equal(captured.title, 'Delete step?', 'forwards the title');
       assert.equal(captured.content, '<p>Remove it?</p>', 'forwards the content');
+      assert.equal('label' in captured.yes, false, 'no confirm label is omitted, never undefined');
+      assert.equal('label' in captured.no, false, 'and so is no cancel label');
+
+      await store.confirmRecipeAction({ title: 't', confirmLabel: 'Go', cancelLabel: 'Keep' });
+      assert.equal(captured.yes.label, 'Go', 'a confirm label is forwarded');
+      assert.equal(captured.no.label, 'Keep', 'and so is a cancel label');
 
       const noServices = createMockServices({ confirmDialog: async () => false });
       const noStore = createAdminStore(noServices);
@@ -2925,6 +2931,34 @@ describe('createAdminStore', () => {
           `${field} is OMITTED, not nulled — an explicit null would destroy the scalar the alchemy cohort relies on`
         );
       }
+    });
+
+    // Issue 3010: an iterative system's row derives its library status, which is no recipe state.
+    it('updateRecipe strips the derived iterative status from a saved draft', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.resolutionMode = 'iterative';
+      sys.iterative = { version: 1, counters: [], actions: [] };
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Non-vacuity: the draft the editor seeds from the row does carry the status.
+      const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      const draft = JSON.parse(JSON.stringify(row));
+      assert.equal(draft.iterativeStatus?.id, 'setup', 'a recipe with no counters needs setup');
+
+      assert.equal(await store.updateRecipe('r1', { ...draft, name: 'Renamed' }), true);
+      assert.equal(updateArgs.updates.name, 'Renamed');
+      assert.equal('iterativeStatus' in updateArgs.updates, false, 'the status is never posted');
     });
 
     it('updateRecipe strips the derived scalar in either membership order', async () => {

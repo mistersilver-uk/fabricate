@@ -427,6 +427,10 @@ export function registerIterativeCases() {
     const pill = () => target.querySelector('[data-iterative-action-pill]');
     assert.equal(pill().dataset.iterativeActionPill, 'blocking');
     assert.equal(pill().textContent.trim(), '1 blocking', 'an unknown counter blocks');
+    // The recipe editor's chip: beside the title, at the header rung, with the table's tone and glyph.
+    assert.ok(pill().parentElement.matches('[data-iterative-action-heading]'), 'beside the title');
+    assert.ok(pill().matches('.is-header.is-danger'), pill().className);
+    assert.ok(Boolean(pill().querySelector('.fa-circle-xmark')), 'the blocking glyph');
     const cost = target.querySelector('[data-iterative-amount="cost"]');
     cost.value = '2 +';
     cost.dispatchEvent(new Event('input', { bubbles: true }));

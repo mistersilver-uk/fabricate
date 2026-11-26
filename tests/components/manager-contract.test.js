@@ -1672,8 +1672,9 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('draws the recipe library as a list of cards', RECIPES_BROWSER, {
     declaresProp: ['browserState'],
     names: ['createRecipeBrowserState'],
-    imports: ['../../components/Chip.svelte'],
-    calls: ['deriveRecipeStatuses', 'statusChipTone'],
+    imports: ['../../components/Chip.svelte', './recipes/recipeStatusPills.js'],
+    // The pills' labels moved to their own module (issue 3010), which reads `deriveRecipeStatuses`.
+    calls: ['statusPills', 'statusChipTone'],
     renders: ['StatusToggle', 'IconButton'],
     spells: ['manager-recipes-table', 'manager-recipe-table-head'],
     spellsExactly: ['FABRICATE.Admin.Manager.Recipe.Column.Recipe'],
