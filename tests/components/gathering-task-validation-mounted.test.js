@@ -18,6 +18,7 @@ const harness = createMountedComponentHarness({
   rawModules: FOUNDRY_BRIDGE_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/gathering-task/GatheringTaskValidationTab.svelte',

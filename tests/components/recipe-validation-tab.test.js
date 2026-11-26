@@ -43,6 +43,7 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     // Each issue row's "View" renders through the manager's push-button primitive
     // (issue 1118).
     'src/ui/svelte/components/Button.svelte',
@@ -587,6 +588,12 @@ describe('RecipeValidationTab (mounted)', () => {
 
       assert.equal(target.querySelector('[data-recipe-count-blocking]').textContent.match(/\d+/)[0], '2');
       assert.equal(target.querySelector('[data-recipe-count-warnings]').textContent.match(/\d+/)[0], '1');
+      assert.ok(
+        rowOf(target, 'iterativeNoSuccessRule:1').querySelector('.manager-recipe-val-pill.is-danger'),
+        'a blocking row draws a danger chip'
+      );
+      assert.ok(onFailure.querySelector('.manager-recipe-val-pill.is-warning'), 'a warning row draws a warning chip');
+      assert.ok(counters.querySelector('.manager-recipe-val-pill.is-positive'), 'a passing row draws a positive chip');
       harness.remount();
     });
 
@@ -647,6 +654,8 @@ describe('RecipeValidationTab (mounted)', () => {
         ]
       );
       assert.ok(rows.every((row) => row.classList.contains('is-pass')));
+      const chips = [...target.querySelectorAll('.manager-recipe-val-pill')];
+      assert.ok(chips.length > 0 && chips.every((chip) => chip.classList.contains('is-positive')), 'every chip is positive');
       assert.equal(target.querySelector('[data-recipe-validation-summary]').dataset.recipeValidationSummary, 'clear');
       harness.remount();
     });
@@ -661,6 +670,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
     rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       'src/ui/svelte/components/Chip.svelte',
+      'src/ui/svelte/components/Kicker.svelte',
       'src/ui/svelte/components/Button.svelte',
       'src/ui/svelte/components/EditorValidationSurface.svelte'
     ],
@@ -702,6 +712,33 @@ describe('EditorValidationSurface row action (mounted)', () => {
   after(() => {
     Object.assign(globalThis.game.i18n, foundryI18n);
     surfaceHarness.teardown();
+  });
+
+  it('tones each status chip by its severity and keeps the status class as a hook (issue 3037)', async () => {
+    const target = await surfaceHarness.mount({
+      groups: [
+        groupOf('checks', [
+          { id: 'passA', status: 'pass', title: 'A' },
+          { id: 'warnB', status: 'warn', title: 'B' },
+          { id: 'blockC', status: 'block', title: 'C' }
+        ])
+      ]
+    });
+    const chipOf = (id) => target.querySelector(`[data-check="${id}"] .manager-recipe-val-pill`);
+    for (const [id, tone, status] of [
+      ['passA', 'is-positive', 'is-pass'],
+      ['warnB', 'is-warning', 'is-warn'],
+      ['blockC', 'is-danger', 'is-block']
+    ]) {
+      assert.ok(chipOf(id).classList.contains(tone), `${id} draws the ${tone} chip`);
+      assert.ok(chipOf(id).classList.contains(status), `${id} keeps ${status} as a hook`);
+      assert.ok(!chipOf(id).classList.contains('is-neutral'), `${id} is never the neutral chip`);
+    }
+    assert.ok(
+      target.querySelector(':scope .manager-recipe-val-group-label .fab-kicker'),
+      'the group label draws through Kicker'
+    );
+    surfaceHarness.remount();
   });
 
   it('lifts blocking rows to the top of their own group and moves nothing else', async () => {

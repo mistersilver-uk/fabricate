@@ -1076,8 +1076,8 @@
 }
 
 .fabricate-manager .manager-checks-validation-route .manager-recipe-val-group-label {
+  /* Kicker sets the label's own face; this 9px sizes only the group's icon. */
   font-size: 9px;
-  letter-spacing: 0.11em;
 }
 
 .fabricate-manager .manager-checks-validation-route .manager-recipe-val-rows {

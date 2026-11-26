@@ -70,6 +70,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     // The preview's player tile is a ListRow card (issue 1778).
     'src/ui/svelte/components/ListRow.svelte',

@@ -331,17 +331,17 @@
 
 /* THE SUMMARY'S THREE STATUS FACES, ON THE CLASSES THE SURFACE ACTUALLY EMITS (issue 1373). */
 .fabricate-validation .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
-  color: var(--fab-success);
+  color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
 .fabricate-validation .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
-  color: var(--fab-warning);
+  color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
 .fabricate-validation .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
-  color: var(--fab-danger);
+  color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
@@ -359,7 +359,7 @@
 
 .fabricate-validation .manager-recipe-rail-summary-title {
   font-family: var(--fab-font-serif);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
@@ -432,9 +432,6 @@
   margin: 0;
   color: var(--fab-text-subtle);
   font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .fabricate-validation .manager-recipe-val-rows {
@@ -465,15 +462,15 @@
 }
 
 .fabricate-validation .manager-recipe-val-row.is-pass .manager-recipe-val-status {
-  color: var(--fab-success);
+  color: var(--fab-success-text);
 }
 
 .fabricate-validation .manager-recipe-val-row.is-warn .manager-recipe-val-status {
-  color: var(--fab-warning);
+  color: var(--fab-warning-text);
 }
 
 .fabricate-validation .manager-recipe-val-row.is-block .manager-recipe-val-status {
-  color: var(--fab-danger);
+  color: var(--fab-danger-text);
 }
 
 .fabricate-validation .manager-recipe-val-copy {
@@ -485,12 +482,17 @@
 }
 
 .fabricate-validation .manager-recipe-val-title {
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .fabricate-validation .manager-recipe-val-detail {
-  font-size: 0.74rem;
   line-height: 1.35;
+}
+
+/* Nested to (0,3,0), the summary-sub precedent above: the detail also carries `.manager-muted`, which `[data-manager-view="recipe-edit"] .manager-muted` scopes at (0,3,0). */
+.fabricate-validation .manager-recipe-val-row .manager-recipe-val-detail {
+  font-size: 0.656rem;
 }
 
 .fabricate-validation .manager-recipe-val-view {
@@ -499,24 +501,6 @@
 
 .fabricate-validation .manager-recipe-val-pill {
   flex: 0 0 auto;
-}
-
-.fabricate-validation .manager-recipe-val-pill.is-pass {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-validation .manager-recipe-val-pill.is-warn {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-validation .manager-recipe-val-pill.is-block {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
 }
 
 /* ── Rebuilt Results tab (issue 643 §C) ─────────────────────────────────────── */

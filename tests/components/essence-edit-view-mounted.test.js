@@ -99,6 +99,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). `EditorValidationSurface`'s View action
     // renders through the primitive, so it is a STATIC import of this tree; omitting it HANGS

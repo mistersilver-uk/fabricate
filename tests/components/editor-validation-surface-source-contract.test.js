@@ -486,3 +486,97 @@ test('the shipped name pattern still has somewhere to put the visible verb', () 
     );
   }
 });
+
+/**
+ * The top-level `const <name> = …` initialisers of one component's instance script, from the AST.
+ *
+ * @param {string} file repo-relative component path
+ * @returns {Map<string, object>}
+ */
+function topLevelConstants(file) {
+  const declared = new Map();
+  for (const node of parse(SOURCES[file], { modern: true, filename: file }).instance?.content
+    ?.body ?? []) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const declarator of node.declarations) {
+      if (declarator.id?.type === 'Identifier' && declarator.init) {
+        declared.set(declarator.id.name, declarator.init);
+      }
+    }
+  }
+  return declared;
+}
+
+/**
+ * The keys of a literal object, or of the one the call (`Object.freeze({…})`) wraps.
+ *
+ * @param {object|undefined} initialiser
+ * @returns {{keys: string[], values: unknown[]}}
+ */
+function literalEntries(initialiser) {
+  const literal = initialiser?.type === 'CallExpression' ? initialiser.arguments[0] : initialiser;
+  assert.equal(literal?.type, 'ObjectExpression', 'expected an object literal');
+  return {
+    keys: literal.properties.map((property) => property.key?.name),
+    values: literal.properties.map((property) => property.value?.value),
+  };
+}
+
+test('each row status draws the Chip tone of its severity, and STATUS_TONES covers every status the icons do', () => {
+  const surface = topLevelConstants(SURFACE_PATH);
+  const tones = literalEntries(surface.get('STATUS_TONES'));
+  const icons = literalEntries(surface.get('statusIcons'));
+  assert.deepEqual(
+    tones.keys,
+    icons.keys,
+    'a status with an icon but no tone would draw a neutral chip in one mode, which is the ' +
+      'defect issue 3037 fixed'
+  );
+  assert.deepEqual(
+    Object.fromEntries(tones.keys.map((key, index) => [key, tones.values[index]])),
+    { pass: 'positive', warn: 'warning', block: 'danger' },
+    'pass, warn and block are the positive, warning and danger tones'
+  );
+
+  const chipTones = parse(SOURCES['src/ui/svelte/components/Chip.svelte'], {
+    modern: true,
+    filename: 'Chip.svelte',
+  })
+    .instance.content.body.flatMap((node) =>
+      node.type === 'VariableDeclaration' ? node.declarations : []
+    )
+    .find((declarator) => declarator.id?.name === 'TONES');
+  const closed = new Set(chipTones.init.arguments[0].elements.map((element) => element.value));
+  for (const tone of tones.values) {
+    assert.ok(closed.has(tone), `${tone} is not one of Chip's TONES, so Chip would drop it`);
+  }
+});
+
+test('the row pill is passed its tone, and the group label is a span Kicker beside its icon', () => {
+  const chips = [];
+  const kickers = [];
+  walkTemplate(
+    parse(SOURCES[SURFACE_PATH], { modern: true, filename: SURFACE_PATH }).fragment,
+    (node) => {
+      if (node.type !== 'Component') return;
+      if (node.name === 'Chip') chips.push(node);
+      if (node.name === 'Kicker') kickers.push(node);
+    }
+  );
+  assert.equal(chips.length, 1, 'the row status pill is the one Chip this surface draws');
+  const toneAttribute = chips[0].attributes.find((attribute) => attribute.name === 'tone');
+  assert.equal(
+    SOURCES[SURFACE_PATH].slice(
+      toneAttribute?.value?.expression?.start,
+      toneAttribute?.value?.expression?.end
+    ),
+    'STATUS_TONES[row.status]',
+    'the pill takes its tone from the frozen status map, not from a class the Chip sheet loses to'
+  );
+  assert.equal(kickers.length, 1, 'the group label text is one Kicker');
+  assert.equal(
+    kickers[0].attributes.find((attribute) => attribute.name === 'as')?.value?.[0]?.data,
+    'span',
+    'the Kicker is `as="span"` so it nests inside the label paragraph beside the icon'
+  );
+});

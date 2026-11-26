@@ -473,7 +473,7 @@ const PRIMITIVES = Object.freeze([
       'manager-recipe-val-pill',
     ]),
     composesClasses: true,
-    // Measured at this commit: 21 written, 46 family selectors, 37 owned.
+    // Measured at this commit: 21 written, 44 family selectors, 35 owned.
     writtenFloor: 18,
     familyFloor: 41,
     ownedFloor: 33,
