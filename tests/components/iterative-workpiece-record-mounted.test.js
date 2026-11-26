@@ -127,9 +127,15 @@ describe('A closed iterative record', () => {
     const yields = all(notice, '[data-list-row]');
     assert.equal(yields.length, 1, 'the set it gives is one dense row');
     assert.match(yields[0].textContent, /Spearhead/);
+    assert.ok(yields[0].textContent.includes('Quantity'), 'the row states its quantity');
+    assert.match(query(yields[0], 'img').getAttribute('src'), /\S/, 'and draws its art');
+    assert.ok(
+      Boolean(query(notice, '.fab-notice-evidence')),
+      'the yields sit in the evidence band'
+    );
     assert.deepEqual(journal.asked, [closed.id]);
-    // The receipts keep their ordinary places beneath the frozen banner.
-    assert.ok(Boolean(query(root, '[data-history-items="produced"]')), 'Crafted is drawn');
+    // The verdict's yields own the produced rows, so Crafted is not drawn a second time.
+    assert.ok(!query(root, '[data-history-items="produced"]'), 'Crafted is not drawn twice');
     assert.ok(!query(root, '[data-history-items="transient-produced"]'), 'not in the banner');
   });
 
@@ -163,6 +169,7 @@ describe('A closed iterative record', () => {
     assert.match(notice.textContent, /Rough out the blade failed/);
     assert.match(notice.textContent, /The step has failed and nothing is produced\./);
     assert.ok(!query(notice, '[data-list-row]'), 'nothing is produced, so no yield is listed');
+    assert.ok(!query(notice, '.fab-notice-evidence'), 'no empty evidence band');
   });
 
   it('reads the shipped verdict text on a later open, with no rule text', async () => {
@@ -187,6 +194,10 @@ describe('A closed iterative record', () => {
     const run = workpieceModel('iterative-record');
     const root = await mount(run);
     assert.ok(!query(root, '[data-journal-verdict]'), 'a reopened success states no verdict');
+    assert.ok(
+      Boolean(query(root, '[data-history-items="produced"]')),
+      'a reopened record keeps Crafted'
+    );
     const order = [
       '[data-iterative-record] [data-iterative-counter]',
       '[data-iterative-record] [data-iterative-sessions]',
@@ -216,12 +227,24 @@ describe('A closed iterative record', () => {
   });
 
   it('keeps a hidden counter from a player and marks it for the GM', async () => {
-    const player = ended('iterative-failed', 'hammer').closed;
+    const { closed: player, verdict } = ended('iterative-failed', 'hammer');
+    const sentinels = [HIDDEN_COUNTER.label, HIDDEN_COUNTER.id, String(HIDDEN_COUNTER.value)];
     const root = await mount(player);
     const record = query(root, '[data-iterative-record]');
-    for (const sentinel of [HIDDEN_COUNTER.label, HIDDEN_COUNTER.id, String(HIDDEN_COUNTER.value)])
-      assert.ok(!record.outerHTML.includes(sentinel), `${sentinel} stays hidden`);
+    for (const sentinel of sentinels)
+      assert.ok(!root.outerHTML.includes(sentinel), `${sentinel} stays hidden on a later open`);
     assert.match(record.textContent, /1 counter is hidden by the GM\./);
+    await harness.remount();
+    const frozenRoot = await mount(player, journalFor(player, { verdict }));
+    assert.ok(
+      Boolean(query(frozenRoot, '[data-journal-verdict] [data-list-row]')),
+      'verdict drawn'
+    );
+    for (const sentinel of sentinels)
+      assert.ok(
+        !frozenRoot.outerHTML.includes(sentinel),
+        `${sentinel} stays hidden in the verdict`
+      );
     await harness.remount();
     const gm = ended('iterative-failed', 'hammer', { viewer: WORKPIECE_GM }).closed;
     const gmRoot = await mount(gm);
@@ -243,5 +266,91 @@ describe('A closed iterative record', () => {
     const root = await mount(run);
     assert.ok(Boolean(query(root, '[data-iterative-record]')), 'the record is drawn');
     assert.ok(!query(root, '[data-iterative-sessions]'), 'no empty table invites a first action');
+  });
+
+  it('draws neither the frozen verdict nor the record on a GM-closed or recovery run', async () => {
+    const { closed, verdict } = ended('iterative-failed', 'hammer');
+    const withRecovery = (status, extra = {}) => ({
+      ...closed,
+      recoveryEvidence: { status, required: false, effects: [], ...extra },
+    });
+    for (const run of [
+      withRecovery('gmClosed'),
+      withRecovery('recoveryRequired', { required: true }),
+    ]) {
+      const root = await mount(run, journalFor(run, { verdict }));
+      assert.ok(!query(root, '[data-journal-verdict]'), `${run.recoveryEvidence.status} verdict`);
+      assert.ok(!query(root, '[data-iterative-record]'), `${run.recoveryEvidence.status} record`);
+      await harness.remount();
+    }
+  });
+
+  it('draws a hidden caption with no visible counter, and no grid without either', async () => {
+    const run = workpieceModel('iterative-record');
+    const withHidden = (hidden) => ({
+      ...run,
+      iterative: { ...run.iterative, counters: [], meta: { ...run.iterative.meta, hidden } },
+    });
+    const record = query(
+      await mount(withHidden('3 counters are hidden by the GM.')),
+      '[data-iterative-record]'
+    );
+    assert.match(record.textContent, /3 counters are hidden by the GM\./);
+    assert.equal(all(record, '[data-iterative-counter]').length, 0);
+    await harness.remount();
+    const bare = await mount(withHidden(''));
+    assert.ok(!query(bare, '.counter-section-grid'), 'no counters and no caption draw no section');
+  });
+
+  it('draws the table for a log compacted to nothing, saying how many are not listed', async () => {
+    const run = workpieceModel('iterative-record');
+    const cut = { ...run, iterative: { ...run.iterative, sessions: [], compactedCount: 3 } };
+    const table = query(await mount(cut), '[data-iterative-sessions]');
+    assert.ok(Boolean(table), 'a compacted-only log still draws its table');
+    assert.match(table.textContent, /Sessions\.EarlierMany/);
+  });
+
+  it('returns the table to its first page on another run', async () => {
+    const run = workpieceModel('iterative-record');
+    const sessions = Array.from({ length: 8 }, (_, index) => ({
+      ...run.iterative.sessions[0],
+      attempt: index + 1,
+      sessionNumber: index + 1,
+    }));
+    const long = { ...run, iterative: { ...run.iterative, sessions } };
+    const root = await mount(long);
+    const rows = () => all(root, '[data-iterative-sessions] tbody tr');
+    assert.equal(rows().length, 5, 'five a page');
+    query(root, '[data-iterative-sessions] [data-pagination-next]').click();
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(rows().length, 3, 'the second page');
+    const other = { ...long, key: 'another-run' };
+    await harness.setProps({ run: other, journal: journalFor(other, { transient: false }) });
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(rows().length, 5, 'another run starts on its first page');
+  });
+
+  it('names the counters and the bars', async () => {
+    const record = query(
+      await mount(workpieceModel('iterative-record')),
+      '[data-iterative-record]'
+    );
+    assert.match(record.textContent, /Workpiece\.Kicker/);
+    assert.match(query(record, '[data-run-progress]').textContent, /Progress\.Label/);
+  });
+
+  it('draws the focus bar of a cancelled mid-step record empty', async () => {
+    const base = workpieceModel('iterative-record');
+    const stages = base.iterative.progress.stages.map((stage, index) =>
+      index === base.iterative.focusStepIndex ? { ...stage, status: 'inProgress' } : stage
+    );
+    const run = {
+      ...base,
+      status: 'cancelled',
+      derivedStatus: 'cancelled',
+      iterative: { ...base.iterative, progress: { ...base.iterative.progress, stages } },
+    };
+    const bars = all(await mount(run), '[data-iterative-record] [role="progressbar"]');
+    assert.equal(bars[run.iterative.focusStepIndex].getAttribute('aria-valuenow'), '0');
   });
 });

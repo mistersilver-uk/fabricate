@@ -8,6 +8,7 @@ import { runAttentionPresentation } from '../../src/ui/svelte/apps/journal/journ
 import { chipToneOf } from '../helpers/chipTone.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
+  WORKPIECE_NOW,
   installWorkpieceEnv,
   workpieceListing,
   workpieceLocalize,
@@ -440,6 +441,11 @@ describe('RunCard for an iterative workpiece', () => {
       ['33', '0'],
       'the rail reads the workpiece progress, Shape 20 of 60'
     );
+    assert.equal(
+      target.querySelector('[data-run-progress]').getAttribute('data-run-progress'),
+      '17',
+      'the hook is the mean of the drawn fills, (33 + 0) / 2'
+    );
   });
 
   it('reads Step done beside In progress at a step boundary', async () => {
@@ -481,5 +487,48 @@ describe('RunCard for an iterative workpiece', () => {
     assert.equal(workpieceLocalize(stepDone.labelKey), 'Step done', 'the label resolves in lang/en.json');
     assert.equal(runAttentionPresentation(refused('selectionRequired')).kind, 'materials');
     assert.equal(runAttentionPresentation(byId('iw-run-longsword')), null);
+  });
+
+  it('marks the focus step as current on the rail', async () => {
+    const target = await harness.mount({ run: byId('iw-run-boundary'), now: 0 });
+    const bars = [...target.querySelector('[data-run-progress]').querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(bars.map((bar) => bar.hasAttribute('aria-current')), [true, false]);
+  });
+
+  it('rounds a fraction of a goal to the nearest percent', async () => {
+    const target = await harness.mount({ run: workpieceModel('iterative-failed-nothing'), now: 0 });
+    assert.equal(target.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '17');
+  });
+
+  it('draws no rail for a timed single-step workpiece, and still counts down', async () => {
+    const timed = workpieceModel('iterative-single', {
+      mutate: (run) => {
+        run.status = 'waitingTime';
+        run.steps[0].status = 'waitingTime';
+        run.steps[0].timeGate = {
+          requiredSeconds: 14_400,
+          initiatedAt: WORKPIECE_NOW - 3600,
+          availableAt: WORKPIECE_NOW + 10_800,
+        };
+      },
+    });
+    const target = await harness.mount({ run: timed, now: 0 });
+    assert.ok(!target.querySelector('[data-run-progress]'), 'one step draws no rail');
+    assert.ok(target.querySelector('[data-run-countdown]'), 'the clock still shows');
+  });
+
+  it('ranks a pending reward or choice over Step done, and leaves a run that is not iterative alone', () => {
+    const run = byId('iw-run-boundary');
+    assert.equal(runAttentionPresentation({ ...run, awardChoicePending: true }).kind, 'reward');
+    assert.equal(runAttentionPresentation({ ...run, awaitingChoice: true }).kind, 'choice');
+    const begin = { atStageStart: true, beginStep: true };
+    assert.equal(runAttentionPresentation({ actions: begin }).kind, 'start');
+    assert.equal(runAttentionPresentation({ iterative: { boundary: null }, actions: begin }).kind, 'start');
+    assert.equal(
+      runAttentionPresentation({
+        actions: { atStageStart: true, beginStep: false, disabledReason: 'stageNotStarted' },
+      }),
+      null
+    );
   });
 });

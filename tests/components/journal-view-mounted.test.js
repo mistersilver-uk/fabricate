@@ -450,6 +450,22 @@ describe('JournalView mounted behavior', () => {
     assert.deepEqual(outcomes, ['failed', 'succeeded', 'succeeded'], 'the shipped outcome glyphs');
   });
 
+  it('reads a record session count alone when its finish time is not known', async () => {
+    installWorkpieceEnv();
+    const { active, history } = workpieceRuns('iterative-list');
+    const listing = workpieceListing({ active: Object.values(active), history });
+    const undated = listing.history.map((run) => ({ ...run, finishedAt: undefined }));
+    const { store } = makeJournal({
+      activePageItems: listing.activeRuns, activeRuns: listing.activeRuns, activeCount: listing.activeRuns.length,
+      historyPageItems: undated, historyCount: undated.length,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    await settle();
+    const when = (id) => target.querySelector(`[data-history-run-id="${id}"] .fab-log-list-when`).textContent.trim();
+    assert.equal(when('iw-run-failed'), '2 sessions');
+    assert.equal(when('iw-run-made'), '1 session');
+  });
+
   it('gives each list its own page-size radio group, checked at the list\'s current size', async () => {
     const run = makeGatheringRun();
     const { store } = makeJournal({
