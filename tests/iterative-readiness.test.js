@@ -961,7 +961,7 @@ describe('counter and action addresses (#3038)', () => {
           { counterId: 'c' }
         );
         library.actions[0].effects[0].amount = amount;
-        extra.forEach((edit) => edit(context));
+        for (const edit of extra) edit(context);
       };
     for (const [amount, wanted] of [
       ['@max.b + @min.a', 'a'],
