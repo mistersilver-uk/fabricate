@@ -1287,6 +1287,14 @@
             "Note": "Step {index}: {counter} {value} of {n}",
             "NoteSingle": "{counter} {value} of {n}"
           },
+          "Refusal": {
+            "ActionUnavailable": "Needs {requirements}.",
+            "CostUnaffordable": "Needs {amount} {counter}; the piece has {value}.",
+            "EffectDice": "The dice for one of this action’s effects couldn’t be rolled. Choose the action again.",
+            "ExpressionInvalid": "The {counter} cost doesn’t work out. Ask your GM to review it.",
+            "UnknownCounter": "This action uses {counter}, which isn’t tracked here. Ask your GM to review it.",
+            "Unspent": "Nothing was spent and the session wasn’t counted."
+          },
           "Route": {
             "NextStep": "Step {index} starts",
             "Nothing": "Nothing",
