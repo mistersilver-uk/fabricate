@@ -210,7 +210,12 @@ function priceCosts({ action, library, step, before, rollData }) {
   );
   if (short) {
     const { costId: entryId, counterId, amount } = short;
-    return refuse(REASON.costUnaffordable, { entryId, counterId, amount });
+    return refuse(REASON.costUnaffordable, {
+      entryId,
+      counterId,
+      amount,
+      value: before.counters.get(counterId),
+    });
   }
   return {
     ok: true,

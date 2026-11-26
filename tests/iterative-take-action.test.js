@@ -239,7 +239,7 @@ describe('a refused Iterative Attempt changes nothing', () => {
   it('carries the resolver detail verbatim', async () => {
     const world = await startedWorld({ fuel: 3 });
     const reply = await world.take('heave');
-    assert.deepEqual(reply.detail, { entryId: 'lift', counterId: 'fuel', amount: 5 });
+    assert.deepEqual(reply.detail, { entryId: 'lift', counterId: 'fuel', amount: 5, value: 3 });
   });
 
   it('resolves a matured timed step with nothing consumed again, resuming the run', async () => {
