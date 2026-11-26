@@ -1219,6 +1219,7 @@
           "awaitingReward": "Choose your reward",
           "rewardPending": "Reward pending",
           "readyToBegin": "Needs your go-ahead",
+          "stepDone": "Step done",
           "needsMaterials": "Needs materials",
           "needsEssences": "Needs essences",
           "needsCurrency": "Needs payment",
@@ -1518,6 +1519,7 @@
         },
         "History": {
           "Title": "Finished",
+          "WhenSessions": "{when} · {sessions}",
           "UnknownMaterial": "Unknown material",
           "CurrencyAwarded": "Currency awarded",
           "RecipeLearned": "Recipe learned",

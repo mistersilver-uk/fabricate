@@ -7,6 +7,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { installWorkpieceEnv, workpieceListing, workpieceRuns } from '../helpers/iterativeJournalListing.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { choosePageSize } from '../helpers/page-size-control.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
@@ -421,6 +422,32 @@ describe('JournalView mounted behavior', () => {
     assert.match(outcomes[0].getAttribute('aria-label'), /unknown/i);
     assert.match(outcomes[1].getAttribute('aria-label'), /Recovery/i);
     assert.match(outcomes[2].getAttribute('aria-label'), /progress/i);
+  });
+
+  // Issue 3011, D-12: the lab's iterative workpieces as the real builder lists them.
+  it('lists a workpiece boundary as Step done and an iterative record with its session count', async () => {
+    installWorkpieceEnv();
+    const { active, history } = workpieceRuns('iterative-list');
+    const listing = workpieceListing({ active: Object.values(active), history });
+    const plain = makeSucceededRun();
+    const finished = [...listing.history, plain];
+    const { store } = makeJournal({
+      activePageItems: listing.activeRuns, activeRuns: listing.activeRuns, activeCount: listing.activeRuns.length,
+      historyPageItems: finished, historyCount: finished.length,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    await settle();
+    const boundary = target.querySelector('[data-run-id="iw-run-boundary"]');
+    assert.equal(boundary.querySelector('[data-run-attention]').dataset.runAttention, 'stepDone');
+    assert.equal(boundary.querySelector('.journal-run-status').dataset.runStatus, 'inProgress');
+    const when = (id) => target.querySelector(`[data-history-run-id="${id}"] .fab-log-list-when`).textContent;
+    assert.match(when('iw-run-failed'), /History\.WhenSessions.*"sessions":"2 sessions"/);
+    assert.match(when('iw-run-made'), /"sessions":"1 session"/);
+    assert.doesNotMatch(when(plain.id), /WhenSessions/, 'a run that is not iterative keeps its time alone');
+    const outcomes = finished.map(
+      (run) => target.querySelector(`[data-history-run-id="${run.id}"] [data-history-outcome]`).dataset.historyOutcome
+    );
+    assert.deepEqual(outcomes, ['failed', 'succeeded', 'succeeded'], 'the shipped outcome glyphs');
   });
 
   it('gives each list its own page-size radio group, checked at the list\'s current size', async () => {

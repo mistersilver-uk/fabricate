@@ -74,11 +74,18 @@
   // Scoped to runs that have a stage SEQUENCE. Gathering and salvage project `steps: []`, and a
   // single-stage craft is the same lone empty track asserting 0% where progress has no meaning —
   // M18 asked for the multi-step rail only (issue 1648, UX2-6).
-  const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const showsStageRail = $derived(!hasGate && stages.length > 1);
+  //
+  // An iterative workpiece's rail is its own per-step progress, the focus step's track filled
+  // toward its goal, whatever its clock is doing (issue 3011).
+  const workpiece = $derived(run?.iterative?.progress ?? null);
+  const stages = $derived(workpiece?.stages ?? (Array.isArray(run?.steps) ? run.steps : []));
+  const showsStageRail = $derived((workpiece !== null || !hasGate) && stages.length > 1);
   // What the tracks draw, in one number for the `data-run-progress` hook: the stage rail reports
   // completed stages over total and a gated run keeps its clock fraction (issue 1648, UX2-5).
-  const currentStageIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
+  const currentStageIndex = $derived(
+    Math.max(0, Number(workpiece ? workpiece.current : run?.stepIndex) || 0)
+  );
+  const railPercent = $derived(workpiece ? Math.round(workpiece.percent ?? 0) : progressPercent);
   const filledStages = $derived(
     stages.filter(
       (stage, index) =>
@@ -163,12 +170,12 @@
 
 {#snippet timing()}
   <div class="journal-run-card-timing">
-    {#if progress !== null || showsStageRail}
+    {#if showsStageRail || (workpiece === null && progress !== null)}
       <div class="journal-run-card-progress" data-run-progress={accessiblePercent}>
         <RunProgress
           stages={stages.length > 0 ? stages : [{}]}
           current={currentStageIndex}
-          progress={progressPercent}
+          progress={railPercent}
           ariaLabel={localize('FABRICATE.App.Journal.Progress.Label')}
         />
       </div>

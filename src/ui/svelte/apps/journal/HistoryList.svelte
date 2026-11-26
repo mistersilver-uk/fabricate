@@ -1,7 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The Journal's Finished list: each terminal run is a `LogList` entry opening its detail, with its
-  relative finish time, a labelled outcome glyph and a dismiss control beside it.
+  relative finish time (and an iterative record's session count), a labelled outcome glyph and a
+  dismiss control beside it.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -50,6 +51,19 @@
     return ['succeeded', 'failed', 'cancelled'].includes(status) ? status : 'unknown';
   }
 
+  /** The finish time, and after it an iterative record's session count (issue 3011). */
+  function whenOf(run) {
+    const when = formatRelativeWorldTime(run?.finishedAt, now, {
+      secondsPerDay,
+      labels: relativeLabels,
+    });
+    const sessions = run?.iterative ? String(run.stepLabel ?? '') : '';
+    if (!sessions) return when;
+    return when
+      ? localize('FABRICATE.App.Journal.History.WhenSessions', { when, sessions })
+      : sessions;
+  }
+
   function entryOf(run) {
     const id = String(run?.id ?? '');
     const status = String(run?.derivedStatus ?? run?.status ?? 'unknown');
@@ -60,10 +74,7 @@
       run,
       id,
       text: String(run?.names?.title ?? ''),
-      when: formatRelativeWorldTime(run?.finishedAt, now, {
-        secondsPerDay,
-        labels: relativeLabels,
-      }),
+      when: whenOf(run),
       art: String(run?.img ?? '') || DEFAULT_RUN_IMAGE,
       tone: status === 'failed' ? 'danger' : '',
       outcome: {
