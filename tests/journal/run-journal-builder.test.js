@@ -2193,7 +2193,7 @@ test('unsupported lifecycle versions remain readable and expose no mutation acti
   assert.equal(run.actions.disabledReason, 'unsupportedLifecycle');
 });
 
-test('redaction preserves owner execution/cancel availability without leaking selection plans', () => {
+test("redaction preserves owner actions to match the visible run's, without leaking selection plans", () => {
   const hiddenStep = {
     ...activeCraftingRun().steps[1],
     selectionPlan: {
@@ -2228,6 +2228,7 @@ test('redaction preserves owner execution/cancel availability without leaking se
   assert.equal(visible.redacted, false);
   assert.deepEqual(run.actions, { ...visible.actions, setSelection: false });
   assert.equal(run.actions.cancel, true);
+  assert.equal(run.actions.pause, true);
   assert.equal(JSON.stringify(run).includes('critical-secret'), false);
   assert.equal(JSON.stringify(run).includes('secret-item'), false);
 });
@@ -2584,6 +2585,7 @@ test('3033: a redacted single-route stage that holds everything offers its begin
   assert.equal(run.actions.disabledReason, 'stageNotStarted');
   assert.equal(run.actions.setSelection, false, 'a pick reads the routes, which are identity');
   assert.equal(run.awaitingChoice, false);
+  assert.equal(runAttentionPresentation(run).kind, 'start');
 });
 
 test('3033: a redacted stage is refused for every cause a visible one is, by code alone', () => {
@@ -2597,7 +2599,11 @@ test('3033: a redacted stage is refused for every cause a visible one is, by cod
     ['an unchosen route', redactedStage([ironRoute(), silverRoute()]), 'routeRequired'],
     ['an unrecorded option', redactedStage([multiOptionSet()]), 'choiceRequired'],
   ];
+  const attention = { routeRequired: null, choiceRequired: null, selectionRequired: 'materials',
+    toolRequired: 'tools' };
   for (const [label, run, code] of cases) {
+    if (code in attention)
+      assert.equal(runAttentionPresentation(run)?.kind ?? null, attention[code], `${label}: its row chip`);
     assert.equal(run.actions.atStageStart, true, `${label}: the begin control renders`);
     assert.equal(run.actions.beginStep, false, `${label}: and is refused`);
     assert.equal(run.actions.disabledReason, code, label);

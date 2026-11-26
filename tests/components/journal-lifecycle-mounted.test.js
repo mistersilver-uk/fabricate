@@ -1358,8 +1358,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
   it('reads the required time of a redacted unstarted stage as hidden, never as none', async () => {
     const SUMMARY = english.FABRICATE.App.Journal.Summary;
     const needsOf = (mounted) =>
-      [...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]')]
-        .find((row) => row.textContent.includes(SUMMARY.Needs))?.textContent ?? '';
+      [
+        ...mounted.target
+          .querySelector('[data-journal-summary-card="time"]')
+          .querySelectorAll('[data-journal-fact]'),
+      ].find((row) => row.textContent.includes(SUMMARY.Needs))?.textContent ?? '';
     const plan = { selectedIngredientSetId: FIXED_SET.id };
     const hidden = needsOf(await mountState('ready-single', redactedFixture([FIXED_SET], plan)));
     assert.ok(hidden.includes(SUMMARY.Hidden), hidden);
