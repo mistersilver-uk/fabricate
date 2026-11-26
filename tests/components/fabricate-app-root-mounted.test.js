@@ -19,6 +19,7 @@ import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
+  ITERATIVE_CRAFTING_FACE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -41,6 +42,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // The Workpiece view an active iterative run draws (issue 3011).
     ...WORKPIECE_VIEW_RAW_MODULES,
+    // The iterative recipe's Crafting-tab face and the formula display the builder delegates to (issue 3011).
+    ...ITERATIVE_CRAFTING_FACE_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
@@ -209,6 +212,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+    'src/ui/svelte/apps/crafting/detail/IterativeRecipeBody.svelte',
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
@@ -902,8 +906,8 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       off(name, id) {
         handlers.get(name)?.delete(id);
       },
-      callAll(name, payload) {
-        for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(payload);
+      callAll(name, ...args) {
+        for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(...args);
       },
       count: (name) => handlers.get(name)?.size ?? 0,
     };
@@ -1046,6 +1050,32 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
     hooks.callAll(dismissalHook);
     await tick();
     assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
+  });
+
+  it("quietly refreshes the Crafting tab when the selected crafting actor's run flags change", async () => {
+    const runFlag = { flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } } };
+    const hasProperty = (object, path) =>
+      path.split('.').reduce((node, key) => (node == null ? node : node[key]), object) !== undefined;
+    const prior = Object.getOwnPropertyDescriptor(globalThis, 'foundry');
+    const value = { ...prior?.value, utils: { ...prior?.value?.utils, hasProperty } };
+    Object.defineProperty(globalThis, 'foundry', { value, configurable: true, writable: true });
+    try {
+      const calls = await mountWithSpies();
+      const fire = (actorId, changes) => hooks.callAll('updateActor', { id: actorId }, changes);
+
+      fire('actor-1', runFlag);
+      assert.equal(calls.crafting, 1, 'the selected crafting actor reloads the Crafting tab');
+      calls.crafting = 0;
+      fire('actor-2', runFlag);
+      fire('actor-1', { system: { attributes: { hp: { value: 3 } } } });
+      assert.equal(calls.crafting, 0, 'another actor or a change outside the run flags is ignored');
+
+      await harness.remount();
+      assert.equal(hooks.count('updateActor'), 0, 'unmount removes both listeners');
+    } finally {
+      if (prior) Object.defineProperty(globalThis, 'foundry', prior);
+      else delete globalThis.foundry;
+    }
   });
 
   it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {

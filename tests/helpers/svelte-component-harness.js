@@ -594,7 +594,25 @@ export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
   'src/systems/countTriggerReach.js',
 ]);
 
+// The iterative recipe's Crafting-tab face (issue 3011) and the check formula display the listing
+// builder delegates to: what `CraftingListingBuilder` imports to project a workpiece's goal and run.
+export const ITERATIVE_CRAFTING_FACE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/craftingFormulaDisplay.js',
+  'src/ui/presenters/iterative/iterativeCraftingFace.js',
+  'src/ui/presenters/iterative/iterativeCounters.js',
+  'src/ui/presenters/iterative/iterativeRuleText.js',
+  'src/ui/presenters/iterative/iterativeRunRead.js',
+  'src/models/iterativeStepConfig.js',
+  'src/systems/iterative/attemptLibrary.js',
+  'src/systems/iterative/counterRule.js',
+  'src/systems/iterative/expression.js',
+  'src/systems/iterative/iterativeStepState.js',
+  'src/systems/iterative/preflightAttempt.js',
+  'src/systems/normalize/iterativeLibrary.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
+  ...ITERATIVE_CRAFTING_FACE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -795,6 +813,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+  'src/ui/svelte/apps/crafting/detail/IterativeRecipeBody.svelte',
   // ProgressiveBody's stage list (issue 651): the shared list and the row and band it composes.
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',

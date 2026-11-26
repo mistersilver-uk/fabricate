@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   COUNT_ADVANTAGE_FOOTER,
+  CRAFTING_ITERATIVE,
   CRAFTING_PROGRESSIVE,
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
@@ -25,6 +26,33 @@ const COUNT_PROMPT_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
 ]);
+
+/** The iterative recipe's Crafting-tab frames (issue 3011): Ironworks as `workpiece`, Forge a Longsword open. */
+const ironRecipe = (id, name) =>
+  Object.freeze([
+    { selector: '.crafting-browser-search input', fill: name },
+    { selector: `.crafting-recipe-row[data-recipe-id="${id}"]` },
+  ]);
+const IRON_RECIPE = ironRecipe('iw-r-longsword', 'Forge a Longsword');
+const ITERATIVE_FACE = (state) =>
+  `[data-recipe-detail-mode="iterative"]:has([data-iterative-face="${state}"])`;
+const iterativeCraftingCase = (entry) =>
+  playerCase({
+    reaches: 'beyond',
+    smokeLabels: [],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    kinds: ['player', 'crafting', 'iterative'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ITERATIVE,
+      PLAYER_DETAIL_HEADER,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay)\.js$/,
+      /^src\/ui\/presenters\/iterative\/iterativeCraftingFace\.js$/,
+    ],
+    ...entry,
+  });
 
 /** Issue 2005's player-rendering states: open the horseshoe and press Craft, prompting. */
 const CRAFT_HORSESHOE = Object.freeze([
@@ -1915,6 +1943,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/craftingStore/,
       PLAYER_DETAIL_HEADER,
     ],
+  }),
+  iterativeCraftingCase({
+    id: 'player-crafting-iterative-not-started',
+    label: 'Player app — Crafting an iterative recipe not yet started',
+    query: { tab: 'crafting', iterative: 'workpiece' },
+    steps: IRON_RECIPE,
+    expectSelector: `${ITERATIVE_FACE('goal')}:has([data-crafting-craft])`,
+  }),
+  iterativeCraftingCase({
+    id: 'player-crafting-iterative-started',
+    label: 'Player app — Crafting an iterative recipe just started (a Spear)',
+    query: { tab: 'crafting', iterative: 'workpiece' },
+    steps: [
+      ...ironRecipe('iw-r-spear', 'Forge a Spear'),
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector: `${ITERATIVE_FACE('workpiece')}:has([data-crafting-continue]):not(:has([data-crafting-craft]))`,
+  }),
+  iterativeCraftingCase({
+    id: 'player-crafting-iterative-in-progress',
+    label: 'Player app — Crafting an iterative recipe in progress',
+    query: { tab: 'crafting', iterative: 'workpiece', journalCaseState: 'iterative-resume' },
+    steps: IRON_RECIPE,
+    expectSelector: `${ITERATIVE_FACE('workpiece')}:has([data-crafting-continue]):has([data-iterative-next-session])`,
+    expectCenterHit: '[data-crafting-continue]',
   }),
   ...playerCountResultCases(),
   ...playerAdvantagePromptCases(),

@@ -1176,7 +1176,19 @@
           "Craft": "Craft 1 item",
           "CraftAnother": "Craft another",
           "Crafting": "Crafting…",
-          "MissingMaterials": "You're missing some required materials."
+          "MissingMaterials": "You're missing some required materials.",
+          "StartCrafting": "Start crafting",
+          "ContinueInJournal": "Continue in Journal"
+        },
+        "Iterative": {
+          "Goal": "What this recipe works toward",
+          "SucceedsWhen": "Succeeds when",
+          "FailsWhen": "Fails when",
+          "Produces": "Produces",
+          "InProgress": "In progress: {step}",
+          "StepNamed": "Step {index}, {name}",
+          "StepNumbered": "Step {index}",
+          "NextSession": "Next session"
         },
         "Notify": {
           "CraftFailed": "Something went wrong while crafting. Nothing was consumed.",

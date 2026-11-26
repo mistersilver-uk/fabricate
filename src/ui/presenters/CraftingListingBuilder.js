@@ -44,9 +44,7 @@
  * what is worth opening, never a promise about what will craft.
  */
 
-import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
-import { activeCheckEvaluation, actorRollData, isFixedSumOver } from '../../systems/checkTarget.js';
-import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
+import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { craftingCheckRefuses, memoizedRollData } from '../../systems/craftingCheckRefusal.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { hasActiveCheck } from '../../systems/salvageCheckUsability.js';
@@ -70,7 +68,9 @@ import {
   CRAFTING_BROWSE_STATUS,
   deriveBrowseStatus,
 } from './craftingBrowseStatus.js';
+import { countFormulaDisplay, sumFormulaDisplay } from './craftingFormulaDisplay.js';
 import { heldToolBonus } from './heldToolBonus.js';
+import { iterativeCraftingFace } from './iterative/iterativeCraftingFace.js';
 import { resultOutputRows, resultSignature, taughtNameReader } from './resultOutputRows.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 import { createToolReadySetsProbe } from './summaryToolPresence.js';
@@ -88,6 +88,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
   routedByCheck: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheck',
   progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
   alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy',
+  iterative: 'FABRICATE.Admin.SystemSettings.ResolutionIterative',
 };
 
 /**
@@ -104,7 +105,6 @@ export { CRAFTING_BROWSE_STATUS } from './craftingBrowseStatus.js';
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
-const COUNT_FORMULA_KEY = 'FABRICATE.Check.CountRoll.Pool';
 const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**
@@ -339,7 +339,7 @@ export class CraftingListingBuilder {
     // absent flag as "not visible" would blank the inspector for every one of those.
     if (resolvedAccess.visible === false) return null;
 
-    return this._buildRecipeModel({
+    const model = this._buildRecipeModel({
       recipe: target,
       access: resolvedAccess,
       isGM,
@@ -353,6 +353,20 @@ export class CraftingListingBuilder {
         knowledgeSources,
       }),
     });
+    return this._withIterativeFace(model, { recipe: target, isGM, craftingActor });
+  }
+
+  /**
+   * An iterative recipe's goal and workpiece (D-17), read from the actor's first active run of it;
+   * every other model, and a redacted teaser, passes through unread and unchanged.
+   * @private
+   */
+  _withIterativeFace(model, { recipe, isGM, craftingActor }) {
+    if (model?.modeToken !== 'iterative' || model.redaction?.redacted) return model;
+    const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
+    const run = this.craftingRunManager?.findActiveRunForRecipe?.(craftingActor, recipe.id);
+    const face = { recipe, system, run, gm: isGM, localize: this.localize };
+    return { ...model, iterative: iterativeCraftingFace(face) };
   }
 
   /**
@@ -952,10 +966,12 @@ export class CraftingListingBuilder {
       : mode === 'routedByIngredients'
         ? usable
         : usable && checksEnabled;
-    const { appliedModifiers, ...formula } =
-      evaluation.product === 'count'
-        ? this._countFormulaDisplay(config, evaluation, craftingActor)
-        : this._sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation });
+    const display = evaluation.product === 'count' ? countFormulaDisplay : sumFormulaDisplay;
+    const read = { config, rollFormula, craftingActor, system, recipe, evaluation };
+    const { appliedModifiers, ...formula } = display(read, {
+      localize: this.localize,
+      resolveCheckFormula: this._resolveCheckFormula,
+    });
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
     // range, not DC, so it has no meaningful DC — null it so the player card hides
     // its DC chip (its `hasDc` gate).
@@ -986,68 +1002,6 @@ export class CraftingListingBuilder {
       optional: !mandatory,
       mandatory,
       usable,
-    };
-  }
-
-  /**
-   * A summed check's authored formula and its display resolved for the acting character.
-   * @private
-   */
-  _sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation }) {
-    // Resolve the formula's @-placeholders against the acting character for display
-    // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
-    // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
-    // false when the formula does not reduce to a number for this actor (error state).
-    const resolution =
-      rollFormula.length > 0 && craftingActor
-        ? // The SAME check-modifier context the engine rolls with (issues 770, 1055, 1095), for
-          // the CRAFTING activity: the selection is per activity, so the listed formula and the
-          // applied modifiers agree with the roll (`resolution-modes/spec.md` requirement 71).
-          this._resolveCheckFormula(
-            rollFormula,
-            craftingActor,
-            buildCheckModifierContext(system, 'crafting', recipe),
-            evaluation
-          )
-        : null;
-    return {
-      rollFormula: rollFormula.length > 0 ? rollFormula : null,
-      resolvedFormula: resolution?.display ?? null,
-      formulaResolved: resolution ? resolution.resolved === true : null,
-      appliedModifiers: resolution?.modifiers ?? [],
-    };
-  }
-
-  /**
-   * A count check's formula line in place of its inert retained formula: the authored pool and
-   * threshold, each bracketed when read from the character, else null when either is blank; and
-   * for the acting character the pool resolved and floored, or `false` when a value cannot be read.
-   * @private
-   */
-  _countFormulaDisplay(config, evaluation, craftingActor) {
-    const { pool, direction } = evaluation;
-    const comparison = config.thresholdMode;
-    const line = (values) => this.localize(COUNT_FORMULA_KEY, countFormulaValues(values));
-    const base = pool.base.trim();
-    const threshold = pool.threshold.trim();
-    const bracketed = (text, number) => (number.test(text) ? text : `(${text})`);
-    const rollFormula =
-      base && threshold
-        ? line({
-            dice: bracketed(base, /^\d+$/),
-            die: pool.die,
-            direction,
-            comparison,
-            threshold: bracketed(threshold, /^[+-]?\d+(?:\.\d+)?$/),
-          })
-        : null;
-    if (!craftingActor) return { rollFormula, resolvedFormula: null, formulaResolved: null };
-    const rollData = actorRollData(craftingActor);
-    const resolved = resolvePool({ evaluation, thresholdMode: comparison, rollData });
-    return {
-      rollFormula,
-      resolvedFormula: resolved.ok ? line(resolved.policy) : null,
-      formulaResolved: resolved.ok,
     };
   }
 

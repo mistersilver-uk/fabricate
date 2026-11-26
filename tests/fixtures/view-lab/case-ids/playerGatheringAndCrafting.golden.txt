@@ -90,6 +90,9 @@ player-crafting-progressive-fixed
 player-crafting-progressive-stacked
 player-crafting-progressive-narrow
 player-crafting-stacked
+player-crafting-iterative-not-started
+player-crafting-iterative-started
+player-crafting-iterative-in-progress
 player-crafting-roll-result-count-pass
 player-crafting-roll-result-count-pass-narrow
 player-crafting-roll-result-count-fail

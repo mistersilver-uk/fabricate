@@ -153,7 +153,12 @@
   const rollResult = $derived(
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
-  const showRunSummary = $derived(Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id);
+  // A workpiece in progress is continued in the Journal, so its start shows no run summary.
+  const showRunSummary = $derived(
+    Boolean(rollResult) &&
+      dismissedRunFor !== selectedRecipe?.id &&
+      !selectedRecipe?.iterative?.workpiece
+  );
   // A reward the outcome left to pick, until this client settles it in the Journal (issue 1773).
   const awardPending = $derived(
     rollResult?.awardChoicePending === true &&
@@ -297,6 +302,7 @@
           {onChoose}
           {onChooseOption}
           {onCraft}
+          onContinue={(runId) => services?.navigateToJournalRun?.(runId)}
           {progressiveStages}
           {canReorderStages}
           {stageAnnouncement}

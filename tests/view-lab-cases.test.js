@@ -4665,8 +4665,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    143,
-    `expected the 143 crafting-path cases to be examined, saw ${examined.length}`
+    146,
+    `expected the 146 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -10190,10 +10190,10 @@ test('every recipe id the capture cases name exists in the lab world', async () 
     await import('./view-lab/world/labIterative.js');
   const seededIdsOf = (viewCase) => {
     const state = viewCase.query?.iterativeRecipes;
-    if (!state) return new Set();
+    if (!state && !viewCase.query?.iterative) return new Set();
     const seeded = buildLabContent();
     seedIterativeState(seeded, viewCase.query.iterative);
-    seedIterativeRecipes(seeded, [], state);
+    if (state) seedIterativeRecipes(seeded, [], state);
     return new Set(seeded.recipes.map((recipe) => recipe.id));
   };
 

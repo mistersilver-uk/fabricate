@@ -124,6 +124,33 @@ describe('CraftingView mounted behavior', () => {
     );
   });
 
+  it('3011: a started workpiece shows no run summary, and Continue opens that run in the Journal', async () => {
+    const opened = [];
+    const workpiece = {
+      runId: 'run-9',
+      stepIndex: 0,
+      stepName: 'Rough',
+      stepCount: 1,
+      counters: [],
+      nextSession: 1
+    };
+    const store = fakeCraftingStore({
+      recipes: [recipe({ modeToken: 'iterative', iterative: { goal: {}, workpiece } })],
+      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+    });
+    const target = await harness.mount({
+      services: services(store, {
+        navigateToJournalRun: (runId) => {
+          opened.push(runId);
+        }
+      })
+    });
+    assert.ok(!target.querySelector('[data-crafting-run-summary]'), 'no run summary beside Continue');
+    assert.ok(Boolean(target.querySelector('[data-crafting-shopping]')), 'the shopping list stays');
+    target.querySelector('[data-crafting-continue]').click();
+    assert.deepEqual(opened, ['run-9']);
+  });
+
   it('1773: an outcome that left a reward to pick names it and opens that run in the Journal', async () => {
     const opened = [];
     const store = fakeCraftingStore({
