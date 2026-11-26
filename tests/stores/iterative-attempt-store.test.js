@@ -1166,6 +1166,18 @@ describe('beginning a step', () => {
     await world.journal.retryCommandError();
     assert.equal(world.calls.command.length, 2, 'the shipped retry resends it');
   });
+
+  test('a begin settles like a press, whether it commits or is refused', async () => {
+    const world = await setup({
+      runs: [begin()],
+      replies: [{ success: false, reason: 'stale-run' }, { success: true }],
+    });
+    await world.journal.iterative.beginStep(world.run());
+    const first = world.journal.iterative.settled;
+    assert.deepEqual({ ...first, serial: 0 }, { runKey: keyOf('run-1'), actionId: null, serial: 0 });
+    await world.journal.iterative.beginStep(world.run());
+    assert.equal(world.journal.iterative.settled.serial, first.serial + 1);
+  });
 });
 
 describe('the focus after a reply', () => {

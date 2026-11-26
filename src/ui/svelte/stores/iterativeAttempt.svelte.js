@@ -326,15 +326,19 @@ class IterativeAttemptStore {
     }
   };
 
-  /** The journal's `beginStep`, and "Step N started" once it commits. */
+  /** The journal's `beginStep`, and "Step N started" once it commits; it settles like a press. */
   beginStep = async (run) => {
     const key = this.#o.runKeyOf(run);
     this.#memory.forget(key);
-    const result = await this.#o.beginStep(run);
-    if (result?.success !== true) return result;
-    const next = this.#active(key);
-    if (next?.iterative) this.#memory.note(key, startedNotice(next.iterative, this.#localize));
-    return result;
+    try {
+      const result = await this.#o.beginStep(run);
+      if (result?.success !== true) return result;
+      const next = this.#active(key);
+      if (next?.iterative) this.#memory.note(key, startedNotice(next.iterative, this.#localize));
+      return result;
+    } finally {
+      this.settled = { runKey: key, actionId: null, serial: (this.#serial += 1) };
+    }
   };
 }
 

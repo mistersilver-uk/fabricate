@@ -367,6 +367,28 @@ describe('The Workpiece view', () => {
     const stoke = query(card(root, 'stoke'), 'button');
     assert.ok(document.activeElement === stoke, 'the pressed card holds focus');
   });
+
+  it('moves focus to the first enabled card once a begin settles, and back to begin on a refusal', async () => {
+    const boundary = workpieceModel('iterative-starting');
+    const settle = (journal, serial) => ({
+      ...journal,
+      iterative: { ...journal.iterative, settled: { runKey: boundary.key, actionId: null, serial } },
+    });
+    const refused = journalFor(boundary);
+    const root = await mount(boundary, refused);
+    await harness.setProps({ journal: settle(refused, 1) });
+    await new Promise((done) => setTimeout(done, 0));
+    assert.ok(document.activeElement === query(root, '[data-run-action="begin"]'), 'begin');
+
+    harness.remount();
+    const started = { ...workpieceModel('iterative-cards'), key: boundary.key };
+    const journal = journalFor(started);
+    const shown = await mount(boundary, journal);
+    await harness.setProps({ run: started, journal: settle(journal, 1) });
+    await new Promise((done) => setTimeout(done, 0));
+    const hammer = query(card(shown, 'hammer'), 'button');
+    assert.ok(document.activeElement === hammer, 'the first enabled card holds focus');
+  });
 });
 
 describe('The Workpiece sessions', () => {
