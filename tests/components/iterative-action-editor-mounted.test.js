@@ -919,7 +919,7 @@ describe('the Crafting Action editor (issue 3009)', () => {
 
     it('draws every rule title as a connective', () => {
       mountList({});
-      const titles = [...host.querySelectorAll('[data-counter-rule] [data-rule-row-title]')];
+      const titles = [...host.querySelectorAll(':scope [data-counter-rule] [data-rule-row-title]')];
       assert.equal(titles.length, RULES.length);
       assert.ok(titles.every((title) => title.classList.contains('is-connective')));
     });
