@@ -18,6 +18,7 @@
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
   import Button from '../../../components/Button.svelte';
+  import { randomId as newId } from '../../../../../utils/randomId.js';
   import SortableList from '../../../components/SortableList.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -53,11 +54,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
   const list = $derived(Array.isArray(tiers) ? tiers : []);

@@ -1,7 +1,4 @@
-/**
- * The one non-security id mint. Both paths work on an insecure origin, where Web Crypto keeps only
- * `getRandomValues`, and neither uses `Math.random` (Sonar S2245).
- */
+/** Non-security id mints that work on an insecure origin and never use `Math.random` (S2245). */
 const BASE36_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 /** `length` base-36 characters; `getRandomValues` is called on `crypto` so it stays bound. */

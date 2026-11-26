@@ -43,4 +43,16 @@ describe('randomBase36', () => {
   it('returns the asked length', () => {
     for (const length of [0, 1, 5, 16, 64]) assert.equal(randomBase36(length).length, length);
   });
+
+  it('never draws from Math.random', () => {
+    const original = Math.random;
+    Math.random = () => {
+      throw new Error('Math.random was read');
+    };
+    try {
+      assert.equal(randomBase36(16).length, 16);
+    } finally {
+      Math.random = original;
+    }
+  });
 });

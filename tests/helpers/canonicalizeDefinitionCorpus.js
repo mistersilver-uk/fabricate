@@ -21,7 +21,7 @@ export const MINTING_KEYS = new Set(['id']);
 
 /**
  * RFC 4122 version 4, variant 1: the ids earlier runs of the two load-path migrations persisted.
- * They now mint through `randomId()`, which a stored-mode {@link CORE_ID_PATTERN} match covers.
+ * A fresh migration id is 16 alphanumerics, which a stored-mode {@link CORE_ID_PATTERN} match covers.
  */
 export const UUID_V4_ID_PATTERN =
   /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i;
