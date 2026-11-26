@@ -153,17 +153,39 @@ test('gathering d100 is live, and says the roll is not authored here', () => {
   assert.equal(check.value.fallback, 'Fixed d100');
 });
 
-test('every localization key the callout can ask for exists in lang/en.json', () => {
-  for (const [activity, mode, alchemyCheckMode] of REACHABLE) {
-    const described = describeCheckMode({ activity, mode, alchemyCheckMode });
-    const keys = [
-      described.title.key,
-      described.body.key,
-      ...described.facts.flatMap((entry) => [entry.label.key, entry.value.key]),
-    ];
-    for (const key of keys) {
-      assert.equal(typeof lookup(key), 'string', `${key} is missing from lang/en.json`);
+for (const outcomeCount of [0, 1, 2]) {
+  test(`every localization key the callout can ask for exists in lang/en.json at ${outcomeCount} tiers`, () => {
+    for (const [activity, mode, alchemyCheckMode] of REACHABLE) {
+      const described = describeCheckMode({ activity, mode, alchemyCheckMode, outcomeCount });
+      const keys = [
+        described.title.key,
+        described.body.key,
+        ...described.facts.flatMap((entry) => [entry.label.key, entry.value.key]),
+      ];
+      for (const key of keys) {
+        assert.equal(typeof lookup(key), 'string', `${key} is missing from lang/en.json`);
+      }
     }
+  });
+}
+
+test('the outcome-tier fact reads singular at exactly one tier and plural at 0 and 2', () => {
+  const expected = [
+    [0, 'OutcomesTiers', '{count} tiers', '0'],
+    [1, 'OutcomesTier', '{count} tier', '1'],
+    [2, 'OutcomesTiers', '{count} tiers', '2'],
+  ];
+  for (const [outcomeCount, keyName, fallback, count] of expected) {
+    const described = describeCheckMode({
+      activity: 'crafting',
+      mode: 'routedByCheck',
+      outcomeCount,
+    });
+    const outcomes = described.facts.filter((entry) => entry.id === 'outcomes');
+    assert.equal(outcomes.length, 1, 'the fact id stays outcomes');
+    assert.ok(outcomes[0].value.key.endsWith(`.Checks.Mode.${keyName}`), outcomes[0].value.key);
+    assert.equal(outcomes[0].value.fallback, fallback);
+    assert.equal(outcomes[0].data.count, count);
   }
 });
 

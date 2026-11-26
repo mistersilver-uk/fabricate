@@ -28,6 +28,7 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
   import { countDigestFormula } from './countPreviewModel.js';
+  import { digestCountRows } from './checksDigestCountRows.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import {
@@ -222,44 +223,16 @@
         tone: hasFormula ? 'set' : 'absent',
       },
     ];
-    if (typeof outcomeCount === 'number') {
-      rows.push({
-        id: 'outcomes',
-        icon: 'fas fa-code-branch',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Digest.Outcomes',
-          '{count} outcome tiers, {success} count as success'
-        )
-          .replace('{count}', String(outcomeCount))
-          .replace('{success}', String(successCount)),
-        target: [activeTab, 'outcomes'],
-        tone: 'set',
-      });
-    }
-    if (typeof triggerCount === 'number') {
-      rows.push({
-        id: 'triggers',
-        icon: 'fas fa-bolt',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Digest.Triggers',
-          '{count} triggers active'
-        ).replace('{count}', String(triggerCount)),
-        target: [activeTab, 'triggers'],
-        tone: 'set',
-      });
-    }
-    if (typeof modifierCount === 'number') {
-      rows.push({
-        id: 'modifiers',
-        icon: 'fas fa-user-group',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Digest.Modifiers',
-          '{count} check modifiers apply'
-        ).replace('{count}', String(modifierCount)),
-        target: [activeTab, 'modifiers'],
-        tone: 'set',
-      });
-    }
+    rows.push(
+      ...digestCountRows({
+        activeTab,
+        outcomeCount,
+        successCount,
+        triggerCount,
+        modifierCount,
+        text,
+      })
+    );
     return rows;
   });
 

@@ -95,6 +95,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
+  'src/ui/svelte/apps/manager/checks/checksDigestCountRows.js',
   // The shared die tiles' model and escaped renderer the readout draws through (issue 2006).
   'src/ui/presenters/countDiceTiles.js',
   'src/ui/presenters/htmlEscape.js',
