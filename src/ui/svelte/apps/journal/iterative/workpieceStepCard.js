@@ -25,6 +25,7 @@ const K = Object.freeze({
   doneWhen: 'FABRICATE.App.Journal.Iterative.Step.DoneWhen',
   failsWhen: 'FABRICATE.App.Journal.Iterative.Step.FailsWhen',
   ended: 'FABRICATE.App.Journal.Iterative.Step.Ended',
+  endedCarried: 'FABRICATE.App.Journal.Iterative.Step.EndedCarried',
   startsWith: 'FABRICATE.App.Journal.Iterative.Step.StartsWith',
   willProduceOne: 'FABRICATE.App.Journal.Iterative.Step.WillProduceOne',
   requiresTime: 'FABRICATE.App.Journal.StepDetails.RequiresTime',
@@ -83,6 +84,10 @@ export function stepHeading(stage, view, localize) {
   };
 }
 
+/** A past step's Ended fact: its set's sub-line, else the step it carried into. */
+const endedText = (stage, heading, localize) =>
+  stage?.set ? heading.sub : localize(K.endedCarried, { index: (stage?.index ?? 0) + 2 });
+
 /** A frozen card's facts: its time, check and rules, then how it ended or what it starts with. */
 export function frozenFacts({ stage, runStep, view, heading, localize }) {
   const seconds = Number(runStep?.detail?.requiredSeconds);
@@ -97,7 +102,7 @@ export function frozenFacts({ stage, runStep, view, heading, localize }) {
     ['done', '', K.doneWhen, stage?.doneWhen ?? ''],
     ['fails', '', K.failsWhen, stage?.failsWhen ?? ''],
     view === 'past'
-      ? ['ended', '', K.ended, heading.sub]
+      ? ['ended', '', K.ended, endedText(stage, heading, localize)]
       : ['starts', '', K.startsWith, stage?.startsWith || stage?.carriedWith || ''],
   ];
   return rows

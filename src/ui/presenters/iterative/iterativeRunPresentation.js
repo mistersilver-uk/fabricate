@@ -98,7 +98,7 @@ function goalOf(step, labels, localize) {
   };
 }
 
-/** "Shape 0, Integrity 54 (formula 52, held at 60)", the hidden rows left out. */
+/** "Shape 0, Integrity 12 (formula 14, held at 12)", the hidden rows left out. */
 function startedWithRows(state, labels, localize) {
   return arrayOrEmpty(state?.startedWith)
     .filter((row) => labels.counter(row?.counterId))
@@ -300,7 +300,8 @@ function livePresentation(ctx) {
     redacted || !state
       ? null
       : routeViews({ groups, state, nextIndex, ended, labels, localize, mapResult: ctx.mapResult });
-  const progress = progressOf(ctx, { goal, state, ended });
+  const tracked = goal ?? goalOf(views[focus]?.iterative, labels, localize);
+  const progress = progressOf(ctx, { goal: tracked, state, ended });
   const rolls = new Map(library.actions.map((action) => [action?.id, action?.check === 'roll']));
   return {
     ...sharedFields(ctx, { state, counters, hiddenCount, startedWith, ended }),

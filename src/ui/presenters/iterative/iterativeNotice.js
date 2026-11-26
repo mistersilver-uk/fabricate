@@ -137,11 +137,11 @@ export function errorNotice(message, localize) {
   return notice('error', 'no-id-service', REFUSED, [localize(K.refusalTitle), message]);
 }
 
-function resultTitle({ row, fallback, localize }) {
+function resultTitle({ reason, row, fallback, localize }) {
   const action = row?.action ?? fallback.action;
   const session = row ? row.sessionNumber : fallback.session;
   const free = session === null || session === undefined;
-  const checked = row?.check?.outcome != null;
+  const checked = reason !== 'private' && row?.check?.outcome != null;
   if (checked) {
     const data = { session, action, outcome: row.check.outcome, value: row.check.value };
     return localize(free ? K.resultTitleFree : K.resultTitle, data);
@@ -169,7 +169,7 @@ export function resultNotice({ reason, row, fallback, replayed, localize }) {
     'result',
     reason,
     RESULT_LOOKS[reason],
-    [resultTitle({ row, fallback, localize }), detail],
+    [resultTitle({ reason, row, fallback, localize }), detail],
     { ledger: row ?? null, replayed: replayed === true }
   );
 }

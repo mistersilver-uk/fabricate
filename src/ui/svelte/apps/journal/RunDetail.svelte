@@ -442,7 +442,7 @@
       <EmptyState
         inline
         icon="fas fa-clock-rotate-left"
-        title={localize('FABRICATE.App.Journal.Iterative.Notice.Idle')}
+        hint={localize('FABRICATE.App.Journal.Iterative.Notice.Idle')}
         data-iterative-idle=""
       />
     {/if}

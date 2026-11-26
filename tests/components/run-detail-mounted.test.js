@@ -199,10 +199,26 @@ describe('RunDetail mounted behavior', () => {
   // Issue 3011: the Workpiece view's dispatch, notice slot and the yield preview's move out of this
   // file draw a run that is not iterative exactly as before, recorded from the commit before them.
   it('draws a run that is not iterative unchanged, with no workpiece hook', async () => {
+    const preview = (presentation, extra) =>
+      makeCraftingRun({
+        craftingYield: { source: 'preview', stageIndex: 0, presentation, entries: [], ...extra },
+      });
+    const progressive = (awardMode) =>
+      preview('progressive', {
+        progressive: { awardMode, stages: [{ name: 'Tonic', quantity: 2, cost: 5 }] },
+      });
     const fixtures = {
       crafting: makeCraftingRun(),
       gathering: makeGatheringRun(),
       succeeded: makeSucceededRun(),
+      progressivePartial: progressive('partial'),
+      progressiveUnset: progressive(undefined),
+      routes: preview('routes', {
+        routes: [
+          { id: 'r1', name: '', entries: [{ id: 'tonic', name: 'Tonic', qty: 1 }] },
+          { id: 'r2', name: 'Silver', entries: [] },
+        ],
+      }),
     };
     const found = {};
     for (const [name, run] of Object.entries(fixtures)) {

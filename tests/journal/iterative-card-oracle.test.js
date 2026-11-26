@@ -87,3 +87,66 @@ describe('every card agrees with the authority', () => {
     });
   }
 });
+
+/** Takes `actionId` as the owning player, or as an observer who owns nothing. */
+function takeAs(world, actionId, user) {
+  if (user === 'player') return world.take(actionId);
+  const request = {
+    requestId: `oracle-${actionId}`,
+    sessionId: 'oracle',
+    actorUuid: world.actor.uuid,
+    runType: 'crafting',
+    runId: world.runId,
+    expectedRevision: world.revision(),
+    action: 'takeAction',
+    payload: { actionId, attemptId: `oracle-${actionId}` },
+  };
+  return world.service.handleRequest(request, user);
+}
+
+const pauseOf = (world) =>
+  world.service.executeJournalRunCommand(
+    {
+      actorUuid: world.actor.uuid,
+      runType: 'crafting',
+      runId: world.runId,
+      expectedRevision: world.revision(),
+      action: 'pause',
+      payload: {},
+    },
+    { interactive: false }
+  );
+
+describe('each run-level cause disables every card, and the authority refuses each', () => {
+  const CAUSES = {
+    'time gate': { options: { timeRequirement: { hours: 1 } } },
+    paused: {
+      options: { timeRequirement: { hours: 1 } },
+      arrange: async (world) => assert.equal((await pauseOf(world)).success, true),
+    },
+    boundary: {
+      arrange: async (world) => {
+        for (let attempt = 0; attempt < 4; attempt += 1) await world.take('stoke');
+        assert.equal(world.run().currentStepIndex, 1);
+      },
+    },
+    'not owner': {
+      arrange: (world) => Object.defineProperty(world.actor, 'isOwner', { value: false }),
+      user: 'observer',
+    },
+  };
+  for (const [cause, { options = {}, arrange, user = 'player' }] of Object.entries(CAUSES)) {
+    test(cause, async () => {
+      const world = await startedWorld(options);
+      await arrange?.(world);
+      const { iterative, actions } = drawn(world);
+      assert.equal(actions.takeAction, false);
+      assert.ok(iterative.cards.length > 0);
+      for (const card of iterative.cards) {
+        assert.equal(card.enabled, false, card.actionId);
+        const reply = await takeAs(world, card.actionId, user);
+        assert.equal(reply.success, false, `${card.actionId} is refused while ${cause}`);
+      }
+    });
+  }
+});

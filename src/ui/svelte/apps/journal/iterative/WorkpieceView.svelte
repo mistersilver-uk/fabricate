@@ -103,9 +103,7 @@
         showHeading={!iterative.redacted}
         showNumber={!single}
         body={view === 'live' ? live : null}
-        facts={view === 'live'
-          ? []
-          : frozenFacts({ stage, runStep, view, heading, localize })}
+        facts={view === 'live' ? [] : frozenFacts({ stage, runStep, view, heading, localize })}
         io={view === 'live' ? [] : frozenIo({ stage, runStep, view, localize })}
         note={view === 'live' ? '' : frozenNote(view, localize)}
       />

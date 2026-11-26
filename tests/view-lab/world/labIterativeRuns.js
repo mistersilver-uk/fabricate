@@ -732,7 +732,7 @@ export function seedIterativeWorkpieces(context, state) {
 
 // ── controller ──────────────────────────────────────────────────────────────
 
-const refusal = (reason, detail = {}) => ({ success: false, reason, detail, message: reason });
+const refusal = (reason, detail = {}) => ({ success: false, reason, detail });
 const bump = (run) => {
   run.runRevision = Math.max(0, Number(run.runRevision) || 0) + 1;
 };

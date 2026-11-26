@@ -50,7 +50,7 @@
   {:else if column.key === 'action'}{isOtherWindow(row)
       ? localize(K.other, { action: row.action })
       : row.action}
-  {:else if column.key === 'check'}<Chip density="row" tone={row.check?.tone ?? ''}
+  {:else if column.key === 'check'}<Chip density="row" mono tone={row.check?.tone ?? ''}
       >{row.check?.text ?? ''}</Chip
     >
   {:else if column.key === 'paid'}{row.paidText}

@@ -302,7 +302,7 @@ export const CASES = Object.freeze([
   }),
   workpieceCase({
     id: 'player-journal-iterative-authority',
-    label: 'Player Journal — workpiece needing an active GM',
+    label: 'Player Journal — workpiece whose run authority is unavailable',
     query: workpiece('authority'),
     steps: [{ selector: '[data-journal-action-blocker]', scroll: true }],
     expectSelector: '[data-journal-action-blocker]',

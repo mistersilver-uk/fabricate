@@ -232,7 +232,7 @@ function cardOf(action, context) {
     ...(note.note === 'waiting' && { availableAt: context.availableAt }),
     costs: chips,
     hazards: hazards.map(({ rule, ...chip }) => chip),
-    noCost: chips.length === 0 && hazards.length === 0 && !hiddenCost,
+    noCost: !setupFault && chips.length === 0 && hazards.length === 0 && !hiddenCost,
     ...refusalFacts(action, context),
   };
 }

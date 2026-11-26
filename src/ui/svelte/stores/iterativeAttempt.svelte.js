@@ -121,6 +121,7 @@ class IterativeAttemptStore {
    * @param {(runKey: string, runId: string) => (() => void) | null} options.claimBusy the journal's
    *   shared busy key: a release function, or `null` while any other command holds it
    * @param {(runKey: string) => void} options.markResolved keeps a run that ended on screen
+   * @param {(runKey: string) => void} options.releaseResolved lets go of it again
    * @param {(run: object) => Promise<object|undefined>} options.beginStep the journal's `beginStep`
    * @param {() => string} [options.newAttemptId]
    */
@@ -230,6 +231,7 @@ class IterativeAttemptStore {
     }
     this.pending = null;
     await this.#reloadPast(key, reply.runRevision);
+    if (stepEnd && this.#listed(key)?.recoveryEvidence?.required) this.#o.releaseResolved(key);
     const row = rowsOf(this.#active(key)).find((entry) => entry.requestId === attemptId) ?? null;
     this.#memory.note(
       key,

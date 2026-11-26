@@ -4449,6 +4449,9 @@ test('3011: takeAction holds only on a mutable, current, unpaused, matured and s
     ended: { mutate: (run) => (run.steps[0].iterative.terminal = { kind: 'failure', attempt: 3, resultGroupId: null }) },
     'not owned': { actor: { ...WORKPIECE_ACTOR, isOwner: false } },
     'authority unavailable': { authority: { available: false, reason: 'authorityUnavailable' } },
+    'recovery required': {
+      mutate: (run) => (run.executionJournal = { status: 'recoveryRequired', effects: [] }),
+    },
   };
   for (const [label, { state = 'iterative-list', ...options }] of Object.entries(cases)) {
     assert.equal(iterativeModel(state, options).actions.takeAction, false, label);

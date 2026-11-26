@@ -17,8 +17,10 @@
 </script>
 
 {#snippet chips(list, tone)}
-  {#each list ?? [] as chip (chip.counterId)}<Chip density="row" {tone} mono>{chip.label}</Chip>
-  {:else}{localize(K.nothing)}{/each}
+  <span class="workpiece-ledger-chips">
+    {#each list ?? [] as chip (chip.counterId)}<Chip density="row" {tone} mono>{chip.label}</Chip>
+    {:else}<Chip density="row" tone="info" mono>{localize(K.nothing)}</Chip>{/each}
+  </span>
 {/snippet}
 
 <div class="workpiece-ledger" data-iterative-ledger>
@@ -38,5 +40,11 @@
     display: grid;
     gap: var(--fab-space-1);
     --journal-fact-key-width: 72px;
+  }
+
+  .workpiece-ledger-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
   }
 </style>

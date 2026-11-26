@@ -452,6 +452,21 @@ describe('the replies', () => {
     assert.equal(notice.title, 'Session 1 · Stoke');
   });
 
+  test('a secret reply never names the outcome, even when its row still holds one', async () => {
+    const world = await setup({
+      replies: [
+        (command, state) => {
+          const entry = row(1, command.payload.attemptId, { check: check('Failure', 7, false) });
+          state.listing = listingOf([iterativeRun({ revision: 5, rows: [entry] })]);
+          return commit({ secret: true });
+        },
+      ],
+    });
+    await world.press();
+    assert.equal(world.notice().reason, 'private');
+    assert.equal(world.notice().title, 'Session 1 · Stoke');
+  });
+
   test('a free action drops its session from the title and the busy notice', async () => {
     const world = await setup({
       runs: [iterativeRun({ cards: [card('rest', { free: true })] })],
@@ -819,6 +834,43 @@ describe('a step-ending reply', () => {
     assert.equal(world.journal.selectedRunKey, keyOf('run-1'));
   });
 
+  test('a run that ends needing recovery is let go once the reload lists it', async () => {
+    const world = await setup({
+      replies: [
+        (_command, state) => {
+          const ended = iterativeRun({ status: 'succeeded', recoveryEvidence: { required: true } });
+          state.listing = listingOf([], [ended]);
+          return endingReply();
+        },
+      ],
+    });
+    await world.press();
+    assert.equal(world.journal.commandResult, null);
+  });
+
+  test('markResolved keeps nothing for a run the player moved away from mid-press', async () => {
+    let answer;
+    const gate = new Promise((resolve) => (answer = resolve));
+    const world = await setup({
+      runs: [iterativeRun(), iterativeRun({ id: 'run-2' })],
+      replies: [
+        (_command, state) =>
+          gate.then(() => {
+            const ended = iterativeRun({ status: 'succeeded' });
+            state.listing = listingOf([iterativeRun({ id: 'run-2' })], [ended]);
+            return endingReply();
+          }),
+      ],
+    });
+    const pressing = world.journal.iterative.takeAction(world.run(), 'stoke');
+    world.journal.select('run-2');
+    answer();
+    await pressing;
+    flushSync();
+    assert.equal(world.journal.commandResult, null);
+    assert.equal(world.journal.selectedRunKey, keyOf('run-2'));
+  });
+
   test('markResolved runs when the reply arrives, while the reload is still pending', async () => {
     const world = await setup({ replies: [endingReply()] });
     const release = world.hold();
@@ -1174,7 +1226,10 @@ describe('beginning a step', () => {
     });
     await world.journal.iterative.beginStep(world.run());
     const first = world.journal.iterative.settled;
-    assert.deepEqual({ ...first, serial: 0 }, { runKey: keyOf('run-1'), actionId: null, serial: 0 });
+    assert.deepEqual(
+      { ...first, serial: 0 },
+      { runKey: keyOf('run-1'), actionId: null, serial: 0 }
+    );
     await world.journal.iterative.beginStep(world.run());
     assert.equal(world.journal.iterative.settled.serial, first.serial + 1);
   });

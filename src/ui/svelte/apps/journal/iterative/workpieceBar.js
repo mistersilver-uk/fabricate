@@ -15,10 +15,10 @@ const K = Object.freeze({
   stopPieceRefund: 'FABRICATE.App.Journal.Iterative.Cancel.StopPieceRefund',
 });
 
-/** The cancel prompt: refunds on unless the run says off, the step named on a multi-step run. */
+/** The cancel prompt: refunds on unless the run says off, the current step named on a multi-step run. */
 function cancelPrompt(run, localize) {
   const refund = run.refundOnCancel !== false;
-  const index = (run.iterative.focusStepIndex ?? 0) + 1;
+  const index = (run.iterative.boundary?.nextStepIndex ?? run.iterative.focusStepIndex ?? 0) + 1;
   if ((run.steps?.length ?? 0) > 1) {
     return localize(refund ? K.stopStepRefund : K.stopStep, { index });
   }

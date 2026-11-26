@@ -407,6 +407,9 @@ export function createJournalStore({ services } = {}) {
     markResolved: (key) => {
       if (selectedRunKey === key) commandResult = { runKey: key };
     },
+    releaseResolved: (key) => {
+      if (commandResult?.runKey === key) commandResult = null;
+    },
   });
 
   return {

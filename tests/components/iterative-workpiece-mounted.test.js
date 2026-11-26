@@ -7,6 +7,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { iterativeFocusTarget } from '../../src/ui/presenters/iterative/iterativeFocusTarget.js';
 import {
+  busyNotice,
   resultNotice,
   resumeNotice,
   verdictNotice,
@@ -23,6 +24,7 @@ import {
   RUN_DETAIL_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { ITERATIVE_SCENARIOS } from '../view-lab/world/labIterativeRuns.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -174,8 +176,20 @@ describe('The Workpiece view', () => {
       Boolean(query(card(root, 'stoke'), '.manager-chip.is-danger.is-lit')),
       'a hazard is a lit danger chip'
     );
-    assert.match(card(root, 'fitHilt').textContent, new RegExp(K('Card.NoCost')));
-    assert.ok(Boolean(query(card(root, 'hammer'), '.manager-chip')), 'the Check tag is drawn');
+    assert.doesNotMatch(card(root, 'fitHilt').textContent, /Card\.NoCost/, 'a setup fault');
+    assert.ok(Boolean(query(card(root, 'hammer'), '.fa-dice-d20')), 'the Check tag is drawn');
+    const short = all(card(root, 'planish'), '.manager-chip.is-danger');
+    assert.deepEqual(
+      short.map((chip) => chip.textContent.trim()),
+      ['Heat −50']
+    );
+    assert.equal(all(card(root, 'hammer'), '.manager-chip.is-danger').length, 0);
+    const ink = (id) => query(card(root, id), '.workpiece-action-note').classList;
+    assert.ok(ink('planish').contains('is-danger') && ink('stoke').contains('is-danger'));
+    assert.ok(ink('hammer').contains('is-muted'));
+    harness.remount();
+    const single = await mount(workpieceModel('iterative-single'));
+    assert.match(card(single, 'fitHilt').textContent, new RegExp(K('Card.NoCost')));
   });
 
   it('marks the pressed card busy and disables every other card and the cancel control', async () => {
@@ -185,6 +199,7 @@ describe('The Workpiece view', () => {
     const hammer = card(root, 'hammer');
     assert.equal(hammer.getAttribute('data-iterative-card-state'), 'busy');
     assert.equal(hammer.getAttribute('data-iterative-card-note'), 'working');
+    assert.ok(query(hammer, '.workpiece-action-note').classList.contains('is-info'));
     assert.equal(query(hammer, 'button').getAttribute('aria-busy'), 'true');
     assert.match(query(hammer, 'button').getAttribute('aria-label'), new RegExp(K('Card.Busy')));
     for (const id of ['planish', 'stoke', 'normalise', 'fitHilt'])
@@ -256,6 +271,15 @@ describe('The Workpiece view', () => {
     }
   });
 
+  it('names the step about to start in the cancel prompt at a boundary', async () => {
+    const run = workpieceModel('iterative-starting');
+    run.refundOnCancel = false;
+    const root = await mount(run);
+    await click(query(root, '[data-run-action="cancel-arm"]'));
+    const prompt = query(root, '[data-run-cancel-prompt]').textContent;
+    assert.ok(prompt.startsWith(`${K('Cancel.StopStep')}:{"index":2}`), prompt);
+  });
+
   it('browses a past and a future step without changing the worked one', async () => {
     const run = workpieceModel('iterative-past-step');
     const root = await mount(run);
@@ -265,7 +289,12 @@ describe('The Workpiece view', () => {
     await click(query(root, '[data-stage-nav-index="0"]'));
     const past = query(root, '[data-iterative-step-card="0"][data-iterative-step-view="past"]');
     assert.ok(Boolean(past), 'the past step is frozen');
-    assert.ok(Boolean(query(past, '[data-stage-fact="ended"]')), 'it says how it ended');
+    assert.ok(
+      query(past, '[data-stage-fact="ended"]').textContent.includes(
+        `${K('Step.EndedCarried')}:{"index":2}`
+      ),
+      'it says how it ended'
+    );
     assert.ok(!query(past, '[data-iterative-action]'), 'a frozen step has no cards');
     await click(query(root, '[data-stage-nav-return]'));
     assert.ok(
@@ -343,6 +372,14 @@ describe('The Workpiece view', () => {
     assert.match(rows[1].textContent, /Integrity −2/);
     assert.ok(all(rows[1], '.manager-chip.is-danger').length > 0, 'paid chips are danger');
     assert.ok(all(rows[2], '.manager-chip.is-positive').length > 0, 'changed chips are positive');
+    assert.equal(all(ledger, '.workpiece-ledger-chips').length, 2, 'each chip list is one wrapper');
+
+    harness.remount();
+    const quiet = { ...notice, ledger: { ...row, changed: [] } };
+    const still = await mount(run, journalFor(run, { notice: quiet }));
+    const changed = all(still, '[data-iterative-ledger] [data-journal-fact]')[2];
+    const nothing = query(changed, '.manager-chip.is-info.is-mono');
+    assert.equal(nothing?.textContent.trim(), K('Ledger.Nothing'), 'nothing is an info chip');
 
     harness.remount();
     const verdict = {
@@ -368,11 +405,52 @@ describe('The Workpiece view', () => {
     assert.ok(document.activeElement === stoke, 'the pressed card holds focus');
   });
 
+  it('leads each notice with its own glyph', async () => {
+    const run = workpieceModel('iterative-result');
+    const row = run.iterative.sessions[0];
+    const result = (reason) =>
+      resultNotice({ reason, row, fallback: {}, replayed: false, localize: workpieceLocalize });
+    const pressed = { runKey: run.key, actionId: 'hammer', name: 'Hammer', sessionNumber: 4 };
+    const boundary = workpieceModel('iterative-starting').iterative.boundary.verdict;
+    const cases = [
+      [busyNotice(pressed, workpieceLocalize), 'fa-hourglass-half'],
+      [result('check-passed'), 'fa-dice-d20'],
+      [result('no-check'), 'fa-hand-back-fist'],
+      [verdictNotice(boundary), 'fa-flag-checkered'],
+    ];
+    for (const [notice, glyph] of cases) {
+      const root = await mount(run, journalFor(run, { notice }));
+      assert.ok(query(root, '.fab-notice > i').classList.contains(glyph), notice.kind);
+      harness.remount();
+    }
+  });
+
+  it('hands a player no hidden counter in any markup, title, aria or data attribute', async () => {
+    const SENTINELS = /Qzx-Hidden-Fit|qzxHidden|7731/;
+    for (const state of Object.keys(ITERATIVE_SCENARIOS)) {
+      const hidden = state === 'iterative-redacted' ? { hidden: ['iw-r-veiled'] } : {};
+      const run = workpieceModel(state, hidden);
+      if (['succeeded', 'failed', 'cancelled'].includes(run.status)) continue;
+      const root = await mount(run);
+      assert.doesNotMatch(root.outerHTML, SENTINELS, state);
+      for (const element of all(root, '*')) {
+        for (const { name, value } of element.attributes) {
+          if (name === 'title' || name.startsWith('aria-') || name.startsWith('data-'))
+            assert.doesNotMatch(value, SENTINELS, `${state} ${name}`);
+        }
+      }
+      harness.remount();
+    }
+  });
+
   it('moves focus to the first enabled card once a begin settles, and back to begin on a refusal', async () => {
     const boundary = workpieceModel('iterative-starting');
     const settle = (journal, serial) => ({
       ...journal,
-      iterative: { ...journal.iterative, settled: { runKey: boundary.key, actionId: null, serial } },
+      iterative: {
+        ...journal.iterative,
+        settled: { runKey: boundary.key, actionId: null, serial },
+      },
     });
     const refused = journalFor(boundary);
     const root = await mount(boundary, refused);
@@ -447,6 +525,31 @@ describe('The Workpiece sessions', () => {
     await harness.setProps({ run: next });
     assert.equal(rowsOf(root).length, 5, 'back on the first page');
     assert.equal(rowsOf(root)[0].querySelector('td').textContent.trim(), '11');
+  });
+
+  it('returns to the first page on a change of run or step', async () => {
+    const run = workpieceModel('iterative-sessions');
+    for (const next of [
+      { ...run, key: 'another-run' },
+      { ...run, iterative: { ...run.iterative, focusStepIndex: 1 } },
+    ]) {
+      const root = await mount(run);
+      await click(query(root, '[data-iterative-sessions] [data-pagination-next]'));
+      assert.equal(rowsOf(root).length, 3);
+      await harness.setProps({ run: next });
+      assert.equal(rowsOf(root).length, 5, 'back on the first page');
+      assert.equal(rowsOf(root)[0].querySelector('td').textContent.trim(), '10');
+      harness.remount();
+    }
+  });
+
+  it('reads a free session as a dash, draws a compact pager and a mono check', async () => {
+    const run = workpieceModel('iterative-sessions');
+    run.iterative.sessions[0] = { ...run.iterative.sessions[0], sessionNumber: null };
+    const root = await mount(run);
+    assert.equal(rowsOf(root)[0].querySelector('td').textContent.trim(), K('Sessions.Free'));
+    assert.ok(Boolean(query(root, '[data-iterative-sessions] [data-pagination-compact]')));
+    assert.ok(Boolean(query(rowsOf(root)[0], '.manager-chip.is-mono')), 'the check is mono');
   });
 
   it('marks an entry from another window', async () => {

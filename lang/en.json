@@ -1389,6 +1389,7 @@
             "Carried": "Succeeded. Its work carried into step {index}",
             "DoneWhen": "Done when",
             "Ended": "Ended",
+            "EndedCarried": "Succeeded; its work carried into step {index}",
             "FailedMany": "Failed after {n} sessions",
             "FailedOne": "Failed after {n} session",
             "FailsWhen": "Fails when",

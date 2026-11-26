@@ -176,8 +176,8 @@ The pane says the outcome is not yet known and keeps the press, and pressing the
 A later load whose log holds the attempt shows its result, and a later load at a newer revision without it states that the workpiece changed elsewhere; a load that no longer lists the run drops the press.
 Another card, or a changed revision, is a new press with a new id.
 
-A stale refusal reloads the workpiece, names the action taken in another window first, and marks that entry "(other window)" in Sessions.
-An entry counts as another window's when its attempt number is past the one this window first saw for the step and its id is not one this window minted.
+A stale refusal reloads the workpiece, names each action another window took after the state the press was drawn from, and marks those entries "(other window)" in Sessions.
+Sessions marks an entry "(other window)" when its attempt number is past the one this window first saw for the step, not the one a press was drawn from, and its id is not one this window minted.
 A committed press is worded from the reloaded session row, never from the reply, so a hidden counter never reaches the pane.
 When the reloaded revision is still below the reply's, the cards stay disabled until one further reload, and are released even if the revision stays low or the run is no longer listed.
 A press that ends a step keeps its verdict for the rest of the window, worded from the counters the viewer may see.
@@ -191,11 +191,12 @@ An active iterative run's detail MUST show, in order: its header, which adds the
 The live step's card shows the counters the viewer may see, each against its scale with its route thresholds marked and one caption; the step's results in authored order, with the one the rules select now marked "Now" and none once the step ends; and one card per allowed Crafting Action.
 The workpiece caption states what the step started with, how many counters are hidden, and whether the values are saved or saving.
 A past or future step's card is frozen: what it consumed and produced, or will consume and produce, the tools it used or needs, its time, check and rules, and how it ended or what it starts with.
-A single step draws no browser and no number, and a redacted run draws no results, step name, sub-line or browser.
+A single step draws no browser and no number, and a redacted run draws no results, step name, sub-line or browser; its progress still reads the goal's counter and threshold, which its counter card already shows.
 
 A card commits on press, so no card is a primary and the pane offers neither a primary nor a pause while a step is worked; at a step's successful end with a later step, "Start step N" is its only primary.
-A card names its action, whether it rolls the check, what it does and each cost and hazard it applies whatever its check gives, else "No cost", and states the first of these that applies: it is saving; the step has ended; its time has not passed ("Waiting until" the world time); its unmet requirements; its setup needs the GM; a cost the workpiece cannot pay; a hazard that already holds; whether it rolls the check.
-While an Iterative Attempt saves, the pressed card is busy, every other card and the cancel control are disabled, and the pane states which session is saving; once it settles, focus returns to the pressed card while it is enabled, else to the begin control, else to the first enabled card.
+A card names its action, whether it rolls the check, what it does and each cost and hazard it applies whatever its check gives, else "No cost" unless its setup needs the GM, and states the first of these that applies, in the authority's preflight order: it is saving; the step has ended; its time has not passed ("Waiting until" the world time); its setup needs the GM; its unmet requirements; a cost the workpiece cannot pay; a hazard that already holds; whether it rolls the check.
+A cost whose formula cannot be read is a setup fault found while pricing, so it is named only once the requirements are met.
+While an Iterative Attempt saves, the pressed card is busy, every other card and the cancel control are disabled, and the pane states which session is saving; once it settles, focus returns to the pressed card while it is enabled, else to the begin control, else to the first enabled card, and a step's start settles the same way.
 A committed attempt's notice carries what it checked, paid and changed, each as a chip, and a step's verdict carries what it gives.
 Sessions lists the focus step's Iterative Attempts newest first, five a page with the pager shown past five, marks another window's entries "(other window)", returns to the first page on a new session or a change of run or step, and states how many earlier attempts are not listed.
 Cancelling states, by the refund setting and the step count, whether the current step's inputs are returned, and with refunds on that its progress is lost.

@@ -312,7 +312,9 @@ describe('cost and hazard chips', () => {
       card(entry, 'planish').costs.map(({ label, short }) => [label, short]),
       [['Heat −50', true]]
     );
-    assert.equal(card(entry, 'fitHilt').noCost, true);
+    assert.equal(card(entry, 'fitHilt').note, 'setup');
+    assert.equal(card(entry, 'fitHilt').noCost, false, 'a setup fault prices nothing');
+    assert.equal(card(model('iterative-single'), 'fitHilt').noCost, true);
   });
 
   test('an unconditional effect is never a hazard, and a held Counter Rule is', () => {
@@ -700,6 +702,25 @@ describe('hidden counters (D18) and redaction', () => {
     assert.doesNotMatch(JSON.stringify(entry), SENTINELS);
   });
 
+  test('a hazard on a visible counter whose rule reads a hidden one is no hazard for a player', () => {
+    const hiddenRule = (run) =>
+      editAction(run, 'stoke', (action) => {
+        action.effects[1].when.rules = [
+          { source: 'counter', counterId: 'qzxHidden', op: '>=', value: 1 },
+        ];
+      });
+    const player = card(model('iterative-cards', { mutate: hiddenRule }), 'stoke');
+    assert.deepEqual(player.hazards, []);
+    assert.notEqual(player.note, 'hazard');
+    assert.doesNotMatch(JSON.stringify(player), SENTINELS);
+    const gm = card(
+      model('iterative-cards', { mutate: hiddenRule, viewer: WORKPIECE_GM }),
+      'stoke'
+    );
+    assert.equal(gm.note, 'hazard');
+    assert.match(gm.noteText, /Qzx-Hidden-Fit 7731/);
+  });
+
   test('a logged delta on a hidden counter is left out of the sessions', () => {
     const entry = model('iterative-list', {
       mutate: (run) => {
@@ -730,7 +751,8 @@ describe('hidden counters (D18) and redaction', () => {
   });
 
   test('a future step’s carried counters and the boundary verdict drop that step’s hidden ids', () => {
-    const hideHeat = (run) => (run.termsSnapshot.recipe.steps[1].iterative.hiddenCounterIds = ['heat']);
+    const hideHeat = (run) =>
+      (run.termsSnapshot.recipe.steps[1].iterative.hiddenCounterIds = ['heat']);
     const ahead = model('iterative-cards').iterative.progress.stages[1];
     assert.equal(ahead.carriedWith, 'Shape 0, Integrity 12 and Heat 40');
     const hidden = model('iterative-cards', { mutate: hideHeat }).iterative;
@@ -757,6 +779,11 @@ describe('hidden counters (D18) and redaction', () => {
     assert.deepEqual(
       iterative.progress.stages.map((stage) => stage.name),
       ['Step 1']
+    );
+    assert.deepEqual(
+      [iterative.progress.note, Math.round(iterative.progress.percent)],
+      ['Shape 10 of 60', 17],
+      'the progress keeps the goal’s counter and threshold, which the counter card already shows'
     );
     assert.ok(iterative.cards.length > 0 && iterative.counters.length > 0);
     assert.equal(iterative.sessions[0].check.text, 'Rolled privately by the GM');
