@@ -481,10 +481,10 @@ export function additionalDiceNoticeText(result, { actorName = '', localize } = 
   return fill(localizeWith(localize, key, undefined, fallback), values);
 }
 
-/** A refused command's wording: why the authority refused bought dice, else the refusal chain. */
-export function journalCommandRefusal(result, localize, generic) {
+/** A refused command's wording: why the authority refused bought dice, else the `fallback` chain. */
+export function journalCommandRefusal(result, localize, generic, fallback = journalRefusalMessage) {
   const refused = result?.additionalDiceRefusal && additionalDiceNoticeText(result, { localize });
-  return refused || journalRefusalMessage(result, localize, generic);
+  return refused || fallback(result, localize, generic);
 }
 
 /** The warning for bought dice a check spent before its stage refused or threw: never refunded. */

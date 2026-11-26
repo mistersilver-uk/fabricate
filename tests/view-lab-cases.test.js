@@ -2954,7 +2954,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    77
+    79
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
@@ -3050,8 +3050,8 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  // 77 since issue 2345 added the focused pressed tile, after issue 2366's stale choice, both registered in playerJournal.js.
-  assert.equal(cases.length, 77);
+  // 79 since issue 3033 added the two redacted stage starts, after issue 2345's focused pressed tile.
+  assert.equal(cases.length, 79);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);

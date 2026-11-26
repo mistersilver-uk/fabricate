@@ -88,6 +88,8 @@ export function journalLifecycleCases() {
     'open-choice-focused',
     'stage-not-started',
     'awaiting-choice',
+    'redacted-stage-start',
+    'redacted-stage-pick',
     'stage-consumed',
     'stage-paid',
     'material-shortage',
@@ -168,6 +170,13 @@ export function journalLifecycleCases() {
     /^src\/ui\/svelte\/apps\/journal\/JournalKindFilter\.svelte$/,
     /^src\/ui\/svelte\/util\/journalRunKinds\.js$/,
   ];
+  // Issue 3033: a hidden recipe's readiness, its reasons and its withheld-pick notice.
+  const redactedStageStates = ['redacted-stage-start', 'redacted-stage-pick'];
+  const redactedStageSources = [
+    /^src\/ui\/presenters\/runJournalRedactedStage\.js$/,
+    /^src\/ui\/svelte\/apps\/journal\/runStateNotice\.js$/,
+    /^src\/ui\/svelte\/util\/journalRunReasons\.js$/,
+  ];
   const selectRivets = [
     { selector: '[data-journal-search] input', fill: 'Forge Iron Rivets' },
     { selector: '[data-run-id="lab-v1-active-4"]' },
@@ -240,6 +249,10 @@ export function journalLifecycleCases() {
     kindTrigger,
   ];
   const steps = {
+    // A hidden recipe is titled "Hidden recipe", so its run is selected by id rather than by search.
+    ...Object.fromEntries(
+      redactedStageStates.map((state) => [state, [{ selector: `[data-run-id="lab-v1-${state}"]` }]])
+    ),
     // Issue 1644: a run counting down sorts after the four ready ones, so its search stays applied.
     'waiting-auto-completes': [
       { selector: '[data-journal-search] input', fill: 'Cure a Salted Hide' },
@@ -425,6 +438,25 @@ export function journalLifecycleCases() {
         '[data-journal-route] input:not(:disabled)'
       ) +
       lacks('[data-journal-action-blocker]', '[data-run-attention="materials"]'),
+    // Issue 3033: begin is offered on a hidden recipe, with no stage rail, route or slot rows.
+    // Each absent control renders only in the detail, so the container stands for the detail.
+    'redacted-stage-start':
+      '.journal-view-container' +
+      has(
+        '[data-run-id="lab-v1-redacted-stage-start"] [data-run-attention="start"]',
+        `${detail} [data-run-action="begin"]:not(:disabled)`,
+        `${detail} [data-run-begin-prompt]`
+      ) +
+      lacks(primary, '[data-journal-stages]', '[data-slot-row]', '[data-journal-route]'),
+    // Its route pick reads identity, so begin waits with the withheld-pick notice and no route control.
+    'redacted-stage-pick':
+      detail +
+      has(
+        '[data-run-action="begin"]:disabled',
+        '[data-run-begin-prompt]',
+        '[data-journal-awaiting-choice="true"][data-journal-choice-withheld="true"][data-notice-tone="info"]'
+      ) +
+      lacks('[data-journal-route]', '[data-journal-action-blocker]', primary),
     // The same stage once started: the receipt of what it consumed, and nothing about the choice editable (M21).
     'stage-consumed':
       detail +
@@ -778,6 +810,8 @@ export function journalLifecycleCases() {
     'ingredient-route': '[data-journal-route]',
     'stage-not-started': '[data-run-action="begin"]',
     'awaiting-choice': '[data-journal-route]',
+    'redacted-stage-start': '[data-run-action="begin"]',
+    'redacted-stage-pick': '[data-run-action="begin"]',
     'check-route': '[data-run-action="primary"]',
     'essence-overshoot': '[data-essence-source$=".Item.jp-sunmote"] [data-stepper-increment]',
     'past-stage': '[data-stage-nav-return]',
@@ -839,6 +873,7 @@ export function journalLifecycleCases() {
         /^src\/ui\/svelte\/stores\/journalStore/,
         /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
         ...(['kind-toggles', 'kind-filter-open'].includes(state) ? kindFilterSources : []),
+        ...(redactedStageStates.includes(state) ? redactedStageSources : []),
       ],
     })
   );

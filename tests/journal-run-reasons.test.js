@@ -10,9 +10,13 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ITERATIVE_ATTEMPT_REFUSALS } from '../src/systems/iterative/resolveAttempt.js';
+import { STAGE_BLOCKERS } from '../src/systems/stageReadiness.js';
+import { runStateNotice } from '../src/ui/svelte/apps/journal/runStateNotice.js';
 import {
   JOURNAL_RUN_REASON_KEYS,
+  REDACTED_REASON_KEYS,
   isResolvedFailureOutcome,
+  journalRedactedRefusal,
   journalRefusalMessage,
   journalRunReasonMessage,
   resolvedFailureMessage,
@@ -254,6 +258,77 @@ describe('journalRefusalMessage chain', () => {
       assert.notEqual(answer, 'undefined');
     }
     assert.equal(typeof journalRefusalMessage({ reason: 'ledger-missing' }, null, null), 'string');
+  });
+});
+
+// Issue 3033: a viewer the recipe is hidden from is told why a stage waits, never what it holds.
+describe('redacted reason wording', () => {
+  const redacted = { redacted: true };
+  const notice = (run) => runStateNotice(run, localizeFromLang);
+  const hiddenRun = (disabledReason, extra = {}) => ({
+    redacted: true, actions: { disabledReason, execute: false, beginStep: false }, ...extra,
+  });
+
+  it('words each overlaid code for a redacted viewer and leaves the shared text alone', () => {
+    assert.deepEqual(Object.keys(REDACTED_REASON_KEYS), ['routeRequired', 'choiceRequired',
+      'awardChoicePending', 'toolRequired', 'selectionRequired', 'essenceRequired']);
+    for (const [code, key] of Object.entries(REDACTED_REASON_KEYS)) {
+      assert.equal(typeof langLeaf(key), 'string', `${key} is a shipped string`);
+      assert.equal(journalRunReasonMessage(code, localizeFromLang, redacted), langLeaf(key), code);
+      const shared = langLeaf(JOURNAL_RUN_REASON_KEYS[code]);
+      assert.equal(journalRunReasonMessage(code, localizeFromLang), shared, `${code} unchanged`);
+      assert.notEqual(shared, langLeaf(key), `${code} is reworded`);
+    }
+    for (const code of ['currencyRequired', 'routeUnavailable', 'sourcesUnavailable', 'stageNotStarted'])
+      assert.equal(journalRunReasonMessage(code, localizeFromLang, redacted),
+        langLeaf(JOURNAL_RUN_REASON_KEYS[code]), `${code} asks for no pick, so it stays shared`);
+  });
+
+  it('carries no placeholder through which a route, material or tool could be named', () => {
+    const keys = [...Object.values(REDACTED_REASON_KEYS),
+      'FABRICATE.App.Journal.Actions.RedactedBeginStepPrompt',
+      'FABRICATE.App.Journal.Notice.RedactedChoiceTitle',
+      'FABRICATE.App.Journal.Notice.RedactedChoiceDetail'];
+    for (const key of keys) assert.doesNotMatch(langLeaf(key), /[{}]/, key);
+  });
+
+  it('reports a redacted refusal by its code and never by the engine sentence', () => {
+    const tool = { success: false, message: 'Missing required tool (Qzx-Tool)', blocker: 'toolRequired' };
+    assert.equal(journalRedactedRefusal(tool, localizeFromLang, 'Generic.'),
+      langLeaf(REDACTED_REASON_KEYS.toolRequired));
+    assert.equal(journalRedactedRefusal({ message: 'Qzx', reason: 'ledger-missing' }, localizeFromLang, 'Generic.'),
+      langLeaf(JOURNAL_RUN_REASON_KEYS['ledger-missing']));
+    assert.equal(journalRedactedRefusal({ message: 'Missing Qzx Ore' }, localizeFromLang, ' Generic. '), 'Generic.');
+    assert.equal(journalRedactedRefusal(null, localizeFromLang, undefined), '');
+  });
+
+  it('raises the withheld-pick notice for a redacted route or option pick', () => {
+    for (const code of [STAGE_BLOCKERS.route, STAGE_BLOCKERS.choice]) {
+      const withheld = notice(hiddenRun(code));
+      assert.equal(withheld.tone, 'info', code);
+      assert.equal(withheld.blocking, false);
+      assert.equal(withheld.title, langLeaf('FABRICATE.App.Journal.Notice.RedactedChoiceTitle'));
+      assert.equal(withheld.detail, langLeaf('FABRICATE.App.Journal.Notice.RedactedChoiceDetail'));
+      assert.deepEqual(withheld.hooks, { 'data-journal-awaiting-choice': 'true',
+        'data-journal-choice-withheld': 'true' });
+      const paused = notice(hiddenRun(code, { pauseState: { pausedAt: 1 } }));
+      assert.equal(paused.hooks['data-journal-paused'], 'true', 'the paused hook rides along');
+    }
+    assert.equal(notice(hiddenRun('stageNotStarted')), null, 'an unbegun stage is ordinary play');
+    assert.equal(notice({ ...hiddenRun('routeRequired'), redacted: false }), null,
+      'a visible run is asked through its own awaitingChoice notice');
+    assert.equal(notice({ ...hiddenRun('routeRequired'), redacted: false, awaitingChoice: true }).title,
+      langLeaf('FABRICATE.App.Journal.Notice.ChoiceTitle'));
+  });
+
+  it('titles a redacted shortfall banner in redacted words', () => {
+    for (const code of ['selectionRequired', 'essenceRequired', 'toolRequired']) {
+      const banner = notice(hiddenRun(code));
+      assert.equal(banner.hooks['data-journal-action-blocker'], code);
+      assert.equal(banner.title, langLeaf(REDACTED_REASON_KEYS[code]), code);
+      assert.equal(notice({ ...hiddenRun(code), redacted: false }).title,
+        langLeaf(JOURNAL_RUN_REASON_KEYS[code]), `${code} visible title unchanged`);
+    }
   });
 });
 

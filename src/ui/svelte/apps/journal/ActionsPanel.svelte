@@ -54,7 +54,7 @@
   // report an authority refusal share it; only the panel's two positional
   // fallbacks (waiting on the time gate, then the generic) stay here.
   function reasonFor(code, ready) {
-    const message = journalRunReasonMessage(code, localize);
+    const message = journalRunReasonMessage(code, localize, { redacted: run?.redacted === true });
     if (message) return message;
     // A code we cannot word is still a REFUSAL, so it must not fall through to the time-gate
     // hint: that told a player to wait for world time while the authority was the thing missing.
@@ -127,7 +127,11 @@
           label: localize('FABRICATE.App.Journal.Actions.BeginStep'),
           busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
           icon: 'fas fa-play',
-          prompt: localize('FABRICATE.App.Journal.Actions.BeginStepPrompt'),
+          prompt: localize(
+            run?.redacted === true
+              ? 'FABRICATE.App.Journal.Actions.RedactedBeginStepPrompt'
+              : 'FABRICATE.App.Journal.Actions.BeginStepPrompt'
+          ),
           reason,
         }
       : null}

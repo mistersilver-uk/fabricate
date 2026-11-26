@@ -40,7 +40,12 @@ import {
   seedIterativeRecipes,
   seedIterativeState,
 } from './view-lab/world/labIterative.js';
-import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
+import {
+  JOURNAL_PROTOTYPE_BINDINGS,
+  REDACTED_STAGE_STATES,
+  journalPrototypeRecipeId,
+  stockJournalPrototype,
+} from './view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   buildLabRunStates,
@@ -1389,6 +1394,32 @@ test('the Journal fixture simulator refuses the stage transitions the engine ref
       action,
     });
     assert.equal(result.success, true, `${state}/${action} must be permitted`);
+  }
+});
+
+// Issue 3033: each redacted-stage state hides exactly its bound recipe from the lab player.
+test('the redacted-stage states hide only their bound recipe, and its run projects redacted', () => {
+  const player = { id: 'user-lab-player', isGM: false };
+  for (const state of REDACTED_STAGE_STATES) {
+    const fixture = journalFixture(state);
+    const { actor, recipes, seeded } = fixture;
+    const service = new RecipeVisibilityService(null, {
+      getSystem: (id) => seeded.systems.find((entry) => entry.id === id),
+    });
+    const bound = journalPrototypeRecipeId(JOURNAL_PROTOTYPE_BINDINGS[state]);
+    const visibleTo = (recipe, viewer) =>
+      service.evaluateRecipeAccess({ recipe, viewer, craftingActor: actor }).visible;
+    const prototype = recipes.filter((recipe) => recipe.id.startsWith('jp-recipe-'));
+    assert.ok(prototype.length > 1, `${state} seeds the prototype cohort`);
+    for (const recipe of prototype)
+      assert.equal(visibleTo(recipe, player), recipe.id !== bound, `${state}: ${recipe.id}`);
+    const boundRecipe = recipes.find((recipe) => recipe.id === bound);
+    assert.equal(visibleTo(boundRecipe, { isGM: true }), true, `${state}: a GM still sees it`);
+    const run = journalProjection(state, player, fixture).activeRuns.find(
+      (entry) => entry.id === LAB_JOURNAL_CASE_STATE_RUN_IDS[state]
+    );
+    assert.equal(run?.redacted, true, `${state} projects its run redacted`);
+    assert.equal(run.actions.atStageStart, true, `${state} sits at its stage's start`);
   }
 });
 

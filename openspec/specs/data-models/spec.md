@@ -4315,6 +4315,12 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
 3. **Viewer redaction (`redacted`).**
    For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, and `img` falls back to the default run image.
    Redaction is NOT an authorization gate (issue 966): an owner retains actions permitted by the lifecycle, while authority, pause, unsupported-version and execution/recovery refusals still apply.
+   Redaction leaves `actions.atStageStart`, `actions.beginStep` and `actions.execute` to the lifecycle and the shared readiness predicate (issue 3033).
+   A redacted run's current stage is judged against its availability as a visible run's is, and only the resulting `actions.disabledReason` code crosses.
+   `actions.setSelection`, `awaitingChoice` and the award pick stay withheld from a redacted viewer, because a pick reads the routes and options that are the recipe's identity.
+   That is a consequence of disclosure, not an authorization gate.
+   This differs from Summary Redaction (`recipe-visibility/spec.md:348`), which computes no availability for a teaser.
+   A run is the viewer's own started work, one record rather than a corpus, and an honest begin control cannot exist without a readiness answer.
    The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
    Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.

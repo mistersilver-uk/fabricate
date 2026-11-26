@@ -644,6 +644,17 @@ describe('the attempt notices an immediate surface raises (issue 2008)', () => {
       localize('FABRICATE.App.Journal.Actions.LedgerMissing')
     );
     assert.equal(journalCommandRefusal({ success: false }, localize, 'Failed.'), 'Failed.');
+    const chain = (result, _localize, generic) => `chain:${result.reason}:${generic}`;
+    assert.equal(
+      journalCommandRefusal(journalRefused, localize, 'Failed.', chain),
+      notice(journalRefused),
+      'the dice notice still leads a substituted chain'
+    );
+    assert.equal(
+      journalCommandRefusal({ success: false, reason: 'x' }, localize, 'Failed.', chain),
+      'chain:x:Failed.',
+      'the substituted chain words every other refusal'
+    );
     assert.equal(spentDiceNotice(journalSpent, localize), notice(journalSpent));
     assert.equal(spentDiceNotice(journalRefused, localize), '', 'a refusal spent nothing');
   });

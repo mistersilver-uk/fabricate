@@ -36,6 +36,8 @@ fabricate-journal-lifecycle-waiting-open-choice
 fabricate-journal-lifecycle-open-choice-focused
 fabricate-journal-lifecycle-stage-not-started
 fabricate-journal-lifecycle-awaiting-choice
+fabricate-journal-lifecycle-redacted-stage-start
+fabricate-journal-lifecycle-redacted-stage-pick
 fabricate-journal-lifecycle-stage-consumed
 fabricate-journal-lifecycle-stage-paid
 fabricate-journal-lifecycle-material-shortage

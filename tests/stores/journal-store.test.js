@@ -770,6 +770,50 @@ describe('journalStore', () => {
     assert.deepEqual(setup.calls.notify, [expected], 'a refused command is never silent');
   });
 
+  // Issue 3033: the engine's sentence can name a tool or ingredient the recipe hides.
+  it("words a redacted run's refusal by its code, never by the engine's sentence", async () => {
+    const refusal = { success: false, message: 'Missing required tool (Qzx-Tool)', blocker: 'toolRequired' };
+    const begin = { atStageStart: true, beginStep: true, cancel: true };
+    const refused = async (redacted) => {
+      const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1,
+        redacted, actions: begin });
+      const setup = makeServices({ listing: baseListing({ activeRuns: [current], history: [] }),
+        commandResult: refusal });
+      const store = await loadedStore(setup);
+      await store.beginStep(current);
+      flushSync();
+      return { setup, store };
+    };
+    const hidden = await refused(true);
+    const expected = langLeaf('FABRICATE.App.Journal.Actions.Redacted.ToolRequired');
+    assert.ok(expected, 'the redacted wording is a shipped string');
+    assert.deepEqual(hidden.setup.calls.notify, [expected]);
+    assert.equal(hidden.store.commandError.message, expected);
+    assert.doesNotMatch(JSON.stringify(hidden.setup.calls.notify), /Qzx-Tool/);
+    assert.deepEqual(hidden.setup.calls.command.at(-1).payload, {}, 'begin sends no plan it cannot see');
+    const visible = await refused(false);
+    assert.deepEqual(visible.setup.calls.notify, [refusal.message], 'a visible run is unchanged');
+  });
+
+  it("keeps a redacted run's refused additional-dice notice ahead of the code wording", async () => {
+    const refusal = {
+      success: false,
+      message: 'Missing Qzx Ore',
+      reason: 'additional-dice-refused',
+      additionalDiceRefusal: 'spendRefused',
+      additionalDiceNotice: { dice: 1, limit: 3, available: 3, label: 'Focus', actorName: 'Hero' },
+    };
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1,
+      redacted: true, actions: { execute: true, cancel: true } });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: refusal });
+    const store = await loadedStore(setup);
+    await store.execute(current);
+    flushSync();
+    assert.match(setup.calls.notify[0], /Focus/, 'the resource notice leads');
+    assert.doesNotMatch(JSON.stringify(setup.calls.notify), /Qzx/, 'message is never read');
+  });
+
   it('falls back to the generic error, and never notifies undefined, for any failure shape', async () => {
     const shapes = [
       { success: false },
