@@ -297,6 +297,7 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconCatalogue.json',
   // Issue 2511: the shared draft-id mint and pending focus the card and the group read.
   'src/ui/svelte/util/draftId.js',
+  'src/utils/randomId.js',
   'src/ui/svelte/util/pendingFocus.js'
 ]);
 
@@ -346,6 +347,7 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
   'src/ui/svelte/util/draftId.js',
+  'src/utils/randomId.js',
   'src/ui/svelte/util/pendingFocus.js'
 ]);
 
@@ -519,6 +521,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/presenters/resultKindGlyphs.js',
   'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
+  'src/utils/randomId.js',
   'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',

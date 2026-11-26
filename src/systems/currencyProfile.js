@@ -1,15 +1,10 @@
 import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
 import { getByPath } from '../utils/objectPath.js';
+import { randomId } from '../utils/randomId.js';
 
-function defaultRandomID() {
-  return (
-    globalThis.foundry?.utils?.randomID?.() ??
-    globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 10)
-  );
-}
-
-// A generated unit id (`randomID()`'s 16 chars, or the crypto fallback's 10) is 10+ alphanumerics;
-// short semantic ids such as the preset `cp`/`sp`/`gp` fail this guard, so a hand-authored
+// A generated unit id is 10+ alphanumerics. `randomId()` mints 16 (Foundry's `randomID`, else
+// base-36), and an earlier UUID-slice fallback persisted 10 hex characters, so the floor stays 10.
+// Short semantic ids such as the preset `cp`/`sp`/`gp` fail this guard, so a hand-authored
 // abbreviation equal to one is preserved.
 function isGeneratedUnitId(value) {
   return /^[A-Za-z0-9]{10,}$/.test(value);
@@ -23,7 +18,7 @@ function isGeneratedUnitId(value) {
  * `abbreviation` defaults to `''`, never to the id; a stored abbreviation equal to a generated id
  * self-heals to `''`, while one equal to a short semantic id is kept.
  */
-export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
+export function normalizeCurrencyUnit(entry = {}, randomID = randomId) {
   if (!entry || typeof entry !== 'object') return null;
   const id = String(entry.id || randomID()).trim();
   if (!id) return null;

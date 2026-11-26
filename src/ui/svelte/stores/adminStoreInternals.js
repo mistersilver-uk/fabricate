@@ -18,6 +18,7 @@
  * rather than failing it).
  */
 import { Tool } from '../../../models/Tool.js';
+import { randomId } from '../../../utils/randomId.js';
 
 /**
  * Deep-copy a plain JSON-safe value, passing `null` and `undefined` through unchanged.
@@ -33,23 +34,11 @@ export function clonePlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-// Module-scope id fallback for the normalizer helpers (which run before the store
-// closure's services-aware _randomID exists). Prefers Foundry's randomID, then the
-// Web Crypto UUID; the last resort is a time + counter id (no PRNG) so we never
-// rely on Math.random for identity.
-let _fallbackIdCounter = 0;
 /**
  * @returns {string} a fresh id, never derived from `Math.random`.
  */
 export function fallbackRandomID() {
-  if (typeof globalThis.foundry?.utils?.randomID === 'function') {
-    return globalThis.foundry.utils.randomID();
-  }
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-  }
-  _fallbackIdCounter += 1;
-  return `id-${Date.now().toString(36)}-${_fallbackIdCounter.toString(36)}`;
+  return randomId();
 }
 
 /**

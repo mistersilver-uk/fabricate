@@ -443,6 +443,7 @@ make the system-level basis decision.
 2a.
 For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical check name-matching reproduces the legacy routing), then `outcomeRouting` is removed.
 Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 4).
+Each per-outcome clone takes a fresh id from `src/utils/randomId.js`.
 3. One-time `routed` system migration (a `routed` system has no system-level provider constraint and may mix `ingredientSet`- and `check`-routed recipes, so a per-system mode is chosen and disagreeing recipes reconciled):
    - **Majority provider wins.** The system becomes the mode matching the provider used by the majority of its recipes; ties — including a system with NO routed recipes — break to `routedByIngredients` (the optional-check, lower-friction mode).
    - **Minority reconciliation.** Recipes whose old provider disagrees with the chosen system mode keep their result data but have their now-meaningless `resultSelection` dropped; the stale routing is surfaced by system validation as a re-authoring issue — never silently mis-routed.
@@ -517,7 +518,11 @@ The essence definition's own `sourceItemUuid` pointer and the `fabricate.interac
 ### Essences → Ingredient Groups Migration (`1.17.0`, per recipe, destructive, irreversible)
 
 Issue 649 supersedes the per-set `IngredientSet.essences` map with first-class essence ingredient options (`match.type === "essence"`).
-The `1.17.0` settings-data migration (`migrateEssencesToIngredientGroups.js`) reads and returns the `recipes` payload as pure data via `crypto.randomUUID()` for new ids (`foundry.utils.randomID()` throws under `node --test`, and `crypto.randomUUID` also satisfies the Sonar S2245 no-`Math.random` gate).
+The `1.17.0` settings-data migration (`migrateEssencesToIngredientGroups.js`) reads and returns the `recipes` payload as pure data.
+It mints each new group id through `src/utils/randomId.js`: Foundry's `randomID` when loaded, else 16 base-36 characters from `crypto.getRandomValues`.
+Both work on an insecure origin, where `crypto.randomUUID` is absent, and both satisfy the Sonar S2245 no-`Math.random` gate.
+The migration never reads `crypto.randomUUID`.
+A group id is opaque: groups minted by an earlier run of this migration keep their UUID ids, and nothing reads an id's shape.
 It additionally reads the `systems` payload READ-ONLY for each alchemy system's components (the ingredient sets live under the recipes setting; `systems` carries zero ingredient sets).
 
 1. For each recipe, walk recipe-level `ingredientSets[]` AND step-level `steps[].ingredientSets[]` (a step-level `set.essences` would orphan when the back-compat read is later removed).
