@@ -19,6 +19,7 @@ The unified window holds five shared read-model stores — `crafting`, `inventor
   Omitting them leaves a GM authoring the missing formula while every player's tab keeps hiding the system — with a well-formed, correctly attributed change, so no fail-safe can catch it.
   `held-inventory` stays out because the gathering view owns an item subscription scoped to the selected actor, which is narrower.
 - A change that names no domain refreshes every store.
+- A change to the selected crafting actor's run flags quietly reloads the `crafting` store, because an iterative recipe's workpiece is read from those runs; another actor's runs, and any change outside the run flags, reload nothing.
 - A change to an actor's held items belongs to the `held-inventory` domain and refreshes exactly that domain's consumers, filtered to actors this window reads from.
 - The shell reloads the inventory listing through the store's bulk-run guard and MUST NOT call the store's direct load seam, on any of these paths.
 - The selectable component-source ACTOR list is refreshed alongside the `crafting` store.
@@ -954,9 +955,20 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The detail leads with its identity header: the recipe's 38px tile, its name in the serif face, and Craft as the pane's one primary.
   Craft is absent, not disabled, while the live craftability says the craft cannot run, and the header then states what is missing; a craft in flight keeps it, busy: it keeps focus, announces `aria-busy`, reads "Crafting…" and ignores a second press, and is never `disabled`.
 - The detail body is keyed on the recipe's `modeToken` (simple,
-  routedByIngredients, routedByCheck, progressive), so each resolution mode renders
+  routedByIngredients, routedByCheck, progressive, iterative), so each resolution mode renders
   its own body (ingredient sets, routed-by-check outcome-tier table, progressive
-  body, etc.).
+  body, iterative recipe body, etc.).
+- The iterative recipe body has two faces.
+  - Before a workpiece exists, the body shows:
+    - the requirements and the ingredient set;
+    - a goal strip of Succeeds when, Fails when and Produces, each stated only when the recipe has it;
+    - the header primary "Start crafting", which stays "Start crafting" after an earlier roll.
+  - While the actor has an active workpiece of the recipe:
+    - the header primary is "Continue in Journal", which opens that workpiece in the Journal and starts nothing;
+    - the body is one strip stating the current step, the counters the viewer may see and the next session, and the pane shows no material shortfall, status, scrim, blocker, requirement table or run summary;
+    - it continues the actor's first active workpiece of the recipe, so a second start is not offered;
+    - a counter the viewer may not see, and an unreadable run, state nothing.
+  - A redacted teaser shows its header only, in both faces.
 - Show the `modeLabel` rather than the raw mode token.
 - Before crafting begins, the detail header visibly shows a fully revealed timed
   implicit recipe as localized `Duration: <value>`.
