@@ -134,6 +134,30 @@ The bolt speaks for the current stage only, because a later stage can still carr
 Gathering runs are out of scope for the bolt in this slice and never carry it, although versioned gathering may also complete automatically.
 The bolt is a glyph alone, so it MUST carry `role="img"` and one localized name, "Finishes this stage as time passes", as both its accessible name and its tooltip, and the row's own accessible name MUST include it.
 
+#### Iterative workpieces
+
+An iterative run (`resolution-modes/spec.md` _Iterative Mode_) is worked one Iterative Attempt at a time, so it MUST NOT offer execution, pause, resume or the completion preference.
+It offers `takeAction` while the run is mutable, current and unpaused and its focus step has begun, has matured and is readable with no step end.
+Every unbegun iterative step is at its own start, its begin control is offered where no stage blocker refuses it, and neither the start nor an attempt reads the viewer's entitlement.
+A begun step reports no stage blocker, because its stage has already spent what it needed; the authority still refuses an attempt a lost Tool or a changed workpiece would break.
+Each Crafting Action the focus step allows is a card judged by preflight against the drawn state, and the authority, not the card, decides the attempt.
+The run reads "Ready" only while an attempt can be taken and a card is enabled, and its list step line counts the focus step's completed sessions.
+The header's mode reads "Iterative".
+
+##### Hidden counters
+
+A viewer who is not a GM MUST see no hidden counter of the step a surface describes: a counter instance marked not visible and the step's own hidden counters are dropped from every card, chip, ledger, table row, rule, route, caption, notice and verdict, with their ids, labels and values.
+A requirement on a hidden counter reads "Its requirements aren’t met yet", a short cost on one reads "The workpiece can’t cover this yet" and never "No cost", and a hazard naming one is not listed.
+The pane states how many counters are hidden.
+A GM sees every counter, the hidden ones marked "Hidden from players", and no hidden count.
+The run's persisted data is never filtered, and no copy promises secrecy.
+A closed record takes its hidden counters from the live recipe, and one whose recipe no longer resolves shows a viewer who is not a GM no counters.
+
+##### Iterative redaction
+
+A redacted iterative run hides its recipe and step names, routes, goal and yields, and keeps its cards, counters, sessions and begin control under the snapshot's library labels.
+Its steps and verdicts read "Step N", and every check it records reads "Rolled privately by the GM".
+
 #### Ordinary closed history
 
 Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.

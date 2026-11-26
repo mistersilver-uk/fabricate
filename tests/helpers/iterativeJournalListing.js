@@ -65,7 +65,8 @@ export function workpieceRuns(state) {
 
 /**
  * The listing for `active` and `history` runs. `hidden` names the recipes the viewer may not see,
- * `missing` the ones that no longer resolve, and `edit(system)` changes Ironworks before the build.
+ * `missing` the ones that no longer resolve, `toolMissing` gives every stage one Tool the actor
+ * lacks, and `edit(system)` changes Ironworks before the build.
  */
 export function workpieceListing({
   active = [],
@@ -74,6 +75,7 @@ export function workpieceListing({
   actor = WORKPIECE_ACTOR,
   hidden = [],
   missing = [],
+  toolMissing = false,
   authority = null,
   now = WORKPIECE_NOW,
   edit = () => {},
@@ -90,6 +92,10 @@ export function workpieceListing({
       getRecipe: (id) => recipes.find((recipe) => recipe.id === id) ?? null,
       ingredientMatchesItem: (_recipe, option, item) =>
         item?.componentId === option?.match?.componentId,
+      ...(toolMissing && {
+        getToolsForSet: () => [{ id: 'iw-tongs', name: 'Tongs' }],
+        resolveToolStates: () => [{ name: 'Tongs', available: false }],
+      }),
     },
     recipeVisibility: {
       evaluateRecipeAccess: ({ recipe }) => ({ visible: !hidden.includes(recipe?.id) }),

@@ -45,6 +45,7 @@ import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
+import { iterativeRunFields } from './iterative/iterativeRunPresentation.js';
 import {
   activeModeLabelKey,
   executedTargetFields,
@@ -746,7 +747,18 @@ export class RunJournalBuilder {
       claimability,
     });
     const bolt = completesAsTimePasses({ run, recipe, getSystem: this._getSystem, claimability });
-    return { ...model, ...fields, completesAsTimePasses: bolt };
+    const iterative = iterativeRunFields({
+      run,
+      model,
+      actor,
+      viewer,
+      system,
+      recipe,
+      localize,
+      checkLabel: this._checkLabel({ system, recipe }),
+      mapResult: (result) => this._mapResult(result, stringOrNull(run.craftingSystemId)),
+    });
+    return { ...model, ...fields, completesAsTimePasses: bolt, ...iterative };
   }
 
   /** The current stage's readiness, held while an earlier stage owes a claimable pick. */

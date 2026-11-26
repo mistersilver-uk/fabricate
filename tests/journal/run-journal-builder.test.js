@@ -11,6 +11,7 @@ import { isActiveJournalGM, journalFacade } from '../../src/bootstrap/journalFac
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { journalModeLabelKey } from '../../src/ui/presenters/journalCheckText.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
@@ -28,7 +29,9 @@ import { formatRoll } from '../../src/ui/svelte/apps/journal/runDetailPresentati
 import {
   WORKPIECE_ACTOR,
   installWorkpieceEnv,
+  workpieceListing,
   workpieceModel,
+  workpieceRuns,
 } from '../helpers/iterativeJournalListing.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
@@ -4494,9 +4497,11 @@ test('3011: a begun step reports no stage blocker, while a boundary reports the 
   });
   assert.equal(shortfall.actions.beginStep, false);
   assert.equal(shortfall.actions.disabledReason, 'selectionRequired');
-  const begun = iterativeModel('iterative-list', { actor: { ...WORKPIECE_ACTOR, items: [] } });
-  assert.equal(begun.actions.takeAction, true);
-  assert.equal(begun.actions.disabledReason, null, 'a started step has already spent its stage');
+  const toolless = iterativeModel('iterative-starting', { toolMissing: true });
+  assert.deepEqual([toolless.actions.beginStep, toolless.actions.disabledReason], [false, 'toolRequired']);
+  const begun = iterativeModel('iterative-list', { toolMissing: true });
+  assert.equal(begun.actions.takeAction, true, 'the authority, not the projection, refuses a lost Tool');
+  assert.equal(begun.actions.disabledReason, null, 'a started step reports no stage blocker');
   const unsupported = iterativeModel('iterative-starting', {
     mutate: (run) => (run.steps[0].iterative.version = 2),
   });
@@ -4513,4 +4518,20 @@ test('3011: an iterative blocker shows only as the blocker notice', () => {
   assert.equal(notice(iterativeModel('iterative-starting')), null, 'an unbegun step raises no banner');
   const locked = iterativeModel('iterative-list', { authority: { available: false, reason: 'authorityUnavailable' } });
   assert.equal(notice(locked).hooks['data-journal-action-blocker'], 'authorityUnavailable');
+});
+
+test('3011: status counts include iterative rows, and the mode label reads Iterative', () => {
+  installWorkpieceEnv();
+  const { active, history } = workpieceRuns('iterative-list');
+  const listing = workpieceListing({ active: Object.values(active), history });
+  assert.deepEqual(listing.counts, { active: 3, history: 2 });
+  assert.deepEqual(
+    listing.activeRuns.map((run) => [run.id, run.derivedStatus, run.resolutionModeLabel]),
+    [
+      ['iw-run-longsword', 'ready', 'Iterative'],
+      ['iw-run-boundary', 'inProgress', 'Iterative'],
+      ['iw-run-spear', 'ready', 'Iterative'],
+    ]
+  );
+  assert.equal(journalModeLabelKey('iterative'), 'FABRICATE.App.Journal.Mode.Iterative');
 });

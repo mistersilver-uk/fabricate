@@ -1224,6 +1224,119 @@
           "needsCurrency": "Needs payment",
           "needsTools": "Needs tools"
         },
+        "Iterative": {
+          "Card": {
+            "CheckName": "crafting check",
+            "Ended": "The step has ended",
+            "HazardAbove": "{counter} {value} is above {threshold}: also {effects}",
+            "HazardAtLeast": "{counter} {value} is at or above {threshold}: also {effects}",
+            "HazardAtMost": "{counter} {value} is at or below {threshold}: also {effects}",
+            "HazardBelow": "{counter} {value} is below {threshold}: also {effects}",
+            "HazardExactly": "{counter} {value} is at {threshold}: also {effects}",
+            "Needs": "Needs {requirements}",
+            "NeedsHidden": "Its requirements aren’t met yet",
+            "NoCheck": "No check",
+            "Rolls": "Rolls the {check}",
+            "Setup": "Ask your GM to review this action",
+            "Short": "Needs {amount} {counter}; the piece has {value}",
+            "ShortHidden": "The workpiece can’t cover this yet",
+            "Working": "Working session {session}… waiting for the save",
+            "WorkingFree": "Working… waiting for the save"
+          },
+          "Chip": {
+            "Add": "{counter} +{amount}",
+            "Set": "{counter} = {amount}",
+            "Subtract": "{counter} −{amount}"
+          },
+          "Counter": {
+            "BreaksAt": "Breaks at {value}",
+            "Broken": "Broken",
+            "Carries": "Carries into step {index}, where it decides the result",
+            "Decides": "Decides the result",
+            "DoneAt": "Done at {value}",
+            "Low": "Low: breaks at {value}",
+            "Mark": "{set} — {rule}",
+            "MarkReached": "{mark}, reached",
+            "Max": "Max {value}",
+            "Named": "{counter} {value}",
+            "Target": "Target {value}",
+            "TargetReached": "Target reached",
+            "Value": "{value} of {scale}"
+          },
+          "Ledger": {
+            "CheckPrivate": "Rolled privately by the GM"
+          },
+          "List": {
+            "And": "{first} and {last}",
+            "Comma": "{first}, {next}",
+            "Or": "{first} or {last}"
+          },
+          "Meta": {
+            "HiddenMany": "{count} counters are hidden by the GM.",
+            "HiddenOne": "{count} counter is hidden by the GM.",
+            "SessionNext": "Session {session} next",
+            "SessionsMany": "{count} sessions",
+            "SessionsOne": "{count} session",
+            "StartFormula": "{counter} {value} (formula {formula})",
+            "StartFormulaHeld": "{counter} {value} (formula {formula}, held at {value})",
+            "StartHeld": "{counter} {value} (held at {value})",
+            "StartedWith": "Started with {counters}.",
+            "StepOf": "Step {index} of {count}"
+          },
+          "Progress": {
+            "Note": "Step {index}: {counter} {value} of {n}",
+            "NoteSingle": "{counter} {value} of {n}"
+          },
+          "Route": {
+            "NextStep": "Step {index} starts",
+            "Nothing": "Nothing",
+            "Now": "{title} This is what it would give if the step ended this way now.",
+            "OnFailure": "On failure.",
+            "OnSuccess": "On success.",
+            "OnSuccessWhen": "On success, when {rule}."
+          },
+          "Rule": {
+            "Counter": "{counter} {op} {value}",
+            "Previous": "right after {actions}",
+            "Sessions": "{threshold} sessions"
+          },
+          "Sessions": {
+            "Check": "{outcome} · {value}",
+            "NoPaid": "—",
+            "Nothing": "Nothing"
+          },
+          "Step": {
+            "Name": "Step {index}"
+          },
+          "StepLabel": {
+            "Many": "Step {index} of {count} · {sessions} sessions completed",
+            "One": "Step {index} of {count} · {sessions} session completed",
+            "SingleMany": "{sessions} sessions completed",
+            "SingleOne": "{sessions} session completed"
+          },
+          "Threshold": {
+            "Above": "more than {value}",
+            "AtLeast": "{value} or more",
+            "AtMost": "{value} or less",
+            "Below": "less than {value}",
+            "Exactly": "exactly {value}"
+          },
+          "Verdict": {
+            "Failed": "{step} failed",
+            "FailedBefore": "{counter} reached {value} before {goal} reached {n}.",
+            "FailedReached": "{counter} reached {value}.",
+            "FailedSet": "{step} failed: {set}",
+            "Finished": "The workpiece is finished.",
+            "Leaves": "The step has failed and leaves {set}.",
+            "LeavesNothing": "The step has failed and nothing is produced.",
+            "Next": "Step {index}, {name}, is next. Starting it takes its own inputs.",
+            "NextCarries": "Step {index}, {name}, is next. Starting it takes its own inputs. Every counter carries on, including {counters}.",
+            "Reaches": "{counter} finished at {value}, which reaches {set} ({threshold}).",
+            "RedactedNext": "The next step is next.",
+            "Succeeded": "{step} succeeded",
+            "SucceededSet": "{step} succeeded: {set}"
+          }
+        },
         "Mode": {
           "Standard": "Standard (DC)",
           "StandardCheck": "Standard check",
@@ -1231,6 +1344,7 @@
           "RoutedByCheck": "Routed by Check",
           "Progressive": "Progressive",
           "Alchemy": "Alchemy",
+          "Iterative": "Iterative",
           "straight": "Direct",
           "d100": "d100",
           "routed": "Check"
