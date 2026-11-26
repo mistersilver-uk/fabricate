@@ -2564,7 +2564,7 @@ const heldTongs = (available) => ({
 const hidden = (rest = {}) => ({ ...rest, dependencies: { recipeVisibility: HIDDEN, ...rest.dependencies } });
 const redactedStage = (sets, stepOverrides = {}, rest = {}) =>
   unbegunSecondStage(sets, stepOverrides, hidden(rest));
-/** The base commit's actions for a visible, held, unbegun second stage. */
+/** A visible, held, unbegun second stage's actions. */
 const VISIBLE_HELD_ACTIONS = Object.freeze({
   execute: false, pause: false, resume: false, setCompletionMode: false, atStageStart: true,
   beginStep: true, setSelection: true, cancel: true, dismiss: false,
@@ -2673,10 +2673,14 @@ test('3033: a redacted run carries no recipe, step, route, ingredient or tool na
     const redacted = fixture(PLAYER, sets);
     assert.equal(redacted.redacted, true);
     assert.doesNotMatch(JSON.stringify(redacted), names);
+    assert.equal(redacted.resolutionModeLabel, '', 'the per-recipe mode label is withheld too');
   }
   const control = variants.map((sets) => JSON.stringify(fixture(GM, sets))).join(' ');
   for (const name of ['Iron Sword', 'Forge', 'Temper', 'route-iron', 'route-silver', 'Metal', 'Qzx Tongs'])
     assert.ok(control.includes(name), `the GM control carries ${name}`);
+  for (const sets of variants)
+    assert.ok(fixture(GM, sets).resolutionModeLabel, 'the GM control still carries its label');
+  assert.ok(unbegunSecondStage([ironRoute()]).resolutionModeLabel, 'and so does a visible run');
 });
 
 test('a stored Sharp essence icon reaches the journal on a face Foundry 14 draws', () => {

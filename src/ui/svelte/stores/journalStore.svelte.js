@@ -310,8 +310,7 @@ export function createJournalStore({ services } = {}) {
       let message = safeCommandMessage(result?.message);
       if (outcome) message = resolvedFailureMessage(services?.localize);
       if (refused) {
-        const refusal = run.redacted === true ? journalRedactedRefusal : journalCommandRefusal;
-        message = refusal(result, services?.localize, services?.craftErrorMessage?.());
+        message = commandRefusal(run, result, services);
         setCommandError(request, message);
       }
       notifyEach(services, [message, spentDiceNotice(result, services?.localize)]);
@@ -570,6 +569,13 @@ export function createJournalStore({ services } = {}) {
 
 function notifyEach(services, messages) {
   for (const message of messages) if (message) services?.notify?.(message);
+}
+
+/** A refused command's wording; a redacted run's reason is read by its code, never `message`. */
+function commandRefusal(run, result, services) {
+  const fallback = run.redacted === true ? journalRedactedRefusal : undefined;
+  const generic = services?.craftErrorMessage?.();
+  return journalCommandRefusal(result, services?.localize, generic, fallback);
 }
 
 /** A legacy cancel's one toast: its message, else a refusal's localized reason, never a Retry. */

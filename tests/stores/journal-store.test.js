@@ -795,6 +795,25 @@ describe('journalStore', () => {
     assert.deepEqual(visible.setup.calls.notify, [refusal.message], 'a visible run is unchanged');
   });
 
+  it("keeps a redacted run's refused additional-dice notice ahead of the code wording", async () => {
+    const refusal = {
+      success: false,
+      message: 'Missing Qzx Ore',
+      reason: 'additional-dice-refused',
+      additionalDiceRefusal: 'spendRefused',
+      additionalDiceNotice: { dice: 1, limit: 3, available: 3, label: 'Focus', actorName: 'Hero' },
+    };
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1,
+      redacted: true, actions: { execute: true, cancel: true } });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: refusal });
+    const store = await loadedStore(setup);
+    await store.execute(current);
+    flushSync();
+    assert.match(setup.calls.notify[0], /Focus/, 'the resource notice leads');
+    assert.doesNotMatch(JSON.stringify(setup.calls.notify), /Qzx/, 'message is never read');
+  });
+
   it('falls back to the generic error, and never notifies undefined, for any failure shape', async () => {
     const shapes = [
       { success: false },

@@ -10,6 +10,7 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ITERATIVE_ATTEMPT_REFUSALS } from '../src/systems/iterative/resolveAttempt.js';
+import { STAGE_BLOCKERS } from '../src/systems/stageReadiness.js';
 import { runStateNotice } from '../src/ui/svelte/apps/journal/runStateNotice.js';
 import {
   JOURNAL_RUN_REASON_KEYS,
@@ -302,7 +303,7 @@ describe('redacted reason wording', () => {
   });
 
   it('raises the withheld-pick notice for a redacted route or option pick', () => {
-    for (const code of ['routeRequired', 'choiceRequired']) {
+    for (const code of [STAGE_BLOCKERS.route, STAGE_BLOCKERS.choice]) {
       const withheld = notice(hiddenRun(code));
       assert.equal(withheld.tone, 'info', code);
       assert.equal(withheld.blocking, false);

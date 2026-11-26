@@ -329,6 +329,7 @@ It is resolved by the GM, by the viewer once the recipe is visible to them again
 A stage that owes a route or option pick also says so in an info notice.
 A redacted run's begin prompt and reasons are worded for a viewer who sees no route, material or tool.
 A refused command on a redacted run is reported by its localized reason, never by the engine's sentence, which can name a hidden tool or ingredient.
+A redacted run shows no resolution-mode label, and an unstarted stage's required time reads as hidden rather than none.
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 - The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.

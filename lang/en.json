@@ -1432,6 +1432,7 @@
           "ReadyAt": "Ready at",
           "None": "None",
           "NotStarted": "Not started",
+          "Hidden": "Hidden",
           "Check": "Check",
           "CheckUnavailable": "Check details are unavailable",
           "NoCheck": "No check",

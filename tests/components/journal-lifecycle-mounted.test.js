@@ -1355,6 +1355,21 @@ describe('Journal versioned lifecycle (mounted)', () => {
       assert.ok(!mounted.target.textContent.includes(name), `${name} stays hidden`);
   });
 
+  it('reads the required time of a redacted unstarted stage as hidden, never as none', async () => {
+    const SUMMARY = english.FABRICATE.App.Journal.Summary;
+    const needsOf = (mounted) =>
+      [...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]')]
+        .find((row) => row.textContent.includes(SUMMARY.Needs))?.textContent ?? '';
+    const plan = { selectedIngredientSetId: FIXED_SET.id };
+    const hidden = needsOf(await mountState('ready-single', redactedFixture([FIXED_SET], plan)));
+    assert.ok(hidden.includes(SUMMARY.Hidden), hidden);
+    assert.ok(!hidden.includes(SUMMARY.None), 'not the no-wait word');
+    const visible = needsOf(await mountPrototypeState('stage-not-started'));
+    assert.ok(visible.includes(SUMMARY.Needs), 'the visible twin still reads its row');
+    assert.ok(!visible.includes(SUMMARY.Hidden), visible);
+    assert.ok(!visible.includes(SUMMARY.None), 'it shows the duration');
+  });
+
   it('holds a redacted run that owes a route pick, and says who makes it', async () => {
     const second = ingredientSet('second-set', [
       { id: 'alloy', name: 'Alloy', options: [componentOption('copper', 'copper')] },

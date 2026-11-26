@@ -712,9 +712,11 @@ export class RunJournalBuilder {
           ? 'FABRICATE.App.Journal.Structure.MultiStep'
           : 'FABRICATE.App.Journal.Structure.SingleStep'
       ),
-      resolutionModeLabel: terminal
-        ? this._historicalModeLabel(steps)
-        : this._resolutionModeLabel(recipe, system),
+      resolutionModeLabel: redacted
+        ? ''
+        : terminal
+          ? this._historicalModeLabel(steps)
+          : this._resolutionModeLabel(recipe, system),
       recipeId: redacted ? null : stringOrNull(run.recipeId),
       taskId: null,
       flavor: '',
