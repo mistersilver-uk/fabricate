@@ -1225,8 +1225,23 @@
           "needsTools": "Needs tools"
         },
         "Iterative": {
+          "Begin": {
+            "Busy": "Starting step {index}…",
+            "Label": "Start step {index}"
+          },
+          "Cancel": {
+            "Aria": "Cancel this workpiece",
+            "Confirm": "Cancel workpiece",
+            "Keep": "Keep working",
+            "StopPiece": "Stop working this piece? Inputs already taken stay spent.",
+            "StopPieceRefund": "Stop working this piece? Its inputs are returned, and its progress is lost.",
+            "StopStep": "Stop at step {index}? Inputs already taken stay spent.",
+            "StopStepRefund": "Stop at step {index}? This step’s inputs are returned, and its progress is lost."
+          },
           "Card": {
+            "Busy": "{action} — working…",
             "CheckName": "crafting check",
+            "CheckTag": "Check",
             "Ended": "The step has ended",
             "HazardAbove": "{counter} {value} is above {threshold}: also {effects}",
             "HazardAtLeast": "{counter} {value} is at or above {threshold}: also {effects}",
@@ -1236,10 +1251,12 @@
             "Needs": "Needs {requirements}",
             "NeedsHidden": "Its requirements aren’t met yet",
             "NoCheck": "No check",
+            "NoCost": "No cost",
             "Rolls": "Rolls the {check}",
             "Setup": "Ask your GM to review this action",
             "Short": "Needs {amount} {counter}; the piece has {value}",
             "ShortHidden": "The workpiece can’t cover this yet",
+            "Waiting": "Waiting until {time}",
             "Working": "Working session {session}… waiting for the save",
             "WorkingFree": "Working… waiting for the save"
           },
@@ -1254,17 +1271,23 @@
             "Carries": "Carries into step {index}, where it decides the result",
             "Decides": "Decides the result",
             "DoneAt": "Done at {value}",
+            "Hidden": "Hidden from players",
             "Low": "Low: breaks at {value}",
             "Mark": "{set} — {rule}",
             "MarkReached": "{mark}, reached",
             "Max": "Max {value}",
             "Named": "{counter} {value}",
+            "Reading": "{value} / {scale}",
             "Target": "Target {value}",
             "TargetReached": "Target reached",
             "Value": "{value} of {scale}"
           },
           "Ledger": {
-            "CheckPrivate": "Rolled privately by the GM"
+            "Changed": "Changed",
+            "Check": "Check",
+            "CheckPrivate": "Rolled privately by the GM",
+            "Nothing": "Nothing",
+            "Paid": "Paid"
           },
           "List": {
             "And": "{first} and {last}",
@@ -1283,12 +1306,20 @@
             "StartedWith": "Started with {counters}.",
             "StepOf": "Step {index} of {count}"
           },
+          "Nav": {
+            "Next": "Next step",
+            "Open": "View step {index}: {name}",
+            "Position": "Viewing step {index} of {count}",
+            "Previous": "Previous step",
+            "Return": "Return to current step {index}"
+          },
           "Notice": {
             "BusyDetail": "Saving…",
             "BusyTitle": "Working session {session}: {action}",
             "BusyTitleFree": "Working: {action}",
             "CheckAsk": "Ask your GM to check the crafting check.",
             "CheckDetail": "The {check} couldn’t be rolled, so nothing happened.",
+            "Idle": "Each session’s result shows here.",
             "RefusalTitle": "Couldn’t take that action",
             "ResultFailed": "The check failed. The costs were paid.",
             "ResultFailedEffect": "The check failed. The costs were paid and the failure effect applied.",
@@ -1323,9 +1354,11 @@
             "Unspent": "Nothing was spent and the session wasn’t counted."
           },
           "Route": {
+            "Label": "Results",
             "NextStep": "Step {index} starts",
             "Nothing": "Nothing",
             "Now": "{title} This is what it would give if the step ended this way now.",
+            "NowPill": "Now",
             "OnFailure": "On failure.",
             "OnSuccess": "On success.",
             "OnSuccessWhen": "On success, when {rule}."
@@ -1336,12 +1369,42 @@
             "Sessions": "{threshold} sessions"
           },
           "Sessions": {
+            "Action": "Action",
+            "Changed": "Changed",
             "Check": "{outcome} · {value}",
+            "CheckColumn": "Check",
+            "EarlierMany": "{n} earlier actions aren’t listed.",
+            "EarlierOne": "{n} earlier action isn’t listed.",
+            "Empty": "No sessions yet. Choose an action to take the first.",
+            "Free": "—",
+            "Heading": "Sessions",
             "NoPaid": "—",
-            "Nothing": "Nothing"
+            "Nothing": "Nothing",
+            "Number": "#",
+            "OtherWindow": "{action} (other window)",
+            "Paid": "Paid"
           },
           "Step": {
-            "Name": "Step {index}"
+            "Carried": "Succeeded. Its work carried into step {index}",
+            "DoneWhen": "Done when",
+            "Ended": "Ended",
+            "FailedMany": "Failed after {n} sessions",
+            "FailedOne": "Failed after {n} session",
+            "FailsWhen": "Fails when",
+            "InProgressMany": "In progress · {n} sessions so far",
+            "InProgressOne": "In progress · {n} session so far",
+            "Name": "Step {index}",
+            "StartsAfter": "Starts after step {index} succeeds",
+            "StartsWith": "Starts with",
+            "SucceededMany": "Succeeded after {n} sessions",
+            "SucceededOne": "Succeeded after {n} session",
+            "SucceededSet": "Succeeded: {set}",
+            "TagDone": "Done",
+            "TagFailed": "Failed",
+            "TagNotReached": "Not reached",
+            "TagSucceeded": "Succeeded",
+            "TagWorking": "Working",
+            "WillProduceOne": "Will produce one of"
           },
           "StepLabel": {
             "Many": "Step {index} of {count} · {sessions} sessions completed",
@@ -1370,6 +1433,13 @@
             "RedactedNext": "The next step is next.",
             "Succeeded": "{step} succeeded",
             "SucceededSet": "{step} succeeded: {set}"
+          },
+          "Workpiece": {
+            "ActionsCaption": "Costs are paid even if the check fails.",
+            "ActionsKicker": "Choose an action",
+            "Kicker": "The workpiece",
+            "Saved": "Saved values.",
+            "Saving": "Saving… values update once the save is confirmed."
           }
         },
         "Mode": {
@@ -1602,6 +1672,7 @@
           "Mode": "Mode"
         },
         "WhatToExpect": {
+          "Iterative": "Choose an action to work the piece. Each one is saved before anything changes, and the step ends when its rules say so.",
           "Protected": "Protected details are hidden. Use the available run controls when ready; missing check details do not mean this run has no check.",
           "Past": "You are looking back at a finished step. Nothing here can be changed — step {index} is the one the run is waiting on.",
           "Future": "You are looking ahead at a step the run has not reached. Its choices open when it gets there; step {index} is the one waiting on you.",

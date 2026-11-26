@@ -8,7 +8,8 @@
   `keyed` sets the label as a key column (`--journal-fact-key-width`, default 120px)
   beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005). A keyed `prose`
   value is a sentence, set in the body face at 12px so it wraps by word (issue 2134). An array
-  `value` renders its segments with a `<wbr>` break opportunity between them.
+  `value` renders its segments with a `<wbr>` break opportunity between them, and a `children`
+  snippet is drawn in the value's place, for a value that is a set of chips (issue 3011).
 -->
 <script>
   let {
@@ -19,6 +20,7 @@
     inline = false,
     keyed = false,
     prose = false,
+    children = undefined,
   } = $props();
 </script>
 
@@ -33,7 +35,7 @@
   {#if icon}<i class={`fas ${icon} journal-fact-icon`} aria-hidden="true"></i>{/if}
   <span class="journal-fact-label">{label}</span>
   <span class="journal-fact-value"
-    >{#if Array.isArray(value)}{#each value as segment, index (index)}{#if index > 0}<wbr
+    >{#if children}{@render children()}{:else if Array.isArray(value)}{#each value as segment, index (index)}{#if index > 0}<wbr
           />{/if}{segment}{/each}{:else}{value}{/if}</span
   >
 </div>

@@ -113,6 +113,8 @@ Future input previews MUST enumerate every entitled authored requirement kind, o
 Future output copy MUST identify a future-stage preview rather than the current stage.
 Past stages use recorded checks and routes; future choices open only when the stage becomes current.
 
+An active iterative run uses the Workpiece composition instead (_Iterative workpieces_), with no TIME/CHECK pair, countdown or yield preview, and a step boundary's verdict beside its begin control states what starting the next step takes.
+
 #### Waiting on the player rather than on the clock
 
 An unstarted stage has no countdown, so its run status alone reads the same whether it needs a choice, needs stock or needs nothing.
@@ -179,6 +181,21 @@ A press that ends a step keeps its verdict for the rest of the window, worded fr
 
 A refused press reads the reply's own message, else a sentence naming the counter, cost or requirement it concerns when the viewer may see it, else the mapped sentence for its reason; each states that nothing was spent and the session was not counted, unless additional dice were bought.
 A check that cannot roll states that nothing happened and who to ask; an effect whose dice cannot roll states which.
+
+##### The Workpiece view
+
+An active iterative run's detail MUST show, in order: its header, which adds the focus step ("Step N of M") and its next session ("Session N next") or its session count; one notice, or "Each session’s result shows here." while none applies; per-step progress, with the goal the focus step works toward while it is worked; the step browser, when there is more than one step; the viewed step's card; Sessions; This run; and guidance.
+The live step's card shows the counters the viewer may see, each against its scale with its route thresholds marked and one caption; the step's results in authored order, with the one the rules select now marked "Now" and none once the step ends; and one card per allowed Crafting Action.
+The workpiece caption states what the step started with, how many counters are hidden, and whether the values are saved or saving.
+A past or future step's card is frozen: what it consumed and produced, or will consume and produce, the tools it used or needs, its time, check and rules, and how it ended or what it starts with.
+A single step draws no browser and no number, and a redacted run draws no results, step name, sub-line or browser.
+
+A card commits on press, so no card is a primary and the pane offers neither a primary nor a pause while a step is worked; at a step's successful end with a later step, "Start step N" is its only primary.
+A card names its action, whether it rolls the check, what it does and each cost and hazard it applies whatever its check gives, else "No cost", and states the first of these that applies: it is saving; the step has ended; its time has not passed ("Waiting until" the world time); its unmet requirements; its setup needs the GM; a cost the workpiece cannot pay; a hazard that already holds; whether it rolls the check.
+While an Iterative Attempt saves, the pressed card is busy, every other card and the cancel control are disabled, and the pane states which session is saving; once it settles, focus returns to the pressed card while it is enabled, else to the begin control, else to the first enabled card.
+A committed attempt's notice carries what it checked, paid and changed, each as a chip, and a step's verdict carries what it gives.
+Sessions lists the focus step's Iterative Attempts newest first, five a page with the pager shown past five, marks another window's entries "(other window)", returns to the first page on a new session or a change of run or step, and states how many earlier attempts are not listed.
+Cancelling states, by the refund setting and the step count, whether the current step's inputs are returned, and with refunds on that its progress is lost.
 
 ##### Iterative notice precedence
 

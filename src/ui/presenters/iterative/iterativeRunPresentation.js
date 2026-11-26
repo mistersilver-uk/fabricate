@@ -62,6 +62,22 @@ function rawGroups(recipeLike, index) {
   return arrayOrEmpty(steps.length > 0 ? steps[index]?.resultGroups : recipeLike?.resultGroups);
 }
 
+/** What a step's success routes would give: each routed group's results, named for the viewer. */
+function producedYields(groups, mapResult) {
+  const routed = groups.filter((group) =>
+    arrayOrEmpty(group?.producedWhen).some((line) => line?.end === 'success')
+  );
+  return {
+    groups: routed.length,
+    items: routed.flatMap((group) =>
+      arrayOrEmpty(group.results).map((result, index) => ({
+        id: `${group.id}-${index}`,
+        ...mapResult(result),
+      }))
+    ),
+  };
+}
+
 const stepState = (run, index) => {
   const read = readIterativeStepState(run?.steps?.[index]?.iterative);
   return read?.supported ? read.state : null;
@@ -159,6 +175,10 @@ function stageOf(index, ctx) {
     ),
     check: live ? (ctx.checkLabel ?? null) : null,
     set: !redacted && live && set ? (set.name ?? null) : null,
+    produces:
+      !redacted && live
+        ? producedYields(rawGroups(recipeLike, index), ctx.mapResult)
+        : { groups: 0, items: [] },
     startsWith: state ? namedCounters(startedWithRows(state, labels, localize), localize) : '',
     endedWith: state?.terminal ? namedCounters(namedRows(state, labels), localize) : '',
   };

@@ -1,15 +1,14 @@
 // Mounted coverage for RunDetail: the per-column "select a run" empty state.
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import {
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SEARCHABLE_POPOVER_COMPILED_MODULES,
-  PLAYER_APP_COMPILED_MODULES,
-  STATUS_TONE_RAW_MODULES,
-  OUTCOME_LADDER_RAW_MODULES,
-  createMountedComponentHarness,
-} from '../helpers/svelte-component-harness.js';
+import { describe, it, before, after, afterEach } from 'node:test';
+
+import { IngredientSet } from '../../src/models/IngredientSet.js';
+import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
+import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
+import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
+import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   makeCraftingRun,
   makeGatheringRun,
@@ -20,92 +19,21 @@ import {
   createPersistedFizzleHistory,
   legacyGatheringEvidence,
 } from '../helpers/journal-fixtures.js';
-import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
-import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
-import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
-import { IngredientSet } from '../../src/models/IngredientSet.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
+import {
+  RUN_DETAIL_COMPILED_MODULES,
+  RUN_DETAIL_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-run-detail-',
-  rawModules: [
-    'src/ui/svelte/util/rollPromptOrigin.js',
-    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
-    'src/ui/svelte/util/focusWhenEnabled.js',
-    // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
-    // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
-    ...SEARCHABLE_POPOVER_RAW_MODULES,
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    ...LOCALIZE_OR_RAW_MODULES,
-    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
-    'src/ui/svelte/util/journalRunReasons.js',
-    'src/ui/svelte/util/listReorderAnnouncement.js',
-    'src/ui/svelte/util/formatDuration.js',
-    'src/ui/svelte/util/worldTimeLabel.js',
-    'src/systems/foundryCalendar.js',
-    'src/ui/svelte/apps/journal/journalRunStatus.js',
-    'src/ui/svelte/apps/journal/historyPresentation.js',
-    // Issue 1773: a reward row's glyph.
-    'src/ui/presenters/resultKindGlyphs.js',
-    'src/ui/svelte/apps/journal/runStateNotice.js',
-    // Issue 1773: the award face's rows.
-    'src/ui/presenters/awardChoiceRows.js',
-    'src/ui/svelte/apps/journal/runDetailPresentation.js',
-    // The roll line signs an executed margin with the shared formatter (issue 2005).
-    'src/utils/checkAdjustmentFormat.js',
-    'src/utils/scalars.js',
-    'src/ui/svelte/apps/journal/stageHeading.js',
-    'src/ui/svelte/apps/journal/runRecovery.js',
-    // Issue 1506: the run's status is a `<Chip>` now.
-    ...STATUS_TONE_RAW_MODULES,
-    ...OUTCOME_LADDER_RAW_MODULES,
-  ],
-  compiledModules: [
-    // Issue 1506: the journal's status pill retired into the shared chip.
-    ...SEARCHABLE_POPOVER_COMPILED_MODULES,
-    // The shared primitives this tree draws.
-    ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/RadioCardGroup.svelte',
-    ...[
-      'RunActionBar',
-      'Button',
-      'SlotTile',
-      'SlotRow',
-      'ChoiceOptionList',
-      'EssencePool',
-      'RunProgress',
-      'StageBars',
-      'StageNav',
-      'StageCard',
-      'YieldScale',
-      'OutcomeLadder',
-      'ListRow',
-    ].map((name) => `src/ui/svelte/components/${name}.svelte`),
-    'src/ui/svelte/apps/journal/JournalCard.svelte',
-    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
-    'src/ui/svelte/apps/journal/StepTimeline.svelte',
-    'src/ui/svelte/apps/journal/StepDetails.svelte',
-    'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
-    'src/ui/svelte/apps/journal/ActionsPanel.svelte',
-    'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
-    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
-    'src/ui/svelte/apps/journal/RecoveryEvidence.svelte',
-    'src/ui/svelte/apps/journal/ThisRun.svelte',
-  ],
+  rawModules: [...RUN_DETAIL_RAW_MODULES],
+  compiledModules: [...RUN_DETAIL_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/journal/RunDetail.svelte',
 });
 
@@ -267,6 +195,27 @@ describe('RunDetail mounted behavior', () => {
       viewer: { id: 'u', isGM: false },
     }).activeRuns[0];
   };
+
+  // Issue 3011: the Workpiece view's dispatch, notice slot and the yield preview's move out of this
+  // file draw a run that is not iterative exactly as before, recorded from the commit before them.
+  it('draws a run that is not iterative unchanged, with no workpiece hook', async () => {
+    const fixtures = {
+      crafting: makeCraftingRun(),
+      gathering: makeGatheringRun(),
+      succeeded: makeSucceededRun(),
+    };
+    const found = {};
+    for (const [name, run] of Object.entries(fixtures)) {
+      const root = await harness.mount({ run, services: services(), journal: services().journal });
+      assert.ok(!root.querySelector('[data-workpiece], [data-iterative-idle]'), name);
+      found[name] = normalizedMarkup(root);
+      harness.remount();
+    }
+    assertMatchesBaseline(
+      resolve(repoRoot, 'tests/fixtures/runDetailNonIterativeBaseline.json'),
+      found
+    );
+  });
 
   it('names what an unbegun stage waits on, telling a choice apart from a shortage', async () => {
     const iron = [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }];
@@ -1082,13 +1031,13 @@ describe('RunDetail mounted behavior', () => {
       assert.ok(target.querySelector('[data-journal-guidance]'));
       if (count > 1) {
         const cards = [...target.querySelectorAll('[data-history-stages] [data-stage-card]')];
-        cards.forEach((card, index) => {
+        for (const [index, card] of cards.entries()) {
           assert.match(
             card.querySelector('[data-stage-io="produced"]').textContent,
             new RegExp(`Award stage-${index}`)
           );
           assert.equal(card.querySelectorAll('[data-stage-fact="resolution"]').length, 1);
-        });
+        }
       }
       if (count > 0) {
         assert.equal(target.querySelectorAll('[data-essence-history-carrier]').length, 2);

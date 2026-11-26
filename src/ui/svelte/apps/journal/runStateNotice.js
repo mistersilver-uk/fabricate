@@ -89,7 +89,7 @@ export const NOTICE_RANK = Object.freeze([
 
 const UNSUPPORTED_BLOCKERS = new Set(['unsupportedLifecycle', 'version-unsupported']);
 
-/** An iterative descriptor as a notice: polite, with its glyph and ledger, and its own two hooks. */
+/** An iterative descriptor as a notice: polite, with its glyph, ledger, yields and two hooks. */
 function iterativeState(descriptor, pausedHook) {
   return {
     tone: descriptor.tone,
@@ -105,6 +105,7 @@ function iterativeState(descriptor, pausedHook) {
     claim: null,
     icon: descriptor.icon,
     ledger: descriptor.ledger ?? null,
+    yields: descriptor.yields ?? [],
   };
 }
 
@@ -117,8 +118,8 @@ function iterativeState(descriptor, pausedHook) {
  *   outranks the shipped reward, choice and paused notices and nothing above them.
  * @returns {{tone: string, blocking: boolean, title: string, detail: string,
  *   hooks: Record<string, string>, evidence: boolean, claim: object|null, icon?: string,
- *   ledger?: object|null}|null} `hooks` is the notice's own `data-*` hook followed by the paused
- *   one; `null` when the run has nothing to report.
+ *   ledger?: object|null, yields?: object[]}|null} `hooks` is the notice's own `data-*` hook
+ *   followed by the paused one; `null` when the run has nothing to report.
  */
 export function runStateNotice(run, localize, iterativeNotice = null) {
   const text = (key, ...data) => localize(`FABRICATE.App.Journal.Notice.${key}`, ...data);

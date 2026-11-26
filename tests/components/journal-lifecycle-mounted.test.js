@@ -25,6 +25,8 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  WORKPIECE_VIEW_COMPILED_MODULES,
+  WORKPIECE_VIEW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createLabDialogV2 } from '../view-lab/foundryDialog.js';
@@ -55,6 +57,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
+    // The Workpiece view an active iterative run draws (issue 3011).
+    ...WORKPIECE_VIEW_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
@@ -103,6 +107,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [
+    ...WORKPIECE_VIEW_COMPILED_MODULES,
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/SearchField.svelte',
