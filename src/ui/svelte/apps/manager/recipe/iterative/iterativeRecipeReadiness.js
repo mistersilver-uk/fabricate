@@ -44,21 +44,28 @@ function ownerOf(issue, single) {
   return single && STEP_CODES.has(issue.code) ? stepCheckId('single') : null;
 }
 
-/** The `data-validation-target` the issue's control carries, or `''` when none is the issue. */
-function focusTargetOf(code, owner) {
+/**
+ * The `data-validation-target` the issue's control carries, or `''` when none is the issue. A counters
+ * issue addressed to one of the recipe's Counter Instances targets that instance's row.
+ */
+function focusTargetOf({ code, counterId }, owner, counterIds) {
   if (code === 'iterativeNoCounters') return 'iterative-counters-add';
-  if (owner === COUNTERS_CHECK) return 'iterative-counters';
+  if (owner === COUNTERS_CHECK) {
+    return counterId && counterIds.includes(counterId)
+      ? `iterative-counter-${counterId}`
+      : 'iterative-counters';
+  }
   const address = owner?.startsWith('iterativeStep:') ? owner.slice('iterativeStep:'.length) : '';
   if (!address) return '';
   if (code === 'iterativeNoSuccessRule') return `iterative-step-${address}-success`;
   return ACTION_CODES.has(code) ? `iterative-step-${address}-actions` : '';
 }
 
-function mappedIssue(issue, owner, steps) {
+function mappedIssue(issue, owner, { steps, counterIds }) {
   const library = issue.entityKind !== 'recipe';
   const step =
     issue.stepIndex == null ? null : steps.find((entry) => entry.index === issue.stepIndex);
-  const focusTarget = focusTargetOf(issue.code, owner);
+  const focusTarget = focusTargetOf(issue, owner, counterIds);
   // `message` is the headless sentence the Validation title falls back to when a key is missing.
   return {
     id: library
@@ -71,22 +78,25 @@ function mappedIssue(issue, owner, steps) {
     target: RESULTS_CODES.has(issue.code) ? 'results' : 'overview',
     ...(focusTarget && { focusTarget }),
     ...(library && { entityName: issue.entityName }),
+    ...(issue.counterId && { counterId: issue.counterId, counterName: issue.counterName }),
+    ...(issue.actionName && { actionName: issue.actionName }),
     ...(step && { stepId: step.id, stepName: step.name }),
   };
 }
 
 /**
- * `{ checks, issues }` over `input`, the route model's `recipeReadinessInput`: `{ issues, steps }`,
- * each step `{ index, id, name }`. Each check names the issue ids it owns as `owners`, and holds
+ * `{ checks, issues }` over `input`, the route model's `recipeReadinessInput`: `{ issues, steps,
+ * counterIds }`, each step `{ index, id, name }` and `counterIds` the recipe's Counter Instance ids. Each check names the issue ids it owns as `owners`, and holds
  * when it owns none.
  */
 export function iterativeRecipeReadiness(input) {
   const steps = Array.isArray(input?.steps) ? input.steps : [];
+  const counterIds = Array.isArray(input?.counterIds) ? input.counterIds : [];
   const single = steps.length === 0;
   const owned = new Map();
   const issues = (Array.isArray(input?.issues) ? input.issues : []).map((issue) => {
     const owner = ownerOf(issue, single);
-    const mapped = mappedIssue(issue, owner, steps);
+    const mapped = mappedIssue(issue, owner, { steps, counterIds });
     if (owner) owned.set(owner, [...(owned.get(owner) ?? []), mapped.id]);
     return mapped;
   });

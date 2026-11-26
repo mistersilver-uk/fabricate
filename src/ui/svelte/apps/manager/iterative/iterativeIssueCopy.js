@@ -3,7 +3,8 @@
  * hand-listed test closure stays complete. `ITERATIVE_ISSUE_KEYS` is the one code-to-lang-key map,
  * its keys literal so the orphan scan sees them, and recipe issues of the same codes read it
  * too; `iterativeIssueSentence(issue, text)` resolves one issue through it, falling back to the
- * issue's own `message`. `overviewIssueGroup(issue)` names the group an issue is listed under.
+ * issue's own `message`, and through `ITERATIVE_ISSUE_NAMED_KEYS` when the issue names its counter
+ * or action. `overviewIssueGroup(issue)` names the group an issue is listed under.
  */
 
 /** Each iterative readiness code's `SystemOverview` lang key; its English equals the headless message. */
@@ -41,6 +42,36 @@ export const ITERATIVE_ISSUE_KEYS = Object.freeze({
     'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeStartOutOfBounds',
 });
 
+/** The codes whose sentence names the issue's counter (`{counter}`) or action (`{action}`), by `SystemOverview` lang key. */
+export const ITERATIVE_ISSUE_NAMED_KEYS = Object.freeze({
+  iterativeUnknownCounter:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeUnknownCounterNamed',
+  iterativeInvalidNumber: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeInvalidNumberNamed',
+  iterativeBoundsInverted:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeBoundsInvertedNamed',
+  iterativeStartOutOfBounds:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeStartOutOfBoundsNamed',
+  iterativeExpressionBoundUnset:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeExpressionBoundUnsetNamed',
+  iterativeUnknownAction: 'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeUnknownActionNamed',
+  iterativeCheckUnavailable:
+    'FABRICATE.Admin.Manager.SystemOverview.IssueIterativeCheckUnavailableNamed',
+});
+
+const ACTION_NAMED_CODES = new Set(['iterativeUnknownAction', 'iterativeCheckUnavailable']);
+
+/** The named sentence of `issue`, or `''` when it has no named key, no name, or the key does not resolve. */
+function namedSentence(issue, text) {
+  if (!Object.hasOwn(ITERATIVE_ISSUE_NAMED_KEYS, issue.code)) return '';
+  const action = ACTION_NAMED_CODES.has(issue.code);
+  const name = action ? issue.actionName : issue.counterName;
+  if (typeof name !== 'string' || name === '') return '';
+  const template = text(ITERATIVE_ISSUE_NAMED_KEYS[issue.code], '');
+  return typeof template === 'string'
+    ? template.split(action ? '{action}' : '{counter}').join(name)
+    : '';
+}
+
 /** The Validation group of `issue`: its Counter or Crafting Action library entity, else its `kind`. */
 export function overviewIssueGroup(issue) {
   const entityKind = issue?.entityKind;
@@ -54,5 +85,6 @@ export function iterativeIssueSentence(issue, text) {
   const key = Object.hasOwn(ITERATIVE_ISSUE_KEYS, issue?.code)
     ? ITERATIVE_ISSUE_KEYS[issue.code]
     : '';
-  return key ? text(key, issue.message || issue.code) : '';
+  if (!key) return '';
+  return namedSentence(issue, text) || text(key, issue.message || issue.code);
 }

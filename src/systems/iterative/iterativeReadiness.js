@@ -23,7 +23,13 @@ import { hasActiveCheck } from '../salvageCheckUsability.js';
 
 import { effectiveBounds } from './attemptLibrary.js';
 import { counterRuleFault } from './counterRule.js';
-import { libraryExpressionCodes, recipeExpressionCodes } from './expressionReadiness.js';
+import {
+  addressedEntry,
+  bareEntries,
+  libraryExpressionCodes,
+  recipeExpressionCodes,
+  unknownEntries,
+} from './expressionReadiness.js';
 import { iterativeTermsSubset } from './iterativeTerms.js';
 
 /** Headless English per code; the manager localizes by `code`. */
@@ -81,16 +87,21 @@ export function iterativeStepModeIssues(steps, { requireComplete = true } = {}) 
   );
 }
 
-/** The codes `rules` raise against the ids they may name. */
-function ruleCodes(rules, { counterIds, actionIds }) {
+/** The entries `rules` raise against the ids they may name, each addressed to the id it names. */
+function ruleEntries(rules, { counterIds, actionIds }) {
   return arrayOrEmpty(rules).flatMap((rule) => {
-    if (counterRuleFault(rule)) return ['iterativeInvalidRule'];
+    if (counterRuleFault(rule)) return bareEntries(['iterativeInvalidRule']);
     if (rule.source === 'counter' && !counterIds.has(rule.counterId)) {
-      return ['iterativeUnknownCounter'];
+      return [addressedEntry('iterativeUnknownCounter', 'counterId', rule.counterId)];
     }
-    const unknown =
-      rule.source === 'previousAction' && rule.actionIds.some((id) => !actionIds.has(id));
-    return unknown ? ['iterativeUnknownAction'] : [];
+    return rule.source === 'previousAction'
+      ? unknownEntries(
+          'iterativeUnknownAction',
+          'actionId',
+          arrayOrEmpty(rule.actionIds),
+          actionIds
+        )
+      : [];
   });
 }
 
@@ -131,7 +142,10 @@ function actionCodes(action, context) {
       ? ['iterativeUnknownCounter']
       : []),
     ...(outcomeIds.some((id) => !tierIds.has(id)) ? ['iterativeUnknownCheckOutcome'] : []),
-    ...ruleCodes(rules, { counterIds: libraryCounterIds, actionIds: context.libraryActionIds }),
+    ...ruleEntries(rules, {
+      counterIds: libraryCounterIds,
+      actionIds: context.libraryActionIds,
+    }).map((entry) => entry.code),
     ...libraryExpressionCodes(action, context),
   ];
 }
@@ -139,9 +153,13 @@ function actionCodes(action, context) {
 /** One issue per code, in first-raised order. */
 const uniqueCodes = (codes) => [...new Set(codes)];
 
-/** One entry per code and step index, in first-raised order. */
+/** The first entry per code and step index, in first-raised order. */
 function uniqueEntries(entries) {
-  const seen = new Map(entries.map((entry) => [`${entry.code}@${entry.stepIndex}`, entry]));
+  const seen = new Map();
+  for (const entry of entries) {
+    const key = `${entry.code}@${entry.stepIndex}`;
+    if (!seen.has(key)) seen.set(key, entry);
+  }
   return [...seen.values()];
 }
 
@@ -190,12 +208,12 @@ function startOutOfBounds(instance, context) {
   return (min !== null && start < min) || (max !== null && start > max);
 }
 
-function instanceCodes(instance, context) {
+function instanceEntries(instance, context) {
   const counter = context.countersById.get(instance.counterId);
   const perRecipe = counter?.limit === 'perRecipe';
   const min = instance.min ?? counter?.min;
   const max = instance.max ?? counter?.max;
-  return [
+  const codes = [
     ...(counter ? [] : ['iterativeUnknownCounter']),
     ...(hasNull(instance, ['start', 'startFormula', 'min', 'max', 'target'])
       ? ['iterativeInvalidNumber']
@@ -203,6 +221,7 @@ function instanceCodes(instance, context) {
     ...(perRecipe && boundsInverted(min, max) ? ['iterativeBoundsInverted'] : []),
     ...(startOutOfBounds(instance, context) ? ['iterativeStartOutOfBounds'] : []),
   ];
+  return codes.map((code) => addressedEntry(code, 'counterId', instance.counterId));
 }
 
 /** The library actions a step allows: every one under `all`, else the ones it names. */
@@ -223,42 +242,49 @@ function stepEntriesHold(config) {
   );
 }
 
-/** A step's action-list codes: an id naming no library action, and an Only list naming none. */
-function stepActionCodes(actions, references) {
+/** A step's action-list entries: the first id naming no library action, and an Only list naming none. */
+function stepActionEntries(actions, references) {
   const ids = actions?.actionIds;
   const none = actions?.mode === 'only' && Array.isArray(ids) && ids.length === 0;
   return [
-    ...(arrayOrEmpty(ids).some((id) => !references.actionIds.has(id))
-      ? ['iterativeUnknownAction']
-      : []),
-    ...(none ? ['iterativeNoAllowedActions'] : []),
+    ...unknownEntries(
+      'iterativeUnknownAction',
+      'actionId',
+      arrayOrEmpty(ids),
+      references.actionIds
+    ),
+    ...bareEntries(none ? ['iterativeNoAllowedActions'] : []),
   ];
 }
 
-function stepConfigCodes(config, references, context) {
-  if (!config) return ['iterativeNoSuccessRule'];
+function stepConfigEntries(config, references, context) {
+  if (!config) return bareEntries(['iterativeNoSuccessRule']);
   const named = [
     ...arrayOrEmpty(config.hiddenCounterIds),
     ...arrayOrEmpty(config.lockedCounterIds),
   ];
-  const rolls = allowedActions(config, context).some((action) => action.check === 'roll');
+  const rolls = allowedActions(config, context).find((action) => action.check === 'roll');
   return [
-    ...(arrayOrEmpty(config.success).length === 0 ? ['iterativeNoSuccessRule'] : []),
-    ...(stepEntriesHold(config) ? [] : ['iterativeInvalidEntry']),
-    ...stepActionCodes(config.actions, references),
-    ...(named.some((id) => !references.counterIds.has(id)) ? ['iterativeUnknownCounter'] : []),
-    ...ruleCodes([...arrayOrEmpty(config.success), ...arrayOrEmpty(config.failure)], references),
-    ...(rolls && !context.routedCheckActive ? ['iterativeCheckUnavailable'] : []),
+    ...bareEntries([
+      ...(arrayOrEmpty(config.success).length === 0 ? ['iterativeNoSuccessRule'] : []),
+      ...(stepEntriesHold(config) ? [] : ['iterativeInvalidEntry']),
+    ]),
+    ...stepActionEntries(config.actions, references),
+    ...unknownEntries('iterativeUnknownCounter', 'counterId', named, references.counterIds),
+    ...ruleEntries([...arrayOrEmpty(config.success), ...arrayOrEmpty(config.failure)], references),
+    ...(rolls && !context.routedCheckActive
+      ? [addressedEntry('iterativeCheckUnavailable', 'actionId', rolls.id)]
+      : []),
   ];
 }
 
-function producedWhenCodes(group, references) {
+function producedWhenEntries(group, references) {
   return arrayOrEmpty(group.producedWhen).flatMap((line) => {
-    if (producedWhenLineFault(line)) return ['iterativeInvalidEntry'];
+    if (producedWhenLineFault(line)) return bareEntries(['iterativeInvalidEntry']);
     const misplaced = group.role === 'failure' && line.end === 'success';
     return [
-      ...ruleCodes(line.rules, references),
-      ...(misplaced ? ['iterativeSuccessLineOnFailureGroup'] : []),
+      ...ruleEntries(line.rules, references),
+      ...bareEntries(misplaced ? ['iterativeSuccessLineOnFailureGroup'] : []),
     ];
   });
 }
@@ -267,10 +293,11 @@ const producesOnSuccess = (groups) =>
   groups.some((group) => arrayOrEmpty(group.producedWhen).some((line) => line?.end === 'success'));
 
 /**
- * The `{ code, stepIndex }` entries a recipe raises: a step's own faults carry its position in
- * `recipe.steps`, and recipe-wide ones, or any on a recipe with no explicit steps, carry `null`.
+ * The `{ code, stepIndex, counterId?, actionId? }` entries a recipe raises: a step's own faults
+ * carry its position in `recipe.steps`, and recipe-wide ones, or any on a recipe with no explicit
+ * steps, carry `null`.
  */
-function recipeCodes(recipe, system, context) {
+function recipeEntries(recipe, system, context) {
   const instances = arrayOrEmpty(recipe?.iterative?.counters);
   const references = {
     counterIds: new Set(instances.map((instance) => instance.counterId)),
@@ -278,29 +305,33 @@ function recipeCodes(recipe, system, context) {
   };
   const views = iterativeStepsOf(recipe);
   const multiStep = arrayOrEmpty(recipe?.steps).length > 0;
-  const entries = (codes, stepIndex = null) => codes.map((code) => ({ code, stepIndex }));
+  const entries = (list, stepIndex = null) => list.map((entry) => ({ ...entry, stepIndex }));
   const addressOf = (view) => (multiStep ? view.stepIndex : null);
   const finalView = views.at(-1);
   return [
-    ...entries(instances.length === 0 ? ['iterativeNoCounters'] : []),
-    ...instances.flatMap((instance) => entries(instanceCodes(instance, context))),
+    ...entries(bareEntries(instances.length === 0 ? ['iterativeNoCounters'] : [])),
+    ...instances.flatMap((instance) => entries(instanceEntries(instance, context))),
     ...views.flatMap((view) =>
-      stepConfigCodes(view.iterative, references, context).map((code) => ({
-        code,
-        stepIndex: code === 'iterativeCheckUnavailable' ? null : addressOf(view),
+      stepConfigEntries(view.iterative, references, context).map((entry) => ({
+        ...entry,
+        stepIndex: entry.code === 'iterativeCheckUnavailable' ? null : addressOf(view),
       }))
     ),
     ...views.flatMap((view) =>
       entries(
-        view.resultGroups.flatMap((g) => producedWhenCodes(g, references)),
+        view.resultGroups.flatMap((g) => producedWhenEntries(g, references)),
         addressOf(view)
       )
     ),
     ...entries(
-      multiStep && system?.features?.multiStepRecipes !== true ? ['iterativeMultiStepOff'] : []
+      bareEntries(
+        multiStep && system?.features?.multiStepRecipes !== true ? ['iterativeMultiStepOff'] : []
+      )
     ),
     ...entries(
-      producesOnSuccess(finalView.resultGroups) ? [] : ['iterativeFinalStepProducesNothing'],
+      bareEntries(
+        producesOnSuccess(finalView.resultGroups) ? [] : ['iterativeFinalStepProducesNothing']
+      ),
       addressOf(finalView)
     ),
     ...entries(
@@ -313,7 +344,10 @@ function recipeCodes(recipe, system, context) {
   ];
 }
 
-function recipeIssue(recipe, { code, stepIndex }) {
+/** The label of the record `id` in `byId`, else the id itself. */
+const nameOf = (byId, id) => trimString(byId.get(id)?.label) || id;
+
+function recipeIssue(recipe, { code, stepIndex, counterId, actionId }, context) {
   const severity = WARNING_CODES.has(code) ? 'warning' : 'critical';
   return {
     stepId: stepIndex === null ? null : (recipe?.steps?.[stepIndex]?.id ?? null),
@@ -327,6 +361,11 @@ function recipeIssue(recipe, { code, stepIndex }) {
     code,
     message: ITERATIVE_READINESS_MESSAGES[code],
     nav: { view: 'recipe-edit', tab: 'overview' },
+    ...(counterId !== undefined && {
+      counterId,
+      counterName: nameOf(context.countersById, counterId),
+    }),
+    ...(actionId !== undefined && { actionId, actionName: nameOf(context.actionsById, actionId) }),
   };
 }
 
@@ -337,6 +376,7 @@ function readinessContext(system) {
   return {
     library,
     countersById: new Map(counters.map((counter) => [counter.id, counter])),
+    actionsById: new Map(arrayOrEmpty(library.actions).map((action) => [action.id, action])),
     libraryCounterIds: new Set(counters.map((counter) => counter.id)),
     libraryActionIds: new Set(arrayOrEmpty(library.actions).map((action) => action.id)),
     tierIds: new Set(routedOutcomeTierOptions(routed).map((tier) => tier.id)),
@@ -357,7 +397,9 @@ export function evaluateIterativeReadiness(system, recipes) {
   return [
     ...libraryIssues(system, context),
     ...arrayOrEmpty(recipes).flatMap((recipe) =>
-      uniqueEntries(recipeCodes(recipe, system, context)).map((entry) => recipeIssue(recipe, entry))
+      uniqueEntries(recipeEntries(recipe, system, context)).map((entry) =>
+        recipeIssue(recipe, entry, context)
+      )
     ),
   ];
 }

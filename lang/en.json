@@ -2880,7 +2880,14 @@
           "IssueIterativeExplodeUnbounded": "An exploding die in an expression can never stop.",
           "IssueIterativeExpressionBoundUnset": "An expression reads a counter minimum, maximum or target that is not set.",
           "IssueIterativeCheckFactWithoutCheck": "An action with no check reads a check result in an effect.",
-          "IssueIterativeStartOutOfBounds": "A counter starts outside its minimum or maximum."
+          "IssueIterativeStartOutOfBounds": "A counter starts outside its minimum or maximum.",
+          "IssueIterativeUnknownCounterNamed": "{counter} is not a counter this recipe can use.",
+          "IssueIterativeInvalidNumberNamed": "{counter} has a start, start formula, bound or target that cannot be read.",
+          "IssueIterativeBoundsInvertedNamed": "{counter}'s minimum is above its maximum.",
+          "IssueIterativeStartOutOfBoundsNamed": "{counter} starts outside its minimum or maximum.",
+          "IssueIterativeExpressionBoundUnsetNamed": "An expression reads {counter}'s minimum, maximum or target, which is not set.",
+          "IssueIterativeUnknownActionNamed": "{action} is not a crafting action in this system.",
+          "IssueIterativeCheckUnavailableNamed": "{action} rolls a check, but the routed crafting check has no roll formula."
         },
         "Nav": {
           "ComponentRules": "Component Rules",
