@@ -16,6 +16,7 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  ITERATIVE_ATTEMPT_RAW_MODULES,
   OUTCOME_LADDER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -31,6 +32,7 @@ const harness = createMountedComponentHarness({
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...ITERATIVE_ATTEMPT_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     ...OUTCOME_LADDER_RAW_MODULES,
@@ -69,6 +71,8 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/iterativeAttempt.svelte.js',
+    'src/ui/svelte/stores/iterativeAttemptMemory.svelte.js',
     'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [

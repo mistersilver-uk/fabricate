@@ -429,6 +429,18 @@ export const OUTCOME_LADDER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/essenceTint.js',
 ]);
 
+// The iterative attempt store (issue 3011) and the presenters it words its notices with, which the
+// journal store imports.
+export const ITERATIVE_ATTEMPT_RAW_MODULES = Object.freeze([
+  'src/systems/iterative/counterRule.js',
+  'src/ui/svelte/stores/journalLegacyCommands.js',
+  'src/ui/presenters/iterative/iterativeFocusTarget.js',
+  'src/ui/presenters/iterative/iterativeNotice.js',
+  'src/ui/presenters/iterative/iterativeRefusalCopy.js',
+  'src/ui/presenters/iterative/iterativeRuleText.js',
+  'src/ui/presenters/iterative/iterativeVerdict.js',
+]);
+
 // The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
 // them and the per-drop breakdown it opens.
 export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([

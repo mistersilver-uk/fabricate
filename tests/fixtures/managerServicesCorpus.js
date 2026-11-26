@@ -181,6 +181,7 @@ export const PLAYER_SERVICE_KEYS = Object.freeze([
   'localize',
   'navigateToCraftingRecipe',
   'navigateToJournalRun',
+  'newAttemptId',
   'notify',
   'offerReleaseForRefusal',
   'progressiveOrderRevertMessage',
@@ -953,8 +954,11 @@ export function installPlayerWorld(world) {
   const saved = [
     ['game', 'game' in globalThis, globalThis.game],
     ['ui', 'ui' in globalThis, globalThis.ui],
+    ['foundry', 'foundry' in globalThis, globalThis.foundry],
   ];
   globalThis.game = world.game;
+  // ratchet-exempt(lint): this fixture installs the Foundry globals a service bag reads
+  globalThis.foundry = { utils: { randomID: () => 'attemptId000000a' } };
   globalThis.ui = {
     notifications: {
       info: (message) => world.record('notify.info', message),

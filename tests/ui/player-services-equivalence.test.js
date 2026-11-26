@@ -109,6 +109,23 @@ describe('createPlayerServices', () => {
       }
     }));
 
+  it('mints an attempt id from Foundry at call time, and hands the journal the same source', async () =>
+    withModules(async ({ createPlayerServices }) => {
+      const restore = installPlayerWorld(buildPlayerWorld());
+      try {
+        const { services } = build(createPlayerServices);
+        let minted = 0;
+        globalThis.foundry.utils.randomID = () => `minted-${(minted += 1)}`;
+        assert.deepStrictEqual(
+          [services.newAttemptId(), services.newAttemptId()],
+          ['minted-1', 'minted-2']
+        );
+        assert.strictEqual(typeof services.journal.iterative.takeAction, 'function');
+      } finally {
+        restore();
+      }
+    }));
+
   it('navigates through the selectTab accessor after selecting the run or recipe', async () =>
     withModules(async ({ createPlayerServices }) => {
       const world = buildPlayerWorld();

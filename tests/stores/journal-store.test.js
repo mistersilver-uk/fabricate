@@ -142,6 +142,8 @@ const JOURNAL_STORE_SHAPE = {
     'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
     'toggleKind', 'viewStage',
   ],
+  // The iterative workbench's own store, one member the view reaches as `journal.iterative`.
+  stores: ['iterative'],
 };
 
 describe('journalStore', () => {
@@ -157,7 +159,7 @@ describe('journalStore', () => {
     compiler.cleanup();
   });
 
-  it('returns exactly the 59 public members the journal view reads, each still a getter', () => {
+  it('returns exactly the 60 public members the journal view reads, each still a getter', () => {
     const store = createJournalStore({ services: makeServices().services });
     const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
 

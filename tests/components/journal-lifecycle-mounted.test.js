@@ -18,6 +18,7 @@ import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { RUN_KICKER_CONTAINERS } from '../helpers/runKickerGround.js';
 import {
+  ITERATIVE_ATTEMPT_RAW_MODULES,
   OUTCOME_LADDER_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -58,6 +59,7 @@ const harness = createMountedComponentHarness({
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...ITERATIVE_ATTEMPT_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     ...OUTCOME_LADDER_RAW_MODULES,
@@ -96,6 +98,8 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/iterativeAttempt.svelte.js',
+    'src/ui/svelte/stores/iterativeAttemptMemory.svelte.js',
     'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [
@@ -403,6 +407,7 @@ function persistedRuntime(state, builderOptions) {
   });
   const dismissed = new Set();
   const notifications = [];
+  let attempts = 0;
   let worldTime = 1_209_600;
   const builder = makeBuilder(containers, dismissed, () => worldTime, builderOptions);
   const controller = createLabJournalCaseController({
@@ -430,6 +435,7 @@ function persistedRuntime(state, builderOptions) {
       notifications.push(message);
     },
     craftErrorMessage: () => 'Craft failed.',
+    newAttemptId: () => `attempt-${++attempts}`,
   };
   return {
     actor,
