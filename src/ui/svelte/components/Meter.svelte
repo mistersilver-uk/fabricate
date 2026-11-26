@@ -142,7 +142,7 @@
     top: -3px;
     width: 2px;
     height: 12px;
-    border-radius: 1px;
+    border-radius: 999px;
     background: var(--fab-text-muted);
     transform: translateX(-50%);
   }
