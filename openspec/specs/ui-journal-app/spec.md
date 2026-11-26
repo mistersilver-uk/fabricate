@@ -158,6 +158,35 @@ A closed record takes its hidden counters from the live recipe, and one whose re
 A redacted iterative run hides its recipe and step names, routes, goal and yields, and keeps its cards, counters, sessions and begin control under the snapshot's library labels.
 Its steps and verdicts read "Step N", and every check it records reads "Rolled privately by the GM".
 
+##### Taking an Iterative Attempt
+
+Pressing an enabled card sends one `takeAction` command at the revision the card was drawn from, with a fresh attempt id from the host's id service (`foundry.utils.randomID`, never `crypto.randomUUID`, which needs a secure context).
+A press holds the Journal's one busy key until the command's reply and the reload it causes have settled, so no other command runs while it saves.
+An absent or unusable id service sends nothing and says so.
+A press is never retried by a Retry control: a refusal and a stale reply state what happened in the pane's own notice, and only starting a step keeps the shipped command error.
+A cancelled roll prompt changes nothing and says nothing.
+
+A command that times out, or throws, has an unknown outcome and MUST NOT be stated as refused or as spending nothing.
+The pane says the outcome is not yet known and keeps the press, and pressing the same card again at the same revision resends the same attempt id, which the authority answers from the run's log without paying twice.
+A later load whose log holds the attempt shows its result, and a later load at a newer revision without it states that the workpiece changed elsewhere; a load that no longer lists the run drops the press.
+Another card, or a changed revision, is a new press with a new id.
+
+A stale refusal reloads the workpiece, names the action taken in another window first, and marks that entry "(other window)" in Sessions.
+An entry counts as another window's when its attempt number is past the one this window first saw for the step and its id is not one this window minted.
+A committed press is worded from the reloaded session row, never from the reply, so a hidden counter never reaches the pane.
+When the reloaded revision is still below the reply's, the cards stay disabled until one further reload, and are released even if the revision stays low or the run is no longer listed.
+A press that ends a step keeps its verdict for the rest of the window, worded from the counters the viewer may see.
+
+A refused press reads the reply's own message, else a sentence naming the counter, cost or requirement it concerns when the viewer may see it, else the mapped sentence for its reason; each states that nothing was spent and the session was not counted, unless additional dice were bought.
+A check that cannot roll states that nothing happened and who to ask; an effect whose dice cannot roll states which.
+
+##### Iterative notice precedence
+
+The run detail shows at most one state notice, ranked: recovery, unsupported version, any other blocker (active GM required included), the Iterative Attempt notice, then the shipped reward, choice and paused notices.
+The Iterative Attempt notice is the first that applies of: saving, outcome unknown, stale, refused (a check that cannot roll and a missing id service included), a step boundary's verdict, a step started, the last result, and resume.
+Resume says the workpiece was read fresh when the window opened, and is shown only until the next press or selection.
+It is polite and never blocking, and it keeps one instance from saving through to the result.
+
 #### Ordinary closed history
 
 Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.
