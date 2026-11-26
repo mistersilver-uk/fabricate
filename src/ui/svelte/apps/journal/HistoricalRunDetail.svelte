@@ -21,10 +21,12 @@
 
   let { run, services = null, transient = false, journal = null } = $props();
   const account = $derived(presentHistory(run, localize));
-  // A frozen verdict owns the banner, so the receipts stay in their ordinary places beneath it.
+  // A frozen verdict owns the banner, and its yields own the produced rows, so Crafted is not
+  // drawn a second time beneath it. Materials used stays. A later open has no frozen yields.
   const frozen = $derived(
     transient && !account.settling ? (journal?.iterative?.verdictFor?.(run) ?? null) : null
   );
+  const bannerOwnsYields = $derived((frozen?.yields?.length ?? 0) > 0);
   const showTransient = $derived(transient && !account.settling && !frozen);
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
@@ -185,7 +187,7 @@
         title={frozen.title}
         detail={frozen.detail}
         data-journal-verdict={run.status ?? ''}
-        evidence={frozen.yields?.length ? frozenYields : null}
+        evidence={bannerOwnsYields ? frozenYields : null}
       />
     {:else if showTransient || account.failed}
       <Notice
@@ -237,7 +239,7 @@
         <JournalFactRow label={spend.label} value={spend.value} />
       {/each}
       {@render essenceRecaps()}
-      {@render items(resultHeading, account.results, 'produced')}
+      {#if !bannerOwnsYields}{@render items(resultHeading, account.results, 'produced')}{/if}
       {@render rewardFacts()}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
         <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />

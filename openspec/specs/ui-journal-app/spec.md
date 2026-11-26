@@ -225,7 +225,7 @@ It shows its receipts, uncertain ones as uncertain, who closed it as checked or 
 
 An iterative record keeps that composition and adds, after its receipts and before This run, its final counters as the viewer may see them (_Hidden counters_), the Sessions of the step it closed on, and inert per-step bars, a failed step's drawn full in danger and read as failed.
 It shows no StageNav, action card or route strip, and draws no Sessions table for a record with no attempts.
-The verdict the Iterative Attempt that ended the run froze, with its rule text and what its set gives, shows on the entry that attempt left selected; a later open reads the shipped success or failure text, because the archive is never rebuilt into rules.
+The verdict the Iterative Attempt that ended the run froze, with its rule text and what its set gives, shows on the entry that attempt left selected, and its yields own that entry's produced rows, so Crafted is not drawn a second time beneath it while Materials used stays; a later open has no frozen yields, reads the shipped success or failure text and keeps Crafted, because the archive is never rebuilt into rules.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.

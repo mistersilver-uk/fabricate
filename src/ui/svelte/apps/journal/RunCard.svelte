@@ -92,9 +92,22 @@
         index < currentStageIndex || ['done', 'succeeded'].includes(stage?.status ?? '')
     ).length
   );
+  // A workpiece's tracks are drawn at their own fills, so its value is their mean: a done or
+  // passed stage counts whole, the focus step its goal fraction and a later one nothing.
+  const workpiecePercent = $derived(
+    Math.round(
+      stages.reduce((total, stage, index) => {
+        const done =
+          index < currentStageIndex || ['done', 'succeeded'].includes(stage?.status ?? '');
+        return total + (done ? 100 : index === currentStageIndex ? railPercent : 0);
+      }, 0) / Math.max(1, stages.length)
+    )
+  );
   const accessiblePercent = $derived(
     showsStageRail && stages.length > 0
-      ? Math.round((filledStages / stages.length) * 100)
+      ? workpiece
+        ? workpiecePercent
+        : Math.round((filledStages / stages.length) * 100)
       : progressPercent
   );
 

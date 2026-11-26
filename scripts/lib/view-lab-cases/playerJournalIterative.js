@@ -227,11 +227,8 @@ export const CASES = Object.freeze([
     id: 'player-journal-iterative-failed',
     label: 'Player Journal — workpiece failed with a set',
     query: workpiece('failed'),
-    steps: [
-      press('hammer'),
-      { selector: '[data-iterative-record] [data-stage-bars-state="danger"]', scroll: true },
-    ],
-    expectSelector: '[data-iterative-record] [data-stage-bars-state="danger"]',
+    steps: [press('hammer'), { selector: '[data-journal-verdict]', scroll: true }],
+    expectSelector: '[data-journal-verdict] [data-list-row]',
   }),
   workpieceCase({
     id: 'player-journal-iterative-failed-nothing',
