@@ -1065,7 +1065,7 @@ describe('iterative recipe Validation', () => {
     }
   });
 
-  it('stamps the Validation target on the row of a repeated counter once, at the first row', async () => {
+  it('lets the first faulted row of a repeated counter take View, in DOM order', async () => {
     const world = ironworks();
     const draft = await draftOf(world, 'iw-r-rivet');
     draft.iterative.counters.push({ ...draft.iterative.counters[0] });
@@ -1099,6 +1099,29 @@ describe('iterative recipe Validation', () => {
       assert.ok(
         focused === $('[data-validation-target="iterative-counters"]'),
         'the counters section holds focus'
+      );
+    } finally {
+      console.warn = warn;
+    }
+    assert.deepEqual(warnings, []);
+  });
+
+  it('lands View on the step for a step rule that names a removed counter (issue 3038)', async () => {
+    const world = ironworks();
+    const draft = await draftOf(world, 'iw-r-sword');
+    draft.steps[0].iterative.success = [
+      { source: 'counter', counterId: 'rust', op: '>=', value: 1 },
+    ];
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...args) => {
+      warnings.push(args);
+    };
+    try {
+      const focused = await focusedByView(world, draft, 'iterativeUnknownCounter:0');
+      assert.ok(
+        focused === $('[data-validation-target="iterative-step-0"]'),
+        'the step configuration holds focus'
       );
     } finally {
       console.warn = warn;

@@ -500,6 +500,7 @@ A set with no line says it is never produced, and a scope with no set says it pr
 The Validation tab groups the recipe's counter and step checks under Steps, first, with one row per step, which passes when the step has no issue.
 The Validation tab names each addressed issue's step and, where the issue carries one, the counter or action it concerns.
 Its View on an issue under "Counters are set up" whose address is one of the recipe's Counter Instances focuses that instance's row, at its first faulted control; on a recipe with no counters it focuses the add control; and on any other issue under that check it focuses the counters section.
+On an iterative counter fault under a step's check, its View focuses that step's configuration (`iterative-step-<address>`).
 It lists the library issues that refuse the recipe's start, using the copy the system Validation tab uses.
 A library issue counts as blocking on the Validation tab and in the status, because it refuses the recipe's start, but it does not block enabling the recipe.
 While active workpieces of the recipe exist in the system, every tab except Validation states how many there are, and that they keep the terms they started with.

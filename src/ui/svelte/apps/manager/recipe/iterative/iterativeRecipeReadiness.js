@@ -57,6 +57,7 @@ function focusTargetOf({ code, counterId }, owner, counterIds) {
   }
   const address = owner?.startsWith('iterativeStep:') ? owner.slice('iterativeStep:'.length) : '';
   if (!address) return '';
+  if (code === 'iterativeUnknownCounter') return `iterative-step-${address}`;
   if (code === 'iterativeNoSuccessRule') return `iterative-step-${address}-success`;
   return ACTION_CODES.has(code) ? `iterative-step-${address}-actions` : '';
 }
@@ -86,8 +87,8 @@ function mappedIssue(issue, owner, { steps, counterIds }) {
 
 /**
  * `{ checks, issues }` over `input`, the route model's `recipeReadinessInput`: `{ issues, steps,
- * counterIds }`, each step `{ index, id, name }` and `counterIds` the recipe's Counter Instance ids. Each check names the issue ids it owns as `owners`, and holds
- * when it owns none.
+ * counterIds }`, each step `{ index, id, name }` and `counterIds` the recipe's Counter Instance
+ * ids. Each check names the issue ids it owns as `owners`, and holds when it owns none.
  */
 export function iterativeRecipeReadiness(input) {
   const steps = Array.isArray(input?.steps) ? input.steps : [];
