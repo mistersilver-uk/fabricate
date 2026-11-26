@@ -495,7 +495,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-normal',
     'manager-world-travel-with-gathering-expanded',
   ]),
-  // The editor validation surface (issue 1444), then one frame per host (issue 3037), because its
+  // The editor validation surface (issue 1444), then one frame per host (issue 3037) — the Tool
+  // Studio's two included, the world essence entry alone having no validation frame — because its
   // toned chips and type read the same in every mode and a host-less set photographs only four.
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
@@ -509,6 +510,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-editor-validation',
     'world-tool-entry-validation',
     'world-component-entry-validation',
+    'manager-tool-stress-invalid-validation',
+    'manager-tool-parity-05-validation-1280x720',
   ]),
   // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
   // a `compact fill` journal body and the hero in a narrow host.

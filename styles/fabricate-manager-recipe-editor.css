@@ -331,17 +331,17 @@
 
 /* THE SUMMARY'S THREE STATUS FACES, ON THE CLASSES THE SURFACE ACTUALLY EMITS (issue 1373). */
 .fabricate-validation .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
-  color: var(--fab-success);
+  color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
 .fabricate-validation .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
-  color: var(--fab-warning);
+  color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
 .fabricate-validation .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
-  color: var(--fab-danger);
+  color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 

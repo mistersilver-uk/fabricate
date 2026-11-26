@@ -87,7 +87,7 @@ function defineHalf({ contract, suffixed, hyphenated, half }) {
     },
     rawRemedy:
       `these components hand-roll the ${half} that ${SURFACE_PATH} owns. Render ` +
-      "`<EditorValidationSurface>` and pass the site's own hooks, classes, labels and counts " +
+      '`<EditorValidationSurface>` and pass the site\'s own hooks, classes, labels and counts ' +
       'as props — `spec.md` requires one arrangement everywhere, and a second copy of the ' +
       'markup is a second thing that can drift from it',
     valuelessRemedy:
@@ -133,8 +133,8 @@ function bagKeys(file, attributeName) {
     const value = Array.isArray(attribute.value) ? attribute.value[0] : attribute.value;
     const expression = value?.expression;
     if (expression?.type !== 'ObjectExpression') return;
-    keys = expression.properties.map(
-      (property) => property.key?.name ?? String(property.key?.value ?? '')
+    keys = expression.properties.map((property) =>
+      property.key?.name ?? String(property.key?.value ?? '')
     );
   });
   return keys;
@@ -399,7 +399,7 @@ test("the View button's name is a translatable key, in a shared namespace, resol
     !fallback.value.startsWith('FABRICATE.Admin.Manager.Recipe.'),
     `\`viewLabel\` defaults to "${fallback.value}", under the RECIPE editor's namespace. This ` +
       'is the default name of a shared primitive on nine surfaces, eight of which are not the ' +
-      "recipe editor; a key filed under one of the nine reads as that screen's property."
+      'recipe editor; a key filed under one of the nine reads as that screen\'s property.'
   );
 
   const children = button.fragment.nodes.filter((node) => node.type !== 'Text');

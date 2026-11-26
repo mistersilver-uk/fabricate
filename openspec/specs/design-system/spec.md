@@ -2784,7 +2784,7 @@ Each issue offers an action that moves focus to the offending control.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 Its one implementation is `src/ui/svelte/components/EditorValidationSurface.svelte`, the library's `<ValidationSummary>`: the verdict and the grouped rows are one entry, not two.
-Each row's status pill MUST be the shared `Chip` in its severity's tone: `positive` for pass, `warning` for warn, `danger` for block.
+Each row's status pill MUST be the shared `Chip` in its severity's tone: `positive` for pass, `warning` for warn, `danger` for block, and its status icon and the summary's medallion ink in that severity's `-text` token.
 A row title MUST draw at 12px and weight 600 in the default ink, its detail at 10.5px, the verdict's serif line at 15px, and each group's label as a `Kicker` beside its icon.
 
 A row MAY carry one action of its own, `{ labelKey, descriptionKey?, onAction }`, for an issue whose fix is a single staged edit.
