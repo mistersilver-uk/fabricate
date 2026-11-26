@@ -1,4 +1,5 @@
 player-journal-iterative-list
+player-journal-iterative-history
 player-journal-iterative-resume
 player-journal-iterative-idle
 player-journal-iterative-fresh
@@ -20,6 +21,10 @@ player-journal-iterative-starting
 player-journal-iterative-begin-refused
 player-journal-iterative-step-started
 player-journal-iterative-routes
+player-journal-iterative-finished
+player-journal-iterative-failed
+player-journal-iterative-failed-nothing
+player-journal-iterative-record
 player-journal-iterative-cancel
 player-journal-iterative-cancel-single-refund
 player-journal-iterative-single

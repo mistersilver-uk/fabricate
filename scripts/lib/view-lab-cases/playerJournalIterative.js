@@ -1,6 +1,6 @@
 /**
  * The player Journal's iterative workpieces, on the lab's `workpiece` Ironworks (issue 3011): the
- * list, and every state of the Workpiece view a player can reach. History follows with its view.
+ * list, every state of the Workpiece view a player can reach, and the history a closed one leaves.
  */
 
 import { JOURNAL_SOURCES } from './caseConstants.js';
@@ -28,6 +28,7 @@ const card = (action, note) =>
 const press = (action) => ({ selector: `[data-iterative-action="${action}"] button` });
 const BEGIN = { selector: '[data-run-action="begin"]' };
 const ARM_CANCEL = { selector: '[data-run-action="cancel-arm"]' };
+const openRecord = (runId) => ({ selector: `[data-history-run-id="${runId}"]` });
 
 /** One Workpiece frame, never on the smoke walk: the smoke never builds an iterative system. */
 const workpieceCase = (entry) =>
@@ -41,18 +42,19 @@ const workpieceCase = (entry) =>
   });
 
 export const CASES = Object.freeze([
-  playerCase({
+  workpieceCase({
     id: 'player-journal-iterative-list',
     label: 'Player Journal — iterative workpieces in the list',
-    // `beyond`: the smoke walk never builds an iterative system.
-    reaches: 'beyond',
-    smokeLabels: [],
     query: workpiece('list'),
     steps: [],
-    expectTab: 'journal',
-    expectSelector: '[data-run-id="iw-run-longsword"]',
-    kinds: ['player', 'journal', 'iterative'],
-    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
+    expectSelector: '[data-run-id="iw-run-boundary"] [data-run-attention="stepDone"]',
+  }),
+  workpieceCase({
+    id: 'player-journal-iterative-history',
+    label: 'Player Journal — iterative records in the finished list',
+    query: workpiece('history'),
+    steps: [openRecord('iw-run-failed')],
+    expectSelector: '[data-history-run-id="iw-run-failed"] [data-history-outcome="failed"]',
   }),
   workpieceCase({
     id: 'player-journal-iterative-resume',
@@ -213,6 +215,37 @@ export const CASES = Object.freeze([
     steps: [],
     expectSelector:
       '[data-iterative-step-card="1"][data-iterative-step-view="live"] [data-outcome-reached]',
+  }),
+  workpieceCase({
+    id: 'player-journal-iterative-finished',
+    label: 'Player Journal — workpiece finished, its verdict and yield',
+    query: workpiece('finished'),
+    steps: [press('fitHilt'), { selector: '[data-journal-verdict]', scroll: true }],
+    expectSelector: '[data-journal-verdict] [data-list-row]',
+  }),
+  workpieceCase({
+    id: 'player-journal-iterative-failed',
+    label: 'Player Journal — workpiece failed with a set',
+    query: workpiece('failed'),
+    steps: [
+      press('hammer'),
+      { selector: '[data-iterative-record] [data-stage-bars-state="danger"]', scroll: true },
+    ],
+    expectSelector: '[data-iterative-record] [data-stage-bars-state="danger"]',
+  }),
+  workpieceCase({
+    id: 'player-journal-iterative-failed-nothing',
+    label: 'Player Journal — workpiece failed, nothing produced',
+    query: workpiece('failed-nothing'),
+    steps: [press('hammer'), { selector: '[data-journal-verdict]', scroll: true }],
+    expectSelector: '[data-journal-verdict]:not(:has([data-list-row]))',
+  }),
+  workpieceCase({
+    id: 'player-journal-iterative-record',
+    label: 'Player Journal — workpiece record reopened',
+    query: workpiece('record'),
+    steps: [openRecord('iw-run-made')],
+    expectSelector: '[data-iterative-record] [data-iterative-sessions]',
   }),
   workpieceCase({
     id: 'player-journal-iterative-cancel',
