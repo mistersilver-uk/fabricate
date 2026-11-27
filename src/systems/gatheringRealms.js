@@ -6,6 +6,7 @@
  * never throws, and the `validate*` helpers reject them at save and import boundaries.
  */
 
+import { randomId } from '../utils/randomId.js';
 import { stringOrEmpty } from '../utils/scalars.js';
 
 export const GATHERING_REALM_REVEAL_MODES = Object.freeze([
@@ -57,26 +58,8 @@ function normalizeStringList(value) {
   return [...new Set(values.map((entry) => stringOrEmpty(entry).toLowerCase()).filter(Boolean))];
 }
 
-let _realmIdFallbackSeq = 0;
-
-// Not `Math.random()`, which Sonar flags: Foundry's `randomID`, else Web Crypto, else a counter.
-function defaultRandomID() {
-  if (globalThis.foundry?.utils?.randomID) return globalThis.foundry.utils.randomID();
-  const cryptoSource = globalThis.crypto;
-  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replaceAll('-', '').slice(0, 16);
-  if (cryptoSource?.getRandomValues) {
-    const bytes = new Uint8Array(8);
-    cryptoSource.getRandomValues(bytes);
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-  return `realm-${(_realmIdFallbackSeq++).toString(36)}`;
-}
-
 /** One scene mapping; a stale uuid is kept verbatim for the GM to repair. */
-export function normalizeGatheringRealmSceneMapping(
-  data = {},
-  { randomID = defaultRandomID } = {}
-) {
+export function normalizeGatheringRealmSceneMapping(data = {}, { randomID = randomId } = {}) {
   return {
     id: data?.id ? String(data.id) : randomID(),
     sceneUuid: stringOrEmpty(data?.sceneUuid),
@@ -93,7 +76,7 @@ function normalizeSceneMappingList(value, collaborators) {
  * One realm modifier. Unknown values coerce on read (`enabled` true, `visibility` visible,
  * `kind` custom, `operation` add, a non-finite `value` 0); validation rejects them on save.
  */
-export function normalizeGatheringRealmModifier(data = {}, { randomID = defaultRandomID } = {}) {
+export function normalizeGatheringRealmModifier(data = {}, { randomID = randomId } = {}) {
   const numericValue = Number(data?.value);
   // The pre-1.0.0 `hazardChance` reads as `eventChance` rather than falling to `custom`.
   const kind = data?.kind === 'hazardChance' ? 'eventChance' : data?.kind;
@@ -116,7 +99,7 @@ function normalizeModifierList(value, collaborators) {
 }
 
 /** One realm's persisted shape; the retired `craftingSystemId` is dropped on read (issue 1282). */
-export function normalizeGatheringRealm(data = {}, { randomID = defaultRandomID } = {}) {
+export function normalizeGatheringRealm(data = {}, { randomID = randomId } = {}) {
   const realm = {
     id: data?.id ? String(data.id) : randomID(),
     name: trimmedOrDefault(data?.name, 'New Realm'),

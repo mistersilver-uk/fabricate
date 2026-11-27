@@ -91,6 +91,7 @@ const RECIPE_RAW_MODULES = [
   'src/ui/presenters/resultKindGlyphs.js',
   'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
+  'src/utils/randomId.js',
   'src/config/currencyPresets.js',
   'src/utils/objectPath.js',
   // ... which names its check sort key from the system's evaluation (issue 2005) ...

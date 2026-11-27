@@ -292,6 +292,7 @@ The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) ma
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
 | `alchemy`             | `FABRICATE.App.Journal.Mode.Alchemy`             | Alchemy               |
+| `iterative`           | `FABRICATE.App.Journal.Mode.Iterative`           | Iterative             |
 | `straight` (gathering) | `FABRICATE.App.Journal.Mode.straight` | Direct |
 | `d100` (gathering) | `FABRICATE.App.Journal.Mode.d100` | d100 |
 | `routed` (gathering) | `FABRICATE.App.Journal.Mode.routed` | Check |
@@ -1153,6 +1154,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
   An entry is invalid when `counterRuleFault`, `iterativeEntryFault`, `producedWhenLineFault` or `stepIdListFault` faults it, when an action, the step or a counter it uses holds a value outside its enum or a list kept as authored, or when a bound, target, start or state value is `null` or missing.
 - Preflight evaluates every cost amount before any check is prepared, and a negative amount refuses as an invalid expression.
   Each `needsEnough` cost refuses on its own when its counter holds less than its amount, so two costs on one counter are each checked alone.
+  The refusal names the cost entry, its counter, the amount and the value the counter held, as `{ entryId, counterId, amount, value }`.
   A locked counter ignores every cost and effect aimed at it.
 - The check summary is `null` exactly when the action has no check, and otherwise holds a success flag, an outcome id or `null`, and a finite value.
   Any other pairing refuses as a mismatched check.

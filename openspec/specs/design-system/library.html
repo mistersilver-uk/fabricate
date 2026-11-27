@@ -2979,6 +2979,24 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           While it is armed it is the <b>only</b> decision on the row, so pause, the switch and the primary are all withdrawn rather than left competing with it.
           The decision sits at the far right of the line, as begin&rsquo;s does, and its prompt is a full-width callout beneath it so a longer translation never moves the buttons.</span>
         </div>
+      <div class="unit">
+        <span class="cap">worked through its cards — no primary and no pause</span>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--fab-space-2)">
+          <button style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;cursor:pointer;border:1px solid var(--fab-border-strong);background:var(--fab-surface-soft);color:var(--fab-text-secondary)" aria-label="Cancel this workpiece"><svg class="i" style="width:11px;height:11px"><use href="#i-ban"></use></svg></button>
+        </div>
+        <span class="k-hint">A run whose step is worked by pressing cards in the pane passes <code>primary: null</code> and <code>pause: null</code>, so the bar holds cancel alone: the cards are the actions, and there is no time to hold.
+          Resume is withdrawn with pause, whatever the run&rsquo;s own pause state says.</span>
+        </div>
+      <div class="unit">
+        <span class="cap">a step done — begin is the one primary, and still no pause</span>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--fab-space-2)">
+          <button style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;cursor:pointer;border:1px solid var(--fab-border-strong);background:var(--fab-surface-soft);color:var(--fab-text-secondary)" aria-label="Cancel this workpiece"><svg class="i" style="width:11px;height:11px"><use href="#i-ban"></use></svg></button>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--fab-space-2);margin-left:auto">
+            <button style="display:inline-flex;align-items:center;justify-content:center;gap:var(--fab-space-chip);height:34px;padding:0 var(--fab-space-3);border-radius:9px;font-family:var(--page-ui-face);font-size:11.5px;font-weight:600;white-space:nowrap;border:1px solid var(--fab-success-border);background:var(--fab-success);color:var(--fab-on-accent);cursor:pointer"><svg class="i" style="width:11px;height:11px"><use href="#i-play"></use></svg>Start step 2</button>
+          </div>
+        </div>
+        <span class="k-hint">A <code>null</code> pause keeps <b>begin</b> and the completion switch: at a step boundary begin takes the primary&rsquo;s place at the far right, and the verdict above the bar states its consequence, so it carries no prompt.</span>
+        </div>
     </div>
     <div class="notes">
       <div>
@@ -2998,9 +3016,9 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li class="k-hint"><b>Read from <code>RunActionBar.svelte</code>&rsquo;s <code>$props()</code>.</b></li>
         <li><b>run</b> the run record — the bar reads its <code>id</code>, which keys <code>armed</code>, its <code>paused</code> or <code>pauseState</code>, which puts Resume in Pause&rsquo;s place, and its <code>busy</code></li>
         <li><b>runLabel</b> <span class="req">required</span> — the icon-only cancel and the switch group both name the run when their own labels are absent</li>
-        <li><b>primary</b> {label, icon, enabled, reason, title, busy, busyLabel} <span class="req">required</span> · <b>onPrimary</b></li>
+        <li><b>primary</b> {label, icon, enabled, reason, title, busy, busyLabel} | null <span class="req">required</span> · <b>onPrimary</b> — <code>null</code> draws no primary, with or without begin</li>
         <li><b>begin</b> null | {label, icon, enabled, reason, prompt, busyLabel} · <b>onBegin</b> — at an unstarted stage it takes the primary&rsquo;s place, and its prompt is a full-width callout beneath the row</li>
-        <li><b>pause</b> {label, icon, enabled, reason, title, ariaLabel} · <b>onPause</b> · <b>resume</b> {label, icon, disabled, title, ariaLabel} · <b>onResume</b></li>
+        <li><b>pause</b> {label, icon, enabled, reason, title, ariaLabel} | null · <b>onPause</b> · <b>resume</b> {label, icon, disabled, title, ariaLabel} · <b>onResume</b> — a <code>null</code> pause draws neither pause nor resume, whatever <code>run.paused</code> or <code>run.pauseState</code> says, and keeps begin and the completion switch</li>
         <li><b>cancel</b> {icon, ariaLabel, title, disabled, confirmLabel, keepLabel, prompt} · <b>onCancel</b>, called by the armed confirm</li>
         <li><b>completion</b> false | {label, options, value, onChange, groupName, ariaLabel} — omit and the switch is not rendered</li>
         <li><b>armed</b> <span class="req">bindable</span> — local to the bar, reset when <code>run.id</code> changes</li>
@@ -4510,6 +4528,47 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <span class="k-hint">An unfilled stage still reads as a stage.
             The earlier single-track version put a divider inside one bar, invisible until the fill reached it.</span>
           </div>
+        <div class="unit">
+          <span class="cap">meter &mdash; marks at its thresholds</span>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:11.5px;font-weight:500">Shape</span>
+            <span class="k-count">45 / 75</span>
+          </div>
+          <div>
+            <div style="position:relative">
+              <div class="k-track">
+                <i style="width:60%"></i>
+              </div>
+              <span title="Fine — Shape ≥ 40" style="position:absolute;top:-3px;left:53.333%;width:2px;height:12px;border-radius:999px;background:var(--fab-accent);transform:translateX(-50%)"></span>
+              <span title="Masterwork — Shape ≥ 60" style="position:absolute;top:-3px;left:80%;width:2px;height:12px;border-radius:999px;background:var(--fab-text-muted);transform:translateX(-50%)"></span>
+            </div>
+            <div aria-hidden="true" style="position:relative;height:12px;margin-top:1px">
+              <span style="position:absolute;left:53.333%;transform:translateX(-50%);font-family:var(--fab-font-mono);font-size:9.5px;font-weight:500;line-height:12px;font-variant-numeric:tabular-nums;color:var(--fab-accent-text)">40</span>
+              <span style="position:absolute;left:80%;transform:translateX(-50%);font-family:var(--fab-font-mono);font-size:9.5px;font-weight:500;line-height:12px;font-variant-numeric:tabular-nums;color:var(--fab-text-muted)">60</span>
+            </div>
+          </div>
+          <span class="k-hint">A 2&times;12 tick over the track at each mark, its figure beneath in mono; a reached mark takes the accent.
+            Each tick&rsquo;s tooltip is its mark&rsquo;s label, and the caller states a reached mark in the meter&rsquo;s reading as well, so the accent is never the only carrier.</span>
+          </div>
+        <div class="unit">
+          <span class="cap">stages &mdash; a failed stage in danger</span>
+          <div class="k-stage-row">
+            <div class="k-track">
+              <i style="width:100%;background:var(--fab-success)"></i>
+            </div>
+            <div class="k-track">
+              <i style="width:100%;background:var(--fab-danger)"></i>
+            </div>
+            <div class="k-track"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:5px">
+            <span class="k-count" style="font-size:9px;color:var(--fab-text-muted)">1 Draw</span>
+            <span class="k-count" style="font-size:9px;color:var(--fab-text-muted)">2 Fold</span>
+            <span class="k-count" style="font-size:9px;color:var(--fab-text-muted)">3 Grind</span>
+          </div>
+          <span class="k-hint">A stage whose <b>status</b> is <code>failed</code> paints danger at any fill, ahead of the filled and current tones.
+            The colour is not the reading: the caller states the failure in the stage&rsquo;s <b>valueText</b>.</span>
+          </div>
       </div>
     </div>
     <div class="notes">
@@ -4519,14 +4578,16 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>Meter.svelte</code>&rsquo;s <code>$props()</code>.
             The shared fill leaf <code>FillBar.svelte</code> renders no role deliberately, so this component owns the one it needs.</li>
           <li><b>Props:</b> <b>value</b> and <b>max</b>, the fill being their ratio and a <b>max</b> of zero reading full &middot; <b>segments</b> an ordered list of entries drawn as the one fill&rsquo;s segments, left to right, each entry a semantic <b>tone</b>, a tag-palette name (<code>ember</code>, <code>butter</code>, <code>peach</code>, <code>verdant</code>, <code>mist</code>, <code>azure</code>, <code>lavender</code>, <code>rose</code>, <code>bone</code> or <code>slate</code>) or a caller-owned <b>color</b>, and a <b>value</b> on the scale of <b>max</b>: each entry but the last spans its value, stopping where the fill ends, and the last spans the rest of the reading, so the segments always make up the fill;
-            an entry that spans nothing is not drawn, when none spans anything the fill takes the first entry&rsquo;s paint, and the segments abut with no gap &middot; <b>valueText</b> the caller-formatted reading (<code>7 / 11</code>) &mdash; caller-formatted because a ratio and a duration are two sentences and neither is arithmetic this component should do &middot; exactly one of <b>labelId</b>, the id of the head the caller already renders above the track, or <b>label</b>, rendered visually hidden.</li>
+            an entry that spans nothing is not drawn, when none spans anything the fill takes the first entry&rsquo;s paint, and the segments abut with no gap &middot; <b>valueText</b> the caller-formatted reading (<code>7 / 11</code>) &mdash; caller-formatted because a ratio and a duration are two sentences and neither is arithmetic this component should do &middot; exactly one of <b>labelId</b>, the id of the head the caller already renders above the track, or <b>label</b>, rendered visually hidden
+            &middot; <b>marks</b>, unpublished, a list of {value, label, reached?}: each finite <b>value</b> from 0 to <b>max</b> draws a 2&times;12 tick over the track and its mono figure in a 12px row beneath, any other is not drawn, and a mark is reached at <b>reached</b> when it is a boolean and otherwise once the meter&rsquo;s value is at or past it; an empty list draws what the meter drew before marks.</li>
           <li><b>Passthrough:</b> <b>class</b> plus a rest spread on the root, written after the class &mdash; the spread carries the <code>data-*</code> hook a harness or a capture step selects on, so the attribute is genuinely absent when unset.</li>
           <li><b>Event contract:</b> none.
             A meter is stated, never operated, so it takes no callback and emits no control; a figure a user can change belongs to a stepper or a band strip.</li>
           <li><b>Accessible naming:</b> the root carries the meter role with its own <code>aria-valuenow</code>, <code>aria-valuemin</code>, <code>aria-valuemax</code> and an <code>aria-valuetext</code> equal to the reading, and it is named by the label the caller renders rather than by a duplicate string.
             The value and its label are always present as text, so colour is never the only encoding.
             A meter in segments still announces one reading: the segments are colour and width, so the caller states each one in <code>valueText</code> and as text beside the track.
-            Neighbouring segments are not held to a contrast step against each other, so that text is the reading, not a legend.</li>
+            Neighbouring segments are not held to a contrast step against each other, so that text is the reading, not a legend.
+            A mark&rsquo;s <b>label</b> is its tick&rsquo;s tooltip, and a reached mark takes the accent, so the caller words a reached mark in its label and in <b>valueText</b> and the accent never carries it alone; the figures are hidden from assistive technology.</li>
         </ul>
       </div>
       <div>
@@ -4547,7 +4608,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>StageBars.svelte</code>&rsquo;s <code>$props()</code>.
             It is one bar per stage side by side, not one track with dividers: the earlier single-track version hid a divider inside a bar until the fill reached it.</li>
-          <li><b>Props:</b> <b>stages</b> an ordered list, each an optional localized <b>name</b>, the visible caption, an optional <b>label</b>, the bar&rsquo;s accessible name, an optional localized <b>valueText</b>, the bar&rsquo;s reading in place of its percentage, and a <b>value</b> from 0 to 100, where an unfilled stage still renders its own bar and still reads as a stage, and optional <b>shares</b>, its fill split as the fill leaf&rsquo;s shares and drawn in place of its state&rsquo;s paint, and an optional localized <b>title</b>, the bar&rsquo;s <code>data-tooltip-text</code>, a pointer-only hint with or without numbers
+          <li><b>Props:</b> <b>stages</b> an ordered list, each an optional localized <b>name</b>, the visible caption, an optional <b>label</b>, the bar&rsquo;s accessible name, an optional localized <b>valueText</b>, the bar&rsquo;s reading in place of its percentage, and a <b>value</b> from 0 to 100, where an unfilled stage still renders its own bar and still reads as a stage, and optional <b>shares</b>, its fill split as the fill leaf&rsquo;s shares and drawn in place of its state&rsquo;s paint, and an optional localized <b>title</b>, the bar&rsquo;s <code>data-tooltip-text</code>, a pointer-only hint with or without numbers, and an optional <b>status</b>, whose <code>failed</code> paints the stage <code>danger</code> at any fill, ahead of the filled and current tones, with <code>data-stage-bars-state="danger"</code>
             &middot; <b>currentIndex</b> the stage being worked &middot; <b>gap</b> <code>default</code> or <code>tight</code>, the tight skin drawing 2px between bars where default draws 6px &middot; <b>track</b> <code>default</code> or <code>thin</code>, the thin skin borderless on <code>--fab-bg-3</code> at the row&rsquo;s 6px, with a 1px edge under forced colours &middot; <b>numbered</b> whether the caption beneath each bar carries its position and name, which the specimen draws, a named caption carrying its stage&rsquo;s name as its <code>title</code> &middot; exactly one of <b>ariaLabel</b> or <b>ariaLabelledBy</b>, the latter where the caller renders the kicker.</li>
           <li><b>Passthrough:</b> <b>class</b> plus a rest spread on the root, written after the class &mdash; the spread carries the <code>data-*</code> hook a harness or a capture step selects on, so the attribute is genuinely absent when unset.</li>
           <li><b>Event contract:</b> none.
@@ -5178,7 +5239,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Card API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 42 importing files: 41 components render 91 tags, 17 of them <code>flush</code>, and the published-component module imports it.
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorCard.svelte</code>&rsquo;s <code>$props()</code>, at 43 importing files: 42 components render 91 tags, 17 of them <code>flush</code>, and the published-component module imports it.
             It was extracted from 80 hand-written card sections across 20 components, and draws both card units above: radius 11, padding <code>--fab-space-4</code>, a 1px <code>--fab-border</code> edge on <code>--fab-bg-2</code>.</li>
           <li><b>flush</b> boolean, default <code>false</code> &mdash; padding 0, for a card whose head and body inset themselves, the second unit above.
             It emits <code>is-flush</code> and is unpublished: the published card takes <code>children</code>, <code>tone</code> and the head below, never <code>flush</code>.</li>
@@ -5347,7 +5408,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>Svelte API</h5>
         <ul>
-          <li><b>shipped</b> <code>components/AppTitleBar.svelte</code>, read from its <code>$props()</code>; its one importer, <code>apps/manager/ManagerTitleBar.svelte</code>, composes the summary, so it is a non-member on the <code>LogList</code>, <code>StageNav</code> and <code>XrefList</code> precedent</li>
+          <li><b>shipped</b> <code>components/AppTitleBar.svelte</code>, read from its <code>$props()</code>; its one importer, <code>apps/manager/ManagerTitleBar.svelte</code>, composes the summary, so it is a non-member on the <code>LogList</code> and <code>XrefList</code> precedent</li>
           <li><b>premiumInstalled</b> boolean, default false: draws the mark while a companion is installed</li>
           <li><b>statusLabel</b> the status part&rsquo;s visible text, composed and localized by the caller and drawn verbatim as the caption and its <code>title</code>; empty draws no status; one caption rather than a snippet, because no control fits the band</li>
           <li><b>own copy</b> the mark word, its read name and the status prefix, from the <code>FABRICATE.Admin.Manager.Titlebar</code> keys</li>
@@ -6060,7 +6121,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li class="k-hint"><b>SHIPPED</b> &mdash; shipped as <code>components/XrefList.svelte</code> and read here from its <code>$props()</code>, to the dense unit above, which is the cross-reference form: a kicker, then rows at a 22px mark, a 12px semibold name and an inline quantity, at radius 9.
           A <b>cross-reference list</b> is a read-only list that states which records a record relates to: what uses it, what produces it, what it is required for, who holds it or what contributes to it.
           It is not import-export&rsquo;s stored cross-reference, which is a persisted reference between documents, and a list whose rows carry actions, or open a body in place, is not one.
-          Its callers are the player inventory inspector&rsquo;s Sources, Contributing, Used by, Required for and Produced by sections, all in <code>InventoryComponentDetail.svelte</code>; with that one importer it is recorded as a non-member on the <code>LogList</code> and <code>StageNav</code> precedent, and the manager&rsquo;s cross-reference lists are adoption debt.</li>
+          Its callers are the player inventory inspector&rsquo;s Sources, Contributing, Used by, Required for and Produced by sections, all in <code>InventoryComponentDetail.svelte</code>; with that one importer it is recorded as a non-member on the <code>LogList</code> precedent, and the manager&rsquo;s cross-reference lists are adoption debt.</li>
         <li><b>Props:</b> <b>label</b> the kicker above the list, required and already localized &middot; <b>items</b> an ordered list, each a name, a mark and an optional caller-formatted quantity.
           Each row IS the dense &lt;ListRow&gt;, or its selectable dense form for a row that opens, composed rather than restated, so a change to that row reaches every cross-reference in the app; every row is one ellipsized line, 40px border-box whether it opens or not.
           Four item extensions: <b>id</b>, the row&rsquo;s key, its position when absent &middot; <b>detail</b>, the caller-formatted role or kind, drawn at the row&rsquo;s trailing edge in the muted ink and never as a quantity &middot; <b>opens: false</b>, which keeps that row from being a control in a list given <b>onOpen</b> &middot; <b>attrs</b>, spread on that row&rsquo;s root, because Required for and Produced by need two hook names with different values.
@@ -6768,6 +6829,65 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           The footer is the caller&rsquo;s band inside the frame, after the scroll container and, when the table pages, after the pager: an adder and its notes, never a row.</span>
       </div>
     </div>
+    <div class="stage col" style="border-top:1px solid var(--fab-border)">
+      <div class="unit" style="width:336px">
+        <span class="cap">compact pager &mdash; a table paged in a narrow pane</span>
+        <div style="border:1px solid var(--fab-border);border-radius:11px;background:var(--fab-bg-2);overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="border-collapse:collapse;width:100%">
+              <caption style="caption-side:top;text-align:left;padding:12px"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600;color:var(--fab-text)">Sessions</span>
+                  <span class="k-count">8</span>
+                </span></caption>
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:0 12px 8px 12px;font-family:var(--fab-font-mono);font-size:8.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);white-space:nowrap">#</th>
+                  <th style="text-align:left;padding:0 12px 8px 0;font-family:var(--fab-font-mono);font-size:8.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);white-space:nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">8</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Planish</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">7</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Hammer</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">6</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Stoke the forge</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">5</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Hammer</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary);font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums">4</td>
+                  <td style="padding:8px 12px 8px 0;border-top:1px solid var(--fab-border);font-size:12px;color:var(--fab-text-secondary)">Normalise</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--fab-space-2);padding:var(--fab-space-2);border-top:1px solid var(--fab-border);font-size:9.5px;color:var(--fab-text-muted)">
+            <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Showing 1&ndash;5 of 8</span>
+            <div style="display:flex;gap:var(--fab-space-2);align-items:center">
+              <button class="k-btn icon s26 dis"><svg class="i"><use href="#i-cl"/></svg></button>
+              <button class="k-btn icon s26"><svg class="i"><use href="#i-cr"/></svg></button>
+            </div>
+            <div style="display:flex;gap:var(--fab-space-2);align-items:center">
+              <span>Per page</span>
+              <div class="k-seg inline">
+                <button class="sel">5</button>
+                <button>10</button>
+                <button>15</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint"><code>pagerDensity="compact"</code> hands the table&rsquo;s pager the compact bar, one line in a narrow pane with its page sizes at the <code>inline</code> rung, closing the frame as its <code>edge</code> so it carries the section inset itself; an omitted or unknown value draws the default bar.</span>
+      </div>
+    </div>
     <div class="notes">
       <div>
         <h5>Canonical spec</h5>
@@ -6793,6 +6913,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
                 <li><b>search</b> a snippet drawn at the caption&rsquo;s end &middot; <b>cell</b> (row, column, index), a snippet drawing one cell; absent, the cell is <code>row[column.key]</code></li>
         <li><b>sort</b> {key, dir} &middot; <b>onSort</b> &mdash; a sortable header is a button and its <code>th</code> carries <code>aria-sort</code></li>
         <li><b>page &middot; perPage &middot; perPageOptions &middot; onPageChange &middot; onPerPageChange</b> &mdash; a table pages only with <code>perPage</code> set, and the caller passes the page&rsquo;s rows</li>
+        <li><b>pagerDensity</b> <code>default</code> | <code>compact</code> &mdash; the pager&rsquo;s <code>density</code>, a compact pager closing the frame as its <code>edge</code>; an omitted or unknown value reads <code>default</code></li>
         <li><b>loading &middot; error</b> &mdash; a store-fed table reaches both in ordinary use</li>
         <li><b>empty</b> {icon, title, hint, action}, <code>action</code> a snippet</li>
         <li><b>selectedKey</b> &middot; <b>onSelectRow</b> (row) &mdash; selection is <code>is-selected</code> on the <code>&lt;tr&gt;</code> alone, set by a pointer click or by focus entering a control in the row; the row is never focusable, and the cell&rsquo;s own button, carrying <code>aria-current</code>, is the keyboard path</li>
@@ -8739,13 +8860,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <span class="cap">one condition the caller combines (All)</span>
         <div style="display:flex;gap:8px;align-items:center">
           <svg class="i" style="width:24px"><use href="#i-bolt"/></svg>
-          <span class="grow" style="font-weight:600">When</span>
+          <span class="grow" style="color:var(--fab-text-muted);font-size:.72rem;font-weight:500">When</span>
           <div class="k-field inline" style="min-width:96px">Heat<svg class="i chev"><use href="#i-cd"/></svg></div>
           <div class="k-field inline" style="min-width:56px">&ge;<svg class="i chev"><use href="#i-cd"/></svg></div>
           <input type="number" aria-label="Value" value="3" readonly style="width:56px;height:28px;border:1px solid var(--fab-border);border-radius:6px;background:var(--fab-bg-2);color:var(--fab-text);font-variant-numeric:tabular-nums">
           <button class="k-btn icon" style="width:34px;height:34px;min-height:34px;border-radius:9px;color:var(--fab-danger-text);border-color:var(--fab-danger-border)" aria-label="Remove rule"><svg class="i"><use href="#i-trash"/></svg></button>
         </div>
-        <span class="k-hint">An iterative counter predicate: one condition on one line, with its source, comparison and value as the field chain. The caller combines its siblings with All or Any and states that once above the list, so the rule carries no sentence.</span>
+        <span class="k-hint">An iterative counter predicate: one condition on one line, with its source, comparison and value as the field chain. The caller combines its siblings with All or Any and states that once above the list, so the rule carries no sentence. Its &ldquo;When&rdquo; is a connective, so it is muted at weight 500 and .72rem rather than a 600 heading.</span>
         </div>
     </div>
     <div class="notes">
@@ -8753,6 +8874,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>Canonical spec</h5>
         <ul>
           <li><b>head</b> one disclosure button &mdash; a toned 28px glyph tile at radius 7, the title (serif 12.5/600) over the sentence as a 10.5px lead 4 below it, a 4/8 pill chip at radius 6 and a 10px chevron &mdash; padded 12, gap 12, with the 26px remove its sibling</li>
+          <li><b>one-line title</b> a heading at weight 600; a connective title (<code>head.connective</code>, such as &ldquo;When&rdquo;) is muted, weight 500 at .72rem and still grows</li>
           <li><b>body</b> bg-0 under a 1px rule · padding 12 · gap 12</li>
           <li><b>field</b> kicker above · select 30 · number field 32 · radius 7</li>
           <li><b>wrap</b> the row wraps rather than scrolls; kickers keep it readable</li>
@@ -8764,7 +8886,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>Svelte API</h5>
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>RuleRow.svelte</code>&rsquo;s and <code>RuleSentence.svelte</code>&rsquo;s <code>$props()</code>.</li>
-          <li><b>schema</b> the rule&rsquo;s anatomy: <code>head(value)</code>, the <code>steps</code> of the field chain (each a snippet the caller derives, so each step narrows the next), <code>sentence(value)</code> and the localized <code>labels</code></li>
+          <li><b>schema</b> the rule&rsquo;s anatomy: <code>head(value)</code> (<code>connective</code> is read by the one-line form only), the <code>steps</code> of the field chain (each a snippet the caller derives, so each step narrows the next), <code>sentence(value)</code> and the localized <code>labels</code></li>
           <li><b>value</b> <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span> &mdash; the whole next rule, or <code>null</code> to remove it</li>
           <li><b>presets</b> starting points offered while the rule is unauthored &middot; <b>collapsible</b> a disclosing head, or an <code>{open, onToggle}</code> object so a list keeps one rule open</li>
           <li><b>sentence</b> {frameKey, clauseKeys, joinKey, params} — <b>never a string</b>; a param may be a nested <code>{key, params}</code> fragment, and casing is a key, never a lowered string &middot; <b>missingClauseKey</b> the sentence drawn for a rule with a missing clause</li>
@@ -9871,7 +9993,43 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         </div>
         <span class="k-hint">Tracks tile the width so the number of stages is legible without counting: a full track is a finished stage, the part-filled one is the stage being served, and empty tracks are stages not reached.
           The stage in progress takes the <b>accent</b>; finished stages take <b>success</b>.
-          The line beside the kicker is reserved for a <b>blocker</b> and is otherwise empty — the countdown belongs to the time card and the state to the stage tag, so this line only ever states the one thing no other surface says.</span>
+          The line beside the kicker holds a <b>blocker</b>, or a caller&rsquo;s muted <b>note</b>, and is otherwise empty — the countdown belongs to the time card and the state to the stage tag, so this line only ever states what no other surface says.</span>
+        </div>
+      <div class="unit">
+        <span class="cap">progress — a failed stage, in danger</span>
+        <div style="display:grid;gap:var(--fab-space-2);max-width:520px">
+          <div style="display:flex;align-items:baseline;gap:var(--fab-space-2)">
+            <span style="line-height:0"><span class="k-kicker" style="line-height:1.3">Progress</span></span>
+          </div>
+          <div role="group" aria-label="Progress" style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--fab-space-chip)">
+            <div role="progressbar" aria-label="Rough out the blade" aria-valuenow="100" style="box-sizing:border-box;height:6px;border-radius:999px;border:1px solid var(--fab-border);background:var(--fab-surface-raised);overflow:hidden">
+              <div style="width:100%;height:100%;border-radius:999px;background:var(--fab-success)"></div>
+            </div>
+            <div role="progressbar" aria-label="Forge the edge" aria-current="step" aria-valuenow="100" style="box-sizing:border-box;height:6px;border-radius:999px;border:1px solid var(--fab-border);background:var(--fab-surface-raised);overflow:hidden">
+              <div style="width:100%;height:100%;border-radius:999px;background:var(--fab-danger)"></div>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint">A stage whose <code>status</code> is <code>failed</code> draws its track in <b>danger</b> and reads &ldquo;<i>p</i>%, failed&rdquo;, or &ldquo;<i>p</i>%, stage <i>n</i> of <i>m</i>, failed&rdquo; when it is named among several, so the failure is stated as well as painted.</span>
+        </div>
+      <div class="unit">
+        <span class="cap">progress — a note beside the kicker</span>
+        <div style="display:grid;gap:var(--fab-space-2);max-width:520px">
+          <div style="display:flex;align-items:baseline;gap:var(--fab-space-2)">
+            <span style="line-height:0"><span class="k-kicker" style="line-height:1.3">Progress</span></span>
+            <span style="font-size:10.5px;color:var(--fab-text-muted)">Step 2: Shape 45 of 60</span>
+          </div>
+          <div role="group" aria-label="Progress" style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--fab-space-chip)">
+            <div role="progressbar" aria-label="Rough out the blade" aria-valuenow="100" style="box-sizing:border-box;height:6px;border-radius:999px;border:1px solid var(--fab-border);background:var(--fab-surface-raised);overflow:hidden">
+              <div style="width:100%;height:100%;border-radius:999px;background:var(--fab-success)"></div>
+            </div>
+            <div role="progressbar" aria-label="Forge the edge" aria-current="step" aria-valuenow="75" style="box-sizing:border-box;height:6px;border-radius:999px;border:1px solid var(--fab-border);background:var(--fab-surface-raised);overflow:hidden">
+              <div style="width:75%;height:100%;border-radius:999px;background:var(--fab-accent)"></div>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint">A <b>note</b> is a muted line beside the kicker that describes the track group: what the stage being worked is reaching for.
+          It is not the blocker, which keeps its warning ink and its own hook.</span>
         </div>
       <div class="unit">
         <span class="cap">stage nav — a five-stage window over a longer run</span>
@@ -10031,10 +10189,10 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>RunProgress API</h5>
         <ul>
         <li class="k-hint"><b>Read from <code>RunProgress.svelte</code>&rsquo;s <code>$props()</code>.</b></li>
-        <li><b>stages</b> the run’s stage list — a stage whose <code>status</code> is <code>done</code> or <code>succeeded</code>, or that sits before <code>current</code>, fills its track · <b>current</b> index — the stage being worked</li>
+        <li><b>stages</b> the run’s stage list — a stage whose <code>status</code> is <code>done</code> or <code>succeeded</code>, or that sits before <code>current</code>, fills its track, and one whose <code>status</code> is <code>failed</code> draws in danger and reads as failed through the <code>FABRICATE.Common.StageBars.Failed</code> keys, alone or among several · <b>current</b> index — the stage being worked</li>
         <li><b>progress</b> 0–100 — the current stage’s own fill</li>
         <li><b>label</b> the kicker, which names the track group when drawn · <b>ariaLabel</b> — the group’s name when no kicker is drawn</li>
-        <li><b>blocker</b> string — the one line beside the Progress kicker</li>
+        <li><b>blocker</b> string — the warning line beside the Progress kicker · <b>note</b> string — a muted line beside it, after any blocker, carrying <code>data-run-progress-note</code> and describing the track group through <code>aria-describedby</code></li>
         <li>No events and no rest spread; the tracks, their group and their stage-named progress roles are <code>&lt;StageBars&gt;</code>’, and an unnamed stage of several is labelled “Stage <i>n</i> of <i>m</i>” here, through the <code>FABRICATE.Common.StageBars.Unnamed</code> key, while a named stage of several reads “<i>p</i>%, stage <i>n</i> of <i>m</i>”, <i>p</i> its whole percent truncated, as its bar’s <b>valueText</b>, through the <code>FABRICATE.Common.StageBars.Position</code> key; a lone stage takes neither.</li>
       </ul>
       </div>
@@ -10048,6 +10206,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>stageLabel</b> (stage, index) — each numeral’s accessible name, since the numeral is a bare number; it defaults to the number</li>
         <li><b>previousLabel</b> · <b>nextLabel</b> — the arrows’ names · <b>positionLabel</b> (view, count) — the nav’s name and its <em>Viewing stage n of m</em> line · <b>returnLabel</b> (current) — the <em>Return to current stage N</em> text</li>
         <li>Fewer than two stages render nothing; no rest spread.</li>
+        <li><b>Shared</b> &mdash; two importers draw it: <code>apps/journal/RunDetail.svelte</code>&rsquo;s stage browser and <code>apps/journal/iterative/WorkpieceView.svelte</code>&rsquo;s step browser, each with its own copy.</li>
       </ul>
       </div>
       <div>
@@ -12392,6 +12551,14 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       </div>
       <p class="k-hint" style="margin:6px 0 0;max-width:none">A composition that also smuggled back the 34px button size the set retires by name.
         <b>Compose:</b> Well + Kicker + Button.</p>
+    </div>
+    <div class="k-well">
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="tag t-out">Out</span>
+        <span class="k-mono" style="font-size:12px;font-weight:700">&lt;CounterGauge&gt;</span>
+      </div>
+      <p class="k-hint" style="margin:6px 0 0;max-width:none">A counter&rsquo;s card is a well holding its name, a meter with marks at its thresholds, and a chip for its state, so it owns no behaviour those four do not.
+        <b>Compose:</b> Well + Kicker + Meter + Chip.</p>
     </div>
     <div class="k-well">
       <div style="display:flex;gap:8px;align-items:center">

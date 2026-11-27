@@ -9,6 +9,7 @@ import { historyEvidenceFields } from '../../../src/systems/runHistoryEvidence.j
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { LAB_HISTORY_DATA_STATES, historyDataRunSets } from './labHistoryEvidence.js';
+import { iterativeFixtureCommand, seedIterativeWorkpieces } from './labIterativeRuns.js';
 import {
   JOURNAL_PROTOTYPE_RECIPES,
   JOURNAL_PROTOTYPE_BINDINGS,
@@ -113,6 +114,45 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'award-choice-forfeit': 'lab-v1-award-choice-forfeit',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
+  // Issue 3011: the iterative workbench's states, each built by `labIterativeRuns.js`.
+  'iterative-list': 'iw-run-longsword',
+  'iterative-history': 'iw-run-failed',
+  'iterative-record': 'iw-run-made',
+  'iterative-resume': 'iw-run-longsword',
+  'iterative-idle': 'iw-run-longsword',
+  'iterative-fresh': 'iw-run-longsword',
+  'iterative-cards': 'iw-run-longsword',
+  'iterative-no-action': 'iw-run-longsword',
+  'iterative-result': 'iw-run-longsword',
+  'iterative-result-nocheck': 'iw-run-longsword',
+  'iterative-busy': 'iw-run-longsword',
+  'iterative-unanswered': 'iw-run-longsword',
+  'iterative-throw': 'iw-run-longsword',
+  'iterative-stale': 'iw-run-longsword',
+  'iterative-error': 'iw-run-longsword',
+  'iterative-refusal-cost-unaffordable': 'iw-run-longsword',
+  'iterative-refusal-action-unavailable': 'iw-run-longsword',
+  'iterative-refusal-unknown-counter': 'iw-run-longsword',
+  'iterative-step-done': 'iw-run-longsword',
+  'iterative-starting': 'iw-run-boundary',
+  'iterative-begin-stale': 'iw-run-boundary',
+  'iterative-step-started': 'iw-run-boundary',
+  'iterative-routes': 'iw-run-longsword',
+  'iterative-finished': 'iw-run-spear',
+  'iterative-failed': 'iw-run-longsword',
+  'iterative-failed-nothing': 'iw-run-longsword',
+  'iterative-cancel': 'iw-run-longsword',
+  'iterative-cancel-single-refund': 'iw-run-spear',
+  'iterative-single': 'iw-run-spear',
+  'iterative-past-step': 'iw-run-longsword',
+  'iterative-future-step': 'iw-run-longsword',
+  'iterative-waiting': 'iw-run-longsword',
+  'iterative-authority': 'iw-run-longsword',
+  'iterative-unsupported': 'iw-run-longsword',
+  'iterative-gm': 'iw-run-longsword',
+  'iterative-redacted': 'iw-run-veiled',
+  'iterative-sessions': 'iw-run-longsword',
+  'iterative-narrow': 'iw-run-longsword',
   ...Object.fromEntries(
     [
       'history-checked-choice',
@@ -709,6 +749,48 @@ function journalCaseFactories(context) {
     'award-choice-forfeit': () => finished(awardChoiceCase(context, single(), { forfeit: true })),
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
+    'iterative-list': () => seedIterativeWorkpieces(context, 'iterative-list'),
+    'iterative-history': () => seedIterativeWorkpieces(context, 'iterative-history'),
+    'iterative-record': () => seedIterativeWorkpieces(context, 'iterative-record'),
+    'iterative-resume': () => seedIterativeWorkpieces(context, 'iterative-resume'),
+    'iterative-idle': () => seedIterativeWorkpieces(context, 'iterative-idle'),
+    'iterative-fresh': () => seedIterativeWorkpieces(context, 'iterative-fresh'),
+    'iterative-cards': () => seedIterativeWorkpieces(context, 'iterative-cards'),
+    'iterative-no-action': () => seedIterativeWorkpieces(context, 'iterative-no-action'),
+    'iterative-result': () => seedIterativeWorkpieces(context, 'iterative-result'),
+    'iterative-result-nocheck': () => seedIterativeWorkpieces(context, 'iterative-result-nocheck'),
+    'iterative-busy': () => seedIterativeWorkpieces(context, 'iterative-busy'),
+    'iterative-unanswered': () => seedIterativeWorkpieces(context, 'iterative-unanswered'),
+    'iterative-throw': () => seedIterativeWorkpieces(context, 'iterative-throw'),
+    'iterative-stale': () => seedIterativeWorkpieces(context, 'iterative-stale'),
+    'iterative-error': () => seedIterativeWorkpieces(context, 'iterative-error'),
+    'iterative-refusal-cost-unaffordable': () =>
+      seedIterativeWorkpieces(context, 'iterative-refusal-cost-unaffordable'),
+    'iterative-refusal-action-unavailable': () =>
+      seedIterativeWorkpieces(context, 'iterative-refusal-action-unavailable'),
+    'iterative-refusal-unknown-counter': () =>
+      seedIterativeWorkpieces(context, 'iterative-refusal-unknown-counter'),
+    'iterative-step-done': () => seedIterativeWorkpieces(context, 'iterative-step-done'),
+    'iterative-starting': () => seedIterativeWorkpieces(context, 'iterative-starting'),
+    'iterative-begin-stale': () => seedIterativeWorkpieces(context, 'iterative-begin-stale'),
+    'iterative-step-started': () => seedIterativeWorkpieces(context, 'iterative-step-started'),
+    'iterative-routes': () => seedIterativeWorkpieces(context, 'iterative-routes'),
+    'iterative-finished': () => seedIterativeWorkpieces(context, 'iterative-finished'),
+    'iterative-failed': () => seedIterativeWorkpieces(context, 'iterative-failed'),
+    'iterative-failed-nothing': () => seedIterativeWorkpieces(context, 'iterative-failed-nothing'),
+    'iterative-cancel': () => seedIterativeWorkpieces(context, 'iterative-cancel'),
+    'iterative-cancel-single-refund': () =>
+      seedIterativeWorkpieces(context, 'iterative-cancel-single-refund'),
+    'iterative-single': () => seedIterativeWorkpieces(context, 'iterative-single'),
+    'iterative-past-step': () => seedIterativeWorkpieces(context, 'iterative-past-step'),
+    'iterative-future-step': () => seedIterativeWorkpieces(context, 'iterative-future-step'),
+    'iterative-waiting': () => seedIterativeWorkpieces(context, 'iterative-waiting'),
+    'iterative-authority': () => seedIterativeWorkpieces(context, 'iterative-authority'),
+    'iterative-unsupported': () => seedIterativeWorkpieces(context, 'iterative-unsupported'),
+    'iterative-gm': () => seedIterativeWorkpieces(context, 'iterative-gm'),
+    'iterative-redacted': () => seedIterativeWorkpieces(context, 'iterative-redacted'),
+    'iterative-sessions': () => seedIterativeWorkpieces(context, 'iterative-sessions'),
+    'iterative-narrow': () => seedIterativeWorkpieces(context, 'iterative-narrow'),
     // Persisted history-data witnesses live in their own module; each state seeds one selected
     // record, plus the earlier record a recovery genuinely reads.
     ...Object.fromEntries(
@@ -1902,6 +1984,16 @@ export function createLabJournalCaseController({
     ) {
       return fixtureFailure('selection-required');
     }
+    const iterative = iterativeFixtureCommand({
+      state,
+      command,
+      container,
+      run,
+      now: Number(nowWorldTime()) || NOW,
+      actor,
+      persist,
+    });
+    if (iterative !== undefined) return iterative;
     const precondition = stagePreconditionFailure({
       run,
       command,

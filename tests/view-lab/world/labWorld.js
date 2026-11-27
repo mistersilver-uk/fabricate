@@ -15,6 +15,7 @@ import {
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { seedIterativeRecipes, seedIterativeState } from './labIterative.js';
+import { seedWorkpieceJourney } from './labIterativeRuns.js';
 import {
   REDACTED_STAGE_STATES,
   journalPrototypeRecipeId,
@@ -1116,6 +1117,7 @@ export async function buildLabWorld({
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   seedIterativeRecipes(content, actors, iterativeRecipes);
+  seedWorkpieceJourney(content, actors, iterative, journalCaseState);
   if (['reward-craft', 'reward-group'].includes(resultRowState)) seedRewardCraftLearned(actors);
   seedCheckPreviewState(content, actors, checkPreviewState);
   if (learnableBook) seedLearnableBook(content, actors);
@@ -1256,7 +1258,7 @@ export async function bootLabRuntime(world, journalCaseState = null) {
   const shim = installFoundryShim(world);
   world.shim = shim;
   // The authority-unavailable case starts without a ledger, which is what blocks its actions.
-  if (journalCaseState !== 'authority-unavailable') {
+  if (!['authority-unavailable', 'iterative-authority'].includes(journalCaseState)) {
     const ledger = createLabRunAuthorityLedger(
       ['claim-retained', 'native-recovery-claim'].includes(journalCaseState)
     );

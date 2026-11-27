@@ -130,6 +130,15 @@ const START_ATTENTION = Object.freeze({
   icon: 'fa-circle-play',
   labelKey: 'FABRICATE.App.Journal.Status.readyToBegin',
 });
+// An iterative step that has just succeeded, with the next one still to begin (issue 3011). It
+// takes the start member's place: the begin control is the same click, but what the player sees
+// is that the step is done, beside `In progress` because the workpiece itself is not.
+const STEP_DONE_ATTENTION = Object.freeze({
+  kind: 'stepDone',
+  tone: 'success',
+  icon: 'fa-check',
+  labelKey: 'FABRICATE.App.Journal.Status.stepDone',
+});
 const MATERIALS_ATTENTION = Object.freeze({
   kind: 'materials',
   tone: 'warning',
@@ -176,8 +185,12 @@ export function runAttentionPresentation(run) {
   // Ranked under the two BLOCKED states: a stage that can be begun is asked for only once
   // nothing else is owed, which `beginStep` already answers — it is the projection's own
   // "`beginVersionedStage` would commit this" predicate, so the chip cannot invite a click the
-  // command refuses.
+  // command refuses. An iterative step boundary says "Step done" in its place, and still says it
+  // when the next step cannot be begun for a reason the acquisition members do not name.
+  const boundary = run?.iterative?.boundary != null;
   if (run?.actions?.atStageStart === true && run?.actions?.beginStep === true)
-    return START_ATTENTION;
-  return ACQUISITION_ATTENTION[run?.actions?.disabledReason] ?? null;
+    return boundary ? STEP_DONE_ATTENTION : START_ATTENTION;
+  return (
+    ACQUISITION_ATTENTION[run?.actions?.disabledReason] ?? (boundary ? STEP_DONE_ATTENTION : null)
+  );
 }

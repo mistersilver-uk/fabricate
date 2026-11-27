@@ -446,8 +446,8 @@ describe('recipe step handlers under iterative', () => {
 
 describe('newStepId', () => {
   // The fallback runs first: this process holds no `foundry` until the second case installs one.
-  it('falls back to a step- id without Foundry', () => {
-    assert.match(newStepId(), /^step-[a-z0-9]+$/);
+  it('falls back to 16 base-36 characters without Foundry', () => {
+    assert.match(newStepId(), /^[a-z0-9]{16}$/);
   });
 
   it('uses Foundry randomID when present', () => {

@@ -1,7 +1,22 @@
 // Mounted coverage for RunCard: status chip + data hooks.
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { runAttentionPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
+import { chipToneOf } from '../helpers/chipTone.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  WORKPIECE_NOW,
+  installWorkpieceEnv,
+  workpieceListing,
+  workpieceLocalize,
+  workpieceModel,
+  workpieceRuns
+} from '../helpers/iterativeJournalListing.js';
+import { makeCraftingRun } from '../helpers/journal-fixtures.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SEARCHABLE_POPOVER_COMPILED_MODULES,
@@ -9,11 +24,6 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { makeCraftingRun } from '../helpers/journal-fixtures.js';
-import { chipToneOf } from '../helpers/chipTone.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -399,5 +409,126 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 0, onSelect: (id) => { selectedId = id; } });
     target.querySelector('.journal-run-card').click();
     assert.equal(selectedId.id, 'run-craft-1', 'clicking the card selects the native run object');
+  });
+});
+
+// Issue 3011, D-12: the lab's real `workpiece` runs, as the real builder lists them.
+describe('RunCard for an iterative workpiece', () => {
+  before(async () => {
+    await harness.setup();
+    installWorkpieceEnv();
+  });
+  afterEach(() => harness.remount());
+  after(() => harness.teardown());
+
+  const listed = () => {
+    const { active, history } = workpieceRuns('iterative-list');
+    return workpieceListing({ active: Object.values(active), history }).activeRuns;
+  };
+  const byId = (id) => listed().find((run) => run.id === id);
+
+  it('reads Ready, the step line and the goal of the focus step on a workpiece being worked', async () => {
+    const run = byId('iw-run-longsword');
+    const target = await harness.mount({ run, now: 0 });
+    const chip = target.querySelector('.journal-run-status');
+    assert.equal(chip.getAttribute('data-run-status'), 'ready');
+    assert.ok(chip.textContent.includes('Status.ready'));
+    assert.ok(!target.querySelector('[data-run-attention]'), 'a worked step owes no begin');
+    assert.equal(target.querySelector('.journal-run-card-step').textContent, 'Step 1 of 2 · 3 sessions completed');
+    const bars = [...target.querySelector('[data-run-progress]').querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-valuenow')),
+      ['33', '0'],
+      'the rail reads the workpiece progress, Shape 20 of 60'
+    );
+    assert.equal(
+      target.querySelector('[data-run-progress]').getAttribute('data-run-progress'),
+      '17',
+      'the hook is the mean of the drawn fills, (33 + 0) / 2'
+    );
+  });
+
+  it('reads Step done beside In progress at a step boundary', async () => {
+    const run = byId('iw-run-boundary');
+    assert.ok(run.iterative.boundary, 'the fixture is at a boundary');
+    const target = await harness.mount({ run, now: 0 });
+    assert.equal(target.querySelector('.journal-run-status').getAttribute('data-run-status'), 'inProgress');
+    const chip = target.querySelector('[data-run-attention]');
+    assert.equal(chip.getAttribute('data-run-attention'), 'stepDone');
+    assert.equal(chipToneOf(chip), 'positive', 'the success family');
+    assert.ok(chip.textContent.includes('Status.stepDone'));
+    assert.ok(chip.querySelector('.fa-check'), 'with its check glyph');
+    assert.match(target.querySelector('.journal-run-card').getAttribute('aria-label'), /Status\.stepDone/);
+    assert.equal(target.querySelector('[data-run-progress]').getAttribute('data-run-progress'), '50');
+  });
+
+  it('keeps the workpiece rail over its clock while a timed step waits', async () => {
+    const run = workpieceModel('iterative-waiting');
+    assert.ok(run.timeGate?.availableAt, 'the fixture is gated');
+    const target = await harness.mount({ run, now: 0 });
+    const bars = [...target.querySelector('[data-run-progress]').querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(bars.map((bar) => bar.getAttribute('aria-valuenow')), ['33', '0']);
+    assert.ok(target.querySelector('[data-run-countdown]'), 'the countdown still states the wait');
+  });
+
+  it('draws no rail for a single-step workpiece', async () => {
+    const target = await harness.mount({ run: byId('iw-run-spear'), now: 0 });
+    assert.ok(!target.querySelector('[data-run-progress]'));
+  });
+
+  it('still says Step done when the next step cannot begin for an unnamed reason, and names a shortfall', () => {
+    const run = byId('iw-run-boundary');
+    const refused = (disabledReason) => ({
+      ...run,
+      actions: { ...run.actions, beginStep: false, disabledReason }
+    });
+    const stepDone = runAttentionPresentation(refused('notOwner'));
+    assert.equal(stepDone.kind, 'stepDone');
+    assert.equal(workpieceLocalize(stepDone.labelKey), 'Step done', 'the label resolves in lang/en.json');
+    assert.equal(runAttentionPresentation(refused('selectionRequired')).kind, 'materials');
+    assert.equal(runAttentionPresentation(byId('iw-run-longsword')), null);
+  });
+
+  it('marks the focus step as current on the rail', async () => {
+    const target = await harness.mount({ run: byId('iw-run-boundary'), now: 0 });
+    const bars = [...target.querySelector('[data-run-progress]').querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(bars.map((bar) => bar.hasAttribute('aria-current')), [true, false]);
+  });
+
+  it('rounds a fraction of a goal to the nearest percent', async () => {
+    const target = await harness.mount({ run: workpieceModel('iterative-failed-nothing'), now: 0 });
+    assert.equal(target.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '17');
+  });
+
+  it('draws no rail for a timed single-step workpiece, and still counts down', async () => {
+    const timed = workpieceModel('iterative-single', {
+      mutate: (run) => {
+        run.status = 'waitingTime';
+        run.steps[0].status = 'waitingTime';
+        run.steps[0].timeGate = {
+          requiredSeconds: 14_400,
+          initiatedAt: WORKPIECE_NOW - 3600,
+          availableAt: WORKPIECE_NOW + 10_800,
+        };
+      },
+    });
+    const target = await harness.mount({ run: timed, now: 0 });
+    assert.ok(!target.querySelector('[data-run-progress]'), 'one step draws no rail');
+    assert.ok(target.querySelector('[data-run-countdown]'), 'the clock still shows');
+  });
+
+  it('ranks a pending reward or choice over Step done, and leaves a run that is not iterative alone', () => {
+    const run = byId('iw-run-boundary');
+    assert.equal(runAttentionPresentation({ ...run, awardChoicePending: true }).kind, 'reward');
+    assert.equal(runAttentionPresentation({ ...run, awaitingChoice: true }).kind, 'choice');
+    const begin = { atStageStart: true, beginStep: true };
+    assert.equal(runAttentionPresentation({ actions: begin }).kind, 'start');
+    assert.equal(runAttentionPresentation({ iterative: { boundary: null }, actions: begin }).kind, 'start');
+    assert.equal(
+      runAttentionPresentation({
+        actions: { atStageStart: true, beginStep: false, disabledReason: 'stageNotStarted' },
+      }),
+      null
+    );
   });
 });

@@ -5,13 +5,13 @@
  * root's localizers. A confirming handler reads the draft again once `confirm` resolves, because
  * `DialogV2` is not modal. Under `iterative` every patch is `withIterativeStepMoved`'s.
  */
+import { randomId } from '../../../../../utils/randomId.js';
+
 import { withIterativeStepMoved } from './iterative/iterativeStepMove.js';
 
-/** A fresh step id, from Foundry's generator where it exists. */
+/** A fresh step id: Foundry's `randomID` where it is loaded, else 16 base-36 characters. */
 export function newStepId() {
-  return (
-    globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`
-  );
+  return randomId();
 }
 
 const DELETE_ALSO_KEYS = {

@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 
 import { migrateLegacyResolutionModes } from '../src/migration/migrateLegacyResolutionModes.js';
 
+import { withInsecureOriginCrypto } from './helpers/insecureOriginCrypto.js';
+
 // Fixture helpers (DRY: every case builds from these tiny shape factories so the suite never
 // re-declares the same large literal — satisfies the Sonar new-code duplication gate the way
 // migrate-remove-system-provider.test.js does).
@@ -119,6 +121,14 @@ test('fan-in (multiple outcomes → one group) splits into per-outcome clones wi
   assert.notEqual(byName.success.id, 'g1', 'clone gets a fresh id');
   assert.deepEqual(byName.critical.results, [{ id: 'shared-r' }]);
   assert.deepEqual(byName.success.results, [{ id: 'shared-r' }], 'clone awards the same results');
+});
+
+test('a fan-in clone takes a fresh id on an insecure origin (issue 3032)', async () => {
+  const recipes = [recipe('sys-tiered', { outcomeRouting: { success: 'g1', critical: 'g1' } })];
+  const out = await withInsecureOriginCrypto(() => migrate([tieredSystem()], recipes));
+  const byName = groupsByName(out.recipes[0].resultGroups);
+  assert.equal(byName.critical.id, 'g1');
+  assert.match(byName.success.id, /^[a-z0-9]{16}$/);
 });
 
 test('unrouted group keeps its name (unreachable by name matching, like the old behavior)', () => {
