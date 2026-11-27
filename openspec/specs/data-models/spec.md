@@ -522,7 +522,7 @@ Checks Studio drafts carry the normalized record, a pass/fail slot move carries 
    Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
    Deleting a referenced item tag strips it from the `tags` of every component carrying it.
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, `"alchemy"`, or `"iterative"`.
-   `"iterative"` is accepted on read and write, and it is selectable only per `resolution-modes` § Iterative Mode Availability.
+   `"iterative"` is accepted on read and write, and a GM may select it (`resolution-modes` § Iterative Mode Availability).
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`checkMode: "none"`, `learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
