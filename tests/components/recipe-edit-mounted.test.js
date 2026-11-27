@@ -275,6 +275,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/SortableList.svelte',
   // The read-only stage complication list's muted label (issue 2445).
   'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
   'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
@@ -355,6 +356,7 @@ const stepsHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
@@ -667,6 +669,19 @@ const MODIFIER_SET_MODE_BY_LABEL = Object.freeze({
 function modifierSetMode(target) {
   const shown = selectTriggerText(target, MODIFIER_SET_TRIGGER);
   return MODIFIER_SET_MODE_BY_LABEL[shown] ?? shown;
+}
+
+/** The Overview section `name` is one `InspectorCard`, and no card sits inside a card. */
+function assertOneCard(target, name) {
+  const section = target.querySelector(`[data-recipe-section="${name}"]`);
+  assert.ok(section, `${name} renders`);
+  assert.ok(section.matches('section.fabricate-card'), `${name} is an InspectorCard`);
+  assert.equal(section.querySelectorAll(':scope .fabricate-card').length, 0, `${name} holds a card`);
+  assert.equal(
+    target.querySelectorAll(':scope .fabricate-card .fabricate-card').length,
+    0,
+    'nested cards'
+  );
 }
 
 describe('RecipeEditView (mounted)', () => {
@@ -8762,6 +8777,53 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   });
 });
 
+// The Overview's section shells draw `InspectorCard`'s one box (issue 3044).
+describe('RecipeEditView — the Overview section shells (mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const STEP = { id: 's1', name: 'Step 1', description: '' };
+
+  it('draws Step mode and the single-step Duration as one card each, with their hooks', async () => {
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
+    );
+    assertOneCard(target, 'recipe-step-mode');
+    assertOneCard(target, 'duration');
+    const mode = target.querySelector('[data-recipe-section="recipe-step-mode"]');
+    assert.ok(mode.classList.contains('manager-recipe-step-mode-card'));
+    assert.ok(mode.querySelector(':scope .fab-card-trailing [data-recipe-step-mode-option="single"]'));
+    const duration = target.querySelector('[data-recipe-section="duration"]');
+    assert.ok(duration.querySelector(':scope .fab-card-trailing [data-recipe-duration-summary]'));
+    assert.ok(duration.querySelector(':scope [data-recipe-duration-unit] [data-stepper-input]'));
+    editHarness.remount();
+  });
+
+  it('draws Step mode and the Steps card as one card each for a multi-step recipe', async () => {
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, steps: [STEP] }, multiStepEnabled: true })
+    );
+    assertOneCard(target, 'recipe-step-mode');
+    assertOneCard(target, 'steps');
+    editHarness.remount();
+  });
+
+  it('draws the collapsed steps as one card whose note is a span in the card note', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, steps: [STEP, { ...STEP, id: 's2', name: 'Step 2' }] },
+        multiStepEnabled: false,
+        onUpdateStep: () => {},
+      })
+    );
+    assertOneCard(target, 'collapsed-steps');
+    const note = target.querySelector('[data-recipe-collapsed-note]');
+    assert.equal(note.tagName, 'SPAN');
+    assert.ok(note.parentElement.classList.contains('fab-card-note'));
+    editHarness.remount();
+  });
+});
+
 // The Overview's routing card through the shell (issue 2513): the draft, the scope writes, the
 // minimum threaded to the Results tab, and the zero points.
 describe('RecipeEditView — the Overview routing card (mounted)', () => {
@@ -8816,6 +8878,22 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
     await flushRender();
     return { target, recipePatches, stepPatches, current: () => current };
   }
+
+  it('draws the Routing card as one card, holding none, on one scope and on several (issue 3044)', async () => {
+    const single = await mountRouted({ ...RECIPE, resultGroups: [group('g-a', ['t-high'])] });
+    assertOneCard(single.target, 'routing');
+    editHarness.remount();
+    const steps = ['s1', 's2'].map((id) => ({
+      id,
+      name: id,
+      ingredientSets: [],
+      resultGroups: [group(`${id}-a`)],
+    }));
+    const several = await mountRouted({ ...RECIPE, steps }, { multiStepEnabled: true });
+    assertOneCard(several.target, 'routing');
+    assert.equal(several.target.querySelectorAll('[data-recipe-routing-scope]').length, 2);
+    editHarness.remount();
+  });
 
   it('re-points a tier on the Overview through the draft', async () => {
     const recipe = { ...RECIPE, resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])] };

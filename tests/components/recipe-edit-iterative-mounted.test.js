@@ -708,6 +708,42 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
   });
 });
 
+/** The Overview section `name` is one `InspectorCard`, and no card sits inside a card. */
+function assertOneCard(name) {
+  const section = $(`[data-recipe-section="${name}"]`);
+  assert.ok(Boolean(section), `${name} renders`);
+  assert.ok(section.matches('section.fabricate-card'), `${name} is an InspectorCard`);
+  assert.equal(
+    section.querySelectorAll(':scope .fabricate-card').length,
+    0,
+    `${name} holds a card`
+  );
+  assert.equal(
+    target.querySelectorAll(':scope .fabricate-card .fabricate-card').length,
+    0,
+    'nested'
+  );
+}
+
+describe('iterative recipe Overview: the section shells are single cards (issue 3044)', () => {
+  it('draws Step mode and Working the recipe as one card each on a single step', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-hinge'));
+    assertOneCard('recipe-step-mode');
+    assertOneCard('iterative-step');
+    assert.ok(Boolean($('[data-recipe-section="recipe-step-mode"] .fab-card-trailing')));
+    assert.ok(Boolean($(`${STEP_CARD} [data-iterative-step-lock="temper"]`)), 'the config renders');
+  });
+
+  it('draws Step mode and the Steps card as one card each on a multi-step recipe', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-sword'));
+    assertOneCard('recipe-step-mode');
+    assertOneCard('steps');
+    assert.ok(!$(STEP_CARD), 'a multi-step recipe has no single-step card');
+  });
+});
+
 describe('iterative recipe Overview: the Steps card', () => {
   it('writes each step’s hide, lock and rules with their joiners, explaining a never-shown counter', async () => {
     const world = ironworks();

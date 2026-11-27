@@ -123,6 +123,13 @@ const SET_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\//,
 ]);
 
+/** Step mode's first option and the single-step Duration's chip and first stepper, as the pointer meets them. */
+const STEP_MODE_OPTION = '[data-recipe-step-mode-option]';
+const DURATION_HITS = Object.freeze([
+  '[data-recipe-section="duration"] [data-recipe-duration-summary]',
+  '[data-recipe-section="duration"] [data-recipe-duration-unit] [data-stepper-input]',
+]);
+
 /** A routed recipe's Overview scrolled to its routing card (issue 2513), the lab world seeded. */
 const ROUTING_CARD = '[data-recipe-section="routing"]';
 const ROUTING_OVERVIEW = (system, recipeId, state, lastRow = '') => ({
@@ -2152,7 +2159,7 @@ export const CASES = Object.freeze([
       `${ROUTING_CARD}:has(${ROW('set:jw-set-silver')} .fabricate-routing-overview-marker:has-text("default")) ` +
       `${ROW('set:jw-set-gold')} .fabricate-routing-overview-marker:has-text("default")`,
     expectLayout: ROUTING_GEOMETRY(),
-    expectCenterHit: [...ROUTING_HITS],
+    expectCenterHit: [...ROUTING_HITS, ...DURATION_HITS],
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [...SET_SOURCES],
   }),
@@ -2362,6 +2369,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager:has([data-recipe-edit-status="ready"]):has([data-recipe-mode-callout="iterative"]) ' +
       `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
     expectCenterHit: [
+      STEP_MODE_OPTION,
       `${COUNTER_ROW('heat')} [data-iterative-counter-visible]`,
       `${COUNTER_ROW('heat')} [data-iterative-counter-remove]`,
       '[data-recipe-edit-heading] [data-recipe-edit-status="ready"]',
@@ -2430,7 +2438,10 @@ export const CASES = Object.freeze([
     recipeId: 'iw-r-hinge',
     width: 880,
     expectSelector: `${COUNTERS_CARD} .fabricate-data-table-scroll [data-iterative-counter-row="heat"]`,
-    expectCenterHit: `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
+    expectCenterHit: [
+      STEP_MODE_OPTION,
+      `${COUNTER_ROW('heat')} [data-iterative-counter-start="heat"]`,
+    ],
     // The table scrolls inside its frame, so the frame stays inside the card at 880px.
     expectContained: [{ container: COUNTERS_CARD, target: '.fabricate-data-table-scroll' }],
   }),
