@@ -3528,6 +3528,8 @@
           "CheckByIngredientsTooltip": "This system routes results by the ingredient set used, with no crafting check.",
           "CheckOff": "Check off",
           "CheckOffTooltip": "This system’s crafting check is switched off, so every matched attempt resolves as a success.",
+          "CheckPerAction": "Per action",
+          "CheckPerActionTooltip": "Each Crafting Action rolls this system’s crafting check, or doesn’t.",
           "CheckNone": "No check",
           "CheckNoneTooltip": "This system has no usable crafting check.",
           "CraftingCheck": "Crafting check",

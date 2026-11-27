@@ -962,12 +962,13 @@ Only a summed roll-high check against a fixed DC shows a DC: a fixed roll-under 
 The sort key those pills share with the check DC reads `Check target` whenever any row names a target or character value (with no rows, whenever the system's summed check is not roll-high against a fixed DC), and a character-value row, which has no single number, sorts with the dynamic rows; the editor subline names the same fact.
 A counting check's pill reads `{n} successes` (`1 success`) in the mono face — the recipe tier's successes needed, falling back to the pool's own like the engine — and `Dynamic successes` when a macro sets the count; the sort key it shares with the check DC reads `Successes needed` and sorts by that count.
 Every pill that carries or stands for a check's difficulty (DC, Target, Character value, successes and their dynamic forms) takes the info tone.
-A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the two check-less states are distinct and must not be conflated:
+A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the check-less states are distinct from each other and from the iterative one, and must not be conflated:
 
 - **`By ingredients`** (neutral) — a `routedByIngredients` system with no usable check.
   Results route off the ingredient set that was used, so the recipe resolves with no roll; this is a working configuration.
-- **`No check`** (warning) — every other mode with no usable check.
+- **`No check`** (warning) — every other non-iterative mode with no usable check.
   The system cannot roll for this recipe, and a GM must be able to **scan** a library for that, which is why it is a warning that names the condition rather than an em dash.
+- **`Per action`** (neutral) — an `iterative` system, whatever its routed check holds, because each Crafting Action rolls the system's crafting check or doesn't and a recipe carries none.
 
 The **filter bar** has three rows.
 Row one carries every filter — a name/description search, a status filter (all / on / off), a lock filter (all / unlocked / locked) and a category filter (bare, named by its `aria-label`).
