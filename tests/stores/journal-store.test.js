@@ -142,6 +142,8 @@ const JOURNAL_STORE_SHAPE = {
     'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
     'toggleKind', 'viewStage',
   ],
+  // The iterative workbench's own store, one member the view reaches as `journal.iterative`.
+  stores: ['iterative'],
 };
 
 describe('journalStore', () => {
@@ -157,7 +159,7 @@ describe('journalStore', () => {
     compiler.cleanup();
   });
 
-  it('returns exactly the 59 public members the journal view reads, each still a getter', () => {
+  it('returns exactly the 60 public members the journal view reads, each still a getter', () => {
     const store = createJournalStore({ services: makeServices().services });
     const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
 
@@ -1162,6 +1164,23 @@ describe('journalStore', () => {
 
     assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
     assert.equal(store.busyRunId, '', 'busy flag cleared so the run is not wedged');
+    assert.equal(setup.calls.list, 1, 'a thrown advance reloads nothing');
+  });
+
+  it('dismiss surfaces a thrown error, reloads once and clears busy', async () => {
+    const done = history(2);
+    const setup = makeServices({
+      dismissThrows: true,
+      listing: baseListing({ activeRuns: [], history: done }),
+    });
+    const store = await loadedStore(setup);
+
+    await assert.doesNotReject(() => store.dismiss(done[0]));
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
+    assert.equal(setup.calls.list, 2, 'a thrown dismissal reloads the listing once');
+    assert.equal(store.busyRunKey, '');
   });
 
   it('cancel surfaces a thrown error and clears busy instead of rejecting', async () => {

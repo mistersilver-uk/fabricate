@@ -4,6 +4,7 @@
  * Each state names how the seeded library differs from the populated one.
  */
 import { component, ICON_BASE, LAB_SYSTEM_IDS, recipe, simpleSet } from './labContent.js';
+import { installWorkpieceWorld, WORKPIECE_CHECK, WORKPIECE_LIBRARY } from './labIterativeRuns.js';
 import { installLabRunStates } from './labRunStates.js';
 
 const counter = (id, label, extra = {}) => ({ id, label, limit: 'none', ...extra });
@@ -138,6 +139,8 @@ export const LAB_ITERATIVE_STATES = Object.freeze({
   }),
   // The routed crafting check counts successes and wins under its target (see `ROUTED_CHECKS`).
   countUnder: (library) => library,
+  // Issue 3011: the workbench's library, with its own counters, actions and recipes (see labIterativeRuns.js).
+  workpiece: () => structuredClone(WORKPIECE_LIBRARY),
   // Enough actions that the ten-row page breaks, so page two and the page size are reachable.
   paged: (library) => ({
     ...library,
@@ -161,6 +164,7 @@ const ROUTED_HIT = Object.freeze({
 
 /** The states whose routed crafting check is not the default one. */
 const ROUTED_CHECKS = Object.freeze({
+  workpiece: WORKPIECE_CHECK,
   noCheck: { ...ROUTED_HIT, rollFormula: '' },
   countUnder: {
     ...ROUTED_HIT,
@@ -220,7 +224,10 @@ export function seedIterativeState(content, stateId) {
     gatheringRealmSettings: { enabled: false },
     iterative: library,
   });
-  if (!RECIPELESS_STATES.has(stateId)) content.recipes.push(...structuredClone(IRONWORKS_RECIPES));
+  if (stateId === 'workpiece') installWorkpieceWorld(content, content.systems.at(-1));
+  else if (!RECIPELESS_STATES.has(stateId)) {
+    content.recipes.push(...structuredClone(IRONWORKS_RECIPES));
+  }
 }
 
 const heatAtLeast = (value) => ({ source: 'counter', counterId: 'heat', op: '>=', value });

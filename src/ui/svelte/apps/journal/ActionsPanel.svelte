@@ -5,6 +5,7 @@
   import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';
+  import { workpieceBar } from './iterative/workpieceBar.js';
 
   let { run = null, journal = null, now = 0 } = $props();
   let cancelArmed = $state(false);
@@ -39,6 +40,10 @@
   // to the ordinary primary the command would refuse (issue 1648, M15).
   const awaitingStart = $derived(currentContract && actions.atStageStart === true);
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
+  // An iterative run is worked card by card: no primary, no pause, its own begin and cancel (D-6).
+  const workpiece = $derived(
+    run?.iterative ? workpieceBar({ run, busy, canCancel, reason, localize }) : null
+  );
   const hasCheck = $derived(
     Boolean(
       run?.currentStep?.detail?.checkLabel ||
@@ -111,41 +116,47 @@
 
 <div class="journal-actions" data-journal-actions>
   <RunActionBar
-    {run}
+    run={workpiece?.run ?? run}
     runLabel={String(run?.names?.title ?? '')}
-    primary={{
-      enabled: canExecute,
-      busy,
-      label: primaryLabel(),
-      busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
-      icon: primaryIcon(),
-      reason,
-    }}
-    begin={awaitingStart
-      ? {
-          enabled: canBegin,
-          label: localize('FABRICATE.App.Journal.Actions.BeginStep'),
+    primary={workpiece
+      ? null
+      : {
+          enabled: canExecute,
+          busy,
+          label: primaryLabel(),
           busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
-          icon: 'fas fa-play',
-          prompt: localize(
-            run?.redacted === true
-              ? 'FABRICATE.App.Journal.Actions.RedactedBeginStepPrompt'
-              : 'FABRICATE.App.Journal.Actions.BeginStepPrompt'
-          ),
+          icon: primaryIcon(),
           reason,
-        }
-      : null}
-    pause={{
-      enabled: actions.pause === true,
-      label: localize('FABRICATE.App.Journal.Actions.Pause'),
-      reason,
-    }}
+        }}
+    begin={workpiece
+      ? workpiece.begin
+      : awaitingStart
+        ? {
+            enabled: canBegin,
+            label: localize('FABRICATE.App.Journal.Actions.BeginStep'),
+            busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
+            icon: 'fas fa-play',
+            prompt: localize(
+              run?.redacted === true
+                ? 'FABRICATE.App.Journal.Actions.RedactedBeginStepPrompt'
+                : 'FABRICATE.App.Journal.Actions.BeginStepPrompt'
+            ),
+            reason,
+          }
+        : null}
+    pause={workpiece
+      ? null
+      : {
+          enabled: actions.pause === true,
+          label: localize('FABRICATE.App.Journal.Actions.Pause'),
+          reason,
+        }}
     resume={{
       disabled: actions.resume !== true,
       label: localize('FABRICATE.App.Journal.Actions.Resume'),
       title: reason,
     }}
-    cancel={{
+    cancel={workpiece?.cancel ?? {
       disabled: !canCancel,
       ariaLabel: localize('FABRICATE.App.Journal.Actions.CancelCraft'),
       title: canCancel ? localize('FABRICATE.App.Journal.Actions.CancelCraft') : reason,
@@ -159,7 +170,7 @@
     }}
     {completion}
     onPrimary={(event) => withRollPromptOrigin(event, () => journal?.execute?.(run))}
-    onBegin={() => journal?.beginStep?.(run)}
+    onBegin={() => (workpiece ? journal?.iterative?.beginStep?.(run) : journal?.beginStep?.(run))}
     onPause={() => journal?.pause?.(run)}
     onResume={() => journal?.resume?.(run)}
     onCancel={() => journal?.cancel?.(run)}

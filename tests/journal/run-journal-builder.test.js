@@ -11,6 +11,7 @@ import { isActiveJournalGM, journalFacade } from '../../src/bootstrap/journalFac
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { gatheringRunNeedsPlayerCheck } from '../../src/systems/gatheringD100Check.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { journalModeLabelKey } from '../../src/ui/presenters/journalCheckText.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
@@ -25,6 +26,13 @@ import {
 } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 import { runStateNotice } from '../../src/ui/svelte/apps/journal/runStateNotice.js';
 import { formatRoll } from '../../src/ui/svelte/apps/journal/runDetailPresentation.js';
+import {
+  WORKPIECE_ACTOR,
+  installWorkpieceEnv,
+  workpieceListing,
+  workpieceModel,
+  workpieceRuns,
+} from '../helpers/iterativeJournalListing.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
 const PLAYER = { id: 'user-1', isGM: false };
@@ -4410,4 +4418,117 @@ test('Native Reconciliation: no user id and no active GM is not the active GM', 
   } finally {
     Reflect.set(globalThis, 'game', previousGame);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Iterative runs (issue 3011, D-2): a workpiece is worked one Iterative Attempt at a time
+// ---------------------------------------------------------------------------
+
+const iterativeModel = (state, options = {}) => {
+  installWorkpieceEnv();
+  return workpieceModel(state, options);
+};
+const ITERATIVE_ONLY = ['execute', 'pause', 'resume', 'setCompletionMode'];
+
+test('3011: an iterative run offers no execute, pause, resume or completion switch', () => {
+  for (const state of ['iterative-list', 'iterative-waiting', 'iterative-starting', 'iterative-single']) {
+    const { actions } = iterativeModel(state);
+    for (const key of ITERATIVE_ONLY) assert.equal(actions[key], false, `${state} ${key}`);
+    assert.equal(typeof actions.takeAction, 'boolean', state);
+  }
+  assert.equal(iterativeModel('iterative-list').actions.takeAction, true);
+});
+
+test('3011: takeAction holds only on a mutable, current, unpaused, matured and supported step', () => {
+  const cases = {
+    paused: { mutate: (run) => (run.pauseState = { pausedAt: 1, remainingSeconds: 60 }) },
+    immature: { state: 'iterative-waiting' },
+    'unsupported lifecycle': { state: 'iterative-unsupported' },
+    'unsupported state': { mutate: (run) => (run.steps[0].iterative.version = 2) },
+    'unsupported library': { mutate: (run) => (run.termsSnapshot.iterative.version = 2) },
+    ended: { mutate: (run) => (run.steps[0].iterative.terminal = { kind: 'failure', attempt: 3, resultGroupId: null }) },
+    'not owned': { actor: { ...WORKPIECE_ACTOR, isOwner: false } },
+    'authority unavailable': { authority: { available: false, reason: 'authorityUnavailable' } },
+    'recovery required': {
+      mutate: (run) => (run.executionJournal = { status: 'recoveryRequired', effects: [] }),
+    },
+  };
+  for (const [label, { state = 'iterative-list', ...options }] of Object.entries(cases)) {
+    assert.equal(iterativeModel(state, options).actions.takeAction, false, label);
+  }
+  assert.equal(iterativeModel('iterative-history').actions.takeAction, false, 'a closed run');
+  const redacted = iterativeModel('iterative-redacted', { hidden: ['iw-r-veiled'] });
+  assert.equal(redacted.redacted, true);
+  assert.equal(redacted.actions.takeAction, true, 'redaction hides identity, never the attempt');
+});
+
+test('3011: a later step is at its own start, offered to begin when nothing blocks it', () => {
+  const boundary = iterativeModel('iterative-starting');
+  assert.deepEqual(
+    [boundary.actions.atStageStart, boundary.actions.beginStep, boundary.actions.takeAction],
+    [true, true, false]
+  );
+  assert.equal(boundary.actions.disabledReason, 'stageNotStarted');
+  assert.deepEqual(boundary.stageStart, { required: true, started: false });
+  const started = iterativeModel('iterative-list');
+  assert.equal(started.actions.atStageStart, false);
+  assert.equal(started.actions.disabledReason, null);
+});
+
+test('3011: a redacted boundary begins judged on its blocker, iterative or not (#3033)', () => {
+  const boundary = (actor) => iterativeModel('iterative-starting', { hidden: ['iw-r-longsword'], actor }).actions;
+  const begin = ({ atStageStart, beginStep, disabledReason }) => [atStageStart, beginStep, disabledReason];
+  assert.equal(iterativeModel('iterative-starting', { hidden: ['iw-r-longsword'] }).redacted, true);
+  assert.deepEqual(begin(boundary(WORKPIECE_ACTOR)), [true, true, 'stageNotStarted'], 'a stocked boundary');
+  assert.deepEqual(begin(boundary({ ...WORKPIECE_ACTOR, items: [] })), [true, false, 'selectionRequired'], 'a shortfall');
+  const shipped = redactedStage([ironRoute()]).actions;
+  assert.deepEqual(begin(shipped), [true, true, 'stageNotStarted'], 'a non-iterative boundary');
+  const short = redactedStage([routeSet('route-gold', 'gold')]).actions;
+  assert.deepEqual(begin(short), [true, false, 'selectionRequired'], 'a non-iterative shortfall');
+  assert.equal(Object.hasOwn(shipped, 'takeAction'), false, 'a non-iterative run gains no key');
+});
+
+test('3011: a begun step reports no stage blocker, while a boundary reports the one that blocks it', () => {
+  const shortfall = iterativeModel('iterative-starting', {
+    actor: { ...WORKPIECE_ACTOR, items: [] },
+  });
+  assert.equal(shortfall.actions.beginStep, false);
+  assert.equal(shortfall.actions.disabledReason, 'selectionRequired');
+  const toolless = iterativeModel('iterative-starting', { toolMissing: true });
+  assert.deepEqual([toolless.actions.beginStep, toolless.actions.disabledReason], [false, 'toolRequired']);
+  const begun = iterativeModel('iterative-list', { toolMissing: true });
+  assert.equal(begun.actions.takeAction, true, 'the authority, not the projection, refuses a lost Tool');
+  assert.equal(begun.actions.disabledReason, null, 'a started step reports no stage blocker');
+  const unsupported = iterativeModel('iterative-starting', {
+    mutate: (run) => (run.steps[0].iterative.version = 2),
+  });
+  assert.deepEqual(
+    [unsupported.actions.beginStep, unsupported.actions.disabledReason],
+    [false, 'version-unsupported']
+  );
+  const locked = iterativeModel('iterative-list', { authority: { available: false, reason: 'authorityUnavailable' } });
+  assert.equal(locked.actions.disabledReason, 'authorityUnavailable');
+});
+
+test('3011: an iterative blocker shows only as the blocker notice', () => {
+  assert.equal(notice(iterativeModel('iterative-list')), null);
+  assert.equal(notice(iterativeModel('iterative-starting')), null, 'an unbegun step raises no banner');
+  const locked = iterativeModel('iterative-list', { authority: { available: false, reason: 'authorityUnavailable' } });
+  assert.equal(notice(locked).hooks['data-journal-action-blocker'], 'authorityUnavailable');
+});
+
+test('3011: status counts include iterative rows, and the mode label reads Iterative', () => {
+  installWorkpieceEnv();
+  const { active, history } = workpieceRuns('iterative-list');
+  const listing = workpieceListing({ active: Object.values(active), history });
+  assert.deepEqual(listing.counts, { active: 3, history: 2 });
+  assert.deepEqual(
+    listing.activeRuns.map((run) => [run.id, run.derivedStatus, run.resolutionModeLabel]),
+    [
+      ['iw-run-longsword', 'ready', 'Iterative'],
+      ['iw-run-boundary', 'inProgress', 'Iterative'],
+      ['iw-run-spear', 'ready', 'Iterative'],
+    ]
+  );
+  assert.equal(journalModeLabelKey('iterative'), 'FABRICATE.App.Journal.Mode.Iterative');
 });

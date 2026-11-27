@@ -45,6 +45,7 @@ import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 import { essenceIconOrNull } from '../svelte/util/essenceIcons.js';
 
+import { iterativeRunFields } from './iterative/iterativeRunPresentation.js';
 import {
   activeModeLabelKey,
   executedTargetFields,
@@ -65,6 +66,7 @@ import {
   inFlightAwardJournal,
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
+import { durationToSeconds, runActions, stageStartState } from './runJournalActions.js';
 import {
   acquisitionShortfallCount,
   choiceAvailability,
@@ -90,7 +92,6 @@ const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green
 // Generic player-facing label for a blind gathering run, shared with the
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
-const DAY_SECONDS = 24 * 60 * 60;
 
 /** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
  *  recorded roll BESIDE the real quantity it produced, an authored expression INSTEAD of a number no
@@ -174,29 +175,6 @@ function dedupeRunModelsById(models, phase) {
     deduped.push(model);
   }
   return deduped;
-}
-
-/**
- * Convert a recipe/step `timeRequirement` (`{minutes,hours,days,months,years}`)
- * into a non-negative second count. Mirrors `CraftingRunManager._durationToSeconds`
- * (months = 30 days, years = 365 days) so the projection's required-time read
- * matches the gate the engine arms.
- */
-function durationToSeconds(timeRequirement = null) {
-  if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
-  const minutes = Number(timeRequirement.minutes || 0);
-  const hours = Number(timeRequirement.hours || 0);
-  const days = Number(timeRequirement.days || 0);
-  const months = Number(timeRequirement.months || 0);
-  const years = Number(timeRequirement.years || 0);
-  return Math.max(
-    0,
-    minutes * 60 +
-      hours * 60 * 60 +
-      days * DAY_SECONDS +
-      months * 30 * DAY_SECONDS +
-      years * 365 * DAY_SECONDS
-  );
 }
 
 /**
@@ -653,7 +631,7 @@ export class RunJournalBuilder {
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
       selectionAvailability: this._awardHeld(run, actor, readiness),
-      stageStart: this._stageStartState({
+      stageStart: stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
         system,
@@ -769,7 +747,18 @@ export class RunJournalBuilder {
       claimability,
     });
     const bolt = completesAsTimePasses({ run, recipe, getSystem: this._getSystem, claimability });
-    return { ...model, ...fields, completesAsTimePasses: bolt };
+    const iterative = iterativeRunFields({
+      run,
+      model,
+      actor,
+      viewer,
+      system,
+      recipe,
+      localize,
+      checkLabel: this._checkLabel({ system, recipe }),
+      mapResult: (result) => this._mapResult(result, stringOrNull(run.craftingSystemId)),
+    });
+    return { ...model, ...fields, completesAsTimePasses: bolt, ...iterative };
   }
 
   /** The current stage's readiness, held while an earlier stage owes a claimable pick. */
@@ -2553,7 +2542,7 @@ export class RunJournalBuilder {
       gmReconciliation: recovery.gmReconciliation,
       awaitingChoice: choiceRequired,
       stageStart: projectedStageStart(stageStart),
-      actions: this._runActions({
+      actions: runActions({
         run,
         runType,
         terminal,
@@ -2594,83 +2583,6 @@ export class RunJournalBuilder {
    */
   _offeredRecoveryClaim({ live, authority }) {
     return live ? (authority?.retained ?? null) : null;
-  }
-
-  /** What this viewer may do to this run, and the one code that says why they may not. */
-  /**
-   * Whether the live stage still has its own start, and whether it has taken it. A
-   * zero-duration stage has no waiting window, so it never has one to take.
-   * @private
-   * @returns {{needed: boolean, locked: boolean, started: boolean, required: boolean}|null}
-   */
-  _stageStartState({ activeStep, recipeStep, system }) {
-    if (!activeStep) return null;
-    const needed =
-      durationToSeconds(recipeStep?.timeRequirement) > 0 &&
-      system?.requirements?.time?.enabled !== false;
-    // `locked` is the D-028 commit; `started` also covers a stage armed before it shipped,
-    // which cannot be begun again even though its plan was never locked.
-    const locked = Boolean(activeStep.preparedConsumption);
-    const started = locked || Boolean(activeStep.timeGate);
-    return { needed, locked, started, required: needed && !started };
-  }
-
-  _runActions({
-    run,
-    runType,
-    terminal,
-    derivedStatus,
-    timeGate,
-    hasPlayerCheck,
-    stageStart,
-    entitled,
-    paused,
-    mutableCurrent,
-    executableType,
-    legacyExecute,
-    legacyCancel,
-    readyToExecute,
-    stageBlocker,
-    awaitingStageStart,
-    blockedReason,
-    recoveryClaim,
-    reconcileUncertain,
-  }) {
-    // The stage-start boundary is a SEPARATE fact from whether the begin control is
-    // enabled (M15). `atStageStart` alone decides which control renders — the begin
-    // decision, not the ordinary primary — so gating `beginStep` on the player's own
-    // unmade choice can never also make the control disappear and hand back an
-    // enabled primary that the command refuses.
-    const atStageStart = mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart;
-    return {
-      execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
-      pause:
-        mutableCurrent &&
-        executableType &&
-        !paused &&
-        run?.status === 'waitingTime' &&
-        Boolean(timeGate),
-      resume: mutableCurrent && executableType && paused,
-      setCompletionMode:
-        mutableCurrent &&
-        executableType &&
-        !paused &&
-        derivedStatus === 'waiting' &&
-        Boolean(timeGate) &&
-        !hasPlayerCheck,
-      atStageStart,
-      // Offered only where `beginVersionedStage` would commit the stage: `stageBlocker` carries
-      // every cause that command refuses on, so none of them is offered and then refused.
-      beginStep: atStageStart && stageBlocker === null,
-      setSelection:
-        mutableCurrent && runType === 'crafting' && entitled && stageStart?.locked !== true,
-      cancel: legacyCancel || (mutableCurrent && executableType),
-      dismiss: terminal,
-      disabledReason:
-        blockedReason ?? stageBlocker ?? (awaitingStageStart ? 'stageNotStarted' : null),
-      reconcileUncertain,
-      ...(recoveryClaim && { recoveryClaim }),
-    };
   }
 
   _mutationBlockedReason({ lifecycleContract, recoveryEvidence, actor, authority }) {

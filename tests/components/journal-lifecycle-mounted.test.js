@@ -18,12 +18,15 @@ import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { RUN_KICKER_CONTAINERS } from '../helpers/runKickerGround.js';
 import {
+  ITERATIVE_ATTEMPT_RAW_MODULES,
   OUTCOME_LADDER_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  WORKPIECE_VIEW_COMPILED_MODULES,
+  WORKPIECE_VIEW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { createLabDialogV2 } from '../view-lab/foundryDialog.js';
@@ -34,6 +37,8 @@ import {
   seedJournalNoCheckFixture,
 } from '../view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
+import { seedIterativeState } from '../view-lab/world/labIterative.js';
+import { isIterativeState } from '../view-lab/world/labIterativeRuns.js';
 import {
   stockJournalPrototype,
   JOURNAL_PROTOTYPE_BINDINGS,
@@ -52,10 +57,13 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
+    // The Workpiece view an active iterative run draws (issue 3011).
+    ...WORKPIECE_VIEW_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...ITERATIVE_ATTEMPT_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     ...OUTCOME_LADDER_RAW_MODULES,
@@ -94,9 +102,12 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/iterativeAttempt.svelte.js',
+    'src/ui/svelte/stores/iterativeAttemptMemory.svelte.js',
     'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [
+    ...WORKPIECE_VIEW_COMPILED_MODULES,
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/SearchField.svelte',
@@ -401,6 +412,7 @@ function persistedRuntime(state, builderOptions) {
   });
   const dismissed = new Set();
   const notifications = [];
+  let attempts = 0;
   let worldTime = 1_209_600;
   const builder = makeBuilder(containers, dismissed, () => worldTime, builderOptions);
   const controller = createLabJournalCaseController({
@@ -428,6 +440,7 @@ function persistedRuntime(state, builderOptions) {
       notifications.push(message);
     },
     craftErrorMessage: () => 'Craft failed.',
+    newAttemptId: () => `attempt-${++attempts}`,
   };
   return {
     actor,
@@ -2170,13 +2183,32 @@ describe('Journal versioned lifecycle (mounted)', () => {
       // The history-data states need the seeded world for the same reason the prototype states
       // do: their records name a real mining task and real recipes, and a substitute would
       // resolve a different account's evidence under this state's name. So does the needs-tools
-      // state, which names the seeded world's `hb-task-icecap`.
+      // state, which names the seeded world's `hb-task-icecap`. The workbench's states read the
+      // `workpiece` Ironworks and throw in any other world.
+      const iterativeState = isIterativeState(state);
       const fixtureContent =
         Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) ||
         LAB_HISTORY_DATA_STATES.includes(state) ||
-        LAB_SEEDED_WORLD_STATES.includes(state)
+        LAB_SEEDED_WORLD_STATES.includes(state) ||
+        iterativeState
           ? buildLabContent({ journalCaseState: state })
           : null;
+      if (iterativeState) {
+        assert.throws(
+          () =>
+            buildLabRunStates({
+              actor: ACTOR,
+              userId: 'user-1',
+              recipes: RECIPES,
+              environments: ENVIRONMENTS,
+              tasks: TASKS,
+              journalCaseState: state,
+            }),
+          /iterative: 'workpiece'/,
+          `${state} needs the workpiece world`
+        );
+        seedIterativeState(fixtureContent, 'workpiece');
+      }
       const containers = buildLabRunStates({
         actor: ACTOR,
         userId: 'user-1',
