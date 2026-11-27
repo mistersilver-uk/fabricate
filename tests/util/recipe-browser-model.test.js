@@ -143,6 +143,51 @@ describe('recipeBrowserModel — sorting', () => {
     assert.equal(recipeCheckSubtitleSuffix(null, english), '');
   });
 
+  it('tones every pill by the pill drawn, and an unknown kind draws the warning `none` pill (issue 3043)', () => {
+    const format = (_key, fallback, data) => fallback.replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+    const toneOf = (kind) => recipeCheckPill({ kind, dc: 1 }, format).tone;
+    const difficulty = ['dc', 'target', 'attribute', 'dynamic', 'dynamicTarget', 'successes', 'dynamicSuccesses'];
+    for (const kind of difficulty) assert.equal(toneOf(kind), 'info', `${kind} carries a difficulty`);
+    for (const kind of ['progressive', 'ingredients', 'checkOff', 'perAction']) {
+      assert.equal(toneOf(kind), 'neutral', `${kind} is a working state with no difficulty`);
+    }
+    assert.equal(toneOf('none'), 'warning');
+    const unknown = recipeCheckPill({ kind: 'bogus', dc: null }, format);
+    assert.equal(unknown.label, 'No check', 'an unknown kind draws the none pill');
+    assert.equal(unknown.icon, 'fas fa-triangle-exclamation');
+    assert.equal(unknown.tone, 'warning', 'the tone follows the pill drawn');
+    assert.equal(recipeCheckPill(null, format).tone, 'warning');
+  });
+
+  it('names an iterative row Per action in the pill, tooltip and fact, with no subline suffix (issue 3043)', () => {
+    const keys = [];
+    const format = (key, fallback) => {
+      keys.push(key);
+      return fallback;
+    };
+    const summary = { kind: 'perAction', dc: null };
+    assert.deepEqual(recipeCheckPill(summary, format), {
+      kind: 'perAction',
+      icon: 'fas fa-dice-d20',
+      label: 'Per action',
+      title: 'Each Crafting Action rolls this system’s crafting check, or doesn’t.',
+      mono: false,
+      tone: 'neutral',
+    });
+    assert.ok(keys.includes('FABRICATE.Admin.Manager.Recipe.CheckPerAction'));
+    assert.ok(keys.includes('FABRICATE.Admin.Manager.Recipe.CheckPerActionTooltip'));
+    assert.equal(recipeCheckFact(summary, format), 'Per action');
+    assert.equal(recipeCheckFact(summary, format), recipeCheckPill(summary, format).label);
+    // Characterisation: the suffix has no `perAction` branch, so the subline carries head only.
+    assert.equal(recipeCheckSubtitleSuffix(summary, format), '');
+  });
+
+  it('keeps the sort label "Check DC" over an all-per-action library (Decision 12)', () => {
+    const english = (_key, fallback) => fallback;
+    const rows = [makeRecipe({ checkSummary: { kind: 'perAction', dc: null } })];
+    assert.equal(recipeCheckSortLabel(rows, english), 'Check DC');
+  });
+
   it('names a switched-off check in the inspector fact as the pill does (issue 2136)', () => {
     const format = (_key, fallback) => fallback;
     const summary = { kind: 'checkOff', dc: null };
@@ -157,7 +202,7 @@ describe('recipeBrowserModel — sorting', () => {
     assert.equal(recipeCheckSortLabel(rows('successes', 2), english), 'Successes needed');
     assert.equal(recipeCheckSortLabel(rows('dynamicSuccesses', null), english), 'Successes needed');
     assert.deepEqual(recipeCheckPill({ kind: 'successes', dc: 2 }, format), {
-      kind: 'successes', icon: 'fas fa-dice-d20', label: '2 successes', title: '', mono: true,
+      kind: 'successes', icon: 'fas fa-dice-d20', label: '2 successes', title: '', mono: true, tone: 'info',
     });
     assert.equal(recipeCheckPill({ kind: 'successes', dc: 1 }, format).label, '1 success');
     assert.equal(recipeCheckPill({ kind: 'dynamicSuccesses', dc: null }, format).label, 'Dynamic successes');

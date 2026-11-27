@@ -99,6 +99,20 @@ describe('the oracle: each lab recipe, written out by hand', () => {
     }
   });
 
+  it('names the counter or action of each addressed lab issue', () => {
+    const named = (id) =>
+      issuesOf(byId(id)).map((issue) => [issue.code, issue.counterName, issue.actionName]);
+    assert.deepEqual(named('iw-r-nail'), [
+      ['iterativeUnknownCounter', 'rust', undefined],
+      ['iterativeUnknownAction', undefined, 'anneal'],
+    ]);
+    assert.deepEqual(named('iw-r-rivet'), [
+      ['iterativeBoundsInverted', 'Heat', undefined],
+      ['iterativeStartOutOfBounds', 'Temper', undefined],
+      ['iterativeInvalidNumber', 'Slag', undefined],
+    ]);
+  });
+
   it('addresses the Sword issues to the explicit steps', () => {
     const issues = issuesOf(byId('iw-r-sword'));
     assert.deepEqual(
@@ -200,13 +214,18 @@ describe('the pill and the readiness input', () => {
 
   it('lists the explicit steps in the mapper input', () => {
     const issues = issuesOf(byId('iw-r-sword'));
+    const instances = byId('iw-r-sword').iterative.counters;
+    assert.ok(instances.length > 0, 'premise: the sword carries Counter Instances');
     assert.deepEqual(iterativeReadinessInput(issues, byId('iw-r-sword')), {
       issues,
+      counterIds: instances.map((instance) => instance.counterId),
       steps: [
         { index: 0, id: 'iw-sword-heat', name: 'Heat the blank' },
         { index: 1, id: 'iw-sword-etch', name: 'Etch the fuller' },
       ],
     });
     assert.deepEqual(iterativeReadinessInput([], byId('iw-r-blade')).steps, []);
+    assert.deepEqual(iterativeReadinessInput([], { id: 'bare' }).counterIds, []);
+    assert.deepEqual(iterativeReadinessInput([], null).counterIds, []);
   });
 });

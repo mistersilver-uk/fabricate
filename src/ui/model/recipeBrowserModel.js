@@ -163,41 +163,77 @@ function successesPill(count, format) {
     : format('FABRICATE.Admin.Manager.Recipe.Count.Pill', '{count} successes', { count });
 }
 
-// The check states. `none` is the one WARNING: a system that cannot roll for this recipe is a
+// The check states, `[label key, fallback, icon, tone]`. A pill that carries or stands for a
+// difficulty is `info`; the working states with none (`progressive`, `ingredients`, `checkOff`,
+// `perAction`) are `neutral`. `none` is the one WARNING: a system that cannot roll for this recipe is a
 // thing the GM must be able to scan a library for. `ingredients` is its neutral sibling — a
 // routedByIngredients system resolves off the ingredient set that was used, so no check is a
 // working configuration, not a gap.
 const CHECK_PILLS = {
-  dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
+  dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20', 'info'],
   // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
-  target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
-  attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
+  target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20', 'info'],
+  attribute: [
+    'FABRICATE.Admin.Manager.Recipe.CheckAttribute',
+    'Character value',
+    'fas fa-user',
+    'info',
+  ],
   dynamicTarget: [
     'FABRICATE.Admin.Manager.Recipe.CheckDynamicTarget',
     'Dynamic target',
     'fas fa-dice-d20',
+    'info',
   ],
-  dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
+  dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20', 'info'],
   // Issue 2006: a counting check names its successes needed, singular for one.
-  successes: ['FABRICATE.Admin.Manager.Recipe.Count.Pill', '{count} successes', 'fas fa-dice-d20'],
+  successes: [
+    'FABRICATE.Admin.Manager.Recipe.Count.Pill',
+    '{count} successes',
+    'fas fa-dice-d20',
+    'info',
+  ],
   dynamicSuccesses: [
     'FABRICATE.Admin.Manager.Recipe.Count.PillDynamic',
     'Dynamic successes',
     'fas fa-dice-d20',
+    'info',
   ],
-  progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive', 'fas fa-list-ol'],
+  progressive: [
+    'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
+    'Progressive',
+    'fas fa-list-ol',
+    'neutral',
+  ],
   ingredients: [
     'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
     'By ingredients',
     'fas fa-code-branch',
+    'neutral',
   ],
   // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
   // treatment as `progressive` and `ingredients`: a working configuration, not a fault.
-  checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
-  none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
+  checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off', 'neutral'],
+  // An iterative system rolls per Crafting Action, so a recipe carries no check of its own.
+  perAction: [
+    'FABRICATE.Admin.Manager.Recipe.CheckPerAction',
+    'Per action',
+    'fas fa-dice-d20',
+    'neutral',
+  ],
+  none: [
+    'FABRICATE.Admin.Manager.Recipe.CheckNone',
+    'No check',
+    'fas fa-triangle-exclamation',
+    'warning',
+  ],
 };
 
 const CHECK_TOOLTIPS = {
+  perAction: [
+    'FABRICATE.Admin.Manager.Recipe.CheckPerActionTooltip',
+    'Each Crafting Action rolls this system’s crafting check, or doesn’t.',
+  ],
   ingredients: [
     'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
     'This system routes results by the ingredient set used, with no crafting check.',
@@ -216,12 +252,13 @@ const CHECK_TOOLTIPS = {
 const NUMERIC_CHECK_KINDS = new Set(['dc', 'target', 'successes']);
 
 /**
- * The row's check pill from its projected `checkSummary`: `{ kind, icon, label, title, mono }`.
+ * The row's check pill from its projected `checkSummary`: `{ kind, icon, label, title, mono, tone }`.
+ * `tone` follows the pill drawn, so an unknown kind draws `none` and its `warning`.
  * `format(key, fallback, replacements)` localizes.
  */
 export function recipeCheckPill(summary, format) {
   const { kind = 'none', dc = null } = summary || {};
-  const [labelKey, fallback, icon] = CHECK_PILLS[kind] || CHECK_PILLS.none;
+  const [labelKey, fallback, icon, tone] = CHECK_PILLS[kind] || CHECK_PILLS.none;
   const tooltip = CHECK_TOOLTIPS[kind];
   return {
     kind,
@@ -232,6 +269,7 @@ export function recipeCheckPill(summary, format) {
         : format(labelKey, fallback, { dc: dc ?? '' }),
     title: tooltip ? format(tooltip[0], tooltip[1], {}) : '',
     mono: NUMERIC_CHECK_KINDS.has(kind),
+    tone,
   };
 }
 
@@ -245,6 +283,7 @@ const CHECK_FACTS = {
   progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
   ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
   checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off'],
+  perAction: ['FABRICATE.Admin.Manager.Recipe.CheckPerAction', 'Per action'],
   none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
 };
 

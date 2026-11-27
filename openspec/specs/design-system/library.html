@@ -172,6 +172,9 @@ a{color:var(--fab-accent)}
 .k-stepset .k-step button,.k-step.vert button{width:100%;height:26px;border-radius:7px}
 .k-stepset .k-step .i,.k-step.vert .i{width:11px;height:11px}
 .k-stepset .k-step input,.k-step.vert input{width:100%;height:30px;padding:0 2px;box-sizing:border-box;font-size:1.05rem}
+.k-step:not(.vert):has(>input[aria-invalid='true']){border-color:var(--fab-danger-border);background:var(--fab-danger-soft)}
+.k-step:not(.vert):has(>input[aria-invalid='true']) button:not(.dis):not(:hover){color:var(--fab-text-secondary)}
+.k-step.vert input[aria-invalid='true']{box-sizing:border-box;border:1px solid var(--fab-danger-border);border-radius:6px;background:var(--fab-danger-soft)}
 .k-pair{display:inline-flex;align-items:center;gap:var(--fab-space-chip)}
 .k-unit{font-size:10px;font-weight:500;color:var(--fab-text-subtle)}
 .k-tog{width:38px;height:22px;border-radius:999px;padding:1px;border:1px solid var(--fab-control-outline);background:var(--fab-surface-soft);background-clip:padding-box;display:flex;align-items:center;cursor:pointer;transition:background 140ms ease}
@@ -1536,6 +1539,22 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <div class="k-step vert" style="width:48px">
           <button><svg class="i"><use href="#i-cu"/></svg></button>
           <input id="spec-step-7" aria-label="Duration in hours" value="4" readonly>
+          <button><svg class="i"><use href="#i-cd"/></svg></button>
+        </div>
+      </div>
+      <div class="unit">
+        <span class="cap">invalid</span>
+        <div class="k-step">
+          <button><svg class="i"><use href="#i-minus"/></svg></button>
+          <input id="spec-step-23" aria-label="Quantity, invalid" aria-invalid="true" value="2" readonly>
+          <button><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+      <div class="unit">
+        <span class="cap">invalid · vertical</span>
+        <div class="k-step vert" style="width:48px">
+          <button><svg class="i"><use href="#i-cu"/></svg></button>
+          <input id="spec-step-24" aria-label="Duration in hours, invalid" aria-invalid="true" value="4" readonly>
           <button><svg class="i"><use href="#i-cd"/></svg></button>
         </div>
       </div>
@@ -8860,13 +8879,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <span class="cap">one condition the caller combines (All)</span>
         <div style="display:flex;gap:8px;align-items:center">
           <svg class="i" style="width:24px"><use href="#i-bolt"/></svg>
-          <span class="grow" style="font-weight:600">When</span>
+          <span class="grow" style="color:var(--fab-text-muted);font-size:.72rem;font-weight:500">When</span>
           <div class="k-field inline" style="min-width:96px">Heat<svg class="i chev"><use href="#i-cd"/></svg></div>
           <div class="k-field inline" style="min-width:56px">&ge;<svg class="i chev"><use href="#i-cd"/></svg></div>
           <input type="number" aria-label="Value" value="3" readonly style="width:56px;height:28px;border:1px solid var(--fab-border);border-radius:6px;background:var(--fab-bg-2);color:var(--fab-text);font-variant-numeric:tabular-nums">
           <button class="k-btn icon" style="width:34px;height:34px;min-height:34px;border-radius:9px;color:var(--fab-danger-text);border-color:var(--fab-danger-border)" aria-label="Remove rule"><svg class="i"><use href="#i-trash"/></svg></button>
         </div>
-        <span class="k-hint">An iterative counter predicate: one condition on one line, with its source, comparison and value as the field chain. The caller combines its siblings with All or Any and states that once above the list, so the rule carries no sentence.</span>
+        <span class="k-hint">An iterative counter predicate: one condition on one line, with its source, comparison and value as the field chain. The caller combines its siblings with All or Any and states that once above the list, so the rule carries no sentence. Its &ldquo;When&rdquo; is a connective, so it is muted at weight 500 and .72rem rather than a 600 heading.</span>
         </div>
     </div>
     <div class="notes">
@@ -8874,6 +8893,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>Canonical spec</h5>
         <ul>
           <li><b>head</b> one disclosure button &mdash; a toned 28px glyph tile at radius 7, the title (serif 12.5/600) over the sentence as a 10.5px lead 4 below it, a 4/8 pill chip at radius 6 and a 10px chevron &mdash; padded 12, gap 12, with the 26px remove its sibling</li>
+          <li><b>one-line title</b> a heading at weight 600; a connective title (<code>head.connective</code>, such as &ldquo;When&rdquo;) is muted, weight 500 at .72rem and still grows</li>
           <li><b>body</b> bg-0 under a 1px rule · padding 12 · gap 12</li>
           <li><b>field</b> kicker above · select 30 · number field 32 · radius 7</li>
           <li><b>wrap</b> the row wraps rather than scrolls; kickers keep it readable</li>
@@ -8885,7 +8905,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <h5>Svelte API</h5>
         <ul>
           <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>RuleRow.svelte</code>&rsquo;s and <code>RuleSentence.svelte</code>&rsquo;s <code>$props()</code>.</li>
-          <li><b>schema</b> the rule&rsquo;s anatomy: <code>head(value)</code>, the <code>steps</code> of the field chain (each a snippet the caller derives, so each step narrows the next), <code>sentence(value)</code> and the localized <code>labels</code></li>
+          <li><b>schema</b> the rule&rsquo;s anatomy: <code>head(value)</code> (<code>connective</code> is read by the one-line form only), the <code>steps</code> of the field chain (each a snippet the caller derives, so each step narrows the next), <code>sentence(value)</code> and the localized <code>labels</code></li>
           <li><b>value</b> <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span> &mdash; the whole next rule, or <code>null</code> to remove it</li>
           <li><b>presets</b> starting points offered while the rule is unauthored &middot; <b>collapsible</b> a disclosing head, or an <code>{open, onToggle}</code> object so a list keeps one rule open</li>
           <li><b>sentence</b> {frameKey, clauseKeys, joinKey, params} — <b>never a string</b>; a param may be a nested <code>{key, params}</code> fragment, and casing is a key, never a lowered string &middot; <b>missingClauseKey</b> the sentence drawn for a rule with a missing clause</li>

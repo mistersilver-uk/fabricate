@@ -371,4 +371,23 @@ describe('RuleRow (mounted)', () => {
     );
     assert.ok(!root.querySelector('[data-rule-row-disclosure], .fabricate-rule-sentence'));
   });
+
+  it('demotes a one-line title to a connective only when its head says so', async () => {
+    const connective = { ...SCHEMA, head: (rule) => ({ ...SCHEMA.head(rule), connective: true }) };
+    const label = (root) => root.querySelector('[data-rule-row-title]');
+    const plain = await rowHarness.mount({ schema: SCHEMA, value: RULE, onChange() {} });
+    assert.ok(!label(plain).classList.contains('is-connective'), 'a plain title stays a heading');
+    rowHarness.remount();
+    const flagged = await rowHarness.mount({ schema: connective, value: RULE, onChange() {} });
+    assert.ok(label(flagged).classList.contains('is-connective'), 'a connective title is demoted');
+    assert.ok(label(flagged).classList.contains('fabricate-rule-row-label'));
+    rowHarness.remount();
+    const collapsible = await rowHarness.mount({
+      schema: connective,
+      value: RULE,
+      collapsible: true,
+      onChange() {},
+    });
+    assert.ok(!collapsible.querySelector('.is-connective'), 'the collapsible head ignores it');
+  });
 });

@@ -1184,6 +1184,19 @@ No in-app caller passes either rung: they exist for the published `Stepper`, who
 - **WHEN** a filled stepper sits in a flex row or grid column narrower than its input's own width
 - **THEN** the stepper ends inside the column, its input taking only the room the two buttons leave
 
+### Requirement: A stepper paints its own invalid state
+
+`Stepper` MUST draw its invalid face whenever its input carries `aria-invalid='true'`: its group edge in `--fab-danger-border` on a `--fab-danger-soft` ground at every rung and density.
+A vertical stepper, which draws no group edge, gives that face to its input, at the same size.
+The face persists under `disabled` and beside the focus ring, and the value keeps its `--fab-text` ink.
+No caller restates it.
+
+#### Scenario: A stepper whose value is refused
+
+- **WHEN** a stepper at any rung, density or orientation carries `aria-invalid='true'` on its input
+- **THEN** its group edge, or a vertical stepper's input edge, inks `--fab-danger-border` on `--fab-danger-soft`
+- **AND** its box is the size the valid stepper draws and its value inks `--fab-text`
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
@@ -1754,6 +1767,7 @@ A continuous scale cut into named regions is a range bar whose spans tile; an or
 `RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and `<RunProgress>` keeps its own entry in the run-surface block, `shipped` since its kicker adopted `Kicker`.
 A counter's card is a composition of `Well`, `Kicker`, a `Meter` with marks and a `Chip`, so `<CounterGauge>` is ruled out.
 A `RuleRow` edits one condition→effect rule, or one condition the caller combines (All/Any): a Check Breakage trigger, a gathering condition modifier's condition and drop-chance change, or an iterative counter predicate.
+A one-line `RuleRow` (one with no `collapsible`) whose `head.title` is a connective, such as an iterative counter predicate's "When", passes `head.connective`, which draws the title in `--fab-text-muted` at weight 500 and 0.72rem rather than as a weight-600 heading; the collapsible form ignores it.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.

@@ -647,6 +647,33 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.ok(sortLabels.includes('Check DC') && !sortLabels.includes('Check target'), 'roll-high keeps DC');
   });
 
+  it('tones each check pill by what it states, so the sheet no longer paints it (issue 3043)', async () => {
+    const toneOfKind = async (kind) => {
+      const root = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind, dc: 12 } })] });
+      const pill = root.querySelector('[data-recipe-check]');
+      const tone = chipToneOf(pill);
+      browser.remount();
+      return { tone, pill };
+    };
+    assert.equal((await toneOfKind('dc')).tone, 'info');
+    assert.equal((await toneOfKind('successes')).tone, 'info');
+    assert.equal((await toneOfKind('none')).tone, 'warning');
+    assert.equal((await toneOfKind('ingredients')).tone, 'neutral');
+
+    const root = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'perAction', dc: null } })]
+    });
+    const pill = root.querySelector('[data-recipe-check]');
+    assert.equal(pill.dataset.recipeCheck, 'perAction');
+    assert.equal(pill.textContent.trim(), 'Per action');
+    assert.ok(pill.classList.contains('is-neutral'), 'a working state with no difficulty is neutral');
+    assert.ok(!pill.classList.contains('is-info'), 'it states no difficulty');
+    assert.ok(!pill.classList.contains('is-warning'), 'and it is not a fault');
+    assert.ok(pill.querySelector('i.fa-dice-d20'), 'the crafting check glyph');
+    assert.equal(pill.getAttribute('title'), 'Each Crafting Action rolls this system’s crafting check, or doesn’t.');
+    assert.equal(pill.classList.contains('is-mono'), false, 'a phrase is not a number');
+  });
+
   // The two check-LESS states are not the same fact.
   it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
     const noCheck = await browser.mount({
