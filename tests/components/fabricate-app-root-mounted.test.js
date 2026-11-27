@@ -1052,31 +1052,78 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
     assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
 
-  it("quietly refreshes the Crafting tab when the selected crafting actor's run flags change", async () => {
-    const runFlag = { flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } } };
+  const runFlag = { flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } } };
+
+  /** Run `body` with a `foundry.utils.hasProperty` the run-flag filter can read a diff through. */
+  async function withHasProperty(body) {
     const hasProperty = (object, path) =>
       path.split('.').reduce((node, key) => (node == null ? node : node[key]), object) !== undefined;
     const prior = Object.getOwnPropertyDescriptor(globalThis, 'foundry');
     const value = { ...prior?.value, utils: { ...prior?.value?.utils, hasProperty } };
     Object.defineProperty(globalThis, 'foundry', { value, configurable: true, writable: true });
     try {
-      const calls = await mountWithSpies();
-      const fire = (actorId, changes) => hooks.callAll('updateActor', { id: actorId }, changes);
-
-      fire('actor-1', runFlag);
-      assert.equal(calls.crafting, 1, 'the selected crafting actor reloads the Crafting tab');
-      calls.crafting = 0;
-      fire('actor-2', runFlag);
-      fire('actor-1', { system: { attributes: { hp: { value: 3 } } } });
-      assert.equal(calls.crafting, 0, 'another actor or a change outside the run flags is ignored');
-
-      await harness.remount();
-      assert.equal(hooks.count('updateActor'), 0, 'unmount removes both listeners');
+      await body();
     } finally {
       if (prior) Object.defineProperty(globalThis, 'foundry', prior);
       else delete globalThis.foundry;
     }
-  });
+  }
+
+  it("quietly refreshes the Crafting tab when the selected crafting actor's run flags change", async () =>
+    withHasProperty(async () => {
+      const calls = await mountWithSpies({ getSelectedActorId: () => 'actor-J' });
+      const fire = (actorId, changes) => hooks.callAll('updateActor', { id: actorId }, changes);
+
+      fire('actor-1', runFlag);
+      assert.equal(calls.crafting, 1, 'the selected crafting actor reloads the Crafting tab');
+      assert.equal(calls.journal, 0, 'and not the Journal, which lists another actor');
+      calls.crafting = 0;
+      fire('actor-J', runFlag);
+      assert.equal(calls.journal, 1, 'the Journal reloads for its own actor');
+      assert.equal(calls.crafting, 0, 'and the Crafting tab does not');
+      calls.journal = 0;
+      fire('actor-2', runFlag);
+      fire('actor-1', { system: { attributes: { hp: { value: 3 } } } });
+      assert.equal(calls.crafting + calls.journal, 0, 'another actor or a non-run change is ignored');
+
+      await harness.remount();
+      assert.equal(hooks.count('updateActor'), 0, 'unmount removes both listeners');
+    }));
+
+  it('each store reloads quietly for its OWN selected actor, read when the hook fires', async () =>
+    withHasProperty(async () => {
+      const loads = [];
+      let journalActor = 'actor-J';
+      let craftingActor = 'actor-C';
+      await mountWithSpies({
+        getSelectedActorId: () => journalActor,
+        getSelectedCraftingActorId: () => craftingActor,
+        journal: {
+          navCount: 0,
+          loadedOnce: true,
+          load: (...args) => {
+            loads.push(['journal', ...args]);
+          },
+        },
+        crafting: {
+          load: (...args) => {
+            loads.push(['crafting', ...args]);
+          },
+        },
+      });
+      const fire = (id) => hooks.callAll('updateActor', { id }, runFlag);
+      loads.length = 0;
+      fire('actor-J');
+      assert.deepEqual(loads, [['journal', true]]);
+      loads.length = 0;
+      fire('actor-C');
+      assert.deepEqual(loads, [['crafting', true]]);
+      loads.length = 0;
+      craftingActor = 'actor-Z';
+      journalActor = 'actor-C';
+      fire('actor-C');
+      assert.deepEqual(loads, [['journal', true]], 'selection read at fire time');
+    }));
 
   it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
     // M25: the listing captures the authority's availability as it builds.

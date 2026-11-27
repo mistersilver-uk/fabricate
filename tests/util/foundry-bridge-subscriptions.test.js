@@ -11,6 +11,7 @@ import {
   subscribeInventoryChange,
   subscribeCraftingDataChange,
   subscribeActorRunFlagChange,
+  subscribeSelectedActorRunFlagChanges,
   CRAFTING_DATA_CHANGED_HOOK,
   RUN_FLAG_DIFF_PATHS,
   readCraftingDataFallbackCount,
@@ -406,5 +407,64 @@ describe('subscribeActorRunFlagChange', () => {
     delete globalThis.foundry;
     assert.ok(!firesFor('flags.fabricate.fabricate.craftingRuns'), 'not even the plain spelling');
     assert.ok(!firesFor('flags.fabricate.fabricate.==craftingRuns'));
+  });
+});
+
+describe('subscribeSelectedActorRunFlagChanges', () => {
+  let env;
+  let hooks;
+  beforeEach(() => {
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
+    globalThis.foundry.utils.hasProperty = (object, path) =>
+      String(path)
+        .split('.')
+        .reduce((node, key) => node?.[key], object) !== undefined;
+  });
+  afterEach(() => env.restore());
+
+  const runFlag = { flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } } };
+
+  it('fires each handler only for its own selected actor, read when the hook fires', () => {
+    const fired = [];
+    let selectedA = 'actor-A';
+    let selectedB = 'actor-B';
+    const cleanup = subscribeSelectedActorRunFlagChanges([
+      [
+        () => {
+          fired.push('A');
+        },
+        () => selectedA,
+      ],
+      [
+        () => {
+          fired.push('B');
+        },
+        () => selectedB,
+      ],
+    ]);
+    assert.equal(hooks.count('updateActor'), 2);
+
+    hooks.fire('updateActor', { id: 'actor-A' }, runFlag);
+    assert.deepEqual(fired, ['A']);
+    fired.length = 0;
+    hooks.fire('updateActor', { id: 'actor-B' }, runFlag);
+    assert.deepEqual(fired, ['B']);
+
+    fired.length = 0;
+    selectedA = 'actor-B';
+    selectedB = 'actor-C';
+    hooks.fire('updateActor', { id: 'actor-B' }, runFlag);
+    assert.deepEqual(fired, ['A'], 'the selection is re-read at fire time');
+
+    fired.length = 0;
+    selectedA = '';
+    selectedB = null;
+    hooks.fire('updateActor', { id: '' }, runFlag);
+    hooks.fire('updateActor', { id: 'null' }, runFlag);
+    assert.deepEqual(fired, [], 'an empty selection fires nothing');
+
+    cleanup();
+    assert.equal(hooks.count('updateActor'), 0, 'one cleanup removes both listeners');
   });
 });
