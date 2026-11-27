@@ -292,6 +292,7 @@ The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) ma
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
 | `alchemy`             | `FABRICATE.App.Journal.Mode.Alchemy`             | Alchemy               |
+| `iterative`           | `FABRICATE.App.Journal.Mode.Iterative`           | Iterative             |
 | `straight` (gathering) | `FABRICATE.App.Journal.Mode.straight` | Direct |
 | `d100` (gathering) | `FABRICATE.App.Journal.Mode.d100` | d100 |
 | `routed` (gathering) | `FABRICATE.App.Journal.Mode.routed` | Check |
@@ -1153,6 +1154,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
   An entry is invalid when `counterRuleFault`, `iterativeEntryFault`, `producedWhenLineFault` or `stepIdListFault` faults it, when an action, the step or a counter it uses holds a value outside its enum or a list kept as authored, or when a bound, target, start or state value is `null` or missing.
 - Preflight evaluates every cost amount before any check is prepared, and a negative amount refuses as an invalid expression.
   Each `needsEnough` cost refuses on its own when its counter holds less than its amount, so two costs on one counter are each checked alone.
+  The refusal names the cost entry, its counter, the amount and the value the counter held, as `{ entryId, counterId, amount, value }`.
   A locked counter ignores every cost and effect aimed at it.
 - The check summary is `null` exactly when the action has no check, and otherwise holds a success flag, an outcome id or `null`, and a finite value.
   Any other pairing refuses as a mismatched check.
@@ -1223,7 +1225,11 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeNoCounters`, `iterativeMultiStepOff`, `iterativeCheckUnavailable`, a Counter Instance's codes and the expression codes are recipe-wide.
   - A recipe raises one issue per code and step address, in first-raised order, with every step's configuration codes before any `producedWhen` code.
     A fault repeated in two steps is two issues, and the recipe-wide issues of one code are one.
-  - Library issues carry neither key, and no severity, `blocks`, message or `nav` depends on the address.
+  - A recipe-scoped issue whose fault is one Counter Instance or counter reference also carries `counterId` and `counterName`, and one whose fault is one action reference carries `actionId` and `actionName`.
+    `counterId` belongs to `iterativeUnknownCounter`, `iterativeInvalidNumber`, `iterativeBoundsInverted`, `iterativeStartOutOfBounds` and `iterativeExpressionBoundUnset`, and `actionId` to `iterativeUnknownAction` and `iterativeCheckUnavailable`; no other code carries an address, `iterativeNoAllowedActions` included.
+    The name is the library label, else the stored id, and the address is the first-raised offender of that code and step address, so an issue names one offender at a time.
+    Expression roots are read in counter, min, max, target order, and an offender with no readable id leaves the issue unaddressed.
+  - Library issues carry neither `stepId`/`stepIndex` nor an address, and no severity, `blocks`, message, `nav` or issue count depends on an address.
 - Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id.
   Each carries `entityKind: 'counter'` or `'action'` for the record it names:
   - `iterativeUnknownCounter`, `iterativeUnknownAction` and `iterativeInvalidRule` over availability rules, effect `when` rules, cost counters and effect targets.

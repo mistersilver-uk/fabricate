@@ -9,11 +9,13 @@ import assert from 'node:assert/strict';
 import { migrateEssencesToIngredientGroups } from '../src/migration/migrateEssencesToIngredientGroups.js';
 import { evaluateSystemValidation } from '../src/systems/systemValidation.js';
 
+import { withInsecureOriginCrypto } from './helpers/insecureOriginCrypto.js';
+
 function recipe(id, overrides = {}) {
   return { id, name: id, craftingSystemId: 'sys-1', enabled: true, ...overrides };
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BASE36_ID = /^[a-z0-9]{16}$/;
 
 test('rewrites each positive per-set essence into a single-option essence group and deletes the map', () => {
   const data = {
@@ -40,7 +42,7 @@ test('rewrites each positive per-set essence into a single-option essence group 
   const essenceGroups = set.ingredientGroups.filter((g) => g.options[0].match.type === 'essence');
   assert.equal(essenceGroups.length, 2);
   for (const group of essenceGroups) {
-    assert.match(group.id, UUID_RE, 'ids are crypto.randomUUID()');
+    assert.match(group.id, BASE36_ID, 'ids mint through randomId(), off Foundry base-36');
     assert.equal(group.options.length, 1);
     assert.equal(group.options[0].quantity, 1);
   }
@@ -48,6 +50,17 @@ test('rewrites each positive per-set essence into a single-option essence group 
     essenceGroups.map((g) => [g.options[0].match.essenceId, g.options[0].match.amount])
   );
   assert.deepEqual(byEssence, { fire: 2, water: 1 }, 'amounts preserved (AND semantics)');
+});
+
+test('mints essence group ids on an insecure origin (issue 3032)', async () => {
+  const data = {
+    recipes: [recipe('r1', { ingredientSets: [{ id: 's-1', essences: { fire: 2, water: 1 } }] })],
+  };
+  const { recipes } = await withInsecureOriginCrypto(() => migrateEssencesToIngredientGroups(data));
+  const ids = recipes[0].ingredientSets[0].ingredientGroups.map((group) => group.id);
+  assert.equal(ids.length, 2);
+  for (const id of ids) assert.match(id, BASE36_ID);
+  assert.notEqual(ids[0], ids[1]);
 });
 
 test('is idempotent — a set with no essence map is untouched on a re-run', () => {

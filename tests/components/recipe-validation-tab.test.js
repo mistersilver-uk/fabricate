@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { iterativeRecipeReadiness } from '../../src/ui/svelte/apps/manager/recipe/iterative/iterativeRecipeReadiness.js';
 import { shippedString } from '../helpers/manager/managerLocalization.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
@@ -28,6 +29,7 @@ const harness = createMountedComponentHarness({
     // …which reads a result choice group's problems through its edits (issue 1773).
     'src/ui/svelte/components/resultGroupEdits.js',
     'src/ui/svelte/util/draftId.js',
+    'src/utils/randomId.js',
     'src/ui/svelte/components/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
     'src/utils/rollFormulaRollability.js',
@@ -638,6 +640,125 @@ describe('RecipeValidationTab (mounted)', () => {
         ['results', '']
       ]);
       harness.remount();
+    });
+
+    const counterIssue = (code, counterId, counterName = counterId) => ({
+      ...issue(code, null), counterId, counterName
+    });
+    const actionIssue = (code, stepIndex, actionName) => ({
+      ...issue(code, stepIndex), actionName
+    });
+
+    it('names the counter or action each addressed issue concerns (issue 3038)', async () => {
+      const target = await harness.mount({
+        recipe: sword,
+        iterativeReadiness: {
+          steps,
+          counterIds: ['heat'],
+          issues: [
+            counterIssue('iterativeUnknownCounter', 'rust'),
+            counterIssue('iterativeBoundsInverted', 'heat', 'Heat'),
+            actionIssue('iterativeUnknownAction', 0, 'anneal'),
+            actionIssue('iterativeCheckUnavailable', null, 'Stoke')
+          ]
+        }
+      });
+      // A check's row carries its issue's sentence as the detail, and an issue no check claims as its title.
+      const sentence = (id) => {
+        const row = rowOf(target, id);
+        return (row.querySelector('.manager-recipe-val-detail') ?? row.querySelector('.manager-recipe-val-title')).textContent;
+      };
+      assert.equal(sentence('iterativeUnknownCounter:recipe'), 'rust is not a counter this recipe can use.');
+      assert.equal(
+        sentence('iterativeBoundsInverted:recipe'),
+        'The minimum of Heat is above its maximum.'
+      );
+      assert.equal(sentence('iterativeUnknownAction:0'), 'Heat the blank: anneal is not a crafting action in this system.');
+      assert.equal(sentence('iterativeCheckUnavailable:recipe'), 'Stoke rolls a check, but the routed crafting check has no roll formula.');
+      harness.remount();
+    });
+
+    it('reads the unnamed sentence for an issue that carries no name', async () => {
+      const target = await harness.mount({
+        recipe: sword,
+        iterativeReadiness: { steps, issues: [issue('iterativeUnknownCounter', null)] }
+      });
+      assert.equal(
+        rowOf(target, 'iterativeUnknownCounter:recipe').querySelector('.manager-recipe-val-detail').textContent,
+        'A counter reference names a counter that does not exist.'
+      );
+      harness.remount();
+    });
+
+    it('hands View the counter row of an addressed Counter Instance, else the counters section (issue 3038)', async () => {
+      const calls = [];
+      const target = await harness.mount({
+        recipe: sword,
+        iterativeReadiness: {
+          steps,
+          counterIds: ['rust', 'heat'],
+          issues: [
+            counterIssue('iterativeUnknownCounter', 'rust'),
+            counterIssue('iterativeBoundsInverted', 'heat', 'Heat'),
+            counterIssue('iterativeInvalidNumber', 'slag'),
+            counterIssue('iterativeExpressionBoundUnset', 'rust'),
+            actionIssue('iterativeUnknownAction', 0, 'anneal')
+          ]
+        },
+        onSelectIssue: (...args) => {
+          calls.push(args);
+        }
+      });
+      for (const id of ['iterativeUnknownCounter:recipe', 'iterativeBoundsInverted:recipe', 'iterativeInvalidNumber:recipe', 'iterativeExpressionBoundUnset:recipe', 'iterativeUnknownAction:0']) {
+        rowOf(target, id).querySelector('[data-recipe-issue-view]').click();
+      }
+      await flushRender();
+      assert.deepEqual(calls.map((call) => call.slice(0, 2)), [
+        ['overview', 'iterative-counter-rust'],
+        ['overview', 'iterative-counter-heat'],
+        ['overview', 'iterative-counters'],
+        ['overview', ''],
+        ['overview', 'iterative-step-0-actions']
+      ]);
+      harness.remount();
+    });
+
+    it('hands View the step configuration for a counter fault under a step check (issue 3038)', () => {
+      const { issues } = iterativeRecipeReadiness({
+        counterIds: ['heat'],
+        steps,
+        issues: [{ ...counterIssue('iterativeUnknownCounter', 'rust'), stepIndex: 1 }]
+      });
+      assert.equal(issues[0].focusTarget, 'iterative-step-1');
+    });
+
+    it('forwards counterId, counterName and actionName, and never an actionId (issue 3038)', () => {
+      const input = {
+        counterIds: ['heat'],
+        steps,
+        issues: [
+          counterIssue('iterativeBoundsInverted', 'heat', 'Heat'),
+          { ...actionIssue('iterativeUnknownAction', 0, 'Anneal'), actionId: 'anneal' },
+          issue('iterativeNoCounters', null)
+        ]
+      };
+      const [counter, action, bare] = iterativeRecipeReadiness(input).issues;
+      assert.equal(counter.counterId, 'heat');
+      assert.equal(counter.counterName, 'Heat');
+      assert.equal(action.actionName, 'Anneal');
+      assert.ok(!Object.hasOwn(action, 'actionId'), 'the mapped issue carries no actionId');
+      assert.ok(!Object.hasOwn(action, 'counterId'));
+      for (const key of ['counterId', 'counterName', 'actionName']) {
+        assert.ok(!Object.hasOwn(bare, key), `an unaddressed issue carries no ${key}`);
+      }
+    });
+
+    it('hands View the counters section for an addressed issue when the input carries no counterIds', () => {
+      const { issues } = iterativeRecipeReadiness({
+        steps,
+        issues: [counterIssue('iterativeBoundsInverted', 'heat', 'Heat')]
+      });
+      assert.equal(issues[0].focusTarget, 'iterative-counters');
     });
 
     it('reads a ready single-step recipe as pass rows with nothing blocking', async () => {

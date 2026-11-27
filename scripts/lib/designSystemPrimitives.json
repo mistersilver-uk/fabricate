@@ -46,6 +46,17 @@
       ]
     },
     {
+      "path": "src/ui/svelte/components/StageNav.svelte",
+      "library": "<StageNav>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": [
+        "The stage browser: arrows, a window of numbered stages and a return to the executable stage, which chooses the stage on screen and never the one being executed.",
+        "`src/ui/svelte/apps/journal/RunDetail.svelte` and `src/ui/svelte/apps/journal/iterative/WorkpieceView.svelte` draw it, so it is shared."
+      ]
+    },
+    {
       "path": "src/ui/svelte/components/YieldScale.svelte",
       "library": "<YieldScale>",
       "status": "shipped",
@@ -776,7 +787,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "A run's stage progress: `StageBars` under a run heading, with its own kicker and blocker.",
+        "A run's stage progress: `StageBars` under a run heading, with its own kicker, blocker and muted note, a failed stage drawn in danger and read as failed.",
         "`src/ui/svelte/apps/journal/RunCard.svelte` and `src/ui/svelte/apps/journal/RunDetail.svelte` draw it, so it is shared."
       ]
     },
@@ -787,7 +798,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The stage instrument over `FillBar`: a named `group` of `progressbar`s, one bar per stage, each named by its stage's `label`, else its `name`, else, in a one-stage list, by the group's own name.",
+        "The stage instrument over `FillBar`: a named `group` of `progressbar`s, one bar per stage, each named by its stage's `label`, else its `name`, else, in a one-stage list, by the group's own name, and a stage whose `status` is `failed` painted danger.",
         "It is published, so it is shared."
       ]
     },
@@ -982,8 +993,8 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`.",
-        "Its two importers include `components/EssencePool.svelte`, so it is shared."
+        "The meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`, with optional marks ticked over its track.",
+        "Its importers include `components/EssencePool.svelte`, so it is shared."
       ]
     },
     {
@@ -1060,7 +1071,7 @@
       "scope": "shared",
       "why": [
         "The strip of current values: an optional kicker naming the group, an optional read-only badge drawn through `Chip`, and glyph-led facts whose values arrive caller-formatted in mono, with nothing focusable inside it.",
-        "The crafting check card, the gathering detail's stamina pool and the Crafting Action editor's Check card are its three importers, so it is shared."
+        "The crafting check card, the gathering detail's stamina pool and the Crafting Action editor's Check card are among its importers, so it is shared."
       ]
     },
     {
@@ -1092,7 +1103,7 @@
       "evidence": "broad",
       "scope": "shared",
       "why": [
-        "The table for records compared down columns: a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `hint` as a second caption line that describes the table outside its name, a `cell` snippet, sortable column headers, and a caller `footer` inside the frame after the pager.",
+        "The table for records compared down columns: a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `hint` as a second caption line that describes the table outside its name, a `cell` snippet, sortable column headers, a pager at the `pagerDensity` it is handed, and a caller `footer` inside the frame after the pager.",
         "`library.html`'s `<DataTable>` specifies it, and it is shared."
       ]
     },
@@ -1169,7 +1180,7 @@
       "callers": ["src/ui/svelte/apps/manager/ManagerTitleBar.svelte"],
       "why": [
         "The manager's title band: the PREMIUM mark while a companion is installed, then a caller's status caption.",
-        "ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, which formats the summary, so it is a non-member on the `LogList`, `StageNav` and `XrefList` precedent."
+        "ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, which formats the summary, so it is a non-member on the `LogList` and `XrefList` precedent."
       ]
     },
     {
@@ -1269,7 +1280,7 @@
       "evidence": "broad",
       "callers": ["src/ui/svelte/apps/journal/ActionsPanel.svelte"],
       "why": [
-        "The Journal's run action bar, implementing the specified library component.",
+        "The Journal's run action bar, implementing the specified library component; a `null` primary or pause draws none.",
         "ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar."
       ]
     },
@@ -1291,16 +1302,6 @@
       "why": [
         "The Journal's slot row, implementing the specified library component.",
         "ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar, and crafting draws `RequirementChooser` instead."
-      ]
-    },
-    {
-      "path": "src/ui/svelte/components/StageNav.svelte",
-      "library": "<StageNav>",
-      "evidence": "broad",
-      "callers": ["src/ui/svelte/apps/journal/RunDetail.svelte"],
-      "why": [
-        "The Journal's stage navigation, implementing the specified library component.",
-        "ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar."
       ]
     },
     {
@@ -1451,6 +1452,12 @@
       "verdict": "composition",
       "replacement": "Well + Kicker + Button",
       "why": "A composition that also smuggled back the 34px button size the set retires by name."
+    },
+    {
+      "name": "<CounterGauge>",
+      "verdict": "composition",
+      "replacement": "Well + Kicker + Meter + Chip",
+      "why": "A counter's card is a well holding its name, a meter with marks at its thresholds, and a chip for its state, so it owns no behaviour those four do not."
     },
     {
       "name": "<FeatureCard>",

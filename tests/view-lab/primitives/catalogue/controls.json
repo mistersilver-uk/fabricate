@@ -1386,5 +1386,50 @@
       },
       "armed": true
     }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "worked through its cards — no primary and no pause",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Forge a Longsword": "the run’s name, the cancel’s fallback name, which its own aria-label replaces"
+    },
+    "props": {
+      "run": {
+        "id": "iw-run-longsword"
+      },
+      "runLabel": "Forge a Longsword",
+      "cancel": {
+        "ariaLabel": "Cancel this workpiece"
+      },
+      "pause": null,
+      "primary": null
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "a step done — begin is the one primary, and still no pause",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Forge a Longsword": "the run’s name, the cancel’s fallback name, which its own aria-label replaces"
+    },
+    "props": {
+      "run": {
+        "id": "iw-run-longsword"
+      },
+      "runLabel": "Forge a Longsword",
+      "cancel": {
+        "ariaLabel": "Cancel this workpiece"
+      },
+      "pause": null,
+      "primary": null,
+      "begin": {
+        "enabled": true,
+        "label": "Start step 2",
+        "icon": "fas fa-play"
+      }
+    }
   }
 ]

@@ -29,7 +29,7 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
 // picker through the shared candidate list, whose reading replaces its count chip. #1778 draws the
 // ingredient routes' hand-painted status pill as a mapped chip. #2559 draws the gathering task's
 // blocked-reason callouts as mapped list chips.
-const MAPPED_TONE_SITES = 24;
+const MAPPED_TONE_SITES = 25;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';

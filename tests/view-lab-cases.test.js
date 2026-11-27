@@ -755,7 +755,7 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
-// The six player cases whose layout expectation asserts "this STACKED at 1024px": one
+// The seven player cases whose layout expectation asserts "this STACKED at 1024px": one
 // resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
@@ -764,6 +764,7 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-crafting-stacked',
   'player-alchemy-stacked',
   'player-journal-stacked',
+  'player-journal-iterative-narrow',
 ];
 
 // And the manager case that asserts the OPPOSITE shape (issue 1362): a released third column —
@@ -3284,7 +3285,8 @@ test('the capture runner threads the per-case console allowance into the render'
     // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
     // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
     // is reported as a warning beside the card that names it (issue 2153). A refused Tool save
-    // raises the store's own failure toast (issue 1522).
+    // raises the store's own failure toast (issue 1522). A thrown Iterative Attempt command is
+    // logged by the attempt store before it reads as unanswered (issue 3011).
     [
       'manager-recipes-blocked-enable-flash',
       'manager-tool-editor-save-failed',
@@ -3299,6 +3301,7 @@ test('the capture runner threads the per-case console allowance into the render'
       'player-crafting-roll-result-count-zero',
       'player-crafting-roll-result-count-zero-penalty',
       'player-crafting-roll-result-count-disadvantage-zero',
+      'player-journal-iterative-thrown',
     ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'

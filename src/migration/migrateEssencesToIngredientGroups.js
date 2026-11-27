@@ -2,10 +2,11 @@
  * `1.17.0` — supersede the per-set `IngredientSet.essences` map with first-class essence ingredient
  * GROUPS, then reconcile the alchemy signature collisions that introduces (issue 649). Pure,
  * deep-clone, idempotent, one-way; spec § Essences → Ingredient Groups Migration owns the rules.
- * THE PAYLOAD IS `data.recipes`, with `data.systems` read-only. Ids come from `crypto.randomUUID()`,
- * which keeps this Foundry-free — `foundry.utils.randomID()` throws under `node --test`.
+ * THE PAYLOAD IS `data.recipes`, with `data.systems` read-only. Ids come from `randomId()`, which
+ * needs no secure context and runs under `node --test` without Foundry.
  */
 import { SignatureValidator } from '../systems/SignatureValidator.js';
+import { randomId } from '../utils/randomId.js';
 
 import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
@@ -51,7 +52,7 @@ function _rewriteRecipeSets(sets) {
       // Drop empty / non-positive entries (runtime no-ops) — behavior-preserving.
       if (!Number.isFinite(amount) || amount <= 0) continue;
       groups.push({
-        id: crypto.randomUUID(),
+        id: randomId(),
         name: '',
         options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }],
       });

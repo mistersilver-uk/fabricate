@@ -4,16 +4,10 @@
  * root value is a thunk read at call time, and each route change lands through the root's
  * `confirmRouteExit`, `afterTruthyResult` and `setActiveView`.
  */
+import { randomBase36 } from '../../../../utils/randomId.js';
+
 import { gatheringDropCountValue, gatheringTaskDropRows } from './gatheringDisplay.js';
 import { EVENT_FIELDS, TASK_FIELDS } from './gatheringRouteModel.svelte.js';
-
-const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-/** `length` base36 characters from the platform CSPRNG; SonarCloud fails a `Math.random()` mint. */
-export function randomBase36(length) {
-  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes, (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join('');
-}
 
 /** What differs between the task and the event library: names, route, store calls and copy. */
 const RECORD_KINDS = Object.freeze({

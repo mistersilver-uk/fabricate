@@ -8,6 +8,8 @@
  * different value, updated in place), `retained` (resolved unchanged) or `reported`.
  */
 
+import { randomBase36 } from '../utils/randomId.js';
+
 import { sourceReferencesOf, toolSourceReferences } from './worldScopeEntityGrouping.js';
 import {
   keyedRemapper,
@@ -64,20 +66,6 @@ const WORLD_SCOPE_OWNER_TYPES = Object.freeze({
   essences: 'essence',
   tools: 'tool',
 });
-
-const LOCAL_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-function localId() {
-  // A Foundry-free 16-char base36 `randomID()` stand-in drawn from the platform CSPRNG, so it
-  // stays pure and free of insecure-randomness findings.
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  let id = '';
-  for (const byte of bytes) {
-    id += LOCAL_ID_ALPHABET[byte % LOCAL_ID_ALPHABET.length];
-  }
-  return id;
-}
 
 /**
  * One incoming record's source-reference set, by the `1.30.0` grouping's six-spelling rule (the
@@ -167,7 +155,7 @@ export function reportWorldEntityCollisions(prepared, worldEntityIndex, mode) {
  * do `includedRealmIds`/`excludedRealmIds`, so the destination-wins merge recognises the world's
  * places instead of duplicating them.
  */
-export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) {
+export function rebindCopyContainerIds(prepared, { generateId = () => randomBase36(16) } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { gatheringEnvironments } = prepared;
 
@@ -196,7 +184,7 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
  */
 export function rebindCopyComponentIds(
   prepared,
-  { generateId = localId, worldEntityIndex = null, report = null } = {}
+  { generateId = () => randomBase36(16), worldEntityIndex = null, report = null } = {}
 ) {
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes, gatheringConfig } = prepared;
@@ -366,7 +354,7 @@ function recipeResults(recipe) {
  * empty and every taught recipe is lost; an id absent from the payload stays verbatim and still
  * reports. The component remap never touches either.
  */
-export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
+export function rebindCopyRecipeIds(prepared, { generateId = () => randomBase36(16) } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes } = prepared;
 

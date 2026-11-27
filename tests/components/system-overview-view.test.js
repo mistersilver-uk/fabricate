@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CHECK_TO_ISSUES } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { shippedString } from '../helpers/manager/managerLocalization.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -304,6 +305,47 @@ describe('SystemOverviewView (mounted)', () => {
     const row = target.querySelector('[data-overview-issue="iterativeBoundsInverted"]');
     assert.match(row.textContent, /headless iterativeBoundsInverted/);
     harness.remount();
+  });
+
+  it('names the counter or action of a recipe issue, and leaves a library issue unnamed (issue 3038)', async () => {
+    const original = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = shippedString;
+    try {
+      const recipeIssue = (code, extra) => ({
+        ...libraryIssue('recipe', 'r-blade', code),
+        kind: 'recipe',
+        ...extra
+      });
+      const target = await harness.mount({
+        report: {
+          issues: [
+            recipeIssue('iterativeBoundsInverted', { counterId: 'heat', counterName: 'Heat' }),
+            recipeIssue('iterativeUnknownAction', { actionId: 'anneal', actionName: 'anneal' }),
+            libraryIssue('counter', 'temper', 'iterativeBoundsInverted')
+          ],
+          counts: { critical: 3, warning: 0, info: 0, blockers: 0 },
+          blocksSystem: false
+        }
+      });
+      const sentences = [...target.querySelectorAll('[data-overview-issue]')].map((row) =>
+        row.textContent.replaceAll(/\s+/g, ' ')
+      );
+      assert.equal(sentences.length, 3);
+      const group = (kind) => target.querySelector(`[data-system-overview-group="${kind}"]`);
+      assert.ok(
+        group('recipe').textContent.includes('The minimum of Heat is above its maximum.'),
+        sentences.join(' | ')
+      );
+      assert.ok(group('recipe').textContent.includes('anneal is not a crafting action in this system.'));
+      assert.ok(
+        group('counter').textContent.includes('A counter minimum is above its maximum.'),
+        'a library issue reads the unnamed sentence'
+      );
+      assert.ok(!group('counter').textContent.includes('The minimum of'));
+    } finally {
+      globalThis.game.i18n.localize = original;
+      harness.remount();
+    }
   });
 
   it('links a counter row to Open counter and an action row to Open action', async () => {

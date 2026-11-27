@@ -114,6 +114,7 @@ function formatCheckReport(result, before, after) {
     );
   }
 
+  if (result.error) report.push(`The Prettier process did not run to completion: ${result.error}`);
   report.push(`${result.stdout}${result.stderr}`);
   return report.join('\n\n');
 }

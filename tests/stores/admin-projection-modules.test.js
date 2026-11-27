@@ -453,6 +453,36 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(dynamic({ product: 'sum', direction: 'over' }), { kind: 'dynamic', dc: null });
   });
 
+  it('reads every row of an iterative system as Per action, with or without a usable routed check (issue 3043)', () => {
+    const kinds = (system) =>
+      buildRecipeList(
+        null,
+        makeRecipeManager([makeRecipe({ id: 'r-a' }), makeRecipe({ id: 'r-b' })]),
+        system,
+        ''
+      ).recipes.map((row) => row.checkSummary);
+    const perAction = [
+      { kind: 'perAction', dc: null },
+      { kind: 'perAction', dc: null },
+    ];
+    const routed = makeSystem({ resolutionMode: 'iterative' });
+    assert.ok(
+      String(routed.craftingCheck.routed.rollFormula).trim(),
+      'the fixture check is usable'
+    );
+    assert.deepEqual(kinds(routed), perAction, 'a usable routed check');
+    const bare = makeSystem({ resolutionMode: 'iterative' });
+    Object.assign(bare.craftingCheck.routed, { rollFormula: '' });
+    Object.assign(bare.craftingCheck.simple, { rollFormula: '' });
+    assert.deepEqual(kinds(bare), perAction, 'no usable check');
+    const off = makeSystem({ resolutionMode: 'alchemy', alchemy: { checkMode: 'none' } });
+    assert.deepEqual(
+      kinds(off)[0],
+      { kind: 'checkOff', dc: null },
+      'alchemy check off is unchanged'
+    );
+  });
+
   it('derives the structure, counts, check pill and membership a row cannot compute', () => {
     const recipes = [
       makeRecipe({ id: 'r-ok', checkTierId: 'tier-hard' }),

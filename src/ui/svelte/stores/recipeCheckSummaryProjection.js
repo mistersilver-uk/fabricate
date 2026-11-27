@@ -35,15 +35,18 @@ function _recipeCheckConfig(system) {
  * `CraftingEngine._resolveSimpleCheckDc`: the recipe's selected tier wins, then
  * the check's static default.
  *
- * The two check-less kinds are NOT the same fact, and the row must not tell the GM
+ * The check-less kinds are NOT the same fact, and the row must not tell the GM
  * they are:
  *
  *  - `ingredients` — a `routedByIngredients` system with no usable check. Results
  *    route off the ingredient set that was used, so the recipe resolves perfectly
  *    well with no roll. This is a working configuration, reported neutrally.
- *  - `none` — every other mode with no usable check. The system cannot roll for this
- *    recipe, which is a state the GM should be able to SCAN a library for, so it
- *    carries a warning rather than an em dash that says nothing.
+ *  - `perAction` — an `iterative` system, whatever its routed check holds: each
+ *    Crafting Action rolls the system's check or doesn't, and a recipe carries none.
+ *    Reported neutrally.
+ *  - `none` — every other non-iterative mode with no usable check. The system cannot
+ *    roll for this recipe, which is a state the GM should be able to SCAN a library
+ *    for, so it carries a warning rather than an em dash that says nothing.
  *
  * Everything that depends on the SYSTEM alone is resolved ONCE per cohort here rather than
  * once per row (issue 1081).
@@ -74,6 +77,9 @@ export function recipeCheckContext(system) {
   if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'none') {
     return constantOf('checkOff');
   }
+
+  // An iterative recipe carries no check: each Crafting Action rolls the system's own, or doesn't.
+  if (mode === 'iterative') return constantOf('perAction');
 
   const config = _recipeCheckConfig(system);
   const rolls = isCountCheck(config) || Boolean(String(config?.rollFormula ?? '').trim());

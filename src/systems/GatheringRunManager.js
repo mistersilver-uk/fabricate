@@ -1,3 +1,4 @@
+import { randomId } from '../utils/randomId.js';
 import { cloneJson, stringOrNull } from '../utils/scalars.js';
 
 import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCoherence.js';
@@ -49,7 +50,7 @@ export class GatheringRunManagerError extends Error {
  */
 export class GatheringRunManager {
   constructor({
-    randomID = defaultRandomID,
+    randomID = randomId,
     nowWorldTime = defaultNowWorldTime,
     getUserId = defaultGetUserId,
     getActors = defaultGetActors,
@@ -918,20 +919,6 @@ function findRun(container, runId, { activeOnly = false } = {}) {
   if (activeOnly) return null;
   const run = (container.history || []).find((entry) => entry?.id === id);
   return run ? { run, terminal: true } : null;
-}
-
-function defaultRandomID() {
-  if (globalThis.foundry?.utils?.randomID) return globalThis.foundry.utils.randomID();
-  // Non-security id fallback for headless contexts. Prefer the Web Crypto RNG
-  // over Math.random so the id is collision-resistant.
-  const cryptoSource = globalThis.crypto;
-  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replaceAll('-', '').slice(0, 16);
-  if (cryptoSource?.getRandomValues) {
-    const bytes = new Uint8Array(8);
-    cryptoSource.getRandomValues(bytes);
-    return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-  return `gathering-${Date.now().toString(36)}`;
 }
 
 function defaultNowWorldTime() {

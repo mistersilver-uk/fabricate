@@ -41,6 +41,7 @@ import { CASES as managerWorldTravelCases } from './view-lab-cases/managerWorldT
 import { CASES as playerGatheringAndCraftingCases } from './view-lab-cases/playerGatheringAndCrafting.js';
 import { CASES as playerInventoryCases } from './view-lab-cases/playerInventory.js';
 import { CASES as playerJournalCases } from './view-lab-cases/playerJournal.js';
+import { CASES as playerJournalIterativeCases } from './view-lab-cases/playerJournalIterative.js';
 import { CASES as worldCataloguesCases } from './view-lab-cases/worldCatalogues.js';
 import { CASES as worldToolCatalogueCases } from './view-lab-cases/worldToolCatalogue.js';
 import { CASES as worldToolEntryCases } from './view-lab-cases/worldToolEntry.js';
@@ -145,6 +146,7 @@ export const VIEW_LAB_CASE_FILES = Object.freeze([
   caseFile('playerInventory', playerInventoryCases),
   caseFile('playerGatheringAndCrafting', playerGatheringAndCraftingCases),
   caseFile('playerJournal', playerJournalCases),
+  caseFile('playerJournalIterative', playerJournalIterativeCases),
   caseFile('coverageMatrix', coverageMatrixCases),
   caseFile('canvasInteractables', canvasInteractablesCases),
 ]);

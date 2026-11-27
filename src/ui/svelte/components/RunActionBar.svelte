@@ -1,4 +1,6 @@
-<!-- Run actions use caller-owned eligibility and a deliberate two-step cancellation. -->
+<!-- Run actions use caller-owned eligibility and a deliberate two-step cancellation. `primary: null`
+     draws no primary, and `pause: null` draws neither pause nor resume whatever the run's pause
+     state, keeping `begin` and `completion`; `tests/components/run-primitives-mounted.test.js`. -->
 <script>
   import SegmentedControl from './SegmentedControl.svelte';
   import IconButton from './IconButton.svelte';
@@ -30,7 +32,7 @@
     armedRunId = nextRunId;
   });
 
-  const paused = $derived(run?.paused === true || Boolean(run?.pauseState));
+  const paused = $derived(pause !== null && (run?.paused === true || Boolean(run?.pauseState)));
   const busy = $derived(primary?.busy === true || run?.busy === true);
   const primaryEnabled = $derived(primary?.enabled === true);
   const primaryLabel = $derived(busy ? primary?.busyLabel || primary?.label : primary?.label);
@@ -115,17 +117,19 @@
         {resume.label}
       </Button>
     {:else}
-      <Button
-        icon={pause.icon || 'fas fa-pause'}
-        class="fab-run-action-control"
-        data-run-action="pause"
-        ariaLabel={pause.ariaLabel || undefined}
-        title={pause.reason || pause.title || undefined}
-        disabled={!pauseEnabled}
-        onclick={onPause}
-      >
-        {pause.label}
-      </Button>
+      {#if pause !== null}
+        <Button
+          icon={pause.icon || 'fas fa-pause'}
+          class="fab-run-action-control"
+          data-run-action="pause"
+          ariaLabel={pause.ariaLabel || undefined}
+          title={pause.reason || pause.title || undefined}
+          disabled={!pauseEnabled}
+          onclick={onPause}
+        >
+          {pause.label}
+        </Button>
+      {/if}
 
       {#if completion}
         <div class="fab-run-action-completion" data-run-completion>
@@ -163,7 +167,7 @@
         {#if begin.prompt}
           <p class="fab-run-begin-prompt" data-run-begin-prompt>{begin.prompt}</p>
         {/if}
-      {:else}
+      {:else if primary !== null}
         <Button
           icon={primary?.icon || ''}
           role={primaryEnabled ? 'primary' : 'neutral'}

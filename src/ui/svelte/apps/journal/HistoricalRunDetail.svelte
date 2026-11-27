@@ -1,4 +1,6 @@
-<!-- Renders the builder's entitled historical evidence, with unknowns local to each field. -->
+<!-- Renders the builder's entitled historical evidence, with unknowns local to each field. An
+     iterative record adds its final workpiece, and on the entry its ending attempt left selected
+     its verdict is the one that attempt froze (`journal.iterative.verdictFor`, issue 3011). -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Callout from '../../components/Callout.svelte';
@@ -13,11 +15,19 @@
   import JournalFactRow from './JournalFactRow.svelte';
   import RecoveryEvidence from './RecoveryEvidence.svelte';
   import ThisRun from './ThisRun.svelte';
+  import WorkpieceRecord from './iterative/WorkpieceRecord.svelte';
+  import { quantityText } from './runDetailPresentation.js';
   import { presentCurrencySpends, presentHistory } from './historyPresentation.js';
 
-  let { run, services = null, transient = false } = $props();
+  let { run, services = null, transient = false, journal = null } = $props();
   const account = $derived(presentHistory(run, localize));
-  const showTransient = $derived(transient && !account.settling);
+  // A frozen verdict owns the banner, and its yields own the produced rows, so Crafted is not
+  // drawn a second time beneath it. Materials used stays. A later open has no frozen yields.
+  const frozen = $derived(
+    transient && !account.settling ? (journal?.iterative?.verdictFor?.(run) ?? null) : null
+  );
+  const bannerOwnsYields = $derived((frozen?.yields?.length ?? 0) > 0);
+  const showTransient = $derived(transient && !account.settling && !frozen);
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
   // A run a GM closed shows only its receipts, which stay uncertain rather than read as awarded.
@@ -122,6 +132,16 @@
   {/if}
 {/snippet}
 
+{#snippet frozenYields()}
+  {#each frozen?.yields ?? [] as item (item.id)}
+    <ListRow
+      name={item.name ?? ''}
+      art={item.img ?? ''}
+      quantity={quantityText(item.quantity, localize)}
+    />
+  {/each}
+{/snippet}
+
 {#snippet verdictEvidence()}
   {#if account.verdictCheck}<span data-history-verdict-check>{account.verdictCheck}</span>{/if}
   {#if transientRows}
@@ -160,6 +180,15 @@
   {#if gmClosed}<RecoveryEvidence {run} {services} />{:else if !recovery}
     {#if account.settling}
       <Notice tone="info" title={text('SettlementTitle')} data-journal-settling="" />
+    {:else if frozen}
+      <Notice
+        tone={frozen.tone}
+        icon={frozen.icon}
+        title={frozen.title}
+        detail={frozen.detail}
+        data-journal-verdict={run.status ?? ''}
+        evidence={bannerOwnsYields ? frozenYields : null}
+      />
     {:else if showTransient || account.failed}
       <Notice
         tone={account.failed ? 'danger' : 'success'}
@@ -210,7 +239,7 @@
         <JournalFactRow label={spend.label} value={spend.value} />
       {/each}
       {@render essenceRecaps()}
-      {@render items(resultHeading, account.results, 'produced')}
+      {#if !bannerOwnsYields}{@render items(resultHeading, account.results, 'produced')}{/if}
       {@render rewardFacts()}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
         <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />
@@ -264,6 +293,10 @@
       </InspectorCard>
     {/if}
     {@render items(text('ToolsUsed'), account.tools, 'tools')}
+    {#if run?.iterative}<WorkpieceRecord
+        iterative={run.iterative}
+        runKey={String(run.key ?? run.id ?? '')}
+      />{/if}
   {/if}
   <ThisRun {run} {services} />
   <Callout tone="neutral" text={account.closed} data-journal-guidance />

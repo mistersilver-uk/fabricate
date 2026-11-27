@@ -136,6 +136,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/runHistoryEvidence.js',
   'src/systems/runLifecycleState.js',
   'src/systems/normalize/checkEvaluation.js',
+  'src/utils/randomId.js',
   'src/systems/normalize/checkAdvantage.js',
   // The additional-dice group's macro wells (issue 2008): the drop target and its macro checks.
   'src/ui/svelte/actions/dragDrop.js',
