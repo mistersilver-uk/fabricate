@@ -1585,7 +1585,7 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`StageBars`.**
   - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
-  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight?, shares?, title? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight?, shares?, title?, status? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
     A bar's `aria-valuenow` is the clamped value truncated to a whole number, so a stage short of 100 never announces 100 and none announces a fraction.
@@ -1611,7 +1611,10 @@ Each group states the accepted values of every key that entry publishes.
     It is not the caption's `title`: while `numbered` a named caption still carries its stage's `name` as its native tooltip, so the bar and its caption each show their own under the pointer.
     So while `numbered` the companion does not repeat the stage's name in `title`: it is a pointer-only hint, so it holds what the caption does not say, as the days spent.
     Naming `title` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws no tooltip and refuses nothing, which `describe` cannot show.
-    A member other than `name`, `label`, `valueText`, `value`, `weight`, `shares` and `title` is private, and an empty `stages` draws the named group with no bar.
+    A stage whose `status` is `failed` paints its bar `danger` at any `value`, in place of its success, accent or neutral state paint; any other `status` draws as if none were passed.
+    The bar writes no word for it, so the companion states the failure in the stage's `valueText` and in its own text beside the bars.
+    Naming `status` is additive, and `StageBars`' `version` stays 1: a Fabricate that predates it draws a failed stage in its state's paint and refuses nothing, which `describe` cannot show.
+    A member other than `name`, `label`, `valueText`, `value`, `weight`, `shares`, `title` and `status` is private, and an empty `stages` draws the named group with no bar.
   - `gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
     Naming `gap` is additive, so `StageBars`' `version` stays 1, and a Fabricate that predates it refuses it with `"gap" is not a data attribute`, which `describe` shows by leaving the key out of `props`.
   - `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as `FillBar`'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.

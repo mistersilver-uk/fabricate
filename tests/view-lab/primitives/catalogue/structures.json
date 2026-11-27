@@ -1355,6 +1355,60 @@
     }
   },
   {
+    "spec": "<DataTable>",
+    "cap": "compact pager — a table paged in a narrow pane",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "fixture": "DataTableFooter",
+    "note": "The first page of a paged table at `pagerDensity=\"compact\"`: the pager draws the compact bar, its page sizes at the inline rung. The fixture keys rows by `id` and wires no footer.",
+    "props": {
+      "heading": "Sessions",
+      "count": 8,
+      "columns": [
+        {
+          "key": "session",
+          "label": "#",
+          "mono": true
+        },
+        {
+          "key": "action",
+          "label": "Action",
+          "rowHeader": true
+        }
+      ],
+      "rows": [
+        {
+          "id": "s8",
+          "session": "8",
+          "action": "Planish"
+        },
+        {
+          "id": "s7",
+          "session": "7",
+          "action": "Hammer"
+        },
+        {
+          "id": "s6",
+          "session": "6",
+          "action": "Stoke the forge"
+        },
+        {
+          "id": "s5",
+          "session": "5",
+          "action": "Hammer"
+        },
+        {
+          "id": "s4",
+          "session": "4",
+          "action": "Normalise"
+        }
+      ],
+      "perPage": 5,
+      "perPageOptions": [5, 10, 15],
+      "pagerDensity": "compact"
+    }
+  },
+  {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
     "cap": "inspector rail section",
     "draws": ":scope > div > section:nth-child(1)",

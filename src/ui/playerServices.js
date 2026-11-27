@@ -205,6 +205,9 @@ export function createPlayerServices({ activeCanvasTool, scopedInteractableRef, 
       game?.fabricate?.executeJournalRunCommand?.(withStationCommand(opts, presentTools())) ?? null,
     advanceCraftingRun: (opts = {}) =>
       game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
+    // Foundry's own id source: `crypto.randomUUID` needs a secure context, which a world served
+    // over plain HTTP is not.
+    newAttemptId: () => foundry.utils.randomID(),
     ...gameForwardingServices(),
     // The stores stay clear of `apps/journal/`, so the GM's release prompt reaches them as a seam.
     offerReleaseForRefusal: (result) => offerReleaseForRefusal({ result, services, localize }),

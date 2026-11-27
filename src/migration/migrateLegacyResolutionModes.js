@@ -3,6 +3,7 @@
  * so the runtime keeps no `tiered` branch or `outcomeRouting` shim; spec § Resolution-Model
  * Migration (Pre-Release) owns the mapping and its five edge cases.
  */
+import { randomId } from '../utils/randomId.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { isPlainObject, forEachSystem } from './migrationHelpers.js';
@@ -175,7 +176,7 @@ function _applyRenamesAndSplits(outcomesByGroupId, groupsById, seenNames) {
         target.name = outcome;
       } else {
         // Deep-copy so the clone shares no nested array by reference with the original.
-        clones.push({ ..._clone(target), id: _randomId(), name: outcome });
+        clones.push({ ..._clone(target), id: randomId(), name: outcome });
       }
     }
   }
@@ -188,11 +189,6 @@ function _logRemovedRecipe(recipe) {
       { id: recipe.id, name: recipe.name, craftingSystemId: recipe.craftingSystemId }
     )}`
   );
-}
-
-function _randomId() {
-  // `crypto.randomUUID` exists in Node 22 and the browser, so no Foundry global is needed.
-  return crypto.randomUUID();
 }
 
 function _clone(value) {

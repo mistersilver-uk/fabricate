@@ -72,7 +72,11 @@
       },
       "StageBars": {
         "Unnamed": "Stage {index} of {count}",
-        "Position": "{percent}%, stage {index} of {count}"
+        "Position": "{percent}%, stage {index} of {count}",
+        "Failed": {
+          "One": "{percent}%, failed",
+          "Several": "{percent}%, stage {index} of {count}, failed"
+        }
       },
       "RuleRow": {
         "Remove": "Remove rule",
@@ -1215,10 +1219,230 @@
           "awaitingReward": "Choose your reward",
           "rewardPending": "Reward pending",
           "readyToBegin": "Needs your go-ahead",
+          "stepDone": "Step done",
           "needsMaterials": "Needs materials",
           "needsEssences": "Needs essences",
           "needsCurrency": "Needs payment",
           "needsTools": "Needs tools"
+        },
+        "Iterative": {
+          "Begin": {
+            "Busy": "Starting step {index}…",
+            "Label": "Start step {index}"
+          },
+          "Cancel": {
+            "Aria": "Cancel this workpiece",
+            "Confirm": "Cancel workpiece",
+            "Keep": "Keep working",
+            "StopPiece": "Stop working this piece? Inputs already taken stay spent.",
+            "StopPieceRefund": "Stop working this piece? Its inputs are returned, and its progress is lost.",
+            "StopStep": "Stop at step {index}? Inputs already taken stay spent.",
+            "StopStepRefund": "Stop at step {index}? This step’s inputs are returned, and its progress is lost."
+          },
+          "Card": {
+            "Busy": "{action} — working…",
+            "CheckName": "crafting check",
+            "CheckTag": "Check",
+            "Ended": "The step has ended",
+            "HazardAbove": "{counter} {value} is above {threshold}: also {effects}",
+            "HazardAtLeast": "{counter} {value} is at or above {threshold}: also {effects}",
+            "HazardAtMost": "{counter} {value} is at or below {threshold}: also {effects}",
+            "HazardBelow": "{counter} {value} is below {threshold}: also {effects}",
+            "HazardExactly": "{counter} {value} is at {threshold}: also {effects}",
+            "Needs": "Needs {requirements}",
+            "NeedsHidden": "Its requirements aren’t met yet",
+            "NoCheck": "No check",
+            "NoCost": "No cost",
+            "Rolls": "Rolls the {check}",
+            "Setup": "Ask your GM to review this action",
+            "Short": "Needs {amount} {counter}; the piece has {value}",
+            "ShortHidden": "The workpiece can’t cover this yet",
+            "Waiting": "Waiting until {time}",
+            "Working": "Working session {session}… waiting for the save",
+            "WorkingFree": "Working… waiting for the save"
+          },
+          "Chip": {
+            "Add": "{counter} +{amount}",
+            "Set": "{counter} = {amount}",
+            "Subtract": "{counter} −{amount}"
+          },
+          "Counter": {
+            "BreaksAt": "Breaks at {value}",
+            "Broken": "Broken",
+            "Carries": "Carries into step {index}, where it decides the result",
+            "Decides": "Decides the result",
+            "DoneAt": "Done at {value}",
+            "Hidden": "Hidden from players",
+            "Low": "Low: breaks at {value}",
+            "Mark": "{set} — {rule}",
+            "MarkReached": "{mark}, reached",
+            "Max": "Max {value}",
+            "Named": "{counter} {value}",
+            "Reading": "{value} / {scale}",
+            "Target": "Target {value}",
+            "TargetReached": "Target reached",
+            "Value": "{value} of {scale}"
+          },
+          "Ledger": {
+            "Changed": "Changed",
+            "Check": "Check",
+            "CheckPrivate": "Rolled privately by the GM",
+            "Nothing": "Nothing",
+            "Paid": "Paid"
+          },
+          "List": {
+            "And": "{first} and {last}",
+            "Comma": "{first}, {next}",
+            "Or": "{first} or {last}"
+          },
+          "Meta": {
+            "HiddenMany": "{count} counters are hidden by the GM.",
+            "HiddenOne": "{count} counter is hidden by the GM.",
+            "SessionNext": "Session {session} next",
+            "SessionsMany": "{count} sessions",
+            "SessionsOne": "{count} session",
+            "StartFormula": "{counter} {value} (formula {formula})",
+            "StartFormulaHeld": "{counter} {value} (formula {formula}, held at {value})",
+            "StartHeld": "{counter} {value} (held at {value})",
+            "StartedWith": "Started with {counters}.",
+            "StepOf": "Step {index} of {count}"
+          },
+          "Nav": {
+            "Next": "Next step",
+            "Open": "View step {index}: {name}",
+            "Position": "Viewing step {index} of {count}",
+            "Previous": "Previous step",
+            "Return": "Return to current step {index}"
+          },
+          "Notice": {
+            "BusyDetail": "Saving…",
+            "BusyTitle": "Working session {session}: {action}",
+            "BusyTitleFree": "Working: {action}",
+            "CheckAsk": "Ask your GM to check the crafting check.",
+            "CheckDetail": "The {check} couldn’t be rolled, so nothing happened.",
+            "Idle": "Each session’s result shows here.",
+            "RefusalTitle": "Couldn’t take that action",
+            "ResultFailed": "The check failed. The costs were paid.",
+            "ResultFailedEffect": "The check failed. The costs were paid and the failure effect applied.",
+            "ResultSaved": "Saved. The workpiece below shows the new state.",
+            "ResultTitle": "Session {session} · {action} · {outcome} ({value})",
+            "ResultTitleFree": "{action} · {outcome} ({value})",
+            "ResultTitlePlain": "Session {session} · {action}",
+            "ResultTitlePlainFree": "{action}",
+            "ResumeDetail": "This is the saved workpiece, read fresh when the window opened. Session {session} is next.",
+            "ResumeDetailFree": "This is the saved workpiece, read fresh when the window opened.",
+            "ResumeTitle": "Picked up where you left off",
+            "StaleDetail": "Someone took {other} in another window first. Your {action} wasn’t applied and nothing was spent. Choose again.",
+            "StaleDetailAlone": "Your {action} wasn’t applied and nothing was spent. Choose again.",
+            "StaleDetailAloneBought": "Your {action} wasn’t applied. Choose again.",
+            "StaleDetailBought": "Someone took {other} in another window first. Your {action} wasn’t applied. Choose again.",
+            "StaleTitle": "This workpiece changed elsewhere and was reloaded",
+            "StartedDetail": "Its inputs were taken once, now. Step {index} starts with {counters}.",
+            "StartedDetailBare": "Its inputs were taken once, now.",
+            "StartedTitle": "Step {index} started",
+            "UnansweredTitle": "No answer from the GM yet"
+          },
+          "Progress": {
+            "Note": "Step {index}: {counter} {value} of {n}",
+            "NoteSingle": "{counter} {value} of {n}"
+          },
+          "Refusal": {
+            "ActionUnavailable": "Needs {requirements}.",
+            "CostUnaffordable": "Needs {amount} {counter}; the piece has {value}.",
+            "EffectDice": "The dice for one of this action’s effects couldn’t be rolled. Choose the action again.",
+            "ExpressionInvalid": "The {counter} cost doesn’t work out. Ask your GM to review it.",
+            "UnknownCounter": "This action uses {counter}, which isn’t tracked here. Ask your GM to review it.",
+            "Unspent": "Nothing was spent and the session wasn’t counted."
+          },
+          "Route": {
+            "Label": "Results",
+            "NextStep": "Step {index} starts",
+            "Nothing": "Nothing",
+            "Now": "{title} This is what it would give if the step ended this way now.",
+            "NowPill": "Now",
+            "OnFailure": "On failure.",
+            "OnSuccess": "On success.",
+            "OnSuccessWhen": "On success, when {rule}."
+          },
+          "Rule": {
+            "Counter": "{counter} {op} {value}",
+            "Previous": "right after {actions}",
+            "Sessions": "{threshold} sessions"
+          },
+          "Sessions": {
+            "Action": "Action",
+            "Changed": "Changed",
+            "Check": "{outcome} · {value}",
+            "CheckColumn": "Check",
+            "EarlierMany": "{n} earlier actions aren’t listed.",
+            "EarlierOne": "{n} earlier action isn’t listed.",
+            "Empty": "No sessions yet. Choose an action to take the first.",
+            "Free": "—",
+            "Heading": "Sessions",
+            "NoPaid": "—",
+            "Nothing": "Nothing",
+            "Number": "#",
+            "OtherWindow": "{action} (other window)",
+            "Paid": "Paid"
+          },
+          "Step": {
+            "Carried": "Succeeded. Its work carried into step {index}",
+            "DoneWhen": "Done when",
+            "Ended": "Ended",
+            "EndedCarried": "Succeeded; its work carried into step {index}",
+            "FailedMany": "Failed after {n} sessions",
+            "FailedOne": "Failed after {n} session",
+            "FailsWhen": "Fails when",
+            "InProgressMany": "In progress · {n} sessions so far",
+            "InProgressOne": "In progress · {n} session so far",
+            "Name": "Step {index}",
+            "StartsAfter": "Starts after step {index} succeeds",
+            "StartsWith": "Starts with",
+            "SucceededMany": "Succeeded after {n} sessions",
+            "SucceededOne": "Succeeded after {n} session",
+            "SucceededSet": "Succeeded: {set}",
+            "TagDone": "Done",
+            "TagFailed": "Failed",
+            "TagNotReached": "Not reached",
+            "TagSucceeded": "Succeeded",
+            "TagWorking": "Working",
+            "WillProduceOne": "Will produce one of"
+          },
+          "StepLabel": {
+            "Many": "Step {index} of {count} · {sessions} sessions completed",
+            "One": "Step {index} of {count} · {sessions} session completed",
+            "SingleMany": "{sessions} sessions completed",
+            "SingleOne": "{sessions} session completed"
+          },
+          "Threshold": {
+            "Above": "more than {value}",
+            "AtLeast": "{value} or more",
+            "AtMost": "{value} or less",
+            "Below": "less than {value}",
+            "Exactly": "exactly {value}"
+          },
+          "Verdict": {
+            "Failed": "{step} failed",
+            "FailedBefore": "{counter} reached {value} before {goal} reached {n}.",
+            "FailedReached": "{counter} reached {value}.",
+            "FailedSet": "{step} failed: {set}",
+            "Finished": "The workpiece is finished.",
+            "Leaves": "The step has failed and leaves {set}.",
+            "LeavesNothing": "The step has failed and nothing is produced.",
+            "Next": "Step {index}, {name}, is next. Starting it takes its own inputs.",
+            "NextCarries": "Step {index}, {name}, is next. Starting it takes its own inputs. Every counter carries on, including {counters}.",
+            "Reaches": "{counter} finished at {value}, which reaches {set} ({threshold}).",
+            "RedactedNext": "The next step is next.",
+            "Succeeded": "{step} succeeded",
+            "SucceededSet": "{step} succeeded: {set}"
+          },
+          "Workpiece": {
+            "ActionsCaption": "Costs are paid even if the check fails.",
+            "ActionsKicker": "Choose an action",
+            "Kicker": "The workpiece",
+            "Saved": "Saved values.",
+            "Saving": "Saving… values update once the save is confirmed."
+          }
         },
         "Mode": {
           "Standard": "Standard (DC)",
@@ -1227,6 +1451,7 @@
           "RoutedByCheck": "Routed by Check",
           "Progressive": "Progressive",
           "Alchemy": "Alchemy",
+          "Iterative": "Iterative",
           "straight": "Direct",
           "d100": "d100",
           "routed": "Check"
@@ -1295,6 +1520,7 @@
         },
         "History": {
           "Title": "Finished",
+          "WhenSessions": "{when} · {sessions}",
           "UnknownMaterial": "Unknown material",
           "CurrencyAwarded": "Currency awarded",
           "RecipeLearned": "Recipe learned",
@@ -1449,6 +1675,7 @@
           "Mode": "Mode"
         },
         "WhatToExpect": {
+          "Iterative": "Choose an action to work the piece. Each one is saved before anything changes, and the step ends when its rules say so.",
           "Protected": "Protected details are hidden. Use the available run controls when ready; missing check details do not mean this run has no check.",
           "Past": "You are looking back at a finished step. Nothing here can be changed — step {index} is the one the run is waiting on.",
           "Future": "You are looking ahead at a step the run has not reached. Its choices open when it gets there; step {index} is the one waiting on you.",

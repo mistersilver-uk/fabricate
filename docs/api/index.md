@@ -3236,7 +3236,7 @@ const select = fabUi.mount('Select', { target, props: props() });
 ### StageBars
 
 `StageBars` draws how far a staged process has come: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value; it draws no control.
-`stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight?, shares?, title? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+`stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value, weight?, shares?, title?, status? }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
 A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
 So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
 `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too.
@@ -3262,7 +3262,10 @@ While it is open Foundry may describe the bar by it through `aria-describedby`, 
 It is not the caption's `title`: while `numbered` a named caption still carries its stage's `name` as its native tooltip, so the bar and its caption each show their own under the pointer.
 So while `numbered` do not repeat the stage's name in `title`: it is a pointer-only hint, so put in it what the caption does not say, as the days spent.
 Naming `title` is additive, and the entry stays at `version` 1: a Fabricate that predates it draws no tooltip and refuses nothing, and `describe` cannot tell you which one is running.
-A member other than `name`, `label`, `valueText`, `value`, `weight`, `shares` and `title` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+A stage whose `status` is `failed` paints its bar `danger` at any `value`, in place of its success, accent or neutral state paint; any other `status` draws as if none were passed.
+The bar writes no word for it, so state the failure in the stage's `valueText` and in your own text beside the bars.
+Naming `status` is additive, and the entry stays at `version` 1: a Fabricate that predates it draws a failed stage in its state's paint and refuses nothing, and `describe` cannot tell you which one is running.
+A member other than `name`, `label`, `valueText`, `value`, `weight`, `shares`, `title` and `status` is private, `id` among them, and an empty `stages` draws the named group with no bar.
 `gap` is `default` or `tight`, and `default` when absent or any other value: `tight` draws a 2px gap between the bars where `default` draws 6px.
 A Fabricate that predates `gap` refuses it with `"gap" is not a data attribute`, and `describe('StageBars').props` shows whether the running one publishes it; adding it is additive, and the entry stays at `version` 1.
 `track` is `default` or `thin`, and `default` when absent or any other value: `thin` draws each bar's track as [`FillBar`](#fillbar)'s `thin` one is drawn, with no border and on `--fab-bg-3` on any ground, but 6px tall, so the fill is the whole 6px rather than inset by the `default` track's 1px border.

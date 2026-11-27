@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `schema` | `{ head, steps, sentence?, missingClauseKey?, labels }` | `{}` | `head(value)` returns `{ glyph, tone?, title, chip? }`, already localized. `steps` is the field chain in order, each `{ key, legend?, render }` with `render` a snippet taking `(value, change)`; the caller derives it, so each step narrows the next. `sentence(value)` returns a `RuleSentence` sentence. `labels` is `{ remove?, expand?, collapse? }`, localized; each unset name reads its own key under `Common.RuleRow`. |
+  | `schema` | `{ head, steps, sentence?, missingClauseKey?, labels }` | `{}` | `head(value)` returns `{ glyph, tone?, title, chip?, connective? }`, already localized; `connective` is read by the one-line form only, which draws a title such as "When" muted and smaller than a heading. `steps` is the field chain in order, each `{ key, legend?, render }` with `render` a snippet taking `(value, change)`; the caller derives it, so each step narrows the next. `sentence(value)` returns a `RuleSentence` sentence. `labels` is `{ remove?, expand?, collapse? }`, localized; each unset name reads its own key under `Common.RuleRow`. |
   | `value` | rule object or `null` | `null` | Bindable. `null` is a rule not yet authored, drawn as its presets alone. |
   | `presets` | `{ id, label, icon?, value }[]` | `[]` | Starting points for an unauthored rule; a function `value` is called on choice, so every chosen rule is fresh. |
   | `collapsible` | boolean or `{ open, onToggle(next) }` | `false` | A head that discloses the field chain, which scrolls itself into the nearest view on opening; the object form lets a list keep one rule open. Without it the head, the chain and the remove sit on one line. |
@@ -169,7 +169,10 @@
   <div class={classes} {...rest} bind:this={node}>
     <div class="fabricate-rule-row-line">
       <span class="fabricate-rule-row-icon"><i class={head.glyph} aria-hidden="true"></i></span>
-      <span class="fabricate-rule-row-label" data-rule-row-title="">{head.title}</span>
+      <span
+        class={['fabricate-rule-row-label', head.connective && 'is-connective']}
+        data-rule-row-title="">{head.title}</span
+      >
       {#each schema.steps ?? [] as step (step.key)}
         {@render step.render(value, change)}
       {/each}

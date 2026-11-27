@@ -10,6 +10,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -125,5 +126,88 @@ describe('RunProgress (mounted)', () => {
     const [bar] = barsOf(root);
     assert.equal(bar.getAttribute('aria-label'), 'Run progress');
     assert.ok(!bar.hasAttribute('aria-labelledby'), 'exactly one naming route');
+  });
+
+  it('draws a failed stage in danger and reads it as failed, alone and among several', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const lone = await harness.mount({
+        stages: [{ name: 'Forge', status: 'failed' }],
+        progress: 40,
+        label: 'Progress',
+      });
+      assert.deepEqual(readingsOf(lone), ['40%, failed']);
+      assert.equal(lone.querySelector('[data-stage-bars-state]').dataset.stageBarsState, 'danger');
+      harness.remount();
+      const several = await harness.mount({
+        stages: [{ name: 'Draw', status: 'failed' }, { status: 'failed' }, { name: 'Temper' }],
+        current: 2,
+        label: 'Progress',
+      });
+      assert.deepEqual(readingsOf(several), [
+        '100%, stage 1 of 3, failed',
+        '100%, failed',
+        '0%, stage 3 of 3',
+      ]);
+      assert.equal(barsOf(several)[1].getAttribute('aria-label'), 'Stage 2 of 3');
+      assert.deepEqual(
+        [...several.querySelectorAll('[data-stage-bars-state]')].map(
+          (stage) => stage.dataset.stageBarsState
+        ),
+        ['danger', 'danger', 'accent']
+      );
+    } finally {
+      restoreI18n();
+    }
+  });
+
+  it('draws a note beside the kicker that describes the group, apart from the blocker', async () => {
+    const root = await harness.mount({
+      stages: [{ name: 'Shape' }],
+      progress: 40,
+      label: 'Progress',
+      blocker: 'Waiting for the GM',
+      note: 'Step 1: Shape 40 of 60',
+    });
+    const note = root.querySelector('[data-run-progress-note]');
+    assert.equal(note.textContent, 'Step 1: Shape 40 of 60');
+    assert.ok(!note.hasAttribute('data-run-progress-blocker'), 'the note is not the blocker');
+    assert.equal(
+      root.querySelector('[data-run-progress-blocker]').textContent,
+      'Waiting for the GM'
+    );
+    assert.equal(root.querySelector('[role="group"]').getAttribute('aria-describedby'), note.id);
+    harness.remount();
+    const bare = await harness.mount({ stages: [{}], note: 'Step 1: Shape 40 of 60' });
+    assert.ok(bare.querySelector(':scope .fab-run-progress-heading [data-run-progress-note]'));
+    harness.remount();
+    const none = await harness.mount({ stages: [{}], label: 'Progress' });
+    assert.ok(!none.querySelector('[data-run-progress-note]'));
+    assert.ok(!none.querySelector('[role="group"]').hasAttribute('aria-describedby'));
+  });
+});
+
+const RUN_PROGRESS_BASELINE = resolve(import.meta.dirname, '../fixtures/runProgressBaseline.json');
+/** The props `RunCard` and `RunDetail` pass, kept as the markup they drew before `status` and `note`. */
+const RUN_PROGRESS_CALLERS = {
+  card: { stages: [{}], current: 0, progress: 35, ariaLabel: 'Progress' },
+  detail: {
+    stages: [{ name: 'Gather', status: 'done' }, { stepName: 'Refine' }, {}],
+    current: 1,
+    progress: 40,
+    blocker: 'Waiting for materials',
+    label: 'Progress',
+  },
+  gate: { stages: [{}], current: 0, progress: 70, label: 'Progress' },
+};
+
+describe('RunProgress callers (mounted)', () => {
+  it('draws every shipped caller as it drew before status and note', async () => {
+    const found = {};
+    for (const [caller, props] of Object.entries(RUN_PROGRESS_CALLERS)) {
+      found[caller] = normalizedMarkup(await harness.mount(props));
+      harness.remount();
+    }
+    assertMatchesBaseline(RUN_PROGRESS_BASELINE, found);
   });
 });

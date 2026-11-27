@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
+    'src/utils/randomId.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',

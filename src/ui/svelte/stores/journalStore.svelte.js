@@ -7,6 +7,8 @@ import {
 } from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
+import { createIterativeAttemptStore, normalizeRevision } from './iterativeAttempt.svelte.js';
+import { createLegacyRunCommands, notifyEach } from './journalLegacyCommands.js';
 
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
@@ -134,6 +136,7 @@ export function createJournalStore({ services } = {}) {
       });
       if (!isCurrentLoad()) return;
       listing = next ?? null;
+      iterative.reconcile(listing);
       if (
         commandResult &&
         [...(listing?.history ?? [])].every((run) => runKey(run, listing) !== commandResult.runKey)
@@ -179,6 +182,7 @@ export function createJournalStore({ services } = {}) {
     const run = resolveRun(runOrId, runType, listing);
     selectedRunId = run?.id ?? (typeof runOrId === 'string' ? runOrId : '');
     selectedRunKey = run ? runKey(run, listing) : '';
+    iterative.onSelect(selectedRunKey);
     if (commandError && commandError.runKey !== selectedRunKey) clearCommandError();
   }
 
@@ -225,7 +229,7 @@ export function createJournalStore({ services } = {}) {
   // Versioned actions send revision/stage-scoped commands; legacy crafting retains its own seam.
   async function execute(run, payload) {
     if (run?.lifecycleContract === 'legacy' || !run?.lifecycleContract) {
-      return advanceLegacy(run);
+      return legacy.advance(run);
     }
     return runCommand(run, 'execute', payload === undefined ? { interactive: true } : payload);
   }
@@ -368,75 +372,45 @@ export function createJournalStore({ services } = {}) {
     return typeof value === 'string' ? value.trim() : '';
   }
 
-  async function advanceLegacy(run) {
-    if (!run?.id || busyRunKey) return;
-    busyRunId = run.id;
-    busyRunKey = runKey(run, listing);
-    try {
-      const result = await services?.advanceCraftingRun?.({
-        actorId: listing?.selectedActorId ?? null,
-        runId: run.id,
-        interactive: true,
-      });
-      if (result?.cancelled === true) return;
-      if (result?.message) services?.notify?.(result.message);
-      await load(true);
-    } catch (err) {
-      console.error('Fabricate | Error advancing a crafting run:', err);
-      services?.notify?.(services?.craftErrorMessage?.() ?? '');
-    } finally {
-      busyRunId = '';
-      busyRunKey = '';
-    }
-  }
-
-  async function cancel(run) {
-    if (run?.lifecycleContract === 'current') return runCommand(run, 'cancel', {});
-    if (!run?.id || busyRunKey) return;
-    busyRunId = run.id;
-    busyRunKey = runKey(run, listing);
-    try {
-      const result = await services?.cancelCraftingRun?.({
-        actorId: listing?.selectedActorId ?? null,
-        runId: run.id,
-      });
-      notifyEach(services, [legacyCancelNotice(result, services)]);
-      await load(true);
-    } catch (err) {
-      console.error('Fabricate | Error cancelling a crafting run:', err);
-      services?.notify?.(services?.craftErrorMessage?.() ?? '');
-    } finally {
-      busyRunId = '';
-      busyRunKey = '';
-    }
-  }
-
-  // Refresh only after the user-scoped dismissal write settles; actor history remains intact.
-  async function dismiss(run) {
-    if (!run?.id || busyRunKey || run?.actions?.dismiss !== true) return;
-    busyRunId = run.id;
-    busyRunKey = runKey(run, listing);
-    try {
-      const result = await services?.dismissJournalRun?.({
-        actorUuid: run.actorUuid ?? listing?.selectedActorUuid ?? null,
-        runType: run.runType,
-        runId: run.id,
-      });
-      if (result?.message) services?.notify?.(result.message);
-      await load(true);
-    } catch (err) {
-      console.error('Fabricate | Error dismissing a Journal run:', err);
-      services?.notify?.(services?.craftErrorMessage?.() ?? '');
-      await load(true);
-    } finally {
-      busyRunId = '';
-      busyRunKey = '';
-    }
-  }
+  const cancel = (run) =>
+    run?.lifecycleContract === 'current' ? runCommand(run, 'cancel', {}) : legacy.cancel(run);
 
   function tickWorldTime() {
     worldTimeTick += 1;
   }
+
+  // One busy key serves every command, so none runs while another saves: a release function, or
+  // `null` while it is held.
+  function claimBusy(key, id) {
+    if (busyRunKey) return null;
+    busyRunKey = key;
+    busyRunId = id;
+    return () => {
+      busyRunKey = '';
+      busyRunId = '';
+    };
+  }
+  const runKeyOf = (run) => runKey(run, listing);
+  const legacy = createLegacyRunCommands({
+    services,
+    claimBusy,
+    runKeyOf,
+    load,
+    getListing: () => listing,
+  });
+  const iterative = createIterativeAttemptStore({
+    services,
+    beginStep,
+    claimBusy,
+    runKeyOf,
+    reload: () => load(true),
+    markResolved: (key) => {
+      if (selectedRunKey === key) commandResult = { runKey: key };
+    },
+    releaseResolved: (key) => {
+      if (commandResult?.runKey === key) commandResult = null;
+    },
+  });
 
   return {
     get listing() {
@@ -562,13 +536,10 @@ export function createJournalStore({ services } = {}) {
     awardChoiceSettled: settledAwards.has,
     advance: execute,
     cancel,
-    dismiss,
+    dismiss: legacy.dismiss,
     tickWorldTime,
+    iterative,
   };
-}
-
-function notifyEach(services, messages) {
-  for (const message of messages) if (message) services?.notify?.(message);
 }
 
 /** A refused command's wording; a redacted run's reason is read by its code, never `message`. */
@@ -576,12 +547,6 @@ function commandRefusal(run, result, services) {
   const fallback = run.redacted === true ? journalRedactedRefusal : undefined;
   const generic = services?.craftErrorMessage?.();
   return journalCommandRefusal(result, services?.localize, generic, fallback);
-}
-
-/** A legacy cancel's one toast: its message, else a refusal's localized reason, never a Retry. */
-function legacyCancelNotice(result, services) {
-  const generic = result?.success === false ? services?.craftErrorMessage?.() : '';
-  return journalCommandRefusal(result, services?.localize, generic);
 }
 
 /** `kinds` with `kind` flipped in or out, the others untouched, in `RUN_KINDS` order. */
@@ -680,11 +645,6 @@ function normalizeStageIndex(run, value) {
   const upper = Math.max(0, (run?.steps?.length ?? 1) - 1);
   const index = Math.trunc(Number(value) || 0);
   return Math.min(upper, Math.max(0, index));
-}
-
-function normalizeRevision(value) {
-  const revision = Number(value);
-  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
 }
 
 function runAvailableAt(run) {

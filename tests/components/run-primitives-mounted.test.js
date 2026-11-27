@@ -8,11 +8,13 @@ import { createRawSnippet } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertMatchesBaseline, normalizedMarkup } from '../helpers/markupBaseline.js';
 import { styleSourcesOf } from '../helpers/splitComponentStyles.js';
 import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, PAGINATION_COMPILED_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
+const RUN_ACTION_BAR_BASELINE = resolve(import.meta.dirname, '../fixtures/runActionBarBaseline.json');
 
 function createHarness(name, dependencies = [], rawModules = []) {
   return createMountedComponentHarness({
@@ -1231,5 +1233,58 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-outcome-yield]').length, 1, 'empty tier never gains a result');
     assert.equal(target.querySelector('.fab-outcome-yield-quantity').textContent, '×4');
     expectGeometry('OutcomeLadder', '.fab-outcome-tier', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
+  });
+
+  it('draws no primary for a null primary, with and without begin', async () => {
+    const actionsOf = (target) =>
+      [...target.querySelectorAll('[data-run-action]')].map((control) => control.dataset.runAction);
+    const bar = { run: { id: 'run-1' }, runLabel: 'Forge a Longsword', pause: null, primary: null };
+    assert.deepEqual(actionsOf(await runActionHarness.mount(bar)), ['cancel-arm']);
+    runActionHarness.remount();
+    const begin = { enabled: true, label: 'Start step 2', icon: 'fas fa-forward-step' };
+    const target = await runActionHarness.mount({ ...bar, begin });
+    assert.deepEqual(actionsOf(target), ['cancel-arm', 'begin']);
+    assert.equal(target.querySelectorAll('.is-primary').length, 1, 'begin is the one primary');
+    runActionHarness.remount();
+  });
+
+  it('draws neither pause nor resume for a null pause, whatever the run says, and keeps begin and completion', async () => {
+    const completion = { label: 'Complete', value: 'manual', options: [{ value: 'manual', label: 'By hand' }] };
+    const begin = { enabled: true, label: 'Start step 2' };
+    for (const run of [{ id: 'run-1', paused: true }, { id: 'run-1', pauseState: { reason: 'gm' } }, { id: 'run-1' }]) {
+      const target = await runActionHarness.mount({
+        run, runLabel: 'Forge a Longsword', pause: null, resume: { label: 'Resume' }, primary: null, begin, completion,
+      });
+      assert.ok(!target.querySelector('[data-run-action="pause"], [data-run-action="resume"]'), JSON.stringify(run));
+      assert.ok(target.querySelector('[data-run-completion]'), 'the completion switch stays');
+      assert.ok(target.querySelector('[data-run-action="begin"]'), 'begin stays');
+      runActionHarness.remount();
+    }
+  });
+
+  it('draws every shipped ActionsPanel state as it drew before a null primary or pause', async () => {
+    const bar = {
+      run: { id: 'run-1' },
+      runLabel: 'Forge Iron Rivets',
+      cancel: { ariaLabel: 'Cancel craft', title: 'Cancel craft', prompt: 'Cancel this run?', confirmLabel: 'Cancel run', keepLabel: 'Keep it' },
+      pause: { enabled: true, label: 'Pause', reason: '' },
+      resume: { disabled: false, label: 'Resume', title: '' },
+      primary: { enabled: true, busy: false, label: 'Roll check', busyLabel: 'Working…', icon: 'fas fa-dice-d20', reason: '' },
+      begin: null,
+    };
+    const states = {
+      ready: bar,
+      busy: { ...bar, primary: { ...bar.primary, busy: true } },
+      begin: { ...bar, begin: { enabled: true, label: 'Begin step', busyLabel: 'Working…', icon: 'fas fa-play', prompt: 'Begin now?', reason: '' } },
+      paused: { ...bar, run: { id: 'run-1', pauseState: { reason: 'gm' } } },
+      waiting: { ...bar, pause: { enabled: false, label: 'Pause', reason: 'Nothing counts down' }, completion: { label: 'Complete', value: 'manual', options: [{ value: 'manual', label: 'By hand' }] } },
+      armed: { ...bar, armed: true },
+    };
+    const found = {};
+    for (const [state, props] of Object.entries(states)) {
+      found[state] = normalizedMarkup(await runActionHarness.mount(props));
+      runActionHarness.remount();
+    }
+    assertMatchesBaseline(RUN_ACTION_BAR_BASELINE, found);
   });
 });
