@@ -29,13 +29,20 @@ describe('the nav reveals its active row (issue 3030)', () => {
       fixtureServer.url(`/tests/fixtures/nav-reveal/index.html?width=${width}&${query}`)
     );
     await page.waitForFunction(() => document.documentElement.dataset.navRevealReady);
+    // Layout settles once the fonts have, and a reveal that follows it is part of what is measured.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      for (let frame = 0; frame < 3; frame += 1) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+    });
     return page;
   }
 
   const read = (page) =>
     page.evaluate(() => {
       const nav = document.querySelector('.manager-nav');
-      const row = document.querySelector('.manager-nav .is-active');
+      const row = document.querySelector('.manager-nav .is-active:not(.manager-nav-subitem)');
       const navBox = nav.getBoundingClientRect();
       const rowBox = row.getBoundingClientRect();
       return {
@@ -46,6 +53,56 @@ describe('the nav reveals its active row (issue 3030)', () => {
         railScroll: document.querySelector('.manager-rail').scrollTop,
       };
     });
+
+  it('keeps a collapsed rail where it was when the active child is hidden', async () => {
+    const page = await open(1000, 'active=26&grouped&collapsed');
+    const measured = await read(page);
+    assert.equal(measured.overflows, true, 'the nav is the scroller (anti-vacuity)');
+    const child = await page.evaluate(
+      () => document.querySelector('.manager-nav-subitem').getClientRects().length
+    );
+    assert.equal(child, 0, 'the active child has no box in a collapsed rail (anti-vacuity)');
+    assert.ok(measured.scrollTop > 0, `the parent was revealed: ${JSON.stringify(measured)}`);
+    assert.equal(measured.rowWithinNav, true, JSON.stringify(measured));
+    await page.evaluate(() => {
+      document.querySelector('.manager-body').classList.remove('is-rail-collapsed');
+      document.querySelector('.manager-body').classList.add('is-rail-collapsed');
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
+    assert.equal((await read(page)).rowWithinNav, true, 'and a resize does not undo it');
+    await page.close();
+  });
+
+  it('reveals the row in the rail of a stacked strip, where the nav does not scroll', async () => {
+    const page = await open(800, 'view=tool-edit&active=26&stacked');
+    const measured = await page.evaluate(() => {
+      const rail = document.querySelector('.manager-rail');
+      const nav = rail.querySelector('.manager-nav');
+      const row = nav.querySelector('.is-active');
+      const railBox = rail.getBoundingClientRect();
+      const rowBox = row.getBoundingClientRect();
+      const link = rail.querySelector('.manager-scope-return').getBoundingClientRect();
+      return {
+        railScrolls: rail.scrollHeight > rail.clientHeight + 1,
+        railScrollTop: rail.scrollTop,
+        navOverflowY: getComputedStyle(nav).overflowY,
+        rowWithinRail: rowBox.top >= railBox.top && rowBox.bottom <= railBox.bottom + 0.5,
+        rowBelowLink: rowBox.top >= link.bottom - 0.5,
+        pageScroll: [window.scrollX, window.scrollY, document.scrollingElement.scrollTop],
+      };
+    });
+    assert.equal(
+      measured.railScrolls,
+      true,
+      `the rail is the scroller: ${JSON.stringify(measured)}`
+    );
+    assert.notEqual(measured.navOverflowY, 'auto', 'the nav is not the scroller here');
+    assert.ok(measured.railScrollTop > 0, JSON.stringify(measured));
+    assert.equal(measured.rowWithinRail, true, JSON.stringify(measured));
+    assert.equal(measured.rowBelowLink, true, 'the row is not left under the pinned link');
+    assert.deepEqual(measured.pageScroll, [0, 0, 0], 'the window did not scroll');
+    await page.close();
+  });
 
   for (const width of WIDTHS) {
     it(`mounts with a row below the fold inside the nav at ${width}px`, async () => {

@@ -55,9 +55,27 @@ function stubNavLayout(belowFoldIds) {
     return { top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top };
   };
   Object.defineProperty(htmlProto, 'clientHeight', { configurable: true, get: () => 100 });
+  const computed = globalThis.getComputedStyle;
+  Object.defineProperty(globalThis, 'getComputedStyle', {
+    configurable: true,
+    writable: true,
+    value: (element, ...rest) =>
+      element.matches?.('.manager-nav')
+        ? { overflowY: 'auto', position: 'static' }
+        : computed(element, ...rest),
+  });
+  const scrollHeight = Object.getOwnPropertyDescriptor(htmlProto, 'scrollHeight');
+  Object.defineProperty(htmlProto, 'scrollHeight', { configurable: true, get: () => 500 });
   return () => {
     Object.defineProperty(proto, 'getBoundingClientRect', box);
     Object.defineProperty(htmlProto, 'clientHeight', height);
+    if (scrollHeight) Object.defineProperty(htmlProto, 'scrollHeight', scrollHeight);
+    else delete htmlProto.scrollHeight;
+    Object.defineProperty(globalThis, 'getComputedStyle', {
+      configurable: true,
+      writable: true,
+      value: computed,
+    });
   };
 }
 

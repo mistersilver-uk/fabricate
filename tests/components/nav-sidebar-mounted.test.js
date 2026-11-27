@@ -489,25 +489,67 @@ describe('NavSidebar, labelled variant, a tier-gated group', () => {
     assert.ok(!root.querySelector('.manager-nav-callout'), 'no note once nothing is gated');
   });
 
-  it('scrolls a revealed row into view once, and again only when the reveal moves', async () => {
-    // happy-dom has no layout, so the nav shows 0..100 and every row sits 150..180, below the fold.
+  /**
+   * happy-dom has no layout, so the nav shows 0..100 of 500 and every row sits 150..180, below the
+   * fold, unless `hidden` names it: a row with no box, as a collapsed rail leaves its sub-items.
+   */
+  function stubLayout(hidden = []) {
     const proto = globalThis.Element.prototype;
-    const original = Object.getOwnPropertyDescriptor(proto, 'getBoundingClientRect');
+    const original = {
+      rect: Object.getOwnPropertyDescriptor(proto, 'getBoundingClientRect'),
+      rects: Object.getOwnPropertyDescriptor(proto, 'getClientRects'),
+    };
     proto.getBoundingClientRect = function box() {
       const [top, bottom] = this.matches?.('.manager-nav') ? [0, 100] : [150, 180];
       return { top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top };
     };
-    const navOf = () => document.querySelector('.manager-nav');
+    proto.getClientRects = function boxes() {
+      return hidden.includes(this.id) ? [] : [this.getBoundingClientRect()];
+    };
+    const nav = () => document.querySelector('.manager-nav');
+    const scrollable = () => {
+      nav().style.overflowY = 'auto';
+      Object.defineProperty(nav(), 'clientHeight', { value: 100, configurable: true });
+      Object.defineProperty(nav(), 'scrollHeight', { value: 500, configurable: true });
+      nav().scrollTop = 0;
+    };
+    const restore = () => {
+      Object.defineProperties(proto, {
+        getBoundingClientRect: original.rect,
+        getClientRects: original.rects,
+      });
+    };
+    return { nav, scrollable, restore };
+  }
+
+  it('scrolls a revealed row into view once, and again only when the reveal moves', async () => {
+    const layout = stubLayout();
     try {
       await mountGated({ reveal: 'ledger' });
-      Object.defineProperty(navOf(), 'clientHeight', { value: 100, configurable: true });
-      navOf().scrollTop = 0;
+      layout.scrollable();
       await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'ledger' })] });
-      assert.equal(navOf().scrollTop, 0, 'a re-render of the same reveal does not scroll again');
+      assert.equal(
+        layout.nav().scrollTop,
+        0,
+        'a re-render of the same reveal does not scroll again'
+      );
       await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'crew' })] });
-      assert.equal(navOf().scrollTop, 80, 'the row scrolls to the nav’s bottom edge, nearest');
+      assert.equal(layout.nav().scrollTop, 80, 'the row scrolls to the nav’s bottom edge, nearest');
     } finally {
-      Object.defineProperty(proto, 'getBoundingClientRect', original);
+      layout.restore();
+    }
+  });
+
+  it('leaves the scroll alone for a row that has no box', async () => {
+    const layout = stubLayout(['probe-crew']);
+    try {
+      await mountGated({ reveal: 'ledger' });
+      layout.scrollable();
+      layout.nav().scrollTop = 30;
+      await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'crew' })] });
+      assert.equal(layout.nav().scrollTop, 30, 'a hidden row is not a reveal target');
+    } finally {
+      layout.restore();
     }
   });
 });

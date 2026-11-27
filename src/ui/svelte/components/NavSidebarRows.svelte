@@ -29,27 +29,54 @@
 
   const reasonId = (domId) => `${domId}-reason`;
 
-  // Moves the nav's own `scrollTop`, never an ancestor, and only when the row is clipped, so a row
-  // already in view does not scroll (issue 3030).
+  const scrolls = (element) =>
+    /auto|scroll/.test(globalThis.getComputedStyle(element).overflowY) &&
+    element.scrollHeight > element.clientHeight;
+
+  // The nav when it scrolls, else the nearest scrolling ancestor up to the rail (a stacked rail
+  // scrolls whole, its nav being `overflow: visible`). Never the page or the window.
+  function scrollerOf(nav) {
+    if (scrolls(nav)) return nav;
+    const rail = nav.closest('.manager-rail');
+    for (let ancestor = rail && nav.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (scrolls(ancestor)) return ancestor;
+      if (ancestor === rail) break;
+    }
+    return null;
+  }
+
+  // Moves that scroller's own `scrollTop` and only when the row is clipped, so a row already in
+  // view does not scroll (issue 3030). A row with no box (a collapsed rail hides its sub-items)
+  // has nothing to reveal, and a pinned block over the scroller's top edge hides what is beneath it.
   function scrollNavTo(node) {
-    const scroller = node.closest('.manager-nav');
+    const nav = node.closest('.manager-nav');
+    if (!nav || !node.getClientRects().length) return;
+    const scroller = scrollerOf(nav);
     if (!scroller) return;
     const row = node.getBoundingClientRect();
-    const top = scroller.getBoundingClientRect().top + scroller.clientTop;
-    const bottom = top + scroller.clientHeight;
+    let top = scroller.getBoundingClientRect().top + scroller.clientTop;
+    for (const child of scroller.children) {
+      if (globalThis.getComputedStyle(child).position === 'sticky') {
+        top = Math.max(top, child.getBoundingClientRect().bottom);
+      }
+    }
+    const bottom =
+      scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
     if (row.top < top) scroller.scrollTop += row.top - top;
     else if (row.bottom > bottom) scroller.scrollTop += row.bottom - bottom;
   }
 
   // A stable function, so a row that stays revealed across re-renders is not scrolled again. It
-  // checks again when the nav's own height changes (a window resize, a web font swapping in), so
-  // the active row is not left clipped by a nav that shrank after it mounted.
+  // checks again when the nav or its rail changes size (a window resize, a web font swapping in),
+  // so the active row is not left clipped by a scroller that shrank after it mounted.
   function revealRow(node) {
     scrollNavTo(node);
-    const scroller = node.closest('.manager-nav');
-    if (!scroller || typeof ResizeObserver === 'undefined') return undefined;
+    const nav = node.closest('.manager-nav');
+    if (!nav || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => scrollNavTo(node));
-    observer.observe(scroller);
+    observer.observe(nav);
+    const rail = nav.closest('.manager-rail');
+    if (rail) observer.observe(rail);
     return () => observer.disconnect();
   }
 </script>
