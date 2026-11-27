@@ -136,10 +136,24 @@ test('the composite and the standalone vertical unit share the shipped vertical 
   ]);
 });
 
+test('the kit invalid units declare the shipped edge and ground, on the group and on the vertical input', () => {
+  assertPairs(
+    ".k-step:not(.vert):has(>input[aria-invalid='true'])",
+    ".fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true'])",
+    [['border-color'], ['background']]
+  );
+  assertPairs(
+    ".k-step.vert input[aria-invalid='true']",
+    ".fab-stepper.is-vertical .fab-stepper-input[aria-invalid='true']",
+    [['box-sizing'], ['border'], ['background']]
+  );
+  assertPairs(".k-step.vert input[aria-invalid='true']", '.fab-stepper-input', [['border-radius']]);
+});
+
 test('the kit states declare the shipped hover, limit and disabled inks', () => {
   const hovers = kit
     .flatMap((rule) => splitSelectorList(rule.selector))
-    .filter((selector) => /\.k-step\b.*:hover/u.test(selector));
+    .filter((selector) => /\.k-step\b.*(?<!:not\():hover/u.test(selector));
   assert.deepEqual(hovers, ['.k-step button:not(.dis):hover'], 'a dimmed button takes no hover');
   assertPairs(hovers[0], '.fab-stepper-adjunct:hover:not(:disabled)', [['color'], ['background']]);
   assertPairs('.k-step button.dis', '.fab-stepper-adjunct:disabled', [['color'], ['cursor']]);

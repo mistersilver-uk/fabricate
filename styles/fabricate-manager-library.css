@@ -283,36 +283,6 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-recipe-check.is-dc,
-.fabricate-manager .manager-recipe-check.is-dynamic,
-.fabricate-manager .manager-recipe-check.is-target,
-.fabricate-manager .manager-recipe-check.is-attribute,
-.fabricate-manager .manager-recipe-check.is-dynamicTarget,
-.fabricate-manager .manager-recipe-check.is-successes,
-.fabricate-manager .manager-recipe-check.is-dynamicSuccesses {
-  border-color: var(--fab-info-border);
-  color: var(--fab-info-text);
-  background: var(--fab-info-soft);
-}
-
-/* The two check-LESS states are not the same fact and must not look alike. */
-
-/* `progressive`, `ingredients` and `checkOff` are working configurations that simply do not roll: a progressive craft advances by stages, a routedByIngredients craft resolves off the ingredient set that was used, and a checkOff system had its check switched off on purpose. */
-.fabricate-manager .manager-recipe-check.is-progressive,
-.fabricate-manager .manager-recipe-check.is-checkOff,
-.fabricate-manager .manager-recipe-check.is-ingredients {
-  border-color: var(--fab-border);
-  color: var(--fab-text-subtle);
-  background: var(--fab-surface-raised);
-}
-
-/* `none` — the system cannot roll for this recipe at all (no authored roll formula). */
-.fabricate-manager .manager-recipe-check.is-none {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
 /* The row's lock box: 28px, quiet until it is ON. */
 .fabricate-manager .manager-recipe-lock {
   width: 28px;

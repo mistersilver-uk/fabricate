@@ -1233,7 +1233,11 @@ The gate evaluates a candidate as though its activation had already landed, whet
   - `iterativeNoCounters`, `iterativeMultiStepOff`, `iterativeCheckUnavailable`, a Counter Instance's codes and the expression codes are recipe-wide.
   - A recipe raises one issue per code and step address, in first-raised order, with every step's configuration codes before any `producedWhen` code.
     A fault repeated in two steps is two issues, and the recipe-wide issues of one code are one.
-  - Library issues carry neither key, and no severity, `blocks`, message or `nav` depends on the address.
+  - A recipe-scoped issue whose fault is one Counter Instance or counter reference also carries `counterId` and `counterName`, and one whose fault is one action reference carries `actionId` and `actionName`.
+    `counterId` belongs to `iterativeUnknownCounter`, `iterativeInvalidNumber`, `iterativeBoundsInverted`, `iterativeStartOutOfBounds` and `iterativeExpressionBoundUnset`, and `actionId` to `iterativeUnknownAction` and `iterativeCheckUnavailable`; no other code carries an address, `iterativeNoAllowedActions` included.
+    The name is the library label, else the stored id, and the address is the first-raised offender of that code and step address, so an issue names one offender at a time.
+    Expression roots are read in counter, min, max, target order, and an offender with no readable id leaves the issue unaddressed.
+  - Library issues carry neither `stepId`/`stepIndex` nor an address, and no severity, `blocks`, message, `nav` or issue count depends on an address.
 - Library codes are `kind: 'system'` and `severity: 'critical'` with no `blocks`, named by the counter's or action's label, else its id.
   Each carries `entityKind: 'counter'` or `'action'` for the record it names:
   - `iterativeUnknownCounter`, `iterativeUnknownAction` and `iterativeInvalidRule` over availability rules, effect `when` rules, cost counters and effect targets.

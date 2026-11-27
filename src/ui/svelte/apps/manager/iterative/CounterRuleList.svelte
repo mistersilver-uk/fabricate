@@ -201,6 +201,7 @@
   const head = (rule) => ({
     glyph: GLYPHS[rule.source] ?? 'fas fa-sliders',
     title: text('FABRICATE.Admin.Manager.Iterative.RuleTitle', 'When'),
+    connective: true,
   });
   /** One rule's schema, its `source` step a snippet that knows the row's mark id. */
   const schemaFor = (rule, source) => ({
