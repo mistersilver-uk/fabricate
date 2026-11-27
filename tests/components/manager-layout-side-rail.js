@@ -48,9 +48,20 @@ function assertSideRailLayout(route, report, label, { width }) {
     `${tag} ${report.ownerSelector} owns the overflow (${report.ownerScroll.scrollHeight} <= ${report.ownerScroll.clientHeight})`
   );
   if (width <= 1120) {
+    // The nav is the rail's scroller (issue 3030), so the pinned title and scope card above it
+    // never slide under one another.
+    assert.match(
+      report.navScroll.overflowY,
+      /^(auto|scroll)$/,
+      `${tag} the rail's nav is a vertical scroller`
+    );
     assert.ok(
-      report.railScroll.scrollHeight > report.railScroll.clientHeight,
-      `${tag} the full-height rail scrolls its own navigation`
+      report.navScroll.scrollHeight > report.navScroll.clientHeight,
+      `${tag} the full-height rail scrolls its own navigation in its nav`
+    );
+    assert.ok(
+      report.railScroll.scrollHeight <= report.railScroll.clientHeight + 1,
+      `${tag} the rail itself does not scroll (${report.railScroll.scrollHeight} > ${report.railScroll.clientHeight})`
     );
   }
   assert.equal(report.railBorder.right, '1px', `${tag} the rail keeps its right divider`);

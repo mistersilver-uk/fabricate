@@ -328,6 +328,7 @@ export async function readSideRailGeometry(
         bodyScroll: scroll('.manager-body'),
         ownerScroll: scroll(ownerSelector),
         railScroll: scroll('.manager-rail'),
+        navScroll: scroll('.manager-rail .manager-nav'),
         railBorder: { right: railStyle.borderRightWidth, bottom: railStyle.borderBottomWidth },
         list: catalogue
           ? {
