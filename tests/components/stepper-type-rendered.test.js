@@ -20,6 +20,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const COUNT = Object.freeze({ value: 3, min: 0, max: 9, ariaLabel: 'Count' });
+const INVALID = Object.freeze({ ...COUNT, inputProps: { 'aria-invalid': 'true' } });
 
 /** Each mount: its props, the host class around it and the slot width it is laid out in. */
 const MOUNTS = Object.freeze({
@@ -35,11 +36,33 @@ const MOUNTS = Object.freeze({
   // The gathering task editor restyles every bare input it holds; the bare control proves it is live.
   hosted: { props: COUNT, host: 'manager-gathering-task-edit-view', bare: true },
   vertical: { props: { ...COUNT, orientation: 'vertical' }, width: 48 },
+  'size-26': { props: { ...COUNT, size: '26' } },
+  // The invalid face (issue 3042) at every rung, density and orientation, beside its valid mount.
+  invalid: { props: INVALID },
+  'invalid-size-26': { props: { ...INVALID, size: '26' } },
+  'invalid-toolbar': { props: { ...INVALID, size: '34' } },
+  'invalid-comfortable': { props: { ...INVALID, density: 'comfortable' } },
+  'invalid-fill': { props: { ...INVALID, fill: true } },
+  'invalid-disabled': { props: { ...INVALID, disabled: true } },
+  'invalid-focus': { props: INVALID },
+  'invalid-vertical': { props: { ...INVALID, orientation: 'vertical' }, width: 48 },
 });
-const HORIZONTAL = Object.keys(MOUNTS).filter((key) => key !== 'vertical');
+const HORIZONTAL = Object.keys(MOUNTS).filter((key) => !key.endsWith('vertical'));
+/** Each invalid mount against the valid mount of its own rung, whose box it must keep. */
+const INVALID_PAIRS = Object.freeze({
+  invalid: 'default',
+  'invalid-size-26': 'size-26',
+  'invalid-toolbar': 'toolbar',
+  'invalid-comfortable': 'comfortable',
+  'invalid-fill': 'fill',
+  'invalid-disabled': 'disabled',
+  'invalid-focus': 'default',
+  'invalid-vertical': 'vertical',
+});
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
+<style>@layer reset{*,*::before,*::after{box-sizing:border-box}}</style>
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, STEPPER)).css}</style>
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
@@ -54,18 +77,33 @@ ${Object.entries(MOUNTS)
 
 /** Each mounted case's computed type, group opacity and box, read in the browser. */
 function readMounted() {
+  const faceOf = (element) => {
+    const style = getComputedStyle(element);
+    return {
+      edge: style.borderTopColor,
+      width: style.borderTopWidth,
+      ground: style.backgroundColor,
+    };
+  };
   const read = (host) => {
     const root = host.querySelector('.fab-stepper');
-    const input = getComputedStyle(root.querySelector('[data-stepper-input]'));
+    const field = root.querySelector('[data-stepper-input]');
+    const input = getComputedStyle(field);
     const box = root.getBoundingClientRect();
+    const fieldBox = field.getBoundingClientRect();
     const bare = host.querySelector('[data-bare]');
     return {
       value: `${input.fontSize} ${input.fontVariantNumeric}`,
       inputMinWidth: input.minWidth,
+      inputBox: `${fieldBox.width}x${fieldBox.height}`,
       glyphs: [...root.querySelectorAll(':scope > .fab-stepper-adjunct > i')].map(
         (glyph) => getComputedStyle(glyph).fontSize
       ),
       opacity: Number(getComputedStyle(root).opacity),
+      group: faceOf(root),
+      field: faceOf(field),
+      ink: input.color,
+      ring: field.matches(':focus-visible') ? input.outlineStyle : 'none',
       box: `${box.width}x${box.height}`,
       bareMinHeight: bare ? getComputedStyle(bare).minHeight : null,
     };
@@ -80,6 +118,14 @@ function readMounted() {
 
 /** The `<Stepper>` entry's drawn units, and the box of every horizontal `.k-step` on the page. */
 function readDrawn() {
+  const faceOf = (element) => {
+    const style = getComputedStyle(element);
+    return {
+      edge: style.borderTopColor,
+      width: style.borderTopWidth,
+      ground: style.backgroundColor,
+    };
+  };
   const size = (element) => {
     const box = element.getBoundingClientRect();
     return `${box.width}x${box.height}`;
@@ -91,7 +137,12 @@ function readDrawn() {
     const step = unit.querySelector(':scope .k-step');
     return [
       unit.querySelector(':scope > .cap').textContent,
-      { box: size(step), opacity: Number(getComputedStyle(step).opacity) },
+      {
+        box: size(step),
+        opacity: Number(getComputedStyle(step).opacity),
+        group: faceOf(step),
+        field: faceOf(step.querySelector(':scope > input')),
+      },
     ];
   });
   return {
@@ -129,6 +180,9 @@ before(async () => {
   browser = await chromium.launch();
   const tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await tab.setContent(page(markup), { waitUntil: 'load' });
+  // :focus-visible needs real keyboard focus, and the page is static markup.
+  await tab.focus('[data-case="invalid-focus"] [data-stepper-decrement]');
+  await tab.keyboard.press('Tab');
   live = await tab.evaluate(readMounted);
   await tab.route(/^https?:/u, (route) => route.abort());
   await tab.setContent(readDesignLibrary());
@@ -158,7 +212,7 @@ it('draws the vertical value at 1.05rem tabular and its glyphs at 11px', () => {
 
 it('dims a disabled group to .45 at either density, and no other', () => {
   for (const [key, { opacity }] of Object.entries(live.cases)) {
-    assert.equal(opacity, key.startsWith('disabled') ? 0.45 : 1, `${key} opacity`);
+    assert.equal(opacity, key.includes('disabled') ? 0.45 : 1, `${key} opacity`);
   }
 });
 
@@ -223,4 +277,70 @@ it('draws the narrow and the comfortable group only in the entries that ship the
     '<ExprInput> <RequirementChooser>',
     '<Stepper>',
   ]);
+});
+
+const GROUP_CASES = HORIZONTAL.filter((key) => key.startsWith('invalid'));
+const VALID_FACE = () => drawn.units.integer.group;
+
+it("draws the library's invalid group edge and ground at every rung, density and state", () => {
+  const invalid = drawn.units.invalid.group;
+  assert.notDeepEqual(invalid, VALID_FACE(), 'the library draws a distinct invalid face');
+  assert.deepEqual(GROUP_CASES.length, 7, 'every horizontal invalid mount is read');
+  for (const key of GROUP_CASES) {
+    assert.deepEqual(live.cases[key].group, invalid, `${key} group`);
+  }
+});
+
+it("draws the library's invalid vertical input edge and ground, and no group edge", () => {
+  const unit = drawn.units['invalid · vertical'];
+  const valid = drawn.units['vertical · in a 48px slot'];
+  assert.notDeepEqual(unit.field, valid.field);
+  assert.deepEqual(live.cases['invalid-vertical'].field, unit.field);
+  assert.deepEqual(unit.group, valid.group, "the library's vertical group stays unpainted");
+  assert.deepEqual(
+    live.cases['invalid-vertical'].group,
+    live.cases.vertical.group,
+    'the vertical group stays unpainted'
+  );
+  assert.equal(
+    live.cases['invalid-vertical'].group.width,
+    '0px',
+    'a vertical stepper draws no group edge'
+  );
+  assert.deepEqual(live.cases.vertical.field, valid.field);
+  assert.equal(
+    live.cases['invalid-vertical'].inputBox,
+    live.cases.vertical.inputBox,
+    'the invalid input keeps the valid input box under the host reset'
+  );
+});
+
+it("leaves a valid mount on the library's valid face, and the invalid input undrawn", () => {
+  const valid = HORIZONTAL.filter((name) => !name.startsWith('invalid'));
+  for (const key of valid) {
+    assert.deepEqual(live.cases[key].group, VALID_FACE(), `${key} group`);
+    assert.equal(live.cases[key].field.width, '0px', `${key} input edge`);
+  }
+  for (const key of GROUP_CASES) {
+    assert.equal(live.cases[key].field.width, '0px', `${key} horizontal input draws no edge`);
+  }
+});
+
+it('keeps the value ink and the box of the valid mount of the same rung', () => {
+  for (const [key, valid] of Object.entries(INVALID_PAIRS)) {
+    assert.equal(live.cases[key].box, live.cases[valid].box, `${key} box`);
+    assert.equal(live.cases[key].ink, live.cases[valid].ink, `${key} ink`);
+    assert.equal(live.cases[key].opacity, live.cases[valid].opacity, `${key} opacity`);
+  }
+});
+
+it('draws the invalid library units at the box of their valid siblings', () => {
+  assert.equal(drawn.units.invalid.box, drawn.units.integer.box);
+  assert.equal(drawn.units['invalid · vertical'].box, drawn.units['vertical · in a 48px slot'].box);
+});
+
+it('keeps the invalid face beside a keyboard focus ring', () => {
+  assert.equal(live.cases['invalid-focus'].ring, 'solid', 'the Tab landed on the input');
+  assert.deepEqual(live.cases['invalid-focus'].group, drawn.units.invalid.group);
+  assert.equal(live.cases.invalid.ring, 'none', 'no other mount holds focus');
 });

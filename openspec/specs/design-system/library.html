@@ -172,6 +172,9 @@ a{color:var(--fab-accent)}
 .k-stepset .k-step button,.k-step.vert button{width:100%;height:26px;border-radius:7px}
 .k-stepset .k-step .i,.k-step.vert .i{width:11px;height:11px}
 .k-stepset .k-step input,.k-step.vert input{width:100%;height:30px;padding:0 2px;box-sizing:border-box;font-size:1.05rem}
+.k-step:not(.vert):has(>input[aria-invalid='true']){border-color:var(--fab-danger-border);background:var(--fab-danger-soft)}
+.k-step:not(.vert):has(>input[aria-invalid='true']) button:not(.dis):not(:hover){color:var(--fab-text-secondary)}
+.k-step.vert input[aria-invalid='true']{box-sizing:border-box;border:1px solid var(--fab-danger-border);border-radius:6px;background:var(--fab-danger-soft)}
 .k-pair{display:inline-flex;align-items:center;gap:var(--fab-space-chip)}
 .k-unit{font-size:10px;font-weight:500;color:var(--fab-text-subtle)}
 .k-tog{width:38px;height:22px;border-radius:999px;padding:1px;border:1px solid var(--fab-control-outline);background:var(--fab-surface-soft);background-clip:padding-box;display:flex;align-items:center;cursor:pointer;transition:background 140ms ease}
@@ -1536,6 +1539,22 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <div class="k-step vert" style="width:48px">
           <button><svg class="i"><use href="#i-cu"/></svg></button>
           <input id="spec-step-7" aria-label="Duration in hours" value="4" readonly>
+          <button><svg class="i"><use href="#i-cd"/></svg></button>
+        </div>
+      </div>
+      <div class="unit">
+        <span class="cap">invalid</span>
+        <div class="k-step">
+          <button><svg class="i"><use href="#i-minus"/></svg></button>
+          <input id="spec-step-23" aria-label="Quantity, invalid" aria-invalid="true" value="2" readonly>
+          <button><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+      <div class="unit">
+        <span class="cap">invalid · vertical</span>
+        <div class="k-step vert" style="width:48px">
+          <button><svg class="i"><use href="#i-cu"/></svg></button>
+          <input id="spec-step-24" aria-label="Duration in hours, invalid" aria-invalid="true" value="4" readonly>
           <button><svg class="i"><use href="#i-cd"/></svg></button>
         </div>
       </div>

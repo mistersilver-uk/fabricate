@@ -1184,6 +1184,19 @@ No in-app caller passes either rung: they exist for the published `Stepper`, who
 - **WHEN** a filled stepper sits in a flex row or grid column narrower than its input's own width
 - **THEN** the stepper ends inside the column, its input taking only the room the two buttons leave
 
+### Requirement: A stepper paints its own invalid state
+
+`Stepper` MUST draw its invalid face whenever its input carries `aria-invalid='true'`: its group edge in `--fab-danger-border` on a `--fab-danger-soft` ground at every rung and density.
+A vertical stepper, which draws no group edge, gives that face to its input, at the same size.
+The face persists under `disabled` and beside the focus ring, and the value keeps its `--fab-text` ink.
+No caller restates it.
+
+#### Scenario: A stepper whose value is refused
+
+- **WHEN** a stepper at any rung, density or orientation carries `aria-invalid='true'` on its input
+- **THEN** its group edge, or a vertical stepper's input edge, inks `--fab-danger-border` on `--fab-danger-soft`
+- **AND** its box is the size the valid stepper draws and its value inks `--fab-text`
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
