@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { SvelteMap } from 'svelte/reactivity';
 
 import { flushSync } from '../node_modules/svelte/src/index-client.js';
+import { randomBase36 } from '../src/utils/randomId.js';
 import { createSvelteModuleCompiler } from './helpers/compile-svelte-module.js';
 
 const MODIFIERS_PATH = 'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
@@ -73,14 +74,13 @@ describe('gathering draft and modifier handlers', () => {
   let compiler;
   let createGatheringModifierHandlers;
   let createGatheringDraftHandlers;
-  let randomBase36;
   let createGatheringRouteModel;
   const originalConfirm = globalThis.confirm;
 
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-gathering-handlers-');
     ({ createGatheringModifierHandlers } = await compiler.loadWithClosure(MODIFIERS_PATH));
-    ({ createGatheringDraftHandlers, randomBase36 } = await compiler.load(DRAFTS_PATH));
+    ({ createGatheringDraftHandlers } = await compiler.loadWithClosure(DRAFTS_PATH));
     ({ createGatheringRouteModel } = await compiler.load(ROUTE_MODEL_PATH));
   });
 

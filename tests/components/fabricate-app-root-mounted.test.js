@@ -60,6 +60,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/resultKindGlyphs.js',
     'src/utils/choiceGroupShape.js',
     'src/systems/currencyProfile.js',
+    'src/utils/randomId.js',
     'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.
     'src/ui/presenters/checkDescriptor.js',

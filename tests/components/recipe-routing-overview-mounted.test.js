@@ -31,6 +31,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/draftId.js',
+    'src/utils/randomId.js',
     'src/utils/scalars.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/failureResultPolicy.js',
