@@ -1186,9 +1186,9 @@
           "FailsWhen": "Fails when",
           "Produces": "Produces",
           "InProgress": "In progress: {step}",
+          "InProgressBare": "In progress",
           "StepNamed": "Step {index}, {name}",
-          "StepNumbered": "Step {index}",
-          "NextSession": "Next session"
+          "StepNumbered": "Step {index}"
         },
         "Notify": {
           "CraftFailed": "Something went wrong while crafting. Nothing was consumed.",

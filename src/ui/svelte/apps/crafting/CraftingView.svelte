@@ -153,12 +153,15 @@
   const rollResult = $derived(
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
-  // A workpiece in progress is continued in the Journal, so its start shows no run summary.
+  // An iterative recipe's outcome is the Journal's, so a start never shows a run summary (issue 3011).
   const showRunSummary = $derived(
     Boolean(rollResult) &&
       dismissedRunFor !== selectedRecipe?.id &&
-      !selectedRecipe?.iterative?.workpiece
+      selectedRecipe?.modeToken !== 'iterative'
   );
+  // A crafting run belongs to the crafting actor, which the Journal switches to when it lists another.
+  const openInJournal = (runId) =>
+    services?.navigateToJournalRun?.(runId, services?.getSelectedCraftingActorId?.() || null);
   // A reward the outcome left to pick, until this client settles it in the Journal (issue 1773).
   const awardPending = $derived(
     rollResult?.awardChoicePending === true &&
@@ -302,7 +305,7 @@
           {onChoose}
           {onChooseOption}
           {onCraft}
-          onContinue={(runId) => services?.navigateToJournalRun?.(runId)}
+          onContinue={openInJournal}
           {progressiveStages}
           {canReorderStages}
           {stageAnnouncement}
@@ -326,7 +329,7 @@
             busy={craftInFlight}
             onCraftNext={onCraft}
             onDismiss={onDismissRun}
-            onOpenRun={(runId) => services?.navigateToJournalRun?.(runId)}
+            onOpenRun={openInJournal}
           />
         {:else}
           <ShoppingList

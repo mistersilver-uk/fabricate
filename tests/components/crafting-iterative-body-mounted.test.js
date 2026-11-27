@@ -19,6 +19,8 @@ const harness = createMountedComponentHarness({
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
+  // The player window hosts the Crafting tab, so a roll's origin resolves to it.
+  rootClass: 'fabricate-app',
 });
 
 const GOAL = Object.freeze({
@@ -53,6 +55,12 @@ const iterative = (workpiece = null, overrides = {}) =>
 const missing = { browseStatus: 'missingMaterials', blockingReasons: ['Missing materials'] };
 const facts = (target) => [...target.querySelectorAll('.fabricate-info-strip-fact')];
 const read = (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim();
+/** The workpiece strip's kicker, its nested `key:{json}` stub output unescaped. */
+const kickerOf = (target) =>
+  read(
+    target.querySelector('[data-iterative-workpiece]').querySelector('.fabricate-info-strip-head')
+  ).replaceAll('\\', '');
+const SESSION_NEXT = 'FABRICATE.App.Journal.Iterative.Meta.SessionNext';
 
 describe('IterativeRecipeBody — the Crafting tab faces (issue 3011)', () => {
   before(harness.setup);
@@ -148,8 +156,11 @@ describe('IterativeRecipeBody — the Crafting tab faces (issue 3011)', () => {
     assert.match(read(strip), /Iterative\.InProgress/u);
     assert.deepEqual(
       facts(strip).map((fact) => read(fact)),
-      ['Shape 20', 'Integrity 8', 'FABRICATE.App.Crafting.Iterative.NextSession 4']
+      ['Shape 20', 'Integrity 8', `${SESSION_NEXT}:{"session":4}`]
     );
+    const session = strip.querySelector('[data-iterative-next-session]');
+    assert.ok(!session.querySelector('i'), 'the session fact carries no glyph');
+    assert.ok(!session.querySelector('.fabricate-info-strip-label'), 'and no label');
     assert.ok(!target.querySelector('[data-iterative-goal-strip]'), 'the goal is not repeated');
   });
 
@@ -170,6 +181,113 @@ describe('IterativeRecipeBody — the Crafting tab faces (issue 3011)', () => {
     ]) {
       assert.ok(!target.querySelector(selector), `no ${selector}`);
     }
+  });
+
+  it('names the step by number and name on a multi-step recipe, else by its name alone', async () => {
+    const cases = [
+      [{}, (text) => /StepNamed.*"index":2,"name":"Draw out the edge"/u.test(text)],
+      [
+        { stepCount: 1 },
+        (text) => text.includes('"step":"Draw out the edge"') && !text.includes('StepNamed'),
+      ],
+      [{ stepName: '' }, (text) => /InProgress:.*StepNumbered.*"index":2/u.test(text)],
+      [
+        { stepName: '', stepCount: 1 },
+        (text) => text === 'FABRICATE.App.Crafting.Iterative.InProgressBare',
+      ],
+    ];
+    for (const [overrides, expected] of cases) {
+      const target = await harness.mount({
+        recipe: iterative({ ...WORKPIECE, ...overrides }),
+        craftability: null,
+      });
+      assert.ok(expected(kickerOf(target)), `${JSON.stringify(overrides)}: ${kickerOf(target)}`);
+      harness.remount();
+    }
+  });
+
+  it('draws the goal face with no goal strip when the recipe states no goal', async () => {
+    const target = await harness.mount({
+      recipe: iterative(null, {
+        iterative: { goal: { succeeds: '', fails: '', produces: '' }, workpiece: null },
+      }),
+      craftability: craftability(),
+    });
+    assert.ok(target.querySelector('[data-iterative-face="goal"]'));
+    assert.ok(!target.querySelector('[data-iterative-goal-strip]'));
+  });
+
+  it('draws each visible counter on the workpiece face', async () => {
+    const target = await harness.mount({ recipe: iterative(WORKPIECE), craftability: null });
+    assert.ok(target.querySelector('[data-iterative-face="workpiece"]'));
+    assert.equal(read(target.querySelector('[data-iterative-counter="shape"]')), 'Shape 20');
+  });
+
+  it('reads the live craftability before a workpiece, and draws no roll result', async () => {
+    const target = await harness.mount({
+      recipe: iterative(),
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            componentId: 'c-qzx',
+            name: 'Qzx Bar',
+            img: '',
+            description: '2x Qzx Bar',
+            need: 2,
+            have: 0,
+            satisfied: false,
+          },
+        ],
+      }),
+      rollResult: { success: true, items: [] },
+    });
+    assert.match(read(target.querySelector('[data-recipe-section="io"]')), /Qzx Bar/u);
+    assert.ok(
+      !target.querySelector('[data-recipe-section="roll-result"]'),
+      'the outcome is the Journal’s'
+    );
+  });
+
+  it('keeps Continue idle while a craft is in flight', async () => {
+    const target = await harness.mount({
+      recipe: iterative(WORKPIECE),
+      craftability: null,
+      busy: true,
+    });
+    const [primary] = primaryButtons(target);
+    assert.ok(primary.hasAttribute('data-crafting-continue'));
+    assert.ok(!primary.hasAttribute('aria-busy'));
+    assert.ok(!primary.querySelector('i.fa-spinner'));
+    assert.match(primary.textContent, /ContinueInJournal/u);
+  });
+
+  it('opens the Journal with no roll origin, where Start crafting takes the window', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const seen = [];
+    let target = await harness.mount({
+      recipe: iterative(WORKPIECE),
+      craftability: null,
+      onContinue: () => {
+        seen.push(['continue', activeRollPromptOrigin()]);
+      },
+    });
+    primaryButtons(target)[0].click();
+    harness.remount();
+    target = await harness.mount({
+      recipe: iterative(),
+      craftability: craftability(),
+      onCraft: () => {
+        seen.push(['start', activeRollPromptOrigin()]);
+      },
+    });
+    primaryButtons(target)[0].click();
+    assert.equal(seen.length, 2);
+    assert.deepEqual(seen[0], ['continue', null]);
+    assert.equal(seen[1][0], 'start');
+    assert.ok(seen[1][1] === target, 'a start rolls from the window it was pressed in');
   });
 
   it('omits the next session once the step has ended', async () => {

@@ -140,15 +140,27 @@ describe('CraftingView mounted behavior', () => {
     });
     const target = await harness.mount({
       services: services(store, {
-        navigateToJournalRun: (runId) => {
-          opened.push(runId);
+        getSelectedCraftingActorId: () => 'actor-crafter',
+        navigateToJournalRun: (...args) => {
+          opened.push(args);
         }
       })
     });
     assert.ok(!target.querySelector('[data-crafting-run-summary]'), 'no run summary beside Continue');
     assert.ok(Boolean(target.querySelector('[data-crafting-shopping]')), 'the shopping list stays');
     target.querySelector('[data-crafting-continue]').click();
-    assert.deepEqual(opened, ['run-9']);
+    assert.deepEqual(opened, [['run-9', 'actor-crafter']], 'that run, for the crafting actor');
+  });
+
+  it('3011: an iterative recipe with no workpiece yet shows no run summary or roll result', async () => {
+    const store = fakeCraftingStore({
+      recipes: [recipe({ modeToken: 'iterative', iterative: { goal: {}, workpiece: null } })],
+      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+    });
+    const target = await harness.mount({ services: services(store) });
+    assert.ok(Boolean(target.querySelector('[data-iterative-face="goal"]')));
+    assert.ok(!target.querySelector('[data-crafting-run-summary]'), 'no Craft another beside Start');
+    assert.ok(!target.querySelector('[data-recipe-section="roll-result"]'));
   });
 
   it('1773: an outcome that left a reward to pick names it and opens that run in the Journal', async () => {
