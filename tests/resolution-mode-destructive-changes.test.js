@@ -493,7 +493,7 @@ test('the pass/fail move carries the evaluation, offer and advantage rule both w
   }
 });
 
-test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check config', async () => {
+test('crossing from routedByIngredients into progressive moves no crafting-check config', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
@@ -508,4 +508,153 @@ test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check con
 
   // progressive has no comparable pass/fail slot; the routed slot stays unauthored.
   assert.equal(manager.getSystem('sys-1').craftingCheck.routed.rollFormula, '');
+});
+
+// The crafting-check slot across `iterative`, which rolls `craftingCheck.routed` (D16).
+
+/** A ready manager holding `sys-1` in `resolutionMode` with the given `craftingCheck`. */
+function slotManager(resolutionMode, craftingCheck) {
+  settingsStore.clear();
+  const manager = makeManager(makeRecipeManager([]));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({ id: 'sys-1', name: 'Forge', resolutionMode, craftingCheck })
+  );
+  return manager;
+}
+
+test('routedByIngredients → iterative copies the pass/fail config simple → routed', async () => {
+  const manager = slotManager('routedByIngredients', { simple: { rollFormula: '2d6+1', dc: 11 } });
+  await manager.updateSystem('sys-1', { resolutionMode: 'iterative' });
+  const { routed } = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(routed.rollFormula, '2d6+1');
+  assert.equal(routed.dc, 11);
+});
+
+test('routedByIngredients → iterative does NOT clobber an already-authored routed slot', async () => {
+  const manager = slotManager('routedByIngredients', {
+    simple: { rollFormula: '2d6+1', dc: 11 },
+    routed: { rollFormula: '1d20', dc: 25 },
+  });
+  await manager.updateSystem('sys-1', { resolutionMode: 'iterative' });
+  const { routed } = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(routed.rollFormula, '1d20', 'authored routed check is preserved');
+  assert.equal(routed.dc, 25);
+});
+
+test('iterative → routedByIngredients copies the pass/fail config routed → simple, never clobbering', async () => {
+  const moved = slotManager('iterative', { routed: { rollFormula: '1d20+3', dc: 17 } });
+  await moved.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
+  assert.equal(moved.getSystem('sys-1').craftingCheck.simple.rollFormula, '1d20+3');
+  assert.equal(moved.getSystem('sys-1').craftingCheck.simple.dc, 17);
+
+  const kept = slotManager('iterative', {
+    routed: { rollFormula: '1d20+3', dc: 17 },
+    simple: { rollFormula: '1d8', dc: 6 },
+  });
+  await kept.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
+  assert.equal(kept.getSystem('sys-1').craftingCheck.simple.rollFormula, '1d8');
+});
+
+test('routedByCheck ↔ iterative moves no crafting-check config, both rolling the routed slot', async () => {
+  for (const [from, to] of [
+    ['routedByCheck', 'iterative'],
+    ['iterative', 'routedByCheck'],
+  ]) {
+    const manager = slotManager(from, { routed: { rollFormula: '1d20', dc: 15 } });
+    await manager.updateSystem('sys-1', { resolutionMode: to });
+    const check = manager.getSystem('sys-1').craftingCheck;
+    assert.equal(check.routed.rollFormula, '1d20', `${from} → ${to}`);
+    assert.equal(check.simple.rollFormula, '', `${from} → ${to}`);
+  }
+});
+
+// Round trips into and out of `iterative`: each hop is the real migration through `updateSystem`,
+// with every stored recipe re-read through `Recipe.fromJSON(json).toJSON()`.
+
+const { Recipe } = await import('../src/models/Recipe.js');
+const { buildIterativeAuthoringFixture, ITERATIVE_MULTI_RECIPE_ID } = await import(
+  './helpers/iterativeAuthoringFixture.js'
+);
+
+const modelJSON = (json) => Recipe.fromJSON(structuredClone(json)).toJSON();
+const METADATA = Object.freeze({ created: 1, modified: 1, author: 'GM', version: '1.0.0' });
+
+/** A recipe manager storing every recipe as its model JSON, the way `RecipeManager` persists it. */
+function modelRecipeManager(recipes) {
+  const stored = new Map(recipes.map((recipe) => [recipe.id, modelJSON(recipe)]));
+  const manager = makeRecipeManager([]);
+  return Object.assign(manager, {
+    getRecipes: () => [...stored.values()].map((json) => ({ ...structuredClone(json), toJSON: () => structuredClone(json) })),
+    getRecipe: (id) => stored.get(id) ?? null,
+    async updateRecipe(id, next) {
+      stored.set(id, modelJSON(next));
+    },
+    stored,
+  });
+}
+
+async function roundTrip(system, recipes, modes) {
+  settingsStore.clear();
+  const recipeManager = modelRecipeManager(recipes);
+  const manager = makeManager(recipeManager);
+  manager.systems.set(system.id, manager._normalizeSystem({ ...system, resolutionMode: modes[0] }));
+  for (const mode of modes.slice(1)) await manager.updateSystem(system.id, { resolutionMode: mode });
+  return { manager, stored: recipeManager.stored };
+}
+
+test('routedByCheck → iterative → routedByCheck collapses sets, seeds the line and keeps the rest', async () => {
+  const set = (id, resultGroupId) => ({ id, name: id, resultGroupId, ingredientGroups: [] });
+  const authored = {
+    id: 'r-rt',
+    name: 'Round Trip',
+    craftingSystemId: 'sys-1',
+    metadata: { ...METADATA },
+    steps: [
+      {
+        id: 'st-1',
+        name: 'Rough',
+        ingredientSets: [set('s-1', 'g-hit'), set('s-2', 'g-miss')],
+        outcomeRouting: { success: 'g-hit' },
+        resultGroups: [
+          { id: 'g-hit', name: 'Hit', checkOutcomeIds: ['tier-hit'], results: [] },
+          { id: 'g-miss', name: 'Miss', checkOutcomeIds: ['tier-miss'], results: [] },
+          { id: 'g-fail', name: '', role: 'failure', results: [] },
+        ],
+      },
+      { id: 'st-2', name: 'Finish', ingredientSets: [set('s-3', null)], resultGroups: [{ id: 'g-2', name: 'Done', results: [] }] },
+    ],
+  };
+  const { stored } = await roundTrip({ id: 'sys-1', name: 'Forge' }, [authored], [
+    'routedByCheck',
+    'iterative',
+    'routedByCheck',
+  ]);
+
+  const expected = modelJSON(authored);
+  expected.steps[0].ingredientSets = expected.steps[0].ingredientSets.slice(0, 1);
+  expected.steps[0].resultGroups[2].producedWhen = [{ end: 'failure', rules: [] }];
+  assert.equal(expected.steps[0].resultSelection, null, 'the premise: no selection survives either way');
+  assert.deepEqual(stored.get('r-rt'), expected);
+  assert.deepEqual(stored.get('r-rt').steps[0].resultGroups[0].checkOutcomeIds, ['tier-hit']);
+  assert.equal(stored.get('r-rt').steps[0].ingredientSets[0].resultGroupId, 'g-hit');
+  assert.deepEqual(stored.get('r-rt').steps[0].outcomeRouting, { success: 'g-hit' });
+});
+
+test('iterative → routedByCheck → iterative keeps every iterative key and seeds only a bare failure group', async () => {
+  const fixture = buildIterativeAuthoringFixture();
+  const shield = structuredClone(fixture.recipes.find((recipe) => recipe.id === ITERATIVE_MULTI_RECIPE_ID));
+  delete shield.steps[1].resultGroups[1].producedWhen;
+  shield.metadata = { ...METADATA };
+  const { manager, stored } = await roundTrip(fixture.system, [shield], [
+    'iterative',
+    'routedByCheck',
+    'iterative',
+  ]);
+
+  const expected = modelJSON(shield);
+  expected.steps[1].resultGroups[1].producedWhen = [{ end: 'failure', rules: [] }];
+  assert.deepEqual(stored.get(ITERATIVE_MULTI_RECIPE_ID), expected);
+  assert.deepEqual(manager.getSystem(fixture.system.id).iterative, manager._normalizeSystem(fixture.system).iterative);
+  assert.ok(manager.getSystem(fixture.system.id).iterative.counters.length > 0, 'the premise: a library');
 });

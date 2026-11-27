@@ -78,18 +78,19 @@ function projectRecipe(recipe, system) {
     resultGroups: asArray(raw.resultGroups),
     resultSelection: raw.resultSelection || null,
     toolIds: asArray(raw.toolIds),
-    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode === 'progressive'),
+    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode),
     structureKey: raw.structureKey,
   };
 }
 
 /**
- * A persistable but uncraftable shell, per the model's `validate()` and `validateStructure()` when
- * present, else a count-only fallback (the admin store's `_isRecipeIncomplete`).
+ * A persistable but uncraftable shell under `mode`, per the model's `validate()` and
+ * `validateStructure()` when present, else a count-only fallback (the admin store's
+ * `_isRecipeIncomplete`).
  */
-function isRecipeIncomplete(recipe, raw, progressive) {
+export function isRecipeIncomplete(recipe, raw, mode) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine(), progressive };
+    const injected = { Roll: diceEngine(), progressive: mode === 'progressive' };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
