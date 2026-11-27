@@ -200,6 +200,25 @@ describe('a change across iterative with active runs', () => {
   });
 });
 
+describe('a change into iterative from every other mode', () => {
+  for (const fromMode of [
+    'simple',
+    'routedByIngredients',
+    'routedByCheck',
+    'progressive',
+    'alchemy',
+  ]) {
+    it(`is refused from ${fromMode} with a run active`, async () => {
+      const { manager } = managerWith(fromMode);
+      await runManager.createRun(actors[0], recipeFor('sys-1'));
+      await assert.rejects(manager.updateSystem('sys-1', { resolutionMode: 'iterative' }), {
+        reason: 'modeChangeRunsActive',
+      });
+      assert.equal(manager.saves, 0);
+    });
+  }
+});
+
 describe('a mode change the run check lets through', () => {
   const passes = async (fromMode, toMode, systemId = 'sys-1') => {
     const { manager } = managerWith(fromMode);
@@ -230,7 +249,7 @@ describe('a mode change the run check lets through', () => {
   });
 
   for (const [direction, [fromMode, toMode]] of Object.entries(DIRECTIONS)) {
-    it(`cancels the pre-flip run ${direction}, then passes the same change`, async () => {
+    it(`after a cancel, the same change passes ${direction}`, async () => {
       const { manager } = managerWith(fromMode);
       const run = await runManager.createRun(actors[0], recipeFor('sys-1'));
       await assert.rejects(manager.updateSystem('sys-1', { resolutionMode: toMode }), {
@@ -241,7 +260,57 @@ describe('a mode change the run check lets through', () => {
       const saved = await manager.updateSystem('sys-1', { resolutionMode: toMode });
       assert.equal(saved.resolutionMode, toMode);
     });
+
+    it(`a run the check did not count stays cancellable after the flip ${direction}`, async () => {
+      const { manager } = managerWith(fromMode);
+      const run = await runManager.createRun(actors[0], recipeFor('sys-1'));
+      // The guard misses the run, as it misses a start still in flight at Save.
+      game.actors = [];
+      const saved = await manager.updateSystem('sys-1', { resolutionMode: toMode });
+      assert.equal(saved.resolutionMode, toMode);
+      game.actors = actors;
+      assert.equal((await runManager.cancelRun(actors[0], run.id)).status, 'cancelled');
+      assert.equal(activeSystemRunCount(runManager, actors, 'sys-1'), 0);
+    });
   }
+
+  it('counts only the runs of the system being changed', async () => {
+    await runManager.createRun(actors[0], recipeFor('sys-1'));
+    await passes('routedByCheck', 'iterative', 'sys-2');
+    await runManager.createRun(actors[1], recipeFor('sys-2', 'r-2'));
+    const { manager } = managerWith('simple');
+    await assert.rejects(manager.updateSystem('sys-2', { resolutionMode: 'iterative' }), {
+      reason: 'modeChangeRunsActive',
+      count: 1,
+    });
+  });
+
+  it('does not count a run on an actor outside the world actors', async () => {
+    await runManager.createRun(new FakeActor('outsider'), recipeFor('sys-1'));
+    await passes('routedByCheck', 'iterative');
+  });
+
+  it('counts 0 when game.actors is undefined', async () => {
+    await runManager.createRun(actors[0], recipeFor('sys-1'));
+    game.actors = undefined;
+    await passes('routedByCheck', 'iterative');
+    assert.equal(activeSystemRunCount(runManager, undefined, 'sys-1'), 0);
+  });
+
+  it('reads no run manager on an update that keeps the mode', async () => {
+    const { manager } = managerWith('routedByCheck');
+    let reads = 0;
+    manager._getCraftingRunManager = () => {
+      reads += 1;
+      return runManager;
+    };
+    // `beforeEach` restores both; a mode-keeping update reaches neither.
+    delete game.fabricate;
+    delete game.actors;
+    const saved = await manager.updateSystem('sys-1', { name: 'Renamed' });
+    assert.equal(saved.name, 'Renamed');
+    assert.equal(reads, 0);
+  });
 
   it('counts 0 with no run manager', async () => {
     game.fabricate = {};
@@ -335,6 +404,28 @@ describe('an overwrite import across iterative while a run is active', () => {
     assert.equal(manager.getSystem('sys-1').resolutionMode, 'routedByCheck');
     assert.equal(recipeManager.calls.createRecipe, 0);
     assert.equal(reporter.dismissed, 1);
+  });
+
+  it('refuses the out direction, and a pack system matched by name under another id', async () => {
+    const cases = [
+      ['iterative', payload('routedByCheck')],
+      [
+        'routedByCheck',
+        { ...payload('iterative'), system: { ...payload('iterative').system, id: 'sys-pack' } },
+      ],
+    ];
+    for (const [mode, data] of cases) {
+      const { manager, recipeManager, importer } = importerHarness(mode);
+      runManager = countingRunManager();
+      await runManager.createRun(actors[0], recipeFor('sys-1'));
+      await assert.rejects(importer.importFromPackData(data, { overwriteExisting: true }), {
+        reason: 'modeChangeRunsActive',
+        direction: mode === 'iterative' ? 'out' : 'into',
+      });
+      assert.equal(manager.saves, 0, mode);
+      assert.equal(manager.getSystem('sys-1').resolutionMode, mode);
+      assert.equal(recipeManager.calls.createRecipe, 0, mode);
+    }
   });
 
   it('a mode-keeping overwrite succeeds beside the same run', async () => {

@@ -336,8 +336,9 @@ test('a non-alchemy mode change does not run signature reconciliation', async ()
 });
 
 // Crafting-check slot movement across the routedByIngredients boundary (issue 532)
-// CraftingSystemManager._reconcileCraftingCheckSlotsForModeChange, run in updateSystem after
-// normalization and before the first persist, keyed on the resolution-mode change.
+// `reconcileCraftingCheckSlots` in `src/systems/manager/resolutionModeChange.js`, run by
+// `prepareModeChange` in updateSystem after normalization and before the first persist, keyed on
+// the resolution-mode change.
 
 test('switching routedByCheck → routedByIngredients copies the pass/fail config routed → simple', async () => {
   settingsStore.clear();
@@ -684,6 +685,20 @@ test('a change into alchemy with Multi-step on persists it off in the same save,
 
   await manager.updateSystem('sys-1', { resolutionMode: 'simple' });
   assert.equal(manager.getSystem('sys-1').features.multiStepRecipes, false, 'leaving alchemy leaves it off');
+});
+
+test('the clamp turns Multi-step off in alchemy only, over every mode, alias and unknown token', async () => {
+  const { RESOLUTION_MODES } = await import('../src/systems/resolutionModeAvailability.js');
+  const manager = makeManager(makeRecipeManager([]));
+  const tokens = [...RESOLUTION_MODES, 'cauldron', 'mapped', 'routed', 'tiered', 'bogus', undefined];
+  for (const resolutionMode of tokens) {
+    for (const features of [{ multiStepRecipes: true }, { complexRecipes: true }]) {
+      const normalized = manager._normalizeSystem({ id: 'sys-c', name: 'Clamp', resolutionMode, features });
+      const label = `${resolutionMode} ${Object.keys(features)[0]}`;
+      assert.equal(normalized.features.multiStepRecipes, normalized.resolutionMode !== 'alchemy', label);
+      assert.deepEqual(manager._normalizeSystem(normalized).features, normalized.features, `${label} re-normalized`);
+    }
+  }
 });
 
 test('createSystem in alchemy (or its cauldron alias) with Multi-step on persists it off', async () => {

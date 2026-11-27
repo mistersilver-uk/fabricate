@@ -112,6 +112,7 @@ describe('the importer', () => {
         error.message,
         "This export's iterative settings were made by a newer version of Fabricate."
       );
+      assert.ok(!error.message.includes(error.reason), 'the message never shows the reason code');
       return true;
     });
     assert.deepEqual(writes, []);

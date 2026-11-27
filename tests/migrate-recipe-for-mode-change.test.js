@@ -739,6 +739,26 @@ for (const from of MODES) {
   }
 }
 
+// One `reasons` literal per matrix row, so a swapped or reworded reason fails.
+const ROW_REASONS = [
+  ['simple', 'routedByCheck', 'oneByOne', ['no resultSelection to clear for routedByCheck mode', 'routing data must be re-authored for routedByCheck']],
+  ['routedByIngredients', 'routedByCheck', 'oneByOne', ['carried into routedByCheck; routing data must be re-authored for the new basis']],
+  ['routedByCheck', 'iterative', 'flatMultiSet', ['collapsed multiple ingredient sets to the first set for iterative mode']],
+  ['progressive', 'alchemy', 'stepTwoSets', ['multi-step recipe cannot be migrated into alchemy mode']],
+  ['alchemy', 'progressive', 'flatFailure', ['dropped the failure result set for progressive mode']],
+  ['iterative', 'routedByIngredients', 'oneByOne', ['carried into routedByIngredients; routing data must be re-authored for the new basis']],
+];
+
+for (const [from, to, name, reasons] of ROW_REASONS) {
+  test(`matrix row ${from} gives its literal reasons (${name} → ${to})`, () => {
+    assert.deepEqual(migrateRecipeForModeChange(MATRIX_FIXTURES[name](), from, to, SYSTEM_NO_CHECK).reasons, reasons);
+  });
+}
+
+test('a non-object recipe is carried', () => {
+  assert.deepEqual(migrateRecipeForModeChange(null, 'simple', 'iterative'), { outcome: 'carry', recipe: null, reasons: [] });
+});
+
 test('migrating into iterative is idempotent and deletes nothing from any source', () => {
   const sources = MODES.filter((mode) => mode !== 'iterative');
   const cases = sources.flatMap((from) => Object.values(MATRIX_FIXTURES).map((make) => [from, make]));
@@ -841,6 +861,7 @@ test('summarizeModeChange flags multiStepOff only into alchemy with Multi-step o
   assert.equal(summarizeModeChange([], 'simple', 'alchemy', off).multiStepOff, false);
   assert.equal(summarizeModeChange([], 'simple', 'routedByCheck', on).multiStepOff, false);
   assert.equal(summarizeModeChange([], 'simple', 'iterative', on).multiStepOff, false);
+  assert.equal(summarizeModeChange([], 'alchemy', 'alchemy', on).multiStepOff, false, 'no change, no flag');
 });
 
 const OUT_TARGETS = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
@@ -867,6 +888,9 @@ test('incompleteAfter counts the survivors the target mode leaves incomplete', (
     assert.equal(count(emptyShell(), to), 1, `the empty shell is counted out to ${to}`);
   }
   assert.equal(summarizeModeChange([chainLink()], 'routedByCheck', 'simple', system).incompleteAfter, 0);
+  for (const [from, to] of [['routedByCheck', 'iterative'], ['routedByCheck', 'routedByIngredients']]) {
+    assert.equal(summarizeModeChange([emptyShell()], from, to, system).incompleteAfter, 0, `${from} → ${to}`);
+  }
 });
 
 test("incompleteAfter equals the row projection's incomplete over the same migrated recipes", () => {
@@ -886,4 +910,52 @@ test("incompleteAfter equals the row projection's incomplete over the same migra
       to
     );
   }
+});
+
+test('summarizeModeChange from iterative to iterative counts nothing', () => {
+  const summary = summarizeModeChange([MATRIX_FIXTURES.tierLinks(), emptyShell()], 'iterative', 'iterative', iterativeSystem());
+  assert.equal(summary.inertTierLinks, 0);
+  assert.equal(summary.needsSetup, 0);
+  assert.equal(summary.incompleteAfter, 0);
+  assert.deepEqual(summary.inertLibrary, { counters: 0, actions: 0 });
+  assert.equal(summary.migrated, 2);
+});
+
+test('summarizeModeChange counts the inert counters and actions apart', () => {
+  const iterative = { counters: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }], actions: [{ id: 'a1' }] };
+  assert.deepEqual(summarizeModeChange([], 'iterative', 'simple', { iterative }).inertLibrary, { counters: 3, actions: 1 });
+});
+
+test('summarizeModeChange lists every dropped set of every scope, in step order', () => {
+  const three = (prefix) => [1, 2, 3].map((n) => ({ id: `${prefix}${n}`, name: `${prefix}${n}` }));
+  const recipe = {
+    id: 'multi',
+    name: 'Multi',
+    ingredientSets: three('f'),
+    steps: [
+      { id: 'st-1', ingredientSets: [{ id: 'a1', name: 'a1' }] },
+      { id: 'st-2', ingredientSets: three('b') },
+    ],
+  };
+  assert.deepEqual(summarizeModeChange([recipe], 'routedByCheck', 'iterative').droppedIngredientSets, [
+    { recipe: 'Multi', step: null, sets: [{ name: 'f2', index: 1 }, { name: 'f3', index: 2 }] },
+    { recipe: 'Multi', step: 1, sets: [{ name: 'b2', index: 1 }, { name: 'b3', index: 2 }] },
+  ]);
+});
+
+test('incompleteAfter judges a survivor under the target mode, progressive included', async () => {
+  const { seededRollClass, withRoll } = await import('./helpers/seededRoll.js');
+  const shell = () => ({
+    id: 'r-prog',
+    name: 'Prog',
+    craftingSystemId: 'sys-1',
+    metadata: { version: '1.0.0' },
+    ingredientSets: [],
+    resultGroups: [{ id: 'g', results: [{ id: 'res', componentId: 'item-A', quantityFormula: 'max(, 2)' }] }],
+  });
+  await withRoll(seededRollClass({ unparsable: ['max(, 2)'] }).Roll, () => {
+    const count = (to) => summarizeModeChange([shell()], 'iterative', to, {}).incompleteAfter;
+    assert.equal(count('progressive'), 1, 'progressive reads no formula, so only the missing set shows');
+    assert.equal(count('routedByCheck'), 0, 'elsewhere the unparsable formula makes the structure invalid');
+  });
 });
